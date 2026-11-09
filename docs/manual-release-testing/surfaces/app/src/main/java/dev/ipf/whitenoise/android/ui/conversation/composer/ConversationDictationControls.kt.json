@@ -55,14 +55,6 @@
         ]
       },
       {
-        "surface": "ConversationDictationListeningIndicator",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "fun ConversationDictationListeningIndicator(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "ConversationDictationPersistentControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "fun ConversationDictationPersistentControl(",
@@ -243,7 +235,7 @@
       {
         "surface": "Saved recovery and background tail Retry do not render completion controls",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
-        "anchor": "state.requiresCompletionControls(controller.recoveryHandedToComposer)",
+        "anchor": "state.requiresCompletionControls(facts.recoveryHandedToComposer)",
         "test_ids": [
           "DIC-002"
         ]

@@ -653,6 +653,11 @@ internal fun FullScreenMediaViewer(
             onClosed = onDismiss,
             selectedSourceEpoch = currentReference.sourceEpoch,
             attachmentAspectRatio = aspectRatioFromDim(currentReference.dim),
+            fallbackCloseAllowed =
+                mediaViewerPlatformMotionAllowed(
+                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    android.os.Build.VERSION.SDK_INT,
+                ),
         ) { motionBodyModifier ->
             MediaViewerFrame(
                 senderLabel = appState.displayName(currentPage.sender),

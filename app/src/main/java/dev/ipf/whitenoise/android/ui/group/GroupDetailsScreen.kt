@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,6 +68,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -115,6 +117,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
@@ -122,6 +125,9 @@ import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
+import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
+import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
@@ -1398,18 +1404,31 @@ internal fun GroupDetailsScreen(
                                 )
                             }
                         }
-                        if (memberSearchOpen) {
-                            FlowSearchField(
-                                value = memberQuery,
-                                onValueChange = { memberQuery = it },
-                                placeholder = stringResource(R.string.search_members),
-                                clipboardInput = GroupMemberIdentitySearch::clipboardInput,
-                                modifier =
-                                    Modifier
-                                        .testTag("chat_info.member_search")
-                                        .padding(horizontal = Dimens.spaceLg)
-                                        .padding(bottom = Dimens.spaceSm),
-                            )
+                        val memberSearchCollapse = rememberSearchCollapse(memberSearchOpen)
+                        if (memberSearchOpen || memberSearchCollapse.closing) {
+                            // The slot keeps its height while the closed field shrinks into the icon.
+                            Box(Modifier.fillMaxWidth().searchCollapseHost(memberSearchCollapse)) {
+                                if (memberSearchOpen) {
+                                    CompositionLocalProvider(LocalSearchCollapse provides memberSearchCollapse) {
+                                        FlowSearchField(
+                                            value = memberQuery,
+                                            onValueChange = { memberQuery = it },
+                                            placeholder = stringResource(R.string.search_members),
+                                            clipboardInput = GroupMemberIdentitySearch::clipboardInput,
+                                            modifier =
+                                                Modifier
+                                                    .testTag("chat_info.member_search")
+                                                    .padding(horizontal = Dimens.spaceLg)
+                                                    .padding(bottom = Dimens.spaceSm)
+                                                    .searchExpandReveal(memberQuery),
+                                        )
+                                    }
+                                } else {
+                                    val heightDp =
+                                        with(LocalDensity.current) { memberSearchCollapse.hostHeightPx.toDp() }
+                                    Spacer(Modifier.fillMaxWidth().height(heightDp))
+                                }
+                            }
                         }
                         // #612: render members in a deterministic order — you first,
                         // then other admins alpha by display name, then non-admins

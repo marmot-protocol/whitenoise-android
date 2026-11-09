@@ -1,17 +1,21 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -19,6 +23,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 internal const val SETTINGS_ROUTE_MOTION_MILLIS = 200
 
@@ -41,7 +46,9 @@ private class SettingsMotionHistory<T>(
 
 /**
  * Slide the opaque destination's draw layer. The old route is disposed immediately: it cannot keep
- * Back handlers, editable state, focus, or protected pixels alive during an exit animation. Keeping
+ * Back handlers, editable state, focus, or protected pixels alive during an exit animation. The
+ * only exception is closing top-level Settings, which briefly draws an inert picture of its last
+ * frame (see [settingsBubbleMotion]); Chats is never captured. Keeping
  * the content call outside a route key preserves the existing screen/state ownership semantics.
  * First composition (including a direct privacy-sensitive route) is settled, never a delayed reveal.
  */
@@ -54,15 +61,49 @@ internal fun <T> SettingsRouteMotion(
     suppressMotion: Boolean = false,
     contentVisible: Boolean = true,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
+    topLevelBubble: Boolean = false,
+    cardMorph: Boolean = false,
     content: @Composable (T) -> Unit,
 ) {
     if (!contentVisible) return
+    val morph = if (cardMorph) remember(ownerKey) { SettingsCardMorph() } else null
+    val motion = animationsEnabled && !suppressMotion
+    // Runs while the new route composes, before the old route's cards have reported their removal.
+    val morphing = morph != null && remember(ownerKey, target) { morph.begin(motion) }
+    val morphProgress = remember(ownerKey, target) { Animatable(if (morphing) 0f else 1f) }
+    morph?.time = { morphProgress.value }
+    LaunchedEffect(morphProgress) {
+        // Linear time: the bubbles ease their geometry and the page fades on its own schedule.
+        morphProgress.animateTo(1f, tween(SETTINGS_CARD_MORPH_MILLIS, easing = LinearEasing))
+        morph?.finish()
+    }
+    val morphHost =
+        if (morph != null) {
+            Modifier.settingsCardMorphHost(
+                morph,
+                backplate = MaterialTheme.colorScheme.surfaceContainerLow,
+                fill = MaterialTheme.colorScheme.surfaceContainerLowest,
+                outline = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outline else Color.Unspecified,
+            )
+        } else {
+            Modifier
+        }
     Box(
-        Modifier.fillMaxSize().then(
-            rememberRouteMotionModifier(target, depth, ownerKey, suppressMotion, animationsEnabled),
+        Modifier.fillMaxSize().then(morphHost).then(
+            // Matched cards carry the transition; the page slide would fight their movement.
+            rememberRouteMotionModifier(
+                target = target,
+                depth = depth,
+                ownerKey = ownerKey,
+                suppressMotion = suppressMotion || morphing,
+                animationsEnabled = animationsEnabled,
+                topLevelBubble = topLevelBubble,
+            ),
         ),
     ) {
-        content(target)
+        CompositionLocalProvider(LocalSettingsCardMorph provides morph) {
+            content(target)
+        }
     }
 }
 
@@ -74,11 +115,14 @@ internal fun <T> rememberRouteMotionModifier(
     ownerKey: Any?,
     suppressMotion: Boolean = false,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
+    topLevelBubble: Boolean = false,
 ): Modifier {
     val history = remember(ownerKey) { SettingsMotionHistory(target, depth) }
+    val snapshot = remember(ownerKey) { SettingsCardSnapshot() }
     val layoutDirection = LocalLayoutDirection.current
-    val logicalDirection =
-        remember(ownerKey, target) { settingsRouteDirection(history.depth, depth) }
+    val previousDepth = remember(ownerKey, target) { history.depth }
+    val logicalDirection = settingsRouteDirection(previousDepth, depth)
+    val bubble = topLevelBubble && usesSettingsBubble(previousDepth, depth)
     val direction = if (layoutDirection == LayoutDirection.Rtl) -logicalDirection else logicalDirection
     val motion = animationsEnabled && !suppressMotion
     val progress = remember(ownerKey, target, motion) { Animatable(if (motion && history.target != target) 0f else 1f) }
@@ -87,21 +131,77 @@ internal fun <T> rememberRouteMotionModifier(
         history.depth = depth
     }
     LaunchedEffect(progress) {
-        if (motion) {
-            progress.animateTo(1f, tween(SETTINGS_ROUTE_MOTION_MILLIS, easing = FastOutSlowInEasing))
-        } else {
-            progress.snapTo(1f)
-        }
+        runRouteMotion(progress, motion, bubble, opening = logicalDirection > 0)
+        // A kept Settings frame is only valid while top-level Settings stays shown.
+        if (depth != 1) snapshot.picture = null
     }
     val travel = with(LocalDensity.current) { 48.dp.toPx() }
     // Draw the themed backplate outside the translated child layer. Moving a whole opaque page
     // otherwise exposes the Activity window behind its vacated edge, including in AMOLED mode.
     val backplate = MaterialTheme.colorScheme.background
-    return Modifier
-        .drawBehind {
-            if (motion && progress.value < 1f) drawRect(backplate)
-        }.graphicsLayer {
-            val remaining = if (motion) 1f - progress.value else 0f
-            translationX = direction * travel * remaining
+    if (bubble) {
+        return Modifier.settingsBubbleMotion(
+            opening = logicalDirection > 0,
+            progress = { progress.value },
+            animating = { motion && progress.value < 1f },
+            backplate = backplate,
+            snapshot = snapshot.takeIf { motion },
+        )
+    }
+    val recorder =
+        if (topLevelBubble && depth == 1 && motion) {
+            Modifier.recordSettingsCard(snapshot) { progress.value >= 1f }
+        } else {
+            Modifier
         }
+    return recorder.settingsSlide(motion, { progress.value }, backplate, direction * travel)
 }
+
+private suspend fun runRouteMotion(
+    progress: Animatable<Float, *>,
+    motion: Boolean,
+    bubble: Boolean,
+    opening: Boolean,
+) {
+    if (motion) {
+        val millis = settingsRouteMotionMillis(bubble, opening)
+        progress.animateTo(1f, tween(millis, easing = settingsRouteMotionEasing(bubble, opening)))
+    } else {
+        progress.snapTo(1f)
+    }
+}
+
+/** Slides the page in from [travel] px while a themed backplate covers the vacated edge. */
+private fun Modifier.settingsSlide(
+    motion: Boolean,
+    progress: () -> Float,
+    backplate: Color,
+    travel: Float,
+): Modifier =
+    drawBehind {
+        if (motion && progress() < 1f) drawRect(backplate)
+    }.graphicsLayer {
+        val remaining = if (motion) 1f - progress() else 0f
+        translationX = travel * remaining
+    }
+
+private fun settingsRouteMotionEasing(
+    bubble: Boolean,
+    opening: Boolean,
+): Easing =
+    when {
+        !bubble -> FastOutSlowInEasing
+        opening -> SettingsBubbleOpenEasing
+        else -> SettingsBubbleCloseEasing
+    }
+
+/** Top-level Settings uses the bubble timing; nested routes keep the shared slide duration. */
+private fun settingsRouteMotionMillis(
+    bubble: Boolean,
+    opening: Boolean,
+): Int =
+    when {
+        !bubble -> SETTINGS_ROUTE_MOTION_MILLIS
+        opening -> SETTINGS_BUBBLE_OPEN_MILLIS
+        else -> SETTINGS_BUBBLE_CLOSE_MILLIS
+    }

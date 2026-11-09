@@ -15,6 +15,7 @@ import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 
 @Suppress("FunctionNaming")
 @Composable
@@ -30,7 +31,12 @@ internal fun SettingsSearchField(
         placeholder = stringResource(R.string.settings_search),
         clearDescription = stringResource(R.string.clear_search),
         outlined = true,
-        modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("settings.search.field"),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .searchExpandReveal(query)
+                .focusRequester(focus)
+                .testTag("settings.search.field"),
     )
 }
 

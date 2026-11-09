@@ -4,13 +4,9 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.content.Intent
 import android.provider.Settings
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,8 +31,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -63,25 +57,43 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.settleControlMorph
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
-import kotlin.math.PI
-import kotlin.math.sin
 
 internal const val COMPOSER_DICTATION_STRIP_TAG = "composer-dictation-strip"
 internal const val COMPOSER_DICTATION_COMPACT_ACTIONS_TAG = "composer-dictation-compact-actions"
 internal const val APP_DICTATION_CONTROL_TAG = "app-dictation-control"
 internal const val DICTATION_LISTENING_INDICATOR_TAG = "dictation-listening-indicator"
 internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
-private const val DICTATION_LISTENING_BAR_COUNT = 3
-private const val DICTATION_LISTENING_BAR_MIN_HEIGHT_DP = 6f
-private const val DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP = 8f
 
 /** A compact 24dp listening pulse followed by three adjacent compact commands. */
 internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 132.dp
-private val DICTATION_PROCESSING_ACTIONS_WIDTH = 108.dp
+internal const val DICTATION_ACTIONS_RESIZE_MILLIS = 200
+
+/**
+ * Controller facts the dictation commands paint from. The floating capsule's exit freezes them
+ * with its state, so the closing capsule cannot restyle or resize while it shrinks away.
+ */
+internal data class DictationControlFacts(
+    val captureInProgress: Boolean,
+    val deliveryInProgress: Boolean,
+    val completionActionsEnabled: Boolean,
+    val processingDeliveryMode: ConversationDictationDeliveryMode?,
+    val recoveryHandedToComposer: Boolean,
+)
+
+internal val ConversationDictationController.controlFacts: DictationControlFacts
+    get() =
+        DictationControlFacts(
+            captureInProgress = captureInProgress,
+            deliveryInProgress = deliveryInProgress,
+            completionActionsEnabled = completionActionsEnabled,
+            processingDeliveryMode = processingDeliveryMode,
+            recoveryHandedToComposer = recoveryHandedToComposer,
+        )
 
 /** Floating app-root control used while the immutable dictation origin is not visible. */
 @Composable
@@ -89,17 +101,18 @@ internal fun ConversationDictationPersistentControl(
     state: ConversationDictationState,
     controller: ConversationDictationController,
     modifier: Modifier = Modifier,
+    facts: DictationControlFacts = controller.controlFacts,
     embedded: Boolean = false,
     chromeVisibility: () -> Float = { if (embedded) 0f else 1f },
     movingChromeSize: () -> Size? = { null },
     actionColors: AccountActionColors = accountActionColors(appState = null),
 ) {
-    if (!state.requiresCompletionControls(controller.recoveryHandedToComposer)) return
+    if (!state.requiresCompletionControls(facts.recoveryHandedToComposer)) return
     val status =
-        if (controller.deliveryInProgress) {
+        if (facts.deliveryInProgress) {
             stringResource(R.string.message_status_pending)
         } else {
-            dictationStatusLabel(state, controller.captureInProgress)
+            dictationStatusLabel(state, facts.captureInProgress)
         }
     val fill = MaterialTheme.colorScheme.surfaceContainerHigh
     val border = MaterialTheme.colorScheme.outlineVariant
@@ -132,6 +145,7 @@ internal fun ConversationDictationPersistentControl(
                     ConversationDictationCompactActions(
                         state = state,
                         controller = controller,
+                        facts = facts,
                         actionColors = actionColors,
                     )
                 }
@@ -148,20 +162,28 @@ internal fun ConversationDictationCompactActions(
     state: ConversationDictationState,
     controller: ConversationDictationController,
     modifier: Modifier = Modifier,
+    facts: DictationControlFacts = controller.controlFacts,
     actionColors: AccountActionColors = accountActionColors(appState = null),
 ) {
-    if (!state.requiresCompletionControls(controller.recoveryHandedToComposer)) return
+    if (!state.requiresCompletionControls(facts.recoveryHandedToComposer)) return
     val status =
-        if (controller.deliveryInProgress) {
+        if (facts.deliveryInProgress) {
             stringResource(R.string.message_status_pending)
         } else {
-            dictationStatusLabel(state, controller.captureInProgress)
+            dictationStatusLabel(state, facts.captureInProgress)
         }
 
+    // Only recovery changes the command set; ease that edge instead of snapping it.
+    val motion = rememberSystemAnimationsEnabled()
+    val width by animateDpAsState(
+        targetValue = state.compactActionsWidth,
+        animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
+        label = "dictation actions width",
+    )
     Box(
         modifier =
             modifier
-                .width(state.compactActionsWidth(controller.captureInProgress))
+                .width(width)
                 .testTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
@@ -174,7 +196,7 @@ internal fun ConversationDictationCompactActions(
             horizontalArrangement = Arrangement.End,
         ) {
             if (state.hasActiveRecognitionActions) {
-                ConversationDictationActiveActions(controller, actionColors)
+                ConversationDictationActiveActions(controller, facts, actionColors)
             } else {
                 ConversationDictationPrimaryAction(
                     state = state,
@@ -227,16 +249,12 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
-/** Reserves either the listening pulse or processing-only action width without shifting controls. */
-internal fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
-    when (this) {
-        is ConversationDictationState.Starting,
-        is ConversationDictationState.Listening,
-        is ConversationDictationState.Processing,
-        -> if (captureInProgress) DICTATION_ACTIVE_ACTIONS_WIDTH else DICTATION_PROCESSING_ACTIONS_WIDTH
-        is ConversationDictationState.Failed -> 96.dp
-        else -> 96.dp
-    }
+/**
+ * Keeps the listening pulse's width through processing: Paste or Send only fades the pulse, so the
+ * capsule holds still until its single exit instead of narrowing first.
+ */
+private val ConversationDictationState.compactActionsWidth
+    get() = if (hasActiveRecognitionActions) DICTATION_ACTIVE_ACTIONS_WIDTH else 96.dp
 
 /**
  * Keeps all three explicit outcomes visible for the lifetime of app-owned recognition.
@@ -244,24 +262,23 @@ internal fun ConversationDictationState.compactActionsWidth(captureInProgress: B
 @Composable
 private fun ConversationDictationActiveActions(
     controller: ConversationDictationController,
+    facts: DictationControlFacts,
     actionColors: AccountActionColors,
 ) {
     val sendLabel = stringResource(R.string.send)
-    if (controller.captureInProgress) {
-        ConversationDictationListeningIndicator()
-    }
+    ConversationDictationListeningSlot(facts.captureInProgress)
     IconButton(
         onClick = settleControlMorph(controller::cancel),
-        enabled = !controller.deliveryInProgress,
+        enabled = !facts.deliveryInProgress,
         modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
     ) {
         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
     }
-    ConversationDictationPasteAction(controller)
-    if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+    ConversationDictationPasteAction(controller, facts)
+    if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
         IconButton(
             onClick = settleControlMorph(controller::send),
-            enabled = controller.completionActionsEnabled,
+            enabled = facts.completionActionsEnabled,
             modifier =
                 Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget).semantics {
                     contentDescription = sendLabel
@@ -287,7 +304,7 @@ private fun ConversationDictationActiveActions(
             contentColor = actionColors.content,
             description = sendLabel,
             icon = R.drawable.ic_arrow_upward,
-            enabled = controller.completionActionsEnabled,
+            enabled = facts.completionActionsEnabled,
             modifier = Modifier.semantics { selected = false },
             // Keep commands adjacent while retaining Material minimum touch expansion.
             width = ComposerShortcutPitch,
@@ -297,21 +314,24 @@ private fun ConversationDictationActiveActions(
 
 /** Pastes the owned transcript and shows progress while that completion action is processing. */
 @Composable
-private fun ConversationDictationPasteAction(controller: ConversationDictationController) {
+private fun ConversationDictationPasteAction(
+    controller: ConversationDictationController,
+    facts: DictationControlFacts,
+) {
     val pasteLabel = stringResource(R.string.paste_dictation_transcript)
     IconButton(
         onClick = settleControlMorph(controller::paste),
-        enabled = controller.completionActionsEnabled,
+        enabled = facts.completionActionsEnabled,
         modifier =
             Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget).semantics {
                 contentDescription = pasteLabel
-                selected = controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
-                if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+                selected = facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
+                if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
                     progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
                 }
             },
     ) {
-        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+        if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
             CircularProgressIndicator(
                 modifier =
                     Modifier
@@ -322,56 +342,6 @@ private fun ConversationDictationPasteAction(controller: ConversationDictationCo
             )
         } else {
             Icon(Icons.Default.ContentPaste, contentDescription = null)
-        }
-    }
-}
-
-/** Three animated bars distinguish live capture from circular action processing. */
-@Composable
-private fun ConversationDictationListeningIndicator() {
-    val transition = rememberInfiniteTransition(label = "dictation listening")
-    val phase by
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(durationMillis = 900, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-            label = "dictation listening phase",
-        )
-    val barColor = MaterialTheme.colorScheme.primary
-    Canvas(
-        modifier =
-            Modifier
-                .size(24.dp)
-                .testTag(DICTATION_LISTENING_INDICATOR_TAG),
-    ) {
-        val barWidth = 3.dp.toPx()
-        val barSpacing = 2.dp.toPx()
-        val totalWidth =
-            barWidth * DICTATION_LISTENING_BAR_COUNT +
-                barSpacing * (DICTATION_LISTENING_BAR_COUNT - 1)
-        val firstBarLeft = (size.width - totalWidth) / 2f
-        repeat(DICTATION_LISTENING_BAR_COUNT) { index ->
-            val phaseOffset = index / DICTATION_LISTENING_BAR_COUNT.toFloat()
-            val level = ((sin((phase + phaseOffset) * 2f * PI) + 1f) / 2f).toFloat()
-            val barHeight =
-                (
-                    DICTATION_LISTENING_BAR_MIN_HEIGHT_DP +
-                        DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP * level
-                ).dp.toPx()
-            drawRoundRect(
-                color = barColor,
-                topLeft =
-                    Offset(
-                        x = firstBarLeft + index * (barWidth + barSpacing),
-                        y = (size.height - barHeight) / 2f,
-                    ),
-                size = Size(width = barWidth, height = barHeight),
-                cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
-            )
         }
     }
 }
