@@ -11,6 +11,15 @@
           "SET-033",
           "SET-036"
         ]
+      },
+      {
+        "surface": "TranslationOwnerResetEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationRoute.kt",
+        "anchor": "internal fun TranslationOwnerResetEffect(",
+        "test_ids": [
+          "CON-045",
+          "SET-033"
+        ]
       }
     ]
   },

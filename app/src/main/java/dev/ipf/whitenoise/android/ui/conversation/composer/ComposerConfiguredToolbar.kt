@@ -108,6 +108,13 @@ internal data class ComposerToolbarBindings(
     val canActivate: () -> Boolean = { true },
     val onVoiceBounds: (Rect?) -> Unit = {},
     val slotModifier: @Composable (ComposerShortcut) -> Modifier = { Modifier },
+    val translate: ComposerTranslateToggle? = null,
+)
+
+/** Translate mode's toolbar adapter; [active] tints the pinned button while the preview line is shown. */
+internal data class ComposerTranslateToggle(
+    val active: Boolean,
+    val onToggle: () -> Unit,
 )
 
 /**

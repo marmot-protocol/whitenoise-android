@@ -98,6 +98,11 @@ import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
+import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
+import dev.ipf.whitenoise.android.translation.ComposerTranslationState
+import dev.ipf.whitenoise.android.translation.ComposerTranslationSync
+import dev.ipf.whitenoise.android.translation.rememberComposerTranslation
 import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
@@ -363,10 +368,13 @@ internal class ComposerTextState(
             contentRevision = contentRevision,
         )
 
-    /** Retains exact caption ownership until durable acceptance, including a failed bubble's later Retry. */
-    fun captureCaptionSettlement(caption: String): () -> Unit {
+    /**
+     * Retains exact editor ownership until durable acceptance, including a failed bubble's later Retry. The sent
+     * caption may be a translation of the editor text, so ownership follows the editor content, not the caption.
+     */
+    fun captureCaptionSettlement(): () -> Unit {
         val token = acceptanceToken()
-        return { if (token.text == caption) clearAccepted(token) }
+        return { clearAccepted(token) }
     }
 
     /** Applies field state while advancing acceptance ownership only for content edits. */
@@ -468,6 +476,9 @@ internal fun ComposerBar(
     editingInitialText: String? = null,
     onCancelEdit: () -> Unit = {},
     appState: WhiteNoiseAppState? = null,
+    // Translate mode for this draft; tests supply their own state to drive Send without the offline engine.
+    composerTranslation: ComposerTranslationState? =
+        appState?.let { rememberComposerTranslation(it, draftAccountRef, draftGroupIdHex) },
     onCustomizeToolbar: (() -> Unit)? = null,
     // Group @-mention picker (#414): candidates the picker filters over, and
     // whether this conversation is a group (the picker is suppressed in DMs —
@@ -989,6 +1000,26 @@ internal fun ComposerBar(
             dictationController?.isOwnedBy(dictationAccountRef, dictationGroupIdHex) == true &&
             dictationController.completionControlsRequired
 
+    // Translate mode belongs to one draft; edits keep the original text, so the mode closes for them.
+    LaunchedEffect(composerTranslation, editingMessageId) {
+        if (editingMessageId != null) composerTranslation?.close()
+    }
+    // Dictation writes the source line while it runs, so a translation would chase partial words. Translate mode
+    // turns off and says so; the toolbar already refuses to reopen it until dictation finishes.
+    val dictationInComposer = dictationOwnedByComposer && dictationController?.completionControlsRequired == true
+    LaunchedEffect(composerTranslation, composerTranslation?.active, dictationInComposer) {
+        val owner = composerTranslation?.takeIf { dictationInComposer && it.active } ?: return@LaunchedEffect
+        owner.close()
+        if (draftAccountRef != null && draftGroupIdHex != null) {
+            appState?.presentConversationTransient(
+                draftAccountRef,
+                draftGroupIdHex,
+                R.string.translation_composer_dictation_off,
+            )
+        }
+    }
+    val translation = composerTranslation?.takeIf { editingMessageId == null }
+    val activeTranslation = translation?.takeIf { it.active }
     val finishControlMorph = LocalFinishControlMorph.current
     val submitMessage: () -> Unit = submit@{
         if (originDictationRequiresCompletion()) return@submit
@@ -996,12 +1027,15 @@ internal fun ComposerBar(
         // An IME can commit text and request Send before the next composition.
         // Eligibility and submission must use the same live editor content.
         val acceptanceToken = textState.acceptanceToken()
+        // Translate mode sends only a current translation of this exact text, never the source text instead.
+        val outgoing =
+            translation?.let { it.outgoingFor(acceptanceToken.text) ?: return@submit } ?: acceptanceToken.text
         if (hasPendingAttachments && editingMessageId == null) {
             if (!attachmentsPreparing && !attachmentSendInFlight && onSendAttachments != null) {
                 attachmentSendInFlight = true
                 var dispatched = false
                 try {
-                    onSendAttachments(acceptanceToken.text) { accepted ->
+                    onSendAttachments(outgoing) { accepted ->
                         attachmentSendInFlight = false
                         if (accepted) {
                             textState.clearAccepted(acceptanceToken)
@@ -1015,7 +1049,7 @@ internal fun ComposerBar(
             }
         } else if (acceptanceToken.text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
-            val visual = if (!sendingEdit && replyingTo == null) sendMotion?.capture(acceptanceToken.text) else null
+            val visual = if (!sendingEdit && replyingTo == null) sendMotion?.capture(outgoing) else null
             val accepted: (String?) -> Unit = { presentationId ->
                 if (!sendingEdit) {
                     // onAccepted can land after the user has started typing the
@@ -1038,9 +1072,9 @@ internal fun ComposerBar(
                 }
             }
             if (onSendWithPresentation != null) {
-                onSendWithPresentation(acceptanceToken.text, accepted)
+                onSendWithPresentation(outgoing, accepted)
             } else {
-                onSend(acceptanceToken.text) { accepted(null) }
+                onSend(outgoing) { accepted(null) }
             }
         }
     }
@@ -1290,7 +1324,7 @@ internal fun ComposerBar(
                 val voiceReviewClip =
                     voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
                 val replyVisible = replyingTo != null || replyExit.exiting
-                val accessoryContent: (@Composable () -> Unit)? =
+                val baseAccessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
                     if (editingMessageId == null && (replyVisible || attachmentContent != null)) {
                         {
@@ -1395,6 +1429,26 @@ internal fun ComposerBar(
                         }
                     } else {
                         null
+                    }
+                translation?.let {
+                    ComposerTranslationSync(it, text)
+                    ComposerTranslationNotice(it)
+                }
+                // The translation line sits above the typed line, after any reply or attachment preview.
+                val accessoryContent: (@Composable () -> Unit)? =
+                    if (activeTranslation != null) {
+                        {
+                            Column {
+                                baseAccessoryContent?.invoke()
+                                ComposerTranslationPreview(
+                                    activeTranslation,
+                                    text,
+                                    Modifier.padding(start = 12.dp, end = 8.dp, bottom = 4.dp),
+                                )
+                            }
+                        }
+                    } else {
+                        baseAccessoryContent
                     }
                 // #414: live @-mention picker. Compute the open query from the current
                 // caret; suppressed entirely in DMs or with no roster. Edit mode
@@ -1534,6 +1588,7 @@ internal fun ComposerBar(
                             }
                         ) +
                         (if (startAppOwnedDictation != null) setOf(ComposerShortcut.Dictation) else emptySet()) +
+                        (if (translation != null) setOf(ComposerShortcut.Translate) else emptySet()) +
                         (
                             if (voiceRecordingController != null && editingMessageId == null) {
                                 setOf(ComposerShortcut.VoiceNote)
@@ -1626,6 +1681,7 @@ internal fun ComposerBar(
                         canActivate = canActivateToolbar,
                         onVoiceBounds = { if (!isRecordingVoice) voiceSlotBounds = it },
                         voiceLauncherVisible = showConfiguredMic && configuredVoiceUsesSlot,
+                        translate = translation?.let { ComposerTranslateToggle(it.active, it::toggle) },
                     )
                 val primaryTrailingActionWidth =
                     if (dictationActiveInComposer) {
@@ -1641,7 +1697,8 @@ internal fun ComposerBar(
                 val primaryActionEnabled =
                     !originDictationRequiresCompletion() &&
                         (!showMicButton || text.isNotBlank() || hasPendingAttachments) &&
-                        (!hasPendingAttachments || editingMessageId != null || attachmentSendEnabled)
+                        (!hasPendingAttachments || editingMessageId != null || attachmentSendEnabled) &&
+                        (translation == null || translation.outgoingFor(text) != null)
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
                     modifier =

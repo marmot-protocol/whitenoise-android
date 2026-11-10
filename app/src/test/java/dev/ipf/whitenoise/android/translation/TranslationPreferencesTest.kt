@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.translation
 
 import android.content.Context
+import android.os.Looper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -11,6 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
@@ -185,5 +187,18 @@ class TranslationPreferencesTest {
         assertEquals(TranslationChoice(true, "fr"), reopened.effective("a", "group"))
         assertEquals(TranslationChoice(false, "de"), reopened.effective("b", "group"))
         reopened.close()
+    }
+
+    /** The composer's outgoing language and notice never change incoming translations, so they must not reset them. */
+    @Test fun composerChoicesLeaveIncomingTranslationsUntouched() {
+        val preferences = TranslationPreferences(context)
+        preferences.setOutgoingTarget("account", "group", "de")
+        preferences.acceptComposerNotice()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, preferences.changes.value)
+        preferences.setOverride("account", "group", TranslationOverride.ON)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, preferences.changes.value)
+        preferences.close()
     }
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntRect
 import dev.ipf.whitenoise.android.R
@@ -129,7 +130,35 @@ internal fun ComposerConfiguredAction(
                 }
             }
         }
+        ComposerShortcut.Translate -> ComposerTranslateAction(modifier, bindings, enabled)
         else -> ComposerOptionalShortcutAction(shortcut, modifier, bindings, enabled, onDictation)
+    }
+}
+
+/** Toggles translate mode; tinted while the translation line is open, disabled where it cannot apply. */
+@Composable
+private fun ComposerTranslateAction(
+    modifier: Modifier,
+    bindings: ComposerToolbarBindings,
+    enabled: Boolean,
+) {
+    val toggle = bindings.translate
+    IconButton(
+        onClick = { if (bindings.canActivate()) toggle?.onToggle?.invoke() },
+        enabled = enabled && toggle != null,
+        modifier = modifier.testTag("composer.translate").semantics { selected = toggle?.active == true },
+    ) {
+        Icon(
+            painterResource(ComposerShortcut.Translate.iconRes),
+            stringResource(ComposerShortcut.Translate.labelRes),
+            Modifier.size(ComposerShortcutIconSize),
+            tint =
+                when {
+                    toggle?.active == true -> MaterialTheme.colorScheme.primary
+                    toggle == null -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_VOICE_OPACITY)
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        )
     }
 }
 
@@ -187,5 +216,7 @@ private fun ComposerToolbarBindings.menuTextShortcuts(
     onEmoji = { if (canActivate()) onEmoji() },
     onPaste = onPaste,
     onDictation = onDictation?.let { dictate -> { if (canActivate()) dictate() } },
+    onTranslate = translate?.let { toggle -> { if (canActivate()) toggle.onToggle() } },
+    translateActive = translate?.active == true,
     pasteAccepted = pasteAccepted,
 )

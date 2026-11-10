@@ -13,6 +13,7 @@ internal val ComposerShortcut.labelRes: Int
             ComposerShortcut.Emoji -> R.string.open_emoji_picker
             ComposerShortcut.Paste -> R.string.paste_from_clipboard
             ComposerShortcut.Dictation -> R.string.dictate_text
+            ComposerShortcut.Translate -> R.string.translation_composer_toggle
             ComposerShortcut.VoiceNote -> R.string.voice_message_record
             ComposerShortcut.Camera -> R.string.attachment_camera
             ComposerShortcut.Gallery -> R.string.attachment_photos_videos
@@ -31,6 +32,7 @@ internal val ComposerShortcut.iconRes: Int
             ComposerShortcut.Emoji -> R.drawable.ic_emoji_smileys
             ComposerShortcut.Paste -> R.drawable.ic_content_paste
             ComposerShortcut.Dictation -> R.drawable.ic_mic
+            ComposerShortcut.Translate -> R.drawable.ic_translate
             ComposerShortcut.VoiceNote -> R.drawable.ic_mic
             ComposerShortcut.Camera -> R.drawable.ic_camera
             ComposerShortcut.Gallery -> R.drawable.ic_image
