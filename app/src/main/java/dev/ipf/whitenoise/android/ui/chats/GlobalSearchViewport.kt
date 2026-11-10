@@ -103,7 +103,8 @@ internal data class GlobalSearchResetOwners(
 
 /**
  * Shell-lived coordinates and ids only: never retains messages, thumbnails, or native result pages. The
- * library extent is a row count for one query, so a return rereads that far instead of keeping pages.
+ * library and message-result extents are row counts for one query, so a return rereads that far instead of
+ * keeping pages.
  */
 internal class GlobalSearchViewport(
     private val active: LazyListState,
@@ -112,6 +113,7 @@ internal class GlobalSearchViewport(
     private val resetOwners: GlobalSearchResetOwners,
     val selection: GlobalSearchSelectionOwner,
     val libraryExtent: GlobalAttachmentLibraryExtent = GlobalAttachmentLibraryExtent(),
+    val messageResultsExtent: GlobalSearchResultsExtent = GlobalSearchResultsExtent(),
 ) {
     fun listState(showArchived: Boolean): LazyListState = if (showArchived) archived else active
 
