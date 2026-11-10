@@ -143,6 +143,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -5981,7 +5982,7 @@ class ConversationController(
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     // Test seams: the user's own emoji a text uses, and the send that carries them.
-    private val customEmojiReader: suspend (String) -> List<LocalEmojiArtwork> = { appState.localEmojiArtworkIn(it) },
+    private val customEmojiReader: (suspend (String) -> List<LocalEmojiArtwork>)? = null,
     private val customEmojiSender: CustomEmojiSender? = null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
@@ -8363,24 +8364,32 @@ class ConversationController(
         block: suspend () -> T,
     ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
 
-    /** The user's own emoji a plain, non-reply text send must carry, or none when this send carries none. */
+    /**
+     * The user's own emoji a plain, non-reply text send must carry, or none when this send carries none.
+     * A lookup failure is raised as an [EmojiUploadFailure], a definite pre-publication failure.
+     */
     private suspend fun emojiArtworkForSend(
+        account: String,
         replyTarget: String?,
         text: String,
     ): List<LocalEmojiArtwork> {
         val applies = emojiSendApplies(replyTarget, textPublisher != null)
-        return if (applies) customEmojiReader(text) else emptyList()
+        if (!applies) return emptyList()
+        // The lookup runs before anything is published, so its failure is never an uncertain delivery.
+        return runCatchingCancellable { customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text) }
+            .getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
     }
 
     /**
      * Admission failures retry for plain text. An emoji send retries only an upload-stage failure,
-     * because nothing was published then, and never a failure of the publish itself.
+     * because nothing was published then, and never a failure of the publish itself. Null artwork
+     * means its lookup failed, which also published nothing.
      */
     private fun isRetryableComposerSend(
-        emojiArtwork: List<LocalEmojiArtwork>,
+        emojiArtwork: List<LocalEmojiArtwork>?,
         throwable: Throwable,
     ): Boolean =
-        if (emojiArtwork.isEmpty()) {
+        if (emojiArtwork?.isEmpty() == true) {
             isRetryableTextAdmissionError(throwable)
         } else {
             isRetryableEmojiUploadFailure(throwable)
@@ -8445,17 +8454,22 @@ class ConversationController(
         trace: PerformanceTrace?,
         clientToken: String,
         optimisticKey: String,
-    ): dev.ipf.marmotkit.SendSummaryFfi {
-        // Replies and injected publishers keep their plain-text path. A message that uses the user's
-        // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
-        val emojiArtwork = emojiArtworkForSend(replyTarget, trimmed)
-        return appState.withConversationTextSendOrder(account, group.groupIdHex) {
+    ): dev.ipf.marmotkit.SendSummaryFfi =
+        appState.withConversationTextSendOrder(account, group.groupIdHex) {
+            // Replies and injected publishers keep their plain-text path. A message that uses the user's
+            // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
+            // Resolving its artwork inside the text order keeps a later message from publishing first,
+            // and inside the attempt lets a transient lookup failure retry before anything is published.
+            val artwork = SendEmojiArtwork { emojiArtworkForSend(account, replyTarget, trimmed) }
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 cancellationGeneration = optimisticCancellationGeneration,
-                retryableFailure = { isRetryableComposerSend(emojiArtwork, it) },
+                retryableFailure = { isRetryableComposerSend(artwork.value, it) },
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
+                // A cancel wakes the retry wait, so check it before a lookup that may fail again and retry forever.
+                requireOptimisticSendNotCancelled(optimisticKey)
+                val emojiArtwork = untilSendCancelled(optimisticKey) { artwork.resolve() }
                 // Serialize only this commit-producing FFI attempt. Releasing the
                 // commit lock before retry backoff keeps reactions and other
                 // mutations usable; the outer text-order lock keeps later text
@@ -8531,7 +8545,6 @@ class ConversationController(
                 }
             }
         }
-    }
 
     /**
      * Trace a transient send retry with the current relay-health snapshot.
@@ -9616,6 +9629,36 @@ class ConversationController(
             }
         }
     }
+
+    /**
+     * Runs [block] until it finishes or the send [optimisticKey] is cancelled. A cancel stops [block] at
+     * once, so a slow artwork lookup never holds the text order for later sends, and ends the send with
+     * [OptimisticSendCancelledException], so it can never publish.
+     */
+    private suspend fun <T> untilSendCancelled(
+        optimisticKey: String,
+        block: suspend () -> T,
+    ): T =
+        coroutineScope {
+            // A lookup that never suspends finishes here without yielding the send to anything else.
+            val work = async(start = CoroutineStart.UNDISPATCHED) { block() }
+            if (work.isCompleted) return@coroutineScope work.await()
+            val watcher =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    optimisticCancellationGeneration.first {
+                        optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED
+                    }
+                    work.cancel()
+                }
+            try {
+                work.await()
+            } catch (cancel: CancellationException) {
+                requireOptimisticSendNotCancelled(optimisticKey)
+                throw cancel
+            } finally {
+                watcher.cancel()
+            }
+        }
 
     private fun requireOptimisticSendNotCancelled(optimisticKey: String) {
         if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED) {

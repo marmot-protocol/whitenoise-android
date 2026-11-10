@@ -171,6 +171,14 @@
         "test_ids": [
           "NCH-008"
         ]
+      },
+      {
+        "surface": "Account-scoped composer emoji library",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "ComposerEmojiLibrary(installedEmoji)",
+        "test_ids": [
+          "SET-051"
+        ]
       }
     ],
     "string_resources": [

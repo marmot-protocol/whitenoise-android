@@ -14,7 +14,6 @@ object Nip30Emoji {
     private const val TAG_SIZE_WITH_SET = 4
     private val codePattern = Regex("[A-Za-z0-9_-]{1,64}")
     private val shortcodeInText = Regex(":($codePattern):")
-    private val sendableCodePattern = Regex("[A-Za-z0-9_]{1,62}")
 
     /** MDK's per-event tag row limit. */
     const val MAX_TAGS = 64
@@ -64,7 +63,7 @@ object Nip30Emoji {
     }
 
     /** Whether [shortcode] (`:code:`) is within the alphabet and length a sent emoji tag may use. */
-    fun isSendable(shortcode: String): Boolean = sendableCodePattern.matches(shortcode.trim(':'))
+    fun isSendable(shortcode: String): Boolean = codePattern.matches(shortcode.trim(':'))
 
     /**
      * Every distinct `:code:` in [text], in first-appearance order. Codes inside inline code spans

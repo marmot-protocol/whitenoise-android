@@ -9,9 +9,9 @@ internal class EmojiSendLimitException(
 ) : IllegalArgumentException(message)
 
 /**
- * The upload stage of a custom-emoji send failed, so nothing was published. Wrapping the cause keeps
- * a connection reset during upload from being read as an uncertain delivery, since it is a definite
- * failure the user can retry.
+ * The artwork lookup or upload stage of a custom-emoji send failed, so nothing was published. Wrapping
+ * the cause keeps a connection reset there from being read as an uncertain delivery, since it is a
+ * definite failure the user can retry.
  */
 internal class EmojiUploadFailure(
     cause: Throwable,
@@ -24,6 +24,20 @@ internal class EmojiUploadFailure(
 internal class EmojiChatChangedException(
     cause: Throwable,
 ) : Exception("the chat changed while sending", cause)
+
+/**
+ * The artwork one composer send carries, looked up on its first attempt and reused by its retries.
+ * [value] stays null until a lookup succeeds, so a failed lookup is retried like an upload stage.
+ */
+internal class SendEmojiArtwork(
+    private val lookup: suspend () -> List<LocalEmojiArtwork>,
+) {
+    var value: List<LocalEmojiArtwork>? = null
+        private set
+
+    /** The resolved artwork, running [lookup] only until it first succeeds. */
+    suspend fun resolve(): List<LocalEmojiArtwork> = value ?: lookup().also { value = it }
+}
 
 /** Whether [throwable] is an upload-stage failure that a connectivity recovery can retry without duplicating. */
 internal fun isRetryableEmojiUploadFailure(throwable: Throwable): Boolean {

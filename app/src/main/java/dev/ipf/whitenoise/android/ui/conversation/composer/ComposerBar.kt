@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
@@ -111,6 +112,7 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
+import dev.ipf.whitenoise.android.ui.rememberInstalledEmojiPicker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -532,6 +534,15 @@ internal fun ComposerBar(
         Box(modifier.fillMaxWidth().height(with(routeDensity) { lastMeasuredHeight.toDp() }))
         return
     }
+    val installedEmoji =
+        rememberInstalledEmojiPicker(
+            appState?.takeIf {
+                draftAccountRef == it.activeAccountRef &&
+                    replyingTo == null &&
+                    editingMessageId == null &&
+                    !hasPendingAttachments
+            },
+        )
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -1439,14 +1450,16 @@ internal fun ComposerBar(
                     composerTextMatchesEditSession &&
                     composerExpansion.mode == ComposerExpansionMode.Automatic
                 ) {
-                    EmojiShortcodeSuggestions(
-                        modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
-                        field = textFieldValue,
-                        onPick = { updated ->
-                            applyComposerFieldValue(updated)
-                            runCatching { composerFocus.requestFocus() }
-                        },
-                    )
+                    ComposerEmojiLibrary(installedEmoji) {
+                        EmojiShortcodeSuggestions(
+                            modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
+                            field = textFieldValue,
+                            onPick = { updated ->
+                                applyComposerFieldValue(updated)
+                                runCatching { composerFocus.requestFocus() }
+                            },
+                        )
+                    }
                 }
                 val showDictationRecovery =
                     dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true
@@ -2092,24 +2105,26 @@ internal fun ComposerBar(
                         .fillMaxWidth()
                         .onSizeChanged { customInputPaneHeightPx = it.height.toFloat() },
                 ) {
-                    ComposerEmojiPickerPane(
-                        height = renderedEmojiPaneHeight,
-                        alpha = 1f,
-                        recentEmojis = recentEmojis,
-                        onEmojiUsed = onEmojiUsed,
-                        onEmojiPicked = { emoji ->
-                            val updated = insertEmojiAtSelection(textFieldValue, emoji)
-                            applyComposerFieldValue(updated)
-                        },
-                        onBackspace = ::deleteFromComposer,
-                        onSearchActiveChange = {
-                            composerEmojiSearchActive = it
-                            onBottomInputChanged()
-                        },
-                        onSearchContentHeightChange = { measured ->
-                            if (measured > 0.dp) composerEmojiSearchRowHeight = measured
-                        },
-                    )
+                    ComposerEmojiLibrary(installedEmoji) {
+                        ComposerEmojiPickerPane(
+                            height = renderedEmojiPaneHeight,
+                            alpha = 1f,
+                            recentEmojis = recentEmojis,
+                            onEmojiUsed = onEmojiUsed,
+                            onEmojiPicked = { emoji ->
+                                val updated = insertEmojiAtSelection(textFieldValue, emoji)
+                                applyComposerFieldValue(updated)
+                            },
+                            onBackspace = ::deleteFromComposer,
+                            onSearchActiveChange = {
+                                composerEmojiSearchActive = it
+                                onBottomInputChanged()
+                            },
+                            onSearchContentHeightChange = { measured ->
+                                if (measured > 0.dp) composerEmojiSearchRowHeight = measured
+                            },
+                        )
+                    }
                 }
             }
         }

@@ -1708,6 +1708,39 @@
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
     <string name="custom_emoji">Свои эмодзи</string>
+    <string name="emoji_sets_title">Наборы эмодзи</string>
+    <string name="emoji_sets_account_required">Выберите профиль, чтобы просматривать и устанавливать наборы эмодзи.</string>
+    <string name="emoji_sets_query">Найдите или вставьте ссылку на набор</string>
+    <string name="emoji_sets_find">Найти наборы</string>
+    <string name="emoji_sets_open">Открыть набор эмодзи</string>
+    <string name="emoji_sets_empty">Наборов пока нет. Найдите их на своих реле или вставьте ссылку на набор.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d эмодзи</item>
+        <item quantity="few">%1$d эмодзи</item>
+        <item quantity="many">%1$d эмодзи</item>
+        <item quantity="other">%1$d эмодзи</item>
+    </plurals>
+    <string name="emoji_sets_installed">Установлен</string>
+    <string name="emoji_sets_update_available">Доступно обновление</string>
+    <string name="emoji_sets_load_image">Загрузить изображение</string>
+    <string name="emoji_sets_image_privacy">При загрузке превью или установке набора ваш IP-адрес увидят серверы его изображений.</string>
+    <string name="emoji_sets_preview_host">Сервер изображения превью: %1$s</string>
+    <string name="emoji_sets_install">Установить набор</string>
+    <string name="emoji_sets_update">Обновить набор</string>
+    <string name="emoji_sets_check_update">Проверить обновление</string>
+    <string name="emoji_sets_preparing_install">Подготовка к установке…</string>
+    <string name="emoji_sets_install_progress">Обработано эмодзи: %1$d из %2$d</string>
+    <string name="emoji_sets_error">Не удалось выполнить запрос. Попробуйте ещё раз.</string>
+    <string name="emoji_sets_not_found">Набор или изображение не найдены. Проверьте ссылку или попробуйте ещё раз.</string>
+    <string name="emoji_sets_changed">Набор изменился. Проверьте новую версию перед установкой.</string>
+    <string name="emoji_sets_cancelled">Установка отменена.</string>
+    <string name="emoji_sets_discovery_incomplete">Некоторые реле недоступны. Результаты могут быть неполными.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Установлено, пропущена %1$d запись.</item>
+        <item quantity="few">Установлено, пропущено %1$d записи.</item>
+        <item quantity="many">Установлено, пропущено %1$d записей.</item>
+        <item quantity="other">Установлено, пропущено %1$d записи.</item>
+    </plurals>
     <string name="custom_emoji_detail">Изображения здесь становятся эмодзи :shortcode:, хранящимися на устройстве. Новое сообщение (не ответ) с таким эмодзи загружает его изображение в зашифрованном виде в этот чат. Реакции, ответы и правки отправляют только shortcode.</string>
     <string name="custom_emoji_empty">Своих эмодзи пока нет.</string>
     <string name="custom_emoji_name_title">Название эмодзи</string>
