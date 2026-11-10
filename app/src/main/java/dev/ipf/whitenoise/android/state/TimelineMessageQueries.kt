@@ -59,3 +59,14 @@ internal fun TimelineMessageQueryFfi.Companion.searchPage(
     afterMessageId = null,
     limit = limit,
 )
+
+private val ACCOUNT_ID_HEX = Regex("^[0-9a-f]{64}$")
+
+/**
+ * The one sender MDK may filter natively, or null to leave every sender to the host check: several senders, or a
+ * single key that is not a canonical account id — a corrupted saved search must not fail a whole scan in MDK.
+ */
+internal fun nativeSenderFilter(senderIds: Set<String>?): String? {
+    val single = senderIds?.singleOrNull()
+    return single?.takeIf(ACCOUNT_ID_HEX::matches)
+}

@@ -15,6 +15,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -53,7 +54,7 @@ class GlobalSearchByMeScreenshotTest {
     @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
     fun activeLargeRtl() = capture("active_large_rtl", active = true, largeRtl = true)
 
-    /** Tapping toggles the stable self sender filter, and TalkBack reads its name and selected state. */
+    /** Tapping toggles the stable self sender filter; TalkBack reads the visible "By me" with its selected state. */
     @Test
     fun tapTogglesTheSelfSenderFilterWithAnAccessibleSelectedState() {
         var state by mutableStateOf(GlobalSearchState(isOpen = true))
@@ -69,10 +70,8 @@ class GlobalSearchByMeScreenshotTest {
         val chip = composeRule.onNodeWithTag(GLOBAL_SEARCH_BY_ME_TAG)
         chip.assertHeightIsAtLeast(32.dp)
         assertEquals(false, chip.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Selected))
-        assertEquals(
-            listOf("Messages by me"),
-            chip.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription),
-        )
+        assertEquals(null, chip.fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription))
+        composeRule.onNodeWithText("By me", useUnmergedTree = true).assertExists()
 
         chip.performClick()
         composeRule.runOnIdle { assertEquals(true, state.byMeActive(SELF)) }

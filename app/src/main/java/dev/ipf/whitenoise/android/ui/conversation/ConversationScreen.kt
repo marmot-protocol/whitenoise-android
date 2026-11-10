@@ -164,7 +164,6 @@ import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.chats.ChatListSearchFilterAction
-import dev.ipf.whitenoise.android.ui.chats.GlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterControlsRow
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterPicker
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
@@ -173,6 +172,7 @@ import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
 import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
+import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
 import dev.ipf.whitenoise.android.ui.chats.toggleGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
@@ -4129,10 +4129,8 @@ internal fun ConversationScreen(
                                     },
                                     // By me keeps the chat scope, so the arrows step through this chat's own messages.
                                     byMe =
-                                        conversationSelfAccountIdHex?.let { self ->
-                                            GlobalSearchByMe(self, byMeLabel) {
-                                                updateConversationSearch { toggleGlobalSearchByMe(it, self, byMeLabel) }
-                                            }
+                                        rememberGlobalSearchByMe(conversationSelfAccountIdHex, byMeLabel) { self ->
+                                            updateConversationSearch { toggleGlobalSearchByMe(it, self, byMeLabel) }
                                         },
                                 )
                                 GlobalSearchFilterControlsRow(

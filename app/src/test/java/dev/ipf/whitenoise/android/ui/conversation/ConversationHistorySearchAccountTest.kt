@@ -174,4 +174,27 @@ class ConversationHistorySearchAccountTest {
             val status = conversationSearchScanStatus("", matches, scanFailed = false, filtersActive = true)
             assertTrue(status.allowsSearchSteps(2))
         }
+
+    /** A malformed saved sender key is not sent to MDK; the host check still applies it, so the scan completes. */
+    @Test
+    fun malformedSenderIsFilteredOnTheHostInsteadOfInMdk() =
+        runBlocking {
+            val queries = mutableListOf<TimelineMessageQueryFfi>()
+            val matches =
+                searchConversationHistoryMatches(
+                    appState = testAppState(),
+                    accountRef = "account",
+                    groupIdHex = "g",
+                    query = "",
+                    constraints = MessageSearchConstraints(senderIds = setOf("not-an-account")),
+                    readPage = { _, query ->
+                        queries += query
+                        val rows = listOf(record("g", "m", at = 1uL, sender = "ab".repeat(32)))
+                        TimelinePageFfi(rows, hasMoreBefore = false, hasMoreAfter = false)
+                    },
+                )
+
+            assertNull(queries.single().sender)
+            assertEquals(emptyList<Any>(), matches)
+        }
 }

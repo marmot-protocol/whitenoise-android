@@ -16,15 +16,7 @@
       {
         "surface": "By me quick filter",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchByMe.kt",
-        "anchor": "R.string.search_quick_filter_by_me)",
-        "test_ids": [
-          "FIND-020"
-        ]
-      },
-      {
-        "surface": "By me accessible name",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchByMe.kt",
-        "anchor": "R.string.search_quick_filter_by_me_description",
+        "anchor": "R.string.search_quick_filter_by_me",
         "test_ids": [
           "FIND-020"
         ]

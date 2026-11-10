@@ -1895,7 +1895,6 @@
     <string name="global_search_results_end">没有更多结果</string>
     <string name="global_search_results_search_older">搜索更早的消息</string>
     <string name="search_quick_filter_by_me">我发送的</string>
-    <string name="search_quick_filter_by_me_description">我发送的消息</string>
     <string name="search_result_unavailable">此消息已不可用</string>
     <string name="search_result_open_failed_retry">无法打开消息。重试</string>
     <string name="text_attachment_open_external">在其他应用中打开</string>

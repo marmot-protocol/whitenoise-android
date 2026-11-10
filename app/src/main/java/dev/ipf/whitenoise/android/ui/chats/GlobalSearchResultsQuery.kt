@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
 import dev.ipf.whitenoise.android.state.messageSearchSnippet
+import dev.ipf.whitenoise.android.state.nativeSenderFilter
 import dev.ipf.whitenoise.android.state.retentionDeadlineForSearch
 import dev.ipf.whitenoise.android.state.searchPage
 import dev.ipf.whitenoise.android.state.searchableTimelineRecord
@@ -67,7 +68,7 @@ internal data class GlobalSearchResultsQuery(
         return TimelineMessageQueryFfi.searchPage(
             groupIdHex = groupIdHex,
             search = needle.ifEmpty { null },
-            sender = constraints?.senderIds?.singleOrNull(),
+            sender = nativeSenderFilter(constraints?.senderIds),
             since = bounds?.let { ceilSeconds(it.startEpochMillisInclusive) },
             until = bounds?.let { ceilSeconds(it.endEpochMillisExclusive) },
             attachmentType = mdkAttachmentType(constraints?.contentKinds.orEmpty()),

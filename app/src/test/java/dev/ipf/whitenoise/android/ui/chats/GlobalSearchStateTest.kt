@@ -504,4 +504,35 @@ class GlobalSearchStateTest {
 
         assertFalse(switched.byMeActive("ab".repeat(32)))
     }
+
+    /** Only a single canonical account id is filtered natively by MDK; anything else stays a host check. */
+    @Test
+    fun onlyACanonicalSingleSenderIsSentToMdk() {
+        val self = "ab".repeat(32)
+        assertEquals(
+            self,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf(self)),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf(self, "cd".repeat(32))),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf("AB".repeat(32))),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf("corrupt")),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(null),
+        )
+    }
 }

@@ -2217,10 +2217,8 @@ internal fun ChatsScreen(
                                 }
                             },
                             byMe =
-                                controller.boundAccountIdHex()?.let { self ->
-                                    GlobalSearchByMe(self, selfLabel) {
-                                        onGlobalSearchStateChange { toggleGlobalSearchByMe(it, self, selfLabel) }
-                                    }
+                                rememberGlobalSearchByMe(controller.boundAccountIdHex(), selfLabel) { self ->
+                                    onGlobalSearchStateChange { toggleGlobalSearchByMe(it, self, selfLabel) }
                                 },
                         )
                     }
