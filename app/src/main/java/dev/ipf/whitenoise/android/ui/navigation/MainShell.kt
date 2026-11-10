@@ -103,6 +103,9 @@ import kotlinx.coroutines.flow.map
 
 internal data class ConversationOpenContext(
     val focusMessageId: String? = null,
+    // Set only when focusMessageId is a search result opened from the chat list (#1945). Voice, playback and
+    // attachment-speech destinations also name a message to focus, but land with their own rules and wording.
+    val focusFromSearch: Boolean = false,
     val focusMessageRequestId: Long = 0L,
     val ttsFocusSessionId: Long? = null,
     val notificationOpenRequestId: Long = 0L,
@@ -1733,7 +1736,12 @@ internal fun MainShell(
         // read must not make a tap look ignored indefinitely; after the bound,
         // the destination owns the existing loading/error surfaces while the
         // same controller continues.
-        selectedChatOpenContext = ConversationOpenContext(focusMessageId = request.focusMessageId)
+        // A chat-list open names a message to focus only for a search result, so its focus lands as one (#1945).
+        selectedChatOpenContext =
+            ConversationOpenContext(
+                focusMessageId = request.focusMessageId,
+                focusFromSearch = request.focusMessageId != null,
+            )
         selectedChatJustCreated = request.justCreated
         selectedChatOpenedAsDmHint = request.justCreated
         chatListReturnHeadSnap =
@@ -2001,6 +2009,7 @@ internal fun MainShell(
                                         content.controller === selectedOrPendingConversationController &&
                                         selectedChat?.id == chat.id,
                                 focusMessageId = content.openContext.focusMessageId,
+                                focusFromSearch = content.openContext.focusFromSearch,
                                 focusMessageRequestId = content.openContext.focusMessageRequestId,
                                 ttsFocusSessionId = content.openContext.ttsFocusSessionId,
                                 notificationOpenRequestId = content.openContext.notificationOpenRequestId,

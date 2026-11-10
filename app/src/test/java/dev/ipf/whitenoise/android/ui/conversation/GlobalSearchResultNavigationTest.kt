@@ -19,7 +19,12 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Landing on a distant global-search result composes only the rows near it, never the history between (#1945). */
+/**
+ * Landing on a distant global-search result composes only the rows near it, never the history between (#1945).
+ * This drives the scroll coordinator and the Compose list writer that ConversationScreen's centering uses, over a
+ * plain list of rows; mounting the whole conversation screen with a scripted multi-thousand-row history is not
+ * practical here, so the screen's own wiring of that centering is covered by the landing tests instead.
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class GlobalSearchResultNavigationTest {

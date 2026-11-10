@@ -1982,7 +1982,7 @@ class ConversationScrollCoordinatorTest {
         assertTrue(mention.contains("resolveTargetIndex = { currentTimelineListIndex(targetMessageId) }"))
     }
 
-    /** Failed search and speech targets share the localized Retry actions; unavailable ones say so truthfully. */
+    /** Failed speech targets restart through the localized Retry; search landings: ConversationHistorySearchTest. */
     @Test
     fun failedFocusTargetSharesExistingLocalizedRetryActions() {
         val screen = sourceFile("ConversationScreen.kt").readText()
@@ -1993,20 +1993,12 @@ class ConversationScrollCoordinatorTest {
         assertTrue("explicit Retry must restart the focus effect", "focusTargetRetry.generation" in focus)
         assertTrue("a newer target must clear the earlier failed request", "focusTargetRetry.clear()" in focus)
         assertEquals(2, Regex("focusTargetRetry.failed\\(navigationRequest\\)").findAll(focus).count())
-        val retryAction = Regex("focusTargetRetry.retry\\(\\s*loadFailurePresent = controller.error != null,?\\s*\\)")
-        // The load-error banners and the search-result Retry chip all resume the same request.
-        assertEquals(4, retryAction.findAll(screen).count())
         assertTrue(
             "searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)" in screen,
         )
         assertTrue(
             "unavailable speech targets keep the existing localized notice",
             "toast_original_message_unavailable" in focus,
-        )
-        assertTrue("search results land through the shared landing rules", "landSearchResult(" in focus)
-        assertTrue(
-            "an unavailable search result says so, and a failed one offers its own Retry",
-            "R.string.search_result_unavailable" in screen && "focusTargetRetry.failed(request)" in screen,
         )
     }
 

@@ -14,15 +14,21 @@ internal const val TRANSIENT_MESSAGE_HIGHLIGHT_DWELL_MILLIS = 1_500L
  * this token gives every operation an explicit stale check before it pages or
  * starts a scroll.
  */
-internal class MessageTargetNavigationOwner {
+internal class MessageTargetNavigationOwner(
+    private val onOwnershipChanged: () -> Unit = {},
+) {
     private var owner = 0L
 
+    /** Starts a navigation that supersedes every earlier one; [onOwnershipChanged] runs first. */
     fun begin(): Request {
+        onOwnershipChanged()
         val requestOwner = ++owner
         return Request { owner == requestOwner }
     }
 
+    /** Ends the current navigation without starting another, as a reader scroll does. */
     fun cancel() {
+        onOwnershipChanged()
         owner += 1L
     }
 

@@ -296,8 +296,10 @@ private class ConversationNavigationState(
     var initialTimelineBackfillNoProgress by surfaceState.initialTimelineBackfillNoProgress
     var initialTimelineBackfillRetryGeneration by mutableLongStateOf(0L)
     val targetHighlight = MessageTargetHighlightLifecycle()
-    val targetNavigation = MessageTargetNavigationOwner()
     val focusTargetRetry = SearchTargetRetryState()
+
+    // Any newer navigation or a reader scroll supersedes a failed search landing, so its Retry leaves with it.
+    val targetNavigation = MessageTargetNavigationOwner(onOwnershipChanged = focusTargetRetry::clear)
     var navigateReplyJob by mutableStateOf<Job?>(null)
     var searchOpen by surfaceState.searchOpen
     val searchState = surfaceState.searchState
@@ -530,6 +532,8 @@ internal fun ConversationScreen(
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
     focusMessageId: String? = null,
+    // True only when focusMessageId came from a search result, which lands with the search rules (#1945).
+    focusFromSearch: Boolean = false,
     // Advances for repeated shell-level focus requests to the same message.
     focusMessageRequestId: Long = 0L,
     // Non-null only for a transport-body return to a live TTS session.
@@ -2473,36 +2477,48 @@ internal fun ConversationScreen(
 
     /**
      * The conversation's steps for landing the global-search result [target] (#1945). The landing stays current
-     * only while [request] owns navigation and no user scroll intent arrived after [intent]; TalkBack hears the
-     * destination through [view] once the row is centered.
+     * only while [request] owns navigation and no user scroll intent arrived after [intent]. Message ids are matched
+     * without regard to case, and the reader's position before the window load is kept so a target that turns out
+     * to be gone can put them back.
      */
     fun searchResultLandingSteps(
         target: String,
         request: MessageTargetNavigationOwner.Request,
         intent: ConversationScrollIntentToken,
-        view: android.view.View,
-        resources: android.content.res.Resources,
-    ) = SearchResultLandingSteps(
-        isCurrent = { request.isCurrent() && scrollCoordinator.intentToken.revision == intent.revision },
-        hidden = {
-            appState
-                .hiddenMessageIdsInGroup(conversationAccountRef, controller.group.groupIdHex)
-                .any { it.equals(target, ignoreCase = true) }
-        },
-        loadWindow = { controller.loadMessageAvailability(target) },
-        loadedRecord = { controller.timeline.firstOrNull { it.record.messageIdHex == target }?.projected },
-        center = {
-            val index = currentTimelineListIndex(target)
-            index != null && centerTimelineItemAt(target, index, ConversationScrollReason.FocusMessage)
-        },
-        announce = {
-            @Suppress("DEPRECATION")
-            view.announceForAccessibility(resources.getString(R.string.search_result_destination_announcement))
-        },
-        highlight = { showTransientMessageHighlight(target) },
-        unavailable = { appState.present(R.string.search_result_unavailable) },
-        failed = { navigationState.focusTargetRetry.failed(request) },
-    )
+    ): SearchResultLandingSteps {
+        val before = scrollCoordinator.bookmark(currentScrollAnchor())
+
+        /** The transcript's own spelling of [target], once its row is loaded. */
+        fun loaded(): TimelineMessage? {
+            val rows = controller.timeline
+            return rows.firstOrNull { it.record.messageIdHex.equals(target, ignoreCase = true) }
+        }
+
+        return SearchResultLandingSteps(
+            isCurrent = { request.isCurrent() && scrollCoordinator.intentToken.revision == intent.revision },
+            ownsNavigation = { request.isCurrent() },
+            hidden = {
+                appState
+                    .hiddenMessageIdsInGroup(conversationAccountRef, controller.group.groupIdHex)
+                    .any { it.equals(target, ignoreCase = true) }
+            },
+            loadWindow = { controller.loadMessageAvailability(target) },
+            loadedRecord = { loaded()?.projected },
+            center = {
+                val id = loaded()?.record?.messageIdHex
+                val index = id?.let(::currentTimelineListIndex)
+                index != null && centerTimelineItemAt(id, index, ConversationScrollReason.FocusMessage)
+            },
+            highlight = { showTransientMessageHighlight(loaded()?.record?.messageIdHex ?: target) },
+            unavailable = { appState.present(R.string.search_result_unavailable) },
+            failed = { navigationState.focusTargetRetry.failed(request) },
+            restoreAnchor = {
+                scrollCoordinator.restoreBookmark(before, expectedIntent = intent) { saved ->
+                    resolveScrollAnchorIndex(saved)
+                }
+            },
+        )
+    }
 
     /** Persists the chosen quick-reaction emojis. */
     fun saveQuickReactionEmojis(choices: List<String>) {
@@ -3509,11 +3525,12 @@ internal fun ConversationScreen(
 
         searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)
 
-        // Lands a global-search result (#290, #1945) or a speech destination. It waits for the first-open
-        // anchor to settle, loads the bounded window around the exact message and centers it with a brief
-        // highlight — the same affordance the reply-jump uses. Fires once per (chat.id, focusMessageId); a
-        // missing, deleted or hidden search target reports that it is unavailable and leaves the reader at the
-        // normal anchor, and a window that could not load offers Retry. Local-only: no relay fetch.
+        // Lands a global-search result (#290, #1945), or a speech, playback or attachment destination. It
+        // waits for the first-open anchor to settle, loads the bounded window around the exact message and
+        // centers it with a brief highlight, the same affordance the reply-jump uses. Fires once per (chat.id,
+        // focusMessageId). A search target that is missing, deleted or hidden reports that it is unavailable
+        // and leaves the reader where they were, and a window that could not load offers Retry; other
+        // destinations keep their own path and wording. Local-only: no relay fetch.
         LaunchedEffect(
             controller,
             focusMessageId,
@@ -3542,10 +3559,8 @@ internal fun ConversationScreen(
             snapshotFlow { initialTimelineAnchored }.filter { it }.first()
             if (!navigationRequest.isCurrent()) return@LaunchedEffect
             val scrollIntent = scrollCoordinator.intentToken
-            if (ttsFocusSessionId == null) {
-                landSearchResult(
-                    searchResultLandingSteps(focus, navigationRequest, scrollIntent, arrivalView, arrivalResources),
-                )
+            if (landsAsSearchResult(focus, focusFromSearch, ttsFocusSessionId)) {
+                landSearchResult(searchResultLandingSteps(focus, navigationRequest, scrollIntent))
                 return@LaunchedEffect
             }
             var target = controller.loadScrollNavigationTarget(focus)
