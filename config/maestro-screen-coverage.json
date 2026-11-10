@@ -170,6 +170,9 @@
     ],
     "NotificationDelivery": [
       "settings-notification-delivery"
+    ],
+    "EmojiSets": [
+      "advanced-emoji-sets"
     ]
   },
   "main_routes": {

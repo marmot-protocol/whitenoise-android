@@ -537,7 +537,7 @@ internal fun ComposerBar(
     val installedEmoji =
         rememberInstalledEmojiPicker(
             appState?.takeIf {
-                dictationAccountRef == it.activeAccountRef &&
+                draftAccountRef == it.activeAccountRef &&
                     replyingTo == null &&
                     editingMessageId == null &&
                     !hasPendingAttachments

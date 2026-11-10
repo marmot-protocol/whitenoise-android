@@ -176,7 +176,7 @@
       {
         "surface": "setting:emoji_sets_item_count",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
-        "anchor": "R.string.emoji_sets_item_count",
+        "anchor": "R.plurals.emoji_sets_item_count",
         "test_ids": [
           "SET-048"
         ]
@@ -224,7 +224,7 @@
       {
         "surface": "setting:emoji_sets_skipped",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
-        "anchor": "R.string.emoji_sets_skipped",
+        "anchor": "R.plurals.emoji_sets_skipped",
         "test_ids": [
           "SET-048"
         ]

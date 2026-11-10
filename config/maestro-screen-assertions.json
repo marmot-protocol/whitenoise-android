@@ -3696,6 +3696,44 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+      "symbol": "EmojiSetsScreen",
+      "bindings": [
+        {
+          "case": "advanced-emoji-sets",
+          "selector": {
+            "id": "emoji_sets.query"
+          },
+          "scope": "Emoji sets destination opened from Custom emoji for the fixture's active account; no relay results or installs.",
+          "entry_assertion": {
+            "id": "emoji_sets.query"
+          },
+          "opened_by": {
+            "text": "Emoji sets"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+      "symbol": "EmojiSetBrowser",
+      "bindings": [
+        {
+          "case": "advanced-emoji-sets",
+          "selector": {
+            "text": "Find sets"
+          },
+          "scope": "Browser search field and Find sets action only; discovery, previews and installs remain manual (SET-048).",
+          "entry_assertion": {
+            "text": "Find sets"
+          },
+          "opened_by": {
+            "text": "Emoji sets"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
       "symbol": "DataUsageScreen",
       "bindings": [

@@ -1642,6 +1642,35 @@
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
     <string name="custom_emoji">Eigene Emoji</string>
+    <string name="emoji_sets_title">Emoji-Sets</string>
+    <string name="emoji_sets_account_required">Wähle ein Profil, um Emoji-Sets zu durchsuchen und zu installieren.</string>
+    <string name="emoji_sets_query">Suchen oder Set-Link einfügen</string>
+    <string name="emoji_sets_find">Sets finden</string>
+    <string name="emoji_sets_open">Emoji-Set öffnen</string>
+    <string name="emoji_sets_empty">Noch keine Sets. Finde Sets auf deinen Relays oder füge einen geteilten Set-Link ein.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d Emoji</item>
+        <item quantity="other">%1$d Emoji</item>
+    </plurals>
+    <string name="emoji_sets_installed">Installiert</string>
+    <string name="emoji_sets_update_available">Update verfügbar</string>
+    <string name="emoji_sets_load_image">Vorschaubild laden</string>
+    <string name="emoji_sets_image_privacy">Beim Laden einer Vorschau oder Installieren eines Sets sehen dessen Bild-Hosts deine IP-Adresse.</string>
+    <string name="emoji_sets_preview_host">Host des Vorschaubilds: %1$s</string>
+    <string name="emoji_sets_install">Set installieren</string>
+    <string name="emoji_sets_update">Set aktualisieren</string>
+    <string name="emoji_sets_check_update">Nach Update suchen</string>
+    <string name="emoji_sets_preparing_install">Installation wird vorbereitet…</string>
+    <string name="emoji_sets_install_progress">%1$d von %2$d Emoji verarbeitet</string>
+    <string name="emoji_sets_error">Die Anfrage konnte nicht abgeschlossen werden. Versuche es erneut.</string>
+    <string name="emoji_sets_not_found">Set oder Bild nicht gefunden. Prüfe den Link oder versuche es erneut.</string>
+    <string name="emoji_sets_changed">Dieses Set hat sich geändert. Prüfe die neue Version vor der Installation.</string>
+    <string name="emoji_sets_cancelled">Installation abgebrochen.</string>
+    <string name="emoji_sets_discovery_incomplete">Einige Relays waren nicht erreichbar. Die Ergebnisse sind möglicherweise unvollständig.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Installiert, %1$d Eintrag übersprungen.</item>
+        <item quantity="other">Installiert, %1$d Einträge übersprungen.</item>
+    </plurals>
     <string name="custom_emoji_detail">Bilder hier werden zu :shortcode:-Emoji und auf diesem Gerät gespeichert. Eine neue Nachricht (keine Antwort) mit einem Emoji lädt dessen Bild verschlüsselt in diesen Chat hoch. Reaktionen, Antworten und Bearbeitungen senden nur den Shortcode.</string>
     <string name="custom_emoji_empty">Noch keine eigenen Emoji.</string>
     <string name="custom_emoji_name_title">Emoji benennen</string>

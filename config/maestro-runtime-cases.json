@@ -310,6 +310,14 @@
       "assertions": "Custom emoji management opens with photo/file actions and Back returns to Appearance.",
       "postcondition": "none"
     },
+    "advanced-emoji-sets": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-048"
+      ],
+      "assertions": "Emoji sets opens from Custom emoji with its search field and Find sets action, and Back returns to Custom emoji.",
+      "postcondition": "none"
+    },
     "connectors-hermes": {
       "suite": "connectors",
       "manual_ids": [

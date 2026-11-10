@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -194,7 +195,10 @@ private fun EmojiSetBrowser(
                                 set.installed?.updateAvailable == true ->
                                     stringResource(R.string.emoji_sets_update_available)
                                 set.installed != null -> stringResource(R.string.emoji_sets_installed)
-                                else -> stringResource(R.string.emoji_sets_item_count, set.emoji.size)
+                                else -> {
+                                    val count = set.emoji.size
+                                    pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
+                                }
                             },
                         enabled = !state.busy,
                         onClick = { onShow(set) },
@@ -252,7 +256,7 @@ private fun EmojiSetPreviewHeader(
     ) {
         Text(set.displayTitle(), style = MaterialTheme.typography.headlineSmall)
         set.description?.takeIf { it.isNotBlank() }?.let { Text(it) }
-        Text(stringResource(R.string.emoji_sets_item_count, set.emoji.size))
+        Text(pluralStringResource(R.plurals.emoji_sets_item_count, set.emoji.size, set.emoji.size))
         Text(
             stringResource(R.string.emoji_sets_image_privacy),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -268,7 +272,7 @@ private fun EmojiSetPreviewHeader(
                     value = withContext(Dispatchers.IO) { decodeEmojiImage(state.artwork)?.let(EmojiArt::Decoded) }
                 }
                 art?.let {
-                    EmojiArtImage(it, stringResource(R.string.emoji_sets_load_image), Modifier.size(EmojiSetImageSize))
+                    EmojiArtImage(it, set.displayTitle(), Modifier.size(EmojiSetImageSize))
                 }
             }
         } else if (imageUrl != null) {
@@ -356,7 +360,7 @@ private fun EmojiSetStatus(state: EmojiSetsState) {
             null -> null
         }
     notice?.let { SettingsExplainer(stringResource(it)) }
-    state.installedWithSkips?.let { SettingsExplainer(stringResource(R.string.emoji_sets_skipped, it)) }
+    state.installedWithSkips?.let { SettingsExplainer(pluralStringResource(R.plurals.emoji_sets_skipped, it, it)) }
 }
 
 private fun EmojiSetFfi.displayTitle(): String = title?.takeIf { it.isNotBlank() } ?: identifier.ifBlank { coordinate }

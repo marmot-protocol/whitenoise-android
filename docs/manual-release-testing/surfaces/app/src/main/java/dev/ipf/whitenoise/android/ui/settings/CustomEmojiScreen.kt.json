@@ -20,6 +20,15 @@
         ]
       },
       {
+        "surface": "CustomEmojiAddActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "fun CustomEmojiAddActions(",
+        "test_ids": [
+          "SET-030",
+          "SET-048"
+        ]
+      },
+      {
         "surface": "CustomEmojiNameDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
         "anchor": "fun CustomEmojiNameDialog(",

@@ -1934,7 +1934,10 @@
     <string name="emoji_sets_find">Find sets</string>
     <string name="emoji_sets_open">Open emoji set</string>
     <string name="emoji_sets_empty">No sets yet. Find sets on your relays or paste a shared set link.</string>
-    <string name="emoji_sets_item_count">%1$d emoji</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d emoji</item>
+        <item quantity="other">%1$d emoji</item>
+    </plurals>
     <string name="emoji_sets_installed">Installed</string>
     <string name="emoji_sets_update_available">Update available</string>
     <string name="emoji_sets_load_image">Load preview image</string>
@@ -1950,7 +1953,10 @@
     <string name="emoji_sets_changed">This set changed. Review the new version before installing.</string>
     <string name="emoji_sets_cancelled">Install cancelled.</string>
     <string name="emoji_sets_discovery_incomplete">Some relays couldn’t be reached. Results may be incomplete.</string>
-    <string name="emoji_sets_skipped">Installed with %1$d entries skipped.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Installed with %1$d entry skipped.</item>
+        <item quantity="other">Installed with %1$d entries skipped.</item>
+    </plurals>
     <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. A new message (not a reply) using one uploads its image, encrypted, to that chat. Reactions, replies and edits send only the shortcode.</string>
     <string name="custom_emoji_empty">No custom emoji yet.</string>
     <string name="custom_emoji_name_title">Name this emoji</string>

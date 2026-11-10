@@ -90,10 +90,14 @@ internal fun ComposerEmojiLibrary(
 /** Resolves one visible shortcode without retaining stale pixels when its set or account changes. */
 @Composable
 internal fun installedEmojiArtwork(shortcode: String): EmojiArt? {
-    val picker = LocalCustomEmoji.current.installed ?: return null
-    val entry = picker.entries[shortcode] ?: return null
-    return key(picker, entry) {
-        val art by produceState<EmojiArt?>(null) { value = picker.artwork(entry) }
-        art
+    val picker = LocalCustomEmoji.current.installed
+    val entry = picker?.entries?.get(shortcode)
+    return if (picker == null || entry == null) {
+        null
+    } else {
+        key(picker, entry) {
+            val art by produceState<EmojiArt?>(null) { value = picker.artwork(entry) }
+            art
+        }
     }
 }

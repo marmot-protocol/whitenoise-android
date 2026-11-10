@@ -146,35 +146,7 @@ internal fun CustomEmojiContent(
     SettingsScaffold(title = stringResource(R.string.custom_emoji), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(CUSTOM_EMOJI_CONTENT_TAG)) {
             item(key = "search.CustomEmoji.1") { SettingsExplainer(stringResource(R.string.custom_emoji_detail)) }
-            item(key = "search.CustomEmoji.2") {
-                SettingsGroup(modifier = Modifier.testTag("custom_emoji.add")) {
-                    row("choose_photo") { context ->
-                        SettingsAction(
-                            context = context,
-                            title = stringResource(R.string.choose_photos),
-                            onClick = onChoosePhoto,
-                            leading = { Icon(painterResource(R.drawable.ic_image), contentDescription = null) },
-                        )
-                    }
-                    if (onOpenSets != null) {
-                        row("emoji_sets") { context ->
-                            SettingsLink(
-                                context = context,
-                                title = stringResource(R.string.emoji_sets_title),
-                                onClick = onOpenSets,
-                            )
-                        }
-                    }
-                    row("choose_file") { context ->
-                        SettingsAction(
-                            context = context,
-                            title = stringResource(R.string.choose_files),
-                            onClick = onChooseFile,
-                            leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
-                        )
-                    }
-                }
-            }
+            item(key = "search.CustomEmoji.2") { CustomEmojiAddActions(onChoosePhoto, onChooseFile, onOpenSets) }
             if (emoji.entries.isEmpty()) {
                 item(key = "search.CustomEmoji.3") { SettingsExplainer(stringResource(R.string.custom_emoji_empty)) }
             } else {
@@ -203,6 +175,43 @@ internal fun CustomEmojiContent(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Photo and file imports, with the emoji-set browser between them when the screen can open it. */
+@Suppress("FunctionNaming")
+@Composable
+private fun CustomEmojiAddActions(
+    onChoosePhoto: () -> Unit,
+    onChooseFile: () -> Unit,
+    onOpenSets: (() -> Unit)?,
+) {
+    SettingsGroup(modifier = Modifier.testTag("custom_emoji.add")) {
+        row("choose_photo") { context ->
+            SettingsAction(
+                context = context,
+                title = stringResource(R.string.choose_photos),
+                onClick = onChoosePhoto,
+                leading = { Icon(painterResource(R.drawable.ic_image), contentDescription = null) },
+            )
+        }
+        if (onOpenSets != null) {
+            row("emoji_sets") { context ->
+                SettingsLink(
+                    context = context,
+                    title = stringResource(R.string.emoji_sets_title),
+                    onClick = onOpenSets,
+                )
+            }
+        }
+        row("choose_file") { context ->
+            SettingsAction(
+                context = context,
+                title = stringResource(R.string.choose_files),
+                onClick = onChooseFile,
+                leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+            )
         }
     }
 }

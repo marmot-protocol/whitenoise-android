@@ -8,9 +8,9 @@ private const val MAX_SET_LINK_LENGTH = 2048
 /** Extracts an emoji-set address from paste or share without ever opening the HTTP URL. */
 internal fun emojiSetAddress(input: String): String? {
     val text = input.trim()
-    if (text.length > MAX_SET_LINK_LENGTH) return null
     val reference =
         when {
+            text.length > MAX_SET_LINK_LENGTH -> null
             text.startsWith("nostr:", ignoreCase = true) -> text.substringAfter(':')
             text.startsWith("https://", ignoreCase = true) ->
                 runCatching { URI(text).path?.substringAfterLast('/') }.getOrNull()
