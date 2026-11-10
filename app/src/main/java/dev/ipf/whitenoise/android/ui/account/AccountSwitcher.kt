@@ -62,6 +62,8 @@ fun AccountAvatarButton(
     unreadDotColor: Color? = null,
     actionDescription: String? = null,
     touchTargetSize: Dp = 56.dp,
+    // Names the tap action for accessibility services when it is not the button's own purpose.
+    onClickLabel: String? = null,
 ) {
     val openSettingsDescription = actionDescription ?: stringResource(R.string.open_settings)
     val accountUnreadDescription =
@@ -78,7 +80,15 @@ fun AccountAvatarButton(
         modifier =
             modifier
                 .size(touchTargetSize)
-                .semantics { contentDescription = avatarContentDescription },
+                .semantics {
+                    contentDescription = avatarContentDescription
+                    if (onClickLabel != null) {
+                        onClick(label = onClickLabel) {
+                            onClick()
+                            true
+                        }
+                    }
+                },
     ) {
         Box {
             Avatar(

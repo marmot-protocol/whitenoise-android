@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -175,9 +176,9 @@ class GroupMembersReviewScreenshotTest {
         }
     }
 
-    /** An unavailable formatter never leaks raw keys or operational group identifiers. */
+    /** An unavailable formatter never leaks raw keys or operational group identifiers; the actor stays an avatar. */
     @Test
-    fun unavailableFormatterHidesRawKeysAndKeepsLocalActorLabel() {
+    fun unavailableFormatterHidesRawKeysAndShowsActorAvatar() {
         val actor = "a".repeat(64)
         val member = "b".repeat(64)
         val state = emptyAppState(accounts = listOf(testAccount("Owner", actor)), activeAccountRef = "Owner")
@@ -194,7 +195,7 @@ class GroupMembersReviewScreenshotTest {
                 )
             }
         }
-        rule.onNodeWithText("Local account label: Owner").assertExists()
+        rule.onNodeWithTag("group.action.acting_account").assertIsDisplayed()
         rule.onAllNodesWithText(actor, substring = true).assertCountEquals(0)
         rule.onAllNodesWithText(member, substring = true).assertCountEquals(0)
         rule.onAllNodesWithText("Public key", substring = true).assertCountEquals(0)
@@ -321,7 +322,7 @@ class GroupMembersReviewScreenshotTest {
                 .getApplicationContext<Context>()
                 .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         listOf(REVIEW_FIRST_MEMBER_NPUB, REVIEW_SECOND_MEMBER_NPUB).forEach { npub ->
-            val memberCopy = rule.onNodeWithContentDescription("Member, $npub")
+            val memberCopy = rule.onNodeWithContentDescription("Alex, Member, $npub")
             memberCopy.performScrollTo()
             val memberBounds = memberCopy.fetchSemanticsNode().boundsInRoot
             assertTrue(memberBounds.height >= 48f && memberBounds.width >= 48f)
@@ -373,6 +374,42 @@ class GroupMembersReviewScreenshotTest {
             .captureRoboImage("src/test/snapshots/group_member_review_overflow.png")
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
         assertEquals(1, submits)
+    }
+
+    /** A dozen destinations scroll in the body, so huge text never pushes the actions off screen. */
+    @Test
+    fun manyDestinationsKeepActionsAndLastGroupReachable() {
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
+        val member =
+            RecipientSearch.Candidate(
+                "b".repeat(64),
+                "Private member",
+                "npub1member",
+                searchProfile = UserProfileMetadataFfi("Member", null, null, null, null, null, null),
+            )
+        rule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = (1..30).map { MemberReviewGroup("group-$it", "Group $it") },
+                    members = listOf(member),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add member",
+                )
+            }
+        }
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+        rule.onNodeWithText("Cancel").assertIsDisplayed()
+        rule.onNodeWithText("Group 30").assertIsNotDisplayed()
+        rule.onNodeWithText("Group 30").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+        rule
+            .onNodeWithTag("group.members.review.dialog")
+            .captureRoboImage("src/test/snapshots/group_member_review_many_groups.png")
     }
 
     /** Retains selection on cancellation and closes review when its destination changes. */
@@ -504,7 +541,7 @@ class GroupMembersReviewScreenshotTest {
         assertEquals(1, dismisses)
     }
 
-    /** An unresolved public name shows exactly one shortened npub, with person before destination. */
+    /** An unresolved public name shows exactly one shortened npub, below its destinations. */
     @Test
     fun unnamedMemberHasOneAbbreviatedIdentity() {
         val state =
@@ -542,7 +579,7 @@ class GroupMembersReviewScreenshotTest {
         rule.onAllNodesWithText(short).assertCountEquals(1)
         val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
         val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
-        assertTrue(person.right <= group.left)
+        assertTrue(group.bottom <= person.top)
         rule
             .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_unnamed.png")
@@ -553,7 +590,7 @@ class GroupMembersReviewScreenshotTest {
     @Config(qualifiers = "en-w360dp-h1280dp-mdpi")
     fun multipleMembersLarge() = captureMultipleMembers(false)
 
-    /** Mirrors the paired identity columns without losing per-member control grouping. */
+    /** Mirrors the member rows without losing per-member control grouping. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1280dp-mdpi")
     fun multipleMembersLargeRtl() = captureMultipleMembers(true)

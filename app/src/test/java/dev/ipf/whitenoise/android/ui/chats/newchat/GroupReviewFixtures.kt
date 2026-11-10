@@ -8,9 +8,15 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -130,17 +136,25 @@ internal fun ComposeContentTestRule.assertGroupMembersReview(rtl: Boolean) {
         assertTrue("Single-member review should leave comfortable room on a 780dp screen", bounds.height <= 460f)
         onAllNodesWithText("Add member").assertCountEquals(2)
     }
-    assertReviewNpubCopy("Acting account", GROUP_REVIEW_ACTOR_NPUB)
-    assertReviewNpubCopy("Member", REVIEW_SECOND_MEMBER_NPUB, scroll = true)
+    // The actor is a picture announced by role and name; it still copies the full npub.
+    assertReviewNpubCopy(onNodeWithContentDescription("Acting account, ", substring = true), GROUP_REVIEW_ACTOR_NPUB)
+    assertReviewNpubCopy(
+        onNodeWithContentDescription(", Member, $REVIEW_SECOND_MEMBER_NPUB", substring = true),
+        REVIEW_SECOND_MEMBER_NPUB,
+        scroll = true,
+    )
 }
 
-private fun ComposeContentTestRule.assertReviewNpubCopy(
-    role: String,
+/** Checks a 48dp target that announces a Copy action and puts exactly [npub] on the clipboard when tapped. */
+private fun assertReviewNpubCopy(
+    node: SemanticsNodeInteraction,
     npub: String,
     scroll: Boolean = false,
 ) {
-    val node = onNodeWithContentDescription("$role, $npub")
     if (scroll) node.performScrollTo()
+    node.assert(
+        SemanticsMatcher("announces Copy") { it.config.getOrNull(SemanticsActions.OnClick)?.label == "Copy" },
+    )
     val bounds = node.fetchSemanticsNode().boundsInRoot
     assertTrue(bounds.height >= 48f && bounds.width >= 48f)
     node.performClick()
@@ -157,16 +171,18 @@ private fun ComposeContentTestRule.assertReviewNpubCopy(
     )
 }
 
-/** Verifies public identity, privacy and logical column order before the golden is captured. */
+/** Verifies public identity, privacy and destination-above-members order before the golden is captured. */
 private fun ComposeContentTestRule.assertPublicReviewIdentity(
     npub: String,
     rtl: Boolean,
 ) {
-    onNodeWithText("Garden club").assertIsDisplayed()
-    onNodeWithText(if (rtl) "Alice Public with a long profile name" else "alice").performScrollTo().assertIsDisplayed()
+    onNodeWithText("to Garden club").assertIsDisplayed()
+    val name = if (rtl) "Alice Public with a long profile name" else "alice"
+    onNodeWithText(name).performScrollTo().assertIsDisplayed()
+    onNodeWithTag("group.members.review.member").assert(hasContentDescription("$name, Member, $npub"))
     onNodeWithText(IdentityFormatter.short(npub, prefix = 10, suffix = 8)).performScrollTo().assertIsDisplayed()
     onNode(hasText("Private Alice") and hasAnyAncestor(hasTestTag("group.members.review.member"))).assertDoesNotExist()
     val group = onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
     val person = onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
-    assertTrue(if (rtl) person.bottom <= group.top else person.center.x < group.center.x)
+    assertTrue("The destination heads the member rows", group.bottom <= person.top)
 }

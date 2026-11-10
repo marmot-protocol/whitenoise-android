@@ -2618,7 +2618,7 @@
         <item quantity="other">%1$d группы</item>
     </plurals>
     <string name="group_review_add_member">Добавить участника</string>
-    <string name="group_review_invitation_visibility">Видно всем участникам.</string>
+    <string name="group_review_destination">в %1$s</string>
     <string name="search_scope_this_chat">Этот чат · %1$s</string>
     <string name="search_scope_all_chats">Все чаты</string>
     <string name="search_scope_other_chats">Искать в других чатах</string>

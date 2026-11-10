@@ -4,9 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,6 +41,33 @@ internal fun GroupReviewPersonIdentity(
     role: String,
     modifier: Modifier = Modifier,
 ) {
+    val person = rememberGroupReviewPerson(appState, member)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Avatar(
+            person.publicName ?: person.identifier,
+            member.accountIdHex,
+            48.dp,
+            pictureUrl = person.picture,
+            pictureDomain = AvatarImageLoader.publicProfiles(),
+        )
+        GroupReviewPersonText(person, role)
+    }
+}
+
+/** Public facts shown for one reviewed person; a local nickname never replaces the public name. */
+internal data class GroupReviewPerson(
+    val identifier: String,
+    val publicName: String?,
+    val nickname: String?,
+    val picture: String?,
+)
+
+/** The member's public name, picture and npub as the active account currently sees them. */
+@Composable
+internal fun rememberGroupReviewPerson(
+    appState: WhiteNoiseAppState,
+    member: RecipientSearch.Candidate,
+): GroupReviewPerson {
     val revision = appState.profileRevisionForCompose
     val profile = remember(appState, member.accountIdHex, revision) { appState.userProfile(member.accountIdHex) }
     val identifier = groupReviewPublicIdentifier(appState, member)
@@ -54,21 +82,30 @@ internal fun GroupReviewPersonIdentity(
             ?.takeIf { it != publicName }
             ?.let(::reviewMemberPublicName)
     val picture = ProfileSanitizer.protocolImageUrl(profile?.picture ?: member.searchProfile?.picture)
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Avatar(
-            publicName ?: identifier,
-            member.accountIdHex,
-            48.dp,
-            pictureUrl = picture,
-            pictureDomain = AvatarImageLoader.publicProfiles(),
-        )
-        publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-        nickname?.let { Text(stringResource(R.string.group_action_local_nickname, it)) }
-        if (identifier.isNotBlank()) {
-            GroupReviewNpub(identifier, role)
-        } else if (publicName == null) {
-            Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
+    return GroupReviewPerson(identifier, publicName, nickname, picture)
+}
+
+/**
+ * Name, local nickname and npub, or one unknown label when nothing public exists. The npub is its own
+ * copy target unless [copyable] is false because an enclosing [GroupReviewCopyRow] already copies it.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun GroupReviewPersonText(
+    person: GroupReviewPerson,
+    role: String,
+    copyable: Boolean = true,
+) {
+    person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
+    groupReviewNicknameLabel(person)?.let { Text(it) }
+    if (person.identifier.isNotBlank()) {
+        if (copyable) {
+            GroupReviewNpub(person.identifier, role)
+        } else {
+            Text(groupReviewNpubLabel(person.identifier), style = MaterialTheme.typography.bodySmall)
         }
+    } else if (person.publicName == null) {
+        Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -94,6 +131,23 @@ internal fun GroupActingAccountIdentity(
     }
 }
 
+/** The local nickname line, kept separate from the public name so it is never mistaken for one. */
+@Composable
+private fun groupReviewNicknameLabel(person: GroupReviewPerson): String? {
+    val nickname = person.nickname ?: return null
+    return stringResource(R.string.group_action_local_nickname, nickname)
+}
+
+/** What [GroupReviewPersonText] shows, spoken in order with the [role] and full npub, for a merged row. */
+@Composable
+internal fun groupReviewPersonDescription(
+    person: GroupReviewPerson,
+    role: String,
+): String {
+    val nickname = groupReviewNicknameLabel(person)
+    return listOfNotNull(person.publicName, nickname, role, person.identifier).joinToString(", ")
+}
+
 /** A small visible label with a full-size copy target and complete spoken identity. */
 @Composable
 @Suppress("FunctionNaming")
@@ -102,17 +156,40 @@ private fun GroupReviewNpub(
     role: String,
     compact: Boolean = false,
 ) {
+    GroupReviewCopyRow(npub, "$role, $npub") {
+        Text(groupReviewNpubLabel(npub, compact), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** The shortened npub shown beside a name; the full value is spoken and copied. */
+private fun groupReviewNpubLabel(
+    npub: String,
+    compact: Boolean = false,
+): String = IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
+
+/**
+ * A row of at least 48dp that copies the full [npub], announced once as [description] with a Copy action.
+ * The merged description replaces the children's text, so it must name everything the row shows.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun GroupReviewCopyRow(
+    npub: String,
+    description: String,
+    modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
+    content: @Composable RowScope.() -> Unit,
+) {
     val clipboard = LocalClipboardManager.current
     val copyLabel = stringResource(R.string.copy)
-    Text(
-        IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8),
-        style = MaterialTheme.typography.bodySmall,
-        modifier =
-            Modifier
-                .heightIn(min = 48.dp)
-                .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.setText(AnnotatedString(npub)) }
-                .semantics(mergeDescendants = true) { contentDescription = "$role, $npub" }
-                .wrapContentHeight(Alignment.CenterVertically),
+    Row(
+        modifier
+            .heightIn(min = 48.dp)
+            .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.setText(AnnotatedString(npub)) }
+            .semantics(mergeDescendants = true) { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = horizontalArrangement,
+        content = content,
     )
 }
 
