@@ -882,6 +882,9 @@
     <string name="toast_couldnt_accept_invite">Einladung konnte nicht angenommen werden</string>
     <string name="toast_invite_declined">Ablehnen</string>
     <string name="toast_couldnt_decline_invite">Einladung konnte nicht abgelehnt werden</string>
+    <string name="invite_decline_step_down_title">Zurücktreten und ablehnen?</string>
+    <string name="invite_decline_step_down_message">Mit dieser Einladung bist du Admin. Um abzulehnen, trittst du zuerst als Admin zurück, und die Mitglieder der Gruppe sehen, dass du zurückgetreten bist.</string>
+    <string name="invite_decline_step_down_confirm">Zurücktreten und ablehnen</string>
     <string name="toast_chat_archived">Chat archiviert</string>
     <string name="toast_chat_restored">Chat wiederhergestellt</string>
     <string name="toast_couldnt_update_chat">Chat konnte nicht aktualisiert werden</string>

@@ -882,6 +882,9 @@
     <string name="toast_couldnt_accept_invite">Davet kabul edilemedi</string>
     <string name="toast_invite_declined">Reddet</string>
     <string name="toast_couldnt_decline_invite">Davet reddedilemedi</string>
+    <string name="invite_decline_step_down_title">Yöneticilikten çekilip reddedilsin mi?</string>
+    <string name="invite_decline_step_down_message">Bu davet sizi yönetici yapıyor. Reddetmek için önce yöneticilikten çekileceksiniz ve grup üyeleri bunu görecek.</string>
+    <string name="invite_decline_step_down_confirm">Çekil ve reddet</string>
     <string name="toast_chat_archived">Sohbet arşivlendi</string>
     <string name="toast_chat_restored">Sohbet geri yüklendi</string>
     <string name="toast_couldnt_update_chat">Sohbet güncellenemedi</string>

@@ -11303,12 +11303,46 @@ class ConversationController(
         inviteConfirmationAuthority.finish()
     }
 
-    /** Declines the current pending Welcome, stepping down first when MDK refuses an admin's decline. */
-    suspend fun declineInvite(): Boolean =
+    // The invitation whose decline waits for the user to agree to step down as admin first.
+    private var inviteDeclineStepDownRequest by mutableStateOf<InviteAcceptanceGeneration?>(null)
+
+    /** Whether Decline is waiting for the user to agree to step down as admin, for the invitation still shown. */
+    val inviteDeclineStepDownRequested: Boolean
+        get() {
+            val request = inviteDeclineStepDownRequest ?: return false
+            return group.pendingConfirmation && request == inviteGeneration(group)
+        }
+
+    /** Withdraws the step-down question, so nothing is declined and no role changes. */
+    fun cancelInviteDeclineStepDown() {
+        inviteDeclineStepDownRequest = null
+    }
+
+    /**
+     * Declines the current pending Welcome. Declining counts as leaving, and MDK will not let an admin leave until
+     * they step down, which the group's members see, so an admin invitee is asked first instead of being stepped
+     * down silently. A non-admin invitee declines at once.
+     */
+    suspend fun declineInvite(): Boolean = declineInviteWithConsent(stepDownConsent = null)
+
+    /** Steps down and declines the invitation the user agreed to, but only while it is still the one shown. */
+    suspend fun confirmInviteDeclineStepDown(): Boolean {
+        val consent = inviteDeclineStepDownRequest ?: return false
+        inviteDeclineStepDownRequest = null
+        return declineInviteWithConsent(stepDownConsent = consent)
+    }
+
+    /**
+     * Declines the current pending Welcome, stepping down first only when [stepDownConsent] names this invitation.
+     * Without that consent an admin invitee, or a decline MDK refuses for an admin, raises the step-down question.
+     */
+    private suspend fun declineInviteWithConsent(stepDownConsent: InviteAcceptanceGeneration?): Boolean =
         withMutationLockResult(false) {
             if (inviteAcceptanceResolutionPending) return@withMutationLockResult false
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val invitation = inviteGeneration(group)
+            val stepDownAgreed = stepDownConsent != null
+            if (!mayDeclineWithoutAsking(invitation, stepDownConsent)) return@withMutationLockResult false
             val stillPending = {
                 mutationPresentation.ownsCurrentPresentation() &&
                     !inviteAcceptanceResolutionPending &&
@@ -11316,7 +11350,14 @@ class ConversationController(
                     inviteGeneration(group) == invitation
             }
             runCatching {
-                if (!declinePendingInvite(account, invitation.groupIdHex, stillPending)) return@runCatching false
+                when (declinePendingInvite(account, invitation.groupIdHex, stepDownAgreed, stillPending)) {
+                    InviteDeclineOutcome.DECLINED -> Unit
+                    InviteDeclineOutcome.STALE -> return@runCatching false
+                    InviteDeclineOutcome.NEEDS_STEP_DOWN_CONSENT -> {
+                        inviteDeclineStepDownRequest = invitation
+                        return@runCatching false
+                    }
+                }
                 appState.dismissConversationNotifications(account, invitation.groupIdHex)
                 if (mutationPresentation.ownsCurrentPresentation() && inviteGeneration(group) == invitation) {
                     group = group.copy(pendingConfirmation = false, archived = true)
@@ -11326,31 +11367,57 @@ class ConversationController(
                 true
             }.getOrElse { failure ->
                 failure.rethrowIfCancellation()
-                if (
-                    failure is MarmotKitException.WouldRemoveLastAdmin &&
-                    failure.groupIdHex.equals(invitation.groupIdHex, ignoreCase = true)
-                ) {
-                    appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-                } else {
-                    appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", failure)
-                }
+                presentInviteDeclineFailure(failure, invitation)
                 false
             }
         }
 
-    /** Serializes decline with commits and keeps an admitted step-down and its decline together. */
+    /**
+     * Whether Decline may go ahead for [invitation]. Consent counts only for the invitation it named, and an admin
+     * invitee who has not agreed to step down may not go ahead, so the question is raised for them instead.
+     */
+    private fun mayDeclineWithoutAsking(
+        invitation: InviteAcceptanceGeneration,
+        stepDownConsent: InviteAcceptanceGeneration?,
+    ): Boolean {
+        if (stepDownConsent != null) return stepDownConsent == invitation
+        if (isSelfAdmin) inviteDeclineStepDownRequest = invitation
+        return !isSelfAdmin
+    }
+
+    /** Explains a failed decline, giving a sole admin the same guidance as Leave instead of a generic failure. */
+    private fun presentInviteDeclineFailure(
+        failure: Throwable,
+        invitation: InviteAcceptanceGeneration,
+    ) {
+        if (
+            failure is MarmotKitException.WouldRemoveLastAdmin &&
+            failure.groupIdHex.equals(invitation.groupIdHex, ignoreCase = true)
+        ) {
+            appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+        } else {
+            appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", failure)
+        }
+    }
+
+    /**
+     * Serializes decline with commits and keeps an admitted step-down and its decline together. MDK refusing an
+     * admin's decline steps down only when [stepDownAgreed], otherwise the caller asks the user first.
+     */
     private suspend fun declinePendingInvite(
         account: String,
         groupIdHex: String,
+        stepDownAgreed: Boolean,
         stillPending: () -> Boolean,
-    ): Boolean =
+    ): InviteDeclineOutcome =
         appState.withGroupCommitLock(account, groupIdHex) {
-            if (!stillPending()) return@withGroupCommitLock false
+            if (!stillPending()) return@withGroupCommitLock InviteDeclineOutcome.STALE
             try {
                 appState.marmotIo { declineGroupInvite(account, groupIdHex) }
             } catch (refusal: MarmotKitException.AdminCannotSelfRemove) {
                 if (!refusal.groupIdHex.equals(groupIdHex, ignoreCase = true)) throw refusal
-                if (!stillPending()) return@withGroupCommitLock false
+                if (!stepDownAgreed) return@withGroupCommitLock InviteDeclineOutcome.NEEDS_STEP_DOWN_CONSENT
+                if (!stillPending()) return@withGroupCommitLock InviteDeclineOutcome.STALE
                 val declineResult =
                     appState.runGroupChange(
                         account,
@@ -11370,7 +11437,7 @@ class ConversationController(
                     }
                 declineResult.getOrThrow()
             }
-            true
+            InviteDeclineOutcome.DECLINED
         }
 
     /**

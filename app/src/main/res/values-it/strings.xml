@@ -884,6 +884,9 @@
     <string name="toast_couldnt_accept_invite">Impossibile accettare l’invito</string>
     <string name="toast_invite_declined">Rifiuta</string>
     <string name="toast_couldnt_decline_invite">Impossibile rifiutare l’invito</string>
+    <string name="invite_decline_step_down_title">Rinunciare al ruolo admin e rifiutare?</string>
+    <string name="invite_decline_step_down_message">Questo invito ti rende admin. Per rifiutarlo, rinuncerai prima al ruolo admin e i membri del gruppo lo vedranno.</string>
+    <string name="invite_decline_step_down_confirm">Rinuncia e rifiuta</string>
     <string name="toast_chat_archived">Chat archiviata</string>
     <string name="toast_chat_restored">Chat ripristinata</string>
     <string name="toast_couldnt_update_chat">Impossibile aggiornare la chat</string>

@@ -9,6 +9,18 @@ internal data class InviteAcceptanceGeneration(
     val welcomeMessageIdHex: String?,
 )
 
+/** How one native decline attempt ended. */
+internal enum class InviteDeclineOutcome {
+    /** MDK declined the invitation. */
+    DECLINED,
+
+    /** The invitation changed or was settled before the decline could run. */
+    STALE,
+
+    /** MDK refused because the invitee is an admin, and the user has not agreed to step down. */
+    NEEDS_STEP_DOWN_CONSENT,
+}
+
 /** Captured account and invitation revision required to settle one native Join attempt. */
 internal data class InviteAcceptanceAttempt(
     val account: String,

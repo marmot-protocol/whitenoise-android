@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-surface-stepdown-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Step down and decline\?
+- assertVisible:
+    text: This invitation makes you an admin.*
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

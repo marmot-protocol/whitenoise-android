@@ -884,6 +884,9 @@
     <string name="toast_couldnt_accept_invite">Não foi possível aceitar o convite</string>
     <string name="toast_invite_declined">Recusar</string>
     <string name="toast_couldnt_decline_invite">Não foi possível recusar o convite</string>
+    <string name="invite_decline_step_down_title">Deixar de ser administrador e recusar?</string>
+    <string name="invite_decline_step_down_message">Este convite torna você administrador. Para recusar, você primeiro deixará de ser administrador, e os membros do grupo verão isso.</string>
+    <string name="invite_decline_step_down_confirm">Deixar de ser administrador e recusar</string>
     <string name="toast_chat_archived">Bate-papo arquivado</string>
     <string name="toast_chat_restored">Bate-papo restaurado</string>
     <string name="toast_couldnt_update_chat">Não foi possível atualizar a conversa</string>

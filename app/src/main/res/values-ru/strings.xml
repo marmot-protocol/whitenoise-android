@@ -920,6 +920,9 @@
     <string name="toast_couldnt_accept_invite">Не удалось принять приглашение</string>
     <string name="toast_invite_declined">Отклонить</string>
     <string name="toast_couldnt_decline_invite">Не удалось отклонить приглашение</string>
+    <string name="invite_decline_step_down_title">Сложить права админа и отклонить?</string>
+    <string name="invite_decline_step_down_message">По этому приглашению вы админ. Чтобы отклонить его, вы сначала сложите права админа, и участники группы это увидят.</string>
+    <string name="invite_decline_step_down_confirm">Сложить права и отклонить</string>
     <string name="toast_chat_archived">Чат в архиве</string>
     <string name="toast_chat_restored">Чат восстановлен</string>
     <string name="toast_couldnt_update_chat">Не удалось обновить чат</string>

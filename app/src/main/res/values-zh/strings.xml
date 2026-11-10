@@ -867,6 +867,9 @@
     <string name="toast_couldnt_accept_invite">无法接受邀请</string>
     <string name="toast_invite_declined">拒绝</string>
     <string name="toast_couldnt_decline_invite">无法拒绝邀请</string>
+    <string name="invite_decline_step_down_title">退出管理员身份并拒绝？</string>
+    <string name="invite_decline_step_down_message">此邀请让你成为管理员。要拒绝，你会先退出管理员身份，群组成员会看到你已退出。</string>
+    <string name="invite_decline_step_down_confirm">退出管理员并拒绝</string>
     <string name="toast_chat_archived">聊天记录已存档</string>
     <string name="toast_chat_restored">聊天已恢复</string>
     <string name="toast_couldnt_update_chat">无法更新聊天</string>

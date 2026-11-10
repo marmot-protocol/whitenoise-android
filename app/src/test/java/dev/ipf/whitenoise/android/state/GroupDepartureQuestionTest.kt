@@ -99,15 +99,20 @@ class GroupDepartureQuestionTest {
             assertEquals(AppText.Resource(R.string.toast_granted_but_couldnt_step_down), state.toast?.title)
         }
 
-    /** An admin invitee can decline after MDK requires and records a step-down. */
+    /** An admin invitee is asked first, and declines only after agreeing to the step-down MDK requires. */
     @Test
-    fun adminInviteDeclinesAfterSteppingDown() =
+    fun adminInviteAsksThenDeclinesAfterSteppingDown() =
         runBlocking {
             val invite =
                 conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
             val controller = ConversationController(appState = appState(inviteRuntime(invite)), initialGroup = invite)
 
-            assertTrue(controller.declineInvite())
+            assertFalse(controller.declineInvite())
+            assertTrue(controller.inviteDeclineStepDownRequested)
+            assertFalse("Decline reached MDK before the user agreed", "declineGroupInvite" in calls)
+
+            assertTrue(controller.confirmInviteDeclineStepDown())
+            assertFalse(controller.inviteDeclineStepDownRequested)
             assertEquals(
                 listOf("declineGroupInvite", "selfDemoteAdminDetailed", "declineGroupInvite"),
                 calls.filter { it == "declineGroupInvite" || it == "selfDemoteAdminDetailed" },
@@ -116,7 +121,7 @@ class GroupDepartureQuestionTest {
             assertTrue(controller.group.archived)
         }
 
-    /** A member invitee declines directly, without changing group roles. */
+    /** A member invitee declines directly, without a question or any change to group roles. */
     @Test
     fun memberInviteDeclinesWithoutSteppingDown() =
         runBlocking {
@@ -124,11 +129,69 @@ class GroupDepartureQuestionTest {
             val controller = ConversationController(appState = appState(inviteRuntime(invite)), initialGroup = invite)
 
             assertTrue(controller.declineInvite())
+            assertFalse(controller.inviteDeclineStepDownRequested)
             assertEquals(1, calls.count { it == "declineGroupInvite" })
             assertFalse("selfDemoteAdminDetailed" in calls)
         }
 
-    /** A sole admin keeps the pending invite and gets the same guidance as Leave. */
+    /** Cancelling the step-down question declines nothing and keeps the invitee an admin. */
+    @Test
+    fun cancellingTheStepDownQuestionChangesNothing() =
+        runBlocking {
+            val invite =
+                conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
+            val controller = ConversationController(appState = appState(inviteRuntime(invite)), initialGroup = invite)
+
+            assertFalse(controller.declineInvite())
+            controller.cancelInviteDeclineStepDown()
+
+            assertFalse(controller.inviteDeclineStepDownRequested)
+            assertFalse("a cancelled question still allowed a step-down", controller.confirmInviteDeclineStepDown())
+            assertFalse("declineGroupInvite" in calls)
+            assertFalse("selfDemoteAdminDetailed" in calls)
+            assertTrue(controller.group.pendingConfirmation)
+            assertTrue(SELF in controller.group.admins)
+        }
+
+    /** When the app's copy missed the admin role, MDK's refusal raises the question instead of a silent step-down. */
+    @Test
+    fun anUnexpectedAdminRefusalAsksBeforeSteppingDown() =
+        runBlocking {
+            val invite = conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(OTHER_ADMIN))
+            val runtime = inviteRuntime(invite, selfAdmin = true)
+            val controller = ConversationController(appState = appState(runtime), initialGroup = invite)
+
+            assertFalse(controller.declineInvite())
+            assertTrue(controller.inviteDeclineStepDownRequested)
+            assertFalse("the step-down ran without consent", "selfDemoteAdminDetailed" in calls)
+
+            assertTrue(controller.confirmInviteDeclineStepDown())
+            assertEquals(1, calls.count { it == "selfDemoteAdminDetailed" })
+            assertFalse(controller.group.pendingConfirmation)
+        }
+
+    /** Consent given for one invitation never steps down for a newer invitation to the same group. */
+    @Test
+    fun consentDoesNotCarryOverToANewerInvitation() =
+        runBlocking {
+            val invite =
+                conversationTimelineTestGroup().copy(
+                    pendingConfirmation = true,
+                    admins = listOf(SELF, OTHER_ADMIN),
+                    viaWelcomeMessageIdHex = "f1".repeat(32),
+                )
+            val controller = ConversationController(appState = appState(inviteRuntime(invite)), initialGroup = invite)
+            assertFalse(controller.declineInvite())
+
+            controller.applyGroupStateForTest(invite.copy(viaWelcomeMessageIdHex = "f2".repeat(32)))
+
+            assertFalse(controller.inviteDeclineStepDownRequested)
+            assertFalse(controller.confirmInviteDeclineStepDown())
+            assertFalse("declineGroupInvite" in calls)
+            assertFalse("selfDemoteAdminDetailed" in calls)
+        }
+
+    /** A sole admin who agrees to step down keeps the pending invite and gets the same guidance as Leave. */
     @Test
     fun soleAdminInviteKeepsTheGroupAdmin() =
         runBlocking {
@@ -137,6 +200,8 @@ class GroupDepartureQuestionTest {
             val controller = ConversationController(appState = state, initialGroup = invite)
 
             assertFalse(controller.declineInvite())
+            assertTrue(controller.inviteDeclineStepDownRequested)
+            assertFalse(controller.confirmInviteDeclineStepDown())
             assertEquals(1, calls.count { it == "declineGroupInvite" })
             assertTrue(controller.group.pendingConfirmation)
             assertEquals(listOf(SELF), controller.group.admins)
@@ -151,9 +216,10 @@ class GroupDepartureQuestionTest {
                 conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
             val state = appState(inviteRuntime(invite, holdStepDown = true))
             val controller = ConversationController(appState = state, initialGroup = invite)
+            assertFalse(controller.declineInvite())
             val decline =
                 CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) {
-                    controller.declineInvite()
+                    controller.confirmInviteDeclineStepDown()
                 }
             try {
                 awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
@@ -202,12 +268,16 @@ class GroupDepartureQuestionTest {
             initialMarmotRuntime = AppMarmotRuntime("test", runtime),
         )
 
-    /** Refuses admin declines before demotion and optionally holds back the step-down while catching up. */
+    /**
+     * Refuses admin declines before demotion and optionally holds back the step-down while catching up. [selfAdmin]
+     * is MDK's own view of the role, which can differ from the app's copy of [invite].
+     */
     private fun inviteRuntime(
         invite: AppGroupRecordFfi,
         holdStepDown: Boolean = false,
+        selfAdmin: Boolean = SELF in invite.admins,
     ): MarmotInterface {
-        var isAdmin = SELF in invite.admins
+        var isAdmin = selfAdmin
         val steppedDown = invite.copy(admins = listOf(OTHER_ADMIN))
         val mutation = testGroupMutationResult(roster().map { it.memberIdHex }, steppedDown.admins)
         return Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) {

@@ -1231,6 +1231,9 @@
     <string name="toast_couldnt_accept_invite">Couldn\'t accept invite</string>
     <string name="toast_invite_declined">Invite declined</string>
     <string name="toast_couldnt_decline_invite">Couldn\'t decline invite</string>
+    <string name="invite_decline_step_down_title">Step down and decline?</string>
+    <string name="invite_decline_step_down_message">This invitation makes you an admin. To decline, you’ll step down as admin first, and the group’s members will see that you stepped down.</string>
+    <string name="invite_decline_step_down_confirm">Step down and decline</string>
     <string name="toast_chat_archived">Chat archived</string>
     <string name="toast_chat_restored">Chat restored</string>
     <string name="toast_couldnt_update_chat">Couldn\'t update chat</string>

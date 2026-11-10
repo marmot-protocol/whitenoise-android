@@ -5187,6 +5187,17 @@ internal fun ConversationScreen(
             )
         }
 
+        if (controller.inviteDeclineStepDownRequested) {
+            InviteDeclineStepDownDialog(
+                onConfirm = {
+                    appState.launchMutation {
+                        if (controller.confirmInviteDeclineStepDown()) exitConversation()
+                    }
+                },
+                onDismiss = controller::cancelInviteDeclineStepDown,
+            )
+        }
+
         if (pollCreateOpen) {
             PollCreateDialog(
                 onDismiss = { pollCreateOpen = false },

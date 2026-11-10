@@ -884,6 +884,9 @@
     <string name="toast_couldnt_accept_invite">No se pudo aceptar la invitación</string>
     <string name="toast_invite_declined">Rechazar</string>
     <string name="toast_couldnt_decline_invite">No se pudo rechazar la invitación</string>
+    <string name="invite_decline_step_down_title">¿Dejar de ser admin y rechazar?</string>
+    <string name="invite_decline_step_down_message">Esta invitación te hace admin. Para rechazarla, primero dejarás de ser admin y los miembros del grupo lo verán.</string>
+    <string name="invite_decline_step_down_confirm">Dejar de ser admin y rechazar</string>
     <string name="toast_chat_archived">Chat archivado</string>
     <string name="toast_chat_restored">Chat restaurado</string>
     <string name="toast_couldnt_update_chat">No se pudo actualizar el chat</string>
