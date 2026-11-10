@@ -145,6 +145,7 @@ internal class TranslationPreferences(
         savedTarget(key(account, group) + OUTGOING_SUFFIX)
             ?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
 
+    /** Saves [target] as this chat's outgoing composer language; only catalog languages are accepted. */
     fun setOutgoingTarget(
         account: String,
         group: String,
@@ -163,6 +164,7 @@ internal class TranslationPreferences(
         return accepted >= CURRENT_PRIVACY_NOTICE
     }
 
+    /** Records that the current composer notice version was accepted, so the composer stops asking. */
     fun acceptComposerNotice() {
         preferences.edit().putInt(COMPOSER_NOTICE_VERSION, CURRENT_PRIVACY_NOTICE).apply()
     }

@@ -176,6 +176,7 @@ internal class ComposerTranslationState(
                 ?.text
         }
 
+    /** Turns translate mode on and asks the composer for its current text. */
     private fun open() {
         active = true
         invalidate()
@@ -190,8 +191,10 @@ internal class ComposerTranslationState(
         failure = null
     }
 
+    /** True while [requestGeneration] is still the latest request and its chat still owns the composer. */
     private fun current(requestGeneration: Long) = requestGeneration == generation && ownerCurrent()
 
+    /** Waits for typing to settle, translates [text] into [chosen], and keeps the outcome only if still current. */
     private suspend fun perform(
         text: String,
         chosen: String,
@@ -376,6 +379,7 @@ private fun ComposerTranslationLine(
     }
 }
 
+/** The line body: the translation, a progress or placeholder hint, or the failure, which retries when tapped. */
 @Composable
 private fun ComposerTranslationContent(
     outgoing: String?,

@@ -14,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ComposerTranslationStateTest {
+    /** Typing settles into one request, and Send uses only the translation of the exact current text. */
     @Test
     fun typingSettlesBeforeOneRequestAndSendUsesTheTranslation() =
         runTest {
@@ -38,6 +39,7 @@ class ComposerTranslationStateTest {
             assertNull(state.outgoingFor("hi there"))
         }
 
+    /** Blank text never reaches the engine and passes through, so attachments can go without a caption. */
     @Test
     fun blankTextPassesThroughSoAttachmentsCanSendWithoutCaption() =
         runTest {
@@ -49,6 +51,7 @@ class ComposerTranslationStateTest {
             assertEquals("", state.outgoingFor(""))
         }
 
+    /** A result that arrives after the text changed is discarded. */
     @Test
     fun lateResultForReplacedTextIsRejected() =
         runTest {
@@ -70,6 +73,7 @@ class ComposerTranslationStateTest {
             assertNull(state.outgoingFor("first"))
         }
 
+    /** A result is dropped when its chat no longer owns the composer. */
     @Test
     fun resultIsDroppedWhenTheOwnerIsNoLongerCurrent() =
         runTest {
@@ -87,6 +91,7 @@ class ComposerTranslationStateTest {
             assertNull(state.outgoingFor("hello"))
         }
 
+    /** An engine failure leaves nothing to send. */
     @Test
     fun engineFailureBlocksSend() =
         runTest {
@@ -100,6 +105,7 @@ class ComposerTranslationStateTest {
             assertNull(state.outgoingFor("hello"))
         }
 
+    /** Choosing another language saves it and retranslates instead of sending the old translation. */
     @Test
     fun changingTargetSavesItAndInvalidatesTheShownTranslation() =
         runTest {
@@ -128,6 +134,7 @@ class ComposerTranslationStateTest {
             assertEquals("fr:hello", state.outgoingFor("hello"))
         }
 
+    /** Leaving translate mode makes Send use the typed text again. */
     @Test
     fun closingStopsSendingTranslations() =
         runTest {
@@ -141,6 +148,7 @@ class ComposerTranslationStateTest {
             assertNull(state.result)
         }
 
+    /** Typing back to already translated text cancels the newer request and reuses the shown translation. */
     @Test
     fun typingBackToTheTranslatedTextCancelsTheNewerRequest() =
         runTest {
@@ -164,6 +172,7 @@ class ComposerTranslationStateTest {
             assertEquals("de:hi", state.outgoingFor("hi"))
         }
 
+    /** Typing back after a failed edit clears the failure and restores the earlier translation. */
     @Test
     fun typingBackAfterAFailureRestoresTheEarlierTranslation() =
         runTest {
@@ -185,6 +194,7 @@ class ComposerTranslationStateTest {
             assertEquals("de:hello", state.outgoingFor("hello"))
         }
 
+    /** The first toggle asks for the notice; accepting records it and opens translate mode. */
     @Test
     fun firstToggleAsksForTheNoticeAndAcceptingOpensTranslateMode() =
         runTest {
@@ -203,6 +213,7 @@ class ComposerTranslationStateTest {
             assertTrue(state.active)
         }
 
+    /** Declining the notice keeps translate mode off and asks again next time. */
     @Test
     fun decliningTheNoticeLeavesTranslateModeOffAndAsksAgainNextTime() =
         runTest {
@@ -221,6 +232,7 @@ class ComposerTranslationStateTest {
             assertFalse(state.consenting)
         }
 
+    /** Closing for dictation makes Send use the typed text instead of the translation. */
     @Test
     fun closingForDictationSendsTheTypedTextInsteadOfTheTranslation() =
         runTest {
@@ -236,6 +248,7 @@ class ComposerTranslationStateTest {
             assertEquals("", state.outgoingFor(""))
         }
 
+    /** A state whose notice acceptance is supplied by the test. */
     private fun noticeState(
         scope: CoroutineScope,
         accepted: () -> Boolean,
@@ -250,17 +263,20 @@ class ComposerTranslationStateTest {
         onNoticeAccepted = onAccepted,
     )
 
+    /** A state translating into German with the test's [translate] and owner check. */
     private fun state(
         scope: CoroutineScope,
         current: () -> Boolean = { true },
         translate: suspend (String, String) -> String,
     ) = ComposerTranslationState(scope, { engine(translate) }, current, "de", settleMillis = SETTLE)
 
+    /** A local engine that delegates to [translate]. */
     private fun engine(translate: suspend (String, String) -> String) =
         object : TranslationEngine {
             override val identity = TranslationEngineIdentity("local", "verified", 1)
             override val trust = TranslationTrust.LOCAL
 
+            /** Delegates to the test's translate function. */
             override suspend fun translate(
                 text: String,
                 source: String,

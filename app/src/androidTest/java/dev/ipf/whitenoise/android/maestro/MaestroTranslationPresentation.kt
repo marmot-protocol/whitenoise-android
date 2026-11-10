@@ -108,6 +108,7 @@ private fun MaestroComposerTranslationPresentation(fixture: MaestroPresentationF
                     override val identity = TranslationEngineIdentity("fixture.local", "fixture", 1)
                     override val trust = TranslationTrust.LOCAL
 
+                    /** Returns the fixed fixture translation without any engine I/O. */
                     override suspend fun translate(
                         text: String,
                         source: String,

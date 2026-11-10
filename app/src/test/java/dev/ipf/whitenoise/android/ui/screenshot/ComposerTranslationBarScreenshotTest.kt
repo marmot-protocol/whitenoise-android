@@ -88,6 +88,7 @@ class ComposerTranslationBarScreenshotTest {
         val failure: TranslationFailure? = null,
     )
 
+    /** Renders [appearance] and records it as the baseline [name]. */
     private fun capture(
         name: String,
         appearance: Appearance = Appearance(),
@@ -96,6 +97,7 @@ class ComposerTranslationBarScreenshotTest {
         composeRule.onNodeWithTag("composer.translation.fixture").captureRoboImage("src/test/snapshots/$name")
     }
 
+    /** Shows the translation bar fixture in [appearance]. */
     private fun render(appearance: Appearance = Appearance()) {
         composeRule.setContent {
             CompositionLocalProvider(

@@ -99,6 +99,7 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
+import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
 import dev.ipf.whitenoise.android.translation.ComposerTranslationSync
 import dev.ipf.whitenoise.android.translation.rememberComposerTranslation
@@ -475,6 +476,9 @@ internal fun ComposerBar(
     editingInitialText: String? = null,
     onCancelEdit: () -> Unit = {},
     appState: WhiteNoiseAppState? = null,
+    // Translate mode for this draft; tests supply their own state to drive Send without the offline engine.
+    composerTranslation: ComposerTranslationState? =
+        appState?.let { rememberComposerTranslation(it, draftAccountRef, draftGroupIdHex) },
     onCustomizeToolbar: (() -> Unit)? = null,
     // Group @-mention picker (#414): candidates the picker filters over, and
     // whether this conversation is a group (the picker is suppressed in DMs —
@@ -997,8 +1001,6 @@ internal fun ComposerBar(
             dictationController.completionControlsRequired
 
     // Translate mode belongs to one draft; edits keep the original text, so the mode closes for them.
-    val composerTranslation =
-        appState?.let { rememberComposerTranslation(it, draftAccountRef, draftGroupIdHex) }
     LaunchedEffect(composerTranslation, editingMessageId) {
         if (editingMessageId != null) composerTranslation?.close()
     }
