@@ -2109,7 +2109,7 @@
     <string name="group_recovery_review_invitation_from">Revisar invitación de %1$s · época %2$s</string>
     <string name="group_recovery_check_failed">No se pudo comprobar la recuperación del grupo. Inténtalo de nuevo.</string>
     <string name="group_history_may_be_incomplete">Es posible que falten algunos mensajes anteriores en este chat.</string>
-    <string name="group_history_before_rejoin">Volviste a unirte a este chat. Es posible que falten mensajes de antes de que volvieras a unirte.</string>
+    <string name="group_history_before_rejoin">Te has vuelto a unir a este chat. Es posible que falten mensajes de antes de que volvieras a unirte.</string>
     <string name="account_history_may_be_incomplete">Es posible que falten algunos mensajes en esta cuenta. White Noise no pudo confirmar que llegaran todos los mensajes.</string>
     <string name="history_notice_dismiss_failed">No se pudo descartar el aviso del historial. Inténtalo de nuevo.</string>
     <string name="group_rejoin_title">¿Volver a unirse al grupo?</string>
