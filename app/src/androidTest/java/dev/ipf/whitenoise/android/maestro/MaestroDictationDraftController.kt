@@ -158,8 +158,7 @@ internal class MaestroDictationDraftController {
 
                 override fun callerAudioFullyFed(): Boolean = true
 
-                // Non-final, so a failing chunk stays retained instead of being dropped as a tail.
-                override fun callerAudioIsFinalChunk(): Boolean = false
+                override fun callerAudioIsFinalChunk(): Boolean = true
 
                 override fun callerAudioContainsSpeech(): Boolean = true
             }

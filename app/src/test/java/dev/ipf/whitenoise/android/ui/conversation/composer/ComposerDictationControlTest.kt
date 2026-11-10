@@ -778,8 +778,7 @@ class ComposerDictationControlTest {
 
                 override fun callerAudioFullyFed() = true
 
-                // Non-final, so a failing chunk stays retained instead of being dropped as a tail.
-                override fun callerAudioIsFinalChunk() = false
+                override fun callerAudioIsFinalChunk() = true
             }
         }
     }

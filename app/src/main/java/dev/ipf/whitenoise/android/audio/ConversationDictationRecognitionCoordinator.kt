@@ -87,9 +87,6 @@ internal class ConversationDictationRecognitionCoordinator {
     val capacityAttempts: Int get() = retry?.capacityAttempts ?: 0
     val failureAttempts: Int get() = retry?.attempts ?: 0
 
-    /** The caller-audio chunk that [failureAttempts] counts, or null without a pending retry. */
-    val failureChunkId: Long? get() = retry?.chunkId
-
     fun tryContextOnce(
         chunkId: Long,
         action: () -> Boolean,
@@ -157,27 +154,6 @@ internal class ConversationDictationRecognitionCoordinator {
         }
     }
 
-    /** The kind of provider failure on the final caller-audio chunk after an explicit finish. */
-    internal enum class TailFault {
-        /** NoSpeech, NoMatch or a blank final result. */
-        Empty,
-
-        /** A retryable provider fault such as a disconnect, busy recognizer or network error. */
-        Transient,
-
-        /** The provider stopped answering within the generation deadline. */
-        TimedOut,
-    }
-
-    /** The final chunk of a finished capture whose recognition failed. */
-    internal data class TailInput(
-        val chunkId: Long?,
-        val finalChunk: Boolean,
-        val chunkHasSpeech: Boolean?,
-        val tailMillis: Long?,
-        val fault: TailFault,
-    )
-
     fun resetFailure() {
         retry = null
     }
@@ -195,10 +171,5 @@ internal class ConversationDictationRecognitionCoordinator {
         spans.clear()
         nextProviderSpanId = -1L
         retry = null
-    }
-
-    internal companion object {
-        /** Final chunks up to this length hold at most a short trailing phrase. */
-        const val SHORT_FINAL_TAIL_MILLIS = 1_500L
     }
 }

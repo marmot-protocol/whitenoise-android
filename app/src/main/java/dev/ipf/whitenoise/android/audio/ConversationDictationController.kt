@@ -1061,7 +1061,7 @@ internal class ConversationDictationController internal constructor(
             PROCESSING_TIMEOUT_MILLIS,
             ConversationDictationRecognitionDeadlines.GenerationPhase.Processing,
         ) {
-            failGenerationTimeout(sessionId, target)
+            failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
         }
         runCatching {
             generation.session?.stop {
@@ -1114,7 +1114,7 @@ internal class ConversationDictationController internal constructor(
                 "caller_audio_drain",
                 isCurrent = { finishRequested && state.sessionId == sessionId },
             ) {
-                failGenerationTimeout(sessionId, target)
+                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
             }
         }
     }
@@ -1149,14 +1149,14 @@ internal class ConversationDictationController internal constructor(
     }
 
     /**
-     * Involuntary focus loss before Send or Paste preserves input as a draft. After either choice,
-     * capture is already sealed, so the chosen action continues under its own drain deadline.
+     * Involuntary focus loss preserves input as a draft, including after automatic silence completion.
+     * After an explicit Send or Paste, capture is already sealed, so the chosen action continues under
+     * its own drain deadline. This deliberately narrows #3401 to choices the user did not make.
      */
     fun interruptForAudioFocusLoss() {
         if (!inActiveRecognitionState || deliveryInProgress || completion.intent.committed) return
-        if (finishRequested) {
-            // Capture is already sealed and the user chose Send or Paste; another app's audio
-            // cannot change the recorded speech, so finish the chosen action.
+        if (finishRequested && completion.intent.explicit) {
+            // Another app's audio cannot change the sealed speech, so finish the user's chosen action.
             conversationDictationDiagnostic("event=audio_focus_lost_after_finish action=continue")
             return
         }
@@ -2081,7 +2081,7 @@ internal class ConversationDictationController internal constructor(
                 "event=recognizer_start_timeout generation=$generationId " +
                     "elapsed_ms=${elapsedRealtime() - generationStartedAtElapsedMillis}",
             )
-            failGenerationTimeout(sessionId, target)
+            failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
         }
         val listener =
             object : ConversationDictationRecognitionListener {
@@ -2143,7 +2143,7 @@ internal class ConversationDictationController internal constructor(
                                 PROCESSING_TIMEOUT_MILLIS,
                                 ConversationDictationRecognitionDeadlines.GenerationPhase.Processing,
                             ) {
-                                failGenerationTimeout(sessionId, target)
+                                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
                             }
                         }
                     }
@@ -2249,17 +2249,7 @@ internal class ConversationDictationController internal constructor(
                     if (!owns(sessionId, generationId)) return
                     unresolvedRecognitionFailure = failure
                     val currentSession = generation.session
-                    val tailFault =
-                        when {
-                            error.isEmptyRecognition ->
-                                ConversationDictationRecognitionCoordinator.TailFault.Empty
-                            failure.canRetryRetainedCallerAudio ->
-                                ConversationDictationRecognitionCoordinator.TailFault.Transient
-                            else -> null
-                        }
-                    if (tailFault != null &&
-                        dropFinalTailIfSafe(sessionId, target, currentSession, tailFault, failure)
-                    ) {
+                    if (error.isEmptyRecognition && dropSilentFinalTail(sessionId, target, currentSession, failure)) {
                         return
                     }
                     val callerAudioPending =
@@ -2397,61 +2387,27 @@ internal class ConversationDictationController internal constructor(
     }
 
     /**
-     * Skips a failing final chunk after Send or Paste when recognized text already exists.
+     * Releases a capture-side silent final chunk after Send or Paste when recognized text already exists.
      *
+     * Silence is decided from the captured PCM, so this does not wait for the provider to be fully fed.
+     * A final chunk that may hold speech keeps the bounded retry and retained-audio recovery path.
      * Returns true when the chunk was released and the transcript continues to delivery.
      */
-    private fun dropFinalTailIfSafe(
+    private fun dropSilentFinalTail(
         sessionId: Long,
         target: ConversationDictationTarget,
         session: ConversationDictationRecognitionSession?,
-        fault: ConversationDictationRecognitionCoordinator.TailFault,
         failure: ConversationDictationFailure,
-        cancelProvider: Boolean = false,
     ): Boolean {
         if (!finishRequested || accumulatedTranscript.isBlank() || session == null) return false
         if (!runCatching(session::callerAudioIsFinalChunk).getOrDefault(false)) return false
-        val chunk = runCatching(session::callerAudioRequest).getOrNull()?.chunk
-        val tailMillis =
-            chunk?.let { (it.lastSampleExclusive - it.firstSample) * 1_000L / CALLER_AUDIO_SAMPLE_RATE_HZ }
-        val drop =
-            recognition.shouldDropFinalTail(
-                ConversationDictationRecognitionCoordinator.TailInput(
-                    chunkId = runCatching(session::callerAudioChunkId).getOrNull(),
-                    finalChunk = true,
-                    chunkHasSpeech = runCatching(session::callerAudioContainsSpeech).getOrNull(),
-                    tailMillis = tailMillis,
-                    fault = fault,
-                ),
-            )
-        if (!drop || !runCatching(session::acknowledgeCallerAudio).getOrDefault(false)) return false
-        conversationDictationDiagnostic(
-            "event=caller_audio_tail_dropped failure=${failure.name} fault=${fault.name} " +
-                "duration_ms=${tailMillis ?: -1} attempts=${recognition.failureAttempts}",
-        )
+        if (runCatching(session::callerAudioContainsSpeech).getOrNull() != false) return false
+        if (!runCatching(session::acknowledgeCallerAudio).getOrDefault(false)) return false
+        conversationDictationDiagnostic("event=caller_audio_tail_dropped failure=${failure.name} reason=silent")
         unresolvedRecognitionFailure = null
-        clearRecognitionGeneration(cancel = cancelProvider)
+        clearRecognitionGeneration(cancel = false)
         advancePastConfirmedSilentCallerAudio(sessionId, target)
         return true
-    }
-
-    /** A stalled provider on a short final chunk does not hold back text the user already sent. */
-    private fun failGenerationTimeout(
-        sessionId: Long,
-        target: ConversationDictationTarget,
-    ) {
-        if (dropFinalTailIfSafe(
-                sessionId,
-                target,
-                generation.session,
-                ConversationDictationRecognitionCoordinator.TailFault.TimedOut,
-                ConversationDictationFailure.TimedOut,
-                cancelProvider = true,
-            )
-        ) {
-            return
-        }
-        failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
     }
 
     /** Bounds exact-chunk recovery, then completes safe accumulated text through the chosen action. */
@@ -2968,13 +2924,8 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
     ) {
         val transcript = accumulatedTranscript.trim()
-        val pendingAudio = callerAudioPendingOrNull()
-        if (pendingAudio == null) {
-            // An unanswerable buffer query is not evidence of unrecognized speech; deliver what was recognized.
-            conversationDictationDiagnostic("event=caller_audio_pending_unknown action=finalize")
-        }
         when {
-            pendingAudio == true ->
+            hasPendingCallerAudio(ifUnknown = true) ->
                 failWithRetainedCallerAudio(
                     sessionId,
                     target,

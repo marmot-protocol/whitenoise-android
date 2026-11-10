@@ -19,14 +19,6 @@
           "DIC-002",
           "DIC-009"
         ]
-      },
-      {
-        "surface": "A failing final chunk after recognized text is released after bounded evidence instead of blocking Send",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationRecognitionCoordinator.kt",
-        "anchor": "const val SHORT_FINAL_TAIL_MILLIS",
-        "test_ids": [
-          "DIC-012"
-        ]
       }
     ]
   },
