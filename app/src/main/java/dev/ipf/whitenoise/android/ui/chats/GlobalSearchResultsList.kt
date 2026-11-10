@@ -146,11 +146,12 @@ private fun GlobalSearchResultsBoundary(
             BoundaryMessage(stringResource(R.string.search_message_content_failed))
             TextButton(onClick = content.actions.onRetry) { Text(stringResource(R.string.retry)) }
         }
-        reading -> BoundaryProgress()
+        reading -> BoundaryProgress(announce = state.batches == 0)
         empty -> {
             WhiteNoiseEmptyState(
                 title = stringResource(R.string.no_results),
                 detail = stringResource(R.string.chat_rows_no_results_detail),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
             if (state.hasMore) SearchOlderButton(content.actions.onLoadMore)
         }
@@ -159,27 +160,33 @@ private fun GlobalSearchResultsBoundary(
     }
 }
 
-/** A batch is being read. */
+/**
+ * A batch is being read. Only the query's first read is [announce]d, so automatic later batches do not
+ * interrupt TalkBack over and over while the user scrolls.
+ */
 @Composable
-private fun BoundaryProgress() {
+private fun BoundaryProgress(announce: Boolean) {
     Row(
         modifier = Modifier.testTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
         CircularProgressIndicator(Modifier.size(GlobalSearchResultsProgressSize), strokeWidth = 2.dp)
-        BoundaryMessage(stringResource(R.string.search_message_content_loading))
+        BoundaryMessage(stringResource(R.string.search_message_content_loading), announce)
     }
 }
 
-/** A polite live-region line, so TalkBack hears a failure or the end without moving focus. */
+/** A boundary line; when [announce]d it is a polite live region, heard without moving focus. */
 @Composable
-private fun BoundaryMessage(text: String) {
+private fun BoundaryMessage(
+    text: String,
+    announce: Boolean = true,
+) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        modifier = if (announce) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier,
     )
 }
 

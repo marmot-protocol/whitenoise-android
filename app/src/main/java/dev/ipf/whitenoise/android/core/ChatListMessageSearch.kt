@@ -210,23 +210,6 @@ data class SnippetHighlight(
 )
 
 /**
- * A chat row's message-body hit, kept only until the chat row stops rendering body snippets; message
- * search lists matches as their own rows (#1944).
- */
-data class MessageBodyMatch(
-    val groupIdHex: String,
-    val messageIdHex: String,
-    val snippet: SnippetHighlight,
-    /**
-     * Timeline timestamp (unix seconds) of the matched message — *not* the
-     * chat's last-message time. A body-match row surfaces this so its
-     * timestamp points at the message the search actually found, which can be
-     * far older than the conversation's latest activity (#594).
-     */
-    val timelineAt: ULong,
-)
-
-/**
  * Message-level constraints of the prototype's Senders, Date and Content filters, evaluated
  * client-side over the engine's timeline rows. AND across categories, OR within one.
  */

@@ -1849,6 +1849,25 @@ internal fun ChatsScreen(
             !chatListState.isScrollInProgress &&
             chatListState.layoutInfo.visibleItemsInfo.any { it.key == globalSearchResultItemKey(result) }
     }
+    val openMessageResult by rememberUpdatedState<(GlobalSearchResult) -> Unit> { result ->
+        searchViewport?.selection?.selected = GlobalSearchSelectedResult(result.groupIdHex, result.messageIdHex)
+        openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
+    }
+    val messageResultsActions =
+        remember(messageResults) {
+            GlobalSearchResultsActions(
+                onOpen = { openMessageResult(it) },
+                onLoadMore = { messageResults?.loadMore() },
+                onRetry = { messageResults?.retry() },
+            )
+        }
+    val messageResultSelected =
+        remember(returnedSearchSelection, searchViewport?.selection?.selected) {
+            { result: GlobalSearchResult ->
+                returnedSearchSelection == searchViewport?.selection?.selected &&
+                    returnedSearchSelection?.matches(result.groupIdHex, result.messageIdHex) == true
+            }
+        }
     val messageResultsContent =
         globalSearchResultsContent(
             appState = appState,
@@ -1856,20 +1875,8 @@ internal fun ChatsScreen(
             chats = messageResultChats,
             titleCopy = groupTitleCopy,
             filterCount = if (filtersActive) GlobalSearchActiveChips.from(globalSearchState).count else 0,
-            selected = { result ->
-                returnedSearchSelection == searchViewport?.selection?.selected &&
-                    returnedSearchSelection?.matches(result.groupIdHex, result.messageIdHex) == true
-            },
-            actions =
-                GlobalSearchResultsActions(
-                    onOpen = { result ->
-                        searchViewport?.selection?.selected =
-                            GlobalSearchSelectedResult(result.groupIdHex, result.messageIdHex)
-                        openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
-                    },
-                    onLoadMore = { messageResults?.loadMore() },
-                    onRetry = { messageResults?.retry() },
-                ),
+            selected = messageResultSelected,
+            actions = messageResultsActions,
         )
 
     /** One focus attempt for the result row a return from its chat lands on, never a scroll. */

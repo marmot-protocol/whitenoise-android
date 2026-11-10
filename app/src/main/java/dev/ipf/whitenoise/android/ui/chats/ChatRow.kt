@@ -44,10 +44,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,8 +55,6 @@ import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
-import dev.ipf.whitenoise.android.core.MessageBodyMatch
-import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -122,9 +118,6 @@ internal fun ChatListRow(
     onDragSelectionCancel: () -> Unit,
     rangeDragActive: Boolean,
     onToggleSelection: () -> Unit,
-    // Non-null when this row matched the chat-list search on a message body
-    // (issue #290); drives the highlighted snippet line under the row.
-    bodyMatch: MessageBodyMatch? = null,
     menuHighlighted: Boolean = false,
     onActionsHeldChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -155,30 +148,10 @@ internal fun ChatListRow(
         onDragSelectionCancel = onDragSelectionCancel,
         rangeDragActive = rangeDragActive,
         onOpenProfile = onOpenProfile,
-        bodyMatch = bodyMatch,
         isMuted = isMuted,
         interactionsEnabled = interactionsEnabled,
         modifier = modifier,
     )
-}
-
-/**
- * Render a [SnippetHighlight] as an [AnnotatedString] with the matched needle
- * range styled by [highlight]. The range is guaranteed valid by
- * `ChatListMessageSearch.buildSnippet`, but we clamp defensively so a future
- * change to the snippet builder can never throw here on the chat-list hot path.
- */
-private fun highlightedSnippet(
-    snippet: SnippetHighlight,
-    highlight: SpanStyle,
-): AnnotatedString {
-    val text = snippet.text
-    val start = snippet.highlightStart.coerceIn(0, text.length)
-    val end = snippet.highlightEnd.coerceIn(start, text.length)
-    return buildAnnotatedString {
-        append(text)
-        if (end > start) addStyle(highlight, start, end)
-    }
 }
 
 /** Renders only immutable row projection and current account-owned draft/identity data; native work stays in owners. */
@@ -201,10 +174,6 @@ internal fun ChatRow(
     selected: Boolean = false,
     isMuted: Boolean = false,
     interactionsEnabled: Boolean = true,
-    // Message-body search hit for this row (issue #290): when present, a
-    // second supporting line shows the matched message with the needle
-    // highlighted, so the user can see why the chat appeared in the results.
-    bodyMatch: MessageBodyMatch? = null,
     menuHighlighted: Boolean = false,
     onActionsHeldChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -238,11 +207,7 @@ internal fun ChatRow(
     val activeAccountIdHex = ownerAccountIdHex
     val rowHasUnread = item.effectiveHasUnread(activeAccountIdHex)
     val rowUnreadCount = item.effectiveUnreadCount(activeAccountIdHex)
-    // On a message-body search hit (#594) the row's timestamp points at the
-    // matched message, which may be far older than the conversation's last
-    // activity. A title/preview-only hit (bodyMatch null) keeps the chat's
-    // last-message time.
-    val timestampAt = bodyMatch?.timelineAt ?: item.latestAt ?: 0uL
+    val timestampAt = item.latestAt ?: 0uL
     val avatarAccount = chatListItemAvatarAccount(item)
     val openableDmAvatarAccount =
         avatarAccount
@@ -470,53 +435,30 @@ internal fun ChatRow(
                         },
                     )
                 }
-            // A body-content hit makes the matched message itself the subtitle:
-            // the highlighted snippet replaces the last-message preview (its
-            // timestamp already rides `timestampAt` above), so the line the user
-            // reads is the one that actually matched. Title/preview-only hits
-            // (bodyMatch null) keep the normal last-message preview.
-            if (bodyMatch != null && !item.checkingInvitation) {
-                val highlightStyle =
-                    SpanStyle(
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                val snippetText =
-                    remember(bodyMatch.snippet, highlightStyle) {
-                        EmojiShortcodes.annotate(highlightedSnippet(bodyMatch.snippet, highlightStyle))
-                    }
-                Text(
-                    text = snippetText,
-                    inlineContent = EmojiShortcodes.content(),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                ChatRowPreviewLine(
-                    preview = preview,
-                    fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
-                    attachmentKind =
-                        draft?.attachmentKind
-                            ?: item.projection
-                                ?.lastMessage
-                                ?.takeIf {
-                                    draft == null &&
-                                        !item.awaitingSendPreview &&
-                                        !invitation &&
-                                        !empty &&
-                                        (
-                                            selectedPreview == null ||
-                                                selectedPreview == SelectedChatPreviewFfi.Message
-                                        ) &&
-                                        !it.deleted &&
-                                        (
-                                            it.kind == LEGACY_NOTE_KIND ||
-                                                it.kind == CHAT_MESSAGE_KIND ||
-                                                it.kind == AGENT_STREAM_FINAL_KIND
-                                        )
-                                }?.attachmentKind,
-                )
-            }
+            ChatRowPreviewLine(
+                preview = preview,
+                fontStyle = if (draft != null) FontStyle.Italic else FontStyle.Normal,
+                attachmentKind =
+                    draft?.attachmentKind
+                        ?: item.projection
+                            ?.lastMessage
+                            ?.takeIf {
+                                draft == null &&
+                                    !item.awaitingSendPreview &&
+                                    !invitation &&
+                                    !empty &&
+                                    (
+                                        selectedPreview == null ||
+                                            selectedPreview == SelectedChatPreviewFfi.Message
+                                    ) &&
+                                    !it.deleted &&
+                                    (
+                                        it.kind == LEGACY_NOTE_KIND ||
+                                            it.kind == CHAT_MESSAGE_KIND ||
+                                            it.kind == AGENT_STREAM_FINAL_KIND
+                                    )
+                            }?.attachmentKind,
+            )
         },
         supportingMetadata = {
             ChatRowSupportingMetadata(
