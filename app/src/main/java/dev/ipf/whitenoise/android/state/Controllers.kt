@@ -8383,6 +8383,8 @@ class ConversationController(
                 retryableFailure = { isRetryableComposerSend(artwork.value, it) },
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
+                // A cancel wakes the retry wait, so check it before a lookup that may fail again and retry forever.
+                requireOptimisticSendNotCancelled(optimisticKey)
                 val emojiArtwork = artwork.resolve()
                 // Serialize only this commit-producing FFI attempt. Releasing the
                 // commit lock before retry backoff keeps reactions and other

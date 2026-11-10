@@ -2036,7 +2036,10 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
         }
 
-    /** A failed artwork lookup published nothing, so the bubble ends Failed and nothing is sent. */
+    /**
+     * A failed artwork lookup published nothing, so the bubble ends Failed and nothing is sent, even when
+     * its error text reads like an uncertain relay delivery.
+     */
     @Test
     fun customEmojiLookupFailureEndsFailedNotPending() =
         runTest {
@@ -2047,7 +2050,7 @@ class ConversationSendRetryIntegrationTest {
                     appState = appState,
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
-                    customEmojiReader = { error("installed emoji index unreadable") },
+                    customEmojiReader = { throw MarmotKitException.Publish("relay did not acknowledge event") },
                     customEmojiSender = { _, _, _, _, _ ->
                         sends += 1
                         successfulSendSummary()
@@ -2087,6 +2090,45 @@ class ConversationSendRetryIntegrationTest {
 
             assertEquals(2, lookups)
             assertEquals(1, sends)
+        }
+
+    /** Cancelling a send whose artwork lookup keeps failing ends it and lets the next send publish without backoff. */
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun cancellingARetryingEmojiLookupUnblocksTheNextSend() =
+        runTest {
+            val lookupFailed = CompletableDeferred<Unit>()
+            val published = mutableListOf<String>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { text ->
+                        if (':' !in text) return@ConversationController emptyList()
+                        lookupFailed.complete(Unit)
+                        throw MarmotKitException.TransportClosed()
+                    },
+                    customEmojiSender = { _, text, _, _, _ ->
+                        published += text
+                        successfulSendSummary()
+                    },
+                )
+            val first = async { appState.sendConversationText(controller, "hi :party:") }
+            lookupFailed.await()
+            runCurrent()
+            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+            val cancellationAtMs = testScheduler.currentTime
+            val second = async { controller.send("next") }
+            first.await()
+            second.await()
+            assertTrue(
+                "cancelled lookup retry held text order through backoff",
+                testScheduler.currentTime - cancellationAtMs < SEND_RETRY_BACKOFF_MS,
+            )
+            assertEquals(emptyList<String>(), published)
+            assertTrue(controller.timeline.none { it.record.plaintext == "hi :party:" })
         }
 
     /** A publish-stage connection loss may have reached a relay, so the bubble stays Pending and is not resent. */
