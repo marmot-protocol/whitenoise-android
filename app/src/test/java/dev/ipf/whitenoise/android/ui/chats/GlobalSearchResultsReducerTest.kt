@@ -278,6 +278,107 @@ class GlobalSearchResultsReducerTest {
             assertEquals(1, reads)
         }
 
+    /** A return whose rows vanished meanwhile stops after a few empty batches instead of walking the account. */
+    @Test
+    fun resumeStopsAfterEmptyBatchesWhenRowsVanished() {
+        var state = GlobalSearchResultsReducer.restart(GlobalSearchResultsState(), resumeTarget = 400)
+        var batches = 0
+        while (GlobalSearchResultsReducer.needsResumeRead(state) || batches == 0) {
+            val (loading, request) = begin(state)
+            val empty = batch(emptyList(), cursor(1_000L - batches))
+            state = GlobalSearchResultsReducer.applyBatch(loading, request, empty)
+            batches++
+        }
+        assertEquals(GLOBAL_SEARCH_AUTO_EMPTY_BATCHES, batches)
+        assertFalse(state.resuming)
+        assertTrue(state.hasMore)
+    }
+
+    /** A sparse return that keeps finding a row per batch still stops within its batch budget. */
+    @Test
+    fun resumeStopsWithinItsBatchBudget() {
+        val target = 100
+        var state = GlobalSearchResultsReducer.restart(GlobalSearchResultsState(), resumeTarget = target)
+        val budget = state.resumeBatchesLeft
+        var batches = 0
+        while (GlobalSearchResultsReducer.needsResumeRead(state) || batches == 0) {
+            val (loading, request) = begin(state)
+            val rows = listOf(result("g", "m$batches"))
+            state = GlobalSearchResultsReducer.applyBatch(loading, request, batch(rows, cursor(1_000L - batches)))
+            batches++
+        }
+        assertEquals(target / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES, budget)
+        assertEquals(budget, batches)
+        assertFalse(state.resuming)
+    }
+
+    /** A refresh replaces the loaded range in place: gone rows drop, a newer match joins at the head. */
+    @Test
+    fun refreshReplacesTheLoadedRangeInPlace() {
+        val (first, firstRequest) = begin(GlobalSearchResultsReducer.restart(GlobalSearchResultsState()))
+        val loadedRows = listOf(result("g", "c", at = 30uL), result("g", "b", at = 20uL), result("g", "a", at = 10uL))
+        val oldest = loadedRows.last().cursor
+        val loaded = GlobalSearchResultsReducer.applyBatch(first, firstRequest, batch(loadedRows, oldest))
+        val (refreshing, refresh) = requireNotNull(GlobalSearchResultsReducer.beginRefresh(loaded))
+        assertTrue(refresh.refresh)
+        assertEquals(oldest, refresh.cursor)
+
+        val reread = listOf(result("g", "new", at = 40uL), result("g", "c", at = 30uL), result("g", "a", at = 10uL))
+        val refreshed = GlobalSearchResultsReducer.applyRefresh(refreshing, refresh, reread, oldest)
+
+        assertEquals(listOf("g:new", "g:c", "g:a"), refreshed.results.map { it.key })
+        assertEquals(oldest, refreshed.nextCursor)
+        assertNull(refreshed.inFlight)
+    }
+
+    /** A reread capped before the old continuation keeps the loaded rows below where it stopped. */
+    @Test
+    fun cappedRefreshKeepsRowsBelowWhereItStopped() {
+        val (first, firstRequest) = begin(GlobalSearchResultsReducer.restart(GlobalSearchResultsState()))
+        val loadedRows = listOf(result("g", "c", at = 30uL), result("g", "b", at = 20uL), result("g", "a", at = 10uL))
+        val loaded = GlobalSearchResultsReducer.applyBatch(first, firstRequest, batch(loadedRows, cursor(5)))
+        val (refreshing, refresh) = requireNotNull(GlobalSearchResultsReducer.beginRefresh(loaded))
+        val stoppedAt = GlobalSearchCursor(20uL, "b", "g")
+        val refreshed = GlobalSearchResultsReducer.applyRefresh(refreshing, refresh, listOf(loadedRows[1]), stoppedAt)
+
+        assertEquals(listOf("g:b", "g:a"), refreshed.results.map { it.key })
+    }
+
+    /** Nothing to refresh before the first batch; a refresh from an older generation is ignored. */
+    @Test
+    fun refreshNeedsLoadedRowsAndAnUnchangedGeneration() {
+        val fresh = GlobalSearchResultsReducer.restart(GlobalSearchResultsState())
+        assertNull(GlobalSearchResultsReducer.beginRefresh(fresh))
+        val (first, firstRequest) = begin(fresh)
+        val loaded = GlobalSearchResultsReducer.applyBatch(first, firstRequest, batch(listOf(result("g", "1"))))
+        val (_, refresh) = requireNotNull(GlobalSearchResultsReducer.beginRefresh(loaded))
+        val restarted = GlobalSearchResultsReducer.restart(loaded)
+
+        assertSame(restarted, GlobalSearchResultsReducer.applyRefresh(restarted, refresh, emptyList(), null))
+    }
+
+    /** The earliest disappearing deadline among loaded rows decides when to recheck them. */
+    @Test
+    fun nextExpiryIsTheEarliestLoadedDeadline() {
+        val rows = listOf(result("g", "1", expiresAt = 90uL), result("g", "2"), result("g", "3", expiresAt = 40uL))
+        assertEquals(40uL, GlobalSearchResultsState(results = rows).nextExpiry)
+        assertNull(GlobalSearchResultsState(results = listOf(result("g", "4"))).nextExpiry)
+    }
+
+    /** A reread from the head stops at the old continuation, so it rereads only the loaded range. */
+    @Test
+    fun rereadStopsAtTheOldContinuation() =
+        runTest {
+            val corpus = (0 until 300).map { Row(group = "g", id = "m%03d".format(it), at = it.toULong()) }
+            val store = FakeAccountSearch(corpus)
+            val through = GlobalSearchCursor(250uL, "m250", "g")
+            val (rows, stoppedAt) = rereadGlobalSearchRange(store.source(), through, budget = 10)
+
+            assertTrue(stoppedAt != null && stoppedAt <= through)
+            assertTrue(rows.map { it.key }.containsAll((251 until 300).map { "g:m%03d".format(it) }))
+            assertEquals(1, store.reads)
+        }
+
     /** Pages a fake store to its end through the reducer and returns every shown key in order. */
     private suspend fun pageEverything(
         store: FakeAccountSearch,
@@ -304,11 +405,13 @@ class GlobalSearchResultsReducerTest {
     /** A cursor at second [at]. */
     private fun cursor(at: Long) = GlobalSearchCursor(at.toULong(), "m$at", "g")
 
-    /** A minimal result row. */
+    /** A minimal result row at second [at], disappearing at [expiresAt] when given. */
     private fun result(
         group: String,
         id: String,
-    ) = GlobalSearchResult(group, id, "sender", 1uL, SnippetHighlight("text", 0, 0))
+        at: ULong = 1uL,
+        expiresAt: ULong? = null,
+    ) = GlobalSearchResult(group, id, "sender", at, SnippetHighlight("text", 0, 0), expiresAt = expiresAt)
 
     /** One stored message of the fake account. */
     private data class Row(

@@ -70,7 +70,10 @@ internal fun globalSearchScopedChats(
         state.chatFilters.mapTo(mutableSetOf()) { it.stableId },
     )
 
-/** Sender, date and content filters as message-search constraints; null when none is active. */
+/**
+ * Sender, date and content filters as message-search constraints; null when none is active, including a selection
+ * that resolves to no constraint at all (a reversed custom range), so it can never widen search to every message.
+ */
 internal fun messageSearchConstraintsFor(
     state: GlobalSearchState,
     nowMillis: Long = System.currentTimeMillis(),
@@ -81,7 +84,7 @@ internal fun messageSearchConstraintsFor(
         senderIds = state.senderFilters.mapTo(mutableSetOf()) { it.stableId.lowercase(Locale.ROOT) },
         dateBounds = runCatching { state.dateFilterSelection.resolveEpochBounds(nowMillis, zoneId) }.getOrNull(),
         contentKinds = state.contentFilterSelection.selectedKinds,
-    )
+    ).takeIf { it.isActive }
 }
 
 /** Picker choices: the account's folders, the chats in the current scope and everyone who writes in them. */

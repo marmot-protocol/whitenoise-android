@@ -1,13 +1,15 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
-import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
+import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
 import dev.ipf.whitenoise.android.state.messageSearchSnippet
+import dev.ipf.whitenoise.android.state.retentionDeadlineForSearch
 import dev.ipf.whitenoise.android.state.searchPage
 import dev.ipf.whitenoise.android.state.searchableTimelineRecord
 import java.util.Locale
@@ -20,12 +22,17 @@ private const val MDK_ATTACHMENT_AUDIO = 3u
 private const val MDK_ATTACHMENT_FILE = 4u
 private const val MDK_ATTACHMENT_ATTACHMENT = 5u
 
+/** The largest chat scope read chat by chat; larger scopes use one account-wide query narrowed on the host. */
+internal const val GLOBAL_SEARCH_FAN_OUT_MAX_CHATS = 10
+
 /**
  * What the global message results list (#1944). MDK filters and pages: the needle as a case-insensitive literal
  * substring, one sender, the time range and an attachment class all go into the typed query. Where Android's
  * filters are wider than one MDK value — several chats, several senders, text or link content — the query asks
- * MDK for the narrowest superset and [admits] keeps the exact rows. [groups] is null for every chat and holds the
- * scoped chats' original ids otherwise; an empty set matches nothing.
+ * MDK for the narrowest superset and [admit] keeps the exact rows. [groups] is null for every chat and holds the
+ * scoped chats' original ids otherwise; an empty set matches nothing. A small scope of two to
+ * [GLOBAL_SEARCH_FAN_OUT_MAX_CHATS] chats is read chat by chat ([fanOutGroups]) and merged, so a few scoped chats
+ * are never buried under newer matches elsewhere in the account.
  */
 internal data class GlobalSearchResultsQuery(
     val needle: String,
@@ -33,20 +40,25 @@ internal data class GlobalSearchResultsQuery(
     val constraints: MessageSearchConstraints? = null,
 ) {
     private val canonicalGroups: Set<String>? = groups?.mapTo(mutableSetOf()) { it.lowercase(Locale.ROOT) }
-    private val ciNeedle: String = needle.lowercase(Locale.ROOT)
+
+    /** The scoped chats read one by one and merged, or null when one query covers the scope. */
+    val fanOutGroups: List<String>? = groups?.sorted()?.takeIf { it.size in 2..GLOBAL_SEARCH_FAN_OUT_MAX_CHATS }
 
     /** True when no message can match, so the list shows its empty state without a native read. */
     val matchesNothing: Boolean get() = groups?.isEmpty() == true
 
-    /** The typed MDK page from [cursor], at most [limit] rows. */
+    /**
+     * The typed MDK page from [cursor], at most [limit] rows, in [groupIdHex] when given. One scoped chat is
+     * searched directly; a large scope is searched account-wide and narrowed by [admit].
+     */
     fun toFfi(
         cursor: GlobalSearchCursor?,
         limit: UInt,
+        groupIdHex: String? = groups?.singleOrNull(),
     ): TimelineMessageQueryFfi {
         val bounds = constraints?.dateBounds
         return TimelineMessageQueryFfi.searchPage(
-            // One scoped chat is searched directly; several are searched account-wide and narrowed by [admits].
-            groupIdHex = groups?.singleOrNull(),
+            groupIdHex = groupIdHex,
             search = needle.ifEmpty { null },
             sender = constraints?.senderIds?.singleOrNull(),
             since = bounds?.let { ceilSeconds(it.startEpochMillisInclusive) },
@@ -60,7 +72,7 @@ internal data class GlobalSearchResultsQuery(
     /**
      * The result row for one MDK record, or null when it must not show: outside the scoped chats, hidden on this
      * device, past its disappearing deadline, not user-authored text (reactions, deletions, system JSON), deleted,
-     * or failing a filter MDK could only approximate.
+     * invalidated on a losing branch the group never accepted, or failing a filter MDK could only approximate.
      */
     fun admit(
         record: TimelineMessageRecordFfi,
@@ -69,9 +81,12 @@ internal data class GlobalSearchResultsQuery(
     ): GlobalSearchResult? {
         val inScope = canonicalGroups == null || record.groupIdHex.lowercase(Locale.ROOT) in canonicalGroups
         val searchable = searchableTimelineRecord(record)
-        val eligible = ChatListMessageSearch.isEligibleMatch(searchable, ciNeedle, constraints, Int.MAX_VALUE)
+        // MDK already matched the needle with its own case folding (which can change a string's length, as for
+        // a dotted İ), so it is not checked again here: only kind, deletion and the filters are.
+        val eligible = ChatListMessageSearch.isEligibleMatch(searchable, ciNeedle = "", constraints = constraints)
         val hidden = hiddenIds(record.groupIdHex).any { it.equals(record.messageIdHex, ignoreCase = true) }
-        val visible = inScope && eligible && !hidden && !isRetentionExpiredForSearch(record, nowMillis)
+        val accepted = record.invalidationStatus == null
+        val visible = inScope && eligible && accepted && !hidden && !isRetentionExpiredForSearch(record, nowMillis)
         val snippet =
             if (visible) {
                 // A hit past the snippet window still shows its leading text rather than vanishing.
@@ -87,7 +102,8 @@ internal data class GlobalSearchResultsQuery(
                 senderIdHex = record.sender,
                 timelineAt = record.timelineAt,
                 snippet = it,
-                attachment = globalSearchResultAttachment(searchable.mediaTypes, searchable.mediaLabels),
+                attachment = globalSearchResultAttachment(MessageAttachments.acceptedReferences(record.media)),
+                expiresAt = retentionDeadlineForSearch(record),
             )
         }
     }
@@ -110,19 +126,17 @@ internal fun globalSearchResultsQuery(
 
 /**
  * The one mode rule of global search (#1944). Any nonblank text query, and any sender, date or content filter,
- * shows paginated message results under the chat-name matches. Attachment-only content filters show the Files &
- * media library instead, a pasted npub or NIP-05 address keeps its identifier result, and folder, chat-type or
- * chat filters alone keep the compact chat list.
+ * shows paginated message results under the chat-name matches. A query shaped like an npub or NIP-05 address
+ * shows its identifier result above them as well, since the same text can appear in messages. Attachment-only
+ * content filters show the Files & media library instead, and folder, chat-type or chat filters alone keep the
+ * compact chat list.
  */
 internal fun globalSearchShowsMessageResults(
     searchActive: Boolean,
     browsingAttachments: Boolean,
     query: String,
     messageFiltersActive: Boolean,
-): Boolean {
-    val textQuery = query.isNotBlank() && ChatListIdentifierSearch.classify(query.trim()) == null
-    return searchActive && !browsingAttachments && (messageFiltersActive || textQuery)
-}
+): Boolean = searchActive && !browsingAttachments && (messageFiltersActive || query.isNotBlank())
 
 /** The cursor of one MDK record, in MDK's account-search order. */
 internal fun TimelineMessageRecordFfi.globalSearchCursor(): GlobalSearchCursor =
@@ -148,12 +162,13 @@ private fun mdkAttachmentType(kinds: Set<GlobalSearchContentKind>): UInt =
         else -> MDK_ATTACHMENT_ATTACHMENT
     }
 
-/** The first accepted attachment's kind and label, or null for a message without one. */
-private fun globalSearchResultAttachment(
-    mediaTypes: List<String>,
-    labels: List<String>,
-): GlobalSearchResultAttachment? {
-    val type = mediaTypes.firstOrNull() ?: return null
+/**
+ * The first accepted attachment's kind from its MIME type and its own file name, kept apart so a real name that
+ * contains a slash is never mistaken for a type. Null for a message without one.
+ */
+private fun globalSearchResultAttachment(references: List<MediaAttachmentReferenceFfi>): GlobalSearchResultAttachment? {
+    val first = references.firstOrNull() ?: return null
+    val type = first.mediaType
     val kind =
         when {
             type.startsWith("image/", ignoreCase = true) -> GlobalSearchResultAttachmentKind.IMAGE
@@ -161,5 +176,5 @@ private fun globalSearchResultAttachment(
             type.startsWith("audio/", ignoreCase = true) -> GlobalSearchResultAttachmentKind.AUDIO
             else -> GlobalSearchResultAttachmentKind.FILE
         }
-    return GlobalSearchResultAttachment(kind, labels.firstOrNull().orEmpty(), mediaTypes.size)
+    return GlobalSearchResultAttachment(kind, first.fileName.trim(), references.size)
 }

@@ -51,17 +51,21 @@ internal enum class GlobalSearchResultAttachmentKind {
     FILE,
 }
 
-/** The first attachment of a result, its file name or type, and how many attachments the message holds. */
+/**
+ * The first attachment of a result: its kind from the MIME type, the sender's own [fileName] (blank when none
+ * was given, never a MIME type), and how many attachments the message holds.
+ */
 internal data class GlobalSearchResultAttachment(
     val kind: GlobalSearchResultAttachmentKind,
-    val label: String,
+    val fileName: String,
     val count: Int,
 )
 
 /**
  * One matching message (#1944). Every match is its own row, so several matches from one chat stay distinct; the
  * [key] combines group and message id because a message id is only unique inside its chat. The [snippet] is
- * built from text that already passed the eligibility, deletion, retention and local-hide checks.
+ * built from text that already passed the eligibility, deletion, retention and local-hide checks; [expiresAt] is
+ * the unix second a disappearing match stops being searchable, so the screen can recheck it then.
  */
 internal data class GlobalSearchResult(
     val groupIdHex: String,
@@ -70,17 +74,25 @@ internal data class GlobalSearchResult(
     val timelineAt: ULong,
     val snippet: SnippetHighlight,
     val attachment: GlobalSearchResultAttachment? = null,
+    val expiresAt: ULong? = null,
 ) {
     val key: String =
         groupIdHex.lowercase(Locale.ROOT) + GLOBAL_SEARCH_KEY_SEPARATOR + messageIdHex.lowercase(Locale.ROOT)
+
+    /** This row's position in MDK's account-search order. */
+    val cursor: GlobalSearchCursor get() = GlobalSearchCursor(timelineAt, messageIdHex, groupIdHex)
 }
 
 private const val GLOBAL_SEARCH_KEY_SEPARATOR = ":"
 
-/** One raw MDK page reduced to its rows and whether older rows remain. */
+/**
+ * One raw MDK page reduced to the rows it consumed and whether older rows remain. [rowsRead] counts every row
+ * the read fetched, which a merged chat-by-chat page can exceed, so the batch budget charges what was read.
+ */
 internal data class GlobalSearchRawPage<R>(
     val rows: List<R>,
     val hasMoreBefore: Boolean,
+    val rowsRead: Int = rows.size,
 )
 
 /**
@@ -131,7 +143,7 @@ internal suspend fun <R> fillGlobalSearchBatch(
         val limit = minOf(budget.rawPageSize, budget.maxRawRows - rows).coerceAtLeast(1)
         val page = source.readPage(next, limit.toUInt())
         pages++
-        rows += page.rows.size
+        rows += page.rowsRead
         val ordered = page.rows.map { it to source.cursorOf(it) }.sortedByDescending { it.second }
         ordered.forEach { (row, _) ->
             val result = source.admit(row)
@@ -147,18 +159,21 @@ internal suspend fun <R> fillGlobalSearchBatch(
 
 /**
  * The one batch a generation has in flight. A completion is applied only while it is still the state's
- * [GlobalSearchResultsState.inFlight], so a page from an older query, filter set or account is dropped.
+ * [GlobalSearchResultsState.inFlight], so a page from an older query, filter set or account is dropped. A
+ * [refresh] rereads the loaded range from the head; its [cursor] is then the old continuation it reads through.
  */
 internal data class GlobalSearchPageRequest(
     val generation: Int,
     val sequence: Int,
     val cursor: GlobalSearchCursor?,
     val seenKeys: Set<String>,
+    val refresh: Boolean = false,
 )
 
 /**
  * Transient results of one search generation. Only admitted rows are kept, never raw pages. [resumeTarget] is
- * the row count a returning session rereads before it shows the list, so Back lands where the user left;
+ * the row count a returning session rereads before it shows the list, so Back lands where the user left, within
+ * [resumeBatchesLeft] batches so rows that vanished meanwhile never walk the whole account;
  * [emptyBatches] counts consecutive batches that showed nothing and [batches] increases with every finished one,
  * so paging effects relaunch even when a batch completes within one frame.
  */
@@ -173,7 +188,11 @@ internal data class GlobalSearchResultsState(
     val emptyBatches: Int = 0,
     val batches: Int = 0,
     val resumeTarget: Int = 0,
+    val resumeBatchesLeft: Int = 0,
 ) {
+    /** The earliest deadline of a loaded disappearing match, when the rows must be checked again. */
+    val nextExpiry: ULong? = results.mapNotNull { it.expiresAt }.minOrNull()
+
     /** A batch is being read. */
     val loading: Boolean get() = inFlight != null
 
@@ -197,8 +216,14 @@ internal object GlobalSearchResultsReducer {
         state: GlobalSearchResultsState,
         resumeTarget: Int = 0,
     ): GlobalSearchResultsState {
-        val generation = state.generation + 1
-        return GlobalSearchResultsState(generation = generation, resumeTarget = resumeTarget.coerceAtLeast(0))
+        val target = resumeTarget.coerceAtLeast(0)
+        // Enough batches for the earlier rows at the batch target, plus the empty-batch allowance.
+        val budget = if (target > 0) target / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES else 0
+        return GlobalSearchResultsState(
+            generation = state.generation + 1,
+            resumeTarget = target,
+            resumeBatchesLeft = budget,
+        )
     }
 
     /** Starts the next batch, or returns null while one is in flight or after MDK's end. */
@@ -218,15 +243,60 @@ internal object GlobalSearchResultsReducer {
         val fresh = batch.results.filter { it.key !in state.seenKeys }.distinctBy { it.key }
         val results = state.results + fresh
         val ended = batch.nextCursor == null
+        val emptyBatches = if (fresh.isEmpty()) state.emptyBatches + 1 else 0
+        val budgetLeft = (state.resumeBatchesLeft - 1).coerceAtLeast(0)
+        // A resume ends at its target, at MDK's end, or once its budget or the empty-batch allowance runs out.
+        val resumeDone =
+            ended ||
+                results.size >= state.resumeTarget ||
+                budgetLeft == 0 ||
+                emptyBatches >= GLOBAL_SEARCH_AUTO_EMPTY_BATCHES
         return state.copy(
             results = results,
             seenKeys = state.seenKeys + fresh.map { it.key },
             nextCursor = batch.nextCursor,
             endReached = ended,
             inFlight = null,
-            emptyBatches = if (fresh.isEmpty()) state.emptyBatches + 1 else 0,
+            emptyBatches = emptyBatches,
             batches = state.batches + 1,
-            resumeTarget = if (ended || results.size >= state.resumeTarget) 0 else state.resumeTarget,
+            resumeTarget = if (resumeDone) 0 else state.resumeTarget,
+            resumeBatchesLeft = if (resumeDone) 0 else budgetLeft,
+        )
+    }
+
+    /**
+     * Starts rereading the loaded range from the head, after a change that may delete, expire or hide a loaded
+     * row or add a newer match. Null while a batch is in flight or before anything loaded.
+     */
+    fun beginRefresh(state: GlobalSearchResultsState): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
+        if (state.inFlight != null || state.batches == 0) return null
+        val request =
+            GlobalSearchPageRequest(state.generation, state.batches, state.nextCursor, emptySet(), refresh = true)
+        return state.copy(inFlight = request) to request
+    }
+
+    /**
+     * Replaces the loaded range with a reread. [refreshed] covers the head down to [rereadThrough]; loaded rows
+     * older than that keep their place, so a reread capped before the old continuation loses nothing. Rows
+     * keep their stable keys, so a list viewport stays where it was while gone rows drop out.
+     */
+    fun applyRefresh(
+        state: GlobalSearchResultsState,
+        request: GlobalSearchPageRequest,
+        refreshed: List<GlobalSearchResult>,
+        rereadThrough: GlobalSearchCursor?,
+    ): GlobalSearchResultsState {
+        if (request != state.inFlight || !request.refresh) return state
+        val through = request.cursor
+        // The old continuation is the oldest row the range consumed, so it belongs to the range.
+        val head = refreshed.filter { through == null || it.cursor >= through }
+        val tail = state.results.filter { rereadThrough != null && it.cursor < rereadThrough }
+        val results = (head + tail).distinctBy { it.key }
+        return state.copy(
+            results = results,
+            seenKeys = results.mapTo(HashSet()) { it.key },
+            inFlight = null,
+            batches = state.batches + 1,
         )
     }
 

@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -43,6 +45,9 @@ private val GlobalSearchResultAvatarSize = 40.dp
 private val GlobalSearchResultMinHeight = 72.dp
 private val GlobalSearchResultAttachmentIconSize = 16.dp
 private const val GLOBAL_SEARCH_RESULT_SNIPPET_LINES = 2
+
+/** Font scale from which the result title stacks above its time. */
+private const val GLOBAL_SEARCH_RESULT_STACKED_FONT_SCALE = 1.5f
 
 /** Test tag of one result row, from its stable key. */
 internal fun globalSearchResultTag(result: GlobalSearchResult): String = "global.search.result.${result.key}"
@@ -74,7 +79,8 @@ internal fun GlobalSearchResultRow(
 ) {
     val result = presentation.result
     val highlight = MaterialTheme.colorScheme.primary
-    val snippet = remember(result.snippet, highlight) { highlightedSnippet(result.snippet, highlight) }
+    val snippet =
+        remember(result.snippet, highlight) { EmojiShortcodes.annotate(highlightedSnippet(result.snippet, highlight)) }
     Row(
         modifier =
             modifier
@@ -97,6 +103,7 @@ internal fun GlobalSearchResultRow(
             GlobalSearchResultOrigin(presentation)
             Text(
                 text = snippet,
+                inlineContent = EmojiShortcodes.content(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = GLOBAL_SEARCH_RESULT_SNIPPET_LINES,
@@ -107,25 +114,53 @@ internal fun GlobalSearchResultRow(
     }
 }
 
-/** "Sender in Chat" on the start side, the time on the end side. */
+/**
+ * "Sender in Chat" on the start side and the time on the end side. At large text the title gets two lines and the
+ * time moves beneath it, so neither is squeezed to a few characters.
+ */
 @Composable
 private fun GlobalSearchResultOrigin(presentation: GlobalSearchResultPresentation) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        EmojiLabel(
-            text = stringResource(R.string.library_sender_in_chat, presentation.senderLabel, presentation.chatTitle),
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = presentation.timeLabel ?: rememberedRelativeTime(presentation.result.timelineAt),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
+    val title = stringResource(R.string.library_sender_in_chat, presentation.senderLabel, presentation.chatTitle)
+    val time = presentation.timeLabel ?: rememberedRelativeTime(presentation.result.timelineAt)
+    if (LocalDensity.current.fontScale >= GLOBAL_SEARCH_RESULT_STACKED_FONT_SCALE) {
+        Column {
+            GlobalSearchResultTitle(title, Modifier, maxLines = 2)
+            GlobalSearchResultTime(time)
+        }
+    } else {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            GlobalSearchResultTitle(title, Modifier.weight(1f), maxLines = 1)
+            GlobalSearchResultTime(time)
+        }
     }
+}
+
+/** The "Sender in Chat" line. */
+@Composable
+private fun GlobalSearchResultTitle(
+    title: String,
+    modifier: Modifier,
+    maxLines: Int,
+) {
+    EmojiLabel(
+        text = title,
+        modifier = modifier,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+/** The match's time. */
+@Composable
+private fun GlobalSearchResultTime(time: String) {
+    Text(
+        text = time,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+    )
 }
 
 /** The attachment's type glyph and name, so a media match shows what it holds without its pixels. */
@@ -140,7 +175,7 @@ private fun GlobalSearchResultAttachmentLine(attachment: GlobalSearchResultAttac
         }
     val typeLabel = stringResource(type)
     val label =
-        attachment.label.takeIf { it.isNotBlank() && !it.contains('/') }?.let { "$typeLabel · $it" } ?: typeLabel
+        attachment.fileName.takeIf { it.isNotBlank() }?.let { "$typeLabel · $it" } ?: typeLabel
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Icon(
             painter = painterResource(icon),

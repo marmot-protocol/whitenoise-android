@@ -1,21 +1,31 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -158,6 +168,71 @@ class GlobalSearchResultRowTest {
         composeRule.onNodeWithText("Search older messages").performClick()
         composeRule.runOnIdle { assertEquals(1, loads) }
     }
+
+    /** A real file name containing a slash is shown; a missing name falls back to the type alone. */
+    @Test
+    fun attachmentNamesAreNeverMistakenForTypes() {
+        val file = GlobalSearchResultAttachment(GlobalSearchResultAttachmentKind.FILE, "Q3/report.pdf", 1)
+        val image = GlobalSearchResultAttachment(GlobalSearchResultAttachmentKind.IMAGE, "", 1)
+        val named = presentation(attachment = file)
+        val unnamed = presentation(attachment = image)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Column {
+                    GlobalSearchResultRow(named, onOpen = {})
+                    GlobalSearchResultRow(unnamed.copy(result = unnamed.result.copy(messageIdHex = "dd")), onOpen = {})
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("File · Q3/report.pdf", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText("Image", useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    /** At large text the title moves above the time so neither is squeezed beside the other. */
+    @Test
+    fun largeTextStacksTheTitleAboveTheTime() {
+        val row = presentation()
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                WhiteNoiseTheme { GlobalSearchResultRow(row, onOpen = {}) }
+            }
+        }
+
+        val title = composeRule.onNodeWithText("Alice in Hiking crew", useUnmergedTree = true).getBoundsInRoot()
+        val time = composeRule.onNodeWithText("10:42", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue(time.top >= title.bottom)
+    }
+
+    /** Only a query's first read is announced; later automatic batches stay quiet, and the empty state is heard. */
+    @Test
+    fun loadingIsAnnouncedOncePerQuery() {
+        val request = GlobalSearchPageRequest(1, 0, null, emptySet())
+        var state by mutableStateOf(GlobalSearchResultsState(generation = 1, inFlight = request))
+        composeRule.setContent {
+            WhiteNoiseTheme { LazyColumn { globalSearchResultItems(GlobalSearchResultsContent(state, emptyList())) } }
+        }
+        assertEquals(LiveRegionMode.Polite, liveRegion("Searching message content…"))
+
+        composeRule.runOnIdle {
+            state = GlobalSearchResultsState(generation = 1, batches = 1, inFlight = request.copy(sequence = 1))
+        }
+        assertNull(liveRegion("Searching message content…"))
+
+        composeRule.runOnIdle { state = GlobalSearchResultsState(generation = 1, batches = 2, endReached = true) }
+        val empty = composeRule.onNodeWithText("No Results", useUnmergedTree = true).fetchSemanticsNode()
+        val announced = generateSequence(empty) { it.parent }.any { it.config.contains(SemanticsProperties.LiveRegion) }
+        assertTrue(announced)
+    }
+
+    /** The live-region mode on the node showing [text], or null when it has none. */
+    private fun liveRegion(text: String): LiveRegionMode? =
+        composeRule
+            .onNodeWithText(text, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .config
+            .getOrNull(SemanticsProperties.LiveRegion)
 
     /** Renders the result items in a list the way the chat list hosts them. */
     private fun render(content: GlobalSearchResultsContent) {

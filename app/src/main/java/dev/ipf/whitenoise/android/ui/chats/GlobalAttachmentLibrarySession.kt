@@ -253,27 +253,33 @@ internal fun rememberGlobalAttachmentPager(
     return pager
 }
 
-/** Subscribes before probing so a change during the first read is not lost; any chat of the account counts. */
-private suspend fun observeLibraryChanges(
+/**
+ * Subscribes before probing so a change during the first read is not lost; any chat of the account counts. Global
+ * message results (#1944) use the same wakeups to recheck their loaded rows. Returns whether the subscription
+ * opened at all, so a caller can stop retrying a runtime that offers none.
+ */
+internal suspend fun observeLibraryChanges(
     runtime: MarmotInterface,
     account: String,
     wakeups: Channel<Unit>,
-) = withContext(Dispatchers.IO) {
-    val subscription = runCatchingCancellable { runtime.subscribeEvents() }.getOrNull()
-    try {
-        wakeups.send(Unit)
-        if (subscription != null) {
-            runCatchingCancellable {
-                while (true) {
-                    val event = subscription.next() ?: break
-                    if (libraryProjectionTouched(event, account)) wakeups.send(Unit)
+): Boolean =
+    withContext(Dispatchers.IO) {
+        val subscription = runCatchingCancellable { runtime.subscribeEvents() }.getOrNull()
+        try {
+            wakeups.send(Unit)
+            if (subscription != null) {
+                runCatchingCancellable {
+                    while (true) {
+                        val event = subscription.next() ?: break
+                        if (libraryProjectionTouched(event, account)) wakeups.send(Unit)
+                    }
                 }
             }
+        } finally {
+            subscription?.let { withContext(NonCancellable) { runCatching { it.destroy() } } }
         }
-    } finally {
-        subscription?.let { withContext(NonCancellable) { runCatching { it.destroy() } } }
+        subscription != null
     }
-}
 
 /**
  * The chats the library can name and open (#2000). The chat list holds only a bounded window of rows, active

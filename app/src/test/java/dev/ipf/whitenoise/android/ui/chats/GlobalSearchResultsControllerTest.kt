@@ -76,7 +76,7 @@ class GlobalSearchResultsControllerTest {
             assertTrue(controller.state.endReached)
         }
 
-    /** Several senders or chats search account-wide and keep only the selected ones on the host. */
+    /** Several senders, or a scope too large to read chat by chat, search account-wide and narrow on the host. */
     @Test
     fun widerFiltersSearchAccountWideAndNarrowOnTheHost() =
         runTest {
@@ -92,7 +92,8 @@ class GlobalSearchResultsControllerTest {
             val query =
                 GlobalSearchResultsQuery(
                     needle = "hello",
-                    groups = setOf("chosen", "chosen2"),
+                    // More chats than the chat-by-chat fan-out reads, so one account-wide query covers them.
+                    groups = setOf("chosen", "chosen2") + (1..GLOBAL_SEARCH_FAN_OUT_MAX_CHATS).map { "spare$it" },
                     constraints = MessageSearchConstraints(senderIds = setOf(SENDER, OTHER_SENDER)),
                 )
             val controller = controller(reader)
@@ -118,7 +119,7 @@ class GlobalSearchResultsControllerTest {
             assertNull(reader.queries.single().search)
         }
 
-    /** Hidden, deleted, expired and system rows never become results, and no snippet shows their text. */
+    /** Hidden, deleted, expired, system and never-accepted rows never become results or show their text. */
     @Test
     fun hiddenDeletedExpiredAndSystemRowsNeverShow() =
         runTest {
@@ -131,6 +132,7 @@ class GlobalSearchResultsControllerTest {
                         record("g", "expired", at = 6uL, text = "secret expired", expiresAt = 1uL),
                         record("g", "system", at = 5uL, text = "{\"secret\":true}", kind = 1210uL),
                         record("g", "reaction", at = 4uL, text = "secret", kind = 7uL),
+                        record("g", "losing", at = 3uL, text = "secret losing branch", invalidation = "LosingBranch"),
                     )
                 })
             val controller =
@@ -265,9 +267,144 @@ class GlobalSearchResultsControllerTest {
             assertEquals(1, reader.queries.size)
         }
 
+    /** MDK's case folding is trusted: a dotted capital İ that MDK matched is not dropped by a host re-check. */
+    @Test
+    fun mdkNeedleMatchIsNotDroppedByHostCaseFolding() =
+        runTest {
+            val reader = FakeReader({ page(record("g", "trip", at = 5uL, text = "İstanbul trip")) })
+            val controller = controller(reader)
+            controller.search(GlobalSearchResultsQuery(needle = "İstanbul"))
+            advanceUntilIdle()
+
+            assertEquals("İstanbul", reader.queries.single().search)
+            assertEquals(listOf("g:trip"), controller.state.results.map { it.key })
+        }
+
+    /** Two scoped chats buried under 600 newer matches elsewhere are read chat by chat and found at once. */
+    @Test
+    fun smallScopeReadsEachChatAndFindsBuriedMatches() =
+        runTest {
+            val noise = (0 until 600).map { record("noise${it % 30}", "n$it", at = 10_000uL + it.toULong()) }
+            val scoped = (0 until 6).map { record(chosen(it), "s$it", at = 100uL + it.toULong()) }
+            val store = StoreReader(noise + scoped)
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello", groups = setOf("chosen-a", "chosen-b")))
+            advanceUntilIdle()
+
+            assertEquals((5 downTo 0).map { "${chosen(it)}:s$it" }, keys(controller))
+            assertTrue(controller.state.endReached)
+            assertTrue(store.queries.all { it.groupIdHex in setOf("chosen-a", "chosen-b") && it.searchWallClock })
+            assertTrue(store.rowsReturned <= GLOBAL_SEARCH_BATCH_ROWS)
+        }
+
+    /** A merged chat-by-chat read pages in account order across chats with no duplicate or gap. */
+    @Test
+    fun smallScopeMergesChatsInAccountOrderAcrossPages() =
+        runTest {
+            val rows = (0 until 120).map { record("c${it % 3}", "m%03d".format(it), at = 500uL + (it / 4).toULong()) }
+            val store = StoreReader(rows + (0 until 40).map { record("other", "o$it", at = 900uL + it.toULong()) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello", groups = setOf("c0", "c1", "c2")))
+            advanceUntilIdle()
+            while (!controller.state.endReached) {
+                controller.loadMore()
+                advanceUntilIdle()
+            }
+
+            val expected = rows.sortedWith(ACCOUNT_ORDER).map { "${it.groupIdHex}:${it.messageIdHex}" }
+            assertEquals(expected, keys(controller))
+        }
+
+    /** A refresh drops a row deleted while listed, adds a newer match, and keeps the other rows in place. */
+    @Test
+    fun refreshDropsDeletedRowsAndAddsNewMatches() =
+        runTest {
+            val store = StoreReader((0 until 5).map { record("g", "m$it", at = 100uL + it.toULong()) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertEquals(listOf("g:m4", "g:m3", "g:m2", "g:m1", "g:m0"), keys(controller))
+
+            store.replace("m2") { it.copy(deleted = true) }
+            store.add(record("g", "fresh", at = 200uL))
+            controller.refresh()
+            advanceUntilIdle()
+
+            assertEquals(listOf("g:fresh", "g:m4", "g:m3", "g:m1", "g:m0"), keys(controller))
+            assertFalse(controller.state.failed)
+        }
+
+    /** A refresh asked for while a later page is loading runs once that page lands. */
+    @Test
+    fun refreshDuringALoadingPageRunsAfterIt() =
+        runTest {
+            val store = StoreReader((0 until 60).map { record("g", "m%02d".format(it), at = 100uL + it.toULong()) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            store.replace("m59") { it.copy(deleted = true) }
+            controller.loadMore()
+            controller.refresh()
+            advanceUntilIdle()
+
+            assertFalse(controller.state.results.any { it.messageIdHex == "m59" })
+            assertEquals(59, controller.state.results.size)
+        }
+
+    /** A failed background refresh keeps every row and shows no failure boundary. */
+    @Test
+    fun failedRefreshKeepsRowsWithoutAFailure() =
+        runTest {
+            val first = page(record("g", "a", at = 2uL), record("g", "b", at = 1uL))
+            val reader = FakeReader({ first }, { error("local read failed") })
+            val controller = controller(reader)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            controller.refresh()
+            advanceUntilIdle()
+
+            assertEquals(listOf("g:a", "g:b"), keys(controller))
+            assertFalse(controller.state.failed)
+            assertFalse(controller.state.loading)
+        }
+
+    /** A return whose rows were all deleted meanwhile reads a bounded number of pages and shows what it found. */
+    @Test
+    fun resumeAfterRowsVanishedIsBounded() =
+        runTest {
+            val reactions = (0 until 2_000).map { record("g", "r%04d".format(it), at = it.toULong(), kind = 7uL) }
+            val store = StoreReader(reactions)
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"), resumeTarget = 300)
+            advanceUntilIdle()
+
+            assertFalse(controller.state.resuming)
+            assertTrue(controller.state.results.isEmpty())
+            assertEquals(GLOBAL_SEARCH_AUTO_EMPTY_BATCHES * GLOBAL_SEARCH_BATCH_PAGES, store.queries.size)
+        }
+
+    /** The resume extent belongs to one account and runtime; another owner starts at the top. */
+    @Test
+    fun resumeExtentIsKeyedByOwner() {
+        val extent = GlobalSearchResultsExtent()
+        val query = GlobalSearchResultsQuery(needle = "gm")
+        extent.record("account-a" to 1, query, loaded = 40)
+
+        assertEquals(40, extent.resumeCount("account-a" to 1, query))
+        assertEquals(0, extent.resumeCount("account-b" to 1, query))
+        assertEquals(0, extent.resumeCount("account-a" to 2, query))
+        assertEquals(0, extent.resumeCount("account-a" to 1, query.copy(needle = "other")))
+    }
+
+    /** One of the two scoped chats, alternating by index. */
+    private fun chosen(index: Int) = if (index % 2 == 0) "chosen-a" else "chosen-b"
+
+    /** The keys of the loaded results in display order. */
+    private fun keys(controller: GlobalSearchResultsController) = controller.state.results.map { it.key }
+
     /** A controller whose batches run as children of the test, with the given local hides and owner check. */
     private fun TestScope.controller(
-        reader: FakeReader,
+        reader: GlobalSearchTimelineReader,
         hidden: (String) -> Set<String> = { emptySet() },
         isCurrent: () -> Boolean = { true },
     ) = GlobalSearchResultsController(
@@ -281,6 +418,63 @@ class GlobalSearchResultsControllerTest {
                 ioDispatcher = StandardTestDispatcher(testScheduler),
             ),
     )
+
+    /**
+     * An in-memory MDK store: filters by chat, text and sender, orders account-wide by (time, message id, group)
+     * or within one chat by (time, message id), applies the strict cursor, and returns pages oldest first.
+     */
+    private class StoreReader(
+        records: List<TimelineMessageRecordFfi>,
+    ) : GlobalSearchTimelineReader {
+        private val rows = records.toMutableList()
+        val queries = mutableListOf<TimelineMessageQueryFfi>()
+        var rowsReturned = 0
+
+        /** Changes the stored row with [id]. */
+        fun replace(
+            id: String,
+            change: (TimelineMessageRecordFfi) -> TimelineMessageRecordFfi,
+        ) {
+            val index = rows.indexOfFirst { it.messageIdHex == id }
+            rows[index] = change(rows[index])
+        }
+
+        /** Stores a new row. */
+        fun add(record: TimelineMessageRecordFfi) {
+            rows += record
+        }
+
+        /** Answers one typed query the way MDK's account-wide or single-chat wall-clock search does. */
+        override suspend fun page(query: TimelineMessageQueryFfi): TimelinePageFfi {
+            queries += query
+            val needle = query.search?.trim()?.lowercase()
+            val cursor =
+                query.before?.let { at ->
+                    GlobalSearchCursor(at, requireNotNull(query.beforeMessageId), query.cursorGroupId.orEmpty())
+                }
+            val matching =
+                rows
+                    .filter { query.groupIdHex == null || it.groupIdHex == query.groupIdHex }
+                    .filter { needle == null || it.plaintext.lowercase().contains(needle) }
+                    .filter { query.sender == null || it.sender == query.sender }
+                    .filter { cursor == null || it.isOlderThan(cursor, sameChat = query.groupIdHex != null) }
+                    .sortedWith(ACCOUNT_ORDER)
+            val limit = query.limit!!.toInt()
+            val page = matching.take(limit)
+            rowsReturned += page.size
+            return TimelinePageFfi(page.reversed(), hasMoreBefore = matching.size > limit, hasMoreAfter = false)
+        }
+
+        /** MDK's strict cursor predicate: by time and id in one chat, by time, id and group account-wide. */
+        private fun TimelineMessageRecordFfi.isOlderThan(
+            cursor: GlobalSearchCursor,
+            sameChat: Boolean,
+        ): Boolean {
+            val own = if (sameChat) GlobalSearchCursor(timelineAt, messageIdHex, "") else globalSearchCursor()
+            val bound = if (sameChat) cursor.copy(groupIdHex = "") else cursor
+            return own < bound
+        }
+    }
 
     /** One final page holding [records] in the order given. */
     private fun page(vararg records: TimelineMessageRecordFfi) =
@@ -304,9 +498,14 @@ class GlobalSearchResultsControllerTest {
         const val NOW_MILLIS = 1_000_000L
         val SENDER = "aa".repeat(32)
         val OTHER_SENDER = "bb".repeat(32)
+
+        /** MDK's account-search order, newest first. */
+        val ACCOUNT_ORDER: Comparator<TimelineMessageRecordFfi> =
+            compareByDescending<TimelineMessageRecordFfi> { it.globalSearchCursor() }
+
         val EMPTY_TOKENS = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
 
-        /** A timeline record with the fields search reads. */
+        /** A timeline record with the fields search reads; [invalidation] marks a losing-branch row. */
         @Suppress("LongParameterList")
         fun record(
             group: String,
@@ -317,6 +516,7 @@ class GlobalSearchResultsControllerTest {
             kind: ULong = 9uL,
             deleted: Boolean = false,
             expiresAt: ULong? = null,
+            invalidation: String? = null,
         ) = TimelineMessageRecordFfi(
             clientToken = null,
             hasReports = false,
@@ -347,7 +547,7 @@ class GlobalSearchResultsControllerTest {
             deleted = deleted,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             deletedByMessageIdHex = null,
-            invalidationStatus = null,
+            invalidationStatus = invalidation,
             recipientConfirmed = false,
             importedFrom = null,
             historyImportProvenance = null,
