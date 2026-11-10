@@ -40,6 +40,7 @@ internal class AccountStickers(
     fun close() = scope.cancel()
 }
 
+/** Binds the sticker library to [accountRef]'s MDK calls, run off the main thread. */
 private fun stickerLibraryFor(
     appState: WhiteNoiseAppState,
     accountRef: String?,

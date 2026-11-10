@@ -185,6 +185,7 @@ class StickerAssetCache<I : Any>(
         images.trimToSize(trim.targetBytes(capacity))
     }
 
+    /** Loads [key]; a failed load returns null so the bubble shows its fallback. Cancellation still propagates. */
     @Suppress("TooGenericExceptionCaught")
     private suspend fun loadOrNull(key: StickerKey): LoadedSticker<I>? =
         try {

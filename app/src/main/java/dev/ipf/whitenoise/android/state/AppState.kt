@@ -1496,6 +1496,7 @@ class WhiteNoiseAppState private constructor(
      */
     internal fun stickersFor(account: String?) = accountStickers.getOrPut(account) { AccountStickers(account, this) }
 
+    /** Drops [account]'s sticker state and cancels its downloads after the account is removed. */
     private fun forgetStickers(account: String) {
         accountStickers.remove(account)?.close()
     }

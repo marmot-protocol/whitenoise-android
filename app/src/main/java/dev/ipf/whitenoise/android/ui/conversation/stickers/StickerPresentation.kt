@@ -23,7 +23,6 @@ internal object StickerPresentation {
     private const val MAX_ALT_CHARS = 120
     private const val MAX_TITLE_CHARS = 80
     private const val MAX_DESCRIPTION_CHARS = 500
-    private const val MAX_LOOKUP_BYTES = 2_048
 
     /**
      * A sticker replaces the bubble only when its kind-9 carries nothing else.
@@ -63,11 +62,8 @@ internal object StickerPresentation {
     /** The sticker's alt text, sanitized and bounded, or null when it has none. */
     fun accessibleAlt(alt: String?): String? = bounded(alt, MAX_ALT_CHARS)
 
-    /** A pasted link, coordinate or `naddr`, trimmed and bounded; MDK parses and validates it. */
-    fun lookupInput(raw: String): String? {
-        val input = raw.trim()
-        return input.takeIf { it.isNotEmpty() && it.toByteArray().size <= MAX_LOOKUP_BYTES }
-    }
+    /** A pasted link, coordinate or `naddr`, trimmed; MDK parses, bounds and validates it. */
+    fun lookupInput(raw: String): String? = raw.trim().takeIf { it.isNotEmpty() }
 
     /** The pack's title, or null when it has none and the caller shows the generic name. */
     fun title(pack: StickerPackFfi): String? = bounded(pack.title, MAX_TITLE_CHARS)

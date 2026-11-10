@@ -159,13 +159,13 @@ private fun PackTabs(
     }
 }
 
-/** Stickers in a grid; [onPick] is null where they are only shown, as in pack detail. */
+/** Stickers in a grid; tapping one calls [onPick]. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerGrid(
     stickers: List<StickerFfi>,
     cache: StickerAssetCache<ImageBitmap>,
-    onPick: ((StickerFfi) -> Unit)?,
+    onPick: (StickerFfi) -> Unit,
     header: LazyGridScope.() -> Unit = {},
     footer: LazyGridScope.() -> Unit = {},
 ) {
@@ -183,7 +183,7 @@ internal fun StickerGrid(
                 loadsAutomatically = true,
                 cache = cache,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                onClick = onPick?.let { pick -> { pick(sticker) } },
+                onClick = { onPick(sticker) },
             )
         }
         footer()

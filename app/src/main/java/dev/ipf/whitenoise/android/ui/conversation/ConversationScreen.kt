@@ -4321,7 +4321,13 @@ internal fun ConversationScreen(
                         } else {
                             null
                         },
-                    onOpenStickers = { stickerSheetOpen = true },
+                    // MDK sends stickers without a reply target, so the action stays hidden while replying or editing.
+                    onOpenStickers =
+                        if (controller.replyingTo == null && controller.editingMessageId == null) {
+                            { stickerSheetOpen = true }
+                        } else {
+                            null
+                        },
                     onPasteImageUris = { uris ->
                         val admission =
                             admitComposerAttachments(

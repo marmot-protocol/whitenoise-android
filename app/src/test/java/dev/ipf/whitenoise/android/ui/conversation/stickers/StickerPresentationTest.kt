@@ -47,7 +47,6 @@ class StickerPresentationTest {
         assertEquals(120, StickerPresentation.accessibleAlt("a".repeat(500))?.length)
         assertEquals(119, StickerPresentation.accessibleAlt("a".repeat(119) + "😀")?.length)
         assertNull(StickerPresentation.lookupInput("  "))
-        assertNull(StickerPresentation.lookupInput("n".repeat(2_049)))
         assertEquals("naddr1x", StickerPresentation.lookupInput(" naddr1x\n"))
     }
 

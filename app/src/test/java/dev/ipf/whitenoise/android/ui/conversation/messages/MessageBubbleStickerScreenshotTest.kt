@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.StickerAssetFfi
 import dev.ipf.marmotkit.StickerFfi
@@ -109,6 +111,43 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
     /** Mirrored rows at 200% text keep the sticker size and wrap only the caption and footer. */
     @Test fun stickerRowsRtlLarge() = capture("rtl_large", AppThemeMode.Light, rtlLarge = true)
 
+    /** The long-press overlay keeps a bare sticker's artwork instead of an empty bubble. */
+    @Test
+    fun focusedBareStickerKeepsItsArtwork() {
+        appState.updateThemeMode(AppThemeMode.Amoled)
+        val item = fileTimelineMessage(230, "", mine = true, attachments = emptyList(), sticker = STICKERS[1])
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(12.dp)) {
+                    StickerMessage(item, isActionMenuOpen = true)
+                }
+            }
+        }
+        val sent = StickerKey.from(STICKERS[1])
+        composeRule.waitUntil(LOAD_TIMEOUT_MS) {
+            controller.stickerAssets.cached(sent) != null || controller.stickerAssets.hasFailed(sent)
+        }
+        composeRule.onNodeWithTag("message-actions-preview", useUnmergedTree = true).assertExists()
+        // One sticker in the timeline row, one in the focused preview.
+        composeRule.onAllNodesWithTag("message.sticker", useUnmergedTree = true).assertCountEquals(2)
+        captureScreenRoboImage("src/test/snapshots/message_bubble_sticker_focused_amoled.png")
+    }
+
+    /** A bare sticker whose message was invalidated shows the warning below the artwork. */
+    @Test
+    fun invalidatedBareStickerShowsItsWarning() {
+        val item =
+            fileTimelineMessage(
+                220,
+                "",
+                attachments = emptyList(),
+                invalidationStatus = "BeyondAppRetention",
+                sticker = STICKERS[0],
+            )
+        composeRule.setContent { WhiteNoiseTheme { StickerMessage(item) } }
+        composeRule.onNodeWithTag("sticker-message-warning", useUnmergedTree = true).assertExists()
+    }
+
     private fun capture(
         name: String,
         mode: AppThemeMode,
@@ -159,7 +198,10 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
         }
 
     @androidx.compose.runtime.Composable
-    private fun StickerMessage(item: TimelineMessage) {
+    private fun StickerMessage(
+        item: TimelineMessage,
+        isActionMenuOpen: Boolean = false,
+    ) {
         MessageBubble(
             item = item,
             controller = controller,
@@ -181,7 +223,7 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
             quickReactionEmojis = emptyList(),
             recentEmojis = emptyList(),
             onEmojiUsed = {},
-            isActionMenuOpen = false,
+            isActionMenuOpen = isActionMenuOpen,
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},

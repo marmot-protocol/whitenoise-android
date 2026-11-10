@@ -3066,6 +3066,15 @@ internal fun MessageBubble(
                                         sourceSize = pressState.focusedMediaSize,
                                     )
                                 }
+                            } else if (stickerRef != null) {
+                                {
+                                    StickerMessageContent(
+                                        ref = stickerRef,
+                                        mine = mine,
+                                        controller = controller,
+                                        appState = appState,
+                                    )
+                                }
                             } else {
                                 null
                             }
