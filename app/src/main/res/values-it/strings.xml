@@ -84,7 +84,7 @@
     <string name="error_loaded_content_kept">Impossibile caricare altri contenuti. I tuoi messaggi sono ancora disponibili; riprova quando vuoi.</string>
     <string name="error_conversation_membership_unavailable">Impossibile verificare i membri di questa conversazione. Riprova per mostrare i tuoi messaggi.</string>
     <string name="error_conversation_membership_inconsistent">L\'elenco dei membri di questa conversazione non corrisponde a questo account, quindi i messaggi restano nascosti. Riprova per controllare di nuovo.</string>
-    <string name="refresh">Aggiorna dump</string>
+    <string name="refresh">Aggiorna</string>
     <string name="retry">Riprova</string>
     <string name="creating_identity_title">Creazione identità</string>
     <string name="sign_in">Accedi</string>
@@ -363,6 +363,12 @@
     <string name="restoring_chat">Ripristino chat...</string>
     <string name="leave_chat">Esci dalla chat</string>
     <string name="leaving_chat">Uscita dalla chat...</string>
+    <string name="group_leave_blocked">Uscita bloccata</string>
+    <string name="group_leave_blocked_hint">Sei l\'unico amministratore. Annulla l\'uscita per restare in questo gruppo.</string>
+    <string name="group_cancel_leave">Annulla uscita</string>
+    <string name="group_leave_refresh_hint">Aggiorna per verificare se sei ancora in questo gruppo.</string>
+    <string name="group_leave_refresh_action">Aggiorna</string>
+    <string name="toast_couldnt_cancel_leave">Impossibile annullare l\'uscita</string>
     <string name="export_conversation_transcript">Esporta trascrizione della conversazione</string>
     <string name="toast_couldnt_export_transcript">Impossibile esportare la trascrizione</string>
     <string name="no_share_target_available">Nessuna destinazione di condivisione disponibile</string>
@@ -1120,6 +1126,8 @@
     <string name="media_downloading">Download in corso</string>
     <string name="media_cancel_download">Annulla il download</string>
     <string name="media_download_cancelled">Download annullato. Tocca per scaricare di nuovo</string>
+    <string name="media_removed_download_again">Rimosso da questo dispositivo. Tocca per scaricare di nuovo</string>
+    <string name="floating_attachment_removed">Rimosso da questo dispositivo. Apri l\'originale per scaricarlo di nuovo</string>
     <string name="media_opening">Apertura</string>
     <string name="media_save">Salva</string>
     <string name="media_saved">Salvato nella galleria</string>
@@ -1640,6 +1648,35 @@
 
     <string name="chat_bubble_colors">Colori dei fumetti</string>
     <string name="custom_emoji">Emoji personalizzate</string>
+    <string name="emoji_sets_title">Set di emoji</string>
+    <string name="emoji_sets_account_required">Scegli un profilo per sfogliare e installare set di emoji.</string>
+    <string name="emoji_sets_query">Cerca o incolla il link di un set</string>
+    <string name="emoji_sets_find">Trova set</string>
+    <string name="emoji_sets_open">Apri set di emoji</string>
+    <string name="emoji_sets_empty">Nessun set. Trova set sui tuoi relay o incolla il link di un set condiviso.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d emoji</item>
+        <item quantity="other">%1$d emoji</item>
+    </plurals>
+    <string name="emoji_sets_installed">Installato</string>
+    <string name="emoji_sets_update_available">Aggiornamento disponibile</string>
+    <string name="emoji_sets_load_image">Carica immagine di anteprima</string>
+    <string name="emoji_sets_image_privacy">Caricare un’anteprima o installare un set condivide il tuo indirizzo IP con i suoi host di immagini.</string>
+    <string name="emoji_sets_preview_host">Host dell’immagine di anteprima: %1$s</string>
+    <string name="emoji_sets_install">Installa set</string>
+    <string name="emoji_sets_update">Aggiorna set</string>
+    <string name="emoji_sets_check_update">Cerca aggiornamenti</string>
+    <string name="emoji_sets_preparing_install">Preparazione dell’installazione…</string>
+    <string name="emoji_sets_install_progress">%1$d di %2$d emoji elaborate</string>
+    <string name="emoji_sets_error">Impossibile completare la richiesta. Riprova.</string>
+    <string name="emoji_sets_not_found">Set o immagine non trovati. Controlla il link o riprova.</string>
+    <string name="emoji_sets_changed">Questo set è cambiato. Controlla la nuova versione prima di installarla.</string>
+    <string name="emoji_sets_cancelled">Installazione annullata.</string>
+    <string name="emoji_sets_discovery_incomplete">Alcuni relay non sono raggiungibili. I risultati potrebbero essere incompleti.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Installato con %1$d voce saltata.</item>
+        <item quantity="other">Installato con %1$d voci saltate.</item>
+    </plurals>
     <string name="custom_emoji_detail">Le immagini qui diventano emoji :shortcode: salvate su questo dispositivo. Un nuovo messaggio (non una risposta) che ne usa una carica la sua immagine, cifrata, in quella chat. Reazioni, risposte e modifiche inviano solo lo shortcode.</string>
     <string name="custom_emoji_empty">Ancora nessuna emoji personalizzata.</string>
     <string name="custom_emoji_name_title">Dai un nome a questa emoji</string>

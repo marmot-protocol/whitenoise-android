@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -24,6 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -46,6 +48,76 @@ class ChatListWindowSetTest {
             assertEquals(listOf(ChatListViewFfi.ARCHIVED), replaced)
             handles.values.forEach(FakeWindow::close)
             receiver.join()
+        }
+
+    /**
+     * A folder set opens one native window per view its query covers, pages on its own, and its rows follow the plain
+     * rows without duplicates once merged.
+     */
+    @Test
+    fun folderSetMergesAfterPlainRowsAndPagesOnItsOwn() =
+        runBlocking {
+            val handles = CHAT_LIST_WINDOW_VIEWS.associateWith { view -> FakeWindow(view, rows = listOf("$view-a")) }
+            val folderWindows =
+                mapOf(
+                    ChatListViewFfi.CHATS to
+                        FakeWindow(ChatListViewFfi.CHATS, listOf("CHATS-a", "f-1"), hasMoreAfter = true),
+                    ChatListViewFfi.ARCHIVED to FakeWindow(ChatListViewFfi.ARCHIVED, listOf("f-archived")),
+                )
+            val advanced = SmartFolderFilter.Group(children = listOf(SmartFolderFilter.Condition(FolderField.PINNED)))
+            val rule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(advanced))
+            val query = requireNotNull(chatFolderQuery(rule, emptySet(), emptySet()))
+            val opened = mutableListOf<ChatListViewQueryFfi>()
+            val folder =
+                ChatFolderWindows(query) { _, native -> folderWindows.getValue(native.view).also { opened += native } }
+            val plain = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
+            val folderSet = ChatListWindowSet.openFolder("acct", folder)
+            assertEquals(query.views.map(query::forView), opened)
+            val merged = plain.frame().withFolder(folderSet)
+            val expected = listOf("CHATS-a", "ARCHIVED-a", "LEFT-a", "f-1", "f-archived")
+            assertEquals(expected, merged.rows.map { it.row.groupIdHex })
+            assertEquals(plain.frame().revision, merged.revision)
+            folderSet.pageForward(ChatListViewFfi.CHATS, folder = true)
+            assertTrue(
+                "CHATS-page" in
+                    plain
+                        .frame()
+                        .withFolder(folderSet)
+                        .rows
+                        .map { it.row.groupIdHex },
+            )
+            assertTrue(handles.getValue(ChatListViewFfi.CHATS).pageCalls.isEmpty())
+            folderSet.close()
+            assertEquals(plain.frame(), plain.frame().withFolder(folderSet))
+            assertTrue(handles.values.none(FakeWindow::closed))
+            plain.close()
+        }
+
+    /** A folder set that fails part way closes the folder windows it opened and leaves the plain windows alone. */
+    @Test
+    fun failedFolderOpenClosesOnlyItsOwnWindows() =
+        runBlocking {
+            val handles = CHAT_LIST_WINDOW_VIEWS.associateWith { view -> FakeWindow(view, rows = listOf("$view-a")) }
+            val chatsFolder = FakeWindow(ChatListViewFfi.CHATS, listOf("f-1"))
+            val muted = SmartFolderFilter.Condition(FolderField.MUTED)
+            val filter = SmartFolderFilter.Group(children = listOf(muted))
+            val rule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(filter))
+            val query = requireNotNull(chatFolderQuery(rule, emptySet(), emptySet()))
+            val folder =
+                ChatFolderWindows(query) { _, native ->
+                    if (native.view != ChatListViewFfi.CHATS) throw MarmotKitException.ChatPresentationNotReady()
+                    chatsFolder
+                }
+            val plain = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
+            try {
+                ChatListWindowSet.openFolder("acct", folder)
+                fail("expected the folder open to fail")
+            } catch (_: MarmotKitException.ChatPresentationNotReady) {
+                // Expected, the controller retries.
+            }
+            assertTrue(chatsFolder.closed)
+            assertTrue(handles.values.none(FakeWindow::closed))
+            plain.close()
         }
 
     /** An equal or older sequence is a duplicate echo and is never installed. */
@@ -407,4 +479,5 @@ internal fun chatRow(groupIdHex: String) =
         mutedUntilMs = null,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
     )

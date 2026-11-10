@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
@@ -142,6 +143,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -892,12 +894,33 @@ internal fun reconcileProvisionalOpenChat(
 
 /**
  * Whether [update] ends this device's membership. A [SelfMembershipFfi.DEVICE_REMOVED] copy counts: this device takes
- * no more sends, while its account stays on the roster through another device.
+ * no more sends, while its account stays on the roster through another device. A durable
+ * pending leave is provisional even when the record already says LEFT.
  */
 internal fun groupStateUpdateRemovesSelf(
     previous: AppGroupRecordFfi,
     update: AppGroupRecordFfi,
-): Boolean = !previous.selfMembership.isNonMember() && update.selfMembership.isNonMember()
+): Boolean = !previous.hasSettledDeparture() && update.hasSettledDeparture()
+
+/** Pending LEFT can still resolve to a joined account after cancellation. */
+private fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
+    selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
+
+/** Distinguishes an actual eviction from a provisional voluntary departure. */
+private fun SelfMembershipFfi.isGroupEviction(): Boolean =
+    when (this) {
+        SelfMembershipFfi.REMOVED, SelfMembershipFfi.DEVICE_REMOVED -> true
+        SelfMembershipFfi.MEMBER, SelfMembershipFfi.LEFT -> false
+    }
+
+/** A readback can rejoin only an active, confirmed group with no outstanding leave request. */
+private fun AppGroupRecordFfi.isJoinedAfterLeave(): Boolean =
+    selfMembership == SelfMembershipFfi.MEMBER &&
+        !leaveRequestPending &&
+        !leaveBlocked &&
+        !pendingConfirmation &&
+        !disbanded &&
+        !disbanding
 
 internal fun cacheAppliedGroupMembers(
     appState: WhiteNoiseAppState,
@@ -1830,6 +1853,27 @@ class ChatsController private constructor(
     private var isCleared = false
 
     internal val folderSource = ChatFolderLiveSource()
+
+    /** Folder memberships MarmotKit computes over every chat, refreshed as the list and folders change (#3652). */
+    internal val folderMembership by lazy { ChatFolderMembership(recomputeScope, liveSubscriptions.chatListQueryIds) }
+
+    /** The selected folder's own windows, open beside [chatListWindows] while a folder is selected (#3652). */
+    @Volatile
+    internal var folderWindows: ChatListWindowSet? = null
+        private set
+
+    /** Whether [folderWindows] is open, as snapshot state so the chat list switches its paging when it changes. */
+    internal var folderWindowsOpen by mutableStateOf(false)
+        private set
+
+    /** Installs or clears the selected folder's windows, closing any set it replaces. */
+    internal fun replaceFolderWindows(windows: ChatListWindowSet?) {
+        val previous = folderWindows
+        folderWindows = windows
+        folderWindowsOpen = windows != null
+        if (previous !== windows) previous?.close()
+    }
+
     private val subscriptionOwner = ChatListSubscriptionOwner()
     private val liveSubscriptionLock get() = subscriptionOwner.lock
     internal val chatListWindows: ChatListWindowSet? get() = subscriptionOwner.windows
@@ -1998,7 +2042,7 @@ class ChatsController private constructor(
                             subscriptionOwner.install(subscriptionAttempt)
                         }
                     }
-                    val initialFrame = chatListStream.frame()
+                    val initialFrame = chatListStream.frame().withFolder(folderWindows)
                     requireCompleteChatListWindowRows(
                         validateChatListWindowRows(accountRef, chatListStream, initialFrame.rows) &&
                             !chatListStream.closed &&
@@ -2048,51 +2092,62 @@ class ChatsController private constructor(
                     folderSourceChanged =
                         folderSource.receiveUntilChanged(completeChatList) {
                             coroutineScope {
-                                runUntilFirstLiveSubscriptionEnds(
-                                    first = {
-                                        chatListStream.receive { view, replacement ->
-                                            appState.recoveryDiagnostics
-                                                .recordChatListSubscriptionReceived()
-                                                ?.let { generation ->
-                                                    pendingRecoveryProjectionGeneration.publish(generation)
+                                // Bounded windows only, the complete stream already holds every folder chat.
+                                val folderJob =
+                                    if (completeChatList) {
+                                        null
+                                    } else {
+                                        launch { runFolderWindows(accountRef, chatListStream) }
+                                    }
+                                try {
+                                    runUntilFirstLiveSubscriptionEnds(
+                                        first = {
+                                            chatListStream.receive { view, replacement ->
+                                                appState.recoveryDiagnostics
+                                                    .recordChatListSubscriptionReceived()
+                                                    ?.let { generation ->
+                                                        pendingRecoveryProjectionGeneration.publish(generation)
+                                                    }
+                                                chatsDebug {
+                                                    "chat list window view=$view sequence=${replacement.sequence} " +
+                                                        "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
                                                 }
-                                            chatsDebug {
-                                                "chat list window view=$view sequence=${replacement.sequence} " +
-                                                    "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
+                                                requireCompleteChatListWindowRows(
+                                                    applyChatListWindowRows(accountRef, chatListStream),
+                                                )
+                                                receivedLiveUpdate = true
+                                                connectionOwner.noteLiveUpdate(connectionAttempt)
+                                                appState.schedulePendingLocalGroupDeleteCleanup()
                                             }
-                                            requireCompleteChatListWindowRows(
-                                                applyChatListWindowRows(accountRef, chatListStream),
+                                            connectionOwner.noteSubscriptionBoundary(
+                                                connectionAttempt,
+                                                PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
                                             )
-                                            receivedLiveUpdate = true
-                                            connectionOwner.noteLiveUpdate(connectionAttempt)
-                                            appState.schedulePendingLocalGroupDeleteCleanup()
-                                        }
-                                        connectionOwner.noteSubscriptionBoundary(
-                                            connectionAttempt,
-                                            PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
-                                        )
-                                    },
-                                    second = {
-                                        while (isActive) {
-                                            val update =
-                                                withContext(Dispatchers.IO) {
-                                                    chatStream.next()
-                                                } ?: break
-                                            if (!isActiveBindEpoch(epoch) || !isActive) break
-                                            receivedLiveUpdate = true
-                                            connectionOwner.noteLiveUpdate(connectionAttempt)
-                                            requestGroupProfiles(update)
-                                            chatsDebug {
-                                                "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                        },
+                                        second = {
+                                            while (isActive) {
+                                                val update =
+                                                    withContext(Dispatchers.IO) {
+                                                        chatStream.next()
+                                                    } ?: break
+                                                if (!isActiveBindEpoch(epoch) || !isActive) break
+                                                receivedLiveUpdate = true
+                                                connectionOwner.noteLiveUpdate(connectionAttempt)
+                                                requestGroupProfiles(update)
+                                                chatsDebug {
+                                                    "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                                }
+                                                foldGroup(update)
                                             }
-                                            foldGroup(update)
-                                        }
-                                        connectionOwner.noteSubscriptionBoundary(
-                                            connectionAttempt,
-                                            PerformancePhase.CONNECTION_CHATS_COMPLETED,
-                                        )
-                                    },
-                                )
+                                            connectionOwner.noteSubscriptionBoundary(
+                                                connectionAttempt,
+                                                PerformancePhase.CONNECTION_CHATS_COMPLETED,
+                                            )
+                                        },
+                                    )
+                                } finally {
+                                    folderJob?.cancel()
+                                }
                             }
                         }
                     if (folderSourceChanged) {
@@ -3193,14 +3248,19 @@ class ChatsController private constructor(
         accountRef: String,
         windows: ChatListWindowSet,
     ): Boolean {
-        val frame = windows.frame()
+        val folder = folderWindows
+        val folderRevision = folder?.currentRevision
+        val frame = windows.frame().withFolder(folder)
         val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+        // The plain revision guards only the plain rows; a folder swap or install since capture makes this frame
+        // stale too, and the change that superseded it publishes its own frame.
+        val folderCurrent = folderWindows === folder && folder?.currentRevision == folderRevision
         return when {
             windows.closed || chatListWindows !== windows -> {
                 windows.close()
                 false
             }
-            !windows.isCurrent(frame) -> true
+            !windows.isCurrent(frame) || !folderCurrent -> true
             !valid -> {
                 windows.close()
                 false
@@ -3838,16 +3898,17 @@ class ChatsController private constructor(
             val row = appState.marmotIo { chatListRow(attempt.account, attempt.groupId) }
             if (!attempt.isCurrent()) return@withGroupCommitLock false
             when {
-                row != null && row.selfMembership.isNonMember() -> {
+                row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
+                row.leaveRequestPending -> {
+                    foldChatRow(row)
+                    appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+                    false
+                }
+                row.selfMembership.isNonMember() -> {
                     foldChatRow(row)
                     attempt.cleanupOnly = true
                     attempt.onStage(ChatDepartureStage.LEFT)
                     true
-                }
-                row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
-                row.leaveRequestPending -> {
-                    appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
-                    false
                 }
                 else -> departJoinedChat(attempt, deleteAfterLeave)
             }
@@ -3892,7 +3953,23 @@ class ChatsController private constructor(
         check(details.group.groupIdHex.equals(attempt.groupId, ignoreCase = true) && resolution.invariant == null) {
             "Authoritative group roster unavailable"
         }
+        return departResolvedChat(attempt, deleteAfterLeave, resolution)
+    }
+
+    /**
+     * Leaves a chat whose authoritative roster [resolution] has been read. A durable leave request already pending
+     * stays provisional, so it keeps the history and reports that the leave is not confirmed yet.
+     */
+    private suspend fun departResolvedChat(
+        attempt: ChatListDepartureAttempt,
+        deleteAfterLeave: Boolean,
+        resolution: GroupRosterResolution,
+    ): Boolean {
         val group = resolution.applied.group
+        if (group.leaveRequestPending) {
+            appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+            return false
+        }
         attempt.members = resolution.applied.members
         val count = resolution.uniqueMemberCount
         val sole = GroupProjector.shouldDissolveAsSoleMember(attempt.members, attempt.activeAccountId)
@@ -4023,6 +4100,7 @@ class ChatsController private constructor(
         return (deleted && !deferred).also { if (it) onStage(ChatDepartureStage.COMPLETED) }
     }
 
+    /** A durable leave request remains provisional even after MDK projects LEFT. */
     private suspend fun confirmChatListDeparture(
         account: String,
         groupIdHex: String,
@@ -4035,7 +4113,8 @@ class ChatsController private constructor(
             }.getOrNull()
         if (!isCurrent()) return false
         departureRow?.let { foldChatRow(it) }
-        val confirmed = departureRow?.selfMembership?.isNonMember() == true
+        val confirmed =
+            departureRow != null && !departureRow.leaveRequestPending && departureRow.selfMembership.isNonMember()
         if (!confirmed) appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
         return confirmed
     }
@@ -4202,8 +4281,8 @@ class ChatsController private constructor(
         val activeId = boundAccountIdHex()
         val row = appState.marmotIo { chatListRow(account, groupIdHex) }
         requireChatListDepartureCurrent(account, epoch, runtime)
-        if (row?.selfMembership?.isNonMember() == true) return emptyList()
         check(row?.leaveRequestPending != true) { "Departure is awaiting native confirmation" }
+        if (row?.selfMembership?.isNonMember() == true) return emptyList()
         val details = chatDepartureGroupDetails(account, groupIdHex)
         requireChatListDepartureCurrent(account, epoch, runtime)
         return if (details == null) {
@@ -4660,28 +4739,41 @@ class ChatsController private constructor(
     }
 
     /**
-     * The complete native membership of [view] for select all (#2925), or null when this owner is stale.
+     * The complete native membership of [scope] for select all (#2925, #3652), or null when this owner is stale.
      * MDK throws ChatPresentationNotReady rather than returning a partial list; callers retry.
      */
     internal suspend fun completeChatListIds(
-        view: ChatListViewFfi,
+        scope: ChatListSelectAllScope,
         owner: ChatListActionOwner,
     ): List<String>? {
-        val read = liveSubscriptions.chatListIds?.takeIf { chatListActionIsCurrent(owner) } ?: return null
-        val ids = read(owner.accountRef, view)
+        val folder = scope.folder
+        val readFolder = liveSubscriptions.chatListQueryIds
+        val readView = liveSubscriptions.chatListIds
+        val available = if (folder != null) readFolder != null else readView != null
+        if (!available || !chatListActionIsCurrent(owner)) return null
+        val ids =
+            if (folder != null) {
+                folder.views.flatMap { requireNotNull(readFolder)(owner.accountRef, folder.forView(it)) }.distinct()
+            } else {
+                requireNotNull(readView)(owner.accountRef, scope.view)
+            }
         return ids.takeIf { chatListActionIsCurrent(owner) }
     }
 
     /**
-     * Drops captured IDs that left [view]; keeps caller order and never adds chats (#2925). Departed groups
+     * Drops captured IDs that left [scope]; keeps caller order and never adds chats (#2925). Departed groups
      * render inside Chats and Archived but MDK places them in LEFT, so a loaded departed row that was
-     * selected stays selected while it is still departed.
+     * selected stays selected while it is still departed. A folder rechecks against its own query in every
+     * view it covers.
      */
     internal suspend fun revalidateCompleteChatListIds(
-        view: ChatListViewFfi,
+        scope: ChatListSelectAllScope,
         groupIds: List<String>,
         owner: ChatListActionOwner,
     ): List<String>? {
+        val folder = scope.folder
+        if (folder != null) return revalidateFolderChatListIds(folder, groupIds, owner)
+        val view = scope.view
         val revalidate = liveSubscriptions.revalidateChatListIds?.takeIf { chatListActionSessionIsCurrent(owner) }
         return when {
             groupIds.isEmpty() -> emptyList()
@@ -4691,6 +4783,38 @@ class ChatsController private constructor(
                 val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
                 if (outside.isNotEmpty()) {
                     revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside)
+                        .mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
+            }
+        }
+    }
+
+    /**
+     * Drops captured IDs that no longer match [folder] in any view it covers; keeps caller order, never adds. A
+     * departed group the folder showed from loaded rows stays selected while MarmotKit still files it under Left.
+     */
+    private suspend fun revalidateFolderChatListIds(
+        folder: ChatFolderQuery,
+        groupIds: List<String>,
+        owner: ChatListActionOwner,
+    ): List<String>? {
+        val revalidate = liveSubscriptions.revalidateChatListQueryIds?.takeIf { chatListActionSessionIsCurrent(owner) }
+        return when {
+            groupIds.isEmpty() -> emptyList()
+            revalidate == null -> null
+            else -> {
+                val kept = hashSetOf<String>()
+                folder.views.forEach { view ->
+                    val matching = revalidate(owner.accountRef, folder.forView(view), groupIds)
+                    matching.mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
+                // Deliberately unfiltered, like the plain path: a departed chat the folder showed was matched by the
+                // loaded-rows evaluator, and MarmotKit's Left scope cannot re-evaluate rules such as Unread there, so
+                // a selected departed chat stays selected for as long as it is still departed.
+                if (outside.isNotEmpty()) {
+                    revalidate(owner.accountRef, ChatListViewQueryFfi(ChatListViewFfi.LEFT, emptyList()), outside)
                         .mapTo(kept) { it.lowercase(Locale.ROOT) }
                 }
                 groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
@@ -5858,7 +5982,7 @@ class ConversationController(
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     // Test seams: the user's own emoji a text uses, and the send that carries them.
-    private val customEmojiReader: suspend (String) -> List<LocalEmojiArtwork> = { appState.localEmojiArtworkIn(it) },
+    private val customEmojiReader: (suspend (String) -> List<LocalEmojiArtwork>)? = null,
     private val customEmojiSender: CustomEmojiSender? = null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
@@ -6499,6 +6623,12 @@ class ConversationController(
         )
     internal val attachmentTransfers: AttachmentTransferCoordinator get() = attachmentPresentation.transfers
 
+    /**
+     * Native transfer states idle tiles read once, by `messageId#index`, so a tile scrolled back into view never reads
+     * again. Touched only on the main thread; a failed read is not kept, so the next composition tries again.
+     */
+    internal val nativeAttachmentStateReads = HashMap<String, dev.ipf.marmotkit.AttachmentTransferStateFfi>()
+
     /** The installed native handle; paging and commits share the session's retirement authorities. */
     internal val timelineSubscription: ConversationTimelineSubscriptionHandle?
         get() = timelineSession.timelineSubscription
@@ -6722,6 +6852,7 @@ class ConversationController(
         get() =
             membersVerified &&
                 isSelfMember &&
+                !showsBlockedLeave &&
                 !group.unrecoverable &&
                 !group.disbanding &&
                 !group.disbanded &&
@@ -7168,7 +7299,7 @@ class ConversationController(
                             }
                         groupSnapshot?.let(::applyGroupState)
                         refreshGroupRecoveryStatus()
-                        refreshMembers(prefetchedRoster = rosterPrefetch)
+                        refreshMembersAfterGroupState(prefetchedRoster = rosterPrefetch)
                         isLoading = false
                         subscriptionError = null
                         connected = true
@@ -7241,6 +7372,11 @@ class ConversationController(
     private fun applyGroupState(incoming: AppGroupRecordFfi) {
         val update = localGroupNames.reconciled(incoming)
         val previousGroup = group
+        if (update.leaveBlocked) observedBlockedLeave = true
+        if (update.selfMembership.isGroupEviction()) {
+            observedBlockedLeave = false
+            cancelledLeaveAwaitingRoster = false
+        }
         groupRecoveryLifetime.advance()
         val previousRetention = group.disappearingMessageSecs
         mutationPresentation.authoritativeGroupApplied()
@@ -7456,7 +7592,15 @@ class ConversationController(
             if (groupStateUpdateRemovesSelf(previousGroup, update)) {
                 conversationAccountRef?.let(::markActiveAccountRemovedFromMembers)
             }
-            refreshMembers()
+            refreshMembersAfterGroupState()
+        }
+    }
+
+    /** The first snapshot and live updates both require full readback after a blocked leave clears. */
+    @VisibleForTesting
+    internal suspend fun refreshMembersAfterGroupState(prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null) {
+        if (!observedBlockedLeave || group.leaveRequestPending || !refreshManagementState()) {
+            refreshMembers(prefetchedRoster = prefetchedRoster)
         }
     }
 
@@ -7749,6 +7893,12 @@ class ConversationController(
         onPresentationAccepted: (String) -> Unit = {},
         onDurablyAccepted: () -> Unit = {},
     ) {
+        if (showsBlockedLeave) {
+            // Dictation's send action and the in-conversation wave and location shares reach here without the
+            // composer gate, so say why.
+            if (text.isNotBlank()) appState.presentTransient(blockedLeaveHint())
+            return
+        }
         val trimmed = text.trim()
         val accountRef = conversationAccountRef
         if (
@@ -8214,24 +8364,32 @@ class ConversationController(
         block: suspend () -> T,
     ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
 
-    /** The user's own emoji a plain, non-reply text send must carry, or none when this send carries none. */
+    /**
+     * The user's own emoji a plain, non-reply text send must carry, or none when this send carries none.
+     * A lookup failure is raised as an [EmojiUploadFailure], a definite pre-publication failure.
+     */
     private suspend fun emojiArtworkForSend(
+        account: String,
         replyTarget: String?,
         text: String,
     ): List<LocalEmojiArtwork> {
         val applies = emojiSendApplies(replyTarget, textPublisher != null)
-        return if (applies) customEmojiReader(text) else emptyList()
+        if (!applies) return emptyList()
+        // The lookup runs before anything is published, so its failure is never an uncertain delivery.
+        return runCatchingCancellable { customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text) }
+            .getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
     }
 
     /**
      * Admission failures retry for plain text. An emoji send retries only an upload-stage failure,
-     * because nothing was published then, and never a failure of the publish itself.
+     * because nothing was published then, and never a failure of the publish itself. Null artwork
+     * means its lookup failed, which also published nothing.
      */
     private fun isRetryableComposerSend(
-        emojiArtwork: List<LocalEmojiArtwork>,
+        emojiArtwork: List<LocalEmojiArtwork>?,
         throwable: Throwable,
     ): Boolean =
-        if (emojiArtwork.isEmpty()) {
+        if (emojiArtwork?.isEmpty() == true) {
             isRetryableTextAdmissionError(throwable)
         } else {
             isRetryableEmojiUploadFailure(throwable)
@@ -8296,17 +8454,22 @@ class ConversationController(
         trace: PerformanceTrace?,
         clientToken: String,
         optimisticKey: String,
-    ): dev.ipf.marmotkit.SendSummaryFfi {
-        // Replies and injected publishers keep their plain-text path. A message that uses the user's
-        // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
-        val emojiArtwork = emojiArtworkForSend(replyTarget, trimmed)
-        return appState.withConversationTextSendOrder(account, group.groupIdHex) {
+    ): dev.ipf.marmotkit.SendSummaryFfi =
+        appState.withConversationTextSendOrder(account, group.groupIdHex) {
+            // Replies and injected publishers keep their plain-text path. A message that uses the user's
+            // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
+            // Resolving its artwork inside the text order keeps a later message from publishing first,
+            // and inside the attempt lets a transient lookup failure retry before anything is published.
+            val artwork = SendEmojiArtwork { emojiArtworkForSend(account, replyTarget, trimmed) }
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 cancellationGeneration = optimisticCancellationGeneration,
-                retryableFailure = { isRetryableComposerSend(emojiArtwork, it) },
+                retryableFailure = { isRetryableComposerSend(artwork.value, it) },
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
+                // A cancel wakes the retry wait, so check it before a lookup that may fail again and retry forever.
+                requireOptimisticSendNotCancelled(optimisticKey)
+                val emojiArtwork = untilSendCancelled(optimisticKey) { artwork.resolve() }
                 // Serialize only this commit-producing FFI attempt. Releasing the
                 // commit lock before retry backoff keeps reactions and other
                 // mutations usable; the outer text-order lock keeps later text
@@ -8382,7 +8545,6 @@ class ConversationController(
                 }
             }
         }
-    }
 
     /**
      * Trace a transient send retry with the current relay-health snapshot.
@@ -9130,9 +9292,11 @@ class ConversationController(
         }
     }
 
+    /** Reactions must wait for a blocked leave to be resolved, even with seeded membership. */
     private fun reactionAccountIfAccepted(): String? {
         val accountRef = conversationAccountRef
         if (
+            showsBlockedLeave ||
             !canAcceptReaction(
                 accountRef = accountRef,
                 membersVerified = membersVerified,
@@ -9465,6 +9629,36 @@ class ConversationController(
             }
         }
     }
+
+    /**
+     * Runs [block] until it finishes or the send [optimisticKey] is cancelled. A cancel stops [block] at
+     * once, so a slow artwork lookup never holds the text order for later sends, and ends the send with
+     * [OptimisticSendCancelledException], so it can never publish.
+     */
+    private suspend fun <T> untilSendCancelled(
+        optimisticKey: String,
+        block: suspend () -> T,
+    ): T =
+        coroutineScope {
+            // A lookup that never suspends finishes here without yielding the send to anything else.
+            val work = async(start = CoroutineStart.UNDISPATCHED) { block() }
+            if (work.isCompleted) return@coroutineScope work.await()
+            val watcher =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    optimisticCancellationGeneration.first {
+                        optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED
+                    }
+                    work.cancel()
+                }
+            try {
+                work.await()
+            } catch (cancel: CancellationException) {
+                requireOptimisticSendNotCancelled(optimisticKey)
+                throw cancel
+            } finally {
+                watcher.cancel()
+            }
+        }
 
     private fun requireOptimisticSendNotCancelled(optimisticKey: String) {
         if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED) {
@@ -10351,6 +10545,11 @@ class ConversationController(
      */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     suspend fun retryFailedSend(item: TimelineMessage) {
+        // A send that failed before the leave was blocked, or before a disband, stays failed while that state holds.
+        outboundRefusal()?.let {
+            appState.presentTransient(it)
+            return
+        }
         val key = item.id
         // A failed edit's bubble is the target's projected row (no
         // optimisticMessages entry); its retry re-runs the edit publish rather
@@ -11667,7 +11866,7 @@ class ConversationController(
         management: GroupManagementStateFfi,
     ): Boolean =
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-            val applied = applyMutationDetails(account, details)
+            val applied = applyMutationDetails(account, details, freshLeaveReadback = true)
             if (applied) {
                 managementState = management.takeIf { group == details.group }
             }
@@ -11871,6 +12070,91 @@ class ConversationController(
     var managementState by mutableStateOf<GroupManagementStateFfi?>(null)
         private set
     private val managementStateLifetime = StalenessGuard()
+    private var cancelledLeaveAwaitingRoster by mutableStateOf(false)
+    private var observedBlockedLeave by mutableStateOf(initialGroup.leaveBlocked)
+
+    /** A cleared block still needs verification before Android restores membership. */
+    internal val blockedLeaveNeedsReadback: Boolean
+        get() = cancelledLeaveAwaitingRoster || (observedBlockedLeave && !group.leaveRequestPending)
+
+    /** Keep the departure notice until native membership has been verified. */
+    internal val showsBlockedLeave: Boolean
+        get() = group.leaveBlocked || blockedLeaveNeedsReadback
+
+    /** MDK owns cancellation eligibility. An unresolved readback can retry without another mutation. */
+    internal val canCancelBlockedLeave: Boolean
+        get() = blockedLeaveNeedsReadback || (group.leaveBlocked && managementState?.canCancelLeave == true)
+
+    /** Cancel the durable leave for the bound account, then read membership from MDK. */
+    internal suspend fun cancelBlockedLeave(): Boolean =
+        withMutationLockResult(false) {
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            val groupId = group.groupIdHex
+            if (!ownsBlockedLeaveAction(account, groupId) || !canCancelBlockedLeave) return@withMutationLockResult false
+            lastMutationError = null
+            val result = runCatchingCancellable { cancelNativeBlockedLeave(account, groupId) }
+            if (!ownsBlockedLeaveAction(account, groupId) || result.getOrNull() == false) {
+                return@withMutationLockResult false
+            }
+            // MDK can durably cancel before its membership projection is updated.
+            // Read back even after a native error or an already-cancelled request.
+            refreshManagementState()
+            if (!ownsBlockedLeaveAction(account, groupId)) return@withMutationLockResult false
+            val stayed = isSelfMember && !showsBlockedLeave && !group.leaveRequestPending
+            if (!stayed) {
+                result.exceptionOrNull()?.let {
+                    recordMutationFailure(R.string.toast_couldnt_cancel_leave, "GROUP_CANCEL_LEAVE", it)
+                }
+            }
+            stayed
+        }
+
+    /**
+     * Why ordinary outbound work is refused right now, or null when it may proceed: a blocked leave, or a group that is
+     * disbanding or disbanded, the terminal states [canSendMessages] also refuses. Shared by every send path that does
+     * not pass through the composer gate.
+     */
+    @StringRes
+    private fun outboundRefusal(): Int? =
+        when {
+            showsBlockedLeave -> blockedLeaveHint()
+            group.disbanded -> R.string.conversation_disbanded_notice
+            group.disbanding -> R.string.conversation_disbanding_notice
+            else -> null
+        }
+
+    /** Matches the blocked-leave notice: a cancelled or cleared block that only awaits readback asks for Refresh. */
+    @StringRes
+    private fun blockedLeaveHint(): Int =
+        when {
+            blockedLeaveNeedsReadback -> R.string.group_leave_refresh_hint
+            else -> R.string.group_leave_blocked_hint
+        }
+
+    /** Check the action owner again under the native group lock before canceling or retrying readback. */
+    private suspend fun cancelNativeBlockedLeave(
+        account: String,
+        groupId: String,
+    ): Boolean =
+        appState.withGroupCommitLock(account, groupId) {
+            if (!ownsBlockedLeaveAction(account, groupId) || !canCancelBlockedLeave) return@withGroupCommitLock false
+            if (!blockedLeaveNeedsReadback) {
+                appState.marmotIo { cancelLeave(account, groupId) }
+                memberRosterRefreshGeneration.advance()
+                managementStateLifetime.advance()
+                cancelledLeaveAwaitingRoster = observedBlockedLeave
+            }
+            true
+        }
+
+    /** Reject work from a retired conversation, account or runtime. */
+    private fun ownsBlockedLeaveAction(
+        account: String,
+        groupId: String,
+    ): Boolean =
+        acceptsConversationActionOwner(account, groupId) &&
+            appState.activeAccountRef == account &&
+            appState.runtimeGeneration == conversationRuntimeGeneration
 
     /** Details and capabilities share one native frontier; later group updates supersede this read. */
     suspend fun refreshManagementState(): Boolean {
@@ -14156,6 +14440,8 @@ class ConversationController(
         val activeAccountIdHex = conversationAccountIdHex ?: return
         mutationPresentation.authoritativeGroupApplied()
         inviteConfirmationAuthority.invalidate()
+        observedBlockedLeave = false
+        cancelledLeaveAwaitingRoster = false
         // Engine-confirmed removal (UseAfterEviction). Record the same
         // authoritative local-left marker the leaveGroup() success path sets so
         // a later authoritative roster result that races ahead of eviction can't re-add
@@ -14204,6 +14490,7 @@ class ConversationController(
     private fun applyGroupDetails(
         account: String,
         details: GroupDetailsFfi,
+        freshLeaveReadback: Boolean,
     ): AppliedGroupDetails? {
         val resolution = resolveAuthoritativeGroupRoster(details, conversationAccountIdHex)
         return applyResolvedGroupRoster(
@@ -14211,6 +14498,7 @@ class ConversationController(
             resolution = resolution,
             returnedRowCount = details.members.size,
             returnedMembership = details.group.selfMembership,
+            freshLeaveReadback = freshLeaveReadback,
         )
     }
 
@@ -14233,6 +14521,7 @@ class ConversationController(
         resolution: GroupRosterResolution,
         returnedRowCount: Int,
         returnedMembership: SelfMembershipFfi,
+        freshLeaveReadback: Boolean = false,
     ): AppliedGroupDetails? {
         val previousRetention = group.disappearingMessageSecs
         val previousGroup = group
@@ -14248,12 +14537,11 @@ class ConversationController(
             return null
         }
         val applied = resolution.applied
+        val restoredAfterCancel = reconcileBlockedLeaveReadback(resolution, freshLeaveReadback)
         mutationPresentation.authoritativeGroupApplied()
-        group =
-            inviteConfirmationAuthority.reconcile(
-                reconcileTerminalSelfMembership(update = applied.group, previous = previousGroup),
-                establishesAcceptance = false,
-            )
+        val reconciled =
+            if (restoredAfterCancel) applied.group else reconcileTerminalSelfMembership(applied.group, previousGroup)
+        group = inviteConfirmationAuthority.reconcile(reconciled, establishesAcceptance = false)
         if (previousRetention != group.disappearingMessageSecs) {
             publishTimelineFromIndexes()
         }
@@ -14286,6 +14574,31 @@ class ConversationController(
         rosterBlockReason = null
         cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
         return AppliedGroupDetails(group = group, members = members)
+    }
+
+    /** Retires a provisional leave only after the current native roster proves the outcome. */
+    private fun reconcileBlockedLeaveReadback(
+        resolution: GroupRosterResolution,
+        freshLeaveReadback: Boolean,
+    ): Boolean {
+        val incoming = resolution.applied.group
+        if (incoming.leaveBlocked) observedBlockedLeave = true
+        val restored =
+            freshLeaveReadback &&
+                observedBlockedLeave &&
+                resolution.containsLocalMember &&
+                incoming.isJoinedAfterLeave() &&
+                !group.selfMembership.isGroupEviction()
+        val settled =
+            incoming.selfMembership.isGroupEviction() ||
+                incoming.disbanded ||
+                (freshLeaveReadback && incoming.hasSettledDeparture() && !resolution.containsLocalMember)
+        if (restored || settled) {
+            observedBlockedLeave = false
+            cancelledLeaveAwaitingRoster = false
+        }
+        if (restored) selfMembership.clearSelfLeft()
+        return restored
     }
 
     private fun logGroupRosterInvariant(
@@ -14336,9 +14649,10 @@ class ConversationController(
     private fun applyMutationDetails(
         account: String,
         details: GroupDetailsFfi,
+        freshLeaveReadback: Boolean = false,
     ): Boolean {
         memberRosterRefreshGeneration.advance()
-        val applied = applyGroupDetails(account, details) ?: return false
+        val applied = applyGroupDetails(account, details, freshLeaveReadback) ?: return false
         appState.applyLocalGroupDetails(account, applied.group, applied.members)
         return true
     }

@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatListWindowSubscription
 import dev.ipf.marmotkit.ChatsSubscription
@@ -169,6 +170,15 @@ internal class ChatListLiveSubscriptions(
     val revalidateChatListIds: (
         suspend (account: String, view: ChatListViewFfi, groupIds: List<String>) -> List<String>
     )? = null,
+    /** A live window over one folder's native query in one view; null keeps folders on loaded rows (#3652). */
+    val openChatListQueryWindow: (suspend (account: String, query: ChatListViewQueryFfi) -> ChatListWindowHandle)? =
+        null,
+    /** Every chat ID a folder's native query matches, in display order, for its count and select all (#3652). */
+    val chatListQueryIds: (suspend (account: String, query: ChatListViewQueryFfi) -> List<String>)? = null,
+    /** Remove-only recheck of captured IDs against a folder's native query before a bulk action (#3652). */
+    val revalidateChatListQueryIds: (
+        suspend (account: String, query: ChatListViewQueryFfi, groupIds: List<String>) -> List<String>
+    )? = null,
 ) {
     companion object {
         /** Binds the seam to the production MarmotKit runtime. */
@@ -208,6 +218,19 @@ internal class ChatListLiveSubscriptions(
                 revalidateChatListIds = { account, view, groupIds ->
                     appState.marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
                         revalidateChatListIds(account, view, groupIds)
+                    }
+                },
+                openChatListQueryWindow = { account, query ->
+                    appState.marmotIo {
+                        FfiChatListWindowHandle(openChatListQueryWindow(account, query, CHAT_LIST_WINDOW_INITIAL_ROWS))
+                    }
+                },
+                chatListQueryIds = { account, query ->
+                    appState.marmotIo(MarmotTraceSection.CHAT_LIST_READ) { chatListQueryIds(account, query) }
+                },
+                revalidateChatListQueryIds = { account, query, groupIds ->
+                    appState.marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
+                        revalidateChatListQueryIds(account, query, groupIds)
                     }
                 },
             )

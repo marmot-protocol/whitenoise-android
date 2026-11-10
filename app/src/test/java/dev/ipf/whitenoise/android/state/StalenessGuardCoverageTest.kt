@@ -333,6 +333,8 @@ class StalenessGuardCoverageTest {
                 "Controllers.kt:submitVisibleReadUpTo" to "monotonic engine cursor with conditional rollback",
                 // activeStreamIds admits one watcher per stream; removal is a separate terminal tombstone.
                 "Controllers.kt:watchAgentTextStream" to "keyed single-owner stream lifecycle",
+                // Runs under cancelBlockedLeave's mutation lock and the group commit lock, rechecking the owner first.
+                "Controllers.kt:cancelNativeBlockedLeave" to "serialized group command with captured owner checks",
             )
         assertTrue(
             "every exemption must explain why no latest-wins guard is required",

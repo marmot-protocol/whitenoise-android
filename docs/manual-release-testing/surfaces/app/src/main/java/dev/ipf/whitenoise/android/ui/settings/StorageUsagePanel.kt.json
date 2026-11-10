@@ -1,0 +1,147 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StorageLegendLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "fun StorageLegendLine(",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "StorageLegendRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "fun StorageLegendRow(",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "StorageUsageBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "fun StorageUsageBar(",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "StorageUsagePanel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "fun StorageUsagePanel(",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "StorageUsagePlaceholderBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "fun StorageUsagePlaceholderBar(",
+        "test_ids": [
+          "SET-047"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "plurals:storage_attachment_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.plurals.storage_attachment_count",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_attachments",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_calculating",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_calculating",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_chat_data",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_chat_data",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_pictures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_pictures",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_temporary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_temporary",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_temporary_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_temporary_detail",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_unused_space",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_unused_space",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_usage_category",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_usage_category",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_usage_category_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_usage_category_detail",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_usage_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_usage_description",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_used_by_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_used_by_profile",
+        "test_ids": [
+          "SET-047"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

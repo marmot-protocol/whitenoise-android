@@ -14,6 +14,20 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NostrEventReferenceTest {
+    /** A shared link opens the emoji browser only when it contains a valid kind-30030 address. */
+    @Test
+    fun routesOnlyEmojiSetAddresses() {
+        val coordinates = nip19Tlv(0, "forest".utf8Ints()) + nip19Tlv(2, List(32) { 1 })
+        val set = nip19("naddr", coordinates + nip19Tlv(3, nip19Uint(30_030u)))
+        val article = nip19("naddr", coordinates + nip19Tlv(3, nip19Uint(30_023u)))
+
+        assertEquals(set, emojiSetAddress(" $set "))
+        assertEquals(set, emojiSetAddress("nostr:$set"))
+        assertEquals(set, emojiSetAddress("https://njump.me/$set"))
+        assertNull(emojiSetAddress("https://njump.me/$article"))
+        assertNull(emojiSetAddress("Here is a link https://njump.me/$set"))
+    }
+
     /** Note, nevent and naddr values decode through one strict path into their typed references. */
     @Test
     fun decodesNoteNeventAndNaddrThroughOneStrictPath() {

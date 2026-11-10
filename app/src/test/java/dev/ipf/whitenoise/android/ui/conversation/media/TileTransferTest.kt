@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.AttachmentCancellationState
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.state.NativeAttachmentTerminalException
+import dev.ipf.whitenoise.android.state.attachmentFilePresentationState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -86,6 +87,49 @@ class TileTransferTest {
             "MDK readmits a parked body without a tap",
             tileObservesNative(false, false, AttachmentTransferState.StorageBlocked),
         )
+        assertTrue(
+            "only the native phase tells a locally removed body from a lost one",
+            tileObservesNative(false, false, AttachmentTransferState.NotRetained),
+        )
+    }
+
+    /**
+     * In a conversation opened after the removal the host only knows the cache missed, so an idle received tile reads
+     * its native state once, read-only, and a removed state then presents as a locally removed body.
+     */
+    @Test
+    fun aFreshlyOpenedRemovedBodyIsProbedAndPresentsAsRemoved() {
+        val remote = AttachmentTransferState.Remote
+        assertTrue(tileProbesNative(observing = false, mine = false, host = remote))
+        assertFalse("a watched tile already has its phase", tileProbesNative(true, false, remote))
+        assertFalse("own sends have nothing to download", tileProbesNative(false, true, remote))
+        assertFalse(tileProbesNative(false, false, AttachmentTransferState.Available))
+        // The one-shot read yields only a phase; a removed one becomes the sample the tile presents from.
+        assertNull(locallyRemovedProgress(AttachmentTransferStateFfi.NOT_REQUESTED))
+        assertNull(locallyRemovedProgress(null))
+        val removedPhase = requireNotNull(locallyRemovedProgress(AttachmentTransferStateFfi.CLEANED_BY_SETTING))
+        val state = attachmentFilePresentationState(remote, removedPhase, AttachmentCancellationState.None)
+        val tile = transfer(state, removedPhase)
+        assertTrue(tile.removed && tile.visible && tile.needsDeliberateRetry)
+    }
+
+    /**
+     * A body this device removed, from Manage storage or Keep media, offers Download again on the tile itself, and the
+     * tap is a deliberate retry rather than a download that would join the removed state.
+     */
+    @Test
+    fun aLocallyRemovedBodyOffersDownloadAgainThroughRetry() {
+        for (phase in listOf(AttachmentTransferStateFfi.REMOVED, AttachmentTransferStateFfi.CLEANED_BY_SETTING)) {
+            val removed = transfer(AttachmentTransferState.NotRetained, progress(0, 4, phase = phase))
+            assertTrue(phase.name, removed.visible && removed.removed)
+            assertFalse(removed.failed || removed.active)
+        }
+        val unavailable = progress(0, 4, phase = AttachmentTransferStateFfi.UNAVAILABLE)
+        val lost = transfer(AttachmentTransferState.NotRetained, unavailable)
+        assertFalse("a body gone for good keeps the idle tile", lost.visible)
+        val removed =
+            transfer(AttachmentTransferState.NotRetained, progress(0, 4, phase = AttachmentTransferStateFfi.REMOVED))
+        assertOneRetryingTap(removed, R.string.media_removed_download_again)
     }
 
     /** A parked surface loads again as soon as MDK resumes the body, so it shows progress and Cancel, not storage. */

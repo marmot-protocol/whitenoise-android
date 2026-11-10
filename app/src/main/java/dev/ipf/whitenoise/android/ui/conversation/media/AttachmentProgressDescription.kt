@@ -8,6 +8,13 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 
+/**
+ * Bodies this device removed itself, from Manage storage or the Keep media window. A tap downloads them again while the
+ * sender's copy is still available, so they invite that rather than reading as unavailable.
+ */
+internal val LOCALLY_REMOVED_PHASES =
+    setOf(AttachmentTransferStateFfi.REMOVED, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
+
 /** Uses native phase names and real body bytes, without presenting ciphertext completion as a ready file. */
 @Composable
 internal fun nativeProgressDescription(
@@ -20,11 +27,10 @@ internal fun nativeProgressDescription(
         host == AttachmentTransferState.StorageBlocked -> stringResource(R.string.media_storage_blocked_short)
         progress?.phase == AttachmentTransferStateFfi.POLICY_BLOCKED ->
             stringResource(R.string.media_download_policy_blocked)
+        progress?.phase in LOCALLY_REMOVED_PHASES -> stringResource(R.string.media_removed_download_again)
         progress?.phase in
             setOf(
                 AttachmentTransferStateFfi.UNAVAILABLE,
-                AttachmentTransferStateFfi.REMOVED,
-                AttachmentTransferStateFfi.CLEANED_BY_SETTING,
                 AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
                 AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
             ) -> stringResource(R.string.media_attachment_unavailable)

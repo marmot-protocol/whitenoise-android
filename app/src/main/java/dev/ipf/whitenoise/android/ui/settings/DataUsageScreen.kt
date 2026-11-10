@@ -72,15 +72,16 @@ private val DownloadMediaOrder =
     )
 
 /**
- * Data Usage: one row per media type listing the networks that may download it (a dialog of switches that write the
- * account's matrix immediately, M105), Reset download settings, the automatic download queue's Stop/Restart action
- * with its confirmation, and the sent-media quality choice.
+ * Data Usage: the Manage storage entry, one row per media type listing the networks that may download it (a dialog
+ * of switches that write the account's matrix immediately, M105), Reset download settings, the automatic download
+ * queue's Stop/Restart action with its confirmation, and the sent-media quality choice.
  */
 @Suppress("LongMethod")
 @Composable
 internal fun DataUsageScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
+    onOpenManageStorage: () -> Unit = {},
 ) {
     var picker by rememberSaveable { mutableStateOf<MediaAutoDownloadType?>(null) }
     var qualityPicker by rememberSaveable { mutableStateOf(false) }
@@ -98,6 +99,19 @@ internal fun DataUsageScreen(
     val qualityDetails = MediaQuality.entries.associateWith { stringResource(it.subtitleRes) }
     SettingsScaffold(title = stringResource(R.string.data_usage_title), onBack = onBack) {
         SettingsList {
+            item(key = "search.DataUsage.10") {
+                SettingsGroup(modifier = Modifier.testTag("data_usage.storage")) {
+                    row("manage_storage") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.manage_storage_title),
+                            subtitle = stringResource(R.string.manage_storage_entry_subtitle),
+                            onClick = onOpenManageStorage,
+                            modifier = Modifier.testTag("data_usage.manage_storage"),
+                        )
+                    }
+                }
+            }
             item(key = "search.DataUsage.1") { SettingsSection(stringResource(R.string.download_automatic)) }
             item(key = "search.DataUsage.2") {
                 SettingsGroup(modifier = Modifier.testTag("data_usage.downloads.group")) {

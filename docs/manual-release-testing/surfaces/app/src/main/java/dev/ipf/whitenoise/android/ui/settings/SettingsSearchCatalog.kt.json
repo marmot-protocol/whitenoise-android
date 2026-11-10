@@ -497,6 +497,28 @@
         ]
       },
       {
+        "surface": "setting:manage_storage_entry_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.manage_storage_entry_subtitle",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "setting:manage_storage_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.manage_storage_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-047"
+        ]
+      },
+      {
         "surface": "setting:public_jpeg_previews_privacy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
         "anchor": "R.string.public_jpeg_previews_privacy",
@@ -683,6 +705,72 @@
           "SET-042",
           "SET-043",
           "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:storage_clear_cache",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.storage_clear_cache",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "setting:storage_clear_cache_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.storage_clear_cache_subtitle",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "setting:storage_keep_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.storage_keep_media",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "setting:storage_keep_media_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.storage_keep_media_help",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "setting:storage_largest_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.storage_largest_attachments",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "setting:storage_remove_older",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.storage_remove_older",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-050"
         ]
       },
       {
@@ -943,6 +1031,14 @@
           "SET-042",
           "SET-043",
           "SET-046"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.emoji_sets_title",
+        "test_ids": [
+          "SET-051"
         ]
       }
     ]

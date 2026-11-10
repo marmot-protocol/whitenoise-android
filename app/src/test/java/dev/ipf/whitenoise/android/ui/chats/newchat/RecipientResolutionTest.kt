@@ -849,6 +849,7 @@ private fun dmChatRow(
     disbandRequest = null,
     leaveRequestPending = false,
     leaveRequestedAtMs = null,
+    leaveBlocked = false,
 )
 
 /** Builds a DM chat-list preview of a "hi" message from the given sender. */
@@ -902,6 +903,7 @@ private fun dmChatGroup(
     disappearingMessageSecs = 0uL,
     leaveRequestPending = false,
     leaveRequestedAtMs = null,
+    leaveBlocked = false,
     disbanding = false,
     disbanded = false,
     disbandRequest = null,

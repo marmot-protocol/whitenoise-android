@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="manage_storage_title">Depolamayı yönet</string>
+    <string name="manage_storage_entry_subtitle">Bu cihazda nelerin depolandığını görün ve yer açın</string>
+    <string name="storage_calculating">Hesaplanıyor…</string>
+    <string name="storage_used_by_profile">Bu profilin bu cihazda kullandığı alan</string>
+    <string name="storage_usage_description">Kullanılan depolama: %1$s. %2$s</string>
+    <string name="storage_usage_category">%1$s: %2$s.</string>
+    <string name="storage_usage_category_detail">%1$s: %2$s, %3$s.</string>
+    <string name="storage_attachments">Ekler</string>
+    <plurals name="storage_attachment_count">
+        <item quantity="one">%d ek</item>
+        <item quantity="other">%d ek</item>
+    </plurals>
+    <string name="storage_chat_data">Mesajlar ve sohbet verileri</string>
+    <string name="storage_unused_space">Kullanılmayan veritabanı alanı</string>
+    <string name="storage_pictures">Profil ve grup fotoğrafları</string>
+    <string name="storage_temporary">Geçici dosyalar</string>
+    <string name="storage_temporary_detail">Bu cihazdaki tüm profiller tarafından paylaşılır</string>
+    <string name="storage_load_failed">Depolama kullanımı yüklenemedi</string>
+    <string name="storage_retry">Tekrar dene</string>
+    <string name="storage_migration_moving_title">Ek depolaması güncelleniyor</string>
+    <string name="storage_migration_moving">Taşınacak %1$s kaldı. Hiçbir şey silinmez.</string>
+    <string name="storage_migration_paused_title">Ek depolaması güncellemesi duraklatıldı</string>
+    <string name="storage_migration_paused">Devam etmek için bu cihazda %1$s yer açın veya aşağıdan ekleri kaldırın. Hiçbir şey silinmez.</string>
+    <string name="storage_migration_compacting_title">Boşalan alan geri kazanılıyor</string>
+    <string name="storage_migration_compacting">Sohbetler kısa bir süre duraklayabilir.</string>
+    <string name="storage_free_up_space">Yer aç</string>
+    <string name="storage_largest_attachments">En büyük ekler</string>
+    <string name="storage_remove_older">Eski ekleri kaldır</string>
+    <string name="storage_clear_cache">Fotoğrafları ve geçici dosyaları temizle</string>
+    <string name="storage_clear_cache_subtitle">Fotoğraflar gerektiğinde yeniden indirilir</string>
+    <string name="storage_removal_help">Kaldırılan ekler mesajlarında kalır. Gönderenin kopyası hâlâ kullanılabilir olduğu sürece onları yeniden indirebilirsiniz.</string>
+    <string name="storage_keep_media">Medyayı sakla</string>
+    <string name="storage_keep_media_help">Bu süreden eski ekler şimdi ve eskidikçe bu cihazdan kaldırılır. Yeniden indirilen bir ek tüm süre boyunca saklanır.</string>
+    <string name="storage_keep_media_failed">Yüklenemedi</string>
+    <string name="storage_keep_forever">Süresiz</string>
+    <string name="storage_keep_one_year">1 yıl</string>
+    <string name="storage_keep_six_months">6 ay</string>
+    <string name="storage_keep_thirty_days">30 gün</string>
+    <string name="storage_keep_confirm_title">Medya saklama süresi %1$s olsun mu?</string>
+    <string name="storage_keep_confirm_message">%1$s süresinden eski ekler şimdi ve eskidikçe bu cihazdan kaldırılır. Mesajlar kalır ve gönderenin kopyası hâlâ kullanılabilir olduğu sürece ekleri yeniden indirebilirsiniz.</string>
+    <string name="storage_older_one_week">1 haftadan eski</string>
+    <string name="storage_older_one_month">1 aydan eski</string>
+    <string name="storage_older_three_months">3 aydan eski</string>
+    <string name="storage_older_six_months">6 aydan eski</string>
+    <string name="storage_older_one_year">1 yıldan eski</string>
+    <string name="storage_remove_older_title">Eski ekler kaldırılsın mı?</string>
+    <string name="storage_remove_older_message">%1$s tarihinden önce alınan ekler tüm sohbetlerde bu cihazdan kaldırılır. Mesajlar kalır ve gönderenin kopyası hâlâ kullanılabilir olduğu sürece ekleri yeniden indirebilirsiniz.</string>
+    <string name="storage_remove_older_chat_message">Bu sohbette %1$s tarihinden önce alınan ekler bu cihazdan kaldırılır. Mesajlar kalır ve gönderenin kopyası hâlâ kullanılabilir olduğu sürece ekleri yeniden indirebilirsiniz.</string>
+    <string name="storage_clear_cache_title">Fotoğraflar ve geçici dosyalar temizlensin mi?</string>
+    <string name="storage_clear_cache_message">Bu işlem en fazla %1$s yer açar. Profil ve grup fotoğrafları gerektiğinde yeniden indirilir.</string>
+    <string name="storage_clear">Temizle</string>
+    <string name="storage_chats">Sohbetler</string>
+    <string name="storage_chats_help">Birden fazla sohbette paylaşılan bir ek her birinde ayrı sayılır.</string>
+    <string name="storage_chat_unavailable">Sohbet kullanılamıyor</string>
+    <string name="storage_no_attachments">Bu cihazda ek yok</string>
+    <string name="storage_chats_failed">Sohbetler yüklenemedi</string>
+    <string name="storage_attachments_failed">Ekler yüklenemedi</string>
+    <string name="storage_remove_all_in_chat">Tüm ekleri kaldır</string>
+    <string name="storage_largest_first">Önce en büyükler</string>
+    <string name="storage_remove">Kaldır</string>
+    <string name="storage_removing">Kaldırılıyor</string>
+    <string name="storage_select_all">Tümünü seç</string>
+    <string name="storage_select_shown">Gösterilenlerin tümünü seç</string>
+    <string name="storage_clear_selection">Seçimi temizle</string>
+    <plurals name="storage_selected">
+        <item quantity="one">%1$d seçildi · %2$s</item>
+        <item quantity="other">%1$d seçildi · %2$s</item>
+    </plurals>
+    <plurals name="storage_remove_attachments_title">
+        <item quantity="one">%d ek kaldırılsın mı?</item>
+        <item quantity="other">%d ek kaldırılsın mı?</item>
+    </plurals>
+    <string name="storage_remove_attachments_message">Bu işlem en fazla %1$s yer açar. Mesajlar kalır ve gönderenin kopyası hâlâ kullanılabilir olduğu sürece ekleri yeniden indirebilirsiniz.</string>
+    <string name="storage_remove_chat_title">Bu sohbetteki tüm ekler kaldırılsın mı?</string>
+    <string name="storage_remove_chat_message">Bu sohbetteki tüm ekler bu cihazdan kaldırılır. Mesajlar kalır ve gönderenin kopyası hâlâ kullanılabilir olduğu sürece ekleri yeniden indirebilirsiniz.</string>
+    <string name="storage_attachment_photo">Fotoğraf</string>
+    <string name="storage_attachment_video">Video dosyası</string>
+    <string name="storage_attachment_audio">Ses</string>
+    <string name="storage_attachment_file">Dosya</string>
+    <plurals name="storage_removed_freed">
+        <item quantity="one">%1$d ek kaldırıldı · %2$s yer açıldı</item>
+        <item quantity="other">%1$d ek kaldırıldı · %2$s yer açıldı</item>
+    </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">%d ek kaldırıldı</item>
+        <item quantity="other">%d ek kaldırıldı</item>
+    </plurals>
+    <string name="storage_nothing_removed">Eşleşen ek olmadığından hiçbir şey kaldırılmadı</string>
+    <string name="storage_keep_media_saved">Medya saklama ayarı kaydedildi</string>
+    <string name="storage_cache_cleared">%1$s yer açıldı</string>
+    <string name="storage_caches_cleared">Fotoğraflar ve geçici dosyalar temizlendi</string>
+    <string name="storage_action_failed">Yer açılamadı. Tekrar deneyin.</string>
+</resources>
