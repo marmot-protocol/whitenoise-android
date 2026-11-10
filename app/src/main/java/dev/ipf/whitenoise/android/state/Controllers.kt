@@ -7582,6 +7582,8 @@ class ConversationController(
             }
             groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
                 if (ownsGroupRecoveryGroup(groupIdHex)) {
+                    // Only the declined invitation leaves. The notice ids, and with them the rejoin wording, stay
+                    // as they are until the refresh below rereads both.
                     groupRecoveryStatus =
                         groupRecoveryStatus?.copy(
                             rejoinInvitations =
