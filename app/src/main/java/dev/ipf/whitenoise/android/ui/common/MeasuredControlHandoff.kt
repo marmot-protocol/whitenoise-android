@@ -238,6 +238,9 @@ internal class MeasuredControlHandoff(
     /** A subtle outline leaves the authoritative live control readable and immediately usable. */
     val opacity: Float get() = (1f - progress.value) * 0.55f
 
+    /** A running morph whose target endpoint may still move under it. */
+    private val followingTarget: Boolean get() = active && !awaitingFrame
+
     /** Reports measured window bounds; zero-sized or clipped endpoints cannot admit a handoff. */
     fun report(
         key: Any,
@@ -247,20 +250,13 @@ internal class MeasuredControlHandoff(
         val positiveSize = bounds.width > 0f && bounds.height > 0f
         val finiteOrigin = bounds.left.isFinite() && bounds.top.isFinite()
         if (positiveSize && finiteOrigin) {
-            val movingTarget = active && !awaitingFrame && key == previous
-            val previousBounds = live[key]?.second
-            if (movingTarget && previousBounds != null && previousBounds != bounds) {
+            val movedFrom = live[key]?.second?.takeIf { key == previous && it != bounds }
+            if (followingTarget && movedFrom != null) {
                 val from = start
                 if (followMovingTarget && fraction < 1f && from != null) {
                     // The in-flight shape rides the same page slide or inset change as its target, so it
                     // neither trails the moving endpoint nor restarts the clock, and lands on it exactly.
-                    start =
-                        Rect(
-                            from.left + bounds.left - previousBounds.left,
-                            from.top + bounds.top - previousBounds.top,
-                            from.right + bounds.right - previousBounds.right,
-                            from.bottom + bounds.bottom - previousBounds.bottom,
-                        )
+                    start = from.carriedBy(movedFrom, bounds)
                 } else {
                     finish()
                 }
@@ -367,7 +363,7 @@ private fun endpointBounds(
     fun same(
         a: Float,
         b: Float,
-    ) = kotlin.math.abs(a - b) < 0.5f
+    ) = kotlin.math.abs(a - b) < SAME_EDGE_TOLERANCE_PX
     val unclippedX = followLayerMotion || (same(raw.left, visible.left) && same(raw.right, visible.right))
     val unclippedY = same(raw.top, visible.top) && same(raw.bottom, visible.bottom)
     return when {
@@ -490,7 +486,22 @@ internal fun Modifier.controlMorphSurface(
         }
 }
 
+/** Moves a shape by the same edge offsets its endpoint moved from [before] to [after]. */
+private fun Rect.carriedBy(
+    before: Rect,
+    after: Rect,
+): Rect =
+    Rect(
+        left + after.left - before.left,
+        top + after.top - before.top,
+        right + after.right - before.right,
+        bottom + after.bottom - before.bottom,
+    )
+
 private const val CONTROL_MORPH_MILLIS = 200
+
+/** Sub-pixel rounding between layout and window bounds is not a clip. */
+private const val SAME_EDGE_TOLERANCE_PX = 0.5f
 
 /** Outgoing route pixels have no live controls or editor semantics. */
 internal val LocalControlHandoffEndpointCurrent = staticCompositionLocalOf { true }

@@ -144,7 +144,10 @@ class ChatListFloatingStackScreenshotTest {
             "jump=$jump should follow capsule=$capsule, expected bottom $expectedBottom",
             kotlin.math.abs(jump.bottom - expectedBottom) <= 1f,
         )
-        assertTrue("jump=$jump must stay clear of the pen", penBounds().top - jump.bottom >= FloatingControlGap.value - 0.5f)
+        assertTrue(
+            "jump=$jump must stay clear of the pen",
+            penBounds().top - jump.bottom >= FloatingControlGap.value - 0.5f,
+        )
     }
 
     private fun assertGap(

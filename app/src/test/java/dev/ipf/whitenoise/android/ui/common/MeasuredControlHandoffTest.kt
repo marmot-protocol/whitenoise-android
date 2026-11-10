@@ -285,7 +285,15 @@ class MeasuredControlHandoffTest {
                 frames.sendFrame(frame * 16_000_000L)
                 runCurrent()
                 val offset = slide * (1f - frame / 12f)
+                val shapeBefore = state.renderedBounds!!.left
+                val targetBefore = state.targetBounds!!.left
                 state.report("members", members, Rect(16f + offset, 300f, 384f + offset, 600f))
+                // The slide alone moves the in-flight shape by exactly the target's own step.
+                assertEquals(
+                    state.targetBounds!!.left - targetBefore,
+                    state.renderedBounds!!.left - shapeBefore,
+                    0.01f,
+                )
                 assertTrue("A moving target must not settle the morph early", state.active)
                 val trailing = abs(state.renderedBounds!!.top - state.targetBounds!!.top)
                 assertTrue("The shape must close on its sliding target every frame", trailing <= gap)
