@@ -1,21 +1,21 @@
 {
   "files": {
-    "gradle/dependency-evidence/default-capture/artifact-evidence.json.gz": "050f5e69572c483d0513c27111faa2d6e624184cc624e4cce0c106a928b45cd7",
-    "gradle/dependency-evidence/default-capture/captured-inputs/app/buildscript-gradle.lockfile.gz": "3e429d2cdd54871dd6138cef8cc9f9b08a8d5a81b7242b78a3fc9dc4bb5844fa",
-    "gradle/dependency-evidence/default-capture/captured-inputs/app/gradle.lockfile.gz": "46492c0f88b7bae22b5b75154cbcb4e03577ab7505cb4eb0851a4ac80cc9060b",
-    "gradle/dependency-evidence/default-capture/captured-inputs/benchmark/buildscript-gradle.lockfile.gz": "3e429d2cdd54871dd6138cef8cc9f9b08a8d5a81b7242b78a3fc9dc4bb5844fa",
-    "gradle/dependency-evidence/default-capture/captured-inputs/benchmark/gradle.lockfile.gz": "64f8e905fd0fc9f79a018e958117e78314d2f6406d37fe97cf6a849a2da3eaf3",
-    "gradle/dependency-evidence/default-capture/captured-inputs/buildscript-gradle.lockfile.gz": "c872cda33f56ac24ca08e699eef7fd74198d26189fb4248d553773a83fb8c3ae",
-    "gradle/dependency-evidence/default-capture/captured-inputs/cryptoBenchmark/buildscript-gradle.lockfile.gz": "3e429d2cdd54871dd6138cef8cc9f9b08a8d5a81b7242b78a3fc9dc4bb5844fa",
-    "gradle/dependency-evidence/default-capture/captured-inputs/cryptoBenchmark/gradle.lockfile.gz": "41fc72c906066ff462cad1575437e021544424bf7f137c00c4c03b4af8039bcb",
-    "gradle/dependency-evidence/default-capture/captured-inputs/fuzz/buildscript-gradle.lockfile.gz": "3e429d2cdd54871dd6138cef8cc9f9b08a8d5a81b7242b78a3fc9dc4bb5844fa",
-    "gradle/dependency-evidence/default-capture/captured-inputs/fuzz/gradle.lockfile.gz": "3c00d1a5819f031449336e951b6abbc57d674ce1e5d2c4fd99c617d2ccae536d",
-    "gradle/dependency-evidence/default-capture/captured-inputs/gradle/verification-metadata.xml.gz": "042b4d83829a19ba89d259aa903d8f7062fd3acd855b7a77eaee2af8344a249d",
-    "gradle/dependency-evidence/default-capture/captured-inputs/settings-gradle.lockfile.gz": "4f6d59578183f25935d46dbee213c5c8173c36172c44ab2e405aa28e0bf8872d",
-    "gradle/dependency-evidence/default-capture/resolution.json.gz": "f81a63a502c9d24d6a2d92eacea12fe9b7d3b29a4621338b5c38f826998f7bc6",
-    "gradle/dependency-evidence/default-capture/source-inputs.json.gz": "eba484086e14b7724d12e630a551e408dd5ad4791ab8ca5ec044844c45d8bc60"
+    "gradle/dependency-evidence/default-capture/artifact-evidence.json.gz": "a3e796e995ae06d25ec47f8a19441f0e25f57320b77f43a8b19c8e4cea458ae5",
+    "gradle/dependency-evidence/default-capture/captured-inputs/app/buildscript-gradle.lockfile.gz": "edc5d8ad131533f0577f1c87cdbb9e151cf933a801de0c546793fa787506eeeb",
+    "gradle/dependency-evidence/default-capture/captured-inputs/app/gradle.lockfile.gz": "995e07b2a231f8d79b4bc3fefeabf776ae52957b62a9724535103b4518bd28e1",
+    "gradle/dependency-evidence/default-capture/captured-inputs/benchmark/buildscript-gradle.lockfile.gz": "edc5d8ad131533f0577f1c87cdbb9e151cf933a801de0c546793fa787506eeeb",
+    "gradle/dependency-evidence/default-capture/captured-inputs/benchmark/gradle.lockfile.gz": "e89bfc53c61437ae66098a8752b4e1bb232f4b1473c5ae04700bc21a8dad1c3a",
+    "gradle/dependency-evidence/default-capture/captured-inputs/buildscript-gradle.lockfile.gz": "f9c3e0cc645e072c1072f7e94cfc4090a85779640711a2246c35c4e9430434b7",
+    "gradle/dependency-evidence/default-capture/captured-inputs/cryptoBenchmark/buildscript-gradle.lockfile.gz": "edc5d8ad131533f0577f1c87cdbb9e151cf933a801de0c546793fa787506eeeb",
+    "gradle/dependency-evidence/default-capture/captured-inputs/cryptoBenchmark/gradle.lockfile.gz": "6b250e06cd9aba9e65eef25d9e435dcacc48f95887ef3dc4d384d22356559f1c",
+    "gradle/dependency-evidence/default-capture/captured-inputs/fuzz/buildscript-gradle.lockfile.gz": "edc5d8ad131533f0577f1c87cdbb9e151cf933a801de0c546793fa787506eeeb",
+    "gradle/dependency-evidence/default-capture/captured-inputs/fuzz/gradle.lockfile.gz": "d306f555be4e02fea2346029fc7370d65f7f51aced885c23ad56a4ec4ee28468",
+    "gradle/dependency-evidence/default-capture/captured-inputs/gradle/verification-metadata.xml.gz": "b7ee72e27f7454c7399408424437dead0dd69dd86d3074426a02a86e0c670f5f",
+    "gradle/dependency-evidence/default-capture/captured-inputs/settings-gradle.lockfile.gz": "5771b116d47d4a4122b47952b7ef684a7a2931b9208ef6ba80d570a0041cc2d3",
+    "gradle/dependency-evidence/default-capture/resolution.json.gz": "cbf7b180559927f6b330ff5c0fe13cd4bb0c4ea1936d7ad9c33b23122db11829",
+    "gradle/dependency-evidence/default-capture/source-inputs.json.gz": "a40d3e445d30255500c005e6e8abc5a85ed9bb736a2b37f550407c378734466a"
   },
-  "original_evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/40697521261/artifacts/12820108009",
+  "original_evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/42769220947/artifacts/13741132937",
   "schema": 1,
-  "source_sha": "4a70e13a7fa0128a77afbbe8c433de19f2c7bba2"
+  "source_sha": "3427a18ac8b70a58ac4b804fde27661b2a53f3b3"
 }
