@@ -2804,7 +2804,7 @@ internal fun ChatsScreen(
                                 }
                             else -> Unit
                         }
-                        ChatListJumpToTopOverlay(
+                        ChatListJumpToTopControl(
                             visible = jumpToTopVisible && !selectionMode,
                             modifier = Modifier.matchParentSize(),
                             onClick = {
@@ -3064,7 +3064,7 @@ private fun ChatListIdentifierResult(
  */
 @Suppress("FunctionNaming")
 @Composable
-internal fun ChatListJumpToTopOverlay(
+internal fun ChatListJumpToTopControl(
     visible: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,

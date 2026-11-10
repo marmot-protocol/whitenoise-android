@@ -248,7 +248,7 @@ class ChatListFloatingStackScreenshotTest {
                 }
             },
         ) { padding ->
-            ChatListJumpToTopOverlay(
+            ChatListJumpToTopControl(
                 visible = jump.value,
                 onClick = {},
                 modifier = Modifier.fillMaxSize().padding(padding),

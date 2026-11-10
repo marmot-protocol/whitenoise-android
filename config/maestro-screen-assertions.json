@@ -250,12 +250,6 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-      "symbol": "ChatListJumpToTopOverlay",
-      "bindings": [],
-      "remaining": "No Maestro flow scrolls the chat list far enough to raise the jump-to-top control. Its stacking above the dictation capsule and pen is covered by ChatListFloatingStackScreenshotTest and manual CHL-035; device scroll, capsule entry/exit, reduced motion, RTL and large-text execution evidence remain separate work."
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
       "symbol": "ChatsScreen",
       "bindings": [
         {
