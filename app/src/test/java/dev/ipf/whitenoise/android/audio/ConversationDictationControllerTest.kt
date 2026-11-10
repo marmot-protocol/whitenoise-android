@@ -1192,7 +1192,12 @@ class ConversationDictationControllerTest {
             platform.listener.onResult("late tail")
             advanceUntilIdle()
             assertEquals(emptyList<String>(), sent)
-            assertTrue(f.drafts.getValue(key()).text.startsWith("Draft"))
+            assertTrue(
+                f.drafts
+                    .getValue(key())
+                    .text
+                    .startsWith("Draft"),
+            )
         }
 
     /** An unavailable original target cannot receive interruption text through another owner. */
@@ -6139,7 +6144,6 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
-    /** Exhausts the exact final PCM's bounded automatic retry budget before terminal assertions. */
     /** Capture-side silence on the final chunk needs no retry, even before the provider was fully fed. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -6173,6 +6177,7 @@ class ConversationDictationControllerTest {
             assertTrue(f.controller.state is ConversationDictationState.Idle)
         }
 
+    /** Exhausts the exact final PCM's bounded automatic retry budget before terminal assertions. */
     private fun exhaustFinalNoMatch(fixture: Fixture) {
         repeat(3) {
             fixture.platform.session.callerAudioFinalChunk = true
