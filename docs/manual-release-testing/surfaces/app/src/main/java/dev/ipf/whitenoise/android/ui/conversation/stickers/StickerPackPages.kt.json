@@ -44,6 +44,14 @@
         ]
       },
       {
+        "surface": "StickerPackToggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun StickerPackToggle(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
         "surface": "Sticker copy refresh",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
         "anchor": "R.string.refresh",
