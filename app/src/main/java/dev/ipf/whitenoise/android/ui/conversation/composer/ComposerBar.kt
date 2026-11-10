@@ -99,8 +99,8 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
-import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
+import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.ComposerTranslationSync
 import dev.ipf.whitenoise.android.translation.rememberComposerTranslation
 import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary

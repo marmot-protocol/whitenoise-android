@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.content.Context
+import android.os.Looper
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -41,6 +42,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /** Drives the real composer Send paths with translate mode on, so only a ready translation can leave. */
@@ -72,7 +74,7 @@ class ComposerTranslationSendTest {
         assertTrue(sent.isEmpty())
 
         gate.complete(Unit)
-        composeRule.waitUntil { !translation.pending }
+        awaitMain { !translation.pending }
         send.assertIsEnabled().performClick()
         composeRule.runOnIdle { assertEquals(listOf("de:Hello"), sent) }
     }
@@ -109,7 +111,7 @@ class ComposerTranslationSendTest {
         assertTrue(sent.isEmpty())
 
         gate.complete(Unit)
-        composeRule.waitUntil { !translation.pending }
+        awaitMain { !translation.pending }
         editor.performImeAction()
         composeRule.runOnIdle { assertEquals(listOf("de:Hello"), sent) }
     }
@@ -123,9 +125,26 @@ class ComposerTranslationSendTest {
         composeRule.waitUntil { translation.outgoingFor(DRAFT) != null }
 
         composeRule.runOnIdle { assertTrue(controller.requestStart(ACCOUNT, GROUP, TextFieldValue(DRAFT))) }
-        composeRule.waitUntil { !translation.active }
-        assertFalse(translation.active)
-        assertEquals(DRAFT, translation.outgoingFor(DRAFT))
+        shadowOf(Looper.getMainLooper()).idle()
+        composeRule.mainClock.advanceTimeBy(DICTATION_SETTLE_MILLIS)
+        composeRule.runOnIdle {
+            assertFalse(translation.active)
+            assertEquals(DRAFT, translation.outgoingFor(DRAFT))
+        }
+    }
+
+    /**
+     * Waits for [condition] by running the main looper and composition frames itself; under Robolectric `waitUntil`
+     * drives neither, so work the test resumed outside composition (a released translation)
+     * would never reach the composer.
+     */
+    private fun awaitMain(condition: () -> Boolean) {
+        repeat(MAX_FRAMES) {
+            shadowOf(Looper.getMainLooper()).idle()
+            composeRule.mainClock.advanceTimeByFrame()
+            if (condition()) return
+        }
+        throw AssertionError("Condition still not satisfied after $MAX_FRAMES frames")
     }
 
     /** Opens translate mode into German with an engine that waits on [beforeResult] and then prefixes the target. */
@@ -229,5 +248,7 @@ class ComposerTranslationSendTest {
         const val ACCOUNT = "account"
         const val GROUP = "group"
         const val REPLY_MESSAGE_ID = "reply-message"
+        const val MAX_FRAMES = 60
+        const val DICTATION_SETTLE_MILLIS = 100L
     }
 }
