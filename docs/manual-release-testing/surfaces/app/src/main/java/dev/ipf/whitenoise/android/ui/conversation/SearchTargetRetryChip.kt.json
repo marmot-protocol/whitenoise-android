@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/SearchTargetRetryChip.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SearchTargetRetryChip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/SearchTargetRetryChip.kt",
+        "anchor": "fun SearchTargetRetryChip(",
+        "test_ids": [
+          "FIND-019"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Search result open failed Retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/SearchTargetRetryChip.kt",
+        "anchor": "R.string.search_result_open_failed_retry",
+        "test_ids": [
+          "FIND-019"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

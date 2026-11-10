@@ -1982,23 +1982,22 @@ class ConversationScrollCoordinatorTest {
         assertTrue(mention.contains("resolveTargetIndex = { currentTimelineListIndex(targetMessageId) }"))
     }
 
+    /** Failed speech targets restart through the localized Retry; search landings: ConversationHistorySearchTest. */
     @Test
     fun failedFocusTargetSharesExistingLocalizedRetryActions() {
         val screen = sourceFile("ConversationScreen.kt").readText()
         val focus =
             screen
-                .substringAfter("// Scroll-to-message for a chat-list")
+                .substringAfter("// Lands a global-search result")
                 .substringBefore("// A settled visible anchor")
         assertTrue("explicit Retry must restart the focus effect", "focusTargetRetry.generation" in focus)
         assertTrue("a newer target must clear the earlier failed request", "focusTargetRetry.clear()" in focus)
         assertEquals(2, Regex("focusTargetRetry.failed\\(navigationRequest\\)").findAll(focus).count())
-        val retryAction = Regex("focusTargetRetry.retry\\(\\s*loadFailurePresent = controller.error != null,?\\s*\\)")
-        assertEquals(3, retryAction.findAll(screen).count())
         assertTrue(
             "searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)" in screen,
         )
         assertTrue(
-            "unavailable targets keep the existing localized notice",
+            "unavailable speech targets keep the existing localized notice",
             "toast_original_message_unavailable" in focus,
         )
     }
@@ -2437,6 +2436,209 @@ class ConversationScrollCoordinatorTest {
                 viewportSizePx = viewportSize,
             )
     }
+
+    /**
+     * A distant global-search result (#1945) snaps near its row and animates only the last few rows, so landing
+     * never scrolls through the intervening history.
+     */
+    @Test
+    fun distantGlobalSearchResultSnapsNearThenAnimatesOnlyTheLastRows() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = writer, initialMode = ConversationScrollMode.FollowingTail)
+
+            val landed =
+                coordinator.programmaticJump(
+                    targetMessageId = "result",
+                    reason = ConversationScrollReason.FocusMessage,
+                ) {
+                    animateScrollToItem(900, 64)
+                }
+
+            assertTrue(landed)
+            assertEquals(listOf(ScrollWrite.Snap(890, 0), ScrollWrite.Animate(900, 64)), writer.writes)
+        }
+
+    /** A newer result tap supersedes a landing still in flight; only the newest landing writes or settles. */
+    @Test
+    fun newerGlobalSearchResultSupersedesTheLandingInFlight() =
+        runTest {
+            val blocking = BlockingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = blocking, initialMode = ConversationScrollMode.FollowingTail)
+            val first =
+                async {
+                    coordinator.programmaticJump("first", ConversationScrollReason.FocusMessage) {
+                        animateScrollToItem(5)
+                    }
+                }
+            blocking.writeStarted.await()
+            val second =
+                async {
+                    coordinator.programmaticJump("second", ConversationScrollReason.FocusMessage) { Unit }
+                }
+            runCurrent()
+            blocking.releaseWrite.complete(Unit)
+
+            assertFalse("the superseded landing never settles", first.await())
+            assertTrue(second.await())
+        }
+
+    /**
+     * After a landing moved the window onto a gone target, the reader's anchor is no longer in the window. It is
+     * loaded back first and restored at its own index, never at the raw index it had in the earlier window.
+     */
+    @Test
+    fun restoreAfterAMovedWindowReloadsTheAnchorInsteadOfUsingItsOldIndex() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 48),
+                )
+            val bookmark = coordinator.bookmark(anchor(messageId = "reader", listIndex = 12, pixelOffset = 48))
+            // The landing's window jump replaced the window around the dead target: "reader" is no longer in it.
+            val window = mutableMapOf("dead" to 3)
+            var reloads = 0
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    ownsNavigation = { true },
+                    resolveAnchorIndex = { saved -> saved.messageId?.let(window::get) },
+                    rematerialize = { id ->
+                        reloads++
+                        window.clear()
+                        window[id] = 31
+                        true
+                    },
+                    returnToNewest = { error("a reader in history does not return to the newest rows") },
+                )
+
+            assertTrue(restored)
+            assertEquals(1, reloads)
+            assertEquals(listOf(ScrollWrite.Snap(31, 48)), writer.writes)
+        }
+
+    /** When the anchor cannot be loaded back, the reader stays put rather than landing on an arbitrary row. */
+    @Test
+    fun restoreThatCannotReloadTheAnchorWritesNothing() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 48),
+                )
+            val bookmark = coordinator.bookmark(anchor(messageId = "reader", listIndex = 12, pixelOffset = 48))
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    ownsNavigation = { true },
+                    resolveAnchorIndex = { null },
+                    rematerialize = { false },
+                    returnToNewest = { error("not following the tail") },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+        }
+
+    /** A reader who was following the newest rows returns to them through the newest window, not an old index. */
+    @Test
+    fun restoreForATailFollowingReaderReturnsToTheNewestRows() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = writer, initialMode = ConversationScrollMode.FollowingTail)
+            val bookmark = coordinator.bookmark(anchor(messageId = "newest", listIndex = 0))
+            var returnedToNewest = false
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    ownsNavigation = { true },
+                    resolveAnchorIndex = { null },
+                    rematerialize = { error("the tail is restored through the newest window") },
+                    returnToNewest = {
+                        returnedToNewest = true
+                        40
+                    },
+                )
+
+            assertTrue(restored)
+            assertTrue(returnedToNewest)
+            assertTrue(coordinator.isFollowingTail)
+            val indexes =
+                writer.writes.map { write ->
+                    when (write) {
+                        is ScrollWrite.Snap -> write.index
+                        is ScrollWrite.Animate -> write.index
+                    }
+                }
+            assertEquals(setOf(40), indexes.toSet())
+        }
+
+    /** A drag while the anchor message is being loaded back wins: the restore scrolls nothing over it. */
+    @Test
+    fun aGestureDuringTheAnchorReloadCancelsTheRestore() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 48),
+                )
+            val bookmark = coordinator.bookmark(anchor(messageId = "reader", listIndex = 12, pixelOffset = 48))
+            val window = mutableMapOf<String, Int>()
+            var owned = true
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    ownsNavigation = { owned },
+                    resolveAnchorIndex = { saved -> saved.messageId?.let(window::get) },
+                    rematerialize = { id ->
+                        window[id] = 31
+                        // The reader drags while the window is reloading.
+                        owned = false
+                        true
+                    },
+                    returnToNewest = { error("not following the tail") },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+        }
+
+    /** A newer jump while the newest window is being reloaded wins: the tail restore scrolls nothing over it. */
+    @Test
+    fun aGestureDuringTheNewestReloadCancelsTheTailRestore() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = writer, initialMode = ConversationScrollMode.FollowingTail)
+            val bookmark = coordinator.bookmark(anchor(messageId = "newest", listIndex = 0))
+            var owned = true
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    ownsNavigation = { owned },
+                    resolveAnchorIndex = { null },
+                    rematerialize = { error("the tail is restored through the newest window") },
+                    returnToNewest = {
+                        owned = false
+                        40
+                    },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+        }
 
     private sealed interface ScrollWrite {
         data class Snap(

@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -102,9 +103,11 @@ internal data class GlobalSearchResetOwners(
 )
 
 /**
- * Shell-lived coordinates and ids only: never retains messages, thumbnails, or native result pages. The
- * library and message-result extents are row counts for one query, so a return rereads that far instead of
- * keeping pages.
+ * Shell-lived search viewport state: list and grid coordinates, the selected result, and the library's extent, a
+ * row count for one query so a return rereads that far instead of keeping pages. Global message results (#1945)
+ * are the exception that retains message rows: their session stays in [messageResults] while the chat list is
+ * away, keeping the loaded pages and cursor, and on Back its rows stay hidden until one recheck confirms them. It
+ * is scoped to this shell's account and runtime and closed with it.
  */
 internal class GlobalSearchViewport(
     private val active: LazyListState,
@@ -113,7 +116,7 @@ internal class GlobalSearchViewport(
     private val resetOwners: GlobalSearchResetOwners,
     val selection: GlobalSearchSelectionOwner,
     val libraryExtent: GlobalAttachmentLibraryExtent = GlobalAttachmentLibraryExtent(),
-    val messageResultsExtent: GlobalSearchResultsExtent = GlobalSearchResultsExtent(),
+    val messageResults: GlobalSearchResultsHolder = GlobalSearchResultsHolder(),
 ) {
     fun listState(showArchived: Boolean): LazyListState = if (showArchived) archived else active
 
@@ -159,13 +162,17 @@ internal fun rememberGlobalSearchViewport(): GlobalSearchViewport {
     val selectionState =
         rememberSaveable(stateSaver = GlobalSearchSelectedResultSaver) { mutableStateOf(GlobalSearchSelectedResult()) }
     val selection = remember(selectionState) { GlobalSearchSelectionOwner(selectionState) }
-    return remember(active, archived, grid, activeReset, archivedReset, gridReset, selection) {
-        GlobalSearchViewport(
-            active,
-            archived,
-            grid,
-            GlobalSearchResetOwners(activeReset, archivedReset, gridReset),
-            selection,
-        )
-    }
+    val viewport =
+        remember(active, archived, grid, activeReset, archivedReset, gridReset, selection) {
+            GlobalSearchViewport(
+                active,
+                archived,
+                grid,
+                GlobalSearchResetOwners(activeReset, archivedReset, gridReset),
+                selection,
+            )
+        }
+    // The held message-search session ends with the shell's account and runtime scope.
+    DisposableEffect(viewport) { onDispose { viewport.messageResults.close() } }
+    return viewport
 }

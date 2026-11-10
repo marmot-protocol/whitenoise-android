@@ -296,8 +296,10 @@ private class ConversationNavigationState(
     var initialTimelineBackfillNoProgress by surfaceState.initialTimelineBackfillNoProgress
     var initialTimelineBackfillRetryGeneration by mutableLongStateOf(0L)
     val targetHighlight = MessageTargetHighlightLifecycle()
-    val targetNavigation = MessageTargetNavigationOwner()
     val focusTargetRetry = SearchTargetRetryState()
+
+    // Any newer navigation or a reader scroll supersedes a failed search landing, so its Retry leaves with it.
+    val targetNavigation = MessageTargetNavigationOwner(onOwnershipChanged = focusTargetRetry::clear)
     var navigateReplyJob by mutableStateOf<Job?>(null)
     var searchOpen by surfaceState.searchOpen
     val searchState = surfaceState.searchState
@@ -530,6 +532,8 @@ internal fun ConversationScreen(
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
     focusMessageId: String? = null,
+    // True only when focusMessageId came from a search result, which lands with the search rules (#1945).
+    focusFromSearch: Boolean = false,
     // Advances for repeated shell-level focus requests to the same message.
     focusMessageRequestId: Long = 0L,
     // Non-null only for a transport-body return to a live TTS session.
@@ -2616,6 +2620,61 @@ internal fun ConversationScreen(
             hasPendingMembership = controller.pendingMembershipActivity != null,
         ) ?: 0
     val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
+
+    /**
+     * The conversation's steps for landing the global-search result [target] (#1945). The landing stays current
+     * only while [request] owns navigation and no user scroll intent arrived after [intent]. [target] is the
+     * canonical lowercase id the open recorded, and the reader's position before the window load is kept so a
+     * target that turns out to be gone can put them back.
+     */
+    fun searchResultLandingSteps(
+        target: String,
+        request: MessageTargetNavigationOwner.Request,
+        intent: ConversationScrollIntentToken,
+    ): SearchResultLandingSteps {
+        val before = scrollCoordinator.bookmark(currentScrollAnchor())
+
+        /** The loaded row of [target], whose id the open already canonicalized. */
+        fun loaded(): TimelineMessage? = controller.timeline.firstOrNull { it.record.messageIdHex == target }
+
+        return SearchResultLandingSteps(
+            isCurrent = { request.isCurrent() && scrollCoordinator.intentToken.revision == intent.revision },
+            ownsNavigation = { request.isCurrent() },
+            hidden = {
+                appState
+                    .hiddenMessageIdsInGroup(conversationAccountRef, controller.group.groupIdHex)
+                    .any { canonicalMessageId(it) == target }
+            },
+            loadWindow = { controller.loadMessageAvailability(target) },
+            loadedRecord = { loaded()?.projected },
+            center = {
+                val index = currentTimelineListIndex(target)
+                index != null && centerTimelineItemAt(target, index, ConversationScrollReason.FocusMessage)
+            },
+            highlight = { showTransientMessageHighlight(target) },
+            unavailable = { appState.present(R.string.search_result_unavailable) },
+            failed = { navigationState.focusTargetRetry.failed(request) },
+            restoreAnchor = {
+                scrollCoordinator.restoreReaderAfterLanding(
+                    bookmark = before,
+                    ownsNavigation = { request.isCurrent() },
+                    resolveAnchorIndex = ::resolveScrollAnchorIndex,
+                    rematerialize = { id ->
+                        controller.loadMessageAvailability(id) == MessageAvailability.AVAILABLE
+                    },
+                    returnToNewest = {
+                        loadConversationTimelineToNewest(
+                            hasMoreAfter = { controller.hasMoreAfterTimeline },
+                            loadNewer = controller::loadNewerTimelinePage,
+                            returnToLatest = controller::returnToLatestWindow,
+                        )
+                        withFrameNanos { }
+                        currentTailIndex
+                    },
+                )
+            },
+        )
+    }
     val seededTailAlignmentReady =
         firstFrameSeed.anchorTailImmediately &&
             (!navigationState.seedTailAwaitingAuthoritative || controller.hasPublishedAuthoritativeTimeline)
@@ -3476,14 +3535,12 @@ internal fun ConversationScreen(
 
         searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)
 
-        // Scroll-to-message for a chat-list message-body search hit (issue #290).
-        // Waits for the first-open anchor to settle, then pages the local timeline
-        // back until the matched message is materialized and scrolls to it with a
-        // brief highlight — the same affordance the reply-jump uses. Fires once
-        // per (chat.id, focusMessageId); a missing message (e.g. it was deleted
-        // between the search and the tap) just toasts and leaves the user at the
-        // normal anchor. Local-only: loadUntilMessageAvailable paginates the
-        // already-persisted store, never a relay fetch.
+        // Lands a global-search result (#290, #1945), or a speech, playback or attachment destination. It
+        // waits for the first-open anchor to settle, loads the bounded window around the exact message and
+        // centers it with a brief highlight, the same affordance the reply-jump uses. Fires once per (chat.id,
+        // focusMessageId). A search target that is missing, deleted or hidden reports that it is unavailable
+        // and leaves the reader where they were, and a window that could not load offers Retry; other
+        // destinations keep their own path and wording. Local-only: no relay fetch.
         LaunchedEffect(
             controller,
             focusMessageId,
@@ -3512,6 +3569,10 @@ internal fun ConversationScreen(
             snapshotFlow { initialTimelineAnchored }.filter { it }.first()
             if (!navigationRequest.isCurrent()) return@LaunchedEffect
             val scrollIntent = scrollCoordinator.intentToken
+            if (landsAsSearchResult(focus, focusFromSearch, ttsFocusSessionId)) {
+                landSearchResult(searchResultLandingSteps(focus, navigationRequest, scrollIntent))
+                return@LaunchedEffect
+            }
             var target = controller.loadScrollNavigationTarget(focus)
             if (!navigationRequest.isCurrent() || scrollCoordinator.intentToken.revision != scrollIntent.revision) {
                 return@LaunchedEffect
@@ -4953,6 +5014,22 @@ internal fun ConversationScreen(
                                                     ttsFollowHandle.revealCurrentPassage(
                                                         appState.ttsController.state.value,
                                                         appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                    )
+                                                },
+                                            )
+                                        }
+                                        // A search result whose window could not load offers its own Retry; the
+                                        // conversation's load-error banner covers the case where loading failed.
+                                        ConversationNavigationControl(
+                                            visible =
+                                                !selectionMode &&
+                                                    navigationState.focusTargetRetry.pending &&
+                                                    controller.error == null,
+                                        ) {
+                                            SearchTargetRetryChip(
+                                                onRetry = {
+                                                    navigationState.focusTargetRetry.retry(
+                                                        loadFailurePresent = controller.error != null,
                                                     )
                                                 },
                                             )

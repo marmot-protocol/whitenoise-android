@@ -167,6 +167,9 @@ internal suspend fun <R> fillGlobalSearchBatch(
  * The one batch a generation has in flight. A completion is applied only while it is still the state's
  * [GlobalSearchResultsState.inFlight], so a page from an older query, filter set or account is dropped. A
  * [refresh] rereads the loaded range from the head; its [cursor] is then the old continuation it reads through.
+ * [launch] is unique per request within a generation, so a completion that outlived its cancellation can never
+ * match a newer request that happens to read the same range. A [verifying] refresh rechecks rows the reader has not
+ * seen confirmed since returning (#1945); it never keeps rows below where it stopped.
  */
 internal data class GlobalSearchPageRequest(
     val generation: Int,
@@ -174,13 +177,14 @@ internal data class GlobalSearchPageRequest(
     val cursor: GlobalSearchCursor?,
     val seenKeys: Set<String>,
     val refresh: Boolean = false,
+    val launch: Long = 0L,
+    val verifying: Boolean = false,
 )
 
 /**
- * Transient results of one search generation. Only admitted rows are kept, never raw pages. [resumeTarget] is
- * the row count a returning session rereads before it shows the list, so Back lands where the user left, within
- * [resumeBatchesLeft] batches so rows that vanished meanwhile never walk the whole account;
- * [emptyBatches] counts consecutive batches that showed nothing and [batches] increases with every finished one,
+ * Transient results of one search generation. Only admitted rows are kept, never raw pages. [emptyBatches] counts
+ * consecutive batches that showed nothing, [launches] numbers every request started, and [batches] increases with
+ * every finished one,
  * so paging effects relaunch even when a batch completes within one frame.
  */
 internal data class GlobalSearchResultsState(
@@ -193,8 +197,7 @@ internal data class GlobalSearchResultsState(
     val failed: Boolean = false,
     val emptyBatches: Int = 0,
     val batches: Int = 0,
-    val resumeTarget: Int = 0,
-    val resumeBatchesLeft: Int = 0,
+    val launches: Long = 0L,
 ) {
     /** The earliest deadline of a loaded disappearing match, when the rows must be checked again. */
     val nextExpiry: ULong? = results.mapNotNull { it.expiresAt }.minOrNull()
@@ -208,9 +211,6 @@ internal data class GlobalSearchResultsState(
     /** MDK returned a continuation, or the first batch has not finished yet. */
     val hasMore: Boolean get() = !endReached
 
-    /** A returning session is still rereading the rows it had before. */
-    val resuming: Boolean get() = resumeTarget > 0 && !failed
-
     /** Nothing has been shown for this generation yet, and no failure has ended the first read. */
     val initialLoading: Boolean get() = batches == 0 && !failed
 
@@ -221,25 +221,18 @@ internal data class GlobalSearchResultsState(
 /** Pure transitions of the global message results; the controller owns I/O and cancellation. */
 internal object GlobalSearchResultsReducer {
     /** A new query, filter set or account: drops every row, cursor and request, and opens the next generation. */
-    fun restart(
-        state: GlobalSearchResultsState,
-        resumeTarget: Int = 0,
-    ): GlobalSearchResultsState {
-        val target = resumeTarget.coerceAtLeast(0)
-        // Enough batches for the earlier rows at the batch target, plus the empty-batch allowance.
-        val budget = if (target > 0) target / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES else 0
-        return GlobalSearchResultsState(
-            generation = state.generation + 1,
-            resumeTarget = target,
-            resumeBatchesLeft = budget,
-        )
+    fun restart(state: GlobalSearchResultsState): GlobalSearchResultsState {
+        val generation = state.generation + 1
+        return GlobalSearchResultsState(generation = generation)
     }
 
     /** Starts the next batch, or returns null while one is in flight or after MDK's end. */
     fun begin(state: GlobalSearchResultsState): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
         if (state.inFlight != null || state.endReached) return null
-        val request = GlobalSearchPageRequest(state.generation, state.batches, state.nextCursor, state.seenKeys)
-        return state.copy(inFlight = request, failed = false) to request
+        val launch = state.launches + 1
+        val request =
+            GlobalSearchPageRequest(state.generation, state.batches, state.nextCursor, state.seenKeys, launch = launch)
+        return state.copy(inFlight = request, failed = false, launches = launch) to request
     }
 
     /** Appends a completed batch for the current request, deduplicated by stable key; a stale one is ignored. */
@@ -253,13 +246,6 @@ internal object GlobalSearchResultsReducer {
         val results = state.results + fresh
         val ended = batch.nextCursor == null
         val emptyBatches = if (fresh.isEmpty()) state.emptyBatches + 1 else 0
-        val budgetLeft = (state.resumeBatchesLeft - 1).coerceAtLeast(0)
-        // A resume ends at its target, at MDK's end, or once its budget or the empty-batch allowance runs out.
-        val resumeDone =
-            ended ||
-                results.size >= state.resumeTarget ||
-                budgetLeft == 0 ||
-                emptyBatches >= GLOBAL_SEARCH_AUTO_EMPTY_BATCHES
         return state.copy(
             results = results,
             seenKeys = state.seenKeys + fresh.map { it.key },
@@ -268,8 +254,6 @@ internal object GlobalSearchResultsReducer {
             inFlight = null,
             emptyBatches = emptyBatches,
             batches = state.batches + 1,
-            resumeTarget = if (resumeDone) 0 else state.resumeTarget,
-            resumeBatchesLeft = if (resumeDone) 0 else budgetLeft,
         )
     }
 
@@ -277,17 +261,31 @@ internal object GlobalSearchResultsReducer {
      * Starts rereading the loaded range from the head, after a change that may delete, expire or hide a loaded
      * row or add a newer match. Null while a batch is in flight or before anything loaded.
      */
-    fun beginRefresh(state: GlobalSearchResultsState): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
+    fun beginRefresh(
+        state: GlobalSearchResultsState,
+        verifying: Boolean = false,
+    ): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
         if (state.inFlight != null || state.batches == 0) return null
+        val launch = state.launches + 1
         val request =
-            GlobalSearchPageRequest(state.generation, state.batches, state.nextCursor, emptySet(), refresh = true)
-        return state.copy(inFlight = request) to request
+            GlobalSearchPageRequest(
+                state.generation,
+                state.batches,
+                state.nextCursor,
+                emptySet(),
+                refresh = true,
+                launch = launch,
+                verifying = verifying,
+            )
+        return state.copy(inFlight = request, launches = launch) to request
     }
 
     /**
      * Replaces the loaded range with a reread. [refreshed] covers the head down to [rereadThrough]; loaded rows
      * older than that keep their place, so a reread capped before the old continuation loses nothing. Rows
-     * keep their stable keys, so a list viewport stays where it was while gone rows drop out.
+     * keep their stable keys, so a list viewport stays where it was while gone rows drop out. A verifying reread
+     * that stopped short instead drops those older, unconfirmed rows and continues from [rereadThrough], so they
+     * return only as fresh pages.
      */
     fun applyRefresh(
         state: GlobalSearchResultsState,
@@ -299,11 +297,17 @@ internal object GlobalSearchResultsReducer {
         val through = request.cursor
         // The old continuation is the oldest row the range consumed, so it belongs to the range.
         val head = refreshed.filter { through == null || it.cursor >= through }
-        val tail = state.results.filter { rereadThrough != null && it.cursor < rereadThrough }
+        val stoppedShort = rereadThrough != null && (through == null || rereadThrough > through)
+        val dropTail = request.verifying && stoppedShort
+        val tail =
+            if (dropTail) emptyList() else state.results.filter { rereadThrough != null && it.cursor < rereadThrough }
         val results = (head + tail).distinctBy { it.key }
         return state.copy(
             results = results,
             seenKeys = results.mapTo(HashSet()) { it.key },
+            nextCursor = if (dropTail) rereadThrough else state.nextCursor,
+            endReached = state.endReached && !dropTail,
+            emptyBatches = if (dropTail) 0 else state.emptyBatches,
             inFlight = null,
             batches = state.batches + 1,
         )
@@ -315,7 +319,7 @@ internal object GlobalSearchResultsReducer {
         request: GlobalSearchPageRequest,
     ): GlobalSearchResultsState {
         val current = request == state.inFlight
-        return if (current) state.copy(inFlight = null, failed = true, resumeTarget = 0) else state
+        return if (current) state.copy(inFlight = null, failed = true) else state
     }
 
     /** Forgets a cancelled request without marking a failure, so the same cursor can be read again. */
@@ -323,10 +327,16 @@ internal object GlobalSearchResultsReducer {
         state: GlobalSearchResultsState,
         request: GlobalSearchPageRequest,
     ): GlobalSearchResultsState = if (request != state.inFlight) state else state.copy(inFlight = null)
+}
 
-    /** Whether a returning session still has rows to reread before it shows its list. */
-    fun needsResumeRead(state: GlobalSearchResultsState): Boolean {
-        val idle = state.inFlight == null && !state.endReached
-        return state.resuming && idle
-    }
+/**
+ * Whether a stale session's re-read has covered the range it had before the reader left: reached MDK's end, or
+ * passed the old continuation [target]. A null target means the old range had ended, so only the end counts.
+ */
+internal fun verificationReached(
+    state: GlobalSearchResultsState,
+    target: GlobalSearchCursor?,
+): Boolean {
+    val cursor = state.nextCursor
+    return state.endReached || cursor == null || (target != null && cursor <= target)
 }

@@ -1921,6 +1921,8 @@
     <string name="global_search_content_any_attachment">Cualquier adjunto</string>
     <string name="global_search_results_end">Fin de los resultados</string>
     <string name="global_search_results_search_older">Buscar mensajes anteriores</string>
+    <string name="search_result_unavailable">Este mensaje ya no está disponible</string>
+    <string name="search_result_open_failed_retry">No se pudo abrir el mensaje. Reintentar</string>
     <string name="text_attachment_open_external">Abrir en otra aplicación</string>
     <string name="text_attachment_filename">Nombre del archivo</string>
     <string name="text_attachment_view_full_filename">Ver nombre completo</string>
