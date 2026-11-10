@@ -835,6 +835,7 @@ class MessageProjectorTest {
     @Test
     fun copyOffersACaptionButNotABareStickersLabel() {
         val ref = StickerRefFfi("30031:author:pack", "wave", "ab".repeat(32))
+
         fun canCopy(record: AppMessageRecordFfi) =
             messageBubbleCanCopyText(
                 TimelineMessage(record.messageIdHex, record, MessageStatus.Sent),
