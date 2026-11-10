@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
@@ -339,7 +340,9 @@ internal fun ComposerTranslationBar(
         // Top-aligned with no button frame, so the line starts as close to the composer edge as typed text does.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
+                // Capped so a long language name cannot squeeze out the outgoing text.
                 Modifier
+                    .widthIn(max = LANGUAGE_SELECTOR_MAX_WIDTH)
                     .clickable(role = Role.Button, onClick = onChooseLanguage)
                     .testTag("composer.translation.language"),
                 verticalAlignment = Alignment.CenterVertically,
@@ -347,8 +350,10 @@ internal fun ComposerTranslationBar(
                 Text(
                     targetLabel,
                     color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f, fill = false),
                     style = MaterialTheme.typography.labelLarge,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
                     painterResource(R.drawable.ic_expand_more),
@@ -456,3 +461,4 @@ private fun needsEngine(failure: TranslationFailure): Boolean =
 
 /** About four body lines; longer translations scroll inside the line. */
 private val PREVIEW_MAX_HEIGHT = 96.dp
+private val LANGUAGE_SELECTOR_MAX_WIDTH = 160.dp
