@@ -1648,6 +1648,35 @@
 
     <string name="chat_bubble_colors">Colori dei fumetti</string>
     <string name="custom_emoji">Emoji personalizzate</string>
+    <string name="emoji_sets_title">Set di emoji</string>
+    <string name="emoji_sets_account_required">Scegli un profilo per sfogliare e installare set di emoji.</string>
+    <string name="emoji_sets_query">Cerca o incolla il link di un set</string>
+    <string name="emoji_sets_find">Trova set</string>
+    <string name="emoji_sets_open">Apri set di emoji</string>
+    <string name="emoji_sets_empty">Nessun set. Trova set sui tuoi relay o incolla il link di un set condiviso.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d emoji</item>
+        <item quantity="other">%1$d emoji</item>
+    </plurals>
+    <string name="emoji_sets_installed">Installato</string>
+    <string name="emoji_sets_update_available">Aggiornamento disponibile</string>
+    <string name="emoji_sets_load_image">Carica immagine di anteprima</string>
+    <string name="emoji_sets_image_privacy">Caricare un’anteprima o installare un set condivide il tuo indirizzo IP con i suoi host di immagini.</string>
+    <string name="emoji_sets_preview_host">Host dell’immagine di anteprima: %1$s</string>
+    <string name="emoji_sets_install">Installa set</string>
+    <string name="emoji_sets_update">Aggiorna set</string>
+    <string name="emoji_sets_check_update">Cerca aggiornamenti</string>
+    <string name="emoji_sets_preparing_install">Preparazione dell’installazione…</string>
+    <string name="emoji_sets_install_progress">%1$d di %2$d emoji elaborate</string>
+    <string name="emoji_sets_error">Impossibile completare la richiesta. Riprova.</string>
+    <string name="emoji_sets_not_found">Set o immagine non trovati. Controlla il link o riprova.</string>
+    <string name="emoji_sets_changed">Questo set è cambiato. Controlla la nuova versione prima di installarla.</string>
+    <string name="emoji_sets_cancelled">Installazione annullata.</string>
+    <string name="emoji_sets_discovery_incomplete">Alcuni relay non sono raggiungibili. I risultati potrebbero essere incompleti.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Installato con %1$d voce saltata.</item>
+        <item quantity="other">Installato con %1$d voci saltate.</item>
+    </plurals>
     <string name="custom_emoji_detail">Le immagini qui diventano emoji :shortcode: salvate su questo dispositivo. Un nuovo messaggio (non una risposta) che ne usa una carica la sua immagine, cifrata, in quella chat. Reazioni, risposte e modifiche inviano solo lo shortcode.</string>
     <string name="custom_emoji_empty">Ancora nessuna emoji personalizzata.</string>
     <string name="custom_emoji_name_title">Dai un nome a questa emoji</string>

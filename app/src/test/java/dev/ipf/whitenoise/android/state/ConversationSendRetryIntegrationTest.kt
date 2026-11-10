@@ -45,6 +45,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -2034,6 +2035,145 @@ class ConversationSendRetryIntegrationTest {
 
             assertEquals(1, sends)
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /**
+     * A failed artwork lookup published nothing, so the bubble ends Failed and nothing is sent, even when
+     * its error text reads like an uncertain relay delivery.
+     */
+    @Test
+    fun customEmojiLookupFailureEndsFailedNotPending() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { throw MarmotKitException.Publish("relay did not acknowledge event") },
+                    customEmojiSender = { _, _, _, _, _ ->
+                        sends += 1
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "meet at 10:30:45")
+
+            assertEquals(0, sends)
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A transport loss during the artwork lookup is retried before publication and then sends once. */
+    @Test
+    fun customEmojiLookupConnectivityFailureIsRetried() =
+        runTest {
+            var lookups = 0
+            var sends = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = {
+                        lookups += 1
+                        if (lookups == 1) throw MarmotKitException.TransportClosed()
+                        listOf(partyArtwork())
+                    },
+                    customEmojiSender = { _, _, _, _, _ ->
+                        sends += 1
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(2, lookups)
+            assertEquals(1, sends)
+        }
+
+    /** Cancelling a send whose artwork lookup keeps failing ends it and lets the next send publish without backoff. */
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun cancellingARetryingEmojiLookupUnblocksTheNextSend() =
+        runTest {
+            val lookupFailed = CompletableDeferred<Unit>()
+            val published = mutableListOf<String>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { text ->
+                        if (':' !in text) return@ConversationController emptyList()
+                        lookupFailed.complete(Unit)
+                        throw MarmotKitException.TransportClosed()
+                    },
+                    customEmojiSender = { _, text, _, _, _ ->
+                        published += text
+                        successfulSendSummary()
+                    },
+                )
+            val first = async { appState.sendConversationText(controller, "hi :party:") }
+            lookupFailed.await()
+            runCurrent()
+            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+            val cancellationAtMs = testScheduler.currentTime
+            val second = async { controller.send("next") }
+            first.await()
+            second.await()
+            assertTrue(
+                "cancelled lookup retry held text order through backoff",
+                testScheduler.currentTime - cancellationAtMs < SEND_RETRY_BACKOFF_MS,
+            )
+            assertEquals(emptyList<String>(), published)
+            assertTrue(controller.timeline.none { it.record.plaintext == "hi :party:" })
+        }
+
+    /** Cancelling a send whose artwork lookup is still running stops the lookup and lets the next send publish. */
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun cancellingASlowEmojiLookupUnblocksTheNextSend() =
+        runTest {
+            val lookupStarted = CompletableDeferred<Unit>()
+            val lookupStopped = CompletableDeferred<Unit>()
+            val published = mutableListOf<String>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { text ->
+                        if (':' !in text) return@ConversationController listOf(partyArtwork())
+                        lookupStarted.complete(Unit)
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            lookupStopped.complete(Unit)
+                        }
+                    },
+                    customEmojiSender = { _, text, _, _, _ ->
+                        published += text
+                        successfulSendSummary()
+                    },
+                )
+            val first = async { appState.sendConversationText(controller, "hi :party:") }
+            lookupStarted.await()
+            runCurrent()
+            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+            runCurrent()
+            ShadowLooper.idleMainLooper()
+            assertTrue("the cancelled send still holds the text order", first.isCompleted)
+            val second = async { controller.send("next") }
+            runCurrent()
+            ShadowLooper.idleMainLooper()
+            second.await()
+            assertTrue(lookupStopped.isCompleted)
+            assertEquals(listOf("next"), published)
+            assertTrue(controller.timeline.none { it.record.plaintext == "hi :party:" })
         }
 
     /** A publish-stage connection loss may have reached a relay, so the bubble stays Pending and is not resent. */

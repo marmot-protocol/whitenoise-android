@@ -312,6 +312,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.Composer,
         SettingsDetail.CustomEmoji,
         -> SettingsDetail.Chats
+        SettingsDetail.EmojiSets -> SettingsDetail.CustomEmoji
         SettingsDetail.Language,
         SettingsDetail.TextToSpeech,
         SettingsDetail.Translation,
@@ -573,7 +574,9 @@ private fun SettingsDetailRoute(
         SettingsDetail.ActionColor -> ActionColorScreen(appState, onBack = onBack)
         SettingsDetail.ChatBubbleColors -> ChatBubbleColorsScreen(appState, onBack = onBack)
         SettingsDetail.Language -> LanguageScreen(appState, onBack = onBack)
-        SettingsDetail.CustomEmoji -> CustomEmojiScreen(appState, onBack = onBack)
+        SettingsDetail.CustomEmoji ->
+            CustomEmojiScreen(appState, onOpenSets = { onDetailChange(SettingsDetail.EmojiSets) }, onBack = onBack)
+        SettingsDetail.EmojiSets -> EmojiSetsScreen(appState, onBack = onBack)
         SettingsDetail.Data ->
             DataUsageScreen(
                 appState,
