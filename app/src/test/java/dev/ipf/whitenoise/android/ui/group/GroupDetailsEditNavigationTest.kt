@@ -1002,6 +1002,7 @@ private fun group(
         disappearingMessageSecs = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         disbanding = false,
         disbanded = disbanded,
         disbandRequest = null,

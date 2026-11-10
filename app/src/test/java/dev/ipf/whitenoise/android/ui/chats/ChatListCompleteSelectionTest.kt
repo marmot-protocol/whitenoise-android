@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.state.ChatFolderRule
+import dev.ipf.whitenoise.android.state.ChatListSelectAllScope
+import dev.ipf.whitenoise.android.state.chatFolderQuery
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,7 +32,7 @@ class ChatListCompleteSelectionTest {
                 reconcileChatListSelection(
                     selected,
                     loaded,
-                    ChatListCompleteSelection(ChatListViewFfi.CHATS, resolved = true),
+                    ChatListCompleteSelection(ChatListSelectAllScope(ChatListViewFfi.CHATS), resolved = true),
                 ),
             )
             assertEquals(
@@ -56,13 +59,18 @@ class ChatListCompleteSelectionTest {
     }
 
     /** Only scopes whose membership MDK owns may claim a complete selection. */
-    @Test fun completeViewOnlyForNativeOwnedScopes() {
-        assertEquals(ChatListViewFfi.CHATS, chatListCompleteSelectAllView(false, false, false, false))
-        assertEquals(ChatListViewFfi.ARCHIVED, chatListCompleteSelectAllView(true, true, false, false))
-        assertNull("custom or edited folders filter locally", chatListCompleteSelectAllView(true, false, false, false))
-        assertNull("unread filters locally", chatListCompleteSelectAllView(false, false, true, false))
-        assertNull("search filters locally", chatListCompleteSelectAllView(false, false, false, true))
-        assertNull("search inside Archived filters locally", chatListCompleteSelectAllView(true, true, false, true))
+    @Test fun completeScopeOnlyForNativeOwnedScopes() {
+        val folder = requireNotNull(chatFolderQuery(ChatFolderRule(pinnedOnly = true), emptySet(), emptySet()))
+        val chats = ChatListSelectAllScope(ChatListViewFfi.CHATS)
+        assertEquals(chats, chatListCompleteSelectAllScope(false, false, false, false))
+        val archived = ChatListSelectAllScope(ChatListViewFfi.ARCHIVED)
+        assertEquals(archived, chatListCompleteSelectAllScope(true, true, false, false))
+        val folderScope = ChatListSelectAllScope(ChatListViewFfi.CHATS, folder)
+        assertEquals(folderScope, chatListCompleteSelectAllScope(true, false, false, false, folder))
+        assertNull("participant folders filter locally", chatListCompleteSelectAllScope(true, false, false, false))
+        assertNull("unread filters locally", chatListCompleteSelectAllScope(false, false, true, false))
+        assertNull("search filters locally", chatListCompleteSelectAllScope(false, false, false, true))
+        assertNull("search inside Archived filters locally", chatListCompleteSelectAllScope(true, true, false, true))
     }
 
     /** The not-ready refusal is retried with backoff; the result is never partial. */
@@ -126,7 +134,7 @@ class ChatListCompleteSelectionTest {
                 archiveAction = ChatListBulkArchiveAction.Archive,
                 showAlternateArchive = true,
             )
-        val chats = ChatListCompleteSelection(ChatListViewFfi.CHATS, resolved = true)
+        val chats = ChatListCompleteSelection(ChatListSelectAllScope(ChatListViewFfi.CHATS), resolved = true)
         assertSame(loaded, chatListCompleteSelectionActions(loaded, chats, allLoaded = true))
         val complete = chatListCompleteSelectionActions(loaded, chats, allLoaded = false)
         assertTrue(complete.showMarkRead && complete.showMarkUnread)
@@ -138,7 +146,7 @@ class ChatListCompleteSelectionTest {
         val archived =
             chatListCompleteSelectionActions(
                 loaded,
-                ChatListCompleteSelection(ChatListViewFfi.ARCHIVED, resolved = true),
+                ChatListCompleteSelection(ChatListSelectAllScope(ChatListViewFfi.ARCHIVED), resolved = true),
                 allLoaded = false,
             )
         assertEquals(ChatListBulkArchiveAction.Unarchive, archived.archiveAction)

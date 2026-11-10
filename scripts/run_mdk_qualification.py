@@ -344,6 +344,14 @@ def main():
         except (RuntimeError, subprocess.SubprocessError) as error:
             facts['phases']['recovery_setup'] = type(error).__name__ + ': ' + str(error)
         else:
+            try:
+                stop()
+                blob.acquisition_unavailable.clear()
+                instrument('stale-upload-retry', UPGRADE, {'retainedAccountHistoryAndMedia'},
+                           (*ports, '-e', 'qualificationPhase', 'stale-upload-retry'))
+                facts['phases']['stale_upload_retry'] = 'passed'
+            except (RuntimeError, subprocess.SubprocessError) as error:
+                facts['phases']['stale_upload_retry'] = type(error).__name__ + ': ' + str(error)
             for comparison in ('refuse', 'ignore'):
                 try:
                     stop()
@@ -364,7 +372,7 @@ def main():
     required = {'baseline', 'upgrade', 'cold_restart', 'pending_promotion', 'promoted_cold_restart',
                 'key_migration', 'key_migration_cold',
                 'recovery_refuse', 'recovery_ignore',
-                'media_corrupt_recovery', 'media_lost_recovery'}
+                'media_corrupt_recovery', 'media_lost_recovery', 'stale_upload_retry'}
     if set(facts['phases']) != required or any(value != 'passed' for value in facts['phases'].values()):
         raise SystemExit('Qualification failed; retained reports distinguish failed and unexecuted phases')
 

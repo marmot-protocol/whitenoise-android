@@ -7,9 +7,12 @@ import dev.ipf.marmotkit.AttachmentTransferStateFfi
  * follows a demand, so a surface entered after one can restore the reader's earlier download instead of offering
  * Download again. Only a request whose native target is already known is read, so no history paging runs.
  */
-internal suspend fun WhiteNoiseAppState.nativeAttachmentParkedForStorage(request: AttachmentTransferRequest): Boolean {
-    val target = request.nativeTarget() ?: return false
-    val state =
+internal suspend fun WhiteNoiseAppState.nativeAttachmentParkedForStorage(request: AttachmentTransferRequest): Boolean =
+    nativeAttachmentState(request) == AttachmentTransferStateFfi.STORAGE_BLOCKED
+
+/** [request]'s native transfer state, read once without requesting or watching it; null when it cannot be read. */
+internal suspend fun WhiteNoiseAppState.nativeAttachmentState(request: AttachmentTransferRequest) =
+    request.nativeTarget()?.let { target ->
         runCatchingCancellable {
             marmotIo {
                 attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(target.toFfi()))
@@ -18,8 +21,7 @@ internal suspend fun WhiteNoiseAppState.nativeAttachmentParkedForStorage(request
                     ?.state
             }
         }.getOrNull()
-    return state == AttachmentTransferStateFfi.STORAGE_BLOCKED
-}
+    }
 
 /** The reader-facing identity of an attachment, the same however its native source is resolved. */
 private fun AttachmentTransferRequest.parkKey(): String = "$accountRef|$groupIdHex|$messageIdHex|$attachmentIndex"

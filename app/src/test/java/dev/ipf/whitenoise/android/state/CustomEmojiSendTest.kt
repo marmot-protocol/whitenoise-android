@@ -98,12 +98,12 @@ class CustomEmojiSendTest {
         directory.resolve("wave.webp").writeBytes(byteArrayOf(3))
         directory.resolve("odd.img").writeBytes(byteArrayOf(4))
         directory.resolve("huge.png").writeBytes(ByteArray(CustomEmojiStore.MAX_BYTES + 1))
-        directory.resolve("bad-code.png").writeBytes(byteArrayOf(6))
+        directory.resolve("bad.code.png").writeBytes(byteArrayOf(6))
         directory.resolve(".staged.tmp").writeBytes(byteArrayOf(5))
         val read =
             readLocalEmojiArtwork(
                 directory,
-                listOf(":wave:", ":odd:", ":huge:", ":absent:", ":party:", ":staged:", ":bad-code:"),
+                listOf(":wave:", ":odd:", ":huge:", ":absent:", ":party:", ":staged:", ":bad.code:"),
             )
         assertEquals(listOf(":wave:", ":party:"), read.map { it.shortcode })
         assertEquals(listOf("image/webp", "image/png"), read.map { it.mediaType })
@@ -368,7 +368,7 @@ class CustomEmojiSendTest {
             val engine = recordingEngine(calls)
             val tooMany = (0..64).map { artwork("c$it") }
             assertTrue(runCatching { engine.send(tooMany) }.exceptionOrNull() is EmojiSendLimitException)
-            val unsendable = listOf(LocalEmojiArtwork(":bad-code:", "x.png", "image/png", byteArrayOf(1)))
+            val unsendable = listOf(LocalEmojiArtwork(":bad.code:", "x.png", "image/png", byteArrayOf(1)))
             assertTrue(runCatching { engine.send(unsendable) }.exceptionOrNull() is EmojiSendLimitException)
             assertEquals(emptyList<String>(), calls.map { it.first })
             engine.send((0 until 64).map { artwork("c$it") })

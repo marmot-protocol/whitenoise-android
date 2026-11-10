@@ -6,6 +6,7 @@ import android.graphics.Color
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
@@ -27,9 +28,13 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.installedEmojiFixture
+import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.CustomEmoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
+import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiCategory
+import dev.ipf.whitenoise.android.ui.InstalledEmojiPicker
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.RecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -380,6 +385,54 @@ class EmojiPickerRecentsBehaviorTest {
         }
         composeRule.onNodeWithTag(emojiPickerItemTestTag(EmojiCategory.Custom, 0)).performClick()
         assertEquals(listOf(":party:", ":party:"), picked)
+    }
+
+    /** An installed pick uses its sendable artwork and disappears when the active library changes. */
+    @Test
+    fun installedEmojiCannotLeakThroughDeviceRecentsOrRenderOnlyFiles() {
+        val code = ":forest-fox:"
+        val legacy = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).asImageBitmap()
+        val local = CustomEmojiSet(listOf(CustomEmoji(code, File("forest-fox.img"), legacy)))
+        val art = EmojiArt.Decoded(Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888).asImageBitmap())
+        val reads = mutableListOf<String>()
+        val picked = mutableListOf<String>()
+        val used = mutableListOf<String>()
+        val installed =
+            mutableStateOf<InstalledEmojiPicker?>(
+                InstalledEmojiPicker(mapOf(code to installedEmojiFixture("forest-fox", "forest"))) {
+                    reads.add(it.shortcode)
+                    art
+                },
+            )
+        val recents = mutableStateOf(emptyList<String>())
+        composeRule.setContent {
+            CompositionLocalProvider(LocalCustomEmoji provides local) {
+                WhiteNoiseTheme {
+                    ComposerEmojiLibrary(installed.value) {
+                        EmojiPickerContent(
+                            onEmojiPicked = picked::add,
+                            onEmojiUsed = used::add,
+                            recentEmojis = recents.value,
+                            modifier = Modifier.width(360.dp).height(400.dp),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithContentDescription("forest fox").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(emojiPickerItemTestTag(EmojiCategory.Custom, 0)).performClick()
+        assertEquals(listOf(code), picked)
+        assertTrue(reads.isNotEmpty())
+        assertTrue(used.isEmpty())
+
+        composeRule.runOnIdle {
+            installed.value = null
+            recents.value = listOf(code)
+        }
+        composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Custom)).assertDoesNotExist()
+        composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Recent)).assertDoesNotExist()
     }
 
     private fun customParty(): CustomEmojiSet {

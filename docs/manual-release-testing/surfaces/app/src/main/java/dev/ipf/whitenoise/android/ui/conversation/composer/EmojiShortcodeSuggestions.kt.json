@@ -20,6 +20,14 @@
         "test_ids": [
           "CON-005"
         ]
+      },
+      {
+        "surface": "Installed set shortcode suggestions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiShortcodeSuggestions.kt",
+        "anchor": "custom.composerShortcodes",
+        "test_ids": [
+          "SET-051"
+        ]
       }
     ]
   },

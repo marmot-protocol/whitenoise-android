@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -439,7 +440,7 @@ private fun chatFolderDisplayName(
 // lockstep with the chip row's hide-when-empty and filtering decisions:
 // every folder's count derives from its rule, defaults included.
 
-/** Number of chats the folder currently holds. */
+/** Number of chats the folder currently holds: MarmotKit's count over every chat, or the loaded rows it matches. */
 private fun folderChatCount(
     folder: ChatFolder,
     appState: WhiteNoiseAppState,
@@ -447,17 +448,19 @@ private fun folderChatCount(
     displayTitle: (ChatListItem) -> String,
 ): Int {
     if (accountRef == null) return 0
-    val rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id)
-    val source = chatFolderSource(rule, appState.chatListItems, appState.archivedChatListItems)
-    val ids =
-        chatFolderChatIds(
-            items = source,
-            manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-            excludedChatIds = appState.chatFolderPreferences.excludedChats(accountRef, folder.id),
-            rule = rule,
-            activeAccountIdHex = appState.activeAccount?.accountIdHex,
-            isMuted = { groupIdHex -> source.any { it.group.groupIdHex == groupIdHex && it.engineMuted() } },
-            displayTitle = displayTitle,
-        )
-    return source.count { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
+    return appState.nativeFolderMembership(accountRef, folder.id)?.ids?.size ?: run {
+        val rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id)
+        val source = chatFolderSource(rule, appState.chatListItems, appState.archivedChatListItems)
+        val ids =
+            chatFolderChatIds(
+                items = source,
+                manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                excludedChatIds = appState.chatFolderPreferences.excludedChats(accountRef, folder.id),
+                rule = rule,
+                activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                isMuted = { groupIdHex -> source.any { it.group.groupIdHex == groupIdHex && it.engineMuted() } },
+                displayTitle = displayTitle,
+            )
+        source.count { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
+    }
 }

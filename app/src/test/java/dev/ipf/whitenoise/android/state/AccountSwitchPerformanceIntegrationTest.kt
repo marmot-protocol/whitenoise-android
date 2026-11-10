@@ -214,6 +214,7 @@ class AccountSwitchPerformanceIntegrationTest {
             updatedAt = index.toULong(),
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             manuallyMarkedUnread = false,
             conversationKind = ChatConversationKindFfi.GROUP,
             muted = false,

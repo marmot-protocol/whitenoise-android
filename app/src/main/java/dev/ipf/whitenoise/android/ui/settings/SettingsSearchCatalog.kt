@@ -74,6 +74,59 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
+                "Data.manage_storage",
+                R.string.manage_storage_title,
+                R.string.settings_data_usage,
+                SettingsDetail.Data,
+                itemKey = "search.DataUsage.10",
+                rowKey = "manage_storage",
+                summaryRes = R.string.manage_storage_entry_subtitle,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "ManageStorage.largest",
+                R.string.storage_largest_attachments,
+                R.string.manage_storage_title,
+                SettingsDetail.ManageStorage,
+                itemKey = "search.ManageStorage.3",
+                rowKey = "largest",
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "ManageStorage.older",
+                R.string.storage_remove_older,
+                R.string.manage_storage_title,
+                SettingsDetail.ManageStorage,
+                itemKey = "search.ManageStorage.3",
+                rowKey = "older",
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "ManageStorage.cache",
+                R.string.storage_clear_cache,
+                R.string.manage_storage_title,
+                SettingsDetail.ManageStorage,
+                itemKey = "search.ManageStorage.3",
+                rowKey = "cache",
+                summaryRes = R.string.storage_clear_cache_subtitle,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "ManageStorage.keep_media",
+                R.string.storage_keep_media,
+                R.string.manage_storage_title,
+                SettingsDetail.ManageStorage,
+                itemKey = "search.ManageStorage.6",
+                rowKey = "keep",
+                summaryRes = R.string.storage_keep_media_help,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
                 "Data.reset",
                 R.string.download_reset,
                 R.string.settings_data_usage,
@@ -421,6 +474,15 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 SettingsDetail.ChatFolders,
                 itemKey = "search.ChatFolders.2",
                 rowKey = "restore",
+                accountRequired = true,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "CustomEmoji.emoji_sets",
+                R.string.emoji_sets_title,
+                R.string.custom_emoji,
+                SettingsDetail.EmojiSets,
                 accountRequired = true,
             ),
         )

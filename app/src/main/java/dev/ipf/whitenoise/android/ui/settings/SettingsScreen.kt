@@ -312,6 +312,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.Composer,
         SettingsDetail.CustomEmoji,
         -> SettingsDetail.Chats
+        SettingsDetail.EmojiSets -> SettingsDetail.CustomEmoji
         SettingsDetail.Language,
         SettingsDetail.TextToSpeech,
         SettingsDetail.Translation,
@@ -346,6 +347,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.Data,
         SettingsDetail.AiAgents,
         -> null
+        SettingsDetail.ManageStorage -> SettingsDetail.Data
     }
 
 /** Back handler: nested detail, then home, blocked during sign-out. */
@@ -572,8 +574,16 @@ private fun SettingsDetailRoute(
         SettingsDetail.ActionColor -> ActionColorScreen(appState, onBack = onBack)
         SettingsDetail.ChatBubbleColors -> ChatBubbleColorsScreen(appState, onBack = onBack)
         SettingsDetail.Language -> LanguageScreen(appState, onBack = onBack)
-        SettingsDetail.CustomEmoji -> CustomEmojiScreen(appState, onBack = onBack)
-        SettingsDetail.Data -> DataUsageScreen(appState, onBack = onBack)
+        SettingsDetail.CustomEmoji ->
+            CustomEmojiScreen(appState, onOpenSets = { onDetailChange(SettingsDetail.EmojiSets) }, onBack = onBack)
+        SettingsDetail.EmojiSets -> EmojiSetsScreen(appState, onBack = onBack)
+        SettingsDetail.Data ->
+            DataUsageScreen(
+                appState,
+                onBack = onBack,
+                onOpenManageStorage = { onDetailChange(SettingsDetail.ManageStorage) },
+            )
+        SettingsDetail.ManageStorage -> ManageStorageScreen(appState, onBack = onBack)
         SettingsDetail.Profile ->
             ProfileEditScreen(
                 appState = appState,

@@ -1,0 +1,267 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "EmojiSetsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetsScreen(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "EmojiSetsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetsContent(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "EmojiSetBrowser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetBrowser(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "EmojiSetPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetPreview(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "EmojiSetPreviewHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetPreviewHeader(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "EmojiSetActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetActions(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "EmojiSetStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetStatus(",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "EmojiSetsAccountTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetsAccountTitle(",
+        "test_ids": [
+          "SET-051"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_account_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_account_required",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_cancelled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_cancelled",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_changed",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_check_update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_check_update",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_discovery_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_discovery_incomplete",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_empty",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_error",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_find",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_find",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_image_privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_image_privacy",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_install",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_install",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_install_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_install_progress",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_installed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_installed",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_item_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.plurals.emoji_sets_item_count",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_load_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_load_image",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_not_found",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_not_found",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_preparing_install",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_preparing_install",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_preview_host",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_preview_host",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_query",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_query",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_skipped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.plurals.emoji_sets_skipped",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_title",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_update",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:emoji_sets_update_available",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.emoji_sets_update_available",
+        "test_ids": [
+          "SET-051"
+        ]
+      },
+      {
+        "surface": "setting:remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "R.string.remove",
+        "test_ids": [
+          "SET-051"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

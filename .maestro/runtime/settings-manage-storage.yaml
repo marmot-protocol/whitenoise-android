@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: settings-manage-storage
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Data & storage"
+    direction: DOWN
+- tapOn: "Data & storage"
+- assertVisible:
+    id: "data_usage.manage_storage"
+- tapOn:
+    id: "data_usage.manage_storage"
+- assertVisible:
+    id: "storage.usage"
+- assertVisible:
+    id: "storage.free_up"
+- assertVisible:
+    id: "storage.keep_media"
+- tapOn: "Back"
+- assertVisible:
+    id: "data_usage.manage_storage"
+- tapOn: "Back"
+- assertVisible: "Settings"
+- tapOn: "Back"
+- assertVisible: "Maestro group"

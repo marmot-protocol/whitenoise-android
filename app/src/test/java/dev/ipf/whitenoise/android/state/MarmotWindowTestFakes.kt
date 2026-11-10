@@ -105,6 +105,7 @@ internal object MarmotWindowTestFakes {
                             canEditGroup = false,
                             canLeave = true,
                             requiresSelfDemoteBeforeLeave = false,
+                            canCancelLeave = false,
                             canEnableDisbanding = false,
                             canDisband = false,
                         ),
