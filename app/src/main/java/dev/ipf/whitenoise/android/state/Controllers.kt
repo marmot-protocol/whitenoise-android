@@ -8280,7 +8280,10 @@ class ConversationController(
         block: suspend () -> T,
     ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
 
-    /** The user's own emoji a plain, non-reply text send must carry, or none when this send carries none. */
+    /**
+     * The user's own emoji a plain, non-reply text send must carry, or none when this send carries none.
+     * A lookup failure is raised as an [EmojiUploadFailure], a definite pre-publication failure.
+     */
     private suspend fun emojiArtworkForSend(
         account: String,
         replyTarget: String?,
@@ -8288,18 +8291,21 @@ class ConversationController(
     ): List<LocalEmojiArtwork> {
         val applies = emojiSendApplies(replyTarget, textPublisher != null)
         if (!applies) return emptyList()
-        return customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text)
+        // The lookup runs before anything is published, so its failure is never an uncertain delivery.
+        return runCatchingCancellable { customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text) }
+            .getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
     }
 
     /**
      * Admission failures retry for plain text. An emoji send retries only an upload-stage failure,
-     * because nothing was published then, and never a failure of the publish itself.
+     * because nothing was published then, and never a failure of the publish itself. Null artwork
+     * means its lookup failed, which also published nothing.
      */
     private fun isRetryableComposerSend(
-        emojiArtwork: List<LocalEmojiArtwork>,
+        emojiArtwork: List<LocalEmojiArtwork>?,
         throwable: Throwable,
     ): Boolean =
-        if (emojiArtwork.isEmpty()) {
+        if (emojiArtwork?.isEmpty() == true) {
             isRetryableTextAdmissionError(throwable)
         } else {
             isRetryableEmojiUploadFailure(throwable)
@@ -8368,14 +8374,16 @@ class ConversationController(
         appState.withConversationTextSendOrder(account, group.groupIdHex) {
             // Replies and injected publishers keep their plain-text path. A message that uses the user's
             // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
-            // Resolving its artwork inside the text order keeps a later message from publishing first.
-            val emojiArtwork = emojiArtworkForSend(account, replyTarget, trimmed)
+            // Resolving its artwork inside the text order keeps a later message from publishing first,
+            // and inside the attempt lets a transient lookup failure retry before anything is published.
+            val artwork = SendEmojiArtwork { emojiArtworkForSend(account, replyTarget, trimmed) }
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 cancellationGeneration = optimisticCancellationGeneration,
-                retryableFailure = { isRetryableComposerSend(emojiArtwork, it) },
+                retryableFailure = { isRetryableComposerSend(artwork.value, it) },
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
+                val emojiArtwork = artwork.resolve()
                 // Serialize only this commit-producing FFI attempt. Releasing the
                 // commit lock before retry backoff keeps reactions and other
                 // mutations usable; the outer text-order lock keeps later text

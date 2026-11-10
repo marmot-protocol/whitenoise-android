@@ -2036,6 +2036,59 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
         }
 
+    /** A failed artwork lookup published nothing, so the bubble ends Failed and nothing is sent. */
+    @Test
+    fun customEmojiLookupFailureEndsFailedNotPending() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { error("installed emoji index unreadable") },
+                    customEmojiSender = { _, _, _, _, _ ->
+                        sends += 1
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "meet at 10:30:45")
+
+            assertEquals(0, sends)
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A transport loss during the artwork lookup is retried before publication and then sends once. */
+    @Test
+    fun customEmojiLookupConnectivityFailureIsRetried() =
+        runTest {
+            var lookups = 0
+            var sends = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = {
+                        lookups += 1
+                        if (lookups == 1) throw MarmotKitException.TransportClosed()
+                        listOf(partyArtwork())
+                    },
+                    customEmojiSender = { _, _, _, _, _ ->
+                        sends += 1
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(2, lookups)
+            assertEquals(1, sends)
+        }
+
     /** A publish-stage connection loss may have reached a relay, so the bubble stays Pending and is not resent. */
     @Test
     fun customEmojiPublishLossStaysPending() =
