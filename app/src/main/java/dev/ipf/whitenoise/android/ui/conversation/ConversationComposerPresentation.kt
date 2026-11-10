@@ -23,6 +23,7 @@ internal fun conversationControllerComposerGate(
         unrecoverable = controller.group.unrecoverable,
         disbanding = controller.group.disbanding,
         disbanded = controller.group.disbanded,
+        leaveBlocked = controller.showsBlockedLeave,
     )
 
 /** Blocking replaces only an otherwise usable direct-message composer. */

@@ -149,6 +149,17 @@ internal class TranslationPreferences(
         preferences.edit().putString(key(account, group) + ":outgoing", target).apply()
     }
 
+    /**
+     * Whether this install accepted the composer's provider logging notice for the current notice version. Typing
+     * sends every draft to the engine, so the composer asks once before its first request, wherever it is opened.
+     */
+    fun composerNoticeAccepted(): Boolean =
+        runCatching { preferences.getInt(COMPOSER_NOTICE_VERSION, 0) }.getOrDefault(0) >= CURRENT_PRIVACY_NOTICE
+
+    fun acceptComposerNotice() {
+        preferences.edit().putInt(COMPOSER_NOTICE_VERSION, CURRENT_PRIVACY_NOTICE).apply()
+    }
+
     /** The raw saved code, `""` for a value of the wrong type, or null when nothing is saved. */
     private fun savedTarget(key: String): String? = runCatching { preferences.getString(key, null) }.getOrElse { "" }
 
@@ -163,6 +174,7 @@ internal class TranslationPreferences(
     private companion object {
         const val PRIVACY_NOTICE_VERSION = "privacy_notice_version"
         const val CURRENT_PRIVACY_NOTICE = 1
+        const val COMPOSER_NOTICE_VERSION = "composer_privacy_notice_version"
         const val DEFAULT_TARGET = "en"
     }
 }

@@ -141,6 +141,114 @@ class ComposerTranslationStateTest {
             assertNull(state.result)
         }
 
+    @Test
+    fun typingBackToTheTranslatedTextCancelsTheNewerRequest() =
+        runTest {
+            val requests = mutableListOf<String>()
+            val state =
+                state(backgroundScope) { text, target ->
+                    requests.add(text)
+                    "$target:$text"
+                }
+            state.toggle()
+            state.update("hi")
+            advanceTimeBy(SETTLE + 1)
+            runCurrent()
+            state.update("hi!")
+            assertTrue(state.pending)
+            state.update("hi")
+            assertFalse(state.pending)
+            advanceTimeBy(SETTLE + 1)
+            runCurrent()
+            assertEquals(listOf("hi"), requests)
+            assertEquals("de:hi", state.outgoingFor("hi"))
+        }
+
+    @Test
+    fun typingBackAfterAFailureRestoresTheEarlierTranslation() =
+        runTest {
+            val state =
+                state(backgroundScope) { text, target ->
+                    if (text == "hello") "$target:$text" else throw TranslationException(TranslationFailure.CONNECTION)
+                }
+            state.toggle()
+            state.update("hello")
+            advanceTimeBy(SETTLE + 1)
+            runCurrent()
+            state.update("hellox")
+            advanceTimeBy(SETTLE + 1)
+            runCurrent()
+            assertEquals(TranslationFailure.CONNECTION, state.failure)
+            assertNull(state.outgoingFor("hellox"))
+            state.update("hello")
+            assertNull(state.failure)
+            assertEquals("de:hello", state.outgoingFor("hello"))
+        }
+
+    @Test
+    fun firstToggleAsksForTheNoticeAndAcceptingOpensTranslateMode() =
+        runTest {
+            var accepted = false
+            val state = noticeState(backgroundScope, { accepted }) { accepted = true }
+            state.toggle()
+            assertTrue(state.consenting)
+            assertFalse(state.active)
+            state.acceptNotice()
+            assertTrue(accepted)
+            assertFalse(state.consenting)
+            assertTrue(state.active)
+            state.toggle()
+            state.toggle()
+            assertFalse(state.consenting)
+            assertTrue(state.active)
+        }
+
+    @Test
+    fun decliningTheNoticeLeavesTranslateModeOffAndAsksAgainNextTime() =
+        runTest {
+            var saved = 0
+            val state = noticeState(backgroundScope, { false }) { saved += 1 }
+            state.toggle()
+            state.declineNotice()
+            assertFalse(state.consenting)
+            assertFalse(state.active)
+            state.acceptNotice()
+            assertFalse(state.active)
+            assertEquals(0, saved)
+            state.toggle()
+            assertTrue(state.consenting)
+            state.close()
+            assertFalse(state.consenting)
+        }
+
+    @Test
+    fun closingForDictationStopsSendingTheTranslation() =
+        runTest {
+            val state = state(backgroundScope) { text, _ -> "t:$text" }
+            state.toggle()
+            state.update("hello")
+            advanceTimeBy(SETTLE + 1)
+            runCurrent()
+            assertEquals("t:hello", state.outgoingFor("hello"))
+            state.close()
+            assertNull(state.outgoingFor("hello"))
+            assertEquals("", state.outgoingFor(""))
+        }
+
+    private fun noticeState(
+        scope: CoroutineScope,
+        accepted: () -> Boolean,
+        onAccepted: () -> Unit,
+    ) = ComposerTranslationState(
+        scope,
+        { engine { text, _ -> text } },
+        { true },
+        "de",
+        settleMillis = SETTLE,
+        noticeAccepted = accepted,
+        onNoticeAccepted = onAccepted,
+    )
+
     private fun state(
         scope: CoroutineScope,
         current: () -> Boolean = { true },

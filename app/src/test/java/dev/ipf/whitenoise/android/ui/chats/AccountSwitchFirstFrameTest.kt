@@ -518,6 +518,7 @@ class AccountSwitchFirstFrameTest {
         updatedAt = updatedAt,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = false,
         conversationKind = ChatConversationKindFfi.GROUP,
         muted = false,

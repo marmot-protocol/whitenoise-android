@@ -31,6 +31,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.group.BlockedLeaveCancelNotice
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsHeader
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -52,6 +53,46 @@ import org.robolectric.annotation.GraphicsMode
 class GroupDetailsHeaderScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** A blocked departure explains the last-admin condition and offers cancellation. */
+    @Test
+    fun blockedLeaveShowsCancel() {
+        var cancelled = false
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(Modifier.width(320.dp)) {
+                    BlockedLeaveCancelNotice(enabled = true, onCancel = { cancelled = true })
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag("chat_info.cancel_blocked_leave")
+            .captureRoboImage("src/test/snapshots/group_details_blocked_leave.png")
+        composeRule.onNodeWithText("Cancel leave").performClick()
+        assertTrue(cancelled)
+    }
+
+    /** A cleared block with unresolved membership offers a read-only retry. */
+    @Test
+    fun clearedLeaveShowsMembershipRefresh() {
+        var refreshed = false
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                Surface(Modifier.width(320.dp)) {
+                    BlockedLeaveCancelNotice(
+                        enabled = true,
+                        refreshingMembership = true,
+                        onCancel = { refreshed = true },
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag("chat_info.cancel_blocked_leave")
+            .captureRoboImage("src/test/snapshots/group_details_blocked_leave_refresh_dark.png")
+        composeRule.onNodeWithText("Refresh").performClick()
+        assertTrue(refreshed)
+    }
 
     /** Group details header light. */
     @Test

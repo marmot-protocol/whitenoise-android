@@ -1,0 +1,20 @@
+{
+  "source": "app/src/main/res/values/storage_strings.xml",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Manage storage English copy: usage panel, free-up actions, Keep media, chat and attachment lists, confirmations and outcome messages",
+        "source": "app/src/main/res/values/storage_strings.xml",
+        "anchor": "name=\"manage_storage_title\"",
+        "test_ids": [
+          "SET-047",
+          "SET-048",
+          "SET-049",
+          "SET-050"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

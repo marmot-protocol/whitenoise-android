@@ -357,6 +357,7 @@ class DetailRouteMotionScreenshotTest {
             disappearingMessageSecs = 0uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             disbanding = false,
             disbanded = false,
             disbandRequest = null,

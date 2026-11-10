@@ -28,6 +28,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -103,6 +105,7 @@ internal data class ComposerMenuTextShortcuts(
     val onPaste: (() -> Boolean)? = null,
     val onDictation: (() -> Unit)? = null,
     val onTranslate: (() -> Unit)? = null,
+    val translateActive: Boolean = false,
     val pasteAccepted: () -> Boolean = { true },
 ) {
     /** Drops actions already pinned to the toolbar or unavailable in this composer. */
@@ -112,6 +115,7 @@ internal data class ComposerMenuTextShortcuts(
             onPaste = onPaste?.takeIf { ComposerShortcut.Paste in hidden },
             onDictation = onDictation?.takeIf { ComposerShortcut.Dictation in hidden },
             onTranslate = onTranslate?.takeIf { ComposerShortcut.Translate in hidden },
+            translateActive = translateActive,
             pasteAccepted = pasteAccepted,
         )
 }
@@ -239,7 +243,13 @@ private fun composerMenuTextItems(
                 dictate()
             }
         },
-        textShortcuts.onTranslate?.let { composerMenuShortcutItem(ComposerShortcut.Translate, onClick = it) },
+        textShortcuts.onTranslate?.let {
+            composerMenuShortcutItem(
+                ComposerShortcut.Translate,
+                Modifier.semantics { selected = textShortcuts.translateActive },
+                onClick = it,
+            )
+        },
     )
 }
 

@@ -2,10 +2,6 @@
 
 package dev.ipf.whitenoise.android.translation
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,13 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -40,13 +36,12 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -75,15 +70,30 @@ internal class ComposerTranslationState(
     initialTarget: String?,
     private val onTargetSaved: (String) -> Unit = {},
     private val settleMillis: Long = TYPING_SETTLE_MS,
+    private val noticeAccepted: () -> Boolean = { true },
+    private val onNoticeAccepted: () -> Unit = {},
 ) {
+    /** True while the translation line is shown and Send delivers only its current translation. */
     var active by mutableStateOf(false)
         private set
+
+    /** True while the one-time provider privacy notice waits for the person to accept or decline. */
+    var consenting by mutableStateOf(false)
+        private set
+
+    /** The saved outgoing language, or null until the person chooses one from the catalog. */
     var target by mutableStateOf(initialTarget?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget))
         private set
+
+    /** The latest translation, which Send may use only while it still matches the editor and target. */
     var result by mutableStateOf<ComposerTranslationResult?>(null)
         private set
+
+    /** True from a request's start until its translation, failure or cancellation. */
     var pending by mutableStateOf(false)
         private set
+
+    /** Why the latest request produced no translation, or null. */
     var failure by mutableStateOf<TranslationFailure?>(null)
         private set
 
@@ -93,17 +103,39 @@ internal class ComposerTranslationState(
     private var job: Job? = null
     private var generation = 0L
 
+    /** Turns translate mode on or off; the first turn-on asks for the privacy notice instead of translating. */
     fun toggle() {
+        if (!active && !noticeAccepted()) {
+            consenting = true
+            return
+        }
         active = !active
         invalidate()
     }
 
+    /** Records the accepted notice once, then opens translate mode. */
+    fun acceptNotice() {
+        if (!consenting) return
+        consenting = false
+        onNoticeAccepted()
+        active = true
+        invalidate()
+    }
+
+    /** Leaves translate mode off; no text has been sent to the engine. */
+    fun declineNotice() {
+        consenting = false
+    }
+
+    /** Leaves translate mode, for example when editing or dictation takes over the composer. */
     fun close() {
+        consenting = false
         if (!active) return
         active = false
         invalidate()
     }
 
+    /** Saves [code] as this chat's outgoing language and retranslates the current text. */
     fun selectTarget(code: String) {
         if (!OfflineTranslatorLanguageCatalog.supportsTarget(code) || code == target) return
         target = code
@@ -128,7 +160,12 @@ internal class ComposerTranslationState(
             failure = null
             return
         }
-        if (result?.let { it.source == text && it.target == chosen } == true) return
+        if (result?.let { it.source == text && it.target == chosen } == true) {
+            // Typing back to the translated text must also stop the request for the text just erased.
+            cancel()
+            failure = null
+            return
+        }
         cancel()
         failure = null
         pending = true
@@ -205,48 +242,29 @@ internal fun rememberComposerTranslation(
             ComposerTranslationState(
                 scope = scope,
                 engine = { withContext(Dispatchers.IO) { OfflineTranslatorClient(context.applicationContext) } },
-                ownerCurrent = {
-                    appState.activeAccountRef == account &&
-                        appState.runtimeGeneration == runtime &&
-                        !appState.appLockScreenVisible &&
-                        lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-                },
+                ownerCurrent = { appState.translationOwnerCurrent(account, runtime, lifecycle) },
                 initialTarget = preferences.outgoingTarget(account, group),
                 onTargetSaved = { preferences.setOutgoingTarget(account, group, it) },
+                noticeAccepted = preferences::composerNoticeAccepted,
+                onNoticeAccepted = preferences::acceptComposerNotice,
             )
         }
     LaunchedEffect(state, appState.appLockScreenVisible) { state.invalidate() }
-    DisposableEffect(state, lifecycle) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_RESUME) state.invalidate()
-            }
-        val receiver =
-            object : BroadcastReceiver() {
-                override fun onReceive(
-                    context: Context,
-                    intent: Intent,
-                ) {
-                    state.invalidate()
-                }
-            }
-        val filter =
-            IntentFilter().apply {
-                addAction(Intent.ACTION_PACKAGE_REMOVED)
-                addAction(Intent.ACTION_PACKAGE_REPLACED)
-                addAction(Intent.ACTION_PACKAGE_CHANGED)
-                addDataScheme("package")
-                addDataSchemeSpecificPart(OFFLINE_TRANSLATOR_PACKAGE, android.os.PatternMatcher.PATTERN_LITERAL)
-            }
-        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-        lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-            context.unregisterReceiver(receiver)
-            state.close()
-        }
-    }
+    TranslationOwnerResetEffect(state, onReset = state::invalidate, onDispose = state::close)
     return state
+}
+
+/** The one-time notice that Offline Translator may log text; nothing is translated until it is accepted. */
+@Composable
+internal fun ComposerTranslationNotice(state: ComposerTranslationState) {
+    if (!state.consenting) return
+    ConfirmDialog(
+        title = stringResource(R.string.translation_composer_toggle),
+        message = stringResource(R.string.translation_privacy_warning),
+        confirmLabel = stringResource(R.string.accept),
+        onConfirm = state::acceptNotice,
+        onDismiss = state::declineNotice,
+    )
 }
 
 /** Keeps the translation in step with the editor; the composer calls this while translate mode is shown. */
@@ -277,7 +295,8 @@ internal fun ComposerTranslationPreview(
     val title = stringResource(R.string.translation_target_language)
     ComposerTranslationBar(
         targetLabel = choices.label(target.orEmpty()),
-        outgoing = state.outgoingFor(text),
+        // A blank draft has nothing to send yet, so the line keeps showing where its translation will appear.
+        outgoing = state.outgoingFor(text)?.takeIf(String::isNotBlank),
         pending = state.pending,
         failure = state.failure,
         onChooseLanguage = { choosing = true },
@@ -335,6 +354,7 @@ internal fun ComposerTranslationBar(
     }
 }
 
+/** A persistent "Will send" label over the outgoing text, which scrolls instead of hiding any of it. */
 @Composable
 private fun ComposerTranslationLine(
     outgoing: String?,
@@ -343,9 +363,28 @@ private fun ComposerTranslationLine(
     onRetry: () -> Unit,
     modifier: Modifier,
 ) {
+    Column(modifier.padding(end = 8.dp).semantics(mergeDescendants = true) {}) {
+        Text(
+            stringResource(R.string.translation_composer_will_send),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("composer.translation.label"),
+        )
+        ComposerTranslationContent(outgoing, pending, failure, onRetry)
+    }
+}
+
+@Composable
+private fun ComposerTranslationContent(
+    outgoing: String?,
+    pending: Boolean,
+    failure: TranslationFailure?,
+    onRetry: () -> Unit,
+) {
     val lineModifier =
-        modifier
-            .padding(end = 8.dp)
+        Modifier
             .semantics { liveRegion = LiveRegionMode.Polite }
             .testTag("composer.translation.text")
     when {
@@ -357,13 +396,15 @@ private fun ComposerTranslationLine(
                 style = MaterialTheme.typography.bodySmall,
             )
         outgoing != null ->
-            SelectionContainer(lineModifier) {
+            SelectionContainer(
+                lineModifier
+                    .heightIn(max = PREVIEW_MAX_HEIGHT)
+                    .fadingVerticalScroll(rememberScrollState()),
+            ) {
                 Text(
                     outgoing,
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge,
-                    maxLines = PREVIEW_MAX_LINES,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         else ->
@@ -398,4 +439,5 @@ private fun needsEngine(failure: TranslationFailure): Boolean =
             TranslationFailure.ENGINE_UPDATE_REQUIRED,
         )
 
-private const val PREVIEW_MAX_LINES = 4
+/** About four body lines; longer translations scroll inside the line. */
+private val PREVIEW_MAX_HEIGHT = 96.dp

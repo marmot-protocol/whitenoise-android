@@ -629,6 +629,7 @@ class ChatListFoldUnreadRegressionTest {
         updatedAt = lastMessageAt,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = false,
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,

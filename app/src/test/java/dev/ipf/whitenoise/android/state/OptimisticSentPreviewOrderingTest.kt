@@ -1487,6 +1487,7 @@ private fun row(
         updatedAt = activityAt,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = false,
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,

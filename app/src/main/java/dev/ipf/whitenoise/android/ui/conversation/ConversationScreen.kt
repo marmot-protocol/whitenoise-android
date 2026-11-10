@@ -4269,7 +4269,7 @@ internal fun ConversationScreen(
                         sendStagedAttachmentsWithCaption(
                             caption,
                             onResult,
-                            composerTextState.captureCaptionSettlement(caption),
+                            composerTextState.captureCaptionSettlement(),
                         )
                     },
                     onAfterSend = {

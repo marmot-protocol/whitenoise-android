@@ -141,6 +141,7 @@ class StartupPostReadyBackgroundRecoveryTest {
             updatedAt = 1uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             manuallyMarkedUnread = false,
             conversationKind = ChatConversationKindFfi.GROUP,
             muted = false,

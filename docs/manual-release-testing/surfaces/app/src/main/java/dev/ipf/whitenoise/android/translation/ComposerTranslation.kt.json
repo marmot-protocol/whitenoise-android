@@ -34,6 +34,22 @@
         "test_ids": [
           "CON-045"
         ]
+      },
+      {
+        "surface": "ComposerTranslationNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+        "anchor": "internal fun ComposerTranslationNotice(",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "ComposerTranslationContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+        "anchor": "private fun ComposerTranslationContent(",
+        "test_ids": [
+          "CON-045"
+        ]
       }
     ],
     "source_coverage": [
@@ -54,9 +70,33 @@
         ]
       },
       {
+        "surface": "R.string.translation_composer_toggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+        "anchor": "R.string.translation_composer_toggle",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "R.string.translation_composer_will_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+        "anchor": "R.string.translation_composer_will_send",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
         "surface": "R.string.translation_loading",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
         "anchor": "R.string.translation_loading",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "R.string.translation_privacy_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+        "anchor": "R.string.translation_privacy_warning",
         "test_ids": [
           "CON-045"
         ]

@@ -179,6 +179,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.rememberLocalVCardContact
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.group.BlockedLeaveComposerNotice
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
@@ -3187,6 +3188,8 @@ internal fun MessageBubble(
                                                 }
                                             },
                                         )
+                                    } else if (controller.showsBlockedLeave) {
+                                        BlockedLeaveComposerNotice(controller, appState)
                                     } else {
                                         Spacer(
                                             Modifier

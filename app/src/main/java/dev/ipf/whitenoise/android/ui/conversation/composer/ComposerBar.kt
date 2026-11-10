@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
 import dev.ipf.whitenoise.android.translation.ComposerTranslationSync
 import dev.ipf.whitenoise.android.translation.rememberComposerTranslation
@@ -364,10 +365,13 @@ internal class ComposerTextState(
             contentRevision = contentRevision,
         )
 
-    /** Retains exact caption ownership until durable acceptance, including a failed bubble's later Retry. */
-    fun captureCaptionSettlement(caption: String): () -> Unit {
+    /**
+     * Retains exact editor ownership until durable acceptance, including a failed bubble's later Retry. The sent
+     * caption may be a translation of the editor text, so ownership follows the editor content, not the caption.
+     */
+    fun captureCaptionSettlement(): () -> Unit {
         val token = acceptanceToken()
-        return { if (token.text == caption) clearAccepted(token) }
+        return { clearAccepted(token) }
     }
 
     /** Applies field state while advancing acceptance ownership only for content edits. */
@@ -987,6 +991,20 @@ internal fun ComposerBar(
     LaunchedEffect(composerTranslation, editingMessageId) {
         if (editingMessageId != null) composerTranslation?.close()
     }
+    // Dictation writes the source line while it runs, so a translation would chase partial words. Translate mode
+    // turns off and says so; the toolbar already refuses to reopen it until dictation finishes.
+    val dictationInComposer = dictationOwnedByComposer && dictationController?.completionControlsRequired == true
+    LaunchedEffect(composerTranslation, composerTranslation?.active, dictationInComposer) {
+        val owner = composerTranslation?.takeIf { dictationInComposer && it.active } ?: return@LaunchedEffect
+        owner.close()
+        if (draftAccountRef != null && draftGroupIdHex != null) {
+            appState?.presentConversationTransient(
+                draftAccountRef,
+                draftGroupIdHex,
+                R.string.translation_composer_dictation_off,
+            )
+        }
+    }
     val translation = composerTranslation?.takeIf { editingMessageId == null }
     val activeTranslation = translation?.takeIf { it.active }
     val finishControlMorph = LocalFinishControlMorph.current
@@ -1399,7 +1417,10 @@ internal fun ComposerBar(
                     } else {
                         null
                     }
-                translation?.let { ComposerTranslationSync(it, text) }
+                translation?.let {
+                    ComposerTranslationSync(it, text)
+                    ComposerTranslationNotice(it)
+                }
                 // The translation line sits above the typed line, after any reply or attachment preview.
                 val accessoryContent: (@Composable () -> Unit)? =
                     if (activeTranslation != null) {
