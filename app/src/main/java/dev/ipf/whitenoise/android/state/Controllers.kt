@@ -6548,6 +6548,12 @@ class ConversationController(
         )
     internal val attachmentTransfers: AttachmentTransferCoordinator get() = attachmentPresentation.transfers
 
+    /**
+     * Native transfer states idle tiles read once, by `messageId#index`, so a tile scrolled back into view never reads
+     * again. Touched only on the main thread; a failed read is not kept, so the next composition tries again.
+     */
+    internal val nativeAttachmentStateReads = HashMap<String, dev.ipf.marmotkit.AttachmentTransferStateFfi>()
+
     /** The installed native handle; paging and commits share the session's retirement authorities. */
     internal val timelineSubscription: ConversationTimelineSubscriptionHandle?
         get() = timelineSession.timelineSubscription

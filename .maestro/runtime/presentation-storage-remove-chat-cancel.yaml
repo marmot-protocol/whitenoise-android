@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-storage-remove-chat-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Remove all attachments in this chat\?
+- assertVisible:
+    id: confirmation.confirm
+    enabled: true
+- tapOn:
+    id: confirmation.cancel
+- assertVisible:
+    id: presentation.complete

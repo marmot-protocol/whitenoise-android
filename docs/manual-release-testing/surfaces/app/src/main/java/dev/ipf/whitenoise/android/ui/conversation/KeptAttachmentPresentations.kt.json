@@ -60,6 +60,15 @@
         ]
       },
       {
+        "surface": "Kept media label: floating_attachment_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
+        "anchor": "R.string.floating_attachment_removed",
+        "test_ids": [
+          "MSG-004",
+          "SET-050"
+        ]
+      },
+      {
         "surface": "Kept media label: floating_attachment_resolving",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt",
         "anchor": "R.string.floating_attachment_resolving",

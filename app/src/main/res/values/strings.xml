@@ -1517,6 +1517,8 @@
     <string name="media_downloading">Downloading</string>
     <string name="media_cancel_download">Cancel download</string>
     <string name="media_download_cancelled">Download cancelled. Tap to download again</string>
+    <string name="media_removed_download_again">Removed from this device. Tap to download again</string>
+    <string name="floating_attachment_removed">Removed from this device. Open the original to download again</string>
     <string name="media_opening">Opening</string>
     <string name="media_save">Save</string>
     <string name="media_saved">Saved to gallery</string>

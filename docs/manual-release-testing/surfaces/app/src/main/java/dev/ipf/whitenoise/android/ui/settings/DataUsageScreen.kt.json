@@ -10,7 +10,8 @@
         "test_ids": [
           "SET-010",
           "SET-011",
-          "MED-005"
+          "MED-005",
+          "SET-047"
         ]
       },
       {
@@ -243,6 +244,24 @@
           "SET-010",
           "SET-011",
           "MED-005"
+        ]
+      },
+      {
+        "surface": "string:manage_storage_entry_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.manage_storage_entry_subtitle",
+        "test_ids": [
+          "SET-010",
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:manage_storage_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.manage_storage_title",
+        "test_ids": [
+          "SET-010",
+          "SET-047"
         ]
       },
       {
