@@ -1,6 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.state.MessageAvailability
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.record
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -119,5 +122,131 @@ class ConversationHistorySearchTest {
             ConversationSearchScanStatus.IDLE,
             conversationSearchScanStatus(" ", scanMatches = listOf(match), scanFailed = true),
         )
+    }
+
+    /** A global-search target lands only when its exact message loaded and may still be shown (#1945). */
+    @Test
+    fun searchTargetLandingIsTruthfulAboutUnavailableAndRetryableTargets() {
+        val live = record("g", "m", at = 10uL)
+        assertEquals(SearchTargetLanding.NAVIGATE, landing(availability = MessageAvailability.AVAILABLE, target = live))
+        assertEquals(SearchTargetLanding.UNAVAILABLE, landing(hidden = true, availability = null, target = live))
+        val missing = landing(availability = MessageAvailability.MISSING, target = null)
+        assertEquals(SearchTargetLanding.UNAVAILABLE, missing)
+        assertEquals(SearchTargetLanding.RETRY, landing(availability = MessageAvailability.RETRYABLE, target = null))
+        listOf(
+            live.copy(deleted = true),
+            live.copy(invalidationStatus = "LosingBranch"),
+            record("g", "m", at = 10uL, expiresAt = 1uL),
+        ).forEach { gone ->
+            val landed = landing(availability = MessageAvailability.AVAILABLE, target = gone)
+            assertEquals(SearchTargetLanding.UNAVAILABLE, landed)
+        }
+    }
+
+    /** An available target is centered, then announced, then highlighted, in that order. */
+    @Test
+    fun availableTargetIsCenteredAnnouncedThenHighlighted() =
+        runBlocking {
+            val steps = RecordingLanding()
+            assertEquals(SearchTargetLanding.NAVIGATE, landSearchResult(steps.steps()))
+            assertEquals(listOf("load", "center", "announce", "highlight"), steps.calls)
+        }
+
+    /** A hidden target reports unavailable without loading its window or showing anything. */
+    @Test
+    fun hiddenTargetIsUnavailableWithoutLoading() =
+        runBlocking {
+            val steps = RecordingLanding(hidden = true)
+            assertEquals(SearchTargetLanding.UNAVAILABLE, landSearchResult(steps.steps()))
+            assertEquals(listOf("unavailable"), steps.calls)
+        }
+
+    /** A window that could not load asks for Retry instead of claiming the message is gone. */
+    @Test
+    fun retryableWindowOffersRetryNotUnavailable() =
+        runBlocking {
+            val steps = RecordingLanding(availability = MessageAvailability.RETRYABLE)
+            assertEquals(SearchTargetLanding.RETRY, landSearchResult(steps.steps()))
+            assertEquals(listOf("load", "failed"), steps.calls)
+        }
+
+    /** A newer tap or gesture during the window load supersedes it: nothing is reported, centered or highlighted. */
+    @Test
+    fun supersededLoadSettlesNothing() =
+        runBlocking {
+            val steps = RecordingLanding(supersedeAfter = "load")
+            assertNull(landSearchResult(steps.steps()))
+            assertEquals(listOf("load"), steps.calls)
+        }
+
+    /** A gesture during centering supersedes the landing before any announcement or highlight. */
+    @Test
+    fun supersededCenteringNeverAnnouncesOrHighlights() =
+        runBlocking {
+            val steps = RecordingLanding(supersedeAfter = "center")
+            assertNull(landSearchResult(steps.steps()))
+            assertEquals(listOf("load", "center"), steps.calls)
+        }
+
+    /** The search-result Retry is offered only for a current request and cleared by a newer navigation. */
+    @Test
+    fun searchTargetRetryIsPendingOnlyForTheCurrentRequest() {
+        val owner = MessageTargetNavigationOwner()
+        val retry = SearchTargetRetryState()
+        val first = owner.begin()
+        retry.failed(first)
+        assertTrue(retry.pending)
+        retry.retry()
+        assertFalse(retry.pending)
+        assertEquals(1L, retry.generation)
+
+        val stale = owner.begin()
+        owner.begin()
+        retry.failed(stale)
+        assertFalse("a superseded request offers no Retry", retry.pending)
+    }
+
+    /** The landing decision for one combination. */
+    private fun landing(
+        hidden: Boolean = false,
+        availability: MessageAvailability?,
+        target: TimelineMessageRecordFfi?,
+    ) = searchTargetLanding(hidden, availability, target, nowMillis = 1_000_000L)
+
+    /** Records each landing step and can supersede the landing right after a named step. */
+    private class RecordingLanding(
+        val hidden: Boolean = false,
+        val availability: MessageAvailability = MessageAvailability.AVAILABLE,
+        val supersedeAfter: String? = null,
+    ) {
+        val calls = mutableListOf<String>()
+        private var current = true
+
+        /** Records [step] and ends currency if it is the one to supersede after. */
+        private fun step(step: String) {
+            calls += step
+            if (step == supersedeAfter) current = false
+        }
+
+        /** The injected steps. */
+        fun steps() =
+            SearchResultLandingSteps(
+                isCurrent = { current },
+                hidden = { hidden },
+                loadWindow = {
+                    step("load")
+                    availability
+                },
+                loadedRecord = { record("g", "m", at = 10uL) },
+                center = {
+                    step("center")
+                    true
+                },
+                announce = { step("announce") },
+                highlight = { step("highlight") },
+                unavailable = { step("unavailable") },
+                failed = { step("failed") },
+                nowMillis = { 1_000_000L },
+            )
     }
 }

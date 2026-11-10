@@ -1894,6 +1894,9 @@
     <string name="global_search_content_any_attachment">任意附件</string>
     <string name="global_search_results_end">沒有更多結果</string>
     <string name="global_search_results_search_older">搜尋更早的訊息</string>
+    <string name="search_result_unavailable">此訊息已無法使用</string>
+    <string name="search_result_open_failed_retry">無法開啟訊息。重試</string>
+    <string name="search_result_destination_announcement">正在顯示相符的訊息</string>
     <string name="text_attachment_open_external">在其他應用程式中開啟</string>
     <string name="text_attachment_filename">檔案名稱</string>
     <string name="text_attachment_view_full_filename">查看完整檔案名稱</string>

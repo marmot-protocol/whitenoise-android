@@ -1982,24 +1982,31 @@ class ConversationScrollCoordinatorTest {
         assertTrue(mention.contains("resolveTargetIndex = { currentTimelineListIndex(targetMessageId) }"))
     }
 
+    /** Failed search and speech targets share the localized Retry actions; unavailable ones say so truthfully. */
     @Test
     fun failedFocusTargetSharesExistingLocalizedRetryActions() {
         val screen = sourceFile("ConversationScreen.kt").readText()
         val focus =
             screen
-                .substringAfter("// Scroll-to-message for a chat-list")
+                .substringAfter("// Lands a global-search result")
                 .substringBefore("// A settled visible anchor")
         assertTrue("explicit Retry must restart the focus effect", "focusTargetRetry.generation" in focus)
         assertTrue("a newer target must clear the earlier failed request", "focusTargetRetry.clear()" in focus)
         assertEquals(2, Regex("focusTargetRetry.failed\\(navigationRequest\\)").findAll(focus).count())
         val retryAction = Regex("focusTargetRetry.retry\\(\\s*loadFailurePresent = controller.error != null,?\\s*\\)")
-        assertEquals(3, retryAction.findAll(screen).count())
+        // The load-error banners and the search-result Retry chip all resume the same request.
+        assertEquals(4, retryAction.findAll(screen).count())
         assertTrue(
             "searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)" in screen,
         )
         assertTrue(
-            "unavailable targets keep the existing localized notice",
+            "unavailable speech targets keep the existing localized notice",
             "toast_original_message_unavailable" in focus,
+        )
+        assertTrue("search results land through the shared landing rules", "landSearchResult(" in focus)
+        assertTrue(
+            "an unavailable search result says so, and a failed one offers its own Retry",
+            "R.string.search_result_unavailable" in screen && "focusTargetRetry.failed(request)" in screen,
         )
     }
 
@@ -2437,6 +2444,54 @@ class ConversationScrollCoordinatorTest {
                 viewportSizePx = viewportSize,
             )
     }
+
+    /**
+     * A distant global-search result (#1945) snaps near its row and animates only the last few rows, so landing
+     * never scrolls through the intervening history.
+     */
+    @Test
+    fun distantGlobalSearchResultSnapsNearThenAnimatesOnlyTheLastRows() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = writer, initialMode = ConversationScrollMode.FollowingTail)
+
+            val landed =
+                coordinator.programmaticJump(
+                    targetMessageId = "result",
+                    reason = ConversationScrollReason.FocusMessage,
+                ) {
+                    animateScrollToItem(900, 64)
+                }
+
+            assertTrue(landed)
+            assertEquals(listOf(ScrollWrite.Snap(890, 0), ScrollWrite.Animate(900, 64)), writer.writes)
+        }
+
+    /** A newer result tap supersedes a landing still in flight; only the newest landing writes or settles. */
+    @Test
+    fun newerGlobalSearchResultSupersedesTheLandingInFlight() =
+        runTest {
+            val blocking = BlockingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = blocking, initialMode = ConversationScrollMode.FollowingTail)
+            val first =
+                async {
+                    coordinator.programmaticJump("first", ConversationScrollReason.FocusMessage) {
+                        animateScrollToItem(5)
+                    }
+                }
+            blocking.writeStarted.await()
+            val second =
+                async {
+                    coordinator.programmaticJump("second", ConversationScrollReason.FocusMessage) { Unit }
+                }
+            runCurrent()
+            blocking.releaseWrite.complete(Unit)
+
+            assertFalse("the superseded landing never settles", first.await())
+            assertTrue(second.await())
+        }
 
     private sealed interface ScrollWrite {
         data class Snap(
