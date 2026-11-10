@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
@@ -124,9 +126,7 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
             }
         }
         val sent = StickerKey.from(STICKERS[1])
-        composeRule.waitUntil(LOAD_TIMEOUT_MS) {
-            controller.stickerAssets.cached(sent) != null || controller.stickerAssets.hasFailed(sent)
-        }
+        awaitLoaded(sent)
         composeRule.onNodeWithTag("message-actions-preview", useUnmergedTree = true).assertExists()
         // One sticker in the timeline row, one in the focused preview.
         composeRule.onAllNodesWithTag("message.sticker", useUnmergedTree = true).assertCountEquals(2)
@@ -174,9 +174,7 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
         }
         // Robolectric reports no network, so auto-download is off: sent stickers load, received ones wait for a tap.
         val sent = StickerKey.from(STICKERS[1])
-        composeRule.waitUntil(LOAD_TIMEOUT_MS) {
-            controller.stickerAssets.cached(sent) != null || controller.stickerAssets.hasFailed(sent)
-        }
+        awaitLoaded(sent)
         assertFalse("The sent sticker failed to load", controller.stickerAssets.hasFailed(sent))
         composeRule.onAllNodesWithTag("message.sticker", useUnmergedTree = true).assertCountEquals(rows.size)
         // The bare rows' "Sticker" preview label must never reach the timeline.
@@ -184,6 +182,17 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
         composeRule.onNodeWithText("Sent caption", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Received caption", useUnmergedTree = true).assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_sticker_rows_$name.png")
+    }
+
+    /**
+     * Waits for [key]'s load to settle. The decode finishes on an IO thread and resumes on the main looper, so each
+     * check drains the looper: once Compose is idle nothing else would, and a slow decode would never be delivered.
+     */
+    private fun awaitLoaded(key: StickerKey) {
+        composeRule.waitUntil(LOAD_TIMEOUT_MS) {
+            shadowOf(Looper.getMainLooper()).idle()
+            controller.stickerAssets.cached(key) != null || controller.stickerAssets.hasFailed(key)
+        }
     }
 
     /** Received then sent, each bare and then captioned. */
