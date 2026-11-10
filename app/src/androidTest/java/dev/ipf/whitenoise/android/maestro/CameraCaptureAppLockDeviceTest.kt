@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -276,7 +277,7 @@ private suspend fun timelineCount(
 ): Int =
     withContext(Dispatchers.IO) {
         native
-            .timelineMessages(account, TimelineMessageQueryFfi(group, null, null, null, null, null, 100u))
+            .timelineMessages(account, TimelineMessageQueryFfi.page(group, null, null, null, null, null, 100u))
             .messages
             .size
     }

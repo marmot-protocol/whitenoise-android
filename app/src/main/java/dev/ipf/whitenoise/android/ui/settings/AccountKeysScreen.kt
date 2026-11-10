@@ -1420,14 +1420,21 @@ internal fun WipeProgressSheet() {
         properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false),
         dragHandle = null,
     ) {
+        // Large text can push the keep-open note past the screen, so the sheet scrolls.
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
+            Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.wipe_progress_title), style = MaterialTheme.typography.titleLarge)
             WipeProgressStageRow(stringResource(R.string.wipe_stage_leaving_groups))
             WipeProgressStageRow(stringResource(R.string.wipe_stage_deleting_key_packages))
             WipeProgressStageRow(stringResource(R.string.wipe_stage_wiping_local_data))
+            // Leaving a chat with another admin first steps this account down, which can wait on relays.
+            Text(
+                stringResource(R.string.wipe_progress_keep_open),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

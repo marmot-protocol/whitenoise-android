@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
 import org.json.JSONObject
@@ -39,6 +40,7 @@ object ConversationTranscriptExport {
         var before: ULong? = null
         var beforeMessageId: String? = null
 
+        /** Adds each message not already collected, keeping the first copy of a repeated id. */
         fun appendUnique(messages: List<TimelineMessageRecordFfi>) {
             messages.forEach { message ->
                 if (!collected.containsKey(message.messageIdHex)) {
@@ -53,7 +55,7 @@ object ConversationTranscriptExport {
                 timelineReader.timelineMessages(
                     accountRef = accountRef,
                     query =
-                        TimelineMessageQueryFfi(
+                        TimelineMessageQueryFfi.page(
                             groupIdHex = groupIdHex,
                             search = null,
                             before = before,

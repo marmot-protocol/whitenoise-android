@@ -1439,6 +1439,7 @@
     <string name="wipe_stage_leaving_groups">Uscita dai gruppi…</string>
     <string name="wipe_stage_deleting_key_packages">Rimozione delle chiavi di invito…</string>
     <string name="wipe_stage_wiping_local_data">Cancellazione dei dati locali…</string>
+    <string name="wipe_progress_keep_open">Potrebbe volerci fino a un minuto. Tieni White Noise aperto finché non ha finito.</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Cancellazione completata con %1$d problema</item>
         <item quantity="other">Cancellazione completata con %1$d problemi</item>
@@ -2139,6 +2140,7 @@
     <string name="group_recovery_review_invitation_from">Esamina l’invito di %1$s · epoca %2$s</string>
     <string name="group_recovery_check_failed">Impossibile verificare il recupero del gruppo. Riprova.</string>
     <string name="group_history_may_be_incomplete">Alcuni messaggi precedenti di questa chat potrebbero mancare.</string>
+    <string name="group_history_before_rejoin">Sei rientrato in questa chat. I messaggi precedenti al tuo rientro potrebbero mancare.</string>
     <string name="account_history_may_be_incomplete">Alcuni messaggi di questo account potrebbero mancare. White Noise non è riuscito a confermare che tutti i messaggi siano arrivati.</string>
     <string name="history_notice_dismiss_failed">Impossibile ignorare l’avviso sulla cronologia. Riprova.</string>
     <string name="group_rejoin_title">Rientrare nel gruppo?</string>

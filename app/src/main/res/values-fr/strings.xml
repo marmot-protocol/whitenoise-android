@@ -1439,6 +1439,7 @@
     <string name="wipe_stage_leaving_groups">Sortie des groupes…</string>
     <string name="wipe_stage_deleting_key_packages">Retrait des clés d’invitation…</string>
     <string name="wipe_stage_wiping_local_data">Effacement des données locales…</string>
+    <string name="wipe_progress_keep_open">Cela peut prendre jusqu’à une minute. Gardez White Noise ouvert jusqu’à la fin.</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Effacement terminé avec %1$d problème</item>
         <item quantity="other">Effacement terminé avec %1$d problèmes</item>
@@ -2139,6 +2140,7 @@
     <string name="group_recovery_review_invitation_from">Examiner l’invitation de %1$s · époque %2$s</string>
     <string name="group_recovery_check_failed">Impossible de vérifier la récupération du groupe. Réessayez.</string>
     <string name="group_history_may_be_incomplete">Certains messages plus anciens de cette discussion sont peut-être manquants.</string>
+    <string name="group_history_before_rejoin">Vous avez rejoint cette discussion à nouveau. Des messages antérieurs à votre retour sont peut-être manquants.</string>
     <string name="account_history_may_be_incomplete">Certains messages de ce compte sont peut-être manquants. White Noise n’a pas pu confirmer que tous les messages sont arrivés.</string>
     <string name="history_notice_dismiss_failed">Impossible de fermer cet avis sur l’historique. Réessayez.</string>
     <string name="group_rejoin_title">Rejoindre à nouveau le groupe ?</string>

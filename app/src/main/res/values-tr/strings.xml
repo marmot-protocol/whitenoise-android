@@ -1422,6 +1422,7 @@
     <string name="wipe_stage_leaving_groups">Gruplardan çıkılıyor…</string>
     <string name="wipe_stage_deleting_key_packages">Davet anahtarları kaldırılıyor…</string>
     <string name="wipe_stage_wiping_local_data">Yerel veriler siliniyor…</string>
+    <string name="wipe_progress_keep_open">Bu işlem bir dakika kadar sürebilir. İşlem bitene kadar White Noise’u açık tutun.</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Silme %1$d sorunla tamamlandı</item>
         <item quantity="other">Silme %1$d sorunla tamamlandı</item>
@@ -2132,6 +2133,7 @@
     <string name="group_recovery_review_invitation_from">%1$s kişisinin davetini incele · dönem %2$s</string>
     <string name="group_recovery_check_failed">Grup kurtarma denetlenemedi. Tekrar deneyin.</string>
     <string name="group_history_may_be_incomplete">Bu sohbetteki bazı eski mesajlar eksik olabilir.</string>
+    <string name="group_history_before_rejoin">Bu sohbete yeniden katıldınız. Yeniden katılmanızdan önceki mesajlar eksik olabilir.</string>
     <string name="account_history_may_be_incomplete">Bu hesapta bazı mesajlar eksik olabilir. White Noise tüm mesajların ulaştığını doğrulayamadı.</string>
     <string name="history_notice_dismiss_failed">Geçmiş bildirimi kapatılamadı. Yeniden deneyin.</string>
     <string name="group_rejoin_title">Gruba yeniden katılınsın mı?</string>

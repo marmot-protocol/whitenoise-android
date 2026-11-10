@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -48,7 +49,7 @@ internal fun readMaestroMessages(
     account: String,
     group: String,
 ): List<TimelineMessageRecordFfi> {
-    val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
+    val query = TimelineMessageQueryFfi.page(group, null, null, null, null, null, 100u)
     return native.timelineMessages(account, query).messages
 }
 

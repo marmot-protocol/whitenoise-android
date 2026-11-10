@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
@@ -32,6 +33,7 @@ import java.util.UUID
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ForwardMediaReferenceFfiIntegrationTest {
+    /** Forwarding each media kind gives every destination its own fresh reference that the recipient can decrypt. */
     @Test
     @Suppress("LongMethod") // Keep the end-to-end native boundary in one auditable sequence.
     fun everyDestinationGetsFreshDecryptablePhotoVideoAudioAndDocumentReferences() =
@@ -119,7 +121,7 @@ class ForwardMediaReferenceFfiIntegrationTest {
                             marmot
                                 .timelineMessages(
                                     account.label,
-                                    TimelineMessageQueryFfi(
+                                    TimelineMessageQueryFfi.page(
                                         groupIdHex = destinationGroup,
                                         search = null,
                                         before = null,
@@ -289,7 +291,7 @@ class ForwardMediaReferenceFfiIntegrationTest {
                         marmot
                             .timelineMessages(
                                 account.label,
-                                TimelineMessageQueryFfi(
+                                TimelineMessageQueryFfi.page(
                                     groupIdHex = destinationGroup,
                                     search = null,
                                     before = null,

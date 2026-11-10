@@ -1412,6 +1412,7 @@
     <string name="wipe_stage_leaving_groups">正在退出群組…</string>
     <string name="wipe_stage_deleting_key_packages">正在移除邀請金鑰…</string>
     <string name="wipe_stage_wiping_local_data">正在清除本機資料…</string>
+    <string name="wipe_progress_keep_open">這可能需要最多一分鐘。完成前請保持 White Noise 開啟。</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="other">清除完成，發現 %1$d 個問題</item>
     </plurals>
@@ -2100,6 +2101,7 @@
     <string name="group_recovery_review_invitation_from">檢視 %1$s 的邀請 · 時期 %2$s</string>
     <string name="group_recovery_check_failed">無法檢查群組復原狀態，請再試一次。</string>
     <string name="group_history_may_be_incomplete">此聊天中可能缺少部分較早的訊息。</string>
+    <string name="group_history_before_rejoin">你已重新加入此聊天。重新加入之前的訊息可能缺漏。</string>
     <string name="account_history_may_be_incomplete">此帳戶可能缺少部分訊息。White Noise 無法確認所有訊息都已送達。</string>
     <string name="history_notice_dismiss_failed">無法忽略歷史記錄提示，請再試一次。</string>
     <string name="group_rejoin_title">重新加入群組？</string>

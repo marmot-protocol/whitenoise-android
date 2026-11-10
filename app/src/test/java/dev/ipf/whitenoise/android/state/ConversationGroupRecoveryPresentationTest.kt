@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
+import dev.ipf.marmotkit.HistoryNoticeCauseFfi
+import dev.ipf.marmotkit.HistoryNoticeFfi
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -241,6 +243,39 @@ class ConversationGroupRecoveryPresentationTest {
             assertTrue(controller.lastMutationError != null)
         }
 
+    /**
+     * MDK lists parked and ledger notices before rejoin notices, so the rejoin wording shows only when every notice is
+     * a rejoin, and never after a failed list read.
+     */
+    @Test
+    fun rejoinWordingFollowsTheFirstNoticeCause() =
+        runTest {
+            val rejoin = HistoryNoticeFfi("aa", HistoryNoticeCauseFfi.BEFORE_REJOIN, groupIdHex(), 1uL)
+            val gap = HistoryNoticeFfi("bb", HistoryNoticeCauseFfi.EPOCH_GAP, groupIdHex(), 2uL)
+            val secondRejoin = HistoryNoticeFfi("cc", HistoryNoticeCauseFfi.BEFORE_REJOIN, groupIdHex(), 3uL)
+            var notices: () -> List<HistoryNoticeFfi> = { listOf(gap, rejoin, secondRejoin) }
+            var noticeIds = listOf("aa")
+            val controller =
+                controller(testAppState(), notices = { notices() }) { recoveryStatus(noticeIds = noticeIds) }
+
+            controller.retryGroupRecoveryStatus()
+            assertTrue(controller.groupHistoryNoticeRejoined)
+
+            noticeIds = listOf("aa", "cc")
+            controller.retryGroupRecoveryStatus()
+            assertTrue("a second rejoin keeps the rejoin wording", controller.groupHistoryNoticeRejoined)
+
+            noticeIds = listOf("bb", "aa")
+            controller.retryGroupRecoveryStatus()
+            assertFalse(controller.groupHistoryNoticeRejoined)
+
+            noticeIds = listOf("aa")
+            notices = { error("notice list unavailable") }
+            controller.retryGroupRecoveryStatus()
+            assertFalse(controller.groupHistoryNoticeRejoined)
+            assertEquals(noticeIds, controller.groupRecoveryStatus?.historyNoticeIds)
+        }
+
     /** Freshness belongs to one account, one group and one runtime, and only the newest creation. */
     @Test
     fun freshnessIsScopedByAccountGroupRuntimeAndSupersession() {
@@ -304,16 +339,18 @@ class ConversationGroupRecoveryPresentationTest {
         historyNoticeIds = noticeIds,
     )
 
-    /** A conversation controller whose only injected behaviour is the advisory recovery read. */
+    /** A conversation controller whose injected behaviour is the advisory recovery read and its notice list. */
     private fun controller(
         appState: WhiteNoiseAppState,
         dismiss: suspend (String, String) -> Boolean = { _, _ -> true },
+        notices: () -> List<HistoryNoticeFfi> = { emptyList() },
         read: () -> GroupRecoveryStatusFfi,
     ) = ConversationController(
         appState = appState,
         initialGroup = conversationTimelineTestGroup(),
         groupRecoveryStatusReader = { _, _ -> read() },
         historyNoticeDismisser = dismiss,
+        historyNoticesReader = { notices() },
     )
 
     /** One signed-in account, with no live subscriptions to start. */

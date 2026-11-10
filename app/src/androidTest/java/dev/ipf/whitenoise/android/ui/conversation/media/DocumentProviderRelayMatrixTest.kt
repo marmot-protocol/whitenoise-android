@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
+import dev.ipf.whitenoise.android.state.page
 import dev.ipf.whitenoise.android.ui.conversation.ConversationAttachmentReader
 import dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure
 import kotlinx.coroutines.delay
@@ -41,6 +42,7 @@ import java.util.UUID
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class DocumentProviderRelayMatrixTest {
+    /** Document grants survive reads and relay delivery, and revoking and plaintext cleanup still work. */
     @Test
     @Suppress("LongMethod") // One disposable sender/receiver pair must own the full real-device sequence.
     fun providerGrantsSurviveReadAndRelayDeliveryButRevokeAndPlaintextCleanupWork() =
@@ -138,7 +140,7 @@ class DocumentProviderRelayMatrixTest {
                             marmot
                                 .timelineMessages(
                                     receiver.label,
-                                    TimelineMessageQueryFfi(group, null, null, null, null, null, 30u),
+                                    TimelineMessageQueryFfi.page(group, null, null, null, null, null, 30u),
                                 ).messages
                                 .firstOrNull { it.messageIdHex == messageId }
                         receivedReferences = message?.let { MessageAttachments.acceptedReferences(it.media) }.orEmpty()

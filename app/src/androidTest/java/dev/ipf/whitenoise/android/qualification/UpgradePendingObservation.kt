@@ -6,7 +6,6 @@ import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.SendSummaryFfi
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import org.json.JSONObject
 
 /** Records native send/history/retention stages without account IDs, descriptors, plaintext or persistence edits. */
@@ -27,7 +26,7 @@ internal suspend fun reportUpgradePending(
         val account = receipt.getString("sender")
         val group = receipt.getString("group")
         val message = receipt.getString("pendingMessage")
-        val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
+        val query = qualificationTimelineQuery(group, 100u)
         val matches = runtime.timelineMessages(account, query).messages.filter { it.messageIdHex == message }
         report.put("timelineMatches", matches.size)
         report.put("confirmedSources", matches.count { it.sourceMessageIdHex != null })

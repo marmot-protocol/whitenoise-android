@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.maestro
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
@@ -18,7 +19,7 @@ internal suspend fun verifyMaestroSend(
         while (true) {
             val messages =
                 native
-                    .timelineMessages(peer, TimelineMessageQueryFfi(group, null, null, null, null, null, 100u))
+                    .timelineMessages(peer, TimelineMessageQueryFfi.page(group, null, null, null, null, null, 100u))
                     .messages
             val received = messages.count { it.plaintext == "Maestro verified send" }
             check(received <= 1) { "Duplicate peer delivery" }

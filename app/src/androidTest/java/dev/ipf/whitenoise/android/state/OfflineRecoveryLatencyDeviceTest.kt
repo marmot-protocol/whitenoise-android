@@ -208,7 +208,7 @@ class OfflineRecoveryLatencyDeviceTest {
                 application.appState.marmotIo {
                     timelineMessages(
                         accountRef,
-                        TimelineMessageQueryFfi(
+                        TimelineMessageQueryFfi.page(
                             groupIdHex = groupIdHex,
                             search = null,
                             before = null,

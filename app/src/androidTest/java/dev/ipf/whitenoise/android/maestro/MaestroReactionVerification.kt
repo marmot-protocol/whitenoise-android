@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.maestro
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
@@ -51,7 +52,7 @@ private suspend fun maestroReactionMessage(
     group: String,
 ): TimelineMessageRecordFfi? =
     native
-        .timelineMessages(account, TimelineMessageQueryFfi(group, null, null, null, null, null, 100u))
+        .timelineMessages(account, TimelineMessageQueryFfi.page(group, null, null, null, null, null, 100u))
         .messages
         .singleOrNull { it.plaintext == "Generated fixture message" }
 

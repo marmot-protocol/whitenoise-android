@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.maestro
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 
@@ -57,7 +58,7 @@ private fun matchingMaestroPoll(
 ): PollProjectionFfi? {
     val polls =
         native
-            .timelineMessages(account, TimelineMessageQueryFfi(group, null, null, null, null, null, 100u))
+            .timelineMessages(account, TimelineMessageQueryFfi.page(group, null, null, null, null, null, 100u))
             .messages
             .mapNotNull { it.poll }
             .filter { it.question == question }
