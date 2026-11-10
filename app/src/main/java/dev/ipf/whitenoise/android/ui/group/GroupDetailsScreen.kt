@@ -103,6 +103,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.folderMemberIds
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.EmojiLabel
@@ -1927,6 +1928,7 @@ internal fun GroupDetailsScreen(
                         folderAccountRef,
                         chatIdLower,
                         groupTitleCopy,
+                        appState.chatFolderMembership?.folders,
                     ) {
                         val accountRef = folderAccountRef ?: return@remember emptyList()
                         val thisChatRow =
@@ -1943,21 +1945,25 @@ internal fun GroupDetailsScreen(
                                     chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
                                 val effective =
                                     chatIdLower in
-                                        chatFolderChatIds(
-                                            items = thisChatRow,
-                                            manualChatIds =
-                                                appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
-                                            rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
-                                            excludedChatIds =
-                                                appState.chatFolderPreferences.excludedChats(accountRef, folder.id),
-                                            activeAccountIdHex = appState.activeAccount?.accountIdHex,
-                                            isMuted = { groupIdHex ->
-                                                thisChatRow.any {
-                                                    it.group.groupIdHex == groupIdHex && it.engineMuted()
-                                                }
-                                            },
-                                            displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
-                                        )
+                                        appState.folderMemberIds(accountRef, folder.id) {
+                                            chatFolderChatIds(
+                                                items = thisChatRow,
+                                                manualChatIds =
+                                                    appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+                                                rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id),
+                                                excludedChatIds =
+                                                    appState.chatFolderPreferences.excludedChats(accountRef, folder.id),
+                                                activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                                                isMuted = { groupIdHex ->
+                                                    thisChatRow.any {
+                                                        it.group.groupIdHex == groupIdHex && it.engineMuted()
+                                                    }
+                                                },
+                                                displayTitle = {
+                                                    chatListItemDisplayTitle(it, appState, groupTitleCopy)
+                                                },
+                                            )
+                                        }
                                 if (effective) folder to manual else null
                             }
                     }

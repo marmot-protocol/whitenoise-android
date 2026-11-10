@@ -92,6 +92,19 @@ internal fun ConversationController.attachmentNativeProgress(
     }
 }
 
+/** This attachment's native transfer state, read once per conversation without requesting or watching it. */
+internal suspend fun ConversationController.attachmentNativeState(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): dev.ipf.marmotkit.AttachmentTransferStateFfi? {
+    val key = "$messageIdHex#$attachmentIndex"
+    val request =
+        attachmentTransferRequest(messageIdHex, attachmentIndex)
+            ?.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex))
+    return nativeAttachmentStateReads[key]
+        ?: request?.let { appState.nativeAttachmentState(it) }?.also { nativeAttachmentStateReads[key] = it }
+}
+
 /** Records that the reader's own download of this attachment is parked for storage, so reopening can restore it. */
 internal fun ConversationController.recordReaderParkedDownload(
     messageIdHex: String,

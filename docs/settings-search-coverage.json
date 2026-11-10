@@ -345,6 +345,10 @@
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt": {
       "controls": [
         {
+          "declaration": "\"manage_storage\"",
+          "represented_by": "Data.manage_storage"
+        },
+        {
           "declaration": "\"public_jpeg_previews\"",
           "represented_by": "Data.public_jpeg_previews"
         },
@@ -363,6 +367,50 @@
         {
           "declaration": "type.preferenceKey",
           "represented_by": "Data.download.Image"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt": {
+      "controls": [
+        {
+          "declaration": "\"cache\"",
+          "represented_by": "ManageStorage.cache"
+        },
+        {
+          "declaration": "\"keep\"",
+          "represented_by": "ManageStorage.keep_media"
+        },
+        {
+          "declaration": "\"largest\"",
+          "represented_by": "ManageStorage.largest"
+        },
+        {
+          "declaration": "\"older\"",
+          "represented_by": "ManageStorage.older"
+        },
+        {
+          "declaration": "\"retry\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        },
+        {
+          "declaration": "entry.groupIdHex",
+          "excluded": "Per-chat storage rows and individual attachment names, origins, sizes and selection are user-generated content. Manage storage and its static free-up/Keep media controls remain indexed."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"older\"",
+          "excluded": "Per-chat Remove older attachments acts inside one user-generated chat's attachment list; the account-wide Remove older attachments control remains indexed."
+        },
+        {
+          "declaration": "\"remove_all\"",
+          "excluded": "Per-chat Remove all attachments acts on one user-generated chat's attachments; Manage storage and its account-wide free-up controls remain indexed."
+        },
+        {
+          "declaration": "\"retry\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
         }
       ]
     },
@@ -753,6 +801,9 @@
     "Data": {
       "catalog_id": "home.DataUsage"
     },
+    "ManageStorage": {
+      "catalog_id": "Data.manage_storage"
+    },
     "Profile": {
       "catalog_id": "home.Profile"
     },
@@ -853,7 +904,8 @@
     "dictation recommendation": "Optional external-provider installation recommendation depends on installed packages and is represented by Dictation management, not an always-present control.",
     "developer demo cleanup": "Cleanup/retry actions depend on transient demo state; Review demo management remains indexed.",
     "developer seed fixture": "Seed fixture is a non-production test-only injected control, absent from shipping runtime.",
-    "build information": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+    "build information": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing.",
+    "storage entities": "Per-chat storage rows and individual attachment names, origins, sizes and selection are user-generated content. Manage storage and its static free-up/Keep media controls remain indexed."
   },
   "non_row_exclusions": {
     "navigation": "Back and search affordances are navigation, not searchable settings.",

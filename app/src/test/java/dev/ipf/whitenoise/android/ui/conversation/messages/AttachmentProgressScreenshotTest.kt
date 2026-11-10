@@ -65,7 +65,7 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
     @Test
     fun progressDarkLargeRtl() = captureProgress("dark-large-rtl", dark = true, rtl = true, fontScale = 1.6f)
 
-    /** Setting-cleaned media names local absence without claiming an active, cancellable download. */
+    /** Setting-cleaned media invites downloading it again without claiming an active, cancellable download. */
     @Test
     fun settingCleanedFileDescribesUnavailabilityWithoutProgress() {
         val reference = fileReference("cleaned.pdf", "application/pdf")
@@ -84,8 +84,9 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                 )
             }
         }
-        composeRule.onNodeWithText("Attachment unavailable").assertExists()
-        composeRule.onNodeWithContentDescription("Attachment unavailable").assertHasNoClickAction()
+        val removed = "Removed from this device. Tap to download again"
+        composeRule.onNodeWithText(removed).assertExists()
+        composeRule.onNodeWithContentDescription(removed).assertHasNoClickAction()
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertCountEquals(0)
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0.5f, 0f..1f))).assertCountEquals(0)
     }
@@ -109,8 +110,9 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         composeRule.onNodeWithText("4.0 MB of 8.0 MB").assertExists()
         composeRule.onNodeWithText("4.0 MB received").assertExists()
         composeRule.onNodeWithText("Download blocked by policy").assertExists()
-        composeRule.onAllNodesWithText("Attachment unavailable").assertCountEquals(2)
-        composeRule.onAllNodesWithContentDescription("Attachment unavailable").assertCountEquals(2)
+        composeRule.onAllNodesWithText("Attachment unavailable").assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Attachment unavailable").assertCountEquals(1)
+        composeRule.onNodeWithText("Removed from this device. Tap to download again").assertExists()
         composeRule.onNodeWithText("Preparing attachment").assertExists()
         composeRule.onNodeWithContentDescription("Cancelling download").assertExists()
         composeRule.onNodeWithContentDescription("Could not confirm cancellation").assertExists()

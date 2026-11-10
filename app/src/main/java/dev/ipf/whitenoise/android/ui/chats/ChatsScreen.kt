@@ -109,14 +109,19 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.deleteLocalChatsBatch
+import dev.ipf.whitenoise.android.state.folderQuery
 import dev.ipf.whitenoise.android.state.hasEarlierChats
+import dev.ipf.whitenoise.android.state.hasFolderWindows
 import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
+import dev.ipf.whitenoise.android.state.loadMoreFolderChats
 import dev.ipf.whitenoise.android.state.localDeleteBatchRetryNotice
+import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
+import dev.ipf.whitenoise.android.state.reportVisibleFolderChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
@@ -315,7 +320,7 @@ internal fun ChatsScreen(
                 command,
                 owner,
                 followScope = pinFollow.currentScope.takeIf { command == ChatListBatchCommand.PIN },
-                completeView = completeSelection?.takeIf { it.resolved }?.view,
+                completeScope = completeSelection?.takeIf { it.resolved }?.scope,
             )
     }
     pendingStateBatch?.let { request ->
@@ -333,16 +338,16 @@ internal fun ChatsScreen(
                         } else {
                             // A complete selection first drops chats that have since left its native view;
                             // without that answer nothing starts, so stale unloaded IDs are never commanded.
-                            val view = request.completeView
+                            val completeScope = request.completeScope
                             val ids =
                                 when {
                                     previous != null -> previous.retryIds
-                                    view == null -> request.ids
+                                    completeScope == null -> request.ids
                                     else ->
                                         runCatchingCancellable {
                                             resolveCompleteChatListIds {
                                                 controller.revalidateCompleteChatListIds(
-                                                    view,
+                                                    completeScope,
                                                     request.ids,
                                                     request.owner,
                                                 )
@@ -587,15 +592,24 @@ internal fun ChatsScreen(
                 appState.chatFolderPreferences.membershipFor(account, folder.id).isEmpty() &&
                 appState.chatFolderPreferences.excludedChats(account, folder.id).isEmpty()
         }
-    val completeSelectAllView =
-        chatListCompleteSelectAllView(
+    val selectedFolderQuery =
+        remember(folderStoreState, appState.activeAccountRef, selectedFolder) {
+            val account = appState.activeAccountRef
+            val folder = selectedFolder
+            val preferences = appState.chatFolderPreferences
+            folder?.let { account?.let { owner -> preferences.folderQuery(owner, it.id) } }
+        }
+    val completeSelectAllScope =
+        chatListCompleteSelectAllScope(
             folderSelected = selectedFolder != null,
             untouchedArchivedFolder = untouchedArchivedFolder,
             unreadOnly = unreadOnly,
             searchOpen = searchOpen,
+            // A folder whose own windows are not open shows only its loaded matches, so it selects only those too.
+            folderQuery = selectedFolderQuery?.takeIf { it.wholeView || controller.hasFolderWindows() },
         )
     // A scope change ends any complete selection; pending reads see the cleared holder and are discarded.
-    LaunchedEffect(completeSelectAllView) { completeSelection = null }
+    LaunchedEffect(completeSelectAllScope) { completeSelection = null }
     // A confirmation still holding the previous account's or list variant's rows must not survive
     // into the next one, where those rows are not even addressable.
     var pendingBulkDelete by
@@ -1145,7 +1159,7 @@ internal fun ChatsScreen(
         val sent = selectedChatIds.toSet()
         val kept =
             runCatchingCancellable {
-                controller.revalidateCompleteChatListIds(complete.view, sent.toList(), owner)
+                controller.revalidateCompleteChatListIds(complete.scope, sent.toList(), owner)
             }.getOrNull() ?: return@LaunchedEffect
         if (completeSelection === complete) {
             selectedChatIds.removeAll(sent - retainRevalidatedChatListIds(sent, kept))
@@ -1544,14 +1558,29 @@ internal fun ChatsScreen(
                 }
             }
     }
-    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder, unreadOnly) {
-        if (advancedFolder || unreadOnly) return@LaunchedEffect
+    // A rule folder pages its own native windows, so chats beyond the plain windows load as the reader nears the end.
+    val folderWindowed = selectedFolderId != null && !unreadOnly && controller.hasFolderWindows()
+    LaunchedEffect(chatListState, controller, folderWindowed) {
+        if (!folderWindowed) return@LaunchedEffect
+        launch { collectChatListForwardPaging(listState = chatListState) { controller.loadMoreFolderChats() } }
+        collectChatListVisibleAnchor(
+            listState = chatListState,
+            searchActive = { currentSearchActive },
+            chatRowKey = { key -> (key as? String)?.takeIf(currentVisibleChatIds::contains) },
+        ) { rowId ->
+            currentVisibleItems.firstOrNull { it.id == rowId }?.group?.let { group ->
+                controller.reportVisibleFolderChat(group.groupIdHex)
+            }
+        }
+    }
+    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder, unreadOnly, folderWindowed) {
+        if (advancedFolder || unreadOnly || folderWindowed) return@LaunchedEffect
         collectChatListForwardPaging(listState = chatListState) {
             controller.loadMoreChats(chatListWindowView)
         }
     }
-    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder, unreadOnly) {
-        if (advancedFolder || unreadOnly) return@LaunchedEffect
+    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder, unreadOnly, folderWindowed) {
+        if (advancedFolder || unreadOnly || folderWindowed) return@LaunchedEffect
         collectChatListVisibleAnchor(
             listState = chatListState,
             searchActive = { currentSearchActive },
@@ -1706,6 +1735,7 @@ internal fun ChatsScreen(
             resolveFolderChatIds,
             pendingFolderIds,
             selectedFolderId,
+            appState.chatFolderMembership?.folders,
         ) {
             chatFolderChipModels(
                 folders = accountFolders,
@@ -1724,6 +1754,7 @@ internal fun ChatsScreen(
                 },
                 pendingFolderIds = pendingFolderIds,
                 selectedFolderId = selectedFolderId,
+                nativeOf = { id -> appState.activeAccountRef?.let { appState.nativeFolderMembership(it, id) } },
             )
         }
     // An empty selected folder remains visible and active until the user picks
@@ -2249,7 +2280,7 @@ internal fun ChatsScreen(
                         allVisibleSelected =
                             visibleChatIds.isNotEmpty() &&
                                 selectedChatIds.containsAll(visibleChatIds) &&
-                                (completeSelectAllView == null || resolvedCompleteSelection != null),
+                                (completeSelectAllScope == null || resolvedCompleteSelection != null),
                         showMarkRead = selectionActions.showMarkRead,
                         showMarkUnread = selectionActions.showMarkUnread,
                         showMute = selectionActions.showMute,
@@ -2374,16 +2405,16 @@ internal fun ChatsScreen(
                         onSelectAll = {
                             selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
                             // #2925: extend past the loaded window to MDK's complete view where it owns membership.
-                            val view = completeSelectAllView
-                            val owner = view?.let { controller.captureChatListActionOwner { actionScope.get() } }
-                            if (view != null && owner != null) {
-                                val pending = ChatListCompleteSelection(view, resolved = false)
+                            val target = completeSelectAllScope
+                            val owner = target?.let { controller.captureChatListActionOwner { actionScope.get() } }
+                            if (target != null && owner != null) {
+                                val pending = ChatListCompleteSelection(target, resolved = false)
                                 val loadedIds = visibleChatIds
                                 completeSelection = pending
                                 scope.launch {
                                     val ids =
                                         runCatchingCancellable {
-                                            resolveCompleteChatListIds { controller.completeChatListIds(view, owner) }
+                                            resolveCompleteChatListIds { controller.completeChatListIds(target, owner) }
                                         }.getOrNull()
                                     if (completeSelection !== pending) return@launch
                                     if (ids != null && controller.chatListActionIsCurrent(owner)) {
