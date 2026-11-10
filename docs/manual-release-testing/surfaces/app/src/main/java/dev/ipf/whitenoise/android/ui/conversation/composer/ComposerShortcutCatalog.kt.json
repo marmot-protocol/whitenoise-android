@@ -115,6 +115,16 @@
           "CON-041"
         ]
       }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Sticker copy stickers title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "anchor": "R.string.stickers_title",
+        "test_ids": [
+          "MSG-045"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

@@ -25,8 +25,9 @@ sealed interface MediaTrustDomain {
     }
 
     /**
-     * Kind-0 profile pictures and banners seen by one account. They are published to relays, so anyone can already
-     * fetch all of them and anyone may choose their bytes; a group's image is never one of these.
+     * Kind-0 profile pictures and banners seen by one account, and the images of sticker packs it sees. Both are
+     * published to relays, so anyone can already fetch all of them and anyone may choose their bytes; a group's image
+     * is never one of these.
      */
     data class PublicProfiles(
         val account: String,

@@ -1,0 +1,78 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "fun StickerSheet(",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "StickerSheetTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "fun StickerSheetTopBar(",
+        "test_ids": [
+          "MSG-045",
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "StickerSectionTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "fun StickerSectionTitle(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "StickerDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "fun StickerDisclosure(",
+        "test_ids": [
+          "MSG-045",
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "StickerProgress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "fun StickerProgress(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "MSG-045",
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MSG-045",
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "R.string.sticker_pack",
+        "test_ids": [
+          "MSG-045",
+          "MSG-046"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

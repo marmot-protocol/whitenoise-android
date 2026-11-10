@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">Sticker</string>
+    <string name="sticker_alt">Sticker: %1$s</string>
+    <string name="sticker_with_emoji">%1$s Sticker</string>
+    <string name="stickers_title">Stickers</string>
+    <string name="sticker_load_hint">Load sticker</string>
+    <string name="sticker_tap_to_load">Tap to load</string>
+    <string name="sticker_tap_to_retry">Tap to retry</string>
+    <string name="stickers_empty_title">No stickers</string>
+    <string name="stickers_empty_detail">Add a sticker pack to send stickers.</string>
+    <string name="stickers_browse">Browse sticker packs</string>
+    <string name="sticker_server_disclosure">Stickers load from servers each pack\'s author chose. Those servers can see your IP address.</string>
+    <string name="sticker_packs_title">Sticker packs</string>
+    <string name="sticker_pack">Sticker pack</string>
+    <string name="sticker_packs_add_by_link">Add by link</string>
+    <string name="sticker_pack_link">Sticker pack link</string>
+    <string name="sticker_pack_open_link">Open link</string>
+    <string name="sticker_pack_opening">Opening…</string>
+    <string name="sticker_packs_installed">Installed</string>
+    <string name="sticker_packs_discover">Discover</string>
+    <string name="sticker_packs_search">Search sticker packs</string>
+    <string name="sticker_packs_none_on_relays">Your relays don\'t have any sticker packs yet. Tap the link button to add one by link.</string>
+    <string name="sticker_packs_no_matches">No sticker packs match your search.</string>
+    <string name="sticker_packs_unreachable">Couldn\'t check your relays for sticker packs.</string>
+    <string name="sticker_packs_try_again">Try again</string>
+    <string name="sticker_packs_public_footer">Sticker packs are public and aren\'t reviewed by White Noise. Your installed packs are listed publicly on your relays.</string>
+    <string name="sticker_pack_add">Add</string>
+    <string name="sticker_pack_by">By %1$s</string>
+    <string name="sticker_pack_tap_to_send">Tap a sticker to send it.</string>
+    <string name="sticker_pack_add_failed">Couldn\'t add sticker pack</string>
+    <string name="sticker_pack_remove_failed">Couldn\'t remove sticker pack</string>
+    <string name="sticker_pack_open_failed">Couldn\'t open sticker pack</string>
+    <string name="sticker_send_failed">Couldn\'t send sticker</string>
+    <string name="sticker_error_invalid">This sticker pack isn\'t valid.</string>
+    <string name="sticker_error_not_found">Couldn\'t find this sticker pack.</string>
+    <string name="sticker_error_network">Couldn\'t reach the sticker pack\'s relays. Check your connection and try again.</string>
+    <string name="sticker_error_import">This sticker pack can\'t be imported.</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="one">%1$d sticker</item>
+        <item quantity="other">%1$d stickers</item>
+    </plurals>
+</resources>

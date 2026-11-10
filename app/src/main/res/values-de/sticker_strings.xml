@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">Sticker</string>
+    <string name="sticker_alt">Sticker: %1$s</string>
+    <string name="sticker_with_emoji">%1$s Sticker</string>
+    <string name="stickers_title">Sticker</string>
+    <string name="sticker_load_hint">Sticker laden</string>
+    <string name="sticker_tap_to_load">Zum Laden tippen</string>
+    <string name="sticker_tap_to_retry">Erneut versuchen</string>
+    <string name="stickers_empty_title">Keine Sticker</string>
+    <string name="stickers_empty_detail">Füge ein Stickerpaket hinzu, um Sticker zu senden.</string>
+    <string name="stickers_browse">Stickerpakete durchsuchen</string>
+    <string name="sticker_server_disclosure">Sticker werden von Servern geladen, die der Autor des jeweiligen Pakets gewählt hat. Diese Server können deine IP-Adresse sehen.</string>
+    <string name="sticker_packs_title">Stickerpakete</string>
+    <string name="sticker_pack">Stickerpaket</string>
+    <string name="sticker_packs_add_by_link">Per Link hinzufügen</string>
+    <string name="sticker_pack_link">Link zum Stickerpaket</string>
+    <string name="sticker_pack_open_link">Link öffnen</string>
+    <string name="sticker_pack_opening">Wird geöffnet…</string>
+    <string name="sticker_packs_installed">Installiert</string>
+    <string name="sticker_packs_discover">Entdecken</string>
+    <string name="sticker_packs_search">Stickerpakete suchen</string>
+    <string name="sticker_packs_none_on_relays">Deine Relays haben noch keine Stickerpakete. Tippe auf die Link-Schaltfläche, um eines per Link hinzuzufügen.</string>
+    <string name="sticker_packs_no_matches">Keine Stickerpakete passen zu deiner Suche.</string>
+    <string name="sticker_packs_unreachable">Deine Relays konnten nicht nach Stickerpaketen abgefragt werden.</string>
+    <string name="sticker_packs_try_again">Erneut versuchen</string>
+    <string name="sticker_packs_public_footer">Stickerpakete sind öffentlich und werden nicht von White Noise geprüft. Deine installierten Pakete sind auf deinen Relays öffentlich gelistet.</string>
+    <string name="sticker_pack_add">Hinzufügen</string>
+    <string name="sticker_pack_by">Von %1$s</string>
+    <string name="sticker_pack_tap_to_send">Tippe auf einen Sticker, um ihn zu senden.</string>
+    <string name="sticker_pack_add_failed">Stickerpaket konnte nicht hinzugefügt werden</string>
+    <string name="sticker_pack_remove_failed">Stickerpaket konnte nicht entfernt werden</string>
+    <string name="sticker_pack_open_failed">Stickerpaket konnte nicht geöffnet werden</string>
+    <string name="sticker_send_failed">Sticker konnte nicht gesendet werden</string>
+    <string name="sticker_error_invalid">Dieses Stickerpaket ist ungültig.</string>
+    <string name="sticker_error_not_found">Dieses Stickerpaket wurde nicht gefunden.</string>
+    <string name="sticker_error_network">Die Relays des Stickerpakets sind nicht erreichbar. Prüfe deine Verbindung und versuche es erneut.</string>
+    <string name="sticker_error_import">Dieses Stickerpaket kann nicht importiert werden.</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="one">%1$d Sticker</item>
+        <item quantity="other">%1$d Sticker</item>
+    </plurals>
+</resources>

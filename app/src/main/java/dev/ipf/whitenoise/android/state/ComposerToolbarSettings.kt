@@ -26,6 +26,7 @@ internal enum class ComposerShortcut(
     Person("person"),
     Contact("contact"),
     Poll("poll"),
+    Sticker("sticker"),
 }
 
 internal enum class ComposerToolbarLayout(

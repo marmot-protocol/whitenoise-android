@@ -67,6 +67,16 @@
           "NTF-044"
         ]
       }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Sticker copy sticker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "R.string.sticker",
+        "test_ids": [
+          "MSG-047"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

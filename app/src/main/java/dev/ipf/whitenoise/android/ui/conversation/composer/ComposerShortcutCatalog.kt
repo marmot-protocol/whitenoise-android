@@ -22,6 +22,7 @@ internal val ComposerShortcut.labelRes: Int
             ComposerShortcut.Person -> R.string.attach_contact
             ComposerShortcut.Contact -> R.string.attachment_device_contact
             ComposerShortcut.Poll -> R.string.poll_create
+            ComposerShortcut.Sticker -> R.string.stickers_title
         }
 
 internal val ComposerShortcut.iconRes: Int
@@ -41,4 +42,5 @@ internal val ComposerShortcut.iconRes: Int
             ComposerShortcut.Person -> R.drawable.ic_person
             ComposerShortcut.Contact -> R.drawable.ic_settings_person_add
             ComposerShortcut.Poll -> R.drawable.ic_description
+            ComposerShortcut.Sticker -> R.drawable.ic_sticker
         }

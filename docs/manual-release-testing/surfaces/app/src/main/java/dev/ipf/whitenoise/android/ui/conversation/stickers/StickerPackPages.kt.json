@@ -1,0 +1,233 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StickerBrowserPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun StickerBrowserPage(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "StickerLinkField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun StickerLinkField(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "StickerSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun StickerSearchField(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "PackRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun PackRow(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "StickerPackDetailPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun StickerPackDetailPage(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "StickerPackToggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun StickerPackToggle(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.refresh",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.remove",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_add",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack add failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_add_failed",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_by",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_link",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack tap to send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_tap_to_send",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack open failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_open_failed",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack open link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_open_link",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack opening",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_opening",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker pack remove failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_pack_remove_failed",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs add by link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_add_by_link",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs discover",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_discover",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs installed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_installed",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs no matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_no_matches",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs none on relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_none_on_relays",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs public footer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_public_footer",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_search",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_title",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs try again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_try_again",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs unreachable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_unreachable",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "MSG-046"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

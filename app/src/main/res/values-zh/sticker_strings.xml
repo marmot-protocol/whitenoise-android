@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">贴纸</string>
+    <string name="sticker_alt">贴纸：%1$s</string>
+    <string name="sticker_with_emoji">%1$s 贴纸</string>
+    <string name="stickers_title">贴纸</string>
+    <string name="sticker_load_hint">加载贴纸</string>
+    <string name="sticker_tap_to_load">点按加载</string>
+    <string name="sticker_tap_to_retry">点按重试</string>
+    <string name="stickers_empty_title">没有贴纸</string>
+    <string name="stickers_empty_detail">添加贴纸包即可发送贴纸。</string>
+    <string name="stickers_browse">浏览贴纸包</string>
+    <string name="sticker_server_disclosure">贴纸从各贴纸包作者选择的服务器加载。这些服务器可以看到你的 IP 地址。</string>
+    <string name="sticker_packs_title">贴纸包</string>
+    <string name="sticker_pack">贴纸包</string>
+    <string name="sticker_packs_add_by_link">通过链接添加</string>
+    <string name="sticker_pack_link">贴纸包链接</string>
+    <string name="sticker_pack_open_link">打开链接</string>
+    <string name="sticker_pack_opening">正在打开…</string>
+    <string name="sticker_packs_installed">已安装</string>
+    <string name="sticker_packs_discover">发现</string>
+    <string name="sticker_packs_search">搜索贴纸包</string>
+    <string name="sticker_packs_none_on_relays">你的中继还没有任何贴纸包。点按链接按钮即可通过链接添加。</string>
+    <string name="sticker_packs_no_matches">没有符合搜索条件的贴纸包。</string>
+    <string name="sticker_packs_unreachable">无法在你的中继上查找贴纸包。</string>
+    <string name="sticker_packs_try_again">重试</string>
+    <string name="sticker_packs_public_footer">贴纸包是公开的，未经 White Noise 审核。你安装的贴纸包会公开列在你的中继上。</string>
+    <string name="sticker_pack_add">添加</string>
+    <string name="sticker_pack_by">作者：%1$s</string>
+    <string name="sticker_pack_tap_to_send">点按贴纸即可发送。</string>
+    <string name="sticker_pack_add_failed">无法添加贴纸包</string>
+    <string name="sticker_pack_remove_failed">无法移除贴纸包</string>
+    <string name="sticker_pack_open_failed">无法打开贴纸包</string>
+    <string name="sticker_send_failed">无法发送贴纸</string>
+    <string name="sticker_error_invalid">此贴纸包无效。</string>
+    <string name="sticker_error_not_found">找不到此贴纸包。</string>
+    <string name="sticker_error_network">无法连接贴纸包的中继。请检查网络连接后重试。</string>
+    <string name="sticker_error_import">此贴纸包无法导入。</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="other">%1$d 张贴纸</item>
+    </plurals>
+</resources>

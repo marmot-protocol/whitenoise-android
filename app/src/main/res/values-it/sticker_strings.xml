@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">Sticker</string>
+    <string name="sticker_alt">Sticker: %1$s</string>
+    <string name="sticker_with_emoji">Sticker %1$s</string>
+    <string name="stickers_title">Sticker</string>
+    <string name="sticker_load_hint">Carica sticker</string>
+    <string name="sticker_tap_to_load">Tocca per caricare</string>
+    <string name="sticker_tap_to_retry">Tocca per riprovare</string>
+    <string name="stickers_empty_title">Nessuno sticker</string>
+    <string name="stickers_empty_detail">Aggiungi un pacchetto di sticker per inviare sticker.</string>
+    <string name="stickers_browse">Sfoglia pacchetti di sticker</string>
+    <string name="sticker_server_disclosure">Gli sticker vengono caricati da server scelti dall\'autore di ogni pacchetto. Questi server possono vedere il tuo indirizzo IP.</string>
+    <string name="sticker_packs_title">Pacchetti di sticker</string>
+    <string name="sticker_pack">Pacchetto di sticker</string>
+    <string name="sticker_packs_add_by_link">Aggiungi tramite link</string>
+    <string name="sticker_pack_link">Link del pacchetto di sticker</string>
+    <string name="sticker_pack_open_link">Apri link</string>
+    <string name="sticker_pack_opening">Apertura…</string>
+    <string name="sticker_packs_installed">Installati</string>
+    <string name="sticker_packs_discover">Scopri</string>
+    <string name="sticker_packs_search">Cerca pacchetti di sticker</string>
+    <string name="sticker_packs_none_on_relays">I tuoi relay non hanno ancora pacchetti di sticker. Tocca il pulsante del link per aggiungerne uno tramite link.</string>
+    <string name="sticker_packs_no_matches">Nessun pacchetto di sticker corrisponde alla ricerca.</string>
+    <string name="sticker_packs_unreachable">Impossibile controllare i tuoi relay per i pacchetti di sticker.</string>
+    <string name="sticker_packs_try_again">Riprova</string>
+    <string name="sticker_packs_public_footer">I pacchetti di sticker sono pubblici e non vengono verificati da White Noise. I pacchetti installati sono elencati pubblicamente sui tuoi relay.</string>
+    <string name="sticker_pack_add">Aggiungi</string>
+    <string name="sticker_pack_by">Di %1$s</string>
+    <string name="sticker_pack_tap_to_send">Tocca uno sticker per inviarlo.</string>
+    <string name="sticker_pack_add_failed">Impossibile aggiungere il pacchetto di sticker</string>
+    <string name="sticker_pack_remove_failed">Impossibile rimuovere il pacchetto di sticker</string>
+    <string name="sticker_pack_open_failed">Impossibile aprire il pacchetto di sticker</string>
+    <string name="sticker_send_failed">Impossibile inviare lo sticker</string>
+    <string name="sticker_error_invalid">Questo pacchetto di sticker non è valido.</string>
+    <string name="sticker_error_not_found">Impossibile trovare questo pacchetto di sticker.</string>
+    <string name="sticker_error_network">Impossibile raggiungere i relay del pacchetto di sticker. Controlla la connessione e riprova.</string>
+    <string name="sticker_error_import">Questo pacchetto di sticker non può essere importato.</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="one">%1$d sticker</item>
+        <item quantity="other">%1$d sticker</item>
+    </plurals>
+</resources>

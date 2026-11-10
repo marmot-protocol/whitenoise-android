@@ -20,6 +20,7 @@ internal data class ChatListPreviewInput(
     val attachmentKind: ChatListAttachmentKindFfi?,
     val attachmentCount: UInt,
     val groupSystem: GroupSystemEventFfi?,
+    val isSticker: Boolean = false,
 ) {
     override fun toString(): String = "ChatListPreviewInput(redacted)"
 }
@@ -50,6 +51,7 @@ internal fun projectedChatListPreviewText(
         MessageProjector.isChatKind(preview.kind) && RemoteGiphyMedia.isEnvelopeText(preview.plaintext) ->
             copy.giphyMedia
         preview.plaintext.isNotBlank() -> preview.plaintext
+        preview.isSticker -> copy.sticker
         preview.attachmentKind != null -> copy.attachmentLabel(preview.attachmentKind, preview.attachmentCount)
         mediaFallback != null -> mediaFallback.text(copy)
         else -> latestFallback(copy.message)

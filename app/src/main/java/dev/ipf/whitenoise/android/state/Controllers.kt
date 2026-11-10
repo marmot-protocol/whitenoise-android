@@ -6639,6 +6639,13 @@ class ConversationController(
      * again. Touched only on the main thread; a failed read is not kept, so the next composition tries again.
      */
     internal val nativeAttachmentStateReads = HashMap<String, dev.ipf.marmotkit.AttachmentTransferStateFfi>()
+    private val stickers = appState.stickersFor(conversationAccountRef)
+
+    /** The bound account's sticker packs, shared with its other conversations. */
+    internal val stickerLibrary: StickerLibrary get() = stickers.library
+
+    /** The bound account's decoded sticker images, shared with its other conversations. */
+    internal val stickerAssets get() = stickers.assets
 
     /** The installed native handle; paging and commits share the session's retirement authorities. */
     internal val timelineSubscription: ConversationTimelineSubscriptionHandle?

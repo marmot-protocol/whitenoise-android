@@ -445,10 +445,12 @@ object LocalNotificationFormatter {
     ): String =
         reactionBody(update, context, reactedToPreviewOverride, readable = true)
             // A caption (or any resolved text) always wins; only a captionless
-            // attachment falls through to the type-aware label, and a non-media
+            // sticker or attachment falls through to its label, and a non-media
             // empty message to the generic body.
             ?: clean(previewTextOverride)
             ?: clean(update.previewText)
+            // A sticker's content is empty; its `sticker` tag is the message.
+            ?: update.sticker?.let { text(context, R.string.sticker, "Sticker") }
             ?: mediaBody(context, mediaKind)
             ?: text(context, R.string.notification_new_message, "New message")
 

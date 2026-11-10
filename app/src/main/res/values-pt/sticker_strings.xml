@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">Figurinha</string>
+    <string name="sticker_alt">Figurinha: %1$s</string>
+    <string name="sticker_with_emoji">Figurinha %1$s</string>
+    <string name="stickers_title">Figurinhas</string>
+    <string name="sticker_load_hint">Carregar figurinha</string>
+    <string name="sticker_tap_to_load">Toque para carregar</string>
+    <string name="sticker_tap_to_retry">Toque para tentar de novo</string>
+    <string name="stickers_empty_title">Nenhuma figurinha</string>
+    <string name="stickers_empty_detail">Adicione um pacote de figurinhas para enviar figurinhas.</string>
+    <string name="stickers_browse">Explorar pacotes de figurinhas</string>
+    <string name="sticker_server_disclosure">As figurinhas são carregadas de servidores escolhidos pelo autor de cada pacote. Esses servidores podem ver seu endereço IP.</string>
+    <string name="sticker_packs_title">Pacotes de figurinhas</string>
+    <string name="sticker_pack">Pacote de figurinhas</string>
+    <string name="sticker_packs_add_by_link">Adicionar por link</string>
+    <string name="sticker_pack_link">Link do pacote de figurinhas</string>
+    <string name="sticker_pack_open_link">Abrir link</string>
+    <string name="sticker_pack_opening">Abrindo…</string>
+    <string name="sticker_packs_installed">Instalados</string>
+    <string name="sticker_packs_discover">Descobrir</string>
+    <string name="sticker_packs_search">Buscar pacotes de figurinhas</string>
+    <string name="sticker_packs_none_on_relays">Seus relays ainda não têm pacotes de figurinhas. Toque no botão de link para adicionar um por link.</string>
+    <string name="sticker_packs_no_matches">Nenhum pacote de figurinhas corresponde à sua busca.</string>
+    <string name="sticker_packs_unreachable">Não foi possível consultar seus relays em busca de pacotes de figurinhas.</string>
+    <string name="sticker_packs_try_again">Tentar de novo</string>
+    <string name="sticker_packs_public_footer">Os pacotes de figurinhas são públicos e não são revisados pelo White Noise. Seus pacotes instalados ficam listados publicamente nos seus relays.</string>
+    <string name="sticker_pack_add">Adicionar</string>
+    <string name="sticker_pack_by">Por %1$s</string>
+    <string name="sticker_pack_tap_to_send">Toque em uma figurinha para enviá-la.</string>
+    <string name="sticker_pack_add_failed">Não foi possível adicionar o pacote de figurinhas</string>
+    <string name="sticker_pack_remove_failed">Não foi possível remover o pacote de figurinhas</string>
+    <string name="sticker_pack_open_failed">Não foi possível abrir o pacote de figurinhas</string>
+    <string name="sticker_send_failed">Não foi possível enviar a figurinha</string>
+    <string name="sticker_error_invalid">Este pacote de figurinhas não é válido.</string>
+    <string name="sticker_error_not_found">Não foi possível encontrar este pacote de figurinhas.</string>
+    <string name="sticker_error_network">Não foi possível acessar os relays do pacote de figurinhas. Verifique sua conexão e tente de novo.</string>
+    <string name="sticker_error_import">Este pacote de figurinhas não pode ser importado.</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="one">%1$d figurinha</item>
+        <item quantity="other">%1$d figurinhas</item>
+    </plurals>
+</resources>

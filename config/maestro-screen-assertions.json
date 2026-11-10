@@ -6420,6 +6420,38 @@
           "scope": "Delivery & battery page renders delivery choices; toolbar Back."
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+      "symbol": "EmptyStickerPicker",
+      "bindings": [
+        {
+          "case": "conversation-stickers-empty-cancel",
+          "selector": {
+            "text": "Browse sticker packs"
+          },
+          "scope": "empty picker for an account with no installed packs; no relay discovery or pack install."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+      "symbol": "StickerSheet",
+      "bindings": [
+        {
+          "case": "conversation-stickers-empty-cancel",
+          "selector": {
+            "text": "No stickers"
+          },
+          "scope": "sticker sheet opened from the attachment menu and dismissed with Back; no sticker send.",
+          "entry_assertion": {
+            "text": "No stickers"
+          },
+          "opened_by": {
+            "text": "Stickers"
+          }
+        }
+      ]
     }
   ]
 }
