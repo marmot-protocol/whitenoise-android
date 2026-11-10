@@ -142,6 +142,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -8385,7 +8386,7 @@ class ConversationController(
             ) { attempt ->
                 // A cancel wakes the retry wait, so check it before a lookup that may fail again and retry forever.
                 requireOptimisticSendNotCancelled(optimisticKey)
-                val emojiArtwork = artwork.resolve()
+                val emojiArtwork = untilSendCancelled(optimisticKey) { artwork.resolve() }
                 // Serialize only this commit-producing FFI attempt. Releasing the
                 // commit lock before retry backoff keeps reactions and other
                 // mutations usable; the outer text-order lock keeps later text
@@ -9545,6 +9546,36 @@ class ConversationController(
             }
         }
     }
+
+    /**
+     * Runs [block] until it finishes or the send [optimisticKey] is cancelled. A cancel stops [block] at
+     * once, so a slow artwork lookup never holds the text order for later sends, and ends the send with
+     * [OptimisticSendCancelledException], so it can never publish.
+     */
+    private suspend fun <T> untilSendCancelled(
+        optimisticKey: String,
+        block: suspend () -> T,
+    ): T =
+        coroutineScope {
+            // A lookup that never suspends finishes here without yielding the send to anything else.
+            val work = async(start = CoroutineStart.UNDISPATCHED) { block() }
+            if (work.isCompleted) return@coroutineScope work.await()
+            val watcher =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    optimisticCancellationGeneration.first {
+                        optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED
+                    }
+                    work.cancel()
+                }
+            try {
+                work.await()
+            } catch (cancel: CancellationException) {
+                requireOptimisticSendNotCancelled(optimisticKey)
+                throw cancel
+            } finally {
+                watcher.cancel()
+            }
+        }
 
     private fun requireOptimisticSendNotCancelled(optimisticKey: String) {
         if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED) {

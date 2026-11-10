@@ -45,6 +45,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -2128,6 +2129,50 @@ class ConversationSendRetryIntegrationTest {
                 testScheduler.currentTime - cancellationAtMs < SEND_RETRY_BACKOFF_MS,
             )
             assertEquals(emptyList<String>(), published)
+            assertTrue(controller.timeline.none { it.record.plaintext == "hi :party:" })
+        }
+
+    /** Cancelling a send whose artwork lookup is still running stops the lookup and lets the next send publish. */
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun cancellingASlowEmojiLookupUnblocksTheNextSend() =
+        runTest {
+            val lookupStarted = CompletableDeferred<Unit>()
+            val lookupStopped = CompletableDeferred<Unit>()
+            val published = mutableListOf<String>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { text ->
+                        if (':' !in text) return@ConversationController listOf(partyArtwork())
+                        lookupStarted.complete(Unit)
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            lookupStopped.complete(Unit)
+                        }
+                    },
+                    customEmojiSender = { _, text, _, _, _ ->
+                        published += text
+                        successfulSendSummary()
+                    },
+                )
+            val first = async { appState.sendConversationText(controller, "hi :party:") }
+            lookupStarted.await()
+            runCurrent()
+            assertTrue(controller.deleteMessage(controller.timeline.single().record, presentFailure = false))
+            runCurrent()
+            ShadowLooper.idleMainLooper()
+            assertTrue("the cancelled send still holds the text order", first.isCompleted)
+            val second = async { controller.send("next") }
+            runCurrent()
+            ShadowLooper.idleMainLooper()
+            second.await()
+            assertTrue(lookupStopped.isCompleted)
+            assertEquals(listOf("next"), published)
             assertTrue(controller.timeline.none { it.record.plaintext == "hi :party:" })
         }
 
