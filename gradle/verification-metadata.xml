@@ -3891,12 +3891,31 @@
             <sha256 value="aa97c53f034c7ffed41975b2c37b82b02b23b3cd28be61a1281edd29014bbcc4" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="androidx.test.uiautomator" name="uiautomator-shell-android" version="2.4.1">
+         <artifact name="uiautomator-shell-android-2.4.1.module">
+            <sha256 value="a38ea817f060be6f2f04bbe9e4565d73e704e1a52109ee4016f613091b22216a" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="uiautomator-shell-android-2.4.1.pom">
+            <sha256 value="56df4473f105b7c786974694a4d07e8fbd34d21ef8cff9366589e6de7aa58fe4" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="uiautomator-shell.aar">
+            <sha256 value="f1ad18e269ae7a22f95d5f91d73e8ba68e4aa4dcae520e1ab3876cc1b017fbe0" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="androidx.test.uiautomator" name="uiautomator-shell" version="2.4.0">
          <artifact name="uiautomator-shell-2.4.0.module">
             <sha256 value="164b4a050954e517d6fba4fd3713fa880ef0c358d5a5d551b84fa0bd33d12d0c" origin="Independent official supplier audit" />
          </artifact>
          <artifact name="uiautomator-shell-2.4.0.pom">
             <sha256 value="862dedac11a8b8482882ea0334cd78b50ac455f8d02633c75afa11cc2147e6d2" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.test.uiautomator" name="uiautomator-shell" version="2.4.1">
+         <artifact name="uiautomator-shell-2.4.1.module">
+            <sha256 value="ad75611eaaee131e8af9a5343503971ba1a9030d7825fdb52a4370ed1a66e88e" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="uiautomator-shell-2.4.1.pom">
+            <sha256 value="c2a39d5a7715c80715d80d531bc4702319b35584107a9f2e46b83996815fae6e" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.test.uiautomator" name="uiautomator" version="2.4.0">
@@ -3908,6 +3927,17 @@
          </artifact>
          <artifact name="uiautomator-2.4.0.pom">
             <sha256 value="00c70e90a3d1c367b51c905794d840b4c53adc7ad48b730307c752a3e7666d17" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="androidx.test.uiautomator" name="uiautomator" version="2.4.1">
+         <artifact name="uiautomator-2.4.1.aar">
+            <sha256 value="549858cf5b51b81576e1d2f3e7fbd4ce40bd6db2fe4954b7c3a62605165d0f25" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="uiautomator-2.4.1.module">
+            <sha256 value="0e4fbdc0277974240fc6616ae0e0c8f4d935bb0f83a76b8eed650af6279d5547" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="uiautomator-2.4.1.pom">
+            <sha256 value="dc0b3639082fc399128cc5840a320bd5b0ee128fb3facd39dcd3da2c0e6ba70a" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="androidx.test" name="annotation" version="1.0.1">
