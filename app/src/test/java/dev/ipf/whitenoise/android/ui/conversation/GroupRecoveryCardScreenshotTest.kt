@@ -191,6 +191,15 @@ class GroupRecoveryCardScreenshotTest {
     @Config(qualifiers = "en-w600dp-h900dp-mdpi")
     fun historyNoticeAmoledLargeRtl() = captureHistoryNotice(dark = true, amoled = true, largeRtl = true)
 
+    /** A notice raised by a rejoin says so, instead of the general missing-messages wording. */
+    @Test
+    fun rejoinHistoryNoticeLight() = captureRejoinNotice(dark = false, largeRtl = false)
+
+    /** The longer rejoin wording still wraps with its Dismiss action reachable in dark, large RTL. */
+    @Test
+    @Config(qualifiers = "en-w600dp-h900dp-mdpi")
+    fun rejoinHistoryNoticeDarkLargeRtl() = captureRejoinNotice(dark = true, largeRtl = true)
+
     /** Without a notice id there is nothing to dismiss, so no Dismiss action is offered. */
     @Test
     fun historyNoticeWithoutIdsOffersNoDismiss() {
@@ -211,11 +220,18 @@ class GroupRecoveryCardScreenshotTest {
         composeRule.onNodeWithText("Dismiss").assertDoesNotExist()
     }
 
+    /** Renders a rejoin's history notice without AMOLED and records its screenshot baseline. */
+    private fun captureRejoinNotice(
+        dark: Boolean,
+        largeRtl: Boolean,
+    ) = captureHistoryNotice(dark = dark, amoled = false, largeRtl = largeRtl, rejoined = true)
+
     /** Renders the group history notice and records its screenshot baseline. */
     private fun captureHistoryNotice(
         dark: Boolean,
         amoled: Boolean,
         largeRtl: Boolean,
+        rejoined: Boolean = false,
     ) {
         var dismissals = 0
         composeRule.setContent {
@@ -231,13 +247,28 @@ class GroupRecoveryCardScreenshotTest {
                         onConfirm = {},
                         onDecline = {},
                         onDismissHistoryNotices = { dismissals++ },
+                        historyRejoined = rejoined,
                         modifier = Modifier.width(if (largeRtl) 600.dp else 360.dp).testTag("group-recovery-card"),
                     )
                 }
             }
         }
-        composeRule.onNodeWithText("Some earlier messages in this chat may be missing.").assertIsDisplayed()
-        val name = if (largeRtl) "amoled_large_rtl" else "light"
+        val wording =
+            if (rejoined) {
+                "You rejoined this chat. Messages from before you rejoined may be missing."
+            } else {
+                "Some earlier messages in this chat may be missing."
+            }
+        composeRule.onNodeWithText(wording).assertIsDisplayed()
+        val theme =
+            if (amoled) {
+                "amoled"
+            } else if (dark) {
+                "dark"
+            } else {
+                "light"
+            }
+        val name = (if (rejoined) "rejoin_" else "") + theme + if (largeRtl) "_large_rtl" else ""
         composeRule
             .onNodeWithTag("group-recovery-card")
             .captureRoboImage("src/test/snapshots/group_recovery_history_notice_$name.png")

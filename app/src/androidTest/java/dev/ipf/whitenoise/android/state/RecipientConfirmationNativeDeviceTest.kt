@@ -141,7 +141,7 @@ class RecipientConfirmationNativeDeviceTest {
                 val page =
                     participant.native.timelineMessages(
                         participant.account.label,
-                        TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
+                        TimelineMessageQueryFfi.page(group, null, null, null, null, null, 100u),
                     )
                 found = page.messages.singleOrNull { it.plaintext == body && matches(it) }
                 if (found == null) delay(100L)

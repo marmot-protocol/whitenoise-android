@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ChatDetailsMorph.kt",
         "anchor": "fun rememberChatDetailsMorph(",
         "test_ids": [
-          "GRP-038"
+          "GRP-039"
         ]
       }
     ]
