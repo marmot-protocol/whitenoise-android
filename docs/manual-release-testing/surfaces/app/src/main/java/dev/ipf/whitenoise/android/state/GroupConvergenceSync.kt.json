@@ -1,0 +1,41 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupConvergenceSync.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "documentation_contracts": [
+      {
+        "surface": "R.string.group_convergence_retry_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupConvergenceSync.kt",
+        "anchor": "R.string.group_convergence_retry_failed",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "R.string.group_convergence_retry_still_parked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupConvergenceSync.kt",
+        "anchor": "R.string.group_convergence_retry_still_parked",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "R.string.toast_chat_still_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupConvergenceSync.kt",
+        "anchor": "R.string.toast_chat_still_loading",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "R.string.toast_send_connection_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupConvergenceSync.kt",
+        "anchor": "R.string.toast_send_connection_failed",
+        "test_ids": [
+          "GRP-039"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -2096,6 +2096,10 @@
     <string name="group_recovery_failed_reinvites">部分邀请无法恢复。请从“群组详情”重新邀请这些成员。</string>
     <string name="group_recovery_review_invitation_from">查看 %1$s 的邀请 · 轮次 %2$s</string>
     <string name="group_recovery_check_failed">无法检查群组恢复状态，请重试。</string>
+    <string name="group_convergence_parked">此聊天已停止同步。你发送的消息会等到它跟上进度后再发出。</string>
+    <string name="group_convergence_retrying">正在重试…</string>
+    <string name="group_convergence_retry_still_parked">此聊天仍未同步，请稍后重试。</string>
+    <string name="group_convergence_retry_failed">无法重新同步此聊天，请稍后重试。</string>
     <string name="group_history_may_be_incomplete">此聊天中可能缺少部分较早的消息。</string>
     <string name="group_history_before_rejoin">你已重新加入此聊天。重新加入之前的消息可能缺失。</string>
     <string name="account_history_may_be_incomplete">此账户可能缺少部分消息。White Noise 无法确认所有消息都已送达。</string>

@@ -38,7 +38,7 @@ internal fun conversationTimelineContentPadding(foregroundOverlap: Dp = 0.dp): P
  * left uncounted, which shifted every timeline index by one row.
  */
 internal fun ConversationController.conversationGroupRecoveryRowVisible(): Boolean =
-    groupRecoveryReadFailed || groupRecoveryStatus?.hasVisibleRecoveryState() == true
+    hasVisibleGroupRecoveryCard(groupRecoveryStatus, groupRecoveryReadFailed, groupConvergenceParked)
 
 /** Counts optional rows rendered between the permanent top spacer and the timeline. */
 internal fun conversationTimelineLeadingStructuralRowCount(

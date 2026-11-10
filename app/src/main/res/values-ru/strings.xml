@@ -2205,6 +2205,10 @@
     <string name="group_recovery_failed_reinvites">Некоторые приглашения не удалось восстановить. Пригласите этих людей снова в разделе сведений о группе.</string>
     <string name="group_recovery_review_invitation_from">Проверить приглашение от %1$s · эпоха %2$s</string>
     <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
+    <string name="group_convergence_parked">Этот чат перестал синхронизироваться. Отправленные вами сообщения будут ждать, пока он не обновится.</string>
+    <string name="group_convergence_retrying">Повторная попытка…</string>
+    <string name="group_convergence_retry_still_parked">Этот чат всё ещё не синхронизируется. Повторите попытку позже.</string>
+    <string name="group_convergence_retry_failed">Не удалось повторить синхронизацию этого чата. Повторите попытку позже.</string>
     <string name="group_history_may_be_incomplete">В этом чате могут отсутствовать некоторые более ранние сообщения.</string>
     <string name="group_history_before_rejoin">Вы снова присоединились к этому чату. Сообщения до повторного вступления могут отсутствовать.</string>
     <string name="account_history_may_be_incomplete">В этом аккаунте могут отсутствовать некоторые сообщения. White Noise не удалось подтвердить, что все сообщения были получены.</string>

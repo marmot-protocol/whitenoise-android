@@ -114,8 +114,7 @@ internal fun TimelineRow(
                 controller.hasMoreBefore ||
                     controller.isLoadingOlder ||
                     (controller.error != null && controller.errorEdge == ConversationLoadFailureEdge.TOP) ||
-                    controller.groupRecoveryReadFailed ||
-                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+                    controller.conversationGroupRecoveryRowVisible()
             DaySeparator(
                 label = daySeparatorLabel,
                 atTranscriptStart = older == null && !hasLeadingHeader,

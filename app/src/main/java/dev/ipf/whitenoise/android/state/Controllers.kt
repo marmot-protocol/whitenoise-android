@@ -33,6 +33,7 @@ import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
+import dev.ipf.marmotkit.EventsSubscriptionInterface
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
@@ -5980,6 +5981,17 @@ class ConversationController(
             groupRecoveryStatus(account, groupIdHex)
         }
     },
+    // Test seams: whether MDK parked this chat's convergence, the explicit retry, and the raw event stream.
+    private val groupConvergenceParkedReader: suspend (String, String) -> Boolean = { account, groupIdHex ->
+        appState.marmotIo { groupMlsState(account, groupIdHex).convergenceParked }
+    },
+    private val groupConvergenceRetrier: suspend (String, String) -> Unit = { account, groupIdHex ->
+        appState.marmotIo { retryGroupConvergence(account, groupIdHex) }
+    },
+    // MDK's runtime event firehose, the only stream that carries a chat's park and resume edges.
+    private val runtimeEventStreamOpener: suspend () -> EventsSubscriptionInterface = {
+        appState.marmotIo { subscribeEvents() }
+    },
     private val historyNoticeDismisser: suspend (String, String) -> Boolean = { account, noticeId ->
         appState.marmotIo { dismissHistoryNotice(account, noticeId) }
     },
@@ -6561,6 +6573,22 @@ class ConversationController(
     /** Prevents duplicate accept/decline actions while MDK verifies the selected invitation. */
     var groupRecoveryMutationInFlight by mutableStateOf(false)
         private set
+
+    /** The last answer MDK gave to whether it parked this chat's convergence, kept when a later read fails. */
+    var groupConvergenceParked by mutableStateOf(false)
+        private set
+
+    /** Whether the user's explicit convergence retry is running. */
+    var groupConvergenceRetrying by mutableStateOf(false)
+        private set
+
+    /** Why the latest convergence retry left the chat parked, as a localized message, or null. */
+    @get:StringRes
+    var groupConvergenceRetryFailure by mutableStateOf<Int?>(null)
+        private set
+
+    // Only the newest parked-flag read may publish, so a slow earlier read cannot overwrite a later answer.
+    private val groupConvergenceReads = StalenessGuard()
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
     internal val localTimelineOrderOverrides =
         appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
@@ -6947,6 +6975,7 @@ class ConversationController(
                 // rescheduled by timeline/group-state publishes; when there is no
                 // loaded row near expiry it falls back to the old slow cadence.
                 val foregroundSweepJob = launch { runForegroundDisappearingMessageSweep(account) }
+                val convergenceEventsJob = launch { runGroupConvergenceEventLoop(account) }
                 try {
                     runConversationSubscriptionLoop(account)
                 } finally {
@@ -6954,6 +6983,7 @@ class ConversationController(
                     // the subscription loop. Stop its infinite sibling so
                     // runStart can finish and release its lifecycle state.
                     foregroundSweepJob.cancel()
+                    convergenceEventsJob.cancel()
                 }
             }
         } catch (cancel: CancellationException) {
@@ -7427,9 +7457,10 @@ class ConversationController(
         }
     }
 
-    /** Re-reads group recovery after each authoritative group-state edge. */
+    /** Re-reads group recovery, and whether convergence is parked, after each authoritative group-state edge. */
     @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure is classified for presentation.
     private suspend fun refreshGroupRecoveryStatus() {
+        refreshGroupConvergenceParked()
         val accountRef = conversationAccountRef ?: return
         val groupIdHex = group.groupIdHex
         val runtimeGeneration = appState.runtimeGeneration
@@ -7498,6 +7529,100 @@ class ConversationController(
 
     /** Explicit retry for an advisory recovery-status read failure. */
     suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()
+
+    /**
+     * Reads whether MDK parked this chat's convergence and publishes the answer under the recovery guards. Returns
+     * the published answer, or null when the read failed or lost ownership. A failed read keeps the last known
+     * answer, since it says nothing about whether the chat is parked.
+     */
+    private suspend fun refreshGroupConvergenceParked(): Boolean? {
+        val accountRef = conversationAccountRef
+        val groupIdHex = group.groupIdHex
+        val runtimeGeneration = appState.runtimeGeneration
+        val recoveryEpoch = groupRecoveryLifetime.capture()
+        val readEpoch = groupConvergenceReads.advance()
+        // Any non-cancellation native failure keeps the last known answer.
+        val parked =
+            accountRef?.let { account ->
+                runCatchingCancellable { groupConvergenceParkedReader(account, groupIdHex) }.getOrNull()
+            } ?: return null
+        var published = false
+        groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
+            if (
+                groupConvergenceReads.isCurrent(readEpoch) &&
+                accountRef != null &&
+                ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)
+            ) {
+                groupConvergenceParked = parked
+                if (!parked) groupConvergenceRetryFailure = null
+                published = true
+            }
+        }
+        return if (published) parked else null
+    }
+
+    /**
+     * Re-reads the parked flag on each raw group-state event for this chat, which MDK fires when convergence parks
+     * or resumes. A stream that ends or fails is reopened after a pause, and every reopen re-reads once, since an
+     * edge may have passed while no stream was open.
+     */
+    @VisibleForTesting
+    internal suspend fun runGroupConvergenceEventLoop(account: String) {
+        var reopened = false
+        while (currentCoroutineContext().isActive) {
+            val stream = runCatchingCancellable { runtimeEventStreamOpener() }.getOrNull()
+            if (stream != null) {
+                try {
+                    if (reopened) refreshGroupConvergenceParked()
+                    runCatchingCancellable {
+                        while (true) {
+                            val event = withContext(Dispatchers.IO) { stream.next() } ?: break
+                            if (event.isGroupStateUpdateFor(account, group.groupIdHex)) refreshGroupConvergenceParked()
+                        }
+                    }
+                } finally {
+                    withContext(NonCancellable) { runCatching { (stream as? AutoCloseable)?.close() } }
+                }
+            }
+            reopened = true
+            delay(GROUP_CONVERGENCE_EVENT_RETRY_MILLIS)
+        }
+    }
+
+    /**
+     * Asks MDK to resume this chat's parked convergence, then re-reads the parked flag to learn whether it worked.
+     * While it runs the card shows progress and the other recovery actions wait. A chat that stays parked gets a
+     * localized reason, never the engine's own text.
+     */
+    @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure is mapped to a localized reason.
+    suspend fun retryGroupConvergence() {
+        if (groupRecoveryMutationInFlight || !groupConvergenceParked) return
+        val accountRef = conversationAccountRef ?: return
+        val groupIdHex = group.groupIdHex
+        val runtimeGeneration = appState.runtimeGeneration
+        groupRecoveryMutationInFlight = true
+        groupConvergenceRetrying = true
+        groupConvergenceRetryFailure = null
+        try {
+            val failure =
+                try {
+                    groupConvergenceRetrier(accountRef, groupIdHex)
+                    null
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (throwable: Throwable) {
+                    Log.w("DMConversation", releaseFailureMarker("GROUP_CONVERGENCE_RETRY", throwable))
+                    throwable
+                }
+            val stillParked = refreshGroupConvergenceParked()
+            if (ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)) {
+                groupConvergenceRetryFailure = groupConvergenceRetryFailureMessage(failure, stillParked)
+            }
+        } finally {
+            groupConvergenceRetrying = false
+            groupRecoveryMutationInFlight = false
+        }
+    }
 
     /** Dismisses this group's shown notice ids, keeping the action busy until refresh completes. */
     suspend fun dismissGroupHistoryNotices() {

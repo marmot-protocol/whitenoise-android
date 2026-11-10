@@ -4479,10 +4479,7 @@ internal fun ConversationScreen(
                                 routeTransitionInProgress = routeTransitionInProgress,
                             )
                         renderedTimeline.isEmpty() &&
-                            (
-                                controller.groupRecoveryReadFailed ||
-                                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
-                            ) ->
+                            controller.conversationGroupRecoveryRowVisible() ->
                             Column(modifier = Modifier.fillMaxSize()) {
                                 ConversationGroupRecoveryCard(controller, appState)
                                 ConversationEmptyMessage(

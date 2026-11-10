@@ -2136,6 +2136,10 @@
     <string name="group_recovery_failed_reinvites">Não foi possível restaurar alguns convites. Volte a convidar essas pessoas nos Detalhes do grupo.</string>
     <string name="group_recovery_review_invitation_from">Revisar convite de %1$s · época %2$s</string>
     <string name="group_recovery_check_failed">Não foi possível verificar a recuperação do grupo. Tente novamente.</string>
+    <string name="group_convergence_parked">Esta conversa parou de sincronizar. As mensagens que você enviar vão aguardar até ela se atualizar.</string>
+    <string name="group_convergence_retrying">Tentando novamente…</string>
+    <string name="group_convergence_retry_still_parked">Esta conversa ainda não está sincronizando. Tente novamente mais tarde.</string>
+    <string name="group_convergence_retry_failed">Não foi possível tentar sincronizar esta conversa novamente. Tente novamente mais tarde.</string>
     <string name="group_history_may_be_incomplete">Algumas mensagens anteriores desta conversa podem estar faltando.</string>
     <string name="group_history_before_rejoin">Você entrou novamente nesta conversa. Mensagens de antes do seu retorno podem estar faltando.</string>
     <string name="account_history_may_be_incomplete">Algumas mensagens desta conta podem estar faltando. O White Noise não conseguiu confirmar que todas as mensagens chegaram.</string>

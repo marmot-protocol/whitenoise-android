@@ -17,7 +17,8 @@
         "anchor": "fun ConversationGroupRecoveryCard(",
         "test_ids": [
           "GRP-021",
-          "GRP-024"
+          "GRP-024",
+          "GRP-039"
         ]
       },
       {
@@ -26,7 +27,8 @@
         "anchor": "fun GroupRecoveryCard(",
         "test_ids": [
           "GRP-021",
-          "GRP-024"
+          "GRP-024",
+          "GRP-039"
         ]
       },
       {
@@ -66,7 +68,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "fun RecoveryNoticeSurface(",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "GroupConvergenceParkedNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "fun GroupConvergenceParkedNotice(",
+        "test_ids": [
+          "GRP-039"
         ]
       }
     ],
@@ -164,7 +175,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
         "anchor": "R.string.retry",
         "test_ids": [
-          "GRP-021"
+          "GRP-021",
+          "GRP-039"
         ]
       },
       {
@@ -173,6 +185,22 @@
         "anchor": "R.string.group_history_before_rejoin",
         "test_ids": [
           "GRP-038"
+        ]
+      },
+      {
+        "surface": "setting:group_convergence_parked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_convergence_parked",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "setting:group_convergence_retrying",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "R.string.group_convergence_retrying",
+        "test_ids": [
+          "GRP-039"
         ]
       }
     ]
