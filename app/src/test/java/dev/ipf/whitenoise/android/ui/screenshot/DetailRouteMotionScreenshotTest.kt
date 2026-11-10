@@ -262,7 +262,8 @@ class DetailRouteMotionScreenshotTest {
 
     /**
      * Steps through 21 frames of the running route transition, checking that the first frame exposes the themed
-     * backplate at the edge the moving page vacates, and saves goldens for frames 0, 6 and 20 (or every frame).
+     * backplate at the edge the moving page or growing card vacates, and saves goldens for frames 0, 6 and 20
+     * (or every frame).
      */
     private fun captureTransition(
         name: String,
@@ -273,7 +274,8 @@ class DetailRouteMotionScreenshotTest {
             if (captureFrames || frame in listOf(0, 6, 20)) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
-                if (frame == 0) {
+                // Closing details shrinks the card over the live conversation, which owns that edge.
+                if (frame == 0 && !name.endsWith("_entry_back")) {
                     val exposedLeft = name.endsWith("_back") == name.contains("_rtl")
                     val edge = if (exposedLeft) 1 else bitmap.width - 2
                     for (y in listOf(bitmap.height / 4, bitmap.height / 2, bitmap.height * 3 / 4)) {

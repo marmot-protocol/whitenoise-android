@@ -3705,6 +3705,8 @@ internal fun ConversationScreen(
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
     // One motion owner for the transcript and both full-screen routes, so Back animates the return.
+    // Details and composer settings grow out of the end edge like top-level Settings, so the chat
+    // speaks the same card language and the route never travels with the closing keyboard.
     val transcriptRouteMotion =
         rememberRouteMotionModifier(
             target = showDetails to showComposerSettings,
@@ -3712,6 +3714,7 @@ internal fun ConversationScreen(
             ownerKey = controller to appState.runtimeGeneration,
             animationsEnabled = surfaceMotionEnabled,
             suppressMotion = routeTransitionInProgress || routePresentationFrozen,
+            topLevelBubble = true,
         )
     // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
     val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
@@ -4088,7 +4091,8 @@ internal fun ConversationScreen(
                             freezeRoutePresentation = freezeRoutePresentation,
                             openDetailsDescription = openDetailsDescription,
                             onOpenDetails = {
-                                // The keyboard starts closing with the slide instead of after the composer leaves.
+                                // The keyboard starts closing as the details card grows,
+                                // not after the composer leaves.
                                 keyboardController?.hide()
                                 showDetails = true
                             },
