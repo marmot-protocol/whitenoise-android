@@ -45,6 +45,12 @@ internal data class GlobalSearchResultsQuery(
     /** The scoped chats read one by one and merged, or null when one query covers the scope. */
     val fanOutGroups: List<String>? = groups?.sorted()?.takeIf { it.size in 2..GLOBAL_SEARCH_FAN_OUT_MAX_CHATS }
 
+    /** Whether [groupIdHex] is inside this query's chat scope; every chat is when no scope is set. */
+    fun coversGroup(groupIdHex: String): Boolean {
+        val scope = canonicalGroups ?: return true
+        return groupIdHex.lowercase(Locale.ROOT) in scope
+    }
+
     /** True when no message can match, so the list shows its empty state without a native read. */
     val matchesNothing: Boolean get() = groups?.isEmpty() == true
 
@@ -82,7 +88,7 @@ internal data class GlobalSearchResultsQuery(
         nowMillis: Long,
         needleMatchedByMdk: Boolean = true,
     ): GlobalSearchResult? {
-        val inScope = canonicalGroups == null || record.groupIdHex.lowercase(Locale.ROOT) in canonicalGroups
+        val inScope = coversGroup(record.groupIdHex)
         val searchable = searchableTimelineRecord(record)
         // A row MDK returned already matched the needle under MDK's own case folding (which can change a string's
         // length, as for a dotted İ), so only kind, deletion and the filters are checked. A row from a live update

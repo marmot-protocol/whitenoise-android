@@ -331,36 +331,48 @@ private val GLOBAL_SEARCH_MATCHING_TRIGGERS =
         TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
     )
 
+/** Triggers that rewrite or remove a row that already existed, which a read in flight may be holding. */
+private val GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS =
+    setOf(
+        TimelineUpdateTriggerFfi.MESSAGE_DELETED,
+        TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
+    )
+
 /**
  * Whether a timeline projection update can change what this session lists: the removal of a loaded row, a
  * deletion, edit, send-state or snapshot change of one, or a new or edited message the query would now admit.
  * Reactions, receipts and activity elsewhere never cause a reread, so a busy account does not keep rereading.
- * While a page or refresh is in flight, any removal or non-inert change counts, since that read may hold the row.
+ * While a page or refresh is in flight it may hold rows that are not listed yet, so a removal, deletion, edit or
+ * invalidation of any in-scope row also counts then; a new message is only ever counted when the query admits it,
+ * so a refresh never queues another one for unrelated traffic.
  */
 internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectionUpdateFfi): Boolean {
     val current = query ?: return false
     val loaded = state.seenKeys
-    // A read in flight may already hold a row this change removes or rewrites, before it is listed, so while one
-    // is in flight every removal and non-inert change counts and queues a recheck after that read.
-    val reading = state.inFlight != null
+    val heldByRead = state.inFlight != null && current.coversGroup(update.groupIdHex)
     return update.changes.any { change ->
         when (change) {
             is TimelineMessageChangeFfi.Remove ->
-                reading || globalSearchKey(update.groupIdHex, change.messageIdHex) in loaded
-            is TimelineMessageChangeFfi.Upsert -> {
-                val listed = reading || globalSearchKey(update.groupIdHex, change.message.messageIdHex) in loaded
-                if (listed) {
-                    change.trigger !in GLOBAL_SEARCH_INERT_TRIGGERS
-                } else {
-                    change.trigger in GLOBAL_SEARCH_MATCHING_TRIGGERS &&
-                        current.admit(
-                            change.message,
-                            environment.hiddenMessageIds,
-                            environment.nowMillis(),
-                            needleMatchedByMdk = false,
-                        ) != null
+                heldByRead || globalSearchKey(update.groupIdHex, change.messageIdHex) in loaded
+            is TimelineMessageChangeFfi.Upsert ->
+                when {
+                    globalSearchKey(update.groupIdHex, change.message.messageIdHex) in loaded ->
+                        change.trigger !in GLOBAL_SEARCH_INERT_TRIGGERS
+                    heldByRead && change.rewritesExistingRow() -> true
+                    else ->
+                        change.trigger in GLOBAL_SEARCH_MATCHING_TRIGGERS &&
+                            current.admit(
+                                change.message,
+                                environment.hiddenMessageIds,
+                                environment.nowMillis(),
+                                needleMatchedByMdk = false,
+                            ) != null
                 }
-            }
         }
     }
 }
+
+/** A deletion or edit of an existing row, or a send-state change that invalidated it. */
+private fun TimelineMessageChangeFfi.Upsert.rewritesExistingRow(): Boolean =
+    trigger in GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS ||
+        (trigger == TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED && message.invalidationStatus != null)

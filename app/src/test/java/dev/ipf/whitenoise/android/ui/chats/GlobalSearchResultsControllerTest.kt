@@ -510,18 +510,8 @@ class GlobalSearchResultsControllerTest {
     fun deletionDuringAPageReadIsRecheckedAfterIt() =
         runTest {
             val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
-            val gate = CompletableDeferred<Unit>()
-            var held = true
             // The first page is read from the store at once, then held, as an IO read in flight would be.
-            val reader =
-                GlobalSearchTimelineReader { query ->
-                    val page = store.page(query)
-                    if (held) {
-                        held = false
-                        gate.await()
-                    }
-                    page
-                }
+            val (reader, gate) = holdingFirstRead(store)
             val controller = controller(reader)
             controller.search(GlobalSearchResultsQuery(needle = "hello"))
             advanceUntilIdle()
@@ -538,19 +528,84 @@ class GlobalSearchResultsControllerTest {
             assertEquals(listOf("g:m2", "g:m0"), keys(controller))
         }
 
-    /** A wakeup during the very first page is queued, not dropped. */
+    /** A removal arriving during the very first page queues a recheck instead of being dropped. */
     @Test
-    fun refreshDuringTheFirstPageIsQueued() =
+    fun removalDuringTheFirstPageIsQueued() =
         runTest {
             val store = StoreReader((0 until 2).map { record("g", "m$it", at = 100uL + it.toULong()) })
-            val controller = controller(store)
+            val (reader, gate) = holdingFirstRead(store)
+            val controller = controller(reader)
             controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertEquals(0, controller.state.batches)
+
+            store.replace("m1") { it.copy(deleted = true) }
+            val removal = TimelineMessageChangeFfi.Remove("m1", TimelineRemoveReasonFfi.entries.first())
+            assertTrue(controller.isTouchedBy(update("g", removal)))
             controller.refresh()
+            gate.complete(Unit)
             advanceUntilIdle()
 
             assertEquals(2, store.queries.size)
-            assertEquals(listOf("g:m1", "g:m0"), keys(controller))
+            assertEquals(listOf("g:m0"), keys(controller))
         }
+
+    /** During a background refresh, unrelated or non-matching new messages never queue another refresh. */
+    @Test
+    fun unrelatedTrafficDuringARefreshDoesNotChainRefreshes() =
+        runTest {
+            val store = StoreReader((0 until 2).map { record("chosen", "m$it", at = 100uL + it.toULong()) })
+            val gate = CompletableDeferred<Unit>()
+            var reads = 0
+            val reader =
+                GlobalSearchTimelineReader { query ->
+                    val page = store.page(query)
+                    if (++reads == 2) gate.await()
+                    page
+                }
+            val controller = controller(reader)
+            controller.search(GlobalSearchResultsQuery(needle = "hello", groups = setOf("chosen")))
+            advanceUntilIdle()
+            controller.refresh()
+            advanceUntilIdle()
+            assertTrue(controller.state.refreshing)
+
+            fun touched(
+                group: String,
+                id: String,
+                text: String,
+                trigger: TimelineUpdateTriggerFfi,
+            ) = controller.isTouchedBy(
+                update(group, TimelineMessageChangeFfi.Upsert(trigger, record(group, id, at = 900uL, text = text))),
+            )
+
+            assertFalse(touched("elsewhere", "e1", "hello from elsewhere", TimelineUpdateTriggerFfi.NEW_MESSAGE))
+            assertFalse(touched("chosen", "n1", "unrelated words", TimelineUpdateTriggerFfi.NEW_MESSAGE))
+            assertFalse(touched("chosen", "n2", "hello", TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED))
+            assertFalse(touched("elsewhere", "e2", "hello", TimelineUpdateTriggerFfi.MESSAGE_DELETED))
+            assertTrue(touched("chosen", "n3", "hello again", TimelineUpdateTriggerFfi.NEW_MESSAGE))
+            assertTrue(touched("chosen", "old", "hello", TimelineUpdateTriggerFfi.MESSAGE_DELETED))
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(2, reads)
+        }
+
+    /** A reader that holds its first read after taking the page from [store], with the gate that releases it. */
+    private fun holdingFirstRead(store: StoreReader): Pair<GlobalSearchTimelineReader, CompletableDeferred<Unit>> {
+        val gate = CompletableDeferred<Unit>()
+        var held = true
+        val reader =
+            GlobalSearchTimelineReader { query ->
+                val page = store.page(query)
+                if (held) {
+                    held = false
+                    gate.await()
+                }
+                page
+            }
+        return reader to gate
+    }
 
     /** One of the two scoped chats, alternating by index. */
     private fun chosen(index: Int) = if (index % 2 == 0) "chosen-a" else "chosen-b"

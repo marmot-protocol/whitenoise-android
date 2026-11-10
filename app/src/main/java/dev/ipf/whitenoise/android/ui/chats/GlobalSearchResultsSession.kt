@@ -138,7 +138,14 @@ private fun GlobalSearchResultsRecheckEffects(
 ) {
     val runtime = remember(appState.runtimeGeneration) { appState.marmot() }
     val wakeups = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
-    LaunchedEffect(controller, appState.runtimeMirrors.blocks.users) { wakeups.send(Unit) }
+    // The first launch before any page landed is not a change: that page reads current data. A later launch is a
+    // real block change, or a return to a screen whose rows may be stale.
+    val firstLaunch = remember(controller) { booleanArrayOf(true) }
+    LaunchedEffect(controller, appState.runtimeMirrors.blocks.users) {
+        val initialProbe = firstLaunch[0] && controller.state.batches == 0
+        firstLaunch[0] = false
+        if (!initialProbe) wakeups.send(Unit)
+    }
     LaunchedEffect(controller) {
         for (ignored in wakeups) {
             delay(GLOBAL_SEARCH_RECHECK_COALESCE_MS)
@@ -150,10 +157,17 @@ private fun GlobalSearchResultsRecheckEffects(
         var failures = 0
         while (failures < GLOBAL_SEARCH_OBSERVER_ATTEMPTS) {
             val opened =
-                observeLibraryChanges(runtime, account, wakeups) { event ->
-                    val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update
-                    update?.accountLabel == account && controller.isTouchedBy(update.update)
-                }
+                observeLibraryChanges(
+                    runtime = runtime,
+                    account = account,
+                    wakeups = wakeups,
+                    touched = { event ->
+                        val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update
+                        update?.accountLabel == account && controller.isTouchedBy(update.update)
+                    },
+                    // Before the first page lands, that page already reads current data.
+                    wakeOnOpen = controller.state.batches > 0,
+                )
             failures = if (opened) 0 else failures + 1
             delay(GLOBAL_SEARCH_OBSERVER_RETRY_MS)
         }
