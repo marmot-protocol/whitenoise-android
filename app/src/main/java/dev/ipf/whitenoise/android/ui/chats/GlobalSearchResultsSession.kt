@@ -169,7 +169,8 @@ private fun GlobalSearchResultsRecheckEffects(
     }
     // A fresh query whose first page found nothing rechecks once, so a match that arrived between that read and the
     // subscription opening is not left waiting for the next trigger.
-    val emptyFirstPage = shouldProbeAfterFirstPage(controller.state)
+    // A reattached stale session already rechecks at once, so it does not probe again.
+    val emptyFirstPage = shouldProbeAfterFirstPage(controller.state) && !controller.stale
     LaunchedEffect(controller, controller.state.generation, emptyFirstPage) {
         if (emptyFirstPage) wakeups.send(Unit)
     }

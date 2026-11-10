@@ -166,6 +166,40 @@ class GlobalSearchReturnStateTest {
         holder.close()
     }
 
+    /**
+     * A recheck on Back is capped at a few batches, so in a long scrolled session it cannot reach every loaded row.
+     * Rows it did not reread are never shown unconfirmed: they return only as fresh pages, read before the stale
+     * mark clears, so a message deleted far down the list stays gone and the rest come back once each.
+     */
+    @Test
+    fun aCappedRecheckNeverShowsUnconfirmedRowsBeyondItsReach() {
+        val store = StoreReader((0 until 400).map { record("g", "m%03d".format(it), at = 1_000uL + it.toULong()) })
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(store, scope) }
+        session.search(query)
+        idleMain()
+        while (!session.state.endReached) {
+            session.loadMore()
+            idleMain()
+        }
+        assertEquals(400, session.state.results.size)
+        holder.detach()
+        // The oldest rows sit far beyond what a capped recheck rereads from the head.
+        store.replace("m005") { it.copy(deleted = true) }
+
+        val returned = holder.obtain(ACCOUNT_A) { scope -> controller(store, scope) }
+        returned.refresh()
+        idleMain()
+
+        val shown = requireNotNull(returned.shownState(query)).results.map { it.key }
+        assertTrue("g:m005" !in shown)
+        assertEquals(399, shown.size)
+        assertEquals(shown.size, shown.toSet().size)
+        assertEquals(false, returned.stale)
+        holder.close()
+    }
+
     /** A refresh queued behind a page in flight at detach is dropped with it, so it cannot confirm the rows. */
     @Test
     fun aQueuedRefreshAtDetachIsDropped() {

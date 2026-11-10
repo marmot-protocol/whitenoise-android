@@ -71,6 +71,11 @@ internal class GlobalSearchResultsController(
     private var refreshPending = false
     private var loadPending = false
 
+    // While a stale session's capped recheck re-reads its range page by page, the old continuation it must reach,
+    // or null when the old range had reached MDK's end (#1945).
+    private var verifying = false
+    private var verifyTarget: GlobalSearchCursor? = null
+
     /**
      * Starts a generation for [next] unless it is already the current query. [debounceMillis] delays only the
      * first read, so typing does not read a page per keystroke.
@@ -85,6 +90,8 @@ internal class GlobalSearchResultsController(
         loadPending = false
         stale = false
         recheckFailed = false
+        verifying = false
+        verifyTarget = null
         query = next
         val restarted = GlobalSearchResultsReducer.restart(state)
         // A scope with no chats cannot match, so it ends at once instead of reading the whole account.
@@ -113,12 +120,14 @@ internal class GlobalSearchResultsController(
      */
     fun refresh() {
         val current = query?.takeUnless { closed } ?: return
-        val started = GlobalSearchResultsReducer.beginRefresh(state)
+        val started = GlobalSearchResultsReducer.beginRefresh(state, verifying = stale)
         // Anything in flight, the first page included, may already hold a row a later change affects.
         if (state.inFlight != null) {
             refreshPending = true
         } else if (started != null) {
             val budget = refreshBatchBudget(state.results.size)
+            // A stale recheck must cover the whole range the reader had; a retry keeps the original target.
+            if (stale && !verifying) verifyTarget = state.nextCursor
             state = started.first
             launch(current, started.second, debounceMillis = 0L, refreshBudget = budget)
         }
@@ -170,12 +179,14 @@ internal class GlobalSearchResultsController(
             scope.launch {
                 try {
                     if (debounceMillis > 0L) delay(debounceMillis)
-                    val next = withContext(environment.ioDispatcher) { complete(current, request, refreshBudget) }
+                    val next =
+                        withContext(environment.ioDispatcher) {
+                            completeGlobalSearchRequest(reader, environment, current, request, refreshBudget)
+                        }
                     if (accepts(current)) {
                         val applies = state.inFlight == request
                         state = next(state)
-                        // Only a recheck that was actually applied verified the rows the screen will show.
-                        if (request.refresh && applies) stale = false
+                        if (applies) settle(request, succeeded = true)
                     }
                 } catch (cancel: CancellationException) {
                     if (accepts(current)) state = GlobalSearchResultsReducer.cancel(state, request)
@@ -185,38 +196,38 @@ internal class GlobalSearchResultsController(
                     if (accepts(current)) {
                         val applies = state.inFlight == request
                         state = failedTransition(state, request)
-                        if (request.refresh && stale && applies) recheckFailed = true
+                        if (applies) settle(request, succeeded = false)
                     }
                 }
                 if (accepts(current)) continueAfter()
             }
     }
 
-    /** Reads what [request] asks for and returns the transition that applies it to the then-current state. */
-    private suspend fun complete(
-        current: GlobalSearchResultsQuery,
+    /**
+     * Updates the stale mark after an applied [request]. Rows are confirmed only by an applied read, and only once
+     * every shown row was reread; a failed recheck or verifying page leaves them hidden behind a Retry.
+     */
+    private fun settle(
         request: GlobalSearchPageRequest,
-        refreshBudget: Int,
-    ): (GlobalSearchResultsState) -> GlobalSearchResultsState =
-        if (request.refresh) {
-            val source = batchSource(reader, environment, current)
-            val (rows, through) = rereadGlobalSearchRange(source, request.cursor, refreshBudget)
-            val apply: (GlobalSearchResultsState) -> GlobalSearchResultsState = {
-                GlobalSearchResultsReducer.applyRefresh(it, request, rows, through)
+        succeeded: Boolean,
+    ) {
+        val confirming = request.verifying || verifying
+        when {
+            !succeeded -> if (stale && (request.refresh || verifying)) recheckFailed = true
+            confirming -> {
+                verifying = !verificationReached(state, verifyTarget)
+                if (!verifying) stale = false
             }
-            apply
-        } else {
-            val source = batchSource(reader, environment, current)
-            val batch = fillGlobalSearchBatch(request.cursor, request.seenKeys, source)
-            val apply: (GlobalSearchResultsState) -> GlobalSearchResultsState = {
-                GlobalSearchResultsReducer.applyBatch(it, request, batch)
-            }
-            apply
+            request.refresh -> stale = false
         }
+    }
 
     /** Runs a refresh that arrived during the batch, else a page asked for during a refresh. */
     private fun continueAfter() {
-        if (refreshPending) {
+        val verificationOwed = verifying && stale && !recheckFailed
+        if (verificationOwed && state.inFlight == null) {
+            read(0L)
+        } else if (refreshPending) {
             refreshPending = false
             refresh()
         } else if (loadPending) {
@@ -228,6 +239,30 @@ internal class GlobalSearchResultsController(
     /** Only the live query on an open, current session may change [state]. */
     private fun accepts(owner: GlobalSearchResultsQuery): Boolean = !closed && owner == query && environment.isCurrent()
 }
+
+/** Reads what [request] asks for and returns the transition that applies it to the then-current state. */
+private suspend fun completeGlobalSearchRequest(
+    reader: GlobalSearchTimelineReader,
+    environment: GlobalSearchResultsEnvironment,
+    current: GlobalSearchResultsQuery,
+    request: GlobalSearchPageRequest,
+    refreshBudget: Int,
+): (GlobalSearchResultsState) -> GlobalSearchResultsState =
+    if (request.refresh) {
+        val source = batchSource(reader, environment, current)
+        val (rows, through) = rereadGlobalSearchRange(source, request.cursor, refreshBudget)
+        val apply: (GlobalSearchResultsState) -> GlobalSearchResultsState = {
+            GlobalSearchResultsReducer.applyRefresh(it, request, rows, through)
+        }
+        apply
+    } else {
+        val source = batchSource(reader, environment, current)
+        val batch = fillGlobalSearchBatch(request.cursor, request.seenKeys, source)
+        val apply: (GlobalSearchResultsState) -> GlobalSearchResultsState = {
+            GlobalSearchResultsReducer.applyBatch(it, request, batch)
+        }
+        apply
+    }
 
 /** A failed page waits for Retry; a failed background refresh just keeps the rows it had. */
 private fun failedTransition(

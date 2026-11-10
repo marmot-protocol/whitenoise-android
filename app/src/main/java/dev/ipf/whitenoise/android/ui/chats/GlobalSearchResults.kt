@@ -168,7 +168,8 @@ internal suspend fun <R> fillGlobalSearchBatch(
  * [GlobalSearchResultsState.inFlight], so a page from an older query, filter set or account is dropped. A
  * [refresh] rereads the loaded range from the head; its [cursor] is then the old continuation it reads through.
  * [launch] is unique per request within a generation, so a completion that outlived its cancellation can never
- * match a newer request that happens to read the same range.
+ * match a newer request that happens to read the same range. A [verifying] refresh rechecks rows the reader has not
+ * seen confirmed since returning (#1945); it never keeps rows below where it stopped.
  */
 internal data class GlobalSearchPageRequest(
     val generation: Int,
@@ -177,6 +178,7 @@ internal data class GlobalSearchPageRequest(
     val seenKeys: Set<String>,
     val refresh: Boolean = false,
     val launch: Long = 0L,
+    val verifying: Boolean = false,
 )
 
 /**
@@ -259,7 +261,10 @@ internal object GlobalSearchResultsReducer {
      * Starts rereading the loaded range from the head, after a change that may delete, expire or hide a loaded
      * row or add a newer match. Null while a batch is in flight or before anything loaded.
      */
-    fun beginRefresh(state: GlobalSearchResultsState): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
+    fun beginRefresh(
+        state: GlobalSearchResultsState,
+        verifying: Boolean = false,
+    ): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
         if (state.inFlight != null || state.batches == 0) return null
         val launch = state.launches + 1
         val request =
@@ -270,6 +275,7 @@ internal object GlobalSearchResultsReducer {
                 emptySet(),
                 refresh = true,
                 launch = launch,
+                verifying = verifying,
             )
         return state.copy(inFlight = request, launches = launch) to request
     }
@@ -277,7 +283,9 @@ internal object GlobalSearchResultsReducer {
     /**
      * Replaces the loaded range with a reread. [refreshed] covers the head down to [rereadThrough]; loaded rows
      * older than that keep their place, so a reread capped before the old continuation loses nothing. Rows
-     * keep their stable keys, so a list viewport stays where it was while gone rows drop out.
+     * keep their stable keys, so a list viewport stays where it was while gone rows drop out. A verifying reread
+     * that stopped short instead drops those older, unconfirmed rows and continues from [rereadThrough], so they
+     * return only as fresh pages.
      */
     fun applyRefresh(
         state: GlobalSearchResultsState,
@@ -289,11 +297,17 @@ internal object GlobalSearchResultsReducer {
         val through = request.cursor
         // The old continuation is the oldest row the range consumed, so it belongs to the range.
         val head = refreshed.filter { through == null || it.cursor >= through }
-        val tail = state.results.filter { rereadThrough != null && it.cursor < rereadThrough }
+        val stoppedShort = rereadThrough != null && (through == null || rereadThrough > through)
+        val dropTail = request.verifying && stoppedShort
+        val tail =
+            if (dropTail) emptyList() else state.results.filter { rereadThrough != null && it.cursor < rereadThrough }
         val results = (head + tail).distinctBy { it.key }
         return state.copy(
             results = results,
             seenKeys = results.mapTo(HashSet()) { it.key },
+            nextCursor = if (dropTail) rereadThrough else state.nextCursor,
+            endReached = state.endReached && !dropTail,
+            emptyBatches = if (dropTail) 0 else state.emptyBatches,
             inFlight = null,
             batches = state.batches + 1,
         )
@@ -313,4 +327,16 @@ internal object GlobalSearchResultsReducer {
         state: GlobalSearchResultsState,
         request: GlobalSearchPageRequest,
     ): GlobalSearchResultsState = if (request != state.inFlight) state else state.copy(inFlight = null)
+}
+
+/**
+ * Whether a stale session's re-read has covered the range it had before the reader left: reached MDK's end, or
+ * passed the old continuation [target]. A null target means the old range had ended, so only the end counts.
+ */
+internal fun verificationReached(
+    state: GlobalSearchResultsState,
+    target: GlobalSearchCursor?,
+): Boolean {
+    val cursor = state.nextCursor
+    return state.endReached || cursor == null || (target != null && cursor <= target)
 }
