@@ -105,12 +105,11 @@ internal class ComposerTranslationState(
 
     /** Turns translate mode on or off; the first turn-on asks for the privacy notice instead of translating. */
     fun toggle() {
-        if (!active && !noticeAccepted()) {
-            consenting = true
-            return
+        when {
+            active -> close()
+            noticeAccepted() -> open()
+            else -> consenting = true
         }
-        active = !active
-        invalidate()
     }
 
     /** Records the accepted notice once, then opens translate mode. */
@@ -118,8 +117,7 @@ internal class ComposerTranslationState(
         if (!consenting) return
         consenting = false
         onNoticeAccepted()
-        active = true
-        invalidate()
+        open()
     }
 
     /** Leaves translate mode off; no text has been sent to the engine. */
@@ -147,50 +145,49 @@ internal class ComposerTranslationState(
     fun invalidate() {
         cancel()
         result = null
-        failure = null
         epoch += 1
     }
 
     /** Requests [text] once typing settles, unless the shown translation already matches it. */
     fun update(text: String) {
+        // Any newer text replaces the previous request, including typing back to the text already translated.
+        cancel()
         val chosen = target
         if (!active || chosen == null || text.isBlank()) {
-            cancel()
             result = null
-            failure = null
-            return
+        } else if (result?.let { it.source == text && it.target == chosen } != true) {
+            pending = true
+            val requestGeneration = generation
+            job = scope.launch { perform(text, chosen, requestGeneration) }
         }
-        if (result?.let { it.source == text && it.target == chosen } == true) {
-            // Typing back to the translated text must also stop the request for the text just erased.
-            cancel()
-            failure = null
-            return
-        }
-        cancel()
-        failure = null
-        pending = true
-        val requestGeneration = generation
-        job = scope.launch { perform(text, chosen, requestGeneration) }
     }
 
     /**
-     * The translated text Send may use for exactly [text], or null while it is missing, pending or stale.
-     * Blank text has nothing to translate, so an attachment can still go without a caption.
+     * What Send delivers for exactly [text]: the text itself outside translate mode, otherwise its current
+     * translation, or null while that is missing, pending or stale. Blank text has nothing to translate, so an
+     * attachment can still go without a caption.
      */
     fun outgoingFor(text: String): String? =
-        if (text.isBlank()) {
+        if (!active || text.isBlank()) {
             text
         } else {
             result
-                ?.takeIf { active && !pending && failure == null && it.source == text && it.target == target }
+                ?.takeIf { !pending && failure == null && it.source == text && it.target == target }
                 ?.text
         }
 
+    private fun open() {
+        active = true
+        invalidate()
+    }
+
+    /** Stops the current request and forgets its failure; a shown result stays until the caller drops it. */
     private fun cancel() {
         generation += 1
         job?.cancel()
         job = null
         pending = false
+        failure = null
     }
 
     private fun current(requestGeneration: Long) = requestGeneration == generation && ownerCurrent()
@@ -354,7 +351,7 @@ internal fun ComposerTranslationBar(
     }
 }
 
-/** A persistent "Will send" label over the outgoing text, which scrolls instead of hiding any of it. */
+/** A "Will send" label over the outgoing text, which scrolls instead of hiding any of it; status lines have none. */
 @Composable
 private fun ComposerTranslationLine(
     outgoing: String?,
@@ -364,14 +361,17 @@ private fun ComposerTranslationLine(
     modifier: Modifier,
 ) {
     Column(modifier.padding(end = 8.dp).semantics(mergeDescendants = true) {}) {
-        Text(
-            stringResource(R.string.translation_composer_will_send),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.testTag("composer.translation.label"),
-        )
+        // Nothing will be sent while the line shows a placeholder, progress or a failure.
+        if (outgoing != null && failure == null) {
+            Text(
+                stringResource(R.string.translation_composer_will_send),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("composer.translation.label"),
+            )
+        }
         ComposerTranslationContent(outgoing, pending, failure, onRetry)
     }
 }
@@ -428,16 +428,18 @@ private fun composerFailureResource(failure: TranslationFailure): Int =
         else -> translationFailureResource(failure)
     }
 
+/** Failures that opening or updating Offline Translator can fix, unlike a dropped connection or bad text. */
 private fun needsEngine(failure: TranslationFailure): Boolean =
-    failure in
-        setOf(
-            TranslationFailure.MISSING_ENGINE,
-            TranslationFailure.UNVERIFIED_ENGINE,
-            TranslationFailure.INCOMPATIBLE_ENGINE,
-            TranslationFailure.SOURCE_MODEL,
-            TranslationFailure.ENGINE,
-            TranslationFailure.ENGINE_UPDATE_REQUIRED,
-        )
+    when (failure) {
+        TranslationFailure.MISSING_ENGINE,
+        TranslationFailure.UNVERIFIED_ENGINE,
+        TranslationFailure.INCOMPATIBLE_ENGINE,
+        TranslationFailure.SOURCE_MODEL,
+        TranslationFailure.ENGINE,
+        TranslationFailure.ENGINE_UPDATE_REQUIRED,
+        -> true
+        else -> false
+    }
 
 /** About four body lines; longer translations scroll inside the line. */
 private val PREVIEW_MAX_HEIGHT = 96.dp

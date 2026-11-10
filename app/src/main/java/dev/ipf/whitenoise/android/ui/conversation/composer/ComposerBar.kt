@@ -1027,7 +1027,7 @@ internal fun ComposerBar(
         val acceptanceToken = textState.acceptanceToken()
         // Translate mode sends only a current translation of this exact text, never the source text instead.
         val outgoing =
-            activeTranslation?.let { it.outgoingFor(acceptanceToken.text) ?: return@submit } ?: acceptanceToken.text
+            translation?.let { it.outgoingFor(acceptanceToken.text) ?: return@submit } ?: acceptanceToken.text
         if (hasPendingAttachments && editingMessageId == null) {
             if (!attachmentsPreparing && !attachmentSendInFlight && onSendAttachments != null) {
                 attachmentSendInFlight = true
@@ -1696,7 +1696,7 @@ internal fun ComposerBar(
                     !originDictationRequiresCompletion() &&
                         (!showMicButton || text.isNotBlank() || hasPendingAttachments) &&
                         (!hasPendingAttachments || editingMessageId != null || attachmentSendEnabled) &&
-                        (activeTranslation == null || activeTranslation.outgoingFor(text) != null)
+                        (translation == null || translation.outgoingFor(text) != null)
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
                     modifier =

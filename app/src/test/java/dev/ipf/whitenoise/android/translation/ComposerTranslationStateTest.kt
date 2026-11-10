@@ -222,7 +222,7 @@ class ComposerTranslationStateTest {
         }
 
     @Test
-    fun closingForDictationStopsSendingTheTranslation() =
+    fun closingForDictationSendsTheTypedTextInsteadOfTheTranslation() =
         runTest {
             val state = state(backgroundScope) { text, _ -> "t:$text" }
             state.toggle()
@@ -231,7 +231,8 @@ class ComposerTranslationStateTest {
             runCurrent()
             assertEquals("t:hello", state.outgoingFor("hello"))
             state.close()
-            assertNull(state.outgoingFor("hello"))
+            assertFalse(state.active)
+            assertEquals("hello", state.outgoingFor("hello"))
             assertEquals("", state.outgoingFor(""))
         }
 

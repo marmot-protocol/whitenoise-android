@@ -28,7 +28,12 @@ internal class TranslationPreferences(
         )
     private val revision = MutableStateFlow(0)
     val changes = revision.asStateFlow()
-    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> revision.value += 1 }
+    private val listener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            // The composer's outgoing language and notice never change incoming translations, so saving them
+            // must not clear the renditions already shown in the chat.
+            if (key != COMPOSER_NOTICE_VERSION && key?.endsWith(OUTGOING_SUFFIX) != true) revision.value += 1
+        }
 
     init {
         resetLegacyAutomaticChoices()
@@ -137,7 +142,7 @@ internal class TranslationPreferences(
         account: String,
         group: String,
     ): String? =
-        savedTarget(key(account, group) + ":outgoing")
+        savedTarget(key(account, group) + OUTGOING_SUFFIX)
             ?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
 
     fun setOutgoingTarget(
@@ -146,7 +151,7 @@ internal class TranslationPreferences(
         target: String,
     ) {
         require(OfflineTranslatorLanguageCatalog.supportsTarget(target))
-        preferences.edit().putString(key(account, group) + ":outgoing", target).apply()
+        preferences.edit().putString(key(account, group) + OUTGOING_SUFFIX, target).apply()
     }
 
     /**
@@ -177,6 +182,7 @@ internal class TranslationPreferences(
         const val PRIVACY_NOTICE_VERSION = "privacy_notice_version"
         const val CURRENT_PRIVACY_NOTICE = 1
         const val COMPOSER_NOTICE_VERSION = "composer_privacy_notice_version"
+        const val OUTGOING_SUFFIX = ":outgoing"
         const val DEFAULT_TARGET = "en"
     }
 }
