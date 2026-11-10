@@ -1632,6 +1632,35 @@
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
     <string name="custom_emoji">Özel emoji</string>
+    <string name="emoji_sets_title">Emoji setleri</string>
+    <string name="emoji_sets_account_required">Emoji setlerine göz atmak ve yüklemek için bir profil seçin.</string>
+    <string name="emoji_sets_query">Ara veya set bağlantısı yapıştır</string>
+    <string name="emoji_sets_find">Set bul</string>
+    <string name="emoji_sets_open">Emoji setini aç</string>
+    <string name="emoji_sets_empty">Henüz set yok. Rölelerinizde set bulun veya paylaşılan bir set bağlantısı yapıştırın.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d emoji</item>
+        <item quantity="other">%1$d emoji</item>
+    </plurals>
+    <string name="emoji_sets_installed">Yüklendi</string>
+    <string name="emoji_sets_update_available">Güncelleme var</string>
+    <string name="emoji_sets_load_image">Önizleme görselini yükle</string>
+    <string name="emoji_sets_image_privacy">Önizleme yüklemek veya set kurmak, IP adresinizi setin görsel sunucularıyla paylaşır.</string>
+    <string name="emoji_sets_preview_host">Önizleme görseli sunucusu: %1$s</string>
+    <string name="emoji_sets_install">Seti yükle</string>
+    <string name="emoji_sets_update">Seti güncelle</string>
+    <string name="emoji_sets_check_update">Güncellemeyi denetle</string>
+    <string name="emoji_sets_preparing_install">Yükleme hazırlanıyor…</string>
+    <string name="emoji_sets_install_progress">%2$d emojiden %1$d tanesi işlendi</string>
+    <string name="emoji_sets_error">İstek tamamlanamadı. Tekrar deneyin.</string>
+    <string name="emoji_sets_not_found">Set veya görsel bulunamadı. Bağlantıyı kontrol edin veya tekrar deneyin.</string>
+    <string name="emoji_sets_changed">Bu set değişti. Yüklemeden önce yeni sürümü inceleyin.</string>
+    <string name="emoji_sets_cancelled">Yükleme iptal edildi.</string>
+    <string name="emoji_sets_discovery_incomplete">Bazı rölelere ulaşılamadı. Sonuçlar eksik olabilir.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Yüklendi, %1$d giriş atlandı.</item>
+        <item quantity="other">Yüklendi, %1$d giriş atlandı.</item>
+    </plurals>
     <string name="custom_emoji_detail">Buradaki görseller bu cihazda saklanan :shortcode: emojilerine dönüşür. Birini kullanan yeni bir mesaj (yanıt değil) görselini şifreli olarak o sohbete yükler. Tepkiler, yanıtlar ve düzenlemeler yalnızca kısa kodu gönderir.</string>
     <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
     <string name="custom_emoji_name_title">Bu emojiye ad ver</string>

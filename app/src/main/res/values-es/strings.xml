@@ -1636,6 +1636,35 @@
 
     <string name="chat_bubble_colors">Colores de las burbujas</string>
     <string name="custom_emoji">Emoji personalizados</string>
+    <string name="emoji_sets_title">Conjuntos de emoji</string>
+    <string name="emoji_sets_account_required">Elige un perfil para explorar e instalar conjuntos de emoji.</string>
+    <string name="emoji_sets_query">Busca o pega un enlace de conjunto</string>
+    <string name="emoji_sets_find">Buscar conjuntos</string>
+    <string name="emoji_sets_open">Abrir conjunto de emoji</string>
+    <string name="emoji_sets_empty">Aún no hay conjuntos. Busca conjuntos en tus relés o pega un enlace compartido.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d emoji</item>
+        <item quantity="other">%1$d emoji</item>
+    </plurals>
+    <string name="emoji_sets_installed">Instalado</string>
+    <string name="emoji_sets_update_available">Actualización disponible</string>
+    <string name="emoji_sets_load_image">Cargar imagen de vista previa</string>
+    <string name="emoji_sets_image_privacy">Cargar una vista previa o instalar un conjunto comparte tu dirección IP con sus servidores de imágenes.</string>
+    <string name="emoji_sets_preview_host">Servidor de la imagen de vista previa: %1$s</string>
+    <string name="emoji_sets_install">Instalar conjunto</string>
+    <string name="emoji_sets_update">Actualizar conjunto</string>
+    <string name="emoji_sets_check_update">Buscar actualización</string>
+    <string name="emoji_sets_preparing_install">Preparando instalación…</string>
+    <string name="emoji_sets_install_progress">%1$d de %2$d emoji procesados</string>
+    <string name="emoji_sets_error">No se pudo completar la solicitud. Inténtalo de nuevo.</string>
+    <string name="emoji_sets_not_found">No se encontró este conjunto o imagen. Revisa el enlace o inténtalo de nuevo.</string>
+    <string name="emoji_sets_changed">Este conjunto cambió. Revisa la nueva versión antes de instalarla.</string>
+    <string name="emoji_sets_cancelled">Instalación cancelada.</string>
+    <string name="emoji_sets_discovery_incomplete">No se pudo contactar con algunos relés. Puede que los resultados estén incompletos.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Instalado con %1$d entrada omitida.</item>
+        <item quantity="other">Instalado con %1$d entradas omitidas.</item>
+    </plurals>
     <string name="custom_emoji_detail">Las imágenes añadidas aquí se convierten en emojis :shortcode: y se guardan en este dispositivo. Un mensaje nuevo (no una respuesta) con un emoji sube su imagen cifrada a este chat. Reacciones, respuestas y ediciones solo envían el shortcode.</string>
     <string name="custom_emoji_empty">Aún no hay emoji personalizados.</string>
     <string name="custom_emoji_name_title">Nombra este emoji</string>

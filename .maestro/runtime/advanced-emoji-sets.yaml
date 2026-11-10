@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: advanced-emoji-sets
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Chats"
+    direction: DOWN
+- tapOn: "Chats"
+- assertVisible:
+    id: "settings.chats.group"
+- scrollUntilVisible:
+    element:
+      text: "Custom emoji"
+    direction: DOWN
+- tapOn: "Custom emoji"
+- assertVisible:
+    id: "custom-emoji-content"
+- tapOn: "Emoji sets"
+- assertVisible:
+    id: "emoji_sets.query"
+- assertVisible: "Find sets"
+- back
+- assertVisible:
+    id: "custom-emoji-content"

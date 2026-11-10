@@ -1932,6 +1932,35 @@
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
     <string name="custom_emoji">Custom emoji</string>
+    <string name="emoji_sets_title">Emoji sets</string>
+    <string name="emoji_sets_account_required">Choose a profile to browse and install emoji sets.</string>
+    <string name="emoji_sets_query">Search or paste a set link</string>
+    <string name="emoji_sets_find">Find sets</string>
+    <string name="emoji_sets_open">Open emoji set</string>
+    <string name="emoji_sets_empty">No sets yet. Find sets on your relays or paste a shared set link.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d emoji</item>
+        <item quantity="other">%1$d emoji</item>
+    </plurals>
+    <string name="emoji_sets_installed">Installed</string>
+    <string name="emoji_sets_update_available">Update available</string>
+    <string name="emoji_sets_load_image">Load preview image</string>
+    <string name="emoji_sets_image_privacy">Loading a preview or installing a set shares your IP address with its image hosts.</string>
+    <string name="emoji_sets_preview_host">Preview image host: %1$s</string>
+    <string name="emoji_sets_install">Install set</string>
+    <string name="emoji_sets_update">Update set</string>
+    <string name="emoji_sets_check_update">Check for update</string>
+    <string name="emoji_sets_preparing_install">Preparing install…</string>
+    <string name="emoji_sets_install_progress">%1$d of %2$d emoji processed</string>
+    <string name="emoji_sets_error">Couldn’t complete the request. Try again.</string>
+    <string name="emoji_sets_not_found">Couldn’t find this set or image. Check the link or try again.</string>
+    <string name="emoji_sets_changed">This set changed. Review the new version before installing.</string>
+    <string name="emoji_sets_cancelled">Install cancelled.</string>
+    <string name="emoji_sets_discovery_incomplete">Some relays couldn’t be reached. Results may be incomplete.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Installed with %1$d entry skipped.</item>
+        <item quantity="other">Installed with %1$d entries skipped.</item>
+    </plurals>
     <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. A new message (not a reply) using one uploads its image, encrypted, to that chat. Reactions, replies and edits send only the shortcode.</string>
     <string name="custom_emoji_empty">No custom emoji yet.</string>
     <string name="custom_emoji_name_title">Name this emoji</string>

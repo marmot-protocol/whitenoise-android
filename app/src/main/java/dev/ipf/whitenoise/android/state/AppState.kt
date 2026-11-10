@@ -1246,6 +1246,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
     internal val emojiUploads = EmojiUploadCache()
+    internal val emojiSetLibrary = EmojiSetLibrary()
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
     internal val contactPictureStore =
         ContactPictureStore(preferences, appContext.noBackupFilesDir.resolve("contact-pictures"))
