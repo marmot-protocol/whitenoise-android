@@ -1187,17 +1187,14 @@ class ConversationDictationControllerTest {
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             platform.capturedSilenceMillis = 3_000L
             f.scheduler.advanceBy(3_000L)
+            // Automatic completion must already be finishing, or this would only cover the before-finish path.
+            assertTrue(f.controller.state is ConversationDictationState.Processing)
             f.controller.interruptForAudioFocusLoss()
             platform.pendingCallerAudio = false
             platform.listener.onResult("late tail")
             advanceUntilIdle()
             assertEquals(emptyList<String>(), sent)
-            assertTrue(
-                f.drafts
-                    .getValue(key())
-                    .text
-                    .startsWith("Draft"),
-            )
+            assertEquals("Draft", f.drafts.getValue(key()).text)
         }
 
     /** An unavailable original target cannot receive interruption text through another owner. */

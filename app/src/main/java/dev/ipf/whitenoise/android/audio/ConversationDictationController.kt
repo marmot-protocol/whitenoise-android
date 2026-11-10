@@ -1157,7 +1157,7 @@ internal class ConversationDictationController internal constructor(
         if (!inActiveRecognitionState || deliveryInProgress || completion.intent.committed) return
         if (finishRequested && completion.intent.explicit) {
             // Another app's audio cannot change the sealed speech, so finish the user's chosen action.
-            conversationDictationDiagnostic("event=audio_focus_lost_after_finish action=continue")
+            conversationDictationDiagnostic("event=audio_focus_lost_after_finish action=continued")
             return
         }
         completion.validation.reset()
@@ -2403,7 +2403,7 @@ internal class ConversationDictationController internal constructor(
         if (!runCatching(session::callerAudioIsFinalChunk).getOrDefault(false)) return false
         if (runCatching(session::callerAudioContainsSpeech).getOrNull() != false) return false
         if (!runCatching(session::acknowledgeCallerAudio).getOrDefault(false)) return false
-        conversationDictationDiagnostic("event=caller_audio_tail_dropped failure=${failure.name} reason=silent")
+        conversationDictationDiagnostic("event=caller_audio_tail_dropped failure=${failure.name} reason=silence")
         unresolvedRecognitionFailure = null
         clearRecognitionGeneration(cancel = false)
         advancePastConfirmedSilentCallerAudio(sessionId, target)

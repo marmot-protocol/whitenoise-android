@@ -103,6 +103,20 @@ class DictationDiagnosticStoreTest {
     }
 
     @Test
+    fun finalTailAndFocusDecisionsSurviveTheClosedSchema() {
+        mapOf(
+            "event=caller_audio_tail_dropped failure=NoMatch reason=silence" to
+                mapOf("failure" to "NoMatch", "reason" to "silence"),
+            "event=audio_focus_lost_after_finish action=continued" to
+                mapOf("action" to "continued"),
+        ).forEach { (event, expected) ->
+            val parsed = requireNotNull(DictationDiagnosticSchema.parse(event))
+            expected.forEach { (key, value) -> assertEquals(event, value, parsed.fields[key]) }
+            assertEquals(event, 0L, parsed.filteredFields)
+        }
+    }
+
+    @Test
     fun callerAudioProvenanceSurvivesWithoutTranscriptOrProviderIdentity() {
         val parsed =
             requireNotNull(
