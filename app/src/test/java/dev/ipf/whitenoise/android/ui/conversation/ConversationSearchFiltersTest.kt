@@ -10,6 +10,8 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchFilterCategory
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchStateSaver
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
+import dev.ipf.whitenoise.android.ui.chats.byMeActive
+import dev.ipf.whitenoise.android.ui.chats.toggleGlobalSearchByMe
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -140,5 +142,19 @@ class ConversationSearchFiltersTest {
         assertEquals(state.chatFilters, cleared.chatFilters)
         assertTrue(cleared.chatTypeFilters.isEmpty())
         assertTrue(cleared.folderFilters.isEmpty())
+    }
+
+    /** By me in a conversation keeps its chat scope, and Clear all removes By me but not the scope. */
+    @Test
+    fun byMeKeepsTheConversationScopeAndClearsWithTheFilters() {
+        val preset = conversationSearchPreset("account", 1, "chat", "Community")
+        val byMe = toggleGlobalSearchByMe(preset, "ab".repeat(32), "You")
+
+        assertTrue(byMe.byMeActive("ab".repeat(32)))
+        assertTrue(keepsConversationSearchNavigator(byMe, "chat"))
+        assertTrue("a blank query with By me still searches", byMe.messageFiltersActive)
+        val cleared = clearConversationSearchFilters(byMe)
+        assertFalse(cleared.byMeActive("ab".repeat(32)))
+        assertEquals(preset.chatFilters, cleared.chatFilters)
     }
 }

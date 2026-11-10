@@ -78,4 +78,19 @@ class GlobalSearchChatSenderFilterTest {
         GroupMemberSnapshot(
             ids.map { AppGroupMemberRecordFfi(memberIdHex = it, account = "local-label", local = false) },
         )
+
+    /** By me selects the same stable sender key the Senders picker offers as "You", so both show one selection. */
+    @Test
+    fun byMeUsesThePickersStableSelfSenderKey() {
+        val self = "Ab".repeat(32)
+        val pickerKeys = globalSearchSenderIds(emptyList(), self)
+        val on = toggleGlobalSearchByMe(GlobalSearchState(isOpen = true), self, "You")
+
+        assertEquals(pickerKeys, on.senderFilters.map { it.stableId }.toSet())
+        val youRow = GlobalSearchSenderFilter(pickerKeys.single(), "You")
+        val picked = GlobalSearchTransitions.toggleSenderFilter(on, youRow)
+        assertTrue("toggling You in the picker clears By me", picked.senderFilters.isEmpty())
+        val constraints = requireNotNull(messageSearchConstraintsFor(on))
+        assertEquals(setOf(self.lowercase()), constraints.senderIds)
+    }
 }

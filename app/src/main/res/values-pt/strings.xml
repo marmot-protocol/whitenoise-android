@@ -1921,6 +1921,8 @@
     <string name="global_search_content_any_attachment">Qualquer anexo</string>
     <string name="global_search_results_end">Fim dos resultados</string>
     <string name="global_search_results_search_older">Pesquisar mensagens mais antigas</string>
+    <string name="search_quick_filter_by_me">Meus</string>
+    <string name="search_quick_filter_by_me_description">Mensagens enviadas por mim</string>
     <string name="search_result_unavailable">Esta mensagem já não está disponível</string>
     <string name="search_result_open_failed_retry">Não foi possível abrir a mensagem. Tentar novamente</string>
     <string name="text_attachment_open_external">Abrir em outro aplicativo</string>
