@@ -17,6 +17,7 @@ internal enum class ComposerShortcut(
     Emoji("emoji"),
     Paste("paste"),
     Dictation("dictation"),
+    Translate("translate"),
     VoiceNote("voice_note"),
     Camera("camera"),
     Gallery("gallery"),
@@ -25,6 +26,7 @@ internal enum class ComposerShortcut(
     Person("person"),
     Contact("contact"),
     Poll("poll"),
+    Sticker("sticker"),
 }
 
 internal enum class ComposerToolbarLayout(

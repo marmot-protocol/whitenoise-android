@@ -1,0 +1,100 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StickerImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "fun StickerImage(",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "StickerMessageContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "fun StickerMessageContent(",
+        "test_ids": [
+          "MSG-045",
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "StickerPlaceholder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "fun StickerPlaceholder(",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "R.string.sticker",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker alt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "R.string.sticker_alt",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker load hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "R.string.sticker_load_hint",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker tap to load",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "R.string.sticker_tap_to_load",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker tap to retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "R.string.sticker_tap_to_retry",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker with emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "R.string.sticker_with_emoji",
+        "test_ids": [
+          "MSG-047"
+        ]
+      },
+      {
+        "surface": "Sticker copy send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "R.string.send",
+        "test_ids": [
+          "MSG-045"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Received sticker load policy and server disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerImage.kt",
+        "anchor": "StickerPresentation.loadsAutomatically(",
+        "test_ids": [
+          "MSG-047"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

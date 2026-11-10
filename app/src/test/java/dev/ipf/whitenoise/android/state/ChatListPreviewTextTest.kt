@@ -35,6 +35,20 @@ class ChatListPreviewTextTest {
     }
 
     @Test
+    fun captionlessStickerReadsAsStickerWhileACaptionWins() {
+        val sticker = ChatListPreviewInput("", 9uL, false, null, 0u, null, isSticker = true)
+
+        assertEquals(
+            MessageTextCopy.Default.sticker,
+            projectedChatListPreviewText(sticker, latestFallback = { error("unexpected") }),
+        )
+        assertEquals(
+            "see you",
+            projectedChatListPreviewText(sticker.copy(plaintext = "see you"), latestFallback = { error("unexpected") }),
+        )
+    }
+
+    @Test
     fun missingEditAndGenericProjectionKeepDistinctFallbackCopy() {
         val received = mutableListOf<String>()
 

@@ -58,6 +58,7 @@ internal fun ComposerToolbarPreview(
             ComposerShortcut.Person,
             ComposerShortcut.Contact,
             ComposerShortcut.Poll,
+            ComposerShortcut.Sticker,
         )
     val visibleShortcuts =
         displayedSettings.displayedShortcuts.filter {

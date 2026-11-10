@@ -38,6 +38,7 @@ class AndroidCiGateTest(unittest.TestCase):
         cls.static_analysis = cls.job_block(cls.workflow, 'static-analysis')
         cls.compile_tests = cls.job_block(cls.workflow, 'compile-tests')
         cls.tests_job = cls.job_block(cls.workflow, 'tests')
+        cls.coverage = cls.job_block(cls.workflow, 'coverage')
         cls.secondary = cls.job_block(cls.workflow, 'secondary-variant')
         cls.gate = cls.job_block(cls.workflow, 'validate')
         cls.app_build = APP_BUILD.read_text()
@@ -128,7 +129,8 @@ class AndroidCiGateTest(unittest.TestCase):
                                          'full_matrix': 'false' if event == 'pull_request' else 'true'}
         if event != 'pull_request' or draft == 'true':
             outcomes['secondary-variant']['result'] = 'skipped'
-        if event == 'pull_request' and draft == 'true':
+        # Compose compiler reports run on master, nightly and dispatch only.
+        if event in {'pull_request', 'merge_group'}:
             outcomes['compose-compiler']['result'] = 'skipped'
         outcomes['compile-tests']['result'] = 'skipped'
         return outcomes
@@ -301,36 +303,37 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(self.tests_job.count('      - name: Upload reports\n'), 1)
         self.assertLess(self.tests_job.index('      - name: Unit tests'),
                         self.tests_job.index('      - name: Upload reports'))
-        self.assertLess(self.tests_job.index('      - name: Upload reports'),
-                        self.tests_job.index('      - name: Require every committed screenshot'))
 
     def test_full_unit_suite_verifies_goldens_and_is_reused_by_coverage(self):
-        """Identical verification inputs let coverage reuse the complete suite."""
-        expected_steps = {
-            'Unit tests',
-            'Coverage gate (Kover)',
-            'Coverage report (Kover)',
-        }
-        test_invocations = {
-            name: self.named_step(self.tests_job, name)
-            for name in expected_steps
-        }
-        for name, invocation in test_invocations.items():
-            with self.subTest(step=name):
-                self.assertIn('-Proborazzi.test.verify=true', invocation)
-        self.assertIn(
-            ':app:testDev${{ matrix.flavor }}DebugUnitTest',
-            test_invocations['Unit tests'],
-        )
+        """Coverage merges every shard's report instead of rerunning the suite."""
+        unit_tests = self.named_step(self.tests_job, 'Unit tests')
+        self.assertIn('-Proborazzi.test.verify=true', unit_tests)
+        self.assertIn(':app:testDev${{ matrix.flavor }}DebugUnitTest', unit_tests)
+        self.assertIn('        id: unit_tests\n', unit_tests)
+        self.assertIn(':app:koverGenerateArtifactDevZapstoreDebug', unit_tests)
         self.assertNotIn('verifyRoborazziDev', self.tests_job)
         self.assertNotIn("--tests '", self.tests_job)
-        unit_tests = test_invocations['Unit tests']
-        self.assertIn('        id: unit_tests\n', unit_tests)
-        coverage_report = test_invocations['Coverage report (Kover)']
-        self.assertIn(
-            "if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}",
-            coverage_report,
-        )
+        for name in ('Coverage gate (Kover)', 'Coverage report (Kover)'):
+            self.assertNotIn(f'      - name: {name}\n', self.tests_job)
+        self.assertIn("ORG_GRADLE_PROJECT_ciTestShard: ${{ matrix.shard }}", self.tests_job)
+        self.assertIn("ORG_GRADLE_PROJECT_ciTestShardCount: '4'", self.tests_job)
+        self.assertIn('        shard: [0, 1, 2, 3]\n', self.tests_job)
+        self.assertIn('kover-binary-Zapstore-${{ matrix.shard }}', self.tests_job)
+        self.assertIn('scripts/kover_class_outputs.py pack', self.tests_job)
+        header = self.coverage.split('    steps:', 1)[0]
+        self.assertIn('    needs: [changes, tests]\n', header)
+        self.assertIn("needs.changes.outputs.precheck != 'true'", header)
+        coverage = self.named_step(self.coverage, 'Coverage gate and report (Kover)')
+        for task in (':app:koverVerifyDevZapstoreDebug', ':app:koverXmlReportDevZapstoreDebug',
+                     ':app:koverHtmlReportDevZapstoreDebug', '-x :app:testDevZapstoreDebugUnitTest',
+                     '-x :app:compileDevZapstoreDebugKotlin', '-Proborazzi.test.verify=true',
+                     '-Pwhitenoise.koverShardReportsDir=', '--no-daemon'):
+            self.assertIn(task, coverage)
+        restore = self.named_step(self.coverage, 'Restore shard coverage inputs')
+        self.assertIn('for shard in 0 1 2 3; do', restore)
+        self.assertIn('scripts/kover_class_outputs.py unpack', restore)
+        self.assertIn('whitenoise.koverShardReportsDir', self.app_build)
+        self.assertIn('scripts/test_kover_class_outputs.py', self.tooling_contracts)
         self.assertIn('testDevZapstoreDebugUnitTest', self.app_build)
         self.assertIn('testDevPlayDebugUnitTest', self.app_build)
         self.assertIn('files(layout.projectDirectory.dir("src/test/snapshots").asFileTree)', self.app_build)
@@ -338,23 +341,18 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
     def test_teardown_floor_reuses_report_and_propagates_report_failure(self):
-        floor = self.named_step(self.tests_job, 'Runtime listener and viewport restoration coverage floors')
-        self.assertIn("matrix.flavor == 'Zapstore'", floor)
-        self.assertIn("steps.unit_tests.outcome == 'success'", floor)
-        self.assertIn('COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}', floor)
-        self.assertIn('test "$COVERAGE_REPORT_OUTCOME" = success', floor)
+        floor = self.named_step(self.coverage, 'Runtime listener and viewport restoration coverage floors')
+        self.assertIn("!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true'", floor)
+        self.assertNotIn('always()', floor)
         self.assertIn('scripts/check_runtime_listener_coverage.py', floor)
         self.assertIn('app/build/reports/kover/reportDevZapstoreDebug.xml', floor)
         self.assertNotIn('continue-on-error:', floor)
         self.assertNotIn('./gradlew', floor)
-        self.assertIn('        id: coverage_report\n',
-                      self.named_step(self.tests_job, 'Coverage report (Kover)'))
+        self.assertLess(self.coverage.index('      - name: Coverage gate and report (Kover)'),
+                        self.coverage.index('      - name: Runtime listener and viewport'))
 
     def test_viewport_floor_reuses_the_required_full_suite_report(self):
-        floor = self.named_step(self.tests_job, 'Runtime listener and viewport restoration coverage floors')
-        self.assertIn("matrix.flavor == 'Zapstore'", floor)
-        self.assertIn("steps.unit_tests.outcome == 'success'", floor)
-        self.assertIn('test "$COVERAGE_REPORT_OUTCOME" = success', floor)
+        floor = self.named_step(self.coverage, 'Runtime listener and viewport restoration coverage floors')
         self.assertIn('scripts/check_viewport_restoration_coverage.py', floor)
         self.assertNotIn('continue-on-error:', floor)
         self.assertNotIn('./gradlew', floor)
@@ -365,10 +363,13 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn(PR_PRIMARY_MATRIX, self.tests_job)
         self.assertNotIn('verifyRoborazziDev', self.workflow)
         self.assertNotIn('--tests ', self.tests_job)
-        step = self.named_step(self.tests_job, 'Require every committed screenshot golden to be compared')
-        self.assertIn('--results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json', step)
+        self.assertIn('app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json',
+                      self.named_step(self.tests_job, 'Upload shard golden comparison evidence'))
+        step = self.named_step(self.coverage, 'Require every committed screenshot golden to be compared')
+        self.assertIn('--results "${summaries[@]}"', step)
+        self.assertIn('No $flavor shard produced a screenshot summary', step)
         self.assertNotIn('continue-on-error:', step)
-        self.assertLess(self.tests_job.index('      - name: Unit tests'), self.tests_job.index(step))
+        self.assertNotIn('        if:', step)
         static = self.named_step(self.tooling_contracts, 'Check committed screenshot golden owners')
         self.assertNotIn('        if:', static)
         self.assertIn('python3 -m unittest scripts/test_check_screenshot_baseline_owners.py', static)
@@ -395,6 +396,8 @@ class AndroidCiGateTest(unittest.TestCase):
         for dependency in self.dependencies:
             if dependency in {'secondary-variant', 'compile-tests'}:
                 continue  # The queue runs both full variants instead.
+            if dependency == 'compose-compiler':
+                continue  # Compose reports run after merge, on master and nightly.
             for result in ['failure', 'cancelled', 'skipped']:
                 bad = self.successful_outcomes('merge_group')
                 bad[dependency]['result'] = result
@@ -420,19 +423,24 @@ class AndroidCiGateTest(unittest.TestCase):
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
-        self.assertEqual(len(gradle_setup_steps), 6)
+        self.assertEqual(len(gradle_setup_steps), 7)
+        shared = ("github.event_name == 'merge_group' || (github.event_name == 'pull_request' && "
+                  "github.event.pull_request.head.repo.full_name != github.repository) }}")
         for step in gradle_setup_steps:
-            self.assertIn(
-                "cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && "
-                "github.event.pull_request.head.repo.full_name != github.repository) }}",
-                step,
-            )
+            if step in self.coverage:
+                # Report tasks only; the shards own the cache entries.
+                self.assertIn('cache-read-only: true\n', step)
+            elif step in self.tests_job:
+                # One shard per flavor writes; the others would race for the same key.
+                self.assertIn('cache-read-only: ${{ matrix.shard != 0 || ' + shared, step)
+            else:
+                self.assertIn('cache-read-only: ${{ ' + shared, step)
         self.assertNotIn('uses: actions/cache@', self.workflow)
-        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 6)
+        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 7)
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
         save_step = self.named_step(self.tests_job, 'Save MarmotKit artifact')
         # Zapstore is the only flavor every event runs.
-        self.assertIn("matrix.flavor == 'Zapstore'", save_step)
+        self.assertIn("matrix.flavor == 'Zapstore' && matrix.shard == 0", save_step)
         self.assertIn("github.event_name != 'merge_group'", save_step)
         self.assertIn("github.event_name != 'pull_request'", save_step)
         self.assertIn(
@@ -525,12 +533,13 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def test_lightweight_tooling_and_test_builds_reuse_the_gradle_daemon(self):
         """Measured lightweight steps reuse a JVM; heavier tooling stays isolated."""
+        # Each shard runs one supervised Gradle invocation; coverage runs one more.
         invocations = self.gradle_steps(self.tests_job)
-        self.assertGreaterEqual(len(invocations), 3)
-        # Only the supervised full-suite invocation needs its own daemon lifetime.
-        unit = self.named_step(self.tests_job, 'Unit tests')
-        self.assertIn('--no-daemon', unit)
-        invocations = [step for step in invocations if '      - name: Unit tests' not in step]
+        self.assertEqual(len(invocations), 1)
+        self.assertIn('--no-daemon', self.named_step(self.tests_job, 'Unit tests'))
+        self.assertEqual(len(self.gradle_steps(self.coverage)), 1)
+        self.assertIn('--no-daemon', self.named_step(self.coverage, 'Coverage gate and report (Kover)'))
+        invocations = []
         tooling = [step for step in self.gradle_steps(self.build_contracts)
                    if "if: matrix.phase == 'tooling'" in step and
                    '- name: Capture dependency-control bootstrap candidates' not in step]
@@ -733,17 +742,25 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
 
     def test_campaign_deferral_is_explicit_and_cannot_mask_failed_reports(self):
-        outcomes = self.successful_outcomes()
+        # PRs and the queue never run Compose reports; master pushes must.
+        outcomes = self.successful_outcomes('push')
         outcomes['changes']['outputs']['supplemental_campaigns'] = 'false'
         outcomes['compose-compiler']['result'] = 'skipped'
-        self.assertEqual(self.run_gate(outcomes).returncode, 0)
+        self.assertEqual(self.run_gate(outcomes, 'push').returncode, 0)
         for value in ('true', '', 'unexpected', None):
             outcomes['changes']['outputs']['supplemental_campaigns'] = value
-            self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+            self.assertNotEqual(self.run_gate(outcomes, 'push').returncode, 0)
         outcomes['changes']['outputs']['supplemental_campaigns'] = 'false'
         for result in ('failure', 'cancelled'):
             outcomes['compose-compiler']['result'] = result
-            self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+            self.assertNotEqual(self.run_gate(outcomes, 'push').returncode, 0)
+        for event in ('pull_request', 'merge_group'):
+            pr = self.successful_outcomes(event)
+            self.assertEqual(pr['compose-compiler']['result'], 'skipped')
+            self.assertEqual(self.run_gate(pr, event).returncode, 0, event)
+            for result in ('failure', 'cancelled'):
+                pr['compose-compiler']['result'] = result
+                self.assertNotEqual(self.run_gate(pr, event).returncode, 0, (event, result))
 
     def test_campaigns_run_nightly_and_manual(self):
         for filename in ('android-ci.yml', 'android-repro-verify.yml'):
@@ -762,9 +779,12 @@ class AndroidCiGateTest(unittest.TestCase):
             self.assertNotIn('github.event.pull_request.draft', job.split('    steps:', 1)[0])
         self.assertIn('!github.event.pull_request.draft', self.compose_compiler.split('    steps:', 1)[0])
         self.assertIn('!github.event.pull_request.draft', self.secondary.split('    steps:', 1)[0])
-        for name in ('Coverage gate (Kover)', 'Coverage report (Kover)',
+        self.assertNotIn('github.event.pull_request.draft', self.coverage.split('    steps:', 1)[0])
+        self.assertNotIn('draft', self.named_step(self.coverage, 'Require every committed screenshot golden to be compared'))
+        for name in ('Download shard coverage data', 'Coverage gate and report (Kover)',
                      'Runtime listener and viewport restoration coverage floors'):
-            self.assertIn('!github.event.pull_request.draft', self.named_step(self.tests_job, name))
+            self.assertIn("${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}",
+                          self.named_step(self.coverage, name))
         self.assertNotIn('draft', self.named_step(self.tests_job, 'Unit tests'))
         self.assertIn('PR_DRAFT: ${{ github.event.pull_request.draft == true }}', self.gate)
 
@@ -835,7 +855,7 @@ class AndroidCiGateTest(unittest.TestCase):
         outcomes = self.successful_outcomes(draft=draft)
         outcomes['compile-tests']['result'] = 'success'
         outcomes['changes']['outputs'].update(precheck='true', ci_mode='precheck', supplemental_campaigns='false')
-        for job in ('tests', 'static-analysis', 'secondary-variant', 'compose-compiler'):
+        for job in ('tests', 'coverage', 'static-analysis', 'secondary-variant', 'compose-compiler'):
             outcomes[job]['result'] = 'skipped'
         return outcomes
 
@@ -870,7 +890,7 @@ class AndroidCiGateTest(unittest.TestCase):
             outcomes = self.successful_outcomes('merge_group')
             self.assertEqual(self.run_gate(outcomes, 'pull_request', draft=draft).returncode, 0)
             for job in self.dependencies:
-                if job in {'secondary-variant', 'compile-tests'}:
+                if job in {'secondary-variant', 'compile-tests', 'compose-compiler'}:
                     continue
                 bad = json.loads(json.dumps(outcomes))
                 bad[job]['result'] = 'skipped'
@@ -949,9 +969,9 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('if [[ "$CI_FULL_MATRIX" != true ]]; then', tooling)
         self.assertIn(':app:compileDevPlayDebugAndroidTestKotlin', self.secondary)
         suite = self.named_step(self.tests_job, 'Unit tests')
-        self.assertIn('if [[ "$CI_FULL_MATRIX" == true ]]; then', suite)
-        self.assertIn('compile_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)', suite)
-        self.assertIn('./gradlew "${compile_tasks[@]}" :app:testDev', suite)
+        self.assertIn('if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "$CI_FULL_MATRIX" == true ]]; then', suite)
+        self.assertIn('extra_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)', suite)
+        self.assertIn('./gradlew "${extra_tasks[@]}" :app:testDev', suite)
         self.assertIn(':benchmark:compileDevZapstoreBenchmarkReleaseKotlin', tooling)
         self.assertIn(':benchmark:assembleDevZapstoreBenchmarkRelease', tooling)
         precheck = tooling.split('if [[ "$CI_PRECHECK" == true ]]; then', 1)[1].split('else', 1)[0]
@@ -989,6 +1009,7 @@ class AndroidCiGateTest(unittest.TestCase):
                     result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script],
                         cwd=directory, capture_output=True, text=True,
                         env={**os.environ, 'CI_PRECHECK': precheck, 'CI_FULL_MATRIX': full,
+                             'ORG_GRADLE_PROJECT_ciTestShard': '0',
                              'UNIT_TEST_DEADLINE_MONOTONIC': str(time.monotonic() + 5)})
                     self.assertEqual(result.returncode, 0, result.stderr)
                     owners.extend(argument for argument in result.stdout.splitlines()

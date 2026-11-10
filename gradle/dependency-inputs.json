@@ -361,15 +361,15 @@
   ],
   "files": {
     "app/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "app/gradle.lockfile": "8defe453472b64757030f22a7471eab6d7888d068fc22a4da06e4955d9b90606",
+    "app/gradle.lockfile": "2a90c4b069c6a032d3f23e535d7a378d6e918329dbe8de214c58424c03f69d0f",
     "benchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
-    "benchmark/gradle.lockfile": "f7a48c3bccc0ccf88268cac2519ca9ed1be144e81219747b767ccf4b8e2cedfd",
+    "benchmark/gradle.lockfile": "75449259599f5530d59d892f9dc85982c237460d56baf642e8ae3d7f5e66bc95",
     "buildscript-gradle.lockfile": "581e953169040a76070e48cc4d48c75c0f6a69d33a26e67af3badfdabb61beda",
     "cryptoBenchmark/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "cryptoBenchmark/gradle.lockfile": "6918058034cbd92551aeaddfbe5857d7fb946e72de7644f8ff52ee10b75ff062",
     "fuzz/buildscript-gradle.lockfile": "e4a6c3491a87c07fba697ac1da0e01cc29dde400f5d3a08031a0c7b46961f9f9",
     "fuzz/gradle.lockfile": "1a058eacc9b9859109a224af8eb8e18d3eb721405af592ec93f9f3e3b81d923a",
-    "gradle/verification-metadata.xml": "404121c5e65a6571ccf17a7f5dd322ce42f0a45f44ef85079c0cb8940c348eef",
+    "gradle/verification-metadata.xml": "002c612ff9d4523549dcec4e330b0057ab4e5c5623c94c408b77c0fa28070327",
     "settings-gradle.lockfile": "e58bb2ed80db9f829601a658d7c33b9802eb7d2191c31e79c28e01f14c225926"
   },
   "post_lock_selection": [
@@ -901,13 +901,13 @@
     }
   ],
   "reviewed_from": {
-    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/42805072926/artifacts/13759070514",
+    "evidence": "https://github.com/marmot-protocol/whitenoise-android/actions/runs/42806790798/artifacts/13760380864",
     "repository": "marmot-protocol/whitenoise-android",
     "retained": {
       "path": "gradle/dependency-evidence/capture.json",
-      "sha256": "ef32fcb883729d24be42ef06e3b6f5abe39daa4e7b68a78d50e0d6b44dfa6907"
+      "sha256": "12767c6644dc7afb476a0655df941fcf6baa7a0066a6a2a0b0eabdc8c9f5ea90"
     },
-    "source_sha": "67a01b212dcf1aece9b4c3141421ddaa9b4c0ed3"
+    "source_sha": "bdb744e2ac0823672ae244ba40b464f9a7d443e6"
   },
   "schema": 1,
   "supplemental_tools": {
@@ -1947,11 +1947,19 @@
     "androidx.test.uiautomator:uiautomator-shell-android:2.4.0/uiautomator-shell-android-2.4.0.module": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.0/uiautomator-shell-android-2.4.0.module.sha256",
     "androidx.test.uiautomator:uiautomator-shell-android:2.4.0/uiautomator-shell-android-2.4.0.pom": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.0/uiautomator-shell-android-2.4.0.pom.sha256",
     "androidx.test.uiautomator:uiautomator-shell-android:2.4.0/uiautomator-shell.aar": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.0/uiautomator-shell-android-2.4.0.aar.sha256",
+    "androidx.test.uiautomator:uiautomator-shell-android:2.4.1/uiautomator-shell-android-2.4.1.module": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.1/uiautomator-shell-android-2.4.1.module.sha256",
+    "androidx.test.uiautomator:uiautomator-shell-android:2.4.1/uiautomator-shell-android-2.4.1.pom": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.1/uiautomator-shell-android-2.4.1.pom",
+    "androidx.test.uiautomator:uiautomator-shell-android:2.4.1/uiautomator-shell.aar": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell-android/2.4.1/uiautomator-shell-android-2.4.1.aar",
     "androidx.test.uiautomator:uiautomator-shell:2.4.0/uiautomator-shell-2.4.0.module": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell/2.4.0/uiautomator-shell-2.4.0.module.sha256",
     "androidx.test.uiautomator:uiautomator-shell:2.4.0/uiautomator-shell-2.4.0.pom": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell/2.4.0/uiautomator-shell-2.4.0.pom.sha256",
+    "androidx.test.uiautomator:uiautomator-shell:2.4.1/uiautomator-shell-2.4.1.module": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell/2.4.1/uiautomator-shell-2.4.1.module.sha256",
+    "androidx.test.uiautomator:uiautomator-shell:2.4.1/uiautomator-shell-2.4.1.pom": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator-shell/2.4.1/uiautomator-shell-2.4.1.pom",
     "androidx.test.uiautomator:uiautomator:2.4.0/uiautomator-2.4.0.aar": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.0/uiautomator-2.4.0.aar.sha256",
     "androidx.test.uiautomator:uiautomator:2.4.0/uiautomator-2.4.0.module": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.0/uiautomator-2.4.0.module.sha256",
     "androidx.test.uiautomator:uiautomator:2.4.0/uiautomator-2.4.0.pom": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.0/uiautomator-2.4.0.pom.sha256",
+    "androidx.test.uiautomator:uiautomator:2.4.1/uiautomator-2.4.1.aar": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.1/uiautomator-2.4.1.aar",
+    "androidx.test.uiautomator:uiautomator:2.4.1/uiautomator-2.4.1.module": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.1/uiautomator-2.4.1.module.sha256",
+    "androidx.test.uiautomator:uiautomator:2.4.1/uiautomator-2.4.1.pom": "https://dl.google.com/dl/android/maven2/androidx/test/uiautomator/uiautomator/2.4.1/uiautomator-2.4.1.pom",
     "androidx.test:annotation:1.0.1/annotation-1.0.1.aar": "https://dl.google.com/dl/android/maven2/androidx/test/annotation/1.0.1/annotation-1.0.1.aar",
     "androidx.test:annotation:1.0.1/annotation-1.0.1.pom": "https://dl.google.com/dl/android/maven2/androidx/test/annotation/1.0.1/annotation-1.0.1.pom.sha256",
     "androidx.test:core:1.5.0/core-1.5.0.aar": "https://dl.google.com/dl/android/maven2/androidx/test/core/1.5.0/core-1.5.0.aar",

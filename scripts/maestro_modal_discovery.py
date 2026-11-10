@@ -1,5 +1,6 @@
 """Find production modal owners from real Kotlin calls, independently of UI name suffixes."""
 
+import functools
 import re
 
 try:
@@ -30,6 +31,7 @@ def balanced_end(code, start, opening, closing):
     raise ValueError('Unbalanced Kotlin modal-owner declaration')
 
 
+@functools.lru_cache(maxsize=None)
 def expression_code(text):
     """Keep one inert value token for literals so a trailing operator cannot swallow the next UI."""
     masked = list(kotlin_code_mask(text))
@@ -128,6 +130,11 @@ def function_ranges(code):
 
 def modal_owners(text):
     """Every real modal call needs a named owner; declarations/comments/literals grant no credit."""
+    return set(_modal_owners(text))
+
+
+@functools.lru_cache(maxsize=None)
+def _modal_owners(text):
     code = expression_code(text)
     functions = function_ranges(code)
     declaration_parameters = {function['parameters_open'] for function in functions}
@@ -142,4 +149,4 @@ def modal_owners(text):
             raise ValueError(f'Modal call has no audited named owner at line {line}: {call.group(1)}')
         owner = min(enclosing, key=lambda function: function['end'] - function['start'])
         names.add(owner['name'])
-    return names
+    return frozenset(names)

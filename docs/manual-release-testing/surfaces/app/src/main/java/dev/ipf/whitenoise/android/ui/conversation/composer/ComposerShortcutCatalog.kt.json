@@ -100,11 +100,29 @@
         ]
       },
       {
+        "surface": "R.string.translation_composer_toggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "anchor": "R.string.translation_composer_toggle",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
         "surface": "R.string.voice_message_record",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
         "anchor": "R.string.voice_message_record",
         "test_ids": [
           "CON-041"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Sticker copy stickers title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "anchor": "R.string.stickers_title",
+        "test_ids": [
+          "MSG-045"
         ]
       }
     ]

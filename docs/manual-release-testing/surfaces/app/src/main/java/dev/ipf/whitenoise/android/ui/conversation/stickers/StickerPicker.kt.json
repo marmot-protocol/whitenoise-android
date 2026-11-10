@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StickerPickerPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "fun StickerPickerPage(",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "EmptyStickerPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "fun EmptyStickerPicker(",
+        "test_ids": [
+          "MSG-045",
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "PackTabs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "fun PackTabs(",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "StickerGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "fun StickerGrid(",
+        "test_ids": [
+          "MSG-045",
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker packs title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "R.string.sticker_packs_title",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "Sticker copy sticker server disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "R.string.sticker_server_disclosure",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "Sticker copy stickers browse",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "R.string.stickers_browse",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "Sticker copy stickers empty detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "R.string.stickers_empty_detail",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "Sticker copy stickers empty title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "R.string.stickers_empty_title",
+        "test_ids": [
+          "MSG-045"
+        ]
+      },
+      {
+        "surface": "Sticker copy stickers title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+        "anchor": "R.string.stickers_title",
+        "test_ids": [
+          "MSG-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

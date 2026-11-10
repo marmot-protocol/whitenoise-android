@@ -24,8 +24,8 @@ expected_mime=application/vnd.android.package-archive
   printf 'PR_NUMBER must be a positive integer\n' >&2
   exit 2
 }
-[[ "$PREVIEW_CHANNEL" == stable || "$PREVIEW_CHANNEL" == isolated ]] || {
-  printf 'PREVIEW_CHANNEL must be stable or isolated\n' >&2
+[[ "$PREVIEW_CHANNEL" == stable ]] || {
+  printf 'PREVIEW_CHANNEL must be stable\n' >&2
   exit 2
 }
 [[ "$release_tag" =~ ^[A-Za-z0-9._-]+$ ]] || {
@@ -58,7 +58,7 @@ ensure_release() {
   if ! gh release create "$release_tag" \
     --repo "$GITHUB_REPOSITORY" \
     --title 'Android PR Previews' \
-    --notes 'Signed Android PR preview assets. Each PR keeps stable and isolated update-in-place APK links.' \
+    --notes 'Signed Android PR preview assets. Each PR keeps one stable update-in-place APK link.' \
     --prerelease; then
     gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null
   fi

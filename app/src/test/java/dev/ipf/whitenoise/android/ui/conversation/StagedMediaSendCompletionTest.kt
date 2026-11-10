@@ -39,7 +39,7 @@ class StagedMediaSendCompletionTest {
                 StagedMediaSendCompletion(
                     { results += true },
                     { results += false },
-                    state.captureCaptionSettlement("original"),
+                    state.captureCaptionSettlement(),
                 )
             completion.reject()
             assertEquals("original", state.valueState.value.text)
@@ -52,6 +52,15 @@ class StagedMediaSendCompletionTest {
             assertEquals(replacement.orEmpty(), state.valueState.value.text)
             assertEquals(listOf(false), results)
         }
+    }
+
+    /** A translated caption still settles the untranslated editor text it was produced from. */
+    @Test
+    fun translatedCaptionSettlesSourceEditorText() {
+        val state = ComposerTextState(TextFieldValue("hola"))
+        val completion = StagedMediaSendCompletion({}, {}, state.captureCaptionSettlement())
+        completion.accept()
+        assertEquals("", state.valueState.value.text)
     }
 
     /** Initial acceptance clears the exact shelf and reports success once, even when durable cleanup repeats. */

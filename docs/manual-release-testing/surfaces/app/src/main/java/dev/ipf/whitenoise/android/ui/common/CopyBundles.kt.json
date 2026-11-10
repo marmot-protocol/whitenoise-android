@@ -26,6 +26,14 @@
         "test_ids": [
           "MSG-038"
         ]
+      },
+      {
+        "surface": "Sticker copy sticker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/CopyBundles.kt",
+        "anchor": "R.string.sticker",
+        "test_ids": [
+          "MSG-047"
+        ]
       }
     ],
     "settings_controls": [

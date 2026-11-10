@@ -56,15 +56,18 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineReplyPreviewFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -758,25 +761,28 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
 /** Owns deterministic message, account, roster, and media fixtures shared by the screenshot cases. */
 open class MessageBubbleFileAttachmentFixtures {
     /** Creates a single-account app state without persistent draft side effects. */
-    protected fun fileFooterAppState(context: android.content.Context) =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence()),
-            accountIdHexResolver = { null },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
+    protected fun fileFooterAppState(
+        context: android.content.Context,
+        marmot: MarmotInterface? = null,
+    ) = WhiteNoiseAppState(
+        context = context,
+        draftStore = DraftStore(EmptyDraftPersistence()),
+        accountIdHexResolver = { null },
+        initialMarmotRuntime = marmot?.let { AppMarmotRuntime(context.cacheDir.resolve("file-footer").path, it) },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ACCOUNT_REF,
+                    accountIdHex = ACCOUNT_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                    unlinked = false,
                 ),
-            activeAccountRef = ACCOUNT_REF,
-        )
+            ),
+        activeAccountRef = ACCOUNT_REF,
+    )
 
     /** Builds a deterministic confirmed-message fixture with a canonical protocol id. */
     @Suppress("LongMethod") // One fixture spells out every field of the authoritative record.
@@ -796,6 +802,7 @@ open class MessageBubbleFileAttachmentFixtures {
         // MarmotKit 0.10 projects attachments as outcomes and echoes no imeta tags; false builds that shape
         // and derives the app record the way the controller does, through TimelineProjector.
         engineEchoesTags: Boolean = true,
+        sticker: StickerRefFfi? = null,
     ): TimelineMessage {
         val messageId = index.toString(16).padStart(2, '0') + "00".repeat(31)
         val (sender, direction) = if (mine) ACCOUNT_ID to "sent" else SENDER_ID to "received"
@@ -818,7 +825,7 @@ open class MessageBubbleFileAttachmentFixtures {
                 retentionExpiresAt = retentionExpiresAt,
                 recordedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
                 receivedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
-                sticker = null,
+                sticker = sticker,
             )
         val projected =
             TimelineMessageRecordFfi(
@@ -854,7 +861,7 @@ open class MessageBubbleFileAttachmentFixtures {
                 sourceEpoch = 1uL,
                 retentionSeconds = retentionSeconds,
                 retentionExpiresAt = retentionExpiresAt,
-                sticker = null,
+                sticker = sticker,
                 importedFrom = null,
                 recipientConfirmed = false,
                 historyImportProvenance = null,

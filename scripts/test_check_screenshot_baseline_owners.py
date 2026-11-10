@@ -185,6 +185,24 @@ class ScreenshotBaselineOwnersTest(unittest.TestCase):
         self.assertEqual(status, 1)
         self.assertIn('light.png was not compared', err)
 
+    def test_shard_summaries_cover_goldens_together(self):
+        """Sharded runs pass when each golden was compared by some shard."""
+        fixture = self.fixture()
+        first, second = fixture.root / 'shard-0.json', fixture.root / 'shard-1.json'
+        first.write_text(json.dumps(fixture.summary('chat_row_light.png')))
+        second.write_text(json.dumps(fixture.summary('light.png')))
+        status, _, err = fixture.run('--results', str(first), str(second))
+        self.assertEqual(status, 0, err)
+
+    def test_one_missing_shard_summary_fails(self):
+        """A shard that wrote no summary fails even when the others cover every golden."""
+        fixture = self.fixture()
+        results = fixture.root / 'shard-0.json'
+        results.write_text(json.dumps(fixture.summary('chat_row_light.png', 'light.png')))
+        status, _, err = fixture.run('--results', str(results), str(fixture.root / 'shard-1.json'))
+        self.assertEqual(status, 1)
+        self.assertIn('missing results summary', err)
+
     def test_missing_results_summary_fails(self):
         """A verification step that produced no summary cannot pass the coverage check."""
         fixture = self.fixture()

@@ -1126,7 +1126,8 @@ Generate the same optimized staging report that CI uploads:
 
 Outputs land in `app/build/compose-metrics/` and
 `app/build/compose-reports/`. CI publishes them as the
-`compose-compiler-reports` artifact for 14 days.
+`compose-compiler-reports` artifact for 14 days. The job runs on `master` pushes,
+nightly and manual dispatch; PRs and merge groups skip it.
 
 ## DEX method-size budgets
 

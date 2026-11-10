@@ -407,6 +407,7 @@ data class ChatListItem(
                         it.attachmentKind,
                         it.attachmentCount,
                         it.groupSystem,
+                        isSticker = it.sticker != null,
                     )
                 },
             copy = copy,

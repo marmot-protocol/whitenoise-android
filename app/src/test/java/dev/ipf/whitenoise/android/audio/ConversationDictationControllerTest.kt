@@ -1130,10 +1130,10 @@ class ConversationDictationControllerTest {
         assertFalse(f.controller.ownsMicrophone)
     }
 
-    /** An involuntary interruption retires an already pending Send validation. */
+    /** Focus loss after Send cannot change sealed speech, so the chosen Send still completes. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun focusInterruptionDuringSendValidationNeverSends() =
+    fun focusInterruptionAfterSendStillSendsOnce() =
         runTest {
             val validation = CompletableDeferred<ConversationDictationTargetValidation>()
             var sends = 0
@@ -1153,11 +1153,48 @@ class ConversationDictationControllerTest {
             f.platform.listener.onResult("tail")
             runCurrent()
             f.controller.interruptForAudioFocusLoss()
-            assertEquals("Draft tail", f.drafts.getValue(key()).text)
+            assertEquals("Draft", f.drafts.getValue(key()).text)
             validation.complete(ConversationDictationTargetValidation.Available)
             advanceUntilIdle()
-            assertEquals(0, sends)
-            assertEquals("Draft tail", f.drafts.getValue(key()).text)
+            assertEquals(1, sends)
+            assertEquals("", f.drafts.getValue(key()).text)
+        }
+
+    /** Automatic silence completion is no user choice, so focus loss still keeps the draft unsent. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun focusInterruptionDuringAutomaticSendNeverSends() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val platform =
+                FakePlatform().apply {
+                    pendingCallerAudio = true
+                    capturedSilenceMillis = 0L
+                }
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    platform = platform,
+                    finishAfterSilenceMillis = { 3_000L },
+                    silenceDeliveryMode = { ConversationDictationDeliveryMode.SendOnFinish },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
+                        true
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            platform.capturedSilenceMillis = 3_000L
+            f.scheduler.advanceBy(3_000L)
+            // Automatic completion must already be finishing, or this would only cover the before-finish path.
+            assertTrue(f.controller.state is ConversationDictationState.Processing)
+            f.controller.interruptForAudioFocusLoss()
+            platform.pendingCallerAudio = false
+            platform.listener.onResult("late tail")
+            advanceUntilIdle()
+            assertEquals(emptyList<String>(), sent)
+            assertEquals("Draft", f.drafts.getValue(key()).text)
         }
 
     /** An unavailable original target cannot receive interruption text through another owner. */
@@ -6103,6 +6140,39 @@ class ConversationDictationControllerTest {
         assertEquals("first", fixture.drafts.getValue(key()).text)
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
+
+    /** Capture-side silence on the final chunk needs no retry, even before the provider was fully fed. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun silentFinalTailAfterSendDeliversOnFirstEmptyResult() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        it.beginDispatch().also { accepted -> if (accepted) sent += it.payload }
+                    },
+                )
+            f.platform.pendingCallerAudio = true
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            if (f.platform.sessions.isEmpty()) f.scheduler.runDelay(500L)
+            f.platform.listener.onResult("first")
+            f.scheduler.runDelay(500L)
+            f.controller.send()
+            val tail = f.platform.session
+            tail.callerAudioFinalChunk = true
+            tail.callerAudioHasSpeech = false
+            tail.callerAudioFeedComplete = false
+            f.platform.pendingCallerAudio = false
+            f.platform.listener.onError(ConversationDictationFailure.NoMatch)
+            advanceUntilIdle()
+            assertEquals(1, tail.acknowledgedCallerAudio)
+            assertEquals(0, tail.retriedCallerAudioWithFollowingAudio)
+            assertEquals(listOf("first"), sent)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+        }
 
     /** Exhausts the exact final PCM's bounded automatic retry budget before terminal assertions. */
     private fun exhaustFinalNoMatch(fixture: Fixture) {

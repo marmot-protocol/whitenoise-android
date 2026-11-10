@@ -136,7 +136,7 @@ private fun Int.inSpeakableCodePointRanges(ranges: IntArray): Boolean {
     return false
 }
 
-private fun Int.isEmojiPresentation(): Boolean = inSpeakableCodePointRanges(SPEAKABLE_EMOJI_PRESENTATION_RANGES)
+internal fun Int.isEmojiPresentation(): Boolean = inSpeakableCodePointRanges(SPEAKABLE_EMOJI_PRESENTATION_RANGES)
 
 private fun Int.isEmojiDefaultText(): Boolean = inSpeakableCodePointRanges(SPEAKABLE_EMOJI_DEFAULT_TEXT_RANGES)
 
