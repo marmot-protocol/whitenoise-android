@@ -1,5 +1,7 @@
 """Regression contracts for fixture isolation, result identity and manual-only admission."""
 
+import copy
+import functools
 import json
 import os
 from pathlib import Path
@@ -14,7 +16,8 @@ import xml.etree.ElementTree as ET
 import yaml
 
 from scripts import maestro_runtime as runtime
-from scripts.maestro_coverage import EDGE_CHECKS, EDGE_DIMENSIONS, family_plans, inventory, markdown_inventory, named_edges, screen_catalog
+from scripts.maestro_coverage import EDGE_CHECKS, EDGE_DIMENSIONS, family_plans, markdown_inventory, named_edges, screen_catalog
+from scripts.maestro_coverage import inventory as build_inventory
 from scripts.maestro_runtime_summary import campaign
 from scripts.maestro_runtime_pair import pair
 from scripts.maestro_runtime_selection import selection, matrix_selection
@@ -36,6 +39,16 @@ def expanded_flow_commands(path, parents=()):
             result.append(command)
     return result
 
+
+
+@functools.lru_cache(maxsize=None)
+def _repository_inventory():
+    return build_inventory()
+
+
+def inventory():
+    """The checked-out repository is read-only here; scan it once and hand each test its own copy."""
+    return copy.deepcopy(_repository_inventory())
 
 class CampaignSummaryTest(unittest.TestCase):
     def test_matrix_cli_works_outside_package_import_context(self):

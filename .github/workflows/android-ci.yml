@@ -142,9 +142,12 @@ jobs:
           "$RUNNER_TEMP/ci-permissions/bin/python" scripts/check_merge_authorization_boundary.py
           "$RUNNER_TEMP/ci-permissions/bin/python" -m unittest scripts/test_merge_authorization_boundary.py
 
+      # These suites mostly wait on local servers and timers, so one process per
+      # module cuts the step from about two minutes to the slowest module.
       - name: Test attachment fixture HTTP ledger and cancellation contracts
         if: needs.changes.outputs.tooling_regressions != 'false'
-        run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
+        working-directory: tools/attachment-fixture
+        run: find . -maxdepth 1 -name 'test_*.py' -printf '%f\n' | sed 's/\.py$//' | sort | xargs -P 8 -n 1 python3 -m unittest -q
 
       # These suites use scripts, workflows and committed fixtures, not changing
       # production UI source. Unknown inputs and all integrations run them.
