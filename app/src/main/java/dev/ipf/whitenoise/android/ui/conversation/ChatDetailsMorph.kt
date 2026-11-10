@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,8 @@ import androidx.compose.ui.graphics.drawscope.draw
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.dp
@@ -113,7 +116,7 @@ private class ChatDetailsMorphState(
 
 /** The details page container transform, shared by group and direct-message details. */
 internal class ChatDetailsMorph(
-    /** True while this change runs the morph; the route slide must stay still. */
+    /** True while the morph is running; the route slide must stay still. */
     val active: Boolean,
     /** Applied to both the details host and the transcript host. */
     val modifier: Modifier,
@@ -141,9 +144,15 @@ internal fun rememberChatDetailsMorph(
     // Runs while the new route composes, before the transcript's composer is detached.
     val active = remember(ownerKey, showDetails) { state.commit(showDetails, motionEnabled, composerBounds) }
     val progress = remember(ownerKey, showDetails) { Animatable(if (active) 0f else 1f) }
+    // Settles back to false so a later Composer settings change keeps its own slide.
+    val running by remember(progress) { derivedStateOf { active && progress.value < 1f } }
     LaunchedEffect(progress) {
-        if (active) progress.animateTo(1f, tween(CHAT_DETAILS_MORPH_MILLIS, easing = LinearEasing))
-        if (!showDetails) state.picture = null
+        try {
+            if (active) progress.animateTo(1f, tween(CHAT_DETAILS_MORPH_MILLIS, easing = LinearEasing))
+        } finally {
+            // Also drops the frame when details reopen mid-shrink; an open interrupted by a close keeps it.
+            if (!showDetails) state.picture = null
+        }
     }
     val request = state.captureRequest
     LaunchedEffect(request) {
@@ -154,7 +163,17 @@ internal fun rememberChatDetailsMorph(
     }
     val colors = MaterialTheme.colorScheme
     val card = CardColors(colors.background, colors.surfaceContainerHigh, colors.outlineVariant)
-    val modifier = Modifier.chatDetailsMorph(state, showDetails, active, { progress.value }, card, composerBounds)
+    // The drawn card is not where the laid-out page is, so touches wait until the morph settles.
+    val modifier =
+        Modifier
+            .pointerInput(progress) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (running) event.changes.forEach { it.consume() }
+                    }
+                }
+            }.chatDetailsMorph(state, showDetails, active, { progress.value }, card, composerBounds)
     val close: (() -> Unit) -> Unit = { action ->
         if (!motionEnabled || state.origin == null) {
             action()
@@ -163,7 +182,7 @@ internal fun rememberChatDetailsMorph(
             state.captureRequest = action
         }
     }
-    return ChatDetailsMorph(active, modifier, close)
+    return ChatDetailsMorph(running, modifier, close)
 }
 
 private class CardColors(

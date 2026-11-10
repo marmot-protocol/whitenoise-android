@@ -254,6 +254,9 @@ class ChatDetailsMorphScreenshotTest {
         rule.waitForIdle()
         val settled = pixels()
         capture("settled_$name")
+        rule.runOnIdle {
+            assertFalse("A settled morph must release the route slide and touches", requireNotNull(morph).active)
+        }
         assertFalse("The card must move between the first frame and the midpoint", first.contentEquals(middle))
         assertFalse("The midpoint must still be in flight", middle.contentEquals(settled))
     }
