@@ -124,6 +124,21 @@ internal class GlobalSearchResultsController(
         }
     }
 
+    /**
+     * Marks loaded rows [stale] when the screen leaves (#1945). Any read in flight or queued is dropped, since it
+     * read the store before the reader went away and must not be what clears [stale]: only a recheck launched
+     * after the return may. A page dropped here is read again from its cursor later.
+     */
+    fun detach() {
+        if (state.batches == 0) return
+        job?.cancel()
+        refreshPending = false
+        loadPending = false
+        state.inFlight?.let { state = GlobalSearchResultsReducer.cancel(state, it) }
+        stale = true
+        recheckFailed = false
+    }
+
     /** Cancels the batch in flight and fences every later completion. */
     fun close() {
         closed = true
@@ -167,7 +182,7 @@ internal class GlobalSearchResultsController(
                 } catch (_: Exception) {
                     // The failure kind is the whole outcome; the message never reaches the screen.
                     if (accepts(current)) {
-                        state = failed(state, request)
+                        state = failedTransition(state, request)
                         if (request.refresh && stale) recheckFailed = true
                     }
                 }
@@ -197,17 +212,6 @@ internal class GlobalSearchResultsController(
             apply
         }
 
-    /** A failed page waits for Retry; a failed background refresh just keeps the rows it had. */
-    private fun failed(
-        state: GlobalSearchResultsState,
-        request: GlobalSearchPageRequest,
-    ): GlobalSearchResultsState =
-        if (request.refresh) {
-            GlobalSearchResultsReducer.cancel(state, request)
-        } else {
-            GlobalSearchResultsReducer.applyFailure(state, request)
-        }
-
     /** Runs a refresh that arrived during the batch, else a page asked for during a refresh. */
     private fun continueAfter() {
         if (refreshPending) {
@@ -222,6 +226,17 @@ internal class GlobalSearchResultsController(
     /** Only the live query on an open, current session may change [state]. */
     private fun accepts(owner: GlobalSearchResultsQuery): Boolean = !closed && owner == query && environment.isCurrent()
 }
+
+/** A failed page waits for Retry; a failed background refresh just keeps the rows it had. */
+private fun failedTransition(
+    state: GlobalSearchResultsState,
+    request: GlobalSearchPageRequest,
+): GlobalSearchResultsState =
+    if (request.refresh) {
+        GlobalSearchResultsReducer.cancel(state, request)
+    } else {
+        GlobalSearchResultsReducer.applyFailure(state, request)
+    }
 
 /**
  * Keeps one account's global message-search session alive in the shell while the chat list is away (#1945): opening
@@ -252,9 +267,9 @@ internal class GlobalSearchResultsHolder {
         return created
     }
 
-    /** Marks the held session [GlobalSearchResultsController.stale] when the chat list leaves composition. */
+    /** Detaches the held session when the chat list leaves composition; see [GlobalSearchResultsController.detach]. */
     fun detach() {
-        held?.takeIf { it.state.batches > 0 }?.stale = true
+        held?.detach()
     }
 
     /** Closes the held session and cancels its work. */

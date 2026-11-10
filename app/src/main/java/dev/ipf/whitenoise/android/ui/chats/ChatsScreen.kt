@@ -835,7 +835,9 @@ internal fun ChatsScreen(
     // Pending until the session adopts this query, and on a return to a held session (#1945) until its first
     // recheck lands, so a restored deep viewport never measures a shorter list and no row unverified since the
     // reader came back is shown. Rows of an older query are never shown.
-    val messageResultsPending = messageResultsMode && messageResultsState == null
+    // A failed recheck stays pending too, so a restored deep anchor keeps its guard until Retry succeeds.
+    val messageResultsPending =
+        messageResultsMode && (messageResultsState == null || messageResults?.recheckFailed == true)
     val messageResultChats =
         rememberSearchChats(
             controller,
@@ -2735,6 +2737,12 @@ internal fun ChatsScreen(
                                     requireNotNull(controller.error),
                                     onRetry = controller::retryLoad,
                                 )
+                            // A failed recheck after Back keeps the deep anchor's guard and offers Retry, which
+                            // returns the reader to where they were once the rows are confirmed (#1945).
+                            messageResults?.recheckFailed == true && preservePendingSearchAnchor ->
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    GlobalSearchResultsFooter(messageResultsContent)
+                                }
                             blockLocalSearchRows(
                                 loading = messageResultsPending,
                                 hasLocalRows = visibleItems.isNotEmpty() || messageResultsMode,

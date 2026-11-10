@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.StoreReader
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.keys
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.record
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -79,6 +80,80 @@ class GlobalSearchReturnStateTest {
 
         val shown = requireNotNull(returned.shownState(query)).results.map { it.key }
         assertEquals(listOf("g:m2", "g:m0"), shown)
+        holder.close()
+    }
+
+    /**
+     * A refresh that read the store before the reader left must not clear the stale mark: the reader may delete
+     * the opened message meanwhile, and only a recheck launched after the return can confirm the rows.
+     */
+    @Test
+    fun aRefreshInFlightAtDetachCannotConfirmTheRows() {
+        val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
+        val gate = CompletableDeferred<Unit>()
+        var holdNext = false
+        val reader =
+            GlobalSearchTimelineReader { query ->
+                val page = store.page(query)
+                if (holdNext) {
+                    holdNext = false
+                    gate.await()
+                }
+                page
+            }
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        session.search(query)
+        idleMain()
+        holdNext = true
+        session.refresh()
+        idleMain()
+
+        holder.detach()
+        store.replace("m1") { it.copy(deleted = true) }
+        gate.complete(Unit)
+        idleMain()
+
+        assertTrue("the earlier refresh did not confirm the rows", session.stale)
+        assertEquals(null, session.shownState(query))
+        session.refresh()
+        idleMain()
+        assertEquals(listOf("g:m2", "g:m0"), requireNotNull(session.shownState(query)).results.map { it.key })
+        holder.close()
+    }
+
+    /** A refresh queued behind a page in flight at detach is dropped with it, so it cannot confirm the rows. */
+    @Test
+    fun aQueuedRefreshAtDetachIsDropped() {
+        val store = StoreReader((0 until 60).map { record("g", "m%02d".format(it), at = 100uL + it.toULong()) })
+        val gate = CompletableDeferred<Unit>()
+        var holdNext = false
+        val reader =
+            GlobalSearchTimelineReader { query ->
+                val page = store.page(query)
+                if (holdNext) {
+                    holdNext = false
+                    gate.await()
+                }
+                page
+            }
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        session.search(query)
+        idleMain()
+        holdNext = true
+        session.loadMore()
+        idleMain()
+        session.refresh()
+
+        holder.detach()
+        gate.complete(Unit)
+        idleMain()
+
+        assertTrue(session.stale)
+        assertEquals(null, session.shownState(query))
         holder.close()
     }
 
