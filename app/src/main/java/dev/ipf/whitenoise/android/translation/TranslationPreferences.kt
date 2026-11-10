@@ -153,8 +153,10 @@ internal class TranslationPreferences(
      * Whether this install accepted the composer's provider logging notice for the current notice version. Typing
      * sends every draft to the engine, so the composer asks once before its first request, wherever it is opened.
      */
-    fun composerNoticeAccepted(): Boolean =
-        runCatching { preferences.getInt(COMPOSER_NOTICE_VERSION, 0) }.getOrDefault(0) >= CURRENT_PRIVACY_NOTICE
+    fun composerNoticeAccepted(): Boolean {
+        val accepted = runCatching { preferences.getInt(COMPOSER_NOTICE_VERSION, 0) }.getOrDefault(0)
+        return accepted >= CURRENT_PRIVACY_NOTICE
+    }
 
     fun acceptComposerNotice() {
         preferences.edit().putInt(COMPOSER_NOTICE_VERSION, CURRENT_PRIVACY_NOTICE).apply()
