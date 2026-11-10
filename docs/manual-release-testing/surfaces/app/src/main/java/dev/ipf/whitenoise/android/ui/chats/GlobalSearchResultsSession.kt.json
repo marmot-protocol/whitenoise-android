@@ -11,6 +11,16 @@
           "FIND-018"
         ]
       }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "GlobalSearchResultsRecheckEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsSession.kt",
+        "anchor": "fun GlobalSearchResultsRecheckEffects(",
+        "test_ids": [
+          "FIND-018"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

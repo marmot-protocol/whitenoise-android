@@ -27,6 +27,22 @@
         "test_ids": [
           "FIND-018"
         ]
+      },
+      {
+        "surface": "GlobalSearchResultTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "fun GlobalSearchResultTitle(",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "GlobalSearchResultTime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "fun GlobalSearchResultTime(",
+        "test_ids": [
+          "FIND-018"
+        ]
       }
     ],
     "settings_controls": [
