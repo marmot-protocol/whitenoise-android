@@ -1494,8 +1494,7 @@ class WhiteNoiseAppState private constructor(
      * The sticker packs and images of [account], shared by its conversations. Main-confined; kept until the account
      * is removed, so a conversation of another account never holds released stickers. Memory trims shrink them.
      */
-    internal fun stickersFor(account: String?): AccountStickers =
-        accountStickers.getOrPut(account) { AccountStickers(account, this) }
+    internal fun stickersFor(account: String?) = accountStickers.getOrPut(account) { AccountStickers(account, this) }
 
     private fun forgetStickers(account: String) {
         accountStickers.remove(account)?.close()

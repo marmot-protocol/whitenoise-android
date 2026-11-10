@@ -360,5 +360,7 @@ private fun stickerPackShareIntent(pack: StickerPackFfi): Intent =
 private const val STICKER_SHARE_LINK_BASE = "https://sonarprivacy.xyz/stickers?a="
 
 /** A link to [pack] that opens on the web and that MDK reads back when pasted into "Add by link". */
-internal fun stickerPackShareLink(pack: StickerPackFfi): String =
-    STICKER_SHARE_LINK_BASE + URLEncoder.encode(pack.coordinate, "UTF-8")
+internal fun stickerPackShareLink(pack: StickerPackFfi): String {
+    val coordinate = URLEncoder.encode(pack.coordinate, "UTF-8")
+    return STICKER_SHARE_LINK_BASE + coordinate
+}
