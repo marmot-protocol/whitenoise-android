@@ -21,11 +21,13 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EmojiSetsControllerTest {
-    /** A cancellation reaches the install handle, clears progress, and publishes no installed snapshot. */
+    /** A cancelled update reaches the install handle, clears progress, and keeps the previous installed snapshot. */
     @Test
     fun cancelWhileProgressIsVisible() =
         runTest {
             val backend = FakeEmojiSetsBackend()
+            val previous = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, true)
+            backend.set = backend.set.copy(installed = previous)
             var changes = 0
             val controller = EmojiSetsController(backend) { changes++ }
             controller.show(backend.set)
@@ -44,7 +46,7 @@ class EmojiSetsControllerTest {
 
             assertEquals(EmojiSetNotice.Cancelled, controller.state.notice)
             assertNull(controller.state.progress)
-            assertNull(controller.state.preview?.installed)
+            assertEquals(previous, controller.state.preview?.installed)
             assertTrue(backend.install.closed)
             assertEquals(0, changes)
         }
