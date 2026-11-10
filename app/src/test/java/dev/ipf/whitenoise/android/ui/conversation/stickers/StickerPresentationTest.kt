@@ -86,7 +86,7 @@ class StickerPresentationTest {
             )
         assertEquals(
             "https://sonarprivacy.xyz/stickers?a=30031%3A${"cd".repeat(32)}%3Aoffice+cats%26more",
-            StickerPresentation.shareLink(pack),
+            stickerPackShareLink(pack),
         )
     }
 }

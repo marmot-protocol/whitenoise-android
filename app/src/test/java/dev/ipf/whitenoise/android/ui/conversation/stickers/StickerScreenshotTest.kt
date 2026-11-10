@@ -88,8 +88,8 @@ class StickerScreenshotTest {
     @Test fun browserAmoled() = browser(rtlLarge = false, name = "sticker_browser_amoled")
 
     /** The top-bar link button opens the paste field above the packs. */
-    @Test fun browserLinkOpenAmoled() =
-        browser(rtlLarge = false, name = "sticker_browser_link_open_amoled", linkOpen = true)
+    @Test
+    fun browserLinkOpenAmoled() = browser(rtlLarge = false, name = "sticker_browser_link_open_amoled", linkOpen = true)
 
     @Test fun browserRtlLargeFont() = browser(rtlLarge = true, name = "sticker_browser_rtl_large")
 

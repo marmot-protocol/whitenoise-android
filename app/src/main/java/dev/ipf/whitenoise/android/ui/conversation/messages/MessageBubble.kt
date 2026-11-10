@@ -3111,7 +3111,9 @@ internal fun MessageBubble(
                             FocusedTextMessagePreview(
                                 presentation = bubblePresentation,
                                 mine = mine,
-                                text = bodyTextToRender ?: displayedBody.takeUnless { hasMedia || stickerRef != null }.orEmpty(),
+                                text =
+                                    bodyTextToRender
+                                        ?: displayedBody.takeUnless { hasMedia || stickerRef != null }.orEmpty(),
                                 document = displayedMarkdownDocument,
                                 time = rememberedMessageBubbleTime(record.recordedAt),
                                 status = item.status,

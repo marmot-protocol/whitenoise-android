@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerPresentation.D
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 
 private const val SEARCH_DEBOUNCE_MS = 250L
 
@@ -72,11 +73,8 @@ internal fun StickerBrowserPage(
     onBack: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
-    var link by rememberSaveable { mutableStateOf("") }
     var linkOpen by rememberSaveable { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
-    var opening by remember { mutableStateOf(false) }
     var discovered by remember { mutableStateOf<List<StickerPackFfi>>(emptyList()) }
     var syncing by remember { mutableStateOf(true) }
     var syncFailed by remember { mutableStateOf(false) }
@@ -91,21 +89,6 @@ internal fun StickerBrowserPage(
     LaunchedEffect(search, library.installed, syncGeneration) {
         if (search.isNotBlank()) delay(SEARCH_DEBOUNCE_MS)
         attemptSticker { discovered = library.discover(search) }
-    }
-    val openLink: () -> Unit = {
-        StickerPresentation.lookupInput(link)?.takeUnless { opening }?.let { input ->
-            opening = true
-            scope.launch {
-                attemptSticker {
-                    onOpen(library.lookUp(input))
-                    link = ""
-                    linkOpen = false
-                }?.let {
-                    onFailure(R.string.sticker_pack_open_failed, "STICKER_PACK_OPEN", it)
-                }
-                opening = false
-            }
-        }
     }
     StickerSheetTopBar(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
         IconToggleButton(
@@ -126,7 +109,12 @@ internal fun StickerBrowserPage(
         modifier = Modifier.fillMaxWidth().testTag("sticker.browser"),
     ) {
         if (linkOpen) {
-            item { StickerLinkField(link, onLinkChange = { link = it }, opening = opening, onOpen = openLink) }
+            item {
+                StickerLinkField(library, onFailure) { pack ->
+                    linkOpen = false
+                    onOpen(pack)
+                }
+            }
         }
         if (library.installed.isNotEmpty()) {
             item { StickerSectionTitle(stringResource(R.string.sticker_packs_installed)) }
@@ -147,11 +135,23 @@ internal fun StickerBrowserPage(
 @Suppress("FunctionNaming")
 @Composable
 private fun StickerLinkField(
-    link: String,
-    onLinkChange: (String) -> Unit,
-    opening: Boolean,
-    onOpen: () -> Unit,
+    library: StickerLibrary,
+    onFailure: StickerFailureReporter,
+    onOpened: (StickerPackFfi) -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    var link by rememberSaveable { mutableStateOf("") }
+    var opening by remember { mutableStateOf(false) }
+    val onOpen: () -> Unit = {
+        StickerPresentation.lookupInput(link)?.takeUnless { opening }?.let { input ->
+            opening = true
+            scope.launch {
+                attemptSticker { onOpened(library.lookUp(input)) }
+                    ?.let { onFailure(R.string.sticker_pack_open_failed, "STICKER_PACK_OPEN", it) }
+                opening = false
+            }
+        }
+    }
     val focus = remember { FocusRequester() }
     LaunchedEffect(focus) { focus.requestFocus() }
     Row(
@@ -160,7 +160,7 @@ private fun StickerLinkField(
     ) {
         WhiteNoiseCompactSearchField(
             value = link,
-            onValueChange = onLinkChange,
+            onValueChange = { link = it },
             placeholder = stringResource(R.string.sticker_pack_link),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { onOpen() }),
@@ -262,10 +262,7 @@ internal fun StickerPackDetailPage(
     onBack: () -> Unit,
     onClose: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    var working by remember(pack.coordinate) { mutableStateOf(false) }
-    val installed = library.isInstalled(pack.coordinate)
     StickerSheetTopBar(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
         IconButton(
             onClick = { context.startActivity(stickerPackShareIntent(pack)) },
@@ -273,29 +270,7 @@ internal fun StickerPackDetailPage(
         ) {
             Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share))
         }
-        TextButton(
-            enabled = !working,
-            onClick = {
-                scope.launch {
-                    working = true
-                    attemptSticker { if (installed) library.uninstall(pack) else library.install(pack) }?.let {
-                        onFailure(
-                            if (installed) R.string.sticker_pack_remove_failed else R.string.sticker_pack_add_failed,
-                            if (installed) "STICKER_PACK_REMOVE" else "STICKER_PACK_ADD",
-                            it,
-                        )
-                    }
-                    working = false
-                }
-            },
-            modifier = Modifier.testTag("sticker.pack.toggle"),
-        ) {
-            if (working) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            } else {
-                Text(stringResource(if (installed) R.string.remove else R.string.sticker_pack_add))
-            }
-        }
+        StickerPackToggle(pack, library, onFailure)
     }
     val description = StickerPresentation.description(pack)
     StickerGrid(
@@ -326,6 +301,41 @@ internal fun StickerPackDetailPage(
     )
 }
 
+@Suppress("FunctionNaming")
+@Composable
+private fun StickerPackToggle(
+    pack: StickerPackFfi,
+    library: StickerLibrary,
+    onFailure: StickerFailureReporter,
+) {
+    val scope = rememberCoroutineScope()
+    var working by remember(pack.coordinate) { mutableStateOf(false) }
+    val installed = library.isInstalled(pack.coordinate)
+    TextButton(
+        enabled = !working,
+        onClick = {
+            scope.launch {
+                working = true
+                attemptSticker { if (installed) library.uninstall(pack) else library.install(pack) }?.let {
+                    onFailure(
+                        if (installed) R.string.sticker_pack_remove_failed else R.string.sticker_pack_add_failed,
+                        if (installed) "STICKER_PACK_REMOVE" else "STICKER_PACK_ADD",
+                        it,
+                    )
+                }
+                working = false
+            }
+        },
+        modifier = Modifier.testTag("sticker.pack.toggle"),
+    ) {
+        if (working) {
+            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+        } else {
+            Text(stringResource(if (installed) R.string.remove else R.string.sticker_pack_add))
+        }
+    }
+}
+
 /**
  * Shares [pack] as a Sonar viewer link: it opens in a browser for people without the app, and MDK reads it back
  * when pasted into "Add by link". The system sheet offers Copy as well.
@@ -334,7 +344,12 @@ private fun stickerPackShareIntent(pack: StickerPackFfi): Intent =
     Intent.createChooser(
         Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, StickerPresentation.shareLink(pack))
+            putExtra(Intent.EXTRA_TEXT, stickerPackShareLink(pack))
         },
         null,
     )
+
+private const val STICKER_SHARE_LINK_BASE = "https://sonarprivacy.xyz/stickers?a="
+
+/** A link to [pack] that opens on the web and that MDK reads back when pasted into "Add by link". */
+internal fun stickerPackShareLink(pack: StickerPackFfi): String = "$STICKER_SHARE_LINK_BASE${URLEncoder.encode(pack.coordinate, "UTF-8")}"

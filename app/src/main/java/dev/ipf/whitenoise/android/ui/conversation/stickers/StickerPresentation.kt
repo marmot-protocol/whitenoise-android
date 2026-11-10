@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.stickers
 import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.isEmojiPresentation
-import java.net.URLEncoder
 import java.text.BreakIterator
 
 internal object StickerMetrics {
@@ -25,7 +24,6 @@ internal object StickerPresentation {
     private const val MAX_TITLE_CHARS = 80
     private const val MAX_DESCRIPTION_CHARS = 500
     private const val MAX_LOOKUP_BYTES = 2_048
-    private const val SHARE_LINK_BASE = "https://sonarprivacy.xyz/stickers?a="
 
     /**
      * A sticker replaces the bubble only when its kind-9 carries nothing else.
@@ -70,9 +68,6 @@ internal object StickerPresentation {
         val input = raw.trim()
         return input.takeIf { it.isNotEmpty() && it.toByteArray().size <= MAX_LOOKUP_BYTES }
     }
-
-    /** A link to [pack] that opens on the web and that MDK reads back when pasted into "Add by link". */
-    fun shareLink(pack: StickerPackFfi): String = "$SHARE_LINK_BASE${URLEncoder.encode(pack.coordinate, "UTF-8")}"
 
     /** The pack's title, or null when it has none and the caller shows the generic name. */
     fun title(pack: StickerPackFfi): String? = bounded(pack.title, MAX_TITLE_CHARS)

@@ -764,26 +764,25 @@ open class MessageBubbleFileAttachmentFixtures {
     protected fun fileFooterAppState(
         context: android.content.Context,
         marmot: MarmotInterface? = null,
-    ) =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence()),
-            accountIdHexResolver = { null },
-            initialMarmotRuntime = marmot?.let { AppMarmotRuntime(context.cacheDir.resolve("file-footer").path, it) },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                        unlinked = false,
-                    ),
+    ) = WhiteNoiseAppState(
+        context = context,
+        draftStore = DraftStore(EmptyDraftPersistence()),
+        accountIdHexResolver = { null },
+        initialMarmotRuntime = marmot?.let { AppMarmotRuntime(context.cacheDir.resolve("file-footer").path, it) },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ACCOUNT_REF,
+                    accountIdHex = ACCOUNT_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                    unlinked = false,
                 ),
-            activeAccountRef = ACCOUNT_REF,
-        )
+            ),
+        activeAccountRef = ACCOUNT_REF,
+    )
 
     /** Builds a deterministic confirmed-message fixture with a canonical protocol id. */
     @Suppress("LongMethod") // One fixture spells out every field of the authoritative record.

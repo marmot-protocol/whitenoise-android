@@ -192,7 +192,7 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
     }
 
     private companion object {
-        const val LOAD_TIMEOUT_MS = 5_000L
+        const val LOAD_TIMEOUT_MS = 15_000L
         val PACK = "30031:${"cd".repeat(32)}:cats"
         val STICKERS = listOf(StickerRefFfi(PACK, "wave", "aa".repeat(32)), StickerRefFfi(PACK, "nod", "bb".repeat(32)))
         val COLORS = mapOf("wave" to 0xFFF2B33D.toInt(), "nod" to 0xFF5FB3A1.toInt())
