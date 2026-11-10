@@ -69,7 +69,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -3702,14 +3701,6 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
-    // Details grow out of the composer and shrink back into it, for groups and direct messages alike.
-    val detailsMorph =
-        rememberChatDetailsMorph(
-            showDetails = showDetails,
-            ownerKey = controller to appState.runtimeGeneration,
-            motionEnabled = surfaceMotionEnabled && !routeTransitionInProgress && !routePresentationFrozen,
-            composerBounds = { composerSendMotion.sourceSurface?.takeIf { it.isAttached }?.boundsInWindow() },
-        )
     // One motion owner for the transcript and both full-screen routes, so Back animates the return.
     val transcriptRouteMotion =
         rememberRouteMotionModifier(
@@ -3717,8 +3708,10 @@ internal fun ConversationScreen(
             depth = if (transcriptRoutedAway) 1 else 0,
             ownerKey = controller to appState.runtimeGeneration,
             animationsEnabled = surfaceMotionEnabled,
-            suppressMotion = routeTransitionInProgress || routePresentationFrozen || detailsMorph.active,
+            suppressMotion = routeTransitionInProgress || routePresentationFrozen,
         )
+    // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
+    val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
     if (transcriptRoutedAway) {
         if (showDetails) {
             /** Shows group details in place of the transcript while they are open. */
@@ -3728,40 +3721,34 @@ internal fun ConversationScreen(
                     appState = appState,
                     controller = controller,
                     onBack = {
-                        detailsMorph.close {
-                            showDetails = false
-                            openAddMemberOnDetails = false
-                        }
+                        showDetails = false
+                        openAddMemberOnDetails = false
                     },
                     onLeft = exitConversation,
                     onJumpToMessage = { messageId ->
-                        detailsMorph.close {
-                            showDetails = false
-                            scrollToSearchMatch(messageId)
-                        }
+                        showDetails = false
+                        scrollToSearchMatch(messageId)
                     },
                     autoOpenAddMember = openAddMemberOnDetails,
                     onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
                     onOpenSearch = {
-                        detailsMorph.close {
-                            showDetails = false
-                            presentationState.searchState.value =
-                                conversationSearchPreset(
-                                    conversationAccountRef,
-                                    appState.runtimeGeneration,
-                                    chat.id,
-                                    controller.title(groupTitleCopy),
-                                )
-                            navigationState.searchOpen = true
-                        }
+                        showDetails = false
+                        presentationState.searchState.value =
+                            conversationSearchPreset(
+                                conversationAccountRef,
+                                appState.runtimeGeneration,
+                                chat.id,
+                                controller.title(groupTitleCopy),
+                            )
+                        navigationState.searchOpen = true
                     },
                     onStartGroupWithPeer = onStartGroupWithPeer,
                 )
             }
-            Box(Modifier.fillMaxSize().then(detailsMorph.modifier).then(transcriptRouteMotion)) { groupDetailsRoute() }
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) { groupDetailsRoute() }
         } else {
             // The same full-screen editor as Settings; Back returns to this conversation.
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) {
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
                 ComposerSettingsScreen(appState) { showComposerSettings = false }
             }
         }
@@ -4009,7 +3996,6 @@ internal fun ConversationScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .then(detailsMorph.modifier)
                     .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                     .dismissTextSelectionOnOutsideTap(
@@ -4098,7 +4084,11 @@ internal fun ConversationScreen(
                             firstFrameAvatar = chat.firstFrameAvatar,
                             freezeRoutePresentation = freezeRoutePresentation,
                             openDetailsDescription = openDetailsDescription,
-                            onOpenDetails = { showDetails = true },
+                            onOpenDetails = {
+                                // The keyboard starts closing with the slide instead of after the composer leaves.
+                                keyboardController?.hide()
+                                showDetails = true
+                            },
                             onBack = exitConversation,
                             compactHeight = compactHeightConversation,
                         )
@@ -4108,7 +4098,10 @@ internal fun ConversationScreen(
             },
             bottomBar = {
                 ConversationBottomBar(
-                    onCustomizeComposer = { showComposerSettings = true },
+                    onCustomizeComposer = {
+                        keyboardController?.hide()
+                        showComposerSettings = true
+                    },
                     compactHeight = compactHeightConversation,
                     dictationControlsVisible = dictationControlsVisible,
                     dictationOriginVisible = dictationOriginVisible,

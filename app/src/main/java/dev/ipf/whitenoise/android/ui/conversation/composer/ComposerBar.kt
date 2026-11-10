@@ -1096,13 +1096,15 @@ internal fun ComposerBar(
     }
 
     // Closing to the keyboard hands the bottom region straight to it; the pane
-    // only keeps whatever part the rising keyboard does not cover yet.
+    // only keeps whatever part the rising keyboard does not cover yet. Opening
+    // from the keyboard takes the keyboard's height on the same frame, before the
+    // animated height catches up, so the composer never drops behind the keyboard.
     val renderedEmojiPaneHeight =
-        if (showEmojiPane) {
-            emojiPaneHeightAnim.value
-        } else {
-            (emojiPaneHeightAnim.value - currentImePaneHeight).coerceAtLeast(0.dp)
-        }
+        resolveRenderedEmojiPaneHeight(
+            showEmojiPane = showEmojiPane,
+            animatedHeight = emojiPaneHeightAnim.value,
+            imePaneHeight = currentImePaneHeight,
+        )
     val emojiPaneRendered = showEmojiPane || renderedEmojiPaneHeight > 0.dp
     LaunchedEffect(emojiPaneRendered) {
         if (!emojiPaneRendered) customInputPaneHeightPx = 0f
@@ -1126,7 +1128,12 @@ internal fun ComposerBar(
             } else {
                 maxHeight
             }
-        val customInputPaneHeight = with(density) { customInputPaneHeightPx.toDp() }
+        // The measured pane height arrives a frame late; the rendered height bounds it on the swap frame.
+        val customInputPaneHeight =
+            maxOf(
+                with(density) { customInputPaneHeightPx.toDp() },
+                if (emojiPaneRendered) renderedEmojiPaneHeight else 0.dp,
+            )
         // The 6dp outer padding completes the prototype surface top gap of 24dp. A compact remainder
         // (landscape with the IME open) keeps that 18dp for the editor, mirroring the ceiling's compact allowance.
         val composerRemainder =
