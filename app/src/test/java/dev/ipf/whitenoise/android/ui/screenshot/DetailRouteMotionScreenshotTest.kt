@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.awaitConversationCondition
+import dev.ipf.whitenoise.android.ui.conversation.CHAT_DETAILS_MORPH_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -183,9 +184,12 @@ class DetailRouteMotionScreenshotTest {
             rule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
             rule.mainClock.advanceTimeByFrame()
             captureTransition("${name}_entry_back", profile)
+            // The close starts after the details page records its inert frame, and touches wait for the morph.
+            rule.mainClock.advanceTimeBy(CHAT_DETAILS_MORPH_MILLIS.toLong())
             rule.onNode(opensDetails()).assertExists()
             rule.onNode(opensDetails()).performClick()
-            rule.mainClock.advanceTimeBy(240)
+            // Wait out the details morph, which holds touches until it settles.
+            rule.mainClock.advanceTimeBy(CHAT_DETAILS_MORPH_MILLIS + 32L)
             // Scrolling is setup; pause again before the next timed navigation/lock assertion.
             rule.mainClock.autoAdvance = true
             action.performScrollTo()
@@ -273,7 +277,9 @@ class DetailRouteMotionScreenshotTest {
             if (captureFrames || frame in listOf(0, 6, 20)) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
-                if (frame == 0) {
+                // Leaving chat details shrinks into the composer over the live transcript instead of
+                // sliding, so ChatDetailsMorphScreenshotTest owns those close pixels.
+                if (frame == 0 && !name.endsWith("_entry_back")) {
                     val exposedLeft = name.endsWith("_back") == name.contains("_rtl")
                     val edge = if (exposedLeft) 1 else bitmap.width - 2
                     for (y in listOf(bitmap.height / 4, bitmap.height / 2, bitmap.height * 3 / 4)) {
