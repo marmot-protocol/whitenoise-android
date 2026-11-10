@@ -309,4 +309,69 @@ class GlobalSearchResultsRecheckTest {
             assertTrue(controller.state.resuming)
             advanceUntilIdle()
         }
+
+    /** An empty first page asks for one recheck, which finds a match that arrived after that read. */
+    @Test
+    fun emptyFirstPageProbesOnceAndFindsALateMatch() =
+        runTest {
+            val store = StoreReader(emptyList())
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertTrue(shouldProbeAfterFirstPage(controller.state))
+
+            store.add(record("g", "late", at = 5uL))
+            controller.refresh()
+            advanceUntilIdle()
+
+            assertEquals(listOf("g:late"), keys(controller))
+            assertFalse("the probe runs once per query", shouldProbeAfterFirstPage(controller.state))
+        }
+
+    /** A first page with matches needs no probe. */
+    @Test
+    fun firstPageWithMatchesDoesNotProbe() =
+        runTest {
+            val controller = controller(StoreReader(listOf(record("g", "m", at = 5uL))))
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+
+            assertFalse(shouldProbeAfterFirstPage(controller.state))
+        }
+
+    /**
+     * A refresh of a long scrolled session rereads a bounded number of batches from the head; rows below where it
+     * stopped keep their previous state until a later refresh reaches them.
+     */
+    @Test
+    fun refreshOfALongSessionIsCappedAndKeepsRowsBelowTheCap() =
+        runTest {
+            val store = StoreReader((0 until 1_600).map { record("g", "m%04d".format(it), at = it.toULong() + 1uL) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            while (!controller.state.endReached) {
+                controller.loadMore()
+                advanceUntilIdle()
+            }
+            assertEquals(1_600, controller.state.results.size)
+            store.replace("m1599") { it.copy(deleted = true) }
+            store.replace("m0000") { it.copy(deleted = true) }
+            val readsBefore = store.queries.size
+
+            controller.refresh()
+            advanceUntilIdle()
+
+            val reads = store.queries.size - readsBefore
+            assertTrue("$reads reads", reads <= GLOBAL_SEARCH_REFRESH_MAX_BATCHES * GLOBAL_SEARCH_BATCH_PAGES)
+            assertFalse("the newest deletion is rechecked", "g:m1599" in keys(controller))
+            assertTrue("a row below the cap keeps its state for a later refresh", "g:m0000" in keys(controller))
+        }
+
+    /** The refresh budget follows the loaded rows but never exceeds its cap. */
+    @Test
+    fun refreshBudgetIsCapped() {
+        assertEquals(GLOBAL_SEARCH_AUTO_EMPTY_BATCHES, refreshBatchBudget(0))
+        assertEquals(GLOBAL_SEARCH_REFRESH_MAX_BATCHES, refreshBatchBudget(100_000))
+    }
 }

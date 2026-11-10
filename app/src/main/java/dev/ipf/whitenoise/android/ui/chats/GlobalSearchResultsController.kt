@@ -96,7 +96,7 @@ internal class GlobalSearchResultsController(
         if (state.inFlight != null) {
             refreshPending = true
         } else if (started != null) {
-            val budget = state.results.size / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES
+            val budget = refreshBatchBudget(state.results.size)
             state = started.first
             launch(current, started.second, debounceMillis = 0L, refreshBudget = budget)
         }
@@ -388,3 +388,20 @@ private fun TimelineMessageChangeFfi.Upsert.rewritesExistingRow(): Boolean {
     val rewrite = trigger in GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS || invalidated
     return rewrite && ChatListMessageSearch.isSearchableKind(message.kind)
 }
+
+/**
+ * Batches one refresh may read: enough for [loadedRows] at the batch target plus the empty-batch allowance, capped
+ * at [GLOBAL_SEARCH_REFRESH_MAX_BATCHES] so a long scrolled session stays cheap. Rows below where a capped refresh
+ * stopped keep their previous state and are rechecked by a later refresh.
+ */
+internal fun refreshBatchBudget(loadedRows: Int): Int {
+    val wanted = loadedRows / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES
+    return wanted.coerceAtMost(GLOBAL_SEARCH_REFRESH_MAX_BATCHES)
+}
+
+/** Whether a generation's first page just landed with nothing, which warrants one recheck. */
+internal fun shouldProbeAfterFirstPage(state: GlobalSearchResultsState): Boolean =
+    state.batches == 1 && state.results.isEmpty() && !state.failed && state.inFlight == null
+
+/** The most batches one refresh rereads, about a thousand raw rows. */
+internal const val GLOBAL_SEARCH_REFRESH_MAX_BATCHES = 5

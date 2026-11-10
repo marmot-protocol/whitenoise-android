@@ -153,6 +153,12 @@ private fun GlobalSearchResultsRecheckEffects(
             controller.refresh()
         }
     }
+    // A fresh query whose first page found nothing rechecks once, so a match that arrived between that read and the
+    // subscription opening is not left waiting for the next trigger.
+    val emptyFirstPage = shouldProbeAfterFirstPage(controller.state)
+    LaunchedEffect(controller, controller.state.generation, emptyFirstPage) {
+        if (emptyFirstPage) wakeups.send(Unit)
+    }
     LaunchedEffect(controller, runtime) {
         if (runtime == null) return@LaunchedEffect
         // A runtime that cannot open a subscription is retried a few times, then left to the other triggers.
