@@ -13,6 +13,12 @@ name: Android CI
 # integration suites. Unset/unknown modes preserve prior PR validation.
 # ci:full opts into the complete two-distribution core matrix. Every merge group,
 # master, nightly and dispatch run stays full (docs/ci-request-policy.md).
+#
+# Each full unit suite runs as four hash-selected shards per distribution; the
+# coverage job merges the Zapstore shards' Kover reports and checks golden
+# ownership across shards. PR, merge-group and master-push lint covers main
+# sources only; nightly and dispatch lint test sources too. Compose compiler reports run on
+# master pushes, nightly and dispatch only.
 
 on:
   pull_request:
@@ -237,7 +243,7 @@ jobs:
         run: bash .github/scripts/test-prefetch-robolectric-android-all.sh
 
       - name: Test Android CI aggregate gate
-        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py
+        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py scripts/test_kover_class_outputs.py
 
       - name: Check committed screenshot golden owners
         run: |
@@ -574,7 +580,8 @@ jobs:
           retention-days: 14
   compose-compiler:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false' && needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true')
+    # Compiler reports run after merge (push), nightly and on demand, not on PRs or in the queue.
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false' && needs.changes.outputs.precheck != 'true' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') && (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     name: Compose compiler metrics and stability reports
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -825,8 +832,19 @@ jobs:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
+      # Test-source lint takes most of a cold analysis (about 24 of 25 minutes) and rarely
+      # finds anything that ships. PRs, the queue and push lint main sources only; push keeps
+      # the same inputs as PRs so their lint cache entries match. The nightly schedule and
+      # manual runs lint test sources too.
       - name: Android lint
-        run: ./gradlew :app:lintDev${{ matrix.flavor }}Debug --build-cache --profile --no-daemon --stacktrace
+        env:
+          LINT_TEST_SOURCES: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          lint_scope=()
+          if [[ "$LINT_TEST_SOURCES" != true ]]; then
+            lint_scope+=(-Pwhitenoise.lintMainSourcesOnly=true)
+          fi
+          ./gradlew :app:lintDev${{ matrix.flavor }}Debug "${lint_scope[@]}" --build-cache --profile --no-daemon --stacktrace
 
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
@@ -870,21 +888,28 @@ jobs:
           path: build/reports/dependency-security
           if-no-files-found: ignore
           retention-days: 14
+  # The unit suite runs in four shards per flavor. Each shard runs the test classes whose
+  # top-level name hashes to its index (see ciTestShard in build.gradle.kts), so a shard
+  # compiles once and runs about a quarter of the suite. The coverage job below merges
+  # every shard's screenshot summary and Kover binary report.
   tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
-    name: Unit tests, screenshots and coverage (${{ matrix.flavor }})
+    name: Unit tests and screenshots (${{ matrix.flavor }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
       # Two test forks leave room for Gradle on 16 GiB hosted runners.
       ORG_GRADLE_PROJECT_ciTestForks: '2'
+      ORG_GRADLE_PROJECT_ciTestShard: ${{ matrix.shard }}
+      ORG_GRADLE_PROJECT_ciTestShardCount: '4'
     strategy:
-      # Keep both variants' diagnostics.
+      # Keep every shard's diagnostics.
       # PRs test Zapstore only; secondary-variant runs Play's flavor-sensitive tests.
       fail-fast: false
       matrix:
         flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
+        shard: [0, 1, 2, 3]
     steps:
       # Include checkout/setup time; never reset this budget when tests start.
       - name: Reserve unit-test diagnostics and upload time
@@ -909,11 +934,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Retain both flavors' compilation outputs; fork PRs remain read-only.
+      # Shard 0 retains each flavor's compilation outputs; the other shards restore the
+      # same entry. One writer per flavor keeps four shards from quadrupling cache use.
+      # Fork PRs remain read-only.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ matrix.shard != 0 || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -937,18 +964,23 @@ jobs:
         shell: bash
         run: ./scripts/prefetch-robolectric-android-all.sh
 
+      # Shard 0 also compiles androidTest sources on full runs and, for Zapstore, writes
+      # the Kover artifact that names the class directories the coverage job needs.
       - name: Unit tests
         timeout-minutes: 30
         id: unit_tests
         env:
           CI_FULL_MATRIX: ${{ needs.changes.outputs.full_matrix }}
         run: |
-          compile_tasks=()
-          if [[ "$CI_FULL_MATRIX" == true ]]; then
-            compile_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)
+          extra_tasks=()
+          if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "$CI_FULL_MATRIX" == true ]]; then
+            extra_tasks+=(:app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin)
+          fi
+          if [[ "$ORG_GRADLE_PROJECT_ciTestShard" == 0 && "${{ matrix.flavor }}" == Zapstore ]]; then
+            extra_tasks+=(:app:koverGenerateArtifactDevZapstoreDebug)
           fi
           python3 scripts/run_unit_tests_with_diagnostics.py -- \
-            ./gradlew "${compile_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest \
+            ./gradlew "${extra_tasks[@]}" :app:testDev${{ matrix.flavor }}DebugUnitTest \
             -Proborazzi.test.verify=true --build-cache --profile --no-daemon --stacktrace
 
       # Upload before later gates: a timed-out child must not lose its actual PNGs.
@@ -958,7 +990,7 @@ jobs:
         timeout-minutes: 3
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android-ci-reports-${{ matrix.flavor }}
+          name: android-ci-reports-${{ matrix.flavor }}-${{ matrix.shard }}
           path: |
             app/build/reports/
             app/build/test-results/
@@ -967,44 +999,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Require every committed screenshot golden to be compared
-        run: >-
-          python3 scripts/check_screenshot_baseline_owners.py
-          --results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json
-
-      # Coverage gate (phase 2): fail CI when overall line coverage drops below the
-      # ratchet floor in app/build.gradle.kts. DevZapstoreDebug only — the aggregate
-      # kover tasks pull in release variants, whose packaging trips the unsigned-release
-      # guard (no signing in CI).
-      - name: Coverage gate (Kover)
-        if: matrix.flavor == 'Zapstore' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true')
-        run: ./gradlew :app:koverVerifyDevZapstoreDebug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
-
-      # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
-      # an artifact. Continue to uploads on report errors; Zapstore still requires
-      # a successful report in the teardown coverage floor below.
-      # Flavor-specific DevDebug variants only (see gate step).
-      - name: Coverage report (Kover)
-        id: coverage_report
-        if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
-        continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
-
-      # Reuse the report from the full suite; no extra Gradle invocation or tests.
-      # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
-      # Viewport family: 82/82 lines, 52/56 branches; preserve 100%/90% floors.
-      - name: Runtime listener and viewport restoration coverage floors
-        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' && (!github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true') }}
-        env:
-          COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}
-        run: |
-          test "$COVERAGE_REPORT_OUTCOME" = success
-          python3 scripts/check_runtime_listener_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
-          python3 scripts/check_viewport_restoration_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
-
       - name: Save MarmotKit artifact
         if: >-
-          ${{ success() && matrix.flavor == 'Zapstore' &&
+          ${{ success() && matrix.flavor == 'Zapstore' && matrix.shard == 0 &&
               github.event_name != 'merge_group' &&
               (github.event_name != 'pull_request' ||
                github.event.pull_request.head.repo.full_name == github.repository) &&
@@ -1014,35 +1011,49 @@ jobs:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
-      - name: Upload full-suite golden comparison evidence
+      # The coverage job checks the union of every shard's summary.
+      - name: Upload shard golden comparison evidence
         if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android-ci-golden-results-${{ matrix.flavor }}
+          name: android-ci-golden-results-${{ matrix.flavor }}-${{ matrix.shard }}
           path: app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
 
+      - name: Upload shard coverage data
+        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kover-binary-Zapstore-${{ matrix.shard }}
+          path: app/build/kover/bin-reports/testDevZapstoreDebugUnitTest.ic
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Pack Kover class directories
+        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        run: python3 scripts/kover_class_outputs.py pack app/build/kover/devZapstoreDebug.artifact build/kover-classes.tar
+
+      - name: Upload Kover class directories
+        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && matrix.shard == 0 && steps.unit_tests.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kover-classes-Zapstore
+          path: build/kover-classes.tar
+          if-no-files-found: error
+          retention-days: 3
+
+      # Only the shard that runs these classes has results to keep.
       - name: Upload Compose regression results
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: compose-rectlist-regressions-${{ matrix.flavor }}
+          name: compose-rectlist-regressions-${{ matrix.flavor }}-${{ matrix.shard }}
           path: |
             app/build/test-results/testDev${{ matrix.flavor }}DebugUnitTest/TEST-dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListRegressionTest.xml
             app/build/test-results/testDev${{ matrix.flavor }}DebugUnitTest/TEST-dev.ipf.whitenoise.android.ui.conversation.messages.BubbleFooterRectListReuseTest.xml
           if-no-files-found: ignore
           retention-days: 14
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: kover-coverage-report-${{ matrix.flavor }}
-          path: |
-            app/build/reports/kover/
-          if-no-files-found: ignore
-          retention-days: 7
 
       # Keep task timings on successful runs too; wall-clock timeouts alone do
       # not show whether compilation, tests, or analysis is doing extra work.
@@ -1050,7 +1061,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android-ci-gradle-profiles-${{ matrix.flavor }}
+          name: android-ci-gradle-profiles-${{ matrix.flavor }}-${{ matrix.shard }}
           path: build/reports/profile/
           if-no-files-found: ignore
           retention-days: 7
@@ -1073,6 +1084,142 @@ jobs:
           path: build/reports/dependency-security
           if-no-files-found: ignore
           retention-days: 14
+  # Merge the unit-test shards: every committed golden must be compared by some shard,
+  # and Zapstore coverage gates read all shards' binary reports. Kover runs against the
+  # class directories shard 0 compiled, so this job neither recompiles nor reruns tests.
+  coverage:
+    needs: [changes, tests]
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
+    name: Screenshot ownership and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Download shard golden comparison evidence
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: android-ci-golden-results-*
+          path: build/golden-results
+
+      - name: Require every committed screenshot golden to be compared
+        env:
+          CI_FLAVORS: ${{ github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && 'Zapstore' || 'Zapstore Play' }}
+        run: |
+          for flavor in $CI_FLAVORS; do
+            summaries=(build/golden-results/android-ci-golden-results-"$flavor"-*/results-summary.json)
+            [[ -f "${summaries[0]}" ]] || { echo "No $flavor shard produced a screenshot summary" >&2; exit 1; }
+            echo "$flavor: ${#summaries[@]} shard summaries"
+            python3 scripts/check_screenshot_baseline_owners.py --results "${summaries[@]}"
+          done
+
+      - name: Configure MarmotKit cache directory
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        shell: bash
+        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
+
+      # AGP 9.x / Gradle 9.4.1 require JDK 17.
+      - name: Set up JDK 17
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Report tasks only; the shards own the cache entries.
+      - name: Set up Gradle
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-read-only: true
+
+      - name: Read MarmotKit artifact pin
+        id: marmotkit
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        shell: bash
+        run: |
+          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
+          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Restore MarmotKit artifact
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      - name: Download shard coverage data
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: kover-binary-Zapstore-*
+          path: build/kover-shards
+
+      - name: Download Kover class directories
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: kover-classes-Zapstore
+          path: build/kover-classes
+
+      # Name each shard's report uniquely in one directory and require all four.
+      - name: Restore shard coverage inputs
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        run: |
+          mkdir -p build/kover-shard-reports
+          for shard in 0 1 2 3; do
+            cp "build/kover-shards/kover-binary-Zapstore-$shard/testDevZapstoreDebugUnitTest.ic" \
+              "build/kover-shard-reports/shard-$shard.ic"
+          done
+          python3 scripts/kover_class_outputs.py unpack build/kover-classes/kover-classes.tar
+
+      # Coverage gate: fail CI when overall line coverage drops below the ratchet floor in
+      # app/build.gradle.kts, then publish the HTML/XML report. DevZapstoreDebug only; the
+      # aggregate kover tasks pull in release variants, whose packaging trips the
+      # unsigned-release guard (no signing in CI). Compilation and tests are excluded:
+      # the restored classes and shard reports are the inputs.
+      - name: Coverage gate and report (Kover)
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        run: >-
+          ./gradlew :app:koverVerifyDevZapstoreDebug :app:koverXmlReportDevZapstoreDebug
+          :app:koverHtmlReportDevZapstoreDebug
+          -x :app:testDevZapstoreDebugUnitTest -x :app:compileDevZapstoreDebugKotlin
+          -x :app:compileDevZapstoreDebugJavaWithJavac
+          -Pwhitenoise.koverShardReportsDir="$PWD/build/kover-shard-reports"
+          -Proborazzi.test.verify=true --profile --no-daemon --stacktrace
+
+      # Reuse the merged report; no extra Gradle invocation or tests.
+      # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
+      # Viewport family: 82/82 lines, 52/56 branches; preserve 100%/90% floors.
+      - name: Runtime listener and viewport restoration coverage floors
+        if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
+        run: |
+          python3 scripts/check_runtime_listener_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
+          python3 scripts/check_viewport_restoration_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kover-coverage-report-Zapstore
+          path: |
+            app/build/reports/kover/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Gradle timing reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: android-ci-gradle-profiles-coverage
+          path: build/reports/profile/
+          if-no-files-found: ignore
+          retention-days: 7
   # PRs run the full suite for Zapstore only. Compile Play (main, unit-test and
   # androidTest sources) and run the unit tests that branch on its BuildConfig,
   # so Play-only code still fails the PR. master/nightly run Play's full suite.
@@ -1194,7 +1341,7 @@ jobs:
   # ready run creates this job only after its heavy lanes finish.
   validate:
     name: Compile, test, ktlint, detekt, Android lint${{ github.event.pull_request.draft && ' (draft fast lane)' || '' }}
-    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, compile-tests, static-analysis, tests, secondary-variant]
+    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, compile-tests, static-analysis, tests, coverage, secondary-variant]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -1216,7 +1363,7 @@ jobs:
             ($event == "pull_request" and $draft == "false" and ($precheck | not) and ($full | not)) as $is_ready |
             (["pull_request", "merge_group", "push", "schedule", "workflow_dispatch"] | index($event) != null) and
             ($draft == "true" or $draft == "false") and ($event == "pull_request" or $draft == "false") and
-            (keys == ["build-contracts", "changes", "compile-tests", "compose-compiler", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
+            (keys == ["build-contracts", "changes", "compile-tests", "compose-compiler", "coverage", "offline-zsp", "secondary-variant", "static-analysis", "tests", "tooling-contracts"]) and
             (.changes.outputs.full_matrix == "true" or .changes.outputs.full_matrix == "false") and
             (.changes.outputs.ci_mode == (if $precheck then "precheck" elif $full then "full" else "legacy-pr" end)) and
             (($event == "pull_request") or $full) and
@@ -1232,9 +1379,9 @@ jobs:
                 if .key == "changes" or .key == "tooling-contracts" then .value.result == "success"
                 else .value.result == "skipped" end)
             else all(to_entries[];
-              if $precheck and (.key == "tests" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
+              if $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
               elif .key == "compile-tests" then .value.result == (if $precheck then "success" else "skipped" end)
-              elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft) then .value.result == "skipped"
+              elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft or $event == "pull_request" or $event == "merge_group") then .value.result == "skipped"
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)
           ' > /dev/null

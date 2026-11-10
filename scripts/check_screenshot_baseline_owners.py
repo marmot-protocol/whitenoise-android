@@ -9,8 +9,9 @@ filters the "Curated screenshot verification" job runs. This script has three mo
   captureRoboImage must be selected (or declared `diagnostic:`).
 * --gradle-test-args: print the filters as `--tests` arguments, one per line, for
   the screenshot job to pass to Gradle.
-* --results SUMMARY: after a verification run, require that Roborazzi compared every
-  PNG committed under app/src/test/snapshots/, so a golden whose owner is no longer
+* --results SUMMARY [SUMMARY ...]: after a verification run, require that Roborazzi
+  compared every PNG committed under app/src/test/snapshots/ in at least one summary
+  (sharded runs pass one per shard), so a golden whose owner is no longer
   selected fails instead of silently going unverified.
 """
 
@@ -142,13 +143,19 @@ def compared_goldens(summary, snapshots_dir):
     return compared
 
 
-def results_problems(root, summary):
-    """Report committed PNG goldens that a verification run never compared."""
+def results_problems(root, *summaries):
+    """Report committed PNG goldens that no summary from a verification run compared.
+
+    Sharded CI runs write one summary per shard, so a golden counts once any shard compared it.
+    """
     snapshots = root / SNAPSHOTS
     committed = {path.name for path in snapshots.glob('*.png')}
     if not committed:
         return [f'no committed goldens found under {SNAPSHOTS}']
-    missing = sorted(committed - compared_goldens(summary, SNAPSHOTS))
+    compared = set()
+    for summary in summaries:
+        compared |= compared_goldens(summary, SNAPSHOTS)
+    missing = sorted(committed - compared)
     return [
         f'{name} was not compared; select the test that captures it in {REGISTRY}'
         for name in missing
@@ -160,7 +167,10 @@ def main(argv=None, root=ROOT, out=sys.stdout, err=sys.stderr):
     parser = argparse.ArgumentParser(description=__doc__.split('\n', 1)[0])
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--gradle-test-args', action='store_true', help='print --tests arguments, one per line')
-    mode.add_argument('--results', type=Path, help='Roborazzi results-summary.json to check for coverage')
+    mode.add_argument(
+        '--results', type=Path, nargs='+',
+        help='Roborazzi results-summary.json files to check together for coverage (one per test shard)',
+    )
     args = parser.parse_args(argv)
     registry_text = (root / REGISTRY).read_text()
     if args.gradle_test_args:
@@ -171,10 +181,12 @@ def main(argv=None, root=ROOT, out=sys.stdout, err=sys.stderr):
             return 1
         return 0
     if args.results:
-        if not args.results.is_file():
-            print(f'screenshot owner coverage: missing results summary {args.results}', file=err)
+        absent = [path for path in args.results if not path.is_file()]
+        if absent:
+            for path in absent:
+                print(f'screenshot owner coverage: missing results summary {path}', file=err)
             return 1
-        problems = results_problems(root, json.loads(args.results.read_text()))
+        problems = results_problems(root, *(json.loads(path.read_text()) for path in args.results))
     else:
         problems = static_problems(root, registry_text)
     for problem in problems:

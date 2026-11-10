@@ -129,5 +129,5 @@ APK_PATH="$apk" GITHUB_REPOSITORY=marmot-protocol/whitenoise-android GH_TOKEN=te
 invalid_status=$?
 set -e
 [[ "$invalid_status" == 2 ]]
-[[ "$(<"$tmp/invalid.stderr")" == *'PREVIEW_CHANNEL must be stable or isolated'* ]]
+[[ "$(<"$tmp/invalid.stderr")" == *'PREVIEW_CHANNEL must be stable'* ]]
 printf 'ok - validates the asset identity inputs before publishing\n'

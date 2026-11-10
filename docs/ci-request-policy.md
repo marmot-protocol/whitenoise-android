@@ -24,7 +24,8 @@ requests while preserving exact-head/current-base validation and testing gates.
 Pushing a PR does not automatically build previews. When debugging or required
 human/device testing needs the current candidate, first look for existing trusted
 artifacts for that exact head and a matching active request. One request builds
-both the stable (update-compatible) and isolated channels:
+the stable (update-compatible) channel only; add `-f include_isolated=true`
+only for an opt-in qualification that consumes the unsigned isolated artifact:
 
 ```sh
 gh workflow run android-pr-apk.yml --repo marmot-protocol/whitenoise-android \
@@ -35,7 +36,7 @@ Hermes agents use the maintained authenticated CLI at `/opt/data/.local/bin/gh`
 with `HERMES_GH_NO_CACHE=1` for live reads and writes. Dispatch from the trusted
 default branch, not PR-controlled workflow code. The workflow resolves and
 rechecks the open internal PR's exact head; the separate trusted publisher
-validates both candidates before signing, upload and description updates.
+validates the stable candidate before signing, upload and description updates.
 
 Play-flavor release packaging and minification are checked by the requested
 preview build; core debug checks do not replace that coverage. For Play-specific
@@ -92,7 +93,8 @@ the distinct draft aggregate context and require readiness before queue admissio
 Every merge group, master push, nightly and manual run uses the full core matrix:
 both complete unit/golden suites and comparison evidence, current coverage gates,
 both lint variants, compile/style/security/ZSP contracts and baseline
-packaging. Compose reports remain risk-selected supplemental work. Merge groups do not use the PR documentation shortcut. Master remains
+packaging. Compose compiler reports run only on `master` pushes, nightly and manual
+dispatch. Merge groups do not use the PR documentation shortcut. Master remains
 full in this first rollout; removing duplicate master work requires separately
 reviewed accepted-integration provenance and a full fallback.
 
@@ -151,8 +153,11 @@ Play is checked on PRs by compiling its main, unit-test and androidTest sources
 and running the unit tests that read `BuildConfig.SELF_UPDATE_ENABLED`. Play's
 complete unit suite and lint run on every `master` push, nightly, manual dispatch
 and merge-queue run. Every complete unit suite also verifies every committed
-screenshot golden in the same execution, with matching verification inputs for
-Kover reuse; there are no separate screenshot test runners.
+screenshot golden in the same execution; there are no separate screenshot test
+runners. Each suite runs as four parallel hash-selected shards, and the `coverage`
+job merges the Zapstore shards' Kover reports and checks that the shards together
+compared every golden. PR, merge-group and `master` push lint checks main sources;
+nightly and manual dispatch also lint unit and Android-test sources.
 
 Release runtime verification and reproduction (with release lint) run on
 `master` pushes, nightly, tags, manual dispatch and the merge queue. PRs run them
@@ -175,8 +180,8 @@ Do not rely on a green draft run for readiness; wait for the ready run.
 The visual-description updater follows opening, reopening and pushes and displays at most
 four inline comparisons, retaining links and the bounded list of all changes.
 
-Compose compiler reports remain risk-selected supplemental work, independent of
-the full core matrix. Independent unsigned
+Compose compiler reports run after integration (`master` pushes, nightly and
+manual dispatch) and are skipped on PRs and merge groups. Independent unsigned
 APK reproduction remains a supplemental campaign. A complete raw diff permits
 its deferral for
 known ordinary Kotlin/Java source, main resources, committed goldens and prose.

@@ -102,22 +102,31 @@ integration validation plus independent authorization.
 Only ordinary Markdown changes in the complete PR diff can use the docs shortcut;
 tooling/manual-guide/metadata validators still run. The complete diff retains
 earlier code changes during docs fixups. Master stays fully checked in this
-first rollout. Compose reports and unsigned reproduction remain risk-selected supplemental
-campaigns, including on merge groups. Separate release workflows retain their
+first rollout. Compose compiler reports run on `master` pushes, nightly and manual
+dispatch only; PRs and merge groups skip them. Unsigned reproduction remains a
+risk-selected supplemental campaign, including on merge groups. Separate release workflows retain their
 conservative qualification policy;
 release qualification remains tied to the exact release candidate.
 
-Coverage artifacts are `kover-coverage-report-Zapstore` and
-`kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
-`android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
-`build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
-`static-analysis-Play`, `compile-tests-Zapstore`, `compile-tests-Play`, `Zapstore`, or
-`Play`. Separate runners
+Each full unit suite runs as four parallel shards per distribution, selected by a
+hash of the top-level test class name (`-PciTestShard`/`-PciTestShardCount`). A
+separate `coverage` job merges the Zapstore shards' Kover binary reports
+(`kover-binary-Zapstore-<shard>`) with the compiled classes from shard 0
+(`kover-classes-Zapstore`), applies the coverage gate and floors, and checks that
+every committed golden was compared using the per-shard
+`android-ci-golden-results-<flavor>-<shard>` summaries. The coverage artifact is
+`kover-coverage-report-Zapstore`; Play runs its full suite without a Kover report.
+Failure reports and Gradle timing profiles use `android-ci-reports-<job>` and
+`android-ci-gradle-profiles-<job>`, where `<job>` is `build-contracts-<phase>`,
+`compose-compiler`, `static-analysis-Zapstore`, `static-analysis-Play`,
+`compile-tests-Zapstore`, `compile-tests-Play`, `coverage`, or
+`<flavor>-<shard>` for the unit shards. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
 wall time and summed job durations when measuring CI performance. Each Gradle job
 retains its own task outputs on master pushes and same-repository PRs; fork PRs
 restore caches read-only. Assertions execute on every fresh runner. The separate
-MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks and docs-only runs do not write it. GitHub's ephemeral runner
+MarmotKit cache retains one writer: Zapstore shard 0 when it runs. Only shard 0 of
+each distribution writes the Gradle cache; the other shards restore it read-only. Prechecks and docs-only runs do not write it. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
@@ -246,9 +255,9 @@ remains a static coverage contract and provides focused local regeneration filte
 Tests named `*ScreenshotTest` are included automatically; a mixed-name test that
 owns committed baselines lists its golden-producing methods there.
 `scripts/check_screenshot_baseline_owners.py` fails the tooling job when a capturing
-class has no registered owner and fails either full-unit job if any committed PNG
-was not compared. A mismatch fails the test; diff/compare images are uploaded in
-`android-ci-reports-Zapstore` and `android-ci-reports-Play`. All goldens remain
+class has no registered owner, and the `coverage` job fails if any committed PNG was
+not compared by the union of that distribution's unit shards. A mismatch fails the
+test; diff/compare images are uploaded in `android-ci-reports-<flavor>-<shard>`. All goldens remain
 protected. PR descriptions show up to four inline comparisons and preserve links
 to the complete visual diff.
 

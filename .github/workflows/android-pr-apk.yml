@@ -2,8 +2,9 @@ name: Android PR APK
 
 # This on-demand workflow is intentionally unprivileged. It compiles the exact
 # current internal PR head and hands unsigned candidates to the trusted publisher.
-# Request a human-test/debugging candidate or restore missing preview links;
-# intermediate pushes do not automatically request two more APK builds.
+# By default only the stable channel is built; the trusted publisher signs and
+# links only stable. Request a human-test/debugging candidate or restore missing preview links;
+# intermediate pushes do not automatically request more APK builds.
 # Signing and upload credentials remain exclusively in the trusted publisher.
 on:
   workflow_dispatch:
@@ -12,6 +13,11 @@ on:
         description: Open internal PR whose current head needs test APKs
         required: true
         type: string
+      include_isolated:
+        description: Also build the unsigned isolated channel for opt-in qualification runs; never signed or linked
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: android-pr-apk-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
@@ -32,7 +38,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        channel: [stable, isolated]
+        channel: ${{ fromJSON(inputs.include_isolated && '["stable","isolated"]' || '["stable"]') }}
     env:
       PR_PREVIEW_CHANNEL: ${{ matrix.channel }}
       GITHUB_RUN_NUMBER: ${{ github.run_number }}
@@ -138,8 +144,8 @@ jobs:
       # its own it stamps android:testOnly="true" into the merged manifest and
       # Android then refuses every install except ADB — which breaks the preview
       # link's tap-to-install/update contract. android.injected.testOnly is an
-      # explicit override that wins over the ABI injection, so both the stable and
-      # the isolated channel must pass it.
+      # explicit override that wins over the ABI injection, so every
+      # channel must pass it.
       - name: Assemble preview candidate
         run: ./gradlew :app:assemblePreviewPlayRelease -Pandroid.injected.build.abi=arm64-v8a -Pandroid.injected.testOnly=false --build-cache --no-daemon --stacktrace --profile -I "$PR_PREVIEW_INIT_SCRIPT"
 

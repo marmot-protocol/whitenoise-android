@@ -13,7 +13,6 @@ const links = {
   prNumber: 2143,
   headSha: 'ba3a01bd3fd43c9c438ec53d4eb203da446fe419',
   stableUrl: 'https://github.com/marmot-protocol/whitenoise-android/releases/download/android-pr-previews/whitenoise-pr-2143-stable.apk',
-  isolatedUrl: 'https://github.com/marmot-protocol/whitenoise-android/releases/download/android-pr-previews/whitenoise-pr-2143-isolated.apk',
 }
 
 test('renders preview links with start/end markers', () => {
@@ -22,7 +21,7 @@ test('renders preview links with start/end markers', () => {
   assert.match(section, /<!-- pr-apk-preview:end -->$/)
   assert.match(section, /Install\/update White Noise PR/)
   assert.match(section, /Built from PR #2143 at `ba3a01bd3fd4`/)
-  assert.match(section, /Isolated PR #2143/)
+  assert.doesNotMatch(section, /isolated/i)
 })
 
 test('appends preview section when description has no prior block', () => {
@@ -99,13 +98,11 @@ test('does not update links or delete the fallback comment for a superseded head
     PR_NUMBER: process.env.PR_NUMBER,
     HEAD_SHA: process.env.HEAD_SHA,
     STABLE_URL: process.env.STABLE_URL,
-    ISOLATED_URL: process.env.ISOLATED_URL,
   }
   Object.assign(process.env, {
     PR_NUMBER: String(links.prNumber),
     HEAD_SHA: links.headSha,
     STABLE_URL: links.stableUrl,
-    ISOLATED_URL: links.isolatedUrl,
   })
 
   try {
@@ -157,13 +154,11 @@ test('a head advance at the write boundary cannot leave stale links as the final
     PR_NUMBER: process.env.PR_NUMBER,
     HEAD_SHA: process.env.HEAD_SHA,
     STABLE_URL: process.env.STABLE_URL,
-    ISOLATED_URL: process.env.ISOLATED_URL,
   }
   Object.assign(process.env, {
     PR_NUMBER: String(links.prNumber),
     HEAD_SHA: links.headSha,
     STABLE_URL: links.stableUrl,
-    ISOLATED_URL: links.isolatedUrl,
   })
 
   try {
