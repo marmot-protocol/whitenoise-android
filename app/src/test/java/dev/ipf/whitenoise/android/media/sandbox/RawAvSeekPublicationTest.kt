@@ -8,7 +8,9 @@ import android.net.Uri
 import android.view.Surface
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -79,7 +81,11 @@ class RawAvSeekPublicationTest {
         }
     }
 
-    /** Stops background consumers so the test explicitly schedules the real private adoption/render boundary. */
+    /**
+     * Stops background consumers so the test explicitly schedules the real private adoption/render boundary.
+     * The worker's cancellation `finally` recycles the retained frame, so it must finish before any adoption —
+     * a bare cancel let it run later on an IO thread and recycle a bitmap the test still asserts on.
+     */
     private fun withEngine(block: (RawAvPlaybackEngine) -> Unit) =
         withSurface { surface ->
             val engine =
@@ -92,7 +98,8 @@ class RawAvSeekPublicationTest {
                         },
                     prepareProbe = { null },
                 )
-            (field(engine, "scope") as CoroutineScope).cancel()
+            val worker = checkNotNull((field(engine, "scope") as CoroutineScope).coroutineContext[Job])
+            runBlocking { worker.cancelAndJoin() }
             set(engine, "durationUs", 4_000_000L)
             try {
                 engine.attachVideo(surface)
