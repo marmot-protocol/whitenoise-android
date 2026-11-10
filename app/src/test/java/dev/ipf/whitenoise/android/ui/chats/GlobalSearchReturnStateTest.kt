@@ -17,6 +17,8 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.record
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
@@ -119,6 +121,47 @@ class GlobalSearchReturnStateTest {
         assertEquals(null, session.shownState(query))
         session.refresh()
         idleMain()
+        assertEquals(listOf("g:m2", "g:m0"), requireNotNull(session.shownState(query)).results.map { it.key })
+        holder.close()
+    }
+
+    /**
+     * A blocking native read cannot be cancelled. When it returns after the reader came back and a new recheck
+     * started, it must neither clear that recheck nor let a rejected recheck confirm the rows.
+     */
+    @Test
+    fun anUncancellableReadReturningLateCannotConfirmOrVoidTheRecheck() {
+        val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
+        val gates = ArrayDeque<CompletableDeferred<Unit>>()
+        val reader =
+            GlobalSearchTimelineReader { query ->
+                val page = store.page(query)
+                gates.removeFirstOrNull()?.let { gate -> withContext(NonCancellable) { gate.await() } }
+                page
+            }
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        session.search(query)
+        idleMain()
+        val oldRead = CompletableDeferred<Unit>()
+        val newRead = CompletableDeferred<Unit>()
+        gates += oldRead
+        session.refresh()
+        idleMain()
+
+        holder.detach()
+        store.replace("m1") { it.copy(deleted = true) }
+        gates += newRead
+        session.refresh()
+        idleMain()
+        oldRead.complete(Unit)
+        idleMain()
+        assertTrue("the late old read did not confirm the rows", session.stale)
+        newRead.complete(Unit)
+        idleMain()
+
+        assertEquals(false, session.stale)
         assertEquals(listOf("g:m2", "g:m0"), requireNotNull(session.shownState(query)).results.map { it.key })
         holder.close()
     }

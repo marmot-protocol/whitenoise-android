@@ -172,9 +172,10 @@ internal class GlobalSearchResultsController(
                     if (debounceMillis > 0L) delay(debounceMillis)
                     val next = withContext(environment.ioDispatcher) { complete(current, request, refreshBudget) }
                     if (accepts(current)) {
+                        val applies = state.inFlight == request
                         state = next(state)
-                        // A landed recheck verified every row the screen will show.
-                        if (request.refresh) stale = false
+                        // Only a recheck that was actually applied verified the rows the screen will show.
+                        if (request.refresh && applies) stale = false
                     }
                 } catch (cancel: CancellationException) {
                     if (accepts(current)) state = GlobalSearchResultsReducer.cancel(state, request)
@@ -182,8 +183,9 @@ internal class GlobalSearchResultsController(
                 } catch (_: Exception) {
                     // The failure kind is the whole outcome; the message never reaches the screen.
                     if (accepts(current)) {
+                        val applies = state.inFlight == request
                         state = failedTransition(state, request)
-                        if (request.refresh && stale) recheckFailed = true
+                        if (request.refresh && stale && applies) recheckFailed = true
                     }
                 }
                 if (accepts(current)) continueAfter()

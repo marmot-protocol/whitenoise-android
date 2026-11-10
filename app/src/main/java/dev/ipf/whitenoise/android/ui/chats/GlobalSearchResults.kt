@@ -167,6 +167,8 @@ internal suspend fun <R> fillGlobalSearchBatch(
  * The one batch a generation has in flight. A completion is applied only while it is still the state's
  * [GlobalSearchResultsState.inFlight], so a page from an older query, filter set or account is dropped. A
  * [refresh] rereads the loaded range from the head; its [cursor] is then the old continuation it reads through.
+ * [launch] is unique per request within a generation, so a completion that outlived its cancellation can never
+ * match a newer request that happens to read the same range.
  */
 internal data class GlobalSearchPageRequest(
     val generation: Int,
@@ -174,11 +176,13 @@ internal data class GlobalSearchPageRequest(
     val cursor: GlobalSearchCursor?,
     val seenKeys: Set<String>,
     val refresh: Boolean = false,
+    val launch: Long = 0L,
 )
 
 /**
  * Transient results of one search generation. Only admitted rows are kept, never raw pages. [emptyBatches] counts
- * consecutive batches that showed nothing and [batches] increases with every finished one,
+ * consecutive batches that showed nothing, [launches] numbers every request started, and [batches] increases with
+ * every finished one,
  * so paging effects relaunch even when a batch completes within one frame.
  */
 internal data class GlobalSearchResultsState(
@@ -191,6 +195,7 @@ internal data class GlobalSearchResultsState(
     val failed: Boolean = false,
     val emptyBatches: Int = 0,
     val batches: Int = 0,
+    val launches: Long = 0L,
 ) {
     /** The earliest deadline of a loaded disappearing match, when the rows must be checked again. */
     val nextExpiry: ULong? = results.mapNotNull { it.expiresAt }.minOrNull()
@@ -222,8 +227,10 @@ internal object GlobalSearchResultsReducer {
     /** Starts the next batch, or returns null while one is in flight or after MDK's end. */
     fun begin(state: GlobalSearchResultsState): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
         if (state.inFlight != null || state.endReached) return null
-        val request = GlobalSearchPageRequest(state.generation, state.batches, state.nextCursor, state.seenKeys)
-        return state.copy(inFlight = request, failed = false) to request
+        val launch = state.launches + 1
+        val request =
+            GlobalSearchPageRequest(state.generation, state.batches, state.nextCursor, state.seenKeys, launch = launch)
+        return state.copy(inFlight = request, failed = false, launches = launch) to request
     }
 
     /** Appends a completed batch for the current request, deduplicated by stable key; a stale one is ignored. */
@@ -254,9 +261,17 @@ internal object GlobalSearchResultsReducer {
      */
     fun beginRefresh(state: GlobalSearchResultsState): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
         if (state.inFlight != null || state.batches == 0) return null
+        val launch = state.launches + 1
         val request =
-            GlobalSearchPageRequest(state.generation, state.batches, state.nextCursor, emptySet(), refresh = true)
-        return state.copy(inFlight = request) to request
+            GlobalSearchPageRequest(
+                state.generation,
+                state.batches,
+                state.nextCursor,
+                emptySet(),
+                refresh = true,
+                launch = launch,
+            )
+        return state.copy(inFlight = request, launches = launch) to request
     }
 
     /**

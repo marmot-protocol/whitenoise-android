@@ -297,6 +297,7 @@ class GlobalSearchResultsRecheckTest {
             assertEquals(listOf("subscribeEvents", "wakeOnOpen"), order.map { it.substringBefore('-') })
             assertTrue(wakeups.tryReceive().isSuccess)
         }
+
     /** An empty first page asks for one recheck, which finds a match that arrived after that read. */
     @Test
     fun emptyFirstPageProbesOnceAndFindsALateMatch() =
