@@ -97,7 +97,7 @@ internal fun GroupReviewPersonText(
     copyable: Boolean = true,
 ) {
     person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-    person.nickname?.let { Text(stringResource(R.string.group_action_local_nickname, it)) }
+    groupReviewNicknameLabel(person)?.let { Text(it) }
     if (person.identifier.isNotBlank()) {
         if (copyable) {
             GroupReviewNpub(person.identifier, role)
@@ -131,6 +131,23 @@ internal fun GroupActingAccountIdentity(
     }
 }
 
+/** The local nickname line, kept separate from the public name so it is never mistaken for one. */
+@Composable
+private fun groupReviewNicknameLabel(person: GroupReviewPerson): String? {
+    val nickname = person.nickname ?: return null
+    return stringResource(R.string.group_action_local_nickname, nickname)
+}
+
+/** What [GroupReviewPersonText] shows, spoken in order with the [role] and full npub, for a merged row. */
+@Composable
+internal fun groupReviewPersonDescription(
+    person: GroupReviewPerson,
+    role: String,
+): String {
+    val nickname = groupReviewNicknameLabel(person)
+    return listOfNotNull(person.publicName, nickname, role, person.identifier).joinToString(", ")
+}
+
 /** A small visible label with a full-size copy target and complete spoken identity. */
 @Composable
 @Suppress("FunctionNaming")
@@ -139,7 +156,7 @@ private fun GroupReviewNpub(
     role: String,
     compact: Boolean = false,
 ) {
-    GroupReviewCopyRow(npub, role) {
+    GroupReviewCopyRow(npub, "$role, $npub") {
         Text(groupReviewNpubLabel(npub, compact), style = MaterialTheme.typography.bodySmall)
     }
 }
@@ -151,14 +168,14 @@ private fun groupReviewNpubLabel(
 ): String = IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
 
 /**
- * A row of at least 48dp that copies the full [npub], announced once as "[role], npub" with a Copy action.
- * Wrapping a whole member row keeps the touch target without padding the small npub line itself.
+ * A row of at least 48dp that copies the full [npub], announced once as [description] with a Copy action.
+ * The merged description replaces the children's text, so it must name everything the row shows.
  */
 @Composable
 @Suppress("FunctionNaming")
 internal fun GroupReviewCopyRow(
     npub: String,
-    role: String,
+    description: String,
     modifier: Modifier = Modifier,
     horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
     content: @Composable RowScope.() -> Unit,
@@ -169,7 +186,7 @@ internal fun GroupReviewCopyRow(
         modifier
             .heightIn(min = 48.dp)
             .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.setText(AnnotatedString(npub)) }
-            .semantics(mergeDescendants = true) { contentDescription = "$role, $npub" },
+            .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = horizontalArrangement,
         content = content,

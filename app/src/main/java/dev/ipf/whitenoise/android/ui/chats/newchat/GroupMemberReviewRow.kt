@@ -43,6 +43,7 @@ internal fun GroupMemberReviewRow(
                 stringResource(R.string.unknown)
             }
     val memberRole = stringResource(R.string.member)
+    val spoken = groupReviewPersonDescription(person, memberRole)
     val admin = initialAdminIds.any { it.equals(member.accountIdHex, ignoreCase = true) }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val stacked = groupReviewStacked(maxWidth)
@@ -62,7 +63,7 @@ internal fun GroupMemberReviewRow(
             val tagged = modifier.testTag("group.members.review.member")
             val gap = Arrangement.spacedBy(GroupReviewAvatarGap)
             if (person.identifier.isNotBlank()) {
-                GroupReviewCopyRow(person.identifier, memberRole, tagged, gap, content)
+                GroupReviewCopyRow(person.identifier, spoken, tagged, gap, content)
             } else {
                 Row(tagged.heightIn(min = 48.dp), gap, Alignment.CenterVertically, content)
             }

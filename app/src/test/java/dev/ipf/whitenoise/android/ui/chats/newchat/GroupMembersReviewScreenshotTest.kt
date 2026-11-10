@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -321,7 +322,7 @@ class GroupMembersReviewScreenshotTest {
                 .getApplicationContext<Context>()
                 .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         listOf(REVIEW_FIRST_MEMBER_NPUB, REVIEW_SECOND_MEMBER_NPUB).forEach { npub ->
-            val memberCopy = rule.onNodeWithContentDescription("Member, $npub")
+            val memberCopy = rule.onNodeWithContentDescription("Alex, Member, $npub")
             memberCopy.performScrollTo()
             val memberBounds = memberCopy.fetchSemanticsNode().boundsInRoot
             assertTrue(memberBounds.height >= 48f && memberBounds.width >= 48f)
@@ -392,7 +393,7 @@ class GroupMembersReviewScreenshotTest {
             WhiteNoiseTheme(fontScale = 2f) {
                 GroupMembersReviewDialog(
                     appState = state,
-                    groups = (1..12).map { MemberReviewGroup("group-$it", "Group $it") },
+                    groups = (1..30).map { MemberReviewGroup("group-$it", "Group $it") },
                     members = listOf(member),
                     busy = false,
                     onDismiss = {},
@@ -403,7 +404,8 @@ class GroupMembersReviewScreenshotTest {
         }
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
         rule.onNodeWithText("Cancel").assertIsDisplayed()
-        rule.onNodeWithText("Group 12").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText("Group 30").assertIsNotDisplayed()
+        rule.onNodeWithText("Group 30").performScrollTo().assertIsDisplayed()
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
         rule
             .onNodeWithTag("group.members.review.dialog")

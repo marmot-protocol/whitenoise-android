@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -138,7 +139,7 @@ internal fun ComposeContentTestRule.assertGroupMembersReview(rtl: Boolean) {
     // The actor is a picture announced by role and name; it still copies the full npub.
     assertReviewNpubCopy(onNodeWithContentDescription("Acting account, ", substring = true), GROUP_REVIEW_ACTOR_NPUB)
     assertReviewNpubCopy(
-        onNodeWithContentDescription("Member, $REVIEW_SECOND_MEMBER_NPUB"),
+        onNodeWithContentDescription(", Member, $REVIEW_SECOND_MEMBER_NPUB", substring = true),
         REVIEW_SECOND_MEMBER_NPUB,
         scroll = true,
     )
@@ -176,7 +177,9 @@ private fun ComposeContentTestRule.assertPublicReviewIdentity(
     rtl: Boolean,
 ) {
     onNodeWithText("to Garden club").assertIsDisplayed()
-    onNodeWithText(if (rtl) "Alice Public with a long profile name" else "alice").performScrollTo().assertIsDisplayed()
+    val name = if (rtl) "Alice Public with a long profile name" else "alice"
+    onNodeWithText(name).performScrollTo().assertIsDisplayed()
+    onNodeWithTag("group.members.review.member").assert(hasContentDescription("$name, Member, $npub"))
     onNodeWithText(IdentityFormatter.short(npub, prefix = 10, suffix = 8)).performScrollTo().assertIsDisplayed()
     onNode(hasText("Private Alice") and hasAnyAncestor(hasTestTag("group.members.review.member"))).assertDoesNotExist()
     val group = onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
