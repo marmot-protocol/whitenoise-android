@@ -82,7 +82,7 @@
     <string name="error_loaded_content_kept">Weitere Inhalte konnten nicht geladen werden. Deine Nachrichten sind weiterhin verfügbar; versuche es erneut, wenn du bereit bist.</string>
     <string name="error_conversation_membership_unavailable">Die Mitglieder dieser Unterhaltung konnten nicht bestätigt werden. Versuche es erneut, um deine Nachrichten anzuzeigen.</string>
     <string name="error_conversation_membership_inconsistent">Die Mitgliederliste dieser Unterhaltung passt nicht zu diesem Konto, daher bleiben ihre Nachrichten ausgeblendet. Versuche es erneut, um sie noch einmal zu prüfen.</string>
-    <string name="refresh">Dump aktualisieren</string>
+    <string name="refresh">Aktualisieren</string>
     <string name="retry">Erneut versuchen</string>
     <string name="creating_identity_title">Identität wird erstellt</string>
     <string name="sign_in">Anmelden</string>
@@ -361,6 +361,12 @@
     <string name="restoring_chat">Chat wird wiederhergestellt...</string>
     <string name="leave_chat">Chat verlassen</string>
     <string name="leaving_chat">Chat wird verlassen...</string>
+    <string name="group_leave_blocked">Verlassen blockiert</string>
+    <string name="group_leave_blocked_hint">Du bist der einzige Admin. Brich das Verlassen ab, um in dieser Gruppe zu bleiben.</string>
+    <string name="group_cancel_leave">Verlassen abbrechen</string>
+    <string name="group_leave_refresh_hint">Aktualisiere, um zu prüfen, ob du noch in dieser Gruppe bist.</string>
+    <string name="group_leave_refresh_action">Aktualisieren</string>
+    <string name="toast_couldnt_cancel_leave">Verlassen konnte nicht abgebrochen werden</string>
     <string name="export_conversation_transcript">Konversationstranskript exportieren</string>
     <string name="toast_couldnt_export_transcript">Transkript konnte nicht exportiert werden</string>
     <string name="no_share_target_available">Kein Freigabeziel verfügbar</string>
@@ -1118,6 +1124,8 @@
     <string name="media_downloading">Wird heruntergeladen</string>
     <string name="media_cancel_download">Download abbrechen</string>
     <string name="media_download_cancelled">Download abgebrochen. Zum erneuten Herunterladen tippen</string>
+    <string name="media_removed_download_again">Von diesem Gerät entfernt. Zum erneuten Herunterladen tippen</string>
+    <string name="floating_attachment_removed">Von diesem Gerät entfernt. Öffne das Original, um es erneut herunterzuladen</string>
     <string name="media_opening">Wird geöffnet</string>
     <string name="media_save">Speichern</string>
     <string name="media_saved">In Galerie gespeichert</string>

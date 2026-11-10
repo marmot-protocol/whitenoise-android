@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-storage-remove-older-confirm
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Remove older attachments
+- tapOn:
+    text: Older than 1 year
+- assertVisible:
+    text: Remove older attachments\?
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

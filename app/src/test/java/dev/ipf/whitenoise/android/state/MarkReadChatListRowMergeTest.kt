@@ -287,6 +287,7 @@ class MarkReadChatListRowMergeTest {
         updatedAt = lastMessageAt,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = manuallyMarkedUnread,
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,

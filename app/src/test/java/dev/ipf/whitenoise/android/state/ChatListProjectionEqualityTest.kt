@@ -172,6 +172,7 @@ class ChatListProjectionEqualityTest {
             mutedUntilMs = null,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
         )
 
     private fun group() =
@@ -197,6 +198,7 @@ class ChatListProjectionEqualityTest {
             selfMembership = SelfMembershipFfi.MEMBER,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
             disbanding = false,

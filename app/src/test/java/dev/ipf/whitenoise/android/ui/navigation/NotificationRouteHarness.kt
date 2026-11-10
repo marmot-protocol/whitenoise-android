@@ -398,6 +398,7 @@ internal object NotificationRouteHarness {
             selfMembership = SelfMembershipFfi.MEMBER,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             disbanding = false,
             disbandRequest = null,
             disbanded = false,

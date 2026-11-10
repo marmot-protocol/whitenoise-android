@@ -1,0 +1,159 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SelectAllAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "fun SelectAllAction(",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "StorageListRetry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "fun StorageListRetry(",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "StorageLoadingRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "fun StorageLoadingRow(",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "StorageSelectionBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "fun StorageSelectionBar(",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "StoredAttachmentGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "fun StoredAttachmentGlyph(",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "StoredAttachmentsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "fun StoredAttachmentsContent(",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "StoredAttachmentsRoute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "fun StoredAttachmentsRoute(",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_select_shown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_select_shown",
+        "test_ids": [
+          "SET-049"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "plurals:storage_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.plurals.storage_selected",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_clear_selection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_clear_selection",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_largest_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_largest_attachments",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_removal_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_removal_help",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_remove",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_all_in_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_remove_all_in_chat",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_older",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_remove_older",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_removing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_removing",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_retry",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_select_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_select_all",
+        "test_ids": [
+          "SET-048"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

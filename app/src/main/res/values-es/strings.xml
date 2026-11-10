@@ -84,7 +84,7 @@
     <string name="error_loaded_content_kept">No se pudo cargar más contenido. Tus mensajes siguen disponibles; vuelve a intentarlo cuando quieras.</string>
     <string name="error_conversation_membership_unavailable">No se pudieron verificar los miembros de esta conversación. Vuelve a intentarlo para mostrar tus mensajes.</string>
     <string name="error_conversation_membership_inconsistent">La lista de miembros de esta conversación no coincide con esta cuenta, así que sus mensajes siguen ocultos. Vuelve a intentarlo para comprobarla de nuevo.</string>
-    <string name="refresh">Actualizar volcado</string>
+    <string name="refresh">Actualizar</string>
     <string name="retry">Reintentar</string>
     <string name="creating_identity_title">Creando identidad</string>
     <string name="sign_in">Iniciar sesión</string>
@@ -363,6 +363,12 @@
     <string name="restoring_chat">Restaurando chat...</string>
     <string name="leave_chat">Salir del chat</string>
     <string name="leaving_chat">Saliendo del chat...</string>
+    <string name="group_leave_blocked">Salida bloqueada</string>
+    <string name="group_leave_blocked_hint">Eres el único administrador. Cancela la salida para quedarte en este grupo.</string>
+    <string name="group_cancel_leave">Cancelar salida</string>
+    <string name="group_leave_refresh_hint">Actualiza para comprobar si sigues en este grupo.</string>
+    <string name="group_leave_refresh_action">Actualizar</string>
+    <string name="toast_couldnt_cancel_leave">No se pudo cancelar la salida</string>
     <string name="export_conversation_transcript">Exportar transcripción de la conversación</string>
     <string name="toast_couldnt_export_transcript">No se pudo exportar la transcripción</string>
     <string name="no_share_target_available">No hay destino para compartir disponible</string>
@@ -1120,6 +1126,8 @@
     <string name="media_downloading">Descargando</string>
     <string name="media_cancel_download">Cancelar la descarga</string>
     <string name="media_download_cancelled">Descarga cancelada. Toca para descargar de nuevo</string>
+    <string name="media_removed_download_again">Eliminado de este dispositivo. Toca para descargar de nuevo</string>
+    <string name="floating_attachment_removed">Eliminado de este dispositivo. Abre el original para descargarlo de nuevo</string>
     <string name="media_opening">Abriendo</string>
     <string name="media_save">Guardar</string>
     <string name="media_saved">Guardado en la galería</string>

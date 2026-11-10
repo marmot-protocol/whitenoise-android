@@ -368,6 +368,10 @@ class GroupStateMemberRefreshGateTest {
 
         assertTrue(groupStateUpdateRemovesSelf(previous, removed))
         assertTrue(groupStateUpdateRemovesSelf(previous, left))
+        val pendingLeave = left.copy(leaveRequestPending = true, leaveRequestedAtMs = 1uL, leaveBlocked = true)
+        assertFalse(groupStateUpdateRemovesSelf(previous, pendingLeave))
+        assertTrue(groupStateUpdateRemovesSelf(pendingLeave, left))
+        assertTrue(groupStateUpdateRemovesSelf(pendingLeave, removed))
         assertFalse(groupStateUpdateRemovesSelf(removed, removed.copy()))
         assertFalse(groupStateUpdateRemovesSelf(previous, previous.copy(name = "Renamed")))
     }
@@ -543,6 +547,7 @@ class GroupStateMemberRefreshGateTest {
             updatedAt = 0uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             manuallyMarkedUnread = false,
             conversationKind = conversationKind,
             muted = false,
@@ -596,6 +601,7 @@ class GroupStateMemberRefreshGateTest {
         disappearingMessageSecs = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         disbanding = false,
         disbanded = false,
         disbandRequest = null,

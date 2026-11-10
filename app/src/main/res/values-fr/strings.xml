@@ -84,7 +84,7 @@
     <string name="error_loaded_content_kept">Impossible de charger davantage de contenu. Vos messages restent disponibles ; réessayez quand vous le souhaitez.</string>
     <string name="error_conversation_membership_unavailable">Impossible de vérifier les membres de cette conversation. Réessayez pour afficher vos messages.</string>
     <string name="error_conversation_membership_inconsistent">La liste des membres de cette conversation ne correspond pas à ce compte, ses messages restent donc masqués. Réessayez pour vérifier à nouveau.</string>
-    <string name="refresh">Actualiser l’export</string>
+    <string name="refresh">Actualiser</string>
     <string name="retry">Réessayer</string>
     <string name="creating_identity_title">Création de l’identité</string>
     <string name="sign_in">Connexion</string>
@@ -363,6 +363,12 @@
     <string name="restoring_chat">Restauration du chat...</string>
     <string name="leave_chat">Quitter la conversation</string>
     <string name="leaving_chat">Sortie du chat...</string>
+    <string name="group_leave_blocked">Départ bloqué</string>
+    <string name="group_leave_blocked_hint">Vous êtes le seul administrateur. Annulez le départ pour rester dans ce groupe.</string>
+    <string name="group_cancel_leave">Annuler le départ</string>
+    <string name="group_leave_refresh_hint">Actualisez pour vérifier si vous êtes toujours dans ce groupe.</string>
+    <string name="group_leave_refresh_action">Actualiser</string>
+    <string name="toast_couldnt_cancel_leave">Impossible d\'annuler le départ</string>
     <string name="export_conversation_transcript">Exporter le transcript de la conversation</string>
     <string name="toast_couldnt_export_transcript">Impossible d’exporter le transcript</string>
     <string name="no_share_target_available">Aucune cible de partage disponible</string>
@@ -1120,6 +1126,8 @@
     <string name="media_downloading">Téléchargement</string>
     <string name="media_cancel_download">Annuler le téléchargement</string>
     <string name="media_download_cancelled">Téléchargement annulé. Appuyez pour télécharger à nouveau</string>
+    <string name="media_removed_download_again">Supprimé de cet appareil. Appuyez pour télécharger à nouveau</string>
+    <string name="floating_attachment_removed">Supprimé de cet appareil. Ouvrez l\'original pour le télécharger à nouveau</string>
     <string name="media_opening">Ouverture</string>
     <string name="media_save">Enregistrer</string>
     <string name="media_saved">Enregistré dans la galerie</string>

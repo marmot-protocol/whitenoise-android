@@ -1,0 +1,179 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "plurals:storage_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.plurals.storage_removed",
+        "test_ids": [
+          "SET-048",
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "plurals:storage_removed_freed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.plurals.storage_removed_freed",
+        "test_ids": [
+          "SET-048",
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_action_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_action_failed",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_attachment_audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_attachment_audio",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_attachment_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_attachment_file",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_attachment_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_attachment_photo",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_attachment_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_attachment_video",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_cache_cleared",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_cache_cleared",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_caches_cleared",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_caches_cleared",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_forever",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_keep_forever",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_media_saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_keep_media_saved",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_one_year",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_keep_one_year",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_six_months",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_keep_six_months",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_thirty_days",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_keep_thirty_days",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_nothing_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_nothing_removed",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_older_one_month",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_older_one_month",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_older_one_week",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_older_one_week",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_older_one_year",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_older_one_year",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_older_six_months",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_older_six_months",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_older_three_months",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_older_three_months",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

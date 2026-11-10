@@ -313,7 +313,7 @@ internal fun MediaVideoGridTile(
      * Opens a clip on the device or downloads one that is not, in place. The explicit Retry control lands here
      * directly, so it retries this tile's download even on the "+N" overflow tile.
      */
-    fun downloadOrOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
+    fun downloadOrOpen(retry: Boolean = failed || (localFile == null && transfer.needsDeliberateRetry)) {
         if (transfer.cancelling || sendingFromStagedFile || !cacheProbeReady) return
         val download = {
             // Native failure can offer Retry before the old local waiter reports its own failure.
@@ -849,7 +849,7 @@ internal fun MediaVideoBubble(
      * Downloads a clip that is not on the device yet, in place. It never opens once it arrives; a later tap opens it.
      * A video still being sent from its staged file has nothing to download yet.
      */
-    fun requestDownload(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
+    fun requestDownload(retry: Boolean = failed || (localFile == null && transfer.needsDeliberateRetry)) {
         if (!cacheProbeReady) return
         if (transfer.cancelling || sendingFromStagedFile) return
         val download = {

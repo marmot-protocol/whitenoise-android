@@ -37,6 +37,21 @@ class StorageParkReadTest {
             assertEquals(listOf("attachmentTransferSnapshot"), calls)
         }
 
+    /**
+     * A tile in a conversation opened after Manage storage removed its body reads that state once, read-only, so it can
+     * offer Download again instead of a plain download that would fail.
+     */
+    @Test
+    fun aRemovedBodyReadsItsStateOnceWithoutDemandingAnything() =
+        runBlocking {
+            for (phase in listOf(AttachmentTransferStateFfi.REMOVED, AttachmentTransferStateFfi.CLEANED_BY_SETTING)) {
+                calls.clear()
+                assertEquals(phase, appState { snapshot(phase) }.nativeAttachmentState(REQUEST))
+                assertEquals(listOf("attachmentTransferSnapshot"), calls)
+            }
+            assertEquals(null, appState { error("snapshot unavailable") }.nativeAttachmentState(REQUEST))
+        }
+
     /** Any other phase, such as a finished or failed body, is not a park. */
     @Test
     fun otherPhasesAreNotAPark() =

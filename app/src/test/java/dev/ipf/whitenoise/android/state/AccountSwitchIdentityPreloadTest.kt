@@ -127,6 +127,7 @@ class AccountSwitchIdentityPreloadTest {
         updatedAt = 1uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = false,
         conversationKind = kind,
         muted = false,

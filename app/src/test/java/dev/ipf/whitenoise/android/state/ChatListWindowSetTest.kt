@@ -479,4 +479,5 @@ internal fun chatRow(groupIdHex: String) =
         mutedUntilMs = null,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
     )

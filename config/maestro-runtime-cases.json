@@ -76,6 +76,11 @@
       "assertions": "Read Aloud opens its expected content; toolbar Back returns to Settings and Chats.",
       "postcondition": "none"
     },
+    "settings-manage-storage": {"suite": "settings", "manual_ids": ["SET-047"], "assertions": "Manage storage opens from the top of Data Usage with its usage panel, Free up space and Keep media groups; toolbar Back returns to Data Usage, Settings and Chats.", "postcondition": "none"},
+    "presentation-storage-keep-shorter-confirm": {"suite": "presentation", "manual_ids": ["SET-047"], "assertions": "Production Keep media picker asks before a shorter window and dispatches exactly the confirmed 30-day window; no attachment is removed.", "postcondition": "presentation-checked", "presentation": "storage-keep-shorter-confirm", "presentation_actions": ["keep-media"], "layer": "production-presentation-ui"},
+    "presentation-storage-remove-older-confirm": {"suite": "presentation", "manual_ids": ["SET-050"], "assertions": "Production Remove older attachments picker shows its dated confirmation and dispatches one account-wide removal callback; no attachment is removed.", "postcondition": "presentation-checked", "presentation": "storage-remove-older-confirm", "presentation_actions": ["remove-older"], "layer": "production-presentation-ui"},
+    "presentation-storage-remove-attachments-cancel": {"suite": "presentation", "manual_ids": ["SET-048"], "assertions": "Production remove-attachments confirmation names the count and Cancel dispatches dismissal without removal.", "postcondition": "presentation-checked", "presentation": "storage-remove-attachments-cancel", "presentation_actions": ["dismiss"], "layer": "production-presentation-ui"},
+    "presentation-storage-remove-chat-cancel": {"suite": "presentation", "manual_ids": ["SET-049"], "assertions": "Production remove-all-in-chat confirmation without known figures names the chat scope and Cancel dispatches dismissal without removal.", "postcondition": "presentation-checked", "presentation": "storage-remove-chat-cancel", "presentation_actions": ["dismiss"], "layer": "production-presentation-ui"},
     "settings-data": {
       "suite": "settings",
       "manual_ids": [
