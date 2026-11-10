@@ -8359,10 +8359,11 @@ class ConversationController(
         clientToken: String,
         optimisticKey: String,
     ): dev.ipf.marmotkit.SendSummaryFfi {
-        // Replies and injected publishers keep their plain-text path. A message that uses the user's
-        // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
-        val emojiArtwork = emojiArtworkForSend(account, replyTarget, trimmed)
         return appState.withConversationTextSendOrder(account, group.groupIdHex) {
+            // Replies and injected publishers keep their plain-text path. A message that uses the user's
+            // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
+            // Resolving its artwork inside the text order keeps a later message from publishing first.
+            val emojiArtwork = emojiArtworkForSend(account, replyTarget, trimmed)
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 cancellationGeneration = optimisticCancellationGeneration,

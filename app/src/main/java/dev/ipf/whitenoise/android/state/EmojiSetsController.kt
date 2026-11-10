@@ -16,27 +16,37 @@ import kotlinx.coroutines.launch
 
 /** Reads and mutates sets for the account and runtime that opened the screen. */
 internal interface EmojiSetsBackend {
+    /** Installed sets plus discovered ones matching [search], from MDK's local projection only. */
     suspend fun sets(search: String?): List<EmojiSetFfi>
 
+    /** Syncs set metadata from the discovery relays; false when some relays could not be reached. */
     suspend fun discover(search: String?): Boolean
 
+    /** Fetches the metadata of one pasted or shared address without touching image hosts. */
     suspend fun fetch(input: String): EmojiSetFfi
 
+    /** The locally known version of [coordinate], or null once it is gone. */
     suspend fun current(coordinate: String): EmojiSetFfi?
 
+    /** Downloads the cover, or the first emoji when the set has none, for one explicit preview. */
     suspend fun preview(set: EmojiSetFfi): ByteArray
 
+    /** A fresh install control. The caller closes it. */
     fun newInstall(): EmojiSetInstall
 
+    /** Uninstalls [coordinate] from the account's library. */
     suspend fun remove(coordinate: String)
 }
 
 /** One version-bound install and its live cancellation handle. */
 internal interface EmojiSetInstall : AutoCloseable {
+    /** Installs exactly this version, failing with `EmojiSetChanged` if MDK holds a newer one. */
     suspend fun run(set: EmojiSetFfi): EmojiSetInstallResultFfi
 
+    /** MDK's latest progress snapshot for this install. */
     fun progress(): EmojiSetInstallProgressFfi
 
+    /** Asks MDK to stop. [run] then fails with `EmojiSetInstallCancelled` and leaves the library unchanged. */
     fun cancel()
 }
 
@@ -46,6 +56,7 @@ internal fun WhiteNoiseAppState.emojiSetsBackend(
     generation: Int,
     activeOwner: String?,
 ): EmojiSetsBackend {
+    /** Runs [block] off the main thread, cancelling it when the runtime, active owner or target account changed. */
     suspend fun <T> scoped(block: suspend dev.ipf.marmotkit.MarmotInterface.() -> T): T =
         marmotIo {
             val targetExists = account == activeOwner || accounts.any { it.label == account }
@@ -58,8 +69,8 @@ internal fun WhiteNoiseAppState.emojiSetsBackend(
     return object : EmojiSetsBackend {
         override suspend fun sets(search: String?): List<EmojiSetFfi> =
             scoped {
-                // Discovery is capped and ordered by date. Always include the full installed projection.
-                val installed = emojiSets(account, true, null, null)
+                // Discovery is capped and ordered by date. Installed sets are listed first and match the same search.
+                val installed = emojiSets(account, true, search, null)
                 val discovered = emojiSets(account, false, search, null)
                 (installed + discovered).distinctBy { it.coordinate }
             }
@@ -99,8 +110,10 @@ internal fun WhiteNoiseAppState.emojiSetsBackend(
     }
 }
 
+/** The typed outcome of the last operation the screen reports. */
 internal enum class EmojiSetNotice { Error, NotFound, Changed, Cancelled, DiscoveryIncomplete }
 
+/** Everything the browser and preview render. Only MDK's projection, never a copy of set contents. */
 internal data class EmojiSetsState(
     val sets: List<EmojiSetFfi> = emptyList(),
     val preview: EmojiSetFfi? = null,
@@ -197,10 +210,12 @@ internal class EmojiSetsController(
         }
     }
 
+    /** Rereads the list for the current search. */
     private suspend fun refresh() {
         state = state.copy(sets = backend.sets(search))
     }
 
+    /** Runs one install, polling MDK's progress until it finishes, and cancels it if this coroutine is cancelled. */
     private suspend fun installWithProgress(set: EmojiSetFfi): EmojiSetInstallResultFfi =
         backend.newInstall().use { install ->
             activeInstall = install
@@ -229,6 +244,7 @@ internal class EmojiSetsController(
             }
         }
 
+    /** Runs one operation at a time and maps its failure to a notice. A changed set needs a fresh decision. */
     @Suppress("TooGenericExceptionCaught") // FFI and runtime failures share a retryable presentation.
     private suspend fun operate(
         set: EmojiSetFfi? = null,
