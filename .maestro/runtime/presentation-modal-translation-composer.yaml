@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-translation-composer
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Translate as you type
+- tapOn: Accept
+- assertVisible: Target language
+- tapOn: Arabic
+- assertVisible:
+    id: composer.translation
+- assertVisible: Fixture translated text
+- assertVisible:
+    id: presentation.complete

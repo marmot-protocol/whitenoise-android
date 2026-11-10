@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.maestro
 
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -17,7 +18,7 @@ internal suspend fun verifyMaestroEmptyLibrary(
     return withTimeout(15_000L) {
         withContext(Dispatchers.IO) {
             for (account in listOf(original.account, original.peer)) {
-                val query = TimelineMessageQueryFfi(original.group, null, null, null, null, null, 100u)
+                val query = TimelineMessageQueryFfi.page(original.group, null, null, null, null, null, 100u)
                 val page = native.timelineMessages(account, query)
                 check(!page.hasMoreBefore) { "Disposable timeline exceeded the complete empty-library proof" }
                 check(page.messages.isNotEmpty())

@@ -41,6 +41,7 @@ internal fun ConversationGroupRecoveryCard(
 ) {
     GroupRecoveryCard(
         status = controller.groupRecoveryStatus,
+        historyRejoined = controller.groupHistoryNoticeRejoined,
         busy = controller.groupRecoveryMutationInFlight,
         inviterName = appState::displayName,
         inviterIdentity = appState::npubForDisplay,
@@ -77,6 +78,7 @@ internal fun GroupRecoveryCard(
     readFailed: Boolean = false,
     onRetry: () -> Unit = {},
     onDismissHistoryNotices: () -> Unit = {},
+    historyRejoined: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (!readFailed && status?.hasVisibleRecoveryState() != true) return
@@ -100,7 +102,7 @@ internal fun GroupRecoveryCard(
                 style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
             )
         }
-        GroupHistoryNotice(status, busy, onDismissHistoryNotices)
+        GroupHistoryNotice(status, historyRejoined, busy, onDismissHistoryNotices)
         status?.rejoinInvitations.orEmpty().forEach { invitation ->
             WhiteNoiseOutlinedButton(
                 onClick = { selectedInvitation = invitation },
@@ -139,17 +141,21 @@ internal fun GroupRecoveryCard(
     }
 }
 
-/** Shows the group-scoped warning and offers dismissal only for active notice ids. */
+/**
+ * Shows the group-scoped warning, worded for a rejoin when [rejoined], and offers dismissal only for active notice ids.
+ */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupHistoryNotice(
     status: GroupRecoveryStatusFfi?,
+    rejoined: Boolean,
     busy: Boolean,
     onDismiss: () -> Unit,
 ) {
     if (status?.historyMayBeIncomplete != true) return
+    val wording = if (rejoined) R.string.group_history_before_rejoin else R.string.group_history_may_be_incomplete
     Text(
-        stringResource(R.string.group_history_may_be_incomplete),
+        stringResource(wording),
         style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
     )
     // Only the user may accept that this history may stay incomplete.

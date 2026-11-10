@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
 import dev.ipf.whitenoise.android.state.hasNativeAttachment
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -582,7 +583,7 @@ internal object ForwardAttachmentProbe {
             marmot
                 .timelineMessages(
                     peers.forwarder.label,
-                    TimelineMessageQueryFfi(
+                    TimelineMessageQueryFfi.page(
                         groupIdHex = peers.destination,
                         search = null,
                         before = null,

@@ -35,6 +35,23 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "GroupReviewCopyRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupReviewCopyRow(",
+        "test_ids": [
+          "GRP-030",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupReviewPersonText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupActionReviewIdentity.kt",
+        "anchor": "fun GroupReviewPersonText(",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ],
     "settings_controls": [

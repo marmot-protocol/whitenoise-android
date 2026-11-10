@@ -17,6 +17,7 @@ internal data class TranslationChoice(
 )
 
 /** Platform choices only: no source text, rendition, error, revision or request identity is persisted. */
+@Suppress("TooManyFunctions")
 internal class TranslationPreferences(
     context: Context,
 ) {
@@ -27,7 +28,12 @@ internal class TranslationPreferences(
         )
     private val revision = MutableStateFlow(0)
     val changes = revision.asStateFlow()
-    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> revision.value += 1 }
+    private val listener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            // The composer's outgoing language and notice never change incoming translations, so saving them
+            // must not clear the renditions already shown in the chat.
+            if (key != COMPOSER_NOTICE_VERSION && key?.endsWith(OUTGOING_SUFFIX) != true) revision.value += 1
+        }
 
     init {
         resetLegacyAutomaticChoices()
@@ -128,6 +134,41 @@ internal class TranslationPreferences(
         edit.apply()
     }
 
+    /**
+     * The language this chat's composer last translated outgoing text into, or null until chosen. It is kept
+     * apart from the incoming target: people usually read in their own language and write in the chat's.
+     */
+    fun outgoingTarget(
+        account: String,
+        group: String,
+    ): String? =
+        savedTarget(key(account, group) + OUTGOING_SUFFIX)
+            ?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
+
+    /** Saves [target] as this chat's outgoing composer language; only catalog languages are accepted. */
+    fun setOutgoingTarget(
+        account: String,
+        group: String,
+        target: String,
+    ) {
+        require(OfflineTranslatorLanguageCatalog.supportsTarget(target))
+        preferences.edit().putString(key(account, group) + OUTGOING_SUFFIX, target).apply()
+    }
+
+    /**
+     * Whether this install accepted the composer's provider logging notice for the current notice version. Typing
+     * sends every draft to the engine, so the composer asks once before its first request, wherever it is opened.
+     */
+    fun composerNoticeAccepted(): Boolean {
+        val accepted = runCatching { preferences.getInt(COMPOSER_NOTICE_VERSION, 0) }.getOrDefault(0)
+        return accepted >= CURRENT_PRIVACY_NOTICE
+    }
+
+    /** Records that the current composer notice version was accepted, so the composer stops asking. */
+    fun acceptComposerNotice() {
+        preferences.edit().putInt(COMPOSER_NOTICE_VERSION, CURRENT_PRIVACY_NOTICE).apply()
+    }
+
     /** The raw saved code, `""` for a value of the wrong type, or null when nothing is saved. */
     private fun savedTarget(key: String): String? = runCatching { preferences.getString(key, null) }.getOrElse { "" }
 
@@ -142,6 +183,8 @@ internal class TranslationPreferences(
     private companion object {
         const val PRIVACY_NOTICE_VERSION = "privacy_notice_version"
         const val CURRENT_PRIVACY_NOTICE = 1
+        const val COMPOSER_NOTICE_VERSION = "composer_privacy_notice_version"
+        const val OUTGOING_SUFFIX = ":outgoing"
         const val DEFAULT_TARGET = "en"
     }
 }

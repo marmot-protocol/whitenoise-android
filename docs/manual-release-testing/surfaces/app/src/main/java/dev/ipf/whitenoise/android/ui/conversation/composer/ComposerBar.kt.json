@@ -173,6 +173,14 @@
         ]
       },
       {
+        "surface": "R.string.translation_composer_dictation_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.translation_composer_dictation_off",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
         "surface": "Account-scoped composer emoji library",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
         "anchor": "ComposerEmojiLibrary(installedEmoji)",

@@ -1426,6 +1426,7 @@
     <string name="wipe_stage_leaving_groups">Saindo dos grupos…</string>
     <string name="wipe_stage_deleting_key_packages">Removendo chaves de convite…</string>
     <string name="wipe_stage_wiping_local_data">Apagando dados locais…</string>
+    <string name="wipe_progress_keep_open">Isso pode levar até um minuto. Mantenha o White Noise aberto até terminar.</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Limpeza concluída com %1$d problema</item>
         <item quantity="other">Limpeza concluída com %1$d problemas</item>
@@ -2139,6 +2140,7 @@
     <string name="group_recovery_review_invitation_from">Revisar convite de %1$s · época %2$s</string>
     <string name="group_recovery_check_failed">Não foi possível verificar a recuperação do grupo. Tente novamente.</string>
     <string name="group_history_may_be_incomplete">Algumas mensagens anteriores desta conversa podem estar faltando.</string>
+    <string name="group_history_before_rejoin">Você entrou novamente nesta conversa. Mensagens de antes do seu retorno podem estar faltando.</string>
     <string name="account_history_may_be_incomplete">Algumas mensagens desta conta podem estar faltando. O White Noise não conseguiu confirmar que todas as mensagens chegaram.</string>
     <string name="history_notice_dismiss_failed">Não foi possível dispensar o aviso do histórico. Tente novamente.</string>
     <string name="group_rejoin_title">Voltar a entrar no grupo?</string>
@@ -2535,7 +2537,7 @@
         <item quantity="other">%1$d grupos</item>
     </plurals>
     <string name="group_review_add_member">Adicionar membro</string>
-    <string name="group_review_invitation_visibility">Visível para todos os membros.</string>
+    <string name="group_review_destination">para %1$s</string>
     <string name="search_scope_this_chat">Esta conversa · %1$s</string>
     <string name="search_scope_all_chats">Todas as conversas</string>
     <string name="search_scope_other_chats">Pesquisar noutras conversas</string>

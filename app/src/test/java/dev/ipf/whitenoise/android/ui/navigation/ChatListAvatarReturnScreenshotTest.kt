@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.os.Looper
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
@@ -24,6 +25,7 @@ import dev.ipf.whitenoise.android.state.durableAvatar
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_HEAD_INPUT_GATE_MILLIS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -34,6 +36,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
@@ -119,15 +122,7 @@ class ChatListAvatarReturnScreenshotTest {
             rule.waitForIdle()
             rule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
             holdReads.set(true)
-            val readsBeforeReturn =
-                rule.runOnIdle {
-                    val reads = fixture.avatarReads.get()
-                    AvatarCacheDiagnostics.start()
-                    // Keep avatar observers from touching the LRU partway through synthetic cache pressure.
-                    evictWorkingSet()
-                    assertCapacityEviction(fixture)
-                    reads
-                }
+            val readsBeforeReturn = evictQuiescentWorkingSet(fixture)
 
             if (refresh) {
                 revision.set(2)
@@ -206,6 +201,30 @@ class ChatListAvatarReturnScreenshotTest {
                 assertNotNull(fixture.appState.durableAvatar(asset(row.groupIdHex), acquireMissing = false))
             }
         }
+
+    /**
+     * Applies capacity churn only after the app's background mutations, Direct Share publication in particular, have
+     * finished. Publication reads every row's pixels through the LRU on an IO worker, and a lookup that lands partway
+     * through the churn promotes those rows past the synthetic entries, so they survive the eviction this case needs.
+     * The churn runs on the main thread inside the wait, so nothing new can launch between the check and the eviction.
+     * Returns the local read count before the return navigation.
+     */
+    private fun evictQuiescentWorkingSet(fixture: ReturnFixture): Int {
+        val mutations = checkNotNull(fixture.appState.mutationsScope.coroutineContext[Job])
+        var reads: Int? = null
+        rule.waitUntil(10_000) {
+            rule.waitForIdle()
+            shadowOf(Looper.getMainLooper()).idle()
+            if (mutations.children.none()) {
+                reads = fixture.avatarReads.get()
+                AvatarCacheDiagnostics.start()
+                evictWorkingSet()
+                assertCapacityEviction(fixture)
+            }
+            reads != null
+        }
+        return checkNotNull(reads)
+    }
 
     /** Confirms real capacity churn removed each initial revision from the LRU. */
     private fun assertCapacityEviction(fixture: ReturnFixture) {

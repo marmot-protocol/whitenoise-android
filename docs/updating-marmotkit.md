@@ -5,18 +5,18 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [November 9 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261109)
-is the current testing-only pin. Replace it with the formal `marmotkit-v0.15.0`
-release once MDK publishes one.
+The [official 0.15.0 adoption](marmotkit-0.15.0.md) records the current pin: the
+formal `marmotkit-v0.15.0` release, its API compatibility and retained-data qualification.
 
-The [8 November nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108)
-is the populated campaign's upgrade baseline. The [6 November nightly](marmotkit-nightly-20261106.md),
+The [November 9 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261109)
+is the populated campaign's upgrade baseline. The
+[8 November nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108),
+[6 November nightly](marmotkit-nightly-20261106.md),
 [5 November nightly](marmotkit-nightly-20261105.md),
 [4 November nightly](marmotkit-nightly-20261104.md),
 [2 November nightly](marmotkit-nightly-20261102.md) and
-[30 October nightly](marmotkit-nightly-20261030.md) are historical. The
-[official 0.14.0 adoption](marmotkit-0.14.0.md) records the last formal artifact,
-API compatibility and retained-data qualification.
+[30 October nightly](marmotkit-nightly-20261030.md) and the
+[official 0.14.0 adoption](marmotkit-0.14.0.md) are historical.
 
 ## Markdown timestamps
 
@@ -70,8 +70,12 @@ execute: no ignored recovery case can satisfy adoption.
 
 The populated campaign builds current master and the candidate with one disposable
 signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed November 8 nightly source `580082a5`. Dispatch once on the
-candidate branch and reuse a matching active run:
+longer pins the reviewed November 9 nightly source `b3e48468`. Qualification
+sources must compile against both runtimes: when a MarmotKit type differs, keep the
+candidate's form in the qualification package and the baseline's form under
+`scripts/mdk-baseline-overlay/` as `<File>.kt.txt`, which the staging script copies
+over the candidate file in the baseline checkout. Dispatch once on the candidate
+branch and reuse a matching active run:
 
 ```bash
 gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-android \

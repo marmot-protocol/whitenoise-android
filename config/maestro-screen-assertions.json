@@ -6124,6 +6124,42 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+      "symbol": "ComposerTranslationNotice",
+      "bindings": [
+        {
+          "case": "presentation-modal-translation-composer",
+          "selector": {
+            "text": "Translate as you type"
+          },
+          "scope": "Audited production owner and distinctive asserted title; controlled presentation proves acceptance precedes any engine request, not the real Android entrypoint.",
+          "entry_assertion": {
+            "text": "Translate as you type"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+      "symbol": "ComposerTranslationPreview",
+      "bindings": [
+        {
+          "case": "presentation-modal-translation-composer",
+          "selector": {
+            "text": "Target language"
+          },
+          "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
+          "entry_assertion": {
+            "text": "Target language"
+          },
+          "opened_by": {
+            "text": "Accept"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
       "symbol": "TranslationLanguageRow",
       "bindings": [

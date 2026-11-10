@@ -53,14 +53,7 @@ internal fun rememberConversationTranslation(
             ConversationTranslationSession(
                 scope,
                 { withContext(Dispatchers.IO) { OfflineTranslatorClient(context.applicationContext) } },
-                {
-                    active &&
-                        account != null &&
-                        appState.activeAccountRef == account &&
-                        appState.runtimeGeneration == runtime &&
-                        !appState.appLockScreenVisible &&
-                        lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-                },
+                { active && account != null && appState.translationOwnerCurrent(account, runtime, lifecycle) },
             )
         }
     val preferencesRevision by preferences.changes.collectAsState()
@@ -73,11 +66,43 @@ internal fun rememberConversationTranslation(
             ownedNotice = appState.presentConversationTransient(account, group, recoveryNotice(session.failure))
         }
     }
-    DisposableEffect(session, lifecycle) {
+    TranslationOwnerResetEffect(session, onReset = session::clear) {
+        session.clear()
+        ownedNotice?.let { appState.clearTransientNotice(it) }
+    }
+    return session
+}
+
+/** Whether translation work started for [account] in [runtime] may still change what is on screen. */
+internal fun WhiteNoiseAppState.translationOwnerCurrent(
+    account: String,
+    runtime: Int,
+    lifecycle: Lifecycle,
+): Boolean =
+    activeAccountRef == account &&
+        runtimeGeneration == runtime &&
+        !appLockScreenVisible &&
+        lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+
+/**
+ * Discards [owner]'s translation work when the screen pauses or resumes or Offline Translator is removed, replaced
+ * or changed, because a result started before then may come from another engine or be shown to someone else.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun TranslationOwnerResetEffect(
+    owner: Any,
+    onReset: () -> Unit,
+    onDispose: () -> Unit = onReset,
+) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val reset by rememberUpdatedState(onReset)
+    val dispose by rememberUpdatedState(onDispose)
+    DisposableEffect(owner, lifecycle) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_PAUSE) session.clear()
-                if (event == Lifecycle.Event.ON_RESUME) session.clear()
+                if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_RESUME) reset()
             }
         val receiver =
             object : BroadcastReceiver() {
@@ -85,7 +110,7 @@ internal fun rememberConversationTranslation(
                     context: Context,
                     intent: Intent,
                 ) {
-                    session.clear()
+                    reset()
                 }
             }
         val filter =
@@ -101,9 +126,7 @@ internal fun rememberConversationTranslation(
         onDispose {
             lifecycle.removeObserver(observer)
             context.unregisterReceiver(receiver)
-            session.clear()
-            ownedNotice?.let { appState.clearTransientNotice(it) }
+            dispose()
         }
     }
-    return session
 }

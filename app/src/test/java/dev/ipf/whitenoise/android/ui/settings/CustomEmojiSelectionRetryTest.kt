@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Looper
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.ActivityResultRegistryOwner
@@ -93,7 +94,7 @@ class CustomEmojiSelectionRetryTest {
             }
             composeRule.waitForIdle()
             unblock.countDown()
-            composeRule.waitUntil { closed.get() }
+            waitForSelection("blocked stream close", reads, app) { closed.get() }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("custom_emoji.name").assertDoesNotExist()
             composeRule.runOnIdle {
@@ -150,7 +151,7 @@ class CustomEmojiSelectionRetryTest {
                 picker.deliver(uri)
             }
             composeRule.waitForIdle()
-            composeRule.waitUntil {
+            waitForSelection("retried selection staged", reads, app) {
                 reads.get() == 2 &&
                     composeRule.onAllNodesWithTag("custom_emoji.name").fetchSemanticsNodes().isNotEmpty()
             }
@@ -160,7 +161,12 @@ class CustomEmojiSelectionRetryTest {
         }
     }
 
-    /** Waits for [condition], failing with the read count and app state at [boundary] on timeout. */
+    /**
+     * Waits for [condition], failing with the read count and app state at [boundary] on timeout. Every boundary
+     * here is reached on `Dispatchers.IO` or `Dispatchers.Default`, outside the Compose clock, so the bound is a
+     * liveness limit rather than the 1 s default — a loaded CI runner took longer than that to start the first read.
+     * The main looper is idled in the condition too, since `waitUntil` never idles it itself.
+     */
     private fun waitForSelection(
         boundary: String,
         reads: AtomicInteger,
@@ -168,7 +174,10 @@ class CustomEmojiSelectionRetryTest {
         condition: () -> Boolean,
     ) {
         try {
-            composeRule.waitUntil(condition = condition)
+            composeRule.waitUntil(BACKGROUND_WORK_TIMEOUT_MILLIS) {
+                shadowOf(Looper.getMainLooper()).idle()
+                condition()
+            }
         } catch (timeout: ComposeTimeoutException) {
             throw AssertionError(
                 "$boundary: reads=${reads.get()}, account=${app.activeAccountRef}, " +
@@ -186,6 +195,11 @@ class CustomEmojiSelectionRetryTest {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
                 bitmap.recycle()
             }.toByteArray()
+
+    private companion object {
+        /** Bounds waits for work on background dispatchers, which the Compose test clock cannot advance. */
+        const val BACKGROUND_WORK_TIMEOUT_MILLIS = 10_000L
+    }
 
     private object EmptyDrafts : DraftPersistence {
         /** Starts every run with no persisted drafts. */

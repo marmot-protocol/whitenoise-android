@@ -1435,6 +1435,7 @@
     <string name="wipe_stage_leaving_groups">Gruppen werden verlassen…</string>
     <string name="wipe_stage_deleting_key_packages">Einladungsschlüssel werden entfernt…</string>
     <string name="wipe_stage_wiping_local_data">Lokale Daten werden gelöscht…</string>
+    <string name="wipe_progress_keep_open">Das kann bis zu einer Minute dauern. Lass White Noise geöffnet, bis der Vorgang abgeschlossen ist.</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Löschen mit %1$d Problem abgeschlossen</item>
         <item quantity="other">Löschen mit %1$d Problemen abgeschlossen</item>
@@ -2151,6 +2152,7 @@
     <string name="group_recovery_review_invitation_from">Einladung von %1$s prüfen · Epoche %2$s</string>
     <string name="group_recovery_check_failed">Die Gruppenwiederherstellung konnte nicht geprüft werden. Versuche es erneut.</string>
     <string name="group_history_may_be_incomplete">In diesem Chat fehlen möglicherweise einige ältere Nachrichten.</string>
+    <string name="group_history_before_rejoin">Du bist diesem Chat erneut beigetreten. Nachrichten von vor deinem erneuten Beitritt fehlen möglicherweise.</string>
     <string name="account_history_may_be_incomplete">Möglicherweise fehlen in diesem Konto einige Nachrichten. White Noise konnte nicht bestätigen, dass alle Nachrichten angekommen sind.</string>
     <string name="history_notice_dismiss_failed">Der Hinweis zum Nachrichtenverlauf konnte nicht geschlossen werden. Versuche es erneut.</string>
     <string name="group_rejoin_title">Gruppe erneut beitreten?</string>
@@ -2547,7 +2549,7 @@
         <item quantity="other">%1$d Gruppen</item>
     </plurals>
     <string name="group_review_add_member">Mitglied hinzufügen</string>
-    <string name="group_review_invitation_visibility">Für alle Mitglieder sichtbar.</string>
+    <string name="group_review_destination">zu %1$s</string>
     <string name="search_scope_this_chat">Dieser Chat · %1$s</string>
     <string name="search_scope_all_chats">Alle Chats</string>
     <string name="search_scope_other_chats">Andere Chats durchsuchen</string>

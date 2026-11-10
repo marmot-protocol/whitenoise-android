@@ -454,7 +454,7 @@ class MarmotKitRecoveryQualificationTest {
             runCatching {
                 participant.runtime.timelineMessages(
                     participant.account.label,
-                    TimelineMessageQueryFfi(group, null, null, null, null, null, PAGE),
+                    TimelineMessageQueryFfi.page(group, null, null, null, null, null, PAGE),
                 )
             }
         val requests = relay.recordedRequests()
@@ -486,7 +486,7 @@ class MarmotKitRecoveryQualificationTest {
             val page =
                 participant.runtime.timelineMessages(
                     participant.account.label,
-                    TimelineMessageQueryFfi(group, null, before, beforeId, null, null, PAGE),
+                    TimelineMessageQueryFfi.page(group, null, before, beforeId, null, null, PAGE),
                 )
             page.messages.forEach { texts += it.plaintext }
             // MDK's cursor orders by time and then id, as the transcript export pages it; many sends share a second.

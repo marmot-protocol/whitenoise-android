@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
+import dev.ipf.whitenoise.android.state.page
 import dev.ipf.whitenoise.android.state.searchableTimelineRecord
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -112,7 +113,7 @@ private suspend fun scanHistoryForNeedle(
             runCatching {
                 readPage(
                     account,
-                    TimelineMessageQueryFfi(
+                    TimelineMessageQueryFfi.page(
                         groupIdHex = groupIdHex,
                         search = needle.takeIf { it.isNotEmpty() },
                         before = cursorBefore,

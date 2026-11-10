@@ -7,12 +7,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
+import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
+import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
 import dev.ipf.whitenoise.android.translation.MessageTranslationDialog
 import dev.ipf.whitenoise.android.translation.MessageTranslationRendition
 import dev.ipf.whitenoise.android.translation.TranslationChatSettingsDialog
+import dev.ipf.whitenoise.android.translation.TranslationEngine
+import dev.ipf.whitenoise.android.translation.TranslationEngineIdentity
 import dev.ipf.whitenoise.android.translation.TranslationOverride
 import dev.ipf.whitenoise.android.translation.TranslationPreferences
+import dev.ipf.whitenoise.android.translation.TranslationTrust
 
 /** Actual translation UI/session; controlled local engine outputs do not claim Binder or installed language packs. */
 @Composable
@@ -20,6 +26,8 @@ import dev.ipf.whitenoise.android.translation.TranslationPreferences
 internal fun MaestroTranslationPresentation(fixture: MaestroPresentationFixture) {
     if (fixture.scenario.startsWith("modal-translation-chat-")) {
         MaestroChatTranslationPresentation(fixture)
+    } else if (fixture.scenario == "modal-translation-composer") {
+        MaestroComposerTranslationPresentation(fixture)
     } else {
         MaestroMessageTranslationPresentation(fixture)
     }
@@ -78,4 +86,59 @@ private fun MaestroChatTranslationPresentation(fixture: MaestroPresentationFixtu
             fixture.finish("override-verified")
         },
     )
+}
+
+private const val COMPOSER_FIXTURE_DRAFT = "Fixture source text"
+private const val COMPOSER_FIXTURE_TRANSLATION = "Fixture translated text"
+
+/**
+ * Actual composer Translate line, its one-time privacy notice and its target dialog: the first turn-on asks for the
+ * notice before any text reaches the engine, turning the mode on without a saved language opens the picker, and the
+ * chosen language must yield exactly the controlled engine's text as Send's outgoing text.
+ */
+@Composable
+@Suppress("FunctionNaming")
+private fun MaestroComposerTranslationPresentation(fixture: MaestroPresentationFixture) {
+    val scope = rememberCoroutineScope()
+    val attempts = remember { mutableListOf<String>() }
+    val state =
+        remember(fixture) {
+            val engine =
+                object : TranslationEngine {
+                    override val identity = TranslationEngineIdentity("fixture.local", "fixture", 1)
+                    override val trust = TranslationTrust.LOCAL
+
+                    /** Returns the fixed fixture translation without any engine I/O. */
+                    override suspend fun translate(
+                        text: String,
+                        source: String,
+                        target: String,
+                    ): String {
+                        check(text == COMPOSER_FIXTURE_DRAFT)
+                        attempts += target
+                        return COMPOSER_FIXTURE_TRANSLATION
+                    }
+                }
+            ComposerTranslationState(
+                scope = scope,
+                engine = { engine },
+                ownerCurrent = { true },
+                initialTarget = null,
+                onTargetSaved = { fixture.record("target-selected") },
+                noticeAccepted = { false },
+                onNoticeAccepted = {
+                    check(attempts.isEmpty())
+                    fixture.record("notice-accepted")
+                },
+            ).also { it.toggle() }
+        }
+    LaunchedEffect(state, state.active, state.target, state.epoch) { state.update(COMPOSER_FIXTURE_DRAFT) }
+    val outgoing = state.outgoingFor(COMPOSER_FIXTURE_DRAFT)
+    LaunchedEffect(outgoing) {
+        if (outgoing == null) return@LaunchedEffect
+        check(state.target == "ar" && attempts == listOf("ar") && outgoing == COMPOSER_FIXTURE_TRANSLATION)
+        fixture.finish("translated")
+    }
+    ComposerTranslationNotice(state)
+    if (state.active) ComposerTranslationPreview(state, COMPOSER_FIXTURE_DRAFT)
 }
