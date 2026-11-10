@@ -189,90 +189,7 @@ class ChatListMessageSearchTest {
         assertEquals(needle, s.text.substring(s.highlightStart, s.highlightEnd))
     }
 
-    // ---- titleOrPreviewMatches (issue #290, blocking review #1) --------------
-
-    @Test
-    fun titleOrPreviewMatchesWhenTitleContainsNeedle() {
-        // A row whose title already matches must be classified as title/preview
-        // so the UI suppresses the body snippet + tap-to-message focus.
-        assertTrue(ChatListMessageSearch.titleOrPreviewMatches("Project Marmot", "no needle here", "marmot"))
-    }
-
-    @Test
-    fun titleOrPreviewMatchesWhenPreviewContainsNeedle() {
-        assertTrue(ChatListMessageSearch.titleOrPreviewMatches("Some chat", "see you at the cafe", "cafe"))
-    }
-
-    @Test
-    fun titleOrPreviewDoesNotMatchWhenOnlyBodyWouldMatch() {
-        // Neither title nor preview contains the needle: this is a body-only
-        // match, so the UI keeps the snippet + focus.
-        assertFalse(ChatListMessageSearch.titleOrPreviewMatches("Some chat", "latest preview line", "marmot"))
-    }
-
-    @Test
-    fun titleOrPreviewMatchIsCaseInsensitive() {
-        assertTrue(ChatListMessageSearch.titleOrPreviewMatches("Project MARMOT", "preview", "marmot"))
-    }
-
-    @Test
-    fun titleOrPreviewUsesLocaleRootCaseFolding() =
-        withDefaultLocale(Locale.forLanguageTag("tr")) {
-            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("INDIGO", "preview", "i"))
-            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("title", "INDIGO", "i"))
-            assertTrue(ChatListMessageSearch.titleOrPreviewMatches("title", "preview", "i", description = "INDIGO"))
-        }
-
-    @Test
-    fun titleOrPreviewBlankNeedleNeverMatches() {
-        assertFalse(ChatListMessageSearch.titleOrPreviewMatches("anything", "anything", ""))
-    }
-
-    // ---- description match (issue #388) -------------------------------------
-
-    @Test
-    fun titleOrPreviewMatchesWhenDescriptionContainsNeedle() {
-        // Regression for #388: the chat-list filter must also OR-match on the
-        // group description, and a row whose only synchronous match is in the
-        // description should be classified as title/preview/description so the
-        // UI suppresses the body snippet line (no older message to scroll to).
-        assertTrue(
-            ChatListMessageSearch.titleOrPreviewMatches(
-                displayTitle = "Some chat",
-                previewText = "latest preview line",
-                ciNeedle = "weekend",
-                description = "weekend hike planning",
-            ),
-        )
-    }
-
-    @Test
-    fun descriptionMatchIsCaseInsensitive() {
-        assertTrue(
-            ChatListMessageSearch.titleOrPreviewMatches(
-                displayTitle = "Some chat",
-                previewText = "preview",
-                ciNeedle = "research",
-                description = "RESEARCH WORKGROUP",
-            ),
-        )
-    }
-
-    @Test
-    fun emptyDescriptionDoesNotMatch() {
-        // The default empty description must not match any non-empty needle, so
-        // existing call sites that don't pass the parameter keep their old
-        // behaviour (no false positives just because description defaulted to "").
-        assertFalse(
-            ChatListMessageSearch.titleOrPreviewMatches(
-                displayTitle = "Some chat",
-                previewText = "no needle here",
-                ciNeedle = "marmot",
-            ),
-        )
-    }
-
-    // ---- firstEligibleBodyMatch (issue #290, blocking review #2) -------------
+    // ---- first eligible match in engine order (issue #290, blocking review #2) ----
 
     private data class Rec(
         override val kind: ULong,
@@ -330,7 +247,7 @@ class ChatListMessageSearchTest {
                 Rec(9uL, true, "", "d1", mediaTypes = listOf("image/png")),
                 Rec(9uL, false, "", "p1", mediaTypes = listOf("image/png"), mediaLabels = listOf("beach.png")),
             )
-        val match = ChatListMessageSearch.firstEligibleBodyMatch(records, "", MessageSearchConstraints())
+        val match = records.firstOrNull { ChatListMessageSearch.isEligibleMatch(it, "", MessageSearchConstraints()) }
         assertEquals("p1", match?.messageIdHex)
         val snippet = ChatListMessageSearch.buildFilteredSnippet("", listOf("beach.png"))
         assertEquals("beach.png", snippet?.text)
@@ -355,12 +272,13 @@ class ChatListMessageSearchTest {
                 Rec(kind = 1210uL, deleted = false, plaintext = "marmot joined", messageIdHex = "a5"),
                 Rec(kind = 9uL, deleted = false, plaintext = "the real marmot message", messageIdHex = "a6"),
             )
-        val match = ChatListMessageSearch.firstEligibleBodyMatch(records, "marmot")
+        val match = records.firstOrNull { ChatListMessageSearch.isEligibleMatch(it, "marmot") }
         assertEquals("a6", match?.messageIdHex)
     }
 
+    /** In engine order the newest eligible row is the first match. */
     @Test
-    fun firstEligibleBodyMatchPicksNewestEligibleWhenSeveralQualify() {
+    fun firstEligibleMatchPicksNewestEligibleWhenSeveralQualify() {
         val records =
             listOf(
                 Rec(kind = 7uL, deleted = false, plaintext = "marmot reaction", messageIdHex = "n1"),
@@ -368,24 +286,26 @@ class ChatListMessageSearchTest {
                 Rec(kind = 1uL, deleted = false, plaintext = "older marmot body", messageIdHex = "n3"),
             )
         // Engine order is newest-first, so the first eligible row wins.
-        assertEquals("n2", ChatListMessageSearch.firstEligibleBodyMatch(records, "marmot")?.messageIdHex)
+        assertEquals("n2", records.firstOrNull { ChatListMessageSearch.isEligibleMatch(it, "marmot") }?.messageIdHex)
     }
 
+    /** Reactions and deleted rows never count as a match. */
     @Test
-    fun firstEligibleBodyMatchReturnsNullWhenNoEligibleRows() {
+    fun firstEligibleMatchReturnsNullWhenNoEligibleRows() {
         val records =
             listOf(
                 Rec(kind = 7uL, deleted = false, plaintext = "marmot reaction", messageIdHex = "x1"),
                 Rec(kind = 9uL, deleted = true, plaintext = "marmot deleted", messageIdHex = "x2"),
             )
-        assertNull(ChatListMessageSearch.firstEligibleBodyMatch(records, "marmot"))
+        assertNull(records.firstOrNull { ChatListMessageSearch.isEligibleMatch(it, "marmot") })
     }
 
+    /** An eligible kind without the needle is not a match. */
     @Test
-    fun firstEligibleBodyMatchRequiresTheNeedle() {
+    fun firstEligibleMatchRequiresTheNeedle() {
         // An eligible kind whose body does NOT contain the needle is skipped.
         val records = listOf(Rec(kind = 9uL, deleted = false, plaintext = "no needle present", messageIdHex = "y1"))
-        assertNull(ChatListMessageSearch.firstEligibleBodyMatch(records, "marmot"))
+        assertNull(records.firstOrNull { ChatListMessageSearch.isEligibleMatch(it, "marmot") })
     }
 
     private fun withDefaultLocale(

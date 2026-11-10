@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
-    /** Behavioral coverage also lives in GlobalSearchBodyStageTest and GlobalSearchStagedViewportTest. */
+    /** Behavioral coverage also lives in GlobalSearchAnchorRestorationTest and GlobalSearchStagedViewportTest. */
     @Test
     fun pendingBodySearchProtectsDeepAnchorsWithoutHidingFreshLocalNames() {
         val source = chatsScreenSource().readText()
@@ -21,7 +21,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue("the fence waits for resumed message results", "loading = messageResultsPending" in source)
         assertTrue("the dataset owns restoration", "rememberSearchBodyAnchorRestoration(" in source)
-        val stage = File(chatsScreenSource().parentFile, "GlobalSearchBodyStage.kt").readText()
+        val stage = File(chatsScreenSource().parentFile, "GlobalSearchAnchorRestoration.kt").readText()
         assertTrue("restoration survives request-only retry", "remember(datasetKey)" in stage)
         assertTrue(
             "committed loading retires restoration",

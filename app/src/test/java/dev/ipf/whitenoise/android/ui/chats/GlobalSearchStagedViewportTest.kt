@@ -13,8 +13,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.core.ChatListSearchCandidate
-import dev.ipf.whitenoise.android.core.projectChatListSearchCandidates
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -111,47 +109,4 @@ class GlobalSearchStagedViewportTest {
         composeRule.onNodeWithText("Restoration pending").assertIsDisplayed()
         composeRule.onNodeWithText("Local name result").assertDoesNotExist()
     }
-
-    @Test
-    fun lateMessageHitsRemainBelowNameMatchesAndPreserveUserOwnedNameAnchor() {
-        var bodiesReady by mutableStateOf(false)
-        val listState = LazyListState()
-        val candidates =
-            (0 until 30).map { index -> candidate("name-$index", "Alice $index") } +
-                (0 until 60).map { index -> candidate("body-$index", "Other $index") }
-        composeRule.setContent {
-            val sections =
-                projectChatListSearchCandidates(
-                    candidates = candidates,
-                    rawQuery = "alice",
-                    bodyMatchGroupIds =
-                        if (bodiesReady) (0 until 60).mapTo(mutableSetOf()) { "body-$it" } else emptySet(),
-                )
-            ChatListSearchTopResetEffect(listState, ChatListDatasetKey(false, null, "alice"), searchActive = true)
-            LazyColumn(state = listState, modifier = Modifier.height(200.dp)) {
-                items(sections.orderedItems(), key = { it }) { Text(it, Modifier.height(48.dp)) }
-            }
-        }
-        composeRule.waitForIdle()
-        composeRule.runOnIdle { listState.requestScrollToItem(12, 7) }
-        composeRule.waitForIdle()
-        composeRule.runOnIdle { bodiesReady = true }
-        composeRule.waitForIdle()
-        assertEquals(
-            "name-12",
-            listState.layoutInfo.visibleItemsInfo
-                .first()
-                .key,
-        )
-        assertEquals(7, listState.firstVisibleItemScrollOffset)
-        val completed =
-            projectChatListSearchCandidates(candidates, "alice", (0 until 60).mapTo(mutableSetOf()) { "body-$it" })
-        assertEquals((0 until 30).map { "name-$it" }, completed.groups)
-        assertEquals((0 until 60).map { "body-$it" }, completed.messages)
-    }
-
-    private fun candidate(
-        id: String,
-        title: String,
-    ): ChatListSearchCandidate<String> = ChatListSearchCandidate(id, id, "", title, "", "")
 }

@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The staged loading fence keeps fresh local names usable and holds back only a restored deep anchor. */
-class GlobalSearchBodyStageTest {
+class GlobalSearchAnchorRestorationTest {
     /** A fresh query never waits on an old dataset's deep position. */
     @Test
     fun freshQueryDoesNotInheritOldDatasetDeepPosition() {

@@ -14,7 +14,7 @@ internal fun preserveSearchBodyAnchor(
     firstVisibleOffset: Int,
 ): Boolean = sameDataset && (firstVisibleIndex > 0 || firstVisibleOffset > 0)
 
-/** One restored viewport waits for its first body load; retries keep already visible names usable. */
+/** One restored viewport waits for its first message-results load; retries keep already visible names usable. */
 @Composable
 internal fun rememberSearchBodyAnchorRestoration(
     datasetKey: ChatListDatasetKey,
@@ -38,6 +38,7 @@ private class SearchBodyAnchorRestoration(
         private set
     private var observedLoading = false
 
+    /** Retires the pending restoration once a load it observed has finished. */
     fun observeLoading(loading: Boolean) {
         if (loading) {
             observedLoading = true
@@ -47,7 +48,7 @@ private class SearchBodyAnchorRestoration(
     }
 }
 
-/** Only an empty result list or a saved deep anchor waits for the body stage. */
+/** Only an empty result list or a saved deep anchor waits for message results to load. */
 internal fun blockLocalSearchRows(
     loading: Boolean,
     hasLocalRows: Boolean,

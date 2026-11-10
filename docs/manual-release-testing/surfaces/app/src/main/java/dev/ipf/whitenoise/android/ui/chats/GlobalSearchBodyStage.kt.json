@@ -1,16 +1,5 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
   "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
-  "categories": {
-    "composable_surfaces": [
-      {
-        "surface": "Search viewport restoration",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchBodyStage.kt",
-        "anchor": "fun rememberSearchBodyAnchorRestoration(",
-        "test_ids": [
-          "FIND-015"
-        ]
-      }
-    ]
-  }
+  "categories": {}
 }
