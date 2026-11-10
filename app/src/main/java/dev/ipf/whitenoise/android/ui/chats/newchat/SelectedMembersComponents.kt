@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -294,27 +295,36 @@ internal fun SelectedMembersReviewScreen(
     }
 }
 
-/** A separate full-width privilege row keeps a large touch target clear of member identity. */
+/**
+ * The admin toggle with a 48dp target and one spoken label. By default it is a separate full-width row
+ * clear of member identity, its content inset by [inset]; [compact] instead sizes it to its content so it
+ * can trail a member row.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun SelectedMemberRoleControl(
     name: String,
     admin: Boolean,
     enabled: Boolean,
+    compact: Boolean = false,
+    inset: Dp = Dimens.spaceSm,
     onChange: (Boolean) -> Unit,
 ) {
     val adminLabel = stringResource(R.string.admin)
     Row(
-        Modifier
-            .fillMaxWidth()
+        (if (compact) Modifier else Modifier.fillMaxWidth())
             .heightIn(min = 48.dp)
             .toggleable(value = admin, enabled = enabled, role = Role.Switch, onValueChange = onChange)
-            .padding(horizontal = Dimens.spaceSm)
+            .padding(start = if (compact) 8.dp else inset, end = if (compact) 0.dp else inset)
             .semantics { contentDescription = "$adminLabel, $name" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(R.string.admin), modifier = Modifier.weight(1f))
+        if (compact) {
+            Text(adminLabel, style = MaterialTheme.typography.labelMedium)
+        } else {
+            Text(adminLabel, modifier = Modifier.weight(1f))
+        }
         Switch(checked = admin, onCheckedChange = null, enabled = enabled)
     }
 }

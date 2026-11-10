@@ -13,23 +13,25 @@
         ]
       },
       {
-        "surface": "GroupReviewAdminSwitch",
+        "surface": "GroupReviewDestinationList",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
-        "anchor": "fun GroupReviewAdminSwitch(",
+        "anchor": "fun GroupReviewDestinationList(",
         "test_ids": [
-          "GRP-030"
+          "GRP-030",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupReviewAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
+        "anchor": "fun GroupReviewAvatar(",
+        "test_ids": [
+          "GRP-030",
+          "GRP-034"
         ]
       }
     ],
     "source_coverage": [
-      {
-        "surface": "R.string.admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
-        "anchor": "R.string.admin",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
       {
         "surface": "R.string.member",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",

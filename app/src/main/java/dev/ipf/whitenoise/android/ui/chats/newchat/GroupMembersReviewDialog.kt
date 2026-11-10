@@ -3,10 +3,13 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -29,15 +32,17 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
@@ -148,6 +153,7 @@ internal fun GroupMembersReviewDialog(
                 Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                if (groups.size > 1) GroupReviewDestinationList(groups)
                 description?.let { EmojiLabel(it, Modifier.padding(bottom = 8.dp)) }
                 if (groups.isNotEmpty()) {
                     members.forEach { member ->
@@ -173,7 +179,11 @@ internal fun groupReviewAddMembersLabel(memberCount: Int): Int {
     return R.string.group_action_add_members
 }
 
-/** Destination at the start, captured acting account at the top end, as in the app bar. */
+/**
+ * The action and at most one destination, with the captured actor at the top end as in the app bar.
+ * Several destinations are listed in the scrolling body instead, because this slot never scrolls.
+ * Large text or a narrow dialog moves both pictures above the headline so it keeps the full width.
+ */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupMembersReviewTitle(
@@ -183,68 +193,54 @@ private fun GroupMembersReviewTitle(
     invitation: Boolean,
     actingAccount: String?,
 ) {
-    Row(
-        Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(
-            Modifier.weight(1f).testTag("group.members.review.destination"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            val single = groups.singleOrNull()
-            single?.let { GroupReviewAvatar(it, 40.dp) }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title)
-                val secondary = MaterialTheme.typography.bodySmall
-                val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
-                if (single != null) {
-                    EmojiLabel(
-                        if (invitation) stringResource(R.string.group_review_destination, single.name) else single.name,
-                        style = secondary,
-                        color = secondaryColor,
-                    )
-                } else {
-                    // Several destinations keep their frozen order, each with its own picture.
-                    groups.forEach { destination ->
-                        key(destination.id) {
-                            Row(
-                                Modifier.padding(top = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                GroupReviewAvatar(destination, 24.dp)
-                                EmojiLabel(destination.name, style = secondary, color = secondaryColor)
-                            }
-                        }
-                    }
-                }
+    val single = groups.singleOrNull()
+    val destinationTag = if (single != null) Modifier.testTag("group.members.review.destination") else Modifier
+    val headline: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title)
+            single?.let {
+                EmojiLabel(
+                    if (invitation) stringResource(R.string.group_review_destination, it.name) else it.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
-        GroupReviewActingAvatar(appState, actingAccount)
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (groupReviewStacked(maxWidth)) {
+            Column(destinationTag.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    single?.let { GroupReviewAvatar(it, GroupReviewAvatarSize) }
+                    Spacer(Modifier.weight(1f))
+                    GroupReviewActingAvatar(appState, actingAccount)
+                }
+                headline(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    destinationTag.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(GroupReviewAvatarGap),
+                ) {
+                    single?.let { GroupReviewAvatar(it, GroupReviewAvatarSize) }
+                    headline(Modifier.weight(1f))
+                }
+                GroupReviewActingAvatar(appState, actingAccount)
+            }
+        }
     }
 }
 
-@Composable
-@Suppress("FunctionNaming")
-private fun GroupReviewAvatar(
-    group: MemberReviewGroup,
-    size: Dp,
-) {
-    Avatar(
-        group.name,
-        group.id,
-        size,
-        pictureUrl = group.pictureUrl,
-        picture = group.image,
-        groupAnimation = group.groupAnimation,
-        // A group's picture never decodes in the public-profile worker; without its account, single-use.
-        pictureDomain = MediaTrustDomain.Unique,
-    )
-}
-
-/** The captured actor's own picture; tapping copies its full npub. */
+/**
+ * The captured actor's own picture. With a public npub it is a labelled copy button;
+ * without one it is a plain picture, so it never offers an action that does nothing.
+ */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupReviewActingAvatar(
@@ -252,17 +248,39 @@ private fun GroupReviewActingAvatar(
     actingAccount: String?,
 ) {
     val account = appState.accounts.firstOrNull { it.label == actingAccount } ?: return
-    val clipboard = LocalClipboardManager.current
+    val name = appState.accountDisplayNameCached(account.accountIdHex)
+    val role = stringResource(R.string.group_action_acting_account)
     val npub = appState.npubForDisplay(account.accountIdHex)
+    if (npub.isBlank()) {
+        Box(
+            Modifier
+                .offset(x = GroupReviewActorTargetInset)
+                .size(48.dp)
+                .testTag("group.action.acting_account")
+                .semantics { contentDescription = "$role, $name" },
+            contentAlignment = Alignment.Center,
+        ) {
+            Avatar(
+                name,
+                account.accountIdHex,
+                32.dp,
+                pictureUrl = ProfileSanitizer.protocolImageUrl(appState.avatarUrl(account.accountIdHex)),
+                pictureDomain = AvatarImageLoader.publicProfiles(),
+            )
+        }
+        return
+    }
+    val clipboard = LocalClipboardManager.current
     AccountAvatarButton(
-        title = appState.accountDisplayNameCached(account.accountIdHex),
+        title = name,
         seed = account.accountIdHex,
         pictureUrl = appState.avatarUrl(account.accountIdHex),
         size = 32.dp,
         touchTargetSize = 48.dp,
-        actionDescription = stringResource(R.string.group_action_acting_account),
-        onClick = { if (npub.isNotBlank()) clipboard.setText(AnnotatedString(npub)) },
-        modifier = Modifier.testTag("group.action.acting_account"),
+        actionDescription = role,
+        onClickLabel = stringResource(R.string.copy),
+        onClick = { clipboard.setText(AnnotatedString(npub)) },
+        modifier = Modifier.offset(x = GroupReviewActorTargetInset).testTag("group.action.acting_account"),
     )
 }
 
@@ -291,10 +309,7 @@ internal fun GroupMemberReviewPair(
     val label = name ?: shortIdentifier.ifBlank { stringResource(R.string.unknown) }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val stacked =
-                LocalDensity.current.fontScale > GROUP_REVIEW_LARGE_FONT_SCALE ||
-                    MaterialTheme.typography.bodyMedium.fontSize >= 20.sp ||
-                    maxWidth < GroupReviewPairedMinWidth
+            val stacked = groupReviewStacked(maxWidth)
             val person: @Composable () -> Unit = {
                 GroupReviewPersonIdentity(
                     appState = appState,
@@ -354,8 +369,22 @@ private fun GroupReviewDestinations(groups: List<MemberReviewGroup>) {
     }
 }
 
-internal const val GROUP_REVIEW_LARGE_FONT_SCALE = 1.3f
-internal val GroupReviewPairedMinWidth = 250.dp
+private const val GROUP_REVIEW_LARGE_FONT_SCALE = 1.3f
+
+/** Destination and member pictures share one size and gap so their names start on the same line. */
+internal val GroupReviewAvatarSize = 40.dp
+internal val GroupReviewAvatarGap = 12.dp
+
+/** The actor's 32dp picture sits in a 48dp target; this pulls the picture flush with the trailing switches. */
+private val GroupReviewActorTargetInset = 8.dp
+private val GroupReviewPairedMinWidth = 250.dp
+
+/** One rule for every review layout: large text or a narrow column stacks content instead of sharing a row. */
+@Composable
+internal fun groupReviewStacked(maxWidth: Dp): Boolean =
+    LocalDensity.current.fontScale > GROUP_REVIEW_LARGE_FONT_SCALE ||
+        MaterialTheme.typography.bodyMedium.fontSize >= 20.sp ||
+        maxWidth < GroupReviewPairedMinWidth
 
 /** Rejects identity placeholders as names so an unnamed person has one abbreviated identifier. */
 internal fun reviewMemberPublicName(value: String?): String? {

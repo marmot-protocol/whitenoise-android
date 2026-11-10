@@ -4,9 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +62,7 @@ internal data class GroupReviewPerson(
     val picture: String?,
 )
 
+/** The member's public name, picture and npub as the active account currently sees them. */
 @Composable
 internal fun rememberGroupReviewPerson(
     appState: WhiteNoiseAppState,
@@ -83,17 +85,25 @@ internal fun rememberGroupReviewPerson(
     return GroupReviewPerson(identifier, publicName, nickname, picture)
 }
 
-/** Name, local nickname and copyable npub, or one unknown label when nothing public exists. */
+/**
+ * Name, local nickname and npub, or one unknown label when nothing public exists. The npub is its own
+ * copy target unless [copyable] is false because an enclosing [GroupReviewCopyRow] already copies it.
+ */
 @Composable
 @Suppress("FunctionNaming")
 internal fun GroupReviewPersonText(
     person: GroupReviewPerson,
     role: String,
+    copyable: Boolean = true,
 ) {
     person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
     person.nickname?.let { Text(stringResource(R.string.group_action_local_nickname, it)) }
     if (person.identifier.isNotBlank()) {
-        GroupReviewNpub(person.identifier, role)
+        if (copyable) {
+            GroupReviewNpub(person.identifier, role)
+        } else {
+            Text(groupReviewNpubLabel(person.identifier), style = MaterialTheme.typography.bodySmall)
+        }
     } else if (person.publicName == null) {
         Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
     }
@@ -124,22 +134,45 @@ internal fun GroupActingAccountIdentity(
 /** A small visible label with a full-size copy target and complete spoken identity. */
 @Composable
 @Suppress("FunctionNaming")
-internal fun GroupReviewNpub(
+private fun GroupReviewNpub(
     npub: String,
     role: String,
     compact: Boolean = false,
 ) {
+    GroupReviewCopyRow(npub, role) {
+        Text(groupReviewNpubLabel(npub, compact), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** The shortened npub shown beside a name; the full value is spoken and copied. */
+private fun groupReviewNpubLabel(
+    npub: String,
+    compact: Boolean = false,
+): String = IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8)
+
+/**
+ * A row of at least 48dp that copies the full [npub], announced once as "[role], npub" with a Copy action.
+ * Wrapping a whole member row keeps the touch target without padding the small npub line itself.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun GroupReviewCopyRow(
+    npub: String,
+    role: String,
+    modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
+    content: @Composable RowScope.() -> Unit,
+) {
     val clipboard = LocalClipboardManager.current
     val copyLabel = stringResource(R.string.copy)
-    Text(
-        IdentityFormatter.short(npub, prefix = if (compact) 8 else 10, suffix = if (compact) 4 else 8),
-        style = MaterialTheme.typography.bodySmall,
-        modifier =
-            Modifier
-                .heightIn(min = 48.dp)
-                .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.setText(AnnotatedString(npub)) }
-                .semantics(mergeDescendants = true) { contentDescription = "$role, $npub" }
-                .wrapContentHeight(Alignment.CenterVertically),
+    Row(
+        modifier
+            .heightIn(min = 48.dp)
+            .clickable(onClickLabel = copyLabel, role = Role.Button) { clipboard.setText(AnnotatedString(npub)) }
+            .semantics(mergeDescendants = true) { contentDescription = "$role, $npub" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = horizontalArrangement,
+        content = content,
     )
 }
 

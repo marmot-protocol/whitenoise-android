@@ -375,6 +375,41 @@ class GroupMembersReviewScreenshotTest {
         assertEquals(1, submits)
     }
 
+    /** A dozen destinations scroll in the body, so huge text never pushes the actions off screen. */
+    @Test
+    fun manyDestinationsKeepActionsAndLastGroupReachable() {
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
+        val member =
+            RecipientSearch.Candidate(
+                "b".repeat(64),
+                "Private member",
+                "npub1member",
+                searchProfile = UserProfileMetadataFfi("Member", null, null, null, null, null, null),
+            )
+        rule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                GroupMembersReviewDialog(
+                    appState = state,
+                    groups = (1..12).map { MemberReviewGroup("group-$it", "Group $it") },
+                    members = listOf(member),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = {},
+                    confirmLabel = "Add member",
+                )
+            }
+        }
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+        rule.onNodeWithText("Cancel").assertIsDisplayed()
+        rule.onNodeWithText("Group 12").performScrollTo().assertIsDisplayed()
+        rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed()
+        rule
+            .onNodeWithTag("group.members.review.dialog")
+            .captureRoboImage("src/test/snapshots/group_member_review_many_groups.png")
+    }
+
     /** Retains selection on cancellation and closes review when its destination changes. */
     @Test
     fun cancellingPreservesSelectionAndChangingGroupClosesReview() {

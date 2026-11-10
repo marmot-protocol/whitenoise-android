@@ -8,7 +8,11 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
@@ -140,12 +144,16 @@ internal fun ComposeContentTestRule.assertGroupMembersReview(rtl: Boolean) {
     )
 }
 
+/** Checks a 48dp target that announces a Copy action and puts exactly [npub] on the clipboard when tapped. */
 private fun assertReviewNpubCopy(
     node: SemanticsNodeInteraction,
     npub: String,
     scroll: Boolean = false,
 ) {
     if (scroll) node.performScrollTo()
+    node.assert(
+        SemanticsMatcher("announces Copy") { it.config.getOrNull(SemanticsActions.OnClick)?.label == "Copy" },
+    )
     val bounds = node.fetchSemanticsNode().boundsInRoot
     assertTrue(bounds.height >= 48f && bounds.width >= 48f)
     node.performClick()
