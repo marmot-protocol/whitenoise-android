@@ -2,7 +2,7 @@
 set -euo pipefail
 
 apk=${1:?staging APK path is required}
-max_apk_bytes=52428800
+max_apk_bytes=104857600
 
 if [[ ! -f "$apk" || -L "$apk" ]]; then
   printf 'Staging APK must be a regular non-symlink file: %s\n' "$apk" >&2
