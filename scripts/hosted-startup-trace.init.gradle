@@ -6,7 +6,7 @@ abstract class StartupTraceExecution {
     abstract ExecOperations getExecOperations()
 }
 
-def avTrace = gradle.startParameter.projectProperties.get('mediaAvStartupTrace', 'false')
+def avTrace = gradle.startParameter.projectProperties.getOrDefault('mediaAvStartupTrace', 'false')
 if (!(avTrace in ['true', 'false'])) throw new GradleException('Fixed AV trace opt-in required')
 
 if (avTrace == 'false') {
