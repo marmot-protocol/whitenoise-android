@@ -136,7 +136,8 @@ private fun GlobalSearchResultsRecheckEffects(
     account: String,
     controller: GlobalSearchResultsController,
 ) {
-    val runtime = remember(appState.runtimeGeneration) { appState.marmot() }
+    // Composition can run before the runtime is installed; the observer waits for one instead of throwing.
+    val runtime = appState.marmotOrNull()
     val wakeups = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
     // The first launch before any page landed is not a change: that page reads current data. A later launch is a
     // real block change, or a return to a screen whose rows may be stale.
@@ -152,7 +153,8 @@ private fun GlobalSearchResultsRecheckEffects(
             controller.refresh()
         }
     }
-    LaunchedEffect(controller) {
+    LaunchedEffect(controller, runtime) {
+        if (runtime == null) return@LaunchedEffect
         // A runtime that cannot open a subscription is retried a few times, then left to the other triggers.
         var failures = 0
         while (failures < GLOBAL_SEARCH_OBSERVER_ATTEMPTS) {

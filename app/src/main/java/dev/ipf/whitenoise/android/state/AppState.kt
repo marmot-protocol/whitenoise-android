@@ -3340,6 +3340,12 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * The native client when one is installed, or null before startup finishes or after teardown. For composition-
+     * time readers that must not throw while the runtime is still coming up; it reads the same runtime as [marmot].
+     */
+    internal fun marmotOrNull(): MarmotInterface? = marmotRuntime?.marmot
+
     fun marmot(): MarmotInterface {
         RuntimePolicyHooks.noteSlowCall("marmot-ffi-access")
         marmotAccessObserver?.invoke()
