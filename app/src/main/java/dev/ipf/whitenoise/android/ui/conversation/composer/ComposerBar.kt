@@ -1443,7 +1443,7 @@ internal fun ComposerBar(
                                 ComposerTranslationPreview(
                                     activeTranslation,
                                     text,
-                                    Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    Modifier.padding(start = 12.dp, end = 8.dp, bottom = 4.dp),
                                 )
                             }
                         }

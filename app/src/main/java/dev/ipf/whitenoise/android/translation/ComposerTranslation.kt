@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +31,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -336,17 +336,26 @@ internal fun ComposerTranslationBar(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth().testTag("composer.translation")) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = 40.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TextButton(
-                onClick = onChooseLanguage,
-                modifier = Modifier.testTag("composer.translation.language"),
+        // Top-aligned with no button frame, so the line starts as close to the composer edge as typed text does.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier
+                    .clickable(role = Role.Button, onClick = onChooseLanguage)
+                    .testTag("composer.translation.language"),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(targetLabel, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-                Icon(painterResource(R.drawable.ic_expand_more), null, Modifier.size(18.dp))
+                Text(
+                    targetLabel,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                )
+                Icon(
+                    painterResource(R.drawable.ic_expand_more),
+                    null,
+                    Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
             }
             ComposerTranslationLine(outgoing, pending, failure, onRetry, Modifier.weight(1f))
         }
