@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -133,7 +134,11 @@ class MessageBubbleStickerScreenshotTest : MessageBubbleFileAttachmentFixtures()
             }
         }
         // Robolectric reports no network, so auto-download is off: sent stickers load, received ones wait for a tap.
-        composeRule.waitUntil(LOAD_TIMEOUT_MS) { controller.stickerAssets.cached(StickerKey.from(STICKERS[1])) != null }
+        val sent = StickerKey.from(STICKERS[1])
+        composeRule.waitUntil(LOAD_TIMEOUT_MS) {
+            controller.stickerAssets.cached(sent) != null || controller.stickerAssets.hasFailed(sent)
+        }
+        assertFalse("The sent sticker failed to load", controller.stickerAssets.hasFailed(sent))
         composeRule.onAllNodesWithTag("message.sticker", useUnmergedTree = true).assertCountEquals(rows.size)
         // The bare rows' "Sticker" preview label must never reach the timeline.
         composeRule.onAllNodesWithTag("sticker-message-footer", useUnmergedTree = true).assertCountEquals(2)
