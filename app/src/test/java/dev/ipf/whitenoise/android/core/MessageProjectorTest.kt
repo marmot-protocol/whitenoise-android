@@ -10,6 +10,9 @@ import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.marmotkit.StickerRefFfi
+import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleCanCopyText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -825,6 +828,24 @@ class MessageProjectorTest {
             ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported),
             MessageProjector.forwardEligibility(captioned, emptyList(), nowSeconds = 1uL),
         )
+        assertNull(MessageProjector.forwardableText(bare))
+        assertNull(MessageProjector.forwardableText(captioned))
+    }
+
+    @Test
+    fun copyOffersACaptionButNotABareStickersLabel() {
+        val ref = StickerRefFfi("30031:author:pack", "wave", "ab".repeat(32))
+        fun canCopy(record: AppMessageRecordFfi) =
+            messageBubbleCanCopyText(
+                TimelineMessage(record.messageIdHex, record, MessageStatus.Sent),
+                deleted = false,
+                persistedFailure = false,
+                displayedBody = MessageProjector.displayBody(record, MessageTextCopy.Default),
+                textCopy = MessageTextCopy.Default,
+            )
+
+        assertFalse(canCopy(message("bare", plaintext = "", sticker = ref)))
+        assertTrue(canCopy(message("captioned", plaintext = "see you", sticker = ref)))
     }
 
     /** Builds a message record with overridable direction, sender, text, kind, tags, time and expiry. */

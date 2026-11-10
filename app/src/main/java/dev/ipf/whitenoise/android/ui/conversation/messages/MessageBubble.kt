@@ -2575,6 +2575,13 @@ internal fun MessageBubble(
                                     if (item.status == MessageStatus.Pending) PENDING_STICKER_ALPHA else 1f,
                                 ),
                         )
+                        invalidationWarning?.let { warning ->
+                            MessageBubbleInvalidationWarning(
+                                warning = warning,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.testTag("sticker-message-warning"),
+                            )
+                        }
                         MessageInlineFooter(
                             timeText = rememberedMessageBubbleTime(record.recordedAt),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

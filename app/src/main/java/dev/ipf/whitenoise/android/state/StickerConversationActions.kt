@@ -36,7 +36,7 @@ internal class AccountStickers(
     /** Sticker images fetched and verified by MDK, decoded with the account's other public images. */
     val assets: StickerAssetCache<ImageBitmap> = stickerAssetCacheFor(appState, account, scope)
 
-    /** Cancels this account's sticker downloads; the next request makes a new instance. */
+    /** Cancels this account's sticker downloads once the account is removed. */
     fun close() = scope.cancel()
 }
 

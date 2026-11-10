@@ -1485,25 +1485,20 @@ class WhiteNoiseAppState private constructor(
         if (plaintextRemoved > 0) bumpMediaCacheRevision()
         if (thumbnailsRemoved > 0) mediaThumbnailRevisionState.update { it + 1L }
         publicJpegPreviewLoader.trimMemory(trim)
-        accountStickers?.assets?.trimMemory(trim)
+        accountStickers.values.forEach { it.assets.trimMemory(trim) }
     }
 
-    private var accountStickers: AccountStickers? = null
+    private val accountStickers = HashMap<String?, AccountStickers>()
 
     /**
-     * The sticker packs and images of [account], shared by its conversations. Main-confined; one account's are kept
-     * at a time, so opening another account's chat releases them.
+     * The sticker packs and images of [account], shared by its conversations. Main-confined; kept until the account
+     * is removed, so a conversation of another account never holds released stickers. Memory trims shrink them.
      */
-    internal fun stickersFor(account: String?): AccountStickers {
-        accountStickers?.takeIf { it.account == account }?.let { return it }
-        accountStickers?.close()
-        return AccountStickers(account, this).also { accountStickers = it }
-    }
+    internal fun stickersFor(account: String?): AccountStickers =
+        accountStickers.getOrPut(account) { AccountStickers(account, this) }
 
     private fun forgetStickers(account: String) {
-        if (accountStickers?.account != account) return
-        accountStickers?.close()
-        accountStickers = null
+        accountStickers.remove(account)?.close()
     }
 
     /** Holds an actively displayed kept thumbnail through cache trims, never through explicit invalidation. */

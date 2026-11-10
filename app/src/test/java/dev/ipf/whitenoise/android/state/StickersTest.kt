@@ -3,8 +3,12 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -14,6 +18,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Sticker image caching and the pack library's loading, discovery and sync rules. */
 class StickersTest {
     @Test
     fun concurrentRequestsShareOneDownloadAndTheResultIsCached() =
@@ -77,6 +82,28 @@ class StickersTest {
             runCurrent()
 
             assertEquals("image", cache.cached(KEY)?.image)
+        }
+
+    @Test
+    fun aDownloadCancelledWithItsAccountLeavesNoStaleEntry() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val accountScope = CoroutineScope(coroutineContext + Job())
+            var loads = 0
+            val cache =
+                StickerAssetCache(accountScope, load = { key ->
+                    loads++
+                    gate.await()
+                    LoadedSticker("image", sticker(key.shortcode))
+                }, maxBytes = 1_000, sizeOf = { 1 })
+
+            val caller = async { runCatching { cache.image(KEY) } }
+            runCurrent()
+            accountScope.cancel()
+            runCurrent()
+            assertTrue(caller.await().exceptionOrNull() is CancellationException)
+            assertEquals(0, cache.downloadsInFlight)
+            assertEquals(1, loads)
         }
 
     @Test

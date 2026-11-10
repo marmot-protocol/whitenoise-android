@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private val PackTabShape = RoundedCornerShape(10.dp)
 
+/** The account's installed packs, one tab per pack, for sending a sticker. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerPickerPage(
@@ -94,6 +95,7 @@ internal fun StickerPickerPage(
     }
 }
 
+/** Shown before any pack is added; leads to the pack browser. */
 @Suppress("FunctionNaming")
 @Composable
 private fun EmptyStickerPicker(onBrowse: () -> Unit) {
@@ -112,6 +114,7 @@ private fun EmptyStickerPicker(onBrowse: () -> Unit) {
     }
 }
 
+/** Tabs that switch between the installed packs. */
 @Suppress("FunctionNaming")
 @Composable
 private fun PackTabs(
@@ -192,10 +195,12 @@ internal fun LazyGridScope.serverDisclosure() {
     fullWidth { StickerDisclosure(stringResource(R.string.sticker_server_disclosure)) }
 }
 
+/** Adds [content] as one row spanning every grid column. */
 internal fun LazyGridScope.fullWidth(content: @Composable () -> Unit) {
     item(span = { GridItemSpan(maxLineSpan) }) { content() }
 }
 
+/** Adds a full-width pack title row to the grid. */
 private fun LazyGridScope.packHeading(title: String) {
     fullWidth {
         Text(

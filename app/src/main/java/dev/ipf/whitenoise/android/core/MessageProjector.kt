@@ -400,7 +400,8 @@ object MessageProjector {
      * summary) even though those kinds are out of v1 scope.
      *
      * Forwardable iff the record is a kind-9 chat message that is NOT confirmed
-     * or pending media, NOT an agent-stream message (no `stream` tag), and carries
+     * or pending media, NOT a sticker (forwarding its caption alone would drop the
+     * sticker), NOT an agent-stream message (no `stream` tag), and carries
      * non-blank text. Reactions (kind-7), deletes (kind-5),
      * agent-stream starts (kind-1200), group-system events (kind-1210) and edit
      * records (kind-1009) are all non-kind-9 and therefore excluded by the
@@ -410,6 +411,7 @@ object MessageProjector {
         message.kind == KindChat &&
             !isMedia(message) &&
             !isPendingMedia(message) &&
+            message.sticker == null &&
             streamId(message) == null &&
             message.plaintext.isNotBlank()
 

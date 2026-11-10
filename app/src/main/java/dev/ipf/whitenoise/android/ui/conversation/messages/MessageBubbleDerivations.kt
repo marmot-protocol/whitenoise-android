@@ -63,8 +63,8 @@ internal fun messageBubbleDisplayedBody(
 
 /**
  * Whether whole-message Copy has anything to put on the clipboard. A poll copies its question and options, so a
- * deleted, failed or malformed poll offers no Copy rather than its bare label; every other bubble copies the
- * [displayedBody] it shows.
+ * deleted, failed or malformed poll offers no Copy rather than its bare label, and neither does a sticker without a
+ * caption; every other bubble copies the [displayedBody] it shows.
  */
 internal fun messageBubbleCanCopyText(
     item: TimelineMessage,
@@ -77,6 +77,8 @@ internal fun messageBubbleCanCopyText(
         deleted -> false
         MessageProjector.isPollKind(item.record.kind) ->
             !persistedFailure && item.projected?.poll?.let { pollCopyText(it, textCopy) } != null
+        // A bare sticker shows its "Sticker" label, which is not message text.
+        MessageProjector.isBareSticker(item.record) -> false
         else -> displayedBody.isNotBlank()
     }
 

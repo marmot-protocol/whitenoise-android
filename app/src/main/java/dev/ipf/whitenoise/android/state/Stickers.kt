@@ -146,6 +146,9 @@ class StickerAssetCache<I : Any>(
     private val failures = HashSet<StickerKey>()
     private val inFlight = HashMap<StickerKey, Deferred<LoadedSticker<I>?>>()
 
+    /** Downloads currently shared by callers; a finished or cancelled download leaves none behind. */
+    internal val downloadsInFlight: Int get() = inFlight.size
+
     /** The decoded image when it is in memory. */
     fun cached(key: StickerKey): LoadedSticker<I>? = images.get(key)
 
@@ -158,17 +161,18 @@ class StickerAssetCache<I : Any>(
         return if (cached != null || key in failures) cached else download(key)
     }
 
-    private suspend fun download(key: StickerKey): LoadedSticker<I>? =
-        inFlight
-            .getOrPut(key) {
-                // Lazy, so the entry is in place before the download can finish and remove it.
-                scope.async(start = CoroutineStart.LAZY) {
-                    loadOrNull(key).also { loaded ->
-                        inFlight.remove(key)
-                        if (loaded != null) images.put(key, loaded) else failures.add(key)
-                    }
-                }
-            }.await()
+    private suspend fun download(key: StickerKey): LoadedSticker<I>? {
+        inFlight[key]?.let { return it.await() }
+        // Lazy, so the entry is in place before the download can finish and remove it.
+        val download =
+            scope.async(start = CoroutineStart.LAZY) {
+                loadOrNull(key).also { loaded -> if (loaded != null) images.put(key, loaded) else failures.add(key) }
+            }
+        inFlight[key] = download
+        // Also runs when the account's scope is cancelled before the download starts.
+        download.invokeOnCompletion { inFlight.remove(key, download) }
+        return download.await()
+    }
 
     /** Clears an earlier failure and downloads again, for an explicit tap. */
     suspend fun retry(key: StickerKey): LoadedSticker<I>? {

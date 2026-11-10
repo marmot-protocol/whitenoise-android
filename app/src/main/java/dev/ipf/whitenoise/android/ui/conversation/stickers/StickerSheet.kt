@@ -119,6 +119,7 @@ internal fun StickerSheet(
     }
 }
 
+/** The sheet's title bar with optional back, a page [action] and close. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerSheetTopBar(
@@ -156,12 +157,14 @@ internal fun StickerSheetTopBar(
     }
 }
 
+/** The pack's display title, or a generic label when it has none. */
 @Composable
 internal fun stickerPackTitle(pack: StickerPackFfi): String {
     val fallback = stringResource(R.string.sticker_pack)
     return StickerPresentation.title(pack) ?: fallback
 }
 
+/** A heading inside a sticker page. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerSectionTitle(text: String) {
@@ -173,12 +176,14 @@ internal fun StickerSectionTitle(text: String) {
     )
 }
 
+/** Secondary explanatory text inside a sticker page. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerDisclosure(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
+/** A centered spinner while sticker data loads. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerProgress() {

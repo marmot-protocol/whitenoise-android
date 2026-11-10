@@ -64,6 +64,7 @@ import java.net.URLEncoder
 
 private const val SEARCH_DEBOUNCE_MS = 250L
 
+/** Lists packs to discover, with search and an optional add-by-link field. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerBrowserPage(
@@ -88,7 +89,8 @@ internal fun StickerBrowserPage(
     }
     LaunchedEffect(search, library.installed, syncGeneration) {
         if (search.isNotBlank()) delay(SEARCH_DEBOUNCE_MS)
-        attemptSticker { discovered = library.discover(search) }
+        // A failed search shows no results rather than the previous query's.
+        if (attemptSticker { discovered = library.discover(search) } != null) discovered = emptyList()
     }
     StickerSheetTopBar(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
         IconToggleButton(
@@ -132,6 +134,7 @@ internal fun StickerBrowserPage(
     }
 }
 
+/** Opens the pack behind a pasted link or address. */
 @Suppress("FunctionNaming")
 @Composable
 private fun StickerLinkField(
@@ -178,6 +181,7 @@ private fun StickerLinkField(
     }
 }
 
+/** Filters discovered packs by name. */
 @Suppress("FunctionNaming")
 @Composable
 private fun StickerSearchField(
@@ -194,6 +198,7 @@ private fun StickerSearchField(
     )
 }
 
+/** Adds the discovered packs, or a loading, empty or unreachable-with-retry state, to the list. */
 private fun LazyListScope.discoveryResults(
     state: DiscoveryState,
     packs: List<StickerPackFfi>,
@@ -218,6 +223,7 @@ private fun LazyListScope.discoveryResults(
     }
 }
 
+/** One discovered pack with its title and sticker count; opens the pack. */
 @Suppress("FunctionNaming")
 @Composable
 private fun PackRow(
@@ -249,6 +255,7 @@ private fun PackRow(
     }
 }
 
+/** Shows one pack: its stickers to send, its author, and controls to share or add it. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerPackDetailPage(
@@ -301,6 +308,7 @@ internal fun StickerPackDetailPage(
     )
 }
 
+/** Adds or removes [pack] from the account's packs. */
 @Suppress("FunctionNaming")
 @Composable
 private fun StickerPackToggle(
@@ -352,4 +360,5 @@ private fun stickerPackShareIntent(pack: StickerPackFfi): Intent =
 private const val STICKER_SHARE_LINK_BASE = "https://sonarprivacy.xyz/stickers?a="
 
 /** A link to [pack] that opens on the web and that MDK reads back when pasted into "Add by link". */
-internal fun stickerPackShareLink(pack: StickerPackFfi): String = "$STICKER_SHARE_LINK_BASE${URLEncoder.encode(pack.coordinate, "UTF-8")}"
+internal fun stickerPackShareLink(pack: StickerPackFfi): String =
+    STICKER_SHARE_LINK_BASE + URLEncoder.encode(pack.coordinate, "UTF-8")
