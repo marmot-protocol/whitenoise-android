@@ -2167,6 +2167,8 @@
     <string name="global_search_content_voice_audio">Voice &amp; Audio</string>
     <string name="global_search_content_files_documents">Files &amp; Documents</string>
     <string name="global_search_content_any_attachment">Any Attachment</string>
+    <string name="global_search_results_end">End of results</string>
+    <string name="global_search_results_search_older">Search older messages</string>
     <string name="text_attachment_open_external">Open in another app</string>
     <string name="text_attachment_filename">File name</string>
     <string name="text_attachment_view_full_filename">View full file name</string>

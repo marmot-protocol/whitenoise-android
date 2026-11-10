@@ -6,83 +6,57 @@ import org.junit.Test
 import java.util.Locale
 
 class ChatListSearchProjectionTest {
+    /** Title matches lead, then metadata matches; a chat matching nothing is not a chat row. */
     @Test
-    fun titleMatchesLeadStableGroupsAndBodyOnlyMatchesStayInMessages() {
+    fun titleMatchesLeadMetadataMatchesAndUnmatchedChatsStayOut() {
         val sections =
             projectChatListSearchCandidates(
                 candidates =
                     listOf(
-                        candidate("body", "01"),
+                        candidate("unmatched", "01"),
                         candidate("preview", "02", preview = "Marmot appears here"),
                         candidate("title-z", "03", title = "Marmot Z"),
                         candidate("title-a", "04", title = "Marmot A"),
                         candidate("description", "05", description = "Marmot planning"),
                     ),
                 rawQuery = "marmot",
-                bodyMatchGroupIds = setOf("01", "04"),
             )
 
         assertEquals(listOf("title-z", "title-a", "preview", "description"), sections.groups)
-        assertEquals(listOf("body"), sections.messages)
         assertEquals(sections.orderedItems().size, sections.orderedItems().distinct().size)
     }
 
+    /** Two candidates with one canonical id keep the stronger classification and one row. */
     @Test
     fun canonicalDuplicateUsesStrongestClassificationWithoutDuplicatingRow() {
         val sections =
             projectChatListSearchCandidates(
                 candidates =
                     listOf(
-                        candidate("body-copy", "AAbb"),
+                        candidate("metadata-copy", "AAbb", description = "marmot"),
                         candidate("title-copy", "aabb", title = "Marmot group"),
                     ),
                 rawQuery = "marmot",
-                bodyMatchGroupIds = setOf("AaBb"),
             )
 
         assertEquals(listOf("title-copy"), sections.groups)
-        assertTrue(sections.messages.isEmpty())
     }
 
+    /** The folder scope uses the same locale-invariant canonical id as the rows. */
     @Test
-    fun metadataAndMessageOrderRemainStableAcrossBodyResultSetOrder() {
-        val candidates =
-            listOf(
-                candidate("message-first", "aa"),
-                candidate("metadata", "bb", description = "needle"),
-                candidate("message-second", "cc"),
-            )
-
-        val first =
-            projectChatListSearchCandidates(
-                candidates = candidates,
-                rawQuery = "needle",
-                bodyMatchGroupIds = linkedSetOf("cc", "aa"),
-            )
-        val second =
-            projectChatListSearchCandidates(
-                candidates = candidates,
-                rawQuery = "needle",
-                bodyMatchGroupIds = linkedSetOf("aa", "cc"),
-            )
-
-        assertEquals(listOf("metadata"), first.groups)
-        assertEquals(listOf("message-first", "message-second"), first.messages)
-        assertEquals(first, second)
-    }
-
-    @Test
-    fun folderAndBodyIdentityUseTheSameLocaleInvariantCanonicalId() {
+    fun folderScopeUsesTheLocaleInvariantCanonicalId() {
         val sections =
             projectChatListSearchCandidates(
-                candidates = listOf(candidate("included", "ABCDEF"), candidate("excluded", "123456")),
-                rawQuery = "message-only",
-                bodyMatchGroupIds = setOf("abcdef", "123456"),
+                candidates =
+                    listOf(
+                        candidate("included", "ABCDEF", title = "needle"),
+                        candidate("excluded", "123456", title = "needle"),
+                    ),
+                rawQuery = "needle",
                 folderChatIds = setOf("AbCdEf"),
             )
 
-        assertTrue(sections.groups.isEmpty())
-        assertEquals(listOf("included"), sections.messages)
+        assertEquals(listOf("included"), sections.groups)
     }
 
     @Test
@@ -95,10 +69,9 @@ class ChatListSearchProjectionTest {
                 )
 
             assertEquals(listOf("title"), sections.groups)
-            assertTrue(sections.messages.isEmpty())
         }
 
-    /** Full copied MLS and Nostr identifiers stay in Groups before and after body-search completion. */
+    /** Full copied MLS and Nostr identifiers stay in Groups, with or without a message-only filter. */
     @Test
     fun copiedGroupIdentifiersRemainStableGroupResults() {
         val mlsId = "0123456789abcdef".repeat(4)
@@ -111,17 +84,10 @@ class ChatListSearchProjectionTest {
 
         listOf(mlsId, nostrId, "  ${nostrId.uppercase()}  ").forEach { query ->
             val immediate = projectChatListSearchCandidates(candidates, rawQuery = query)
-            val afterBodySearch =
-                projectChatListSearchCandidates(
-                    candidates,
-                    rawQuery = query,
-                    bodyMatchGroupIds = setOf("a".repeat(64), mlsId),
-                    messageOnly = true,
-                )
+            val messageOnly = projectChatListSearchCandidates(candidates, rawQuery = query, messageOnly = true)
 
             assertEquals(listOf("matched"), immediate.groups)
-            assertEquals(listOf("matched"), afterBodySearch.groups)
-            assertEquals(listOf("other"), afterBodySearch.messages)
+            assertEquals(listOf("matched"), messageOnly.groups)
         }
     }
 
@@ -141,12 +107,10 @@ class ChatListSearchProjectionTest {
                 projectChatListSearchCandidates(
                     candidates = candidates,
                     rawQuery = query,
-                    bodyMatchGroupIds = setOf(titleId, previewId),
                     messageOnly = true,
                 )
 
             assertEquals(listOf(expected), sections.groups)
-            assertEquals(listOf(if (expected == "title") "preview" else "title"), sections.messages)
         }
     }
 
@@ -182,24 +146,21 @@ class ChatListSearchProjectionTest {
         }
     }
 
-    /** Message only keeps body matches as messages and drops title matches. */
+    /** A message-only filter drops title and metadata chat rows; matching messages are listed separately. */
     @Test
-    fun messageOnlyKeepsBodyMatchesAsMessagesAndDropsTitleMatches() {
+    fun messageOnlyDropsTitleAndMetadataRows() {
         val sections =
             projectChatListSearchCandidates(
                 candidates =
                     listOf(
-                        candidate("body", "01"),
-                        candidate("title-with-body", "02", title = "Marmot"),
-                        candidate("title-only", "03", title = "Marmot Z"),
+                        candidate("title", "02", title = "Marmot"),
+                        candidate("metadata", "03", description = "Marmot"),
                     ),
-                rawQuery = "",
-                bodyMatchGroupIds = setOf("01", "02"),
+                rawQuery = "marmot",
                 messageOnly = true,
             )
 
         assertTrue(sections.groups.isEmpty())
-        assertEquals(listOf("body", "title-with-body"), sections.messages)
     }
 
     private fun candidate(

@@ -1912,6 +1912,8 @@
     <string name="global_search_content_voice_audio">Ses ve sesli mesaj</string>
     <string name="global_search_content_files_documents">Dosyalar ve belgeler</string>
     <string name="global_search_content_any_attachment">Herhangi bir ek</string>
+    <string name="global_search_results_end">Sonuçların sonu</string>
+    <string name="global_search_results_search_older">Daha eski mesajlarda ara</string>
     <string name="text_attachment_open_external">Başka bir uygulamada aç</string>
     <string name="text_attachment_filename">Dosya adı</string>
     <string name="text_attachment_view_full_filename">Tam dosya adını görüntüle</string>

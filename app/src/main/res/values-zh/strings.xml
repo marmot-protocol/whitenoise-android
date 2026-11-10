@@ -1892,6 +1892,8 @@
     <string name="global_search_content_voice_audio">语音和音频</string>
     <string name="global_search_content_files_documents">文件和文档</string>
     <string name="global_search_content_any_attachment">任意附件</string>
+    <string name="global_search_results_end">没有更多结果</string>
+    <string name="global_search_results_search_older">搜索更早的消息</string>
     <string name="text_attachment_open_external">在其他应用中打开</string>
     <string name="text_attachment_filename">文件名</string>
     <string name="text_attachment_view_full_filename">查看完整文件名</string>

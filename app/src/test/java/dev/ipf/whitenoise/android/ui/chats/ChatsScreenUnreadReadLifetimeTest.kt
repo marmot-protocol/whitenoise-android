@@ -441,18 +441,20 @@ class ChatsScreenUnreadReadLifetimeTest {
         assertEquals(1, rule.onAllNodesWithText(rule.activity.getString(R.string.retry)).fetchSemanticsNodes().size)
     }
 
-    /** Per-chat search failures complete as no matches without a top-level recovery action. */
-    @Test fun mountedPerChatBodySearchFailureCompletesEmptySearch() {
+    /** A failed message-search batch keeps the list and offers one localized retry at its boundary. */
+    @Test fun mountedMessageSearchFailureOffersRetryAtTheListBoundary() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
         mount(model, globalSearchState = GlobalSearchState(isOpen = true, query = "no-matching-conversation"))
         awaitProgress {
-            rule.onAllNodesWithText(rule.activity.getString(R.string.no_results)).fetchSemanticsNodes().isNotEmpty()
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.search_message_content_failed))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
-        rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_results_detail)).assertExists()
-        rule.onNodeWithTag("chats.list").assertDoesNotExist()
-        rule.onNodeWithText(rule.activity.getString(R.string.retry)).assertDoesNotExist()
+        rule.onNodeWithTag("chats.list").assertExists()
+        assertEquals(1, rule.onAllNodesWithText(rule.activity.getString(R.string.retry)).fetchSemanticsNodes().size)
         rule.onNodeWithText(rule.activity.getString(R.string.couldnt_load_chats)).assertDoesNotExist()
-        rule.onNodeWithText(rule.activity.getString(R.string.search_message_content_failed)).assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.no_results)).assertDoesNotExist()
     }
 
     /** No known matches remain pending until native completion; failure must never look caught up. */

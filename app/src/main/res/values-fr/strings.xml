@@ -1932,6 +1932,8 @@
     <string name="global_search_content_voice_audio">Voix et audio</string>
     <string name="global_search_content_files_documents">Fichiers et documents</string>
     <string name="global_search_content_any_attachment">Toute pièce jointe</string>
+    <string name="global_search_results_end">Fin des résultats</string>
+    <string name="global_search_results_search_older">Rechercher des messages plus anciens</string>
     <string name="text_attachment_open_external">Ouvrir dans une autre application</string>
     <string name="text_attachment_filename">Nom du fichier</string>
     <string name="text_attachment_view_full_filename">Afficher le nom complet</string>

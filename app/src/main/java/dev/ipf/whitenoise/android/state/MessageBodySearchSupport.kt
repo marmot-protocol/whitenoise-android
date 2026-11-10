@@ -20,17 +20,22 @@ import dev.ipf.whitenoise.android.core.SnippetHighlight
 internal fun isRetentionExpiredForSearch(
     record: TimelineMessageRecordFfi,
     nowMillis: Long,
-): Boolean =
-    DisappearingMessageSweep.isLocallyExpired(
-        nowMillis = nowMillis,
-        row =
-            DisappearingMessageSweep.LocalExpiryRow(
-                timelineAtSeconds = record.timelineAt,
-                // Zero is not a real deadline: the engine emits it when retention is off, and
-                // reading it as epoch would hide every row.
-                expiresAtLocalSeconds = record.retentionExpiresAt?.takeIf { it > 0uL },
-                retentionAtSendSeconds = record.retentionSeconds?.takeIf { it > 0uL },
-            ),
+): Boolean = DisappearingMessageSweep.isLocallyExpired(nowMillis = nowMillis, row = searchExpiryRow(record))
+
+/** The unix second a row stops being searchable under [isRetentionExpiredForSearch], or null if it never does. */
+internal fun retentionDeadlineForSearch(record: TimelineMessageRecordFfi): ULong? {
+    val row = searchExpiryRow(record)
+    return DisappearingMessageSweep.resolveLocalExpirySeconds(row)
+}
+
+/** The read-anchor-free expiry input search uses for one row. */
+private fun searchExpiryRow(record: TimelineMessageRecordFfi) =
+    DisappearingMessageSweep.LocalExpiryRow(
+        timelineAtSeconds = record.timelineAt,
+        // Zero is not a real deadline: the engine emits it when retention is off, and
+        // reading it as epoch would hide every row.
+        expiresAtLocalSeconds = record.retentionExpiresAt?.takeIf { it > 0uL },
+        retentionAtSendSeconds = record.retentionSeconds?.takeIf { it > 0uL },
     )
 
 /** Adapts an engine timeline row to the client-side search predicate, media types and labels included. */

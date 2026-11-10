@@ -2001,6 +2001,8 @@
     <string name="global_search_content_voice_audio">Голос и аудио</string>
     <string name="global_search_content_files_documents">Файлы и документы</string>
     <string name="global_search_content_any_attachment">Любое вложение</string>
+    <string name="global_search_results_end">Больше результатов нет</string>
+    <string name="global_search_results_search_older">Искать в более ранних сообщениях</string>
     <string name="text_attachment_open_external">Открыть в другом приложении</string>
     <string name="text_attachment_filename">Имя файла</string>
     <string name="text_attachment_view_full_filename">Показать полное имя</string>

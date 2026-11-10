@@ -103,7 +103,7 @@ class ComposeHotPathCoverageTest {
         val source = source("chats/ChatsScreen.kt").readText()
         val searchProjectionRemember =
             "remember\\(\\s*scopedSourceList,\\s*normalizedSearchQuery,\\s*effectiveFolderChatIds,\\s*" +
-                "groupTitleCopy,\\s*profileRev,\\s*bodyMatches,\\s*messageSearchConstraints,?\\s*\\)"
+                "groupTitleCopy,\\s*profileRev,\\s*messageSearchConstraints,?\\s*\\)"
 
         assertTrue(
             "scroll index must be observed from snapshotFlow",
@@ -118,7 +118,7 @@ class ComposeHotPathCoverageTest {
             "val normalizedSearchQuery = remember(trimmedQuery) { localeInvariantFold(trimmedQuery) }" in source,
         )
         assertTrue(
-            "title, metadata, and body classification must be projected once per result dataset",
+            "title and metadata classification must be projected once per result dataset",
             Regex(searchProjectionRemember).containsMatchIn(source) &&
                 "projectChatListSearchSections(" in source,
         )

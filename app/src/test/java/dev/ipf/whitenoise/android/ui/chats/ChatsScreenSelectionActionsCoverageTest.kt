@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
-    /** Behavioral coverage also lives in GlobalSearchBodyStageTest and GlobalSearchStagedViewportTest. */
+    /** Behavioral coverage also lives in GlobalSearchAnchorRestorationTest and GlobalSearchStagedViewportTest. */
     @Test
     fun pendingBodySearchProtectsDeepAnchorsWithoutHidingFreshLocalNames() {
         val source = chatsScreenSource().readText()
@@ -15,9 +15,13 @@ class ChatsScreenSelectionActionsCoverageTest {
             "the fence receives the restoration owner",
             "preservePendingAnchor = preservePendingSearchAnchor" in source,
         )
-        assertTrue("the fence receives available local rows", "hasLocalRows = visibleItems.isNotEmpty()" in source)
+        assertTrue(
+            "the fence receives available local rows",
+            "hasLocalRows = visibleItems.isNotEmpty() || messageResultsMode" in source,
+        )
+        assertTrue("the fence waits for resumed message results", "loading = messageResultsPending" in source)
         assertTrue("the dataset owns restoration", "rememberSearchBodyAnchorRestoration(" in source)
-        val stage = File(chatsScreenSource().parentFile, "GlobalSearchBodyStage.kt").readText()
+        val stage = File(chatsScreenSource().parentFile, "GlobalSearchAnchorRestoration.kt").readText()
         assertTrue("restoration survives request-only retry", "remember(datasetKey)" in stage)
         assertTrue(
             "committed loading retires restoration",
@@ -37,31 +41,30 @@ class ChatsScreenSelectionActionsCoverageTest {
     }
 
     /**
-     * Inline body failure keeps names available, request-only retry cannot settle the results viewport, and a failed
+     * A failed message batch keeps names and loaded results and retries at the list boundary, and a failed
      * attachment batch offers a retry that pages the account library again.
      */
     @Test
     fun lookupFailureRetainsLocalRowsAndOffersRequestOnlyRetry() {
         val source = chatsScreenSource().readText()
         assertTrue(
-            "full-screen body failure is reserved for unavailable local rows",
-            "bodySearchFailure != null && visibleItems.isEmpty() ->" in source,
+            "message results own their failure at the list boundary, never a full-screen error",
+            "messageResultsMode -> Unit" in source && "onRetry = { messageResults?.retry() }" in source,
         )
-        assertTrue("available local rows retain inline body recovery", "GlobalSearchBodyStage(" in source)
-        val stage = File(chatsScreenSource().parentFile, "GlobalSearchBodyStage.kt").readText()
+        val list = File(chatsScreenSource().parentFile, "GlobalSearchResultsList.kt").readText()
         assertTrue(
-            "inline failure preserves retry controls",
-            "InlineErrorBanner(" in stage && "onRetry = onRetry" in stage,
+            "the boundary failure preserves its retry control",
+            "TextButton(onClick = content.actions.onRetry)" in list,
         )
         val library = File(chatsScreenSource().parentFile, "GlobalAttachmentLibraryHost.kt").readText()
         assertTrue(
             "attachment failures have recoverable presentation",
             "failed = failure != null," in library && "onRetry = loadMore," in library,
         )
-        assertTrue("body retry renews the lookup only", "onRetry = { bodySearchRetry++ }" in source)
+        val controller = File(chatsScreenSource().parentFile, "GlobalSearchResultsController.kt").readText()
         assertTrue(
-            "body lookup uses the cancellation-safe presenter",
-            "rememberGlobalSearchLookup(bodySearchRequest" in source,
+            "late batches from an older query, account or runtime cannot publish",
+            "!closed && owner == query && environment.isCurrent()" in controller,
         )
         assertTrue(
             "library pages come from the account pager",
@@ -77,7 +80,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "failed lookups cannot expire return focus as settled data",
-            "&& bodySearchFailure == null" in source,
+            "messageResultsState?.failed != true" in source,
         )
     }
 
