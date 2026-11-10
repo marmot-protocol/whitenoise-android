@@ -1428,6 +1428,12 @@ internal fun WipeProgressSheet() {
             WipeProgressStageRow(stringResource(R.string.wipe_stage_leaving_groups))
             WipeProgressStageRow(stringResource(R.string.wipe_stage_deleting_key_packages))
             WipeProgressStageRow(stringResource(R.string.wipe_stage_wiping_local_data))
+            // Leaving a chat with another admin first steps this account down, which can wait on relays.
+            Text(
+                stringResource(R.string.wipe_progress_keep_open),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

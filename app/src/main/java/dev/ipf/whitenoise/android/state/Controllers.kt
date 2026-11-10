@@ -39,6 +39,8 @@ import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.marmotkit.GroupRosterFfi
+import dev.ipf.marmotkit.HistoryNoticeCauseFfi
+import dev.ipf.marmotkit.HistoryNoticeFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -3635,7 +3637,7 @@ class ChatsController private constructor(
                     appState.marmotIo(MarmotTraceSection.MESSAGE_SEARCH) {
                         timelineMessages(
                             account,
-                            TimelineMessageQueryFfi(
+                            TimelineMessageQueryFfi.page(
                                 groupIdHex = groupIdHex,
                                 // Filter-only searches (no needle) page the plain timeline instead.
                                 search = needle.takeIf { it.isNotEmpty() },
@@ -5561,7 +5563,7 @@ class ChatsController private constructor(
                                 appState.marmotIo(MarmotTraceSection.TIMELINE_READ) {
                                     timelineMessages(
                                         account,
-                                        TimelineMessageQueryFfi(
+                                        TimelineMessageQueryFfi.page(
                                             groupIdHex = groupIdHex,
                                             search = null,
                                             before = null,
@@ -5895,6 +5897,9 @@ class ConversationController(
     },
     private val historyNoticeDismisser: suspend (String, String) -> Boolean = { account, noticeId ->
         appState.marmotIo { dismissHistoryNotice(account, noticeId) }
+    },
+    private val historyNoticesReader: suspend (String) -> List<HistoryNoticeFfi> = { account ->
+        appState.marmotIo { historyNotices(account) }
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     // Test seams: the user's own emoji a text uses, and the send that carries them.
@@ -6461,6 +6466,10 @@ class ConversationController(
 
     /** Whether the latest recovery-status read failed while prior evidence stays inspectable. */
     var groupRecoveryReadFailed by mutableStateOf(false)
+        private set
+
+    /** Whether this group's first shown history notice says the account rejoined, so older messages may be missing. */
+    var groupHistoryNoticeRejoined by mutableStateOf(false)
         private set
 
     /** Prevents duplicate accept/decline actions while MDK verifies the selected invitation. */
@@ -7349,16 +7358,39 @@ class ConversationController(
                 }
                 return
             }
+        val rejoined = firstGroupNoticeRejoined(accountRef, status)
         groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
             if (
                 ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration) &&
                 status.groupIdHex == groupIdHex
             ) {
                 groupRecoveryStatus = status
+                groupHistoryNoticeRejoined = rejoined
                 groupRecoveryReadFailed = false
                 appState.freshGroupCreations.settle(accountRef, groupIdHex, runtimeGeneration)
             }
         }
+    }
+
+    /**
+     * Whether the first of [status]'s notice ids is a rejoin notice, the one the card words. The cause lives only in
+     * the account's notice list, and a failed advisory read falls back to the general wording.
+     */
+    @Suppress("TooGenericExceptionCaught") // Any non-cancellation native failure keeps the general wording.
+    private suspend fun firstGroupNoticeRejoined(
+        accountRef: String,
+        status: GroupRecoveryStatusFfi,
+    ): Boolean {
+        val first = status.historyNoticeIds.firstOrNull() ?: return false
+        val notices =
+            try {
+                historyNoticesReader(accountRef)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Throwable) {
+                emptyList()
+            }
+        return notices.firstOrNull { it.noticeId == first }?.cause == HistoryNoticeCauseFfi.BEFORE_REJOIN
     }
 
     /** Whether this conversation is the group whose creation was opened most recently. */
@@ -7419,10 +7451,12 @@ class ConversationController(
                 appState.marmotIo {
                     confirmGroupRejoin(accountRef, current.welcomeIdHex, current.localStateToken)
                 }
+            val rejoined = firstGroupNoticeRejoined(accountRef, status)
             var published = false
             groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
                 if (ownsGroupRecoveryGroup(groupIdHex) && status.groupIdHex == groupIdHex) {
                     groupRecoveryStatus = status
+                    groupHistoryNoticeRejoined = rejoined
                     groupRecoveryReadFailed = false
                     presentConversationTransient(R.string.group_rejoin_success)
                     published = true
@@ -12534,7 +12568,7 @@ class ConversationController(
                 ?: appState.marmotIo(MarmotTraceSection.TIMELINE_READ) {
                     timelineMessages(
                         account,
-                        TimelineMessageQueryFfi(
+                        TimelineMessageQueryFfi.page(
                             groupIdHex = group.groupIdHex,
                             search = null,
                             before = null,

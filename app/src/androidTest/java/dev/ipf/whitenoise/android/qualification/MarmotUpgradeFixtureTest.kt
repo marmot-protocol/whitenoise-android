@@ -12,7 +12,6 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -463,7 +462,7 @@ class MarmotUpgradeFixtureTest {
         assertTrue(read.available)
         assertArrayEquals(plaintext, read.bytes)
         // Watch for a duplicate relay delivery over a bounded window, failing on the first observation that has one.
-        val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
+        val query = qualificationTimelineQuery(group, 100u)
         repeat(DUPLICATE_OBSERVATIONS) {
             val messages = runtime.timelineMessages(peer, query).messages
             assertEquals(listOf(message), messages.filter { it.plaintext == caption }.map { it.messageIdHex })
@@ -514,7 +513,7 @@ class MarmotUpgradeFixtureTest {
         val group = value.getString("group")
         assertTrue(runtime.chatList(account, true).any { it.groupIdHex == group })
         assertEquals(GROUP, runtime.groupDetails(account, group).group.name)
-        val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
+        val query = qualificationTimelineQuery(group, 100u)
         val messages = runtime.timelineMessages(account, query)
         repeat(3) { index -> assertTrue(messages.messages.any { it.plaintext == "$TEXT $index" }) }
     }

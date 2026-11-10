@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.ensureActive
 import org.json.JSONArray
 import org.json.JSONObject
@@ -53,7 +54,7 @@ object ConversationTranscriptExport {
                 timelineReader.timelineMessages(
                     accountRef = accountRef,
                     query =
-                        TimelineMessageQueryFfi(
+                        TimelineMessageQueryFfi.page(
                             groupIdHex = groupIdHex,
                             search = null,
                             before = before,

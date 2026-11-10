@@ -157,7 +157,7 @@ internal class AppReviewDemoNative(
             .marmotIo {
                 timelineMessages(
                     ref,
-                    TimelineMessageQueryFfi(
+                    TimelineMessageQueryFfi.page(
                         groupIdHex = groupId,
                         search = null,
                         before = null,

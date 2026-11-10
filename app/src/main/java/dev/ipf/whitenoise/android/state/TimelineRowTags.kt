@@ -24,7 +24,7 @@ internal fun MarmotInterface.timelineRowTags(
 
     fun adjacent(cursor: TimelineCursor?): TimelineMessageRecordFfi? {
         val query =
-            TimelineMessageQueryFfi(
+            TimelineMessageQueryFfi.page(
                 groupIdHex = groupIdHex,
                 search = null,
                 // Group cursors are ordered by message id; the timestamp only has to be present.

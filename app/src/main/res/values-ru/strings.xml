@@ -1489,6 +1489,7 @@
     <string name="wipe_stage_leaving_groups">Выход из групп…</string>
     <string name="wipe_stage_deleting_key_packages">Удаление ключей приглашений…</string>
     <string name="wipe_stage_wiping_local_data">Стирание локальных данных…</string>
+    <string name="wipe_progress_keep_open">Это может занять до минуты. Не закрывайте White Noise, пока процесс не завершится.</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Стирание завершено: %1$d проблема</item>
         <item quantity="few">Стирание завершено: %1$d проблемы</item>
@@ -2173,6 +2174,7 @@
     <string name="group_recovery_review_invitation_from">Проверить приглашение от %1$s · эпоха %2$s</string>
     <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
     <string name="group_history_may_be_incomplete">В этом чате могут отсутствовать некоторые более ранние сообщения.</string>
+    <string name="group_history_before_rejoin">Вы снова присоединились к этому чату. Сообщения до повторного вступления могут отсутствовать.</string>
     <string name="account_history_may_be_incomplete">В этом аккаунте могут отсутствовать некоторые сообщения. White Noise не удалось подтвердить, что все сообщения были получены.</string>
     <string name="history_notice_dismiss_failed">Не удалось закрыть уведомление об истории. Попробуйте ещё раз.</string>
     <string name="group_rejoin_title">Вернуться в группу?</string>

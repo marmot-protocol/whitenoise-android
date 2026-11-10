@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
@@ -119,7 +120,7 @@ class ForwardMediaReferenceFfiIntegrationTest {
                             marmot
                                 .timelineMessages(
                                     account.label,
-                                    TimelineMessageQueryFfi(
+                                    TimelineMessageQueryFfi.page(
                                         groupIdHex = destinationGroup,
                                         search = null,
                                         before = null,
@@ -289,7 +290,7 @@ class ForwardMediaReferenceFfiIntegrationTest {
                         marmot
                             .timelineMessages(
                                 account.label,
-                                TimelineMessageQueryFfi(
+                                TimelineMessageQueryFfi.page(
                                     groupIdHex = destinationGroup,
                                     search = null,
                                     before = null,

@@ -996,6 +996,7 @@
     <string name="wipe_stage_leaving_groups">Leaving groups…</string>
     <string name="wipe_stage_deleting_key_packages">Removing invitation keys…</string>
     <string name="wipe_stage_wiping_local_data">Wiping local data…</string>
+    <string name="wipe_progress_keep_open">This can take up to a minute. Keep White Noise open until it finishes.</string>
     <plurals name="wipe_finished_with_issues">
         <item quantity="one">Wipe finished with %1$d issue</item>
         <item quantity="other">Wipe finished with %1$d issues</item>
@@ -1297,6 +1298,7 @@
     <string name="group_recovery_review_invitation_from">Review invitation from %1$s · epoch %2$s</string>
     <string name="group_recovery_check_failed">Couldn’t check group recovery. Try again.</string>
     <string name="group_history_may_be_incomplete">Some earlier messages in this chat may be missing.</string>
+    <string name="group_history_before_rejoin">You rejoined this chat. Messages from before you rejoined may be missing.</string>
     <string name="account_history_may_be_incomplete">Some messages may be missing from this account. White Noise couldn’t confirm that every message arrived.</string>
     <string name="history_notice_dismiss_failed">Couldn\'t dismiss the history notice. Try again.</string>
     <string name="group_rejoin_title">Rejoin group?</string>

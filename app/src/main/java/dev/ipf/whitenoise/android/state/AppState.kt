@@ -10261,7 +10261,7 @@ class WhiteNoiseAppState private constructor(
                     marmotIo {
                         timelineMessages(
                             account,
-                            TimelineMessageQueryFfi(
+                            TimelineMessageQueryFfi.page(
                                 groupIdHex = group,
                                 search = null,
                                 before = null,
@@ -12835,7 +12835,7 @@ class WhiteNoiseAppState private constructor(
                 marmotIo {
                     timelineMessages(
                         update.accountRef,
-                        TimelineMessageQueryFfi(
+                        TimelineMessageQueryFfi.page(
                             groupIdHex = update.groupIdHex,
                             search = null,
                             before = null,
@@ -13008,7 +13008,7 @@ class WhiteNoiseAppState private constructor(
         marmotIo {
             timelineMessages(
                 accountRef,
-                TimelineMessageQueryFfi(
+                TimelineMessageQueryFfi.page(
                     groupIdHex = groupIdHex,
                     search = null,
                     before = null,
@@ -13195,7 +13195,7 @@ class WhiteNoiseAppState private constructor(
 
     /** The reconciliation page query for one conversation. */
     private fun notificationPageQuery(groupIdHex: String) =
-        TimelineMessageQueryFfi(
+        TimelineMessageQueryFfi.page(
             groupIdHex = groupIdHex,
             search = null,
             before = null,
