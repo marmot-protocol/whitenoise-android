@@ -60,7 +60,7 @@ ln -s "$apk" "$tmp/staging-link.apk"
 expect_rejection 'symlink APK' env PATH="$tmp/bin:$PATH" "$verifier" "$tmp/staging-link.apk"
 expect_rejection 'missing APK' env PATH="$tmp/bin:$PATH" "$verifier" "$tmp/missing.apk"
 
-truncate -s 52428801 "$apk"
+truncate -s 104857601 "$apk"
 expect_rejection 'transport-unsafe size' env PATH="$tmp/bin:$PATH" "$verifier" "$apk"
 
 printf 'staging APK transport validation fixtures: passed\n'
