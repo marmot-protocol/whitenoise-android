@@ -21,6 +21,25 @@ internal fun MarmotEventFfi.isGroupStateUpdateFor(
         accountLabel == accountRef &&
         this.groupIdHex.equals(groupIdHex, ignoreCase = true)
 
+/** One open runtime event stream, read until it ends and then destroyed. */
+interface RuntimeEventStream {
+    /** The next runtime event, or null once the stream has ended. */
+    suspend fun next(): MarmotEventFfi?
+
+    /** Releases the native subscription behind this stream. */
+    fun destroy()
+}
+
+/** Opens MDK's runtime event firehose, the only stream that carries a chat's park and resume edges. */
+internal suspend fun WhiteNoiseAppState.openRuntimeEventStream(): RuntimeEventStream {
+    val subscription = marmotIo { subscribeEvents() }
+    return object : RuntimeEventStream {
+        override suspend fun next(): MarmotEventFfi? = subscription.next()
+
+        override fun destroy() = subscription.destroy()
+    }
+}
+
 /**
  * The localized reason a convergence retry did not get a parked chat syncing again, or null when there is nothing
  * to explain. [stillParked] is the parked flag read after the retry, null when that read failed. A chat that is no

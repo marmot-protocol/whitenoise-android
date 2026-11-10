@@ -5187,8 +5187,14 @@ internal fun ConversationScreen(
             )
         }
 
+        // MDK's event firehose skips events when it lags, so each return to the foreground re-reads the parked flag.
+        androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_START) {
+            scope.launch { controller.refreshGroupConvergenceOnStart() }
+        }
+
         if (controller.inviteDeclineStepDownRequested) {
             InviteDeclineStepDownDialog(
+                busy = controller.mutationInFlight,
                 onConfirm = {
                     appState.launchMutation {
                         if (controller.confirmInviteDeclineStepDown()) exitConversation()

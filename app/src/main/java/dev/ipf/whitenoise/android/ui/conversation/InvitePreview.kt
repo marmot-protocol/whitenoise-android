@@ -128,13 +128,15 @@ private val InvitationActionsMaximumWidth = 520.dp
 
 /**
  * Asks an admin invitee before declining: MDK lets an admin leave only after stepping down, which the group's
- * members see, so Decline steps down first only when the user agrees here.
+ * members see, so Decline steps down first only when the user agrees here. While another conversation change is
+ * [busy] the confirm action waits, visibly disabled, instead of dropping the answer.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun InviteDeclineStepDownDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    busy: Boolean = false,
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
@@ -144,6 +146,7 @@ internal fun InviteDeclineStepDownDialog(
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
+                enabled = !busy,
                 modifier = Modifier.testTag("invite.decline.stepDown.confirm"),
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
             ) { Text(stringResource(R.string.invite_decline_step_down_confirm)) }

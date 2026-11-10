@@ -33,7 +33,6 @@ import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
-import dev.ipf.marmotkit.EventsSubscriptionInterface
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
@@ -159,6 +158,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
@@ -5989,9 +5989,7 @@ class ConversationController(
         appState.marmotIo { retryGroupConvergence(account, groupIdHex) }
     },
     // MDK's runtime event firehose, the only stream that carries a chat's park and resume edges.
-    private val runtimeEventStreamOpener: suspend () -> EventsSubscriptionInterface = {
-        appState.marmotIo { subscribeEvents() }
-    },
+    private val runtimeEventStreamOpener: suspend () -> RuntimeEventStream = { appState.openRuntimeEventStream() },
     private val historyNoticeDismisser: suspend (String, String) -> Boolean = { account, noticeId ->
         appState.marmotIo { dismissHistoryNotice(account, noticeId) }
     },
@@ -6589,6 +6587,13 @@ class ConversationController(
 
     // Only the newest parked-flag read may publish, so a slow earlier read cannot overwrite a later answer.
     private val groupConvergenceReads = StalenessGuard()
+
+    // One parked-flag read runs at a time, and requests made meanwhile fold into a single read after it.
+    private val groupConvergenceReadGate = Mutex()
+    private val groupConvergenceReadRequested = AtomicBoolean(false)
+
+    // Completes once the conversation's first open settles, so the parked read never waits ahead of it.
+    private val groupConvergenceOpenSettled = CompletableDeferred<Unit>()
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
     internal val localTimelineOrderOverrides =
         appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
@@ -7349,6 +7354,7 @@ class ConversationController(
                         refreshGroupRecoveryStatus()
                         refreshMembersAfterGroupState(prefetchedRoster = rosterPrefetch)
                         isLoading = false
+                        groupConvergenceOpenSettled.complete(Unit)
                         subscriptionError = null
                         connected = true
                         initialMetadataReady.complete(Unit)
@@ -7457,10 +7463,12 @@ class ConversationController(
         }
     }
 
-    /** Re-reads group recovery, and whether convergence is parked, after each authoritative group-state edge. */
+    /**
+     * Re-reads group recovery after each authoritative group-state edge. The parked flag is read separately, by the
+     * raw-event loop, so this open-path read stays a single account-worker command.
+     */
     @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure is classified for presentation.
     private suspend fun refreshGroupRecoveryStatus() {
-        refreshGroupConvergenceParked()
         val accountRef = conversationAccountRef ?: return
         val groupIdHex = group.groupIdHex
         val runtimeGeneration = appState.runtimeGeneration
@@ -7527,8 +7535,36 @@ class ConversationController(
     private fun isFreshlyCreatedGroup(groupIdHex: String): Boolean =
         appState.freshGroupCreations.isFresh(conversationAccountRef, groupIdHex, appState.runtimeGeneration)
 
-    /** Explicit retry for an advisory recovery-status read failure. */
-    suspend fun retryGroupRecoveryStatus() = refreshGroupRecoveryStatus()
+    /** Explicit retry for an advisory recovery-status read failure, which also re-reads the parked flag. */
+    suspend fun retryGroupRecoveryStatus() {
+        refreshGroupRecoveryStatus()
+        requestGroupConvergenceRead()
+    }
+
+    /**
+     * Re-reads the parked flag when the conversation returns to the foreground. MDK's event firehose skips events
+     * when it lags, so a park or resume edge can be lost while the stream stays open; this keeps a dropped resume
+     * from leaving a stale notice. It waits for the first open, which already reads the flag once.
+     */
+    suspend fun refreshGroupConvergenceOnStart() {
+        if (groupConvergenceOpenSettled.isCompleted) requestGroupConvergenceRead()
+    }
+
+    /**
+     * Reads the parked flag now, or, when a read is already running, makes that reader read once more after it
+     * finishes. A burst of events therefore costs at most one read in flight and one after it.
+     */
+    @VisibleForTesting
+    internal suspend fun requestGroupConvergenceRead() {
+        groupConvergenceReadRequested.set(true)
+        while (groupConvergenceReadRequested.get() && groupConvergenceReadGate.tryLock()) {
+            try {
+                while (groupConvergenceReadRequested.getAndSet(false)) refreshGroupConvergenceParked()
+            } finally {
+                groupConvergenceReadGate.unlock()
+            }
+        }
+    }
 
     /**
      * Reads whether MDK parked this chat's convergence and publishes the answer under the recovery guards. Returns
@@ -7562,30 +7598,34 @@ class ConversationController(
     }
 
     /**
-     * Re-reads the parked flag on each raw group-state event for this chat, which MDK fires when convergence parks
-     * or resumes. A stream that ends or fails is reopened after a pause, and every reopen re-reads once, since an
-     * edge may have passed while no stream was open.
+     * Reads the parked flag on entry and on each raw group-state event for this chat, which MDK fires whenever the
+     * group's state changes, parks and resumes included. It starts only after the first open settles, so the open
+     * path never waits on this account-worker read. Every successful open, the first included, reads once, since
+     * an edge may pass before the stream exists. A stream that ends or fails is destroyed and reopened after a pause.
      */
     @VisibleForTesting
-    internal suspend fun runGroupConvergenceEventLoop(account: String) {
-        var reopened = false
+    internal suspend fun runGroupConvergenceEventLoop(
+        account: String,
+        awaitOpen: suspend () -> Unit = { groupConvergenceOpenSettled.await() },
+        retryMillis: Long = GROUP_CONVERGENCE_EVENT_RETRY_MILLIS,
+    ) {
+        awaitOpen()
         while (currentCoroutineContext().isActive) {
             val stream = runCatchingCancellable { runtimeEventStreamOpener() }.getOrNull()
             if (stream != null) {
                 try {
-                    if (reopened) refreshGroupConvergenceParked()
+                    requestGroupConvergenceRead()
                     runCatchingCancellable {
                         while (true) {
-                            val event = withContext(Dispatchers.IO) { stream.next() } ?: break
-                            if (event.isGroupStateUpdateFor(account, group.groupIdHex)) refreshGroupConvergenceParked()
+                            val event = stream.next() ?: break
+                            if (event.isGroupStateUpdateFor(account, group.groupIdHex)) requestGroupConvergenceRead()
                         }
                     }
                 } finally {
-                    withContext(NonCancellable) { runCatching { (stream as? AutoCloseable)?.close() } }
+                    withContext(NonCancellable + Dispatchers.IO) { runCatching { stream.destroy() } }
                 }
             }
-            reopened = true
-            delay(GROUP_CONVERGENCE_EVENT_RETRY_MILLIS)
+            delay(retryMillis)
         }
     }
 
@@ -11325,10 +11365,12 @@ class ConversationController(
      */
     suspend fun declineInvite(): Boolean = declineInviteWithConsent(stepDownConsent = null)
 
-    /** Steps down and declines the invitation the user agreed to, but only while it is still the one shown. */
+    /**
+     * Steps down and declines the invitation the user agreed to, but only while it is still the one shown. The
+     * question stays open until the decline takes the mutation lock, so a busy conversation never drops the answer.
+     */
     suspend fun confirmInviteDeclineStepDown(): Boolean {
         val consent = inviteDeclineStepDownRequest ?: return false
-        inviteDeclineStepDownRequest = null
         return declineInviteWithConsent(stepDownConsent = consent)
     }
 
@@ -11342,7 +11384,7 @@ class ConversationController(
             val account = conversationAccountRef ?: return@withMutationLockResult false
             val invitation = inviteGeneration(group)
             val stepDownAgreed = stepDownConsent != null
-            if (!mayDeclineWithoutAsking(invitation, stepDownConsent)) return@withMutationLockResult false
+            if (requestDeclineConsentIfNeeded(invitation, stepDownConsent)) return@withMutationLockResult false
             val stillPending = {
                 mutationPresentation.ownsCurrentPresentation() &&
                     !inviteAcceptanceResolutionPending &&
@@ -11373,17 +11415,38 @@ class ConversationController(
         }
 
     /**
-     * Whether Decline may go ahead for [invitation]. Consent counts only for the invitation it named, and an admin
-     * invitee who has not agreed to step down may not go ahead, so the question is raised for them instead.
+     * Stops Decline for [invitation] when it must not go ahead yet, and returns whether it stopped. Consent counts
+     * only for the invitation it named and is used up here, under the mutation lock. A sole admin cannot step down,
+     * so asking would promise what MDK refuses: they get the existing guidance at once. Any other admin who has not
+     * agreed yet gets the step-down question. MDK's own refusals stay the fallback when this copy of the roles is
+     * stale.
      */
-    private fun mayDeclineWithoutAsking(
+    private fun requestDeclineConsentIfNeeded(
         invitation: InviteAcceptanceGeneration,
         stepDownConsent: InviteAcceptanceGeneration?,
     ): Boolean {
-        if (stepDownConsent != null) return stepDownConsent == invitation
-        if (isSelfAdmin) inviteDeclineStepDownRequest = invitation
-        return !isSelfAdmin
+        inviteDeclineStepDownRequest = null
+        val stop =
+            when {
+                stepDownConsent != null -> stepDownConsent != invitation
+                isSoleAdminInvitee() -> {
+                    appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+                    true
+                }
+                isSelfAdmin -> {
+                    inviteDeclineStepDownRequest = invitation
+                    true
+                }
+                else -> false
+            }
+        return stop
     }
+
+    /**
+     * Whether this account is the invitation's only admin. The admin list comes from MDK's group record, which a
+     * pending invitation has before its roster loads, so the roster-based check alone could miss a sole admin.
+     */
+    private fun isSoleAdminInvitee(): Boolean = isSoleAdminWithOtherMembers || (isSelfAdmin && group.admins.distinctBy { it.lowercase() }.size <= 1)
 
     /** Explains a failed decline, giving a sole admin the same guidance as Leave instead of a generic failure. */
     private fun presentInviteDeclineFailure(

@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.whitenoise.android.R
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -191,7 +192,10 @@ class GroupDepartureQuestionTest {
             assertFalse("selfDemoteAdminDetailed" in calls)
         }
 
-    /** A sole admin who agrees to step down keeps the pending invite and gets the same guidance as Leave. */
+    /**
+     * A sole admin keeps the pending invite and gets the same guidance as Leave in one tap, without a question that
+     * would promise a step-down MDK refuses.
+     */
     @Test
     fun soleAdminInviteKeepsTheGroupAdmin() =
         runBlocking {
@@ -200,12 +204,61 @@ class GroupDepartureQuestionTest {
             val controller = ConversationController(appState = state, initialGroup = invite)
 
             assertFalse(controller.declineInvite())
-            assertTrue(controller.inviteDeclineStepDownRequested)
-            assertFalse(controller.confirmInviteDeclineStepDown())
-            assertEquals(1, calls.count { it == "declineGroupInvite" })
+            assertFalse(controller.inviteDeclineStepDownRequested)
+            assertEquals(0, calls.count { it == "declineGroupInvite" })
+            assertFalse("selfDemoteAdminDetailed" in calls)
             assertTrue(controller.group.pendingConfirmation)
             assertEquals(listOf(SELF), controller.group.admins)
             assertEquals(AppText.Resource(R.string.toast_make_another_admin_before_leaving), state.toast?.title)
+        }
+
+    /** When this copy still lists another admin, MDK's last-admin refusal stays the fallback after the question. */
+    @Test
+    fun staleSecondAdminFallsBackToMdkLastAdminRefusal() =
+        runBlocking {
+            val invite =
+                conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
+            val state = appState(inviteRuntime(invite, lastAdmin = true))
+            val controller = ConversationController(appState = state, initialGroup = invite)
+
+            assertFalse(controller.declineInvite())
+            assertTrue(controller.inviteDeclineStepDownRequested)
+            assertFalse(controller.confirmInviteDeclineStepDown())
+
+            assertEquals(1, calls.count { it == "declineGroupInvite" })
+            assertTrue(controller.group.pendingConfirmation)
+            assertEquals(AppText.Resource(R.string.toast_make_another_admin_before_leaving), state.toast?.title)
+        }
+
+    /** An answer given while another conversation change holds the lock keeps the question open and changes nothing. */
+    @Test
+    fun aBusyConversationKeepsTheStepDownQuestion() =
+        runBlocking {
+            val invite =
+                conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
+            val release = CompletableDeferred<Unit>()
+            val controller =
+                ConversationController(
+                    appState = appState(inviteRuntime(invite)),
+                    initialGroup = invite,
+                    groupArchivedUpdater = { _, _, archived ->
+                        release.await()
+                        invite.copy(archived = archived)
+                    },
+                )
+            assertFalse(controller.declineInvite())
+            val scope = CoroutineScope(Job())
+            val archive = scope.async(start = CoroutineStart.UNDISPATCHED) { controller.setArchived(true) }
+            try {
+                awaitWithMainLooper { controller.mutationInFlight }
+
+                assertFalse(controller.confirmInviteDeclineStepDown())
+                assertTrue("a busy lock dropped the user's answer", controller.inviteDeclineStepDownRequested)
+                assertFalse("declineGroupInvite" in calls)
+            } finally {
+                release.complete(Unit)
+                archive.await()
+            }
         }
 
     /** Waiting on the step-down leaves the same invitation pending with its original role. */
@@ -270,12 +323,13 @@ class GroupDepartureQuestionTest {
 
     /**
      * Refuses admin declines before demotion and optionally holds back the step-down while catching up. [selfAdmin]
-     * is MDK's own view of the role, which can differ from the app's copy of [invite].
+     * and [lastAdmin] are MDK's own view of the roles, which can differ from the app's copy of [invite].
      */
     private fun inviteRuntime(
         invite: AppGroupRecordFfi,
         holdStepDown: Boolean = false,
         selfAdmin: Boolean = SELF in invite.admins,
+        lastAdmin: Boolean = invite.admins == listOf(SELF),
     ): MarmotInterface {
         var isAdmin = selfAdmin
         val steppedDown = invite.copy(admins = listOf(OTHER_ADMIN))
@@ -303,7 +357,7 @@ class GroupDepartureQuestionTest {
                 "selfDemoteAdminDetailed" -> {
                     check(isAdmin)
                     when {
-                        invite.admins == listOf(SELF) ->
+                        lastAdmin ->
                             failSuspendedNativeCall(arguments, MarmotKitException.WouldRemoveLastAdmin(GROUP))
                         holdStepDown ->
                             failSuspendedNativeCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
