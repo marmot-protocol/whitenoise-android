@@ -76,14 +76,19 @@ internal data class GlobalSearchResult(
     val attachment: GlobalSearchResultAttachment? = null,
     val expiresAt: ULong? = null,
 ) {
-    val key: String =
-        groupIdHex.lowercase(Locale.ROOT) + GLOBAL_SEARCH_KEY_SEPARATOR + messageIdHex.lowercase(Locale.ROOT)
+    val key: String = globalSearchKey(groupIdHex, messageIdHex)
 
     /** This row's position in MDK's account-search order. */
     val cursor: GlobalSearchCursor get() = GlobalSearchCursor(timelineAt, messageIdHex, groupIdHex)
 }
 
 private const val GLOBAL_SEARCH_KEY_SEPARATOR = ":"
+
+/** The stable key of one message: group and message id, since a message id is only unique inside its chat. */
+internal fun globalSearchKey(
+    groupIdHex: String,
+    messageIdHex: String,
+): String = groupIdHex.lowercase(Locale.ROOT) + GLOBAL_SEARCH_KEY_SEPARATOR + messageIdHex.lowercase(Locale.ROOT)
 
 /**
  * One raw MDK page reduced to the rows it consumed and whether older rows remain. [rowsRead] counts every row
@@ -126,7 +131,8 @@ internal class GlobalSearchBatchSource<R>(
  * [cursor] and keeps the rows [GlobalSearchBatchSource.admit] accepts — the Android-owned local hides, eligibility
  * and retention checks MDK cannot apply. Each page is consumed whole, so the returned cursor is always the last
  * consumed page's own continuation and no row is skipped. Rows already in [seenKeys] or earlier in this batch
- * are dropped. A batch whose rows were all filtered out still returns its continuation.
+ * are dropped. A batch whose rows were all filtered out still returns its continuation. Over a small chat scope one
+ * raw page is a merged read of up to n per-chat MDK queries, still charged by the rows they fetch.
  */
 internal suspend fun <R> fillGlobalSearchBatch(
     cursor: GlobalSearchCursor?,
@@ -193,8 +199,11 @@ internal data class GlobalSearchResultsState(
     /** The earliest deadline of a loaded disappearing match, when the rows must be checked again. */
     val nextExpiry: ULong? = results.mapNotNull { it.expiresAt }.minOrNull()
 
-    /** A batch is being read. */
-    val loading: Boolean get() = inFlight != null
+    /** A page is being read; a background refresh keeps the boundary settled and is not loading. */
+    val loading: Boolean get() = inFlight != null && !inFlight.refresh
+
+    /** A background refresh of the loaded rows is in flight. */
+    val refreshing: Boolean get() = inFlight?.refresh == true
 
     /** MDK returned a continuation, or the first batch has not finished yet. */
     val hasMore: Boolean get() = !endReached

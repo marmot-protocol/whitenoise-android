@@ -255,13 +255,14 @@ internal fun rememberGlobalAttachmentPager(
 
 /**
  * Subscribes before probing so a change during the first read is not lost; any chat of the account counts. Global
- * message results (#1944) use the same wakeups to recheck their loaded rows. Returns whether the subscription
- * opened at all, so a caller can stop retrying a runtime that offers none.
+ * message results (#1944) pass a narrower [touched] that wakes only for changes that can alter their rows. Returns
+ * whether the subscription opened at all, so a caller can stop retrying a runtime that offers none.
  */
 internal suspend fun observeLibraryChanges(
     runtime: MarmotInterface,
     account: String,
     wakeups: Channel<Unit>,
+    touched: (MarmotEventFfi) -> Boolean = { libraryProjectionTouched(it, account) },
 ): Boolean =
     withContext(Dispatchers.IO) {
         val subscription = runCatchingCancellable { runtime.subscribeEvents() }.getOrNull()
@@ -271,7 +272,7 @@ internal suspend fun observeLibraryChanges(
                 runCatchingCancellable {
                     while (true) {
                         val event = subscription.next() ?: break
-                        if (libraryProjectionTouched(event, account)) wakeups.send(Unit)
+                        if (touched(event)) wakeups.send(Unit)
                     }
                 }
             }

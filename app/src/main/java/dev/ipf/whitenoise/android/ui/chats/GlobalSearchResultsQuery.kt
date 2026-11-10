@@ -40,6 +40,7 @@ internal data class GlobalSearchResultsQuery(
     val constraints: MessageSearchConstraints? = null,
 ) {
     private val canonicalGroups: Set<String>? = groups?.mapTo(mutableSetOf()) { it.lowercase(Locale.ROOT) }
+    private val mdkNeedle: String = needle.trim().lowercase(Locale.ROOT)
 
     /** The scoped chats read one by one and merged, or null when one query covers the scope. */
     val fanOutGroups: List<String>? = groups?.sorted()?.takeIf { it.size in 2..GLOBAL_SEARCH_FAN_OUT_MAX_CHATS }
@@ -73,17 +74,23 @@ internal data class GlobalSearchResultsQuery(
      * The result row for one MDK record, or null when it must not show: outside the scoped chats, hidden on this
      * device, past its disappearing deadline, not user-authored text (reactions, deletions, system JSON), deleted,
      * invalidated on a losing branch the group never accepted, or failing a filter MDK could only approximate.
+     * [needleMatchedByMdk] is false for a row from a live update, whose needle match is then checked here.
      */
     fun admit(
         record: TimelineMessageRecordFfi,
         hiddenIds: (groupIdHex: String) -> Set<String>,
         nowMillis: Long,
+        needleMatchedByMdk: Boolean = true,
     ): GlobalSearchResult? {
         val inScope = canonicalGroups == null || record.groupIdHex.lowercase(Locale.ROOT) in canonicalGroups
         val searchable = searchableTimelineRecord(record)
-        // MDK already matched the needle with its own case folding (which can change a string's length, as for
-        // a dotted İ), so it is not checked again here: only kind, deletion and the filters are.
-        val eligible = ChatListMessageSearch.isEligibleMatch(searchable, ciNeedle = "", constraints = constraints)
+        // A row MDK returned already matched the needle under MDK's own case folding (which can change a string's
+        // length, as for a dotted İ), so only kind, deletion and the filters are checked. A row from a live update
+        // was not searched, so the needle is checked here with the same full Unicode lowercase MDK uses.
+        val needleOk =
+            needleMatchedByMdk || mdkNeedle.isEmpty() || record.plaintext.lowercase(Locale.ROOT).contains(mdkNeedle)
+        val eligible =
+            needleOk && ChatListMessageSearch.isEligibleMatch(searchable, ciNeedle = "", constraints = constraints)
         val hidden = hiddenIds(record.groupIdHex).any { it.equals(record.messageIdHex, ignoreCase = true) }
         val accepted = record.invalidationStatus == null
         val visible = inScope && eligible && accepted && !hidden && !isRetentionExpiredForSearch(record, nowMillis)

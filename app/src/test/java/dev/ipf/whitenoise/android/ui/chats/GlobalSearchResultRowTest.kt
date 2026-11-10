@@ -226,6 +226,17 @@ class GlobalSearchResultRowTest {
         assertTrue(announced)
     }
 
+    /** A background refresh keeps the settled boundary: no spinner, no announcement, End of results stays. */
+    @Test
+    fun backgroundRefreshKeepsTheSettledBoundary() {
+        val refresh = GlobalSearchPageRequest(1, 1, null, emptySet(), refresh = true)
+        val state = GlobalSearchResultsState(generation = 1, batches = 1, endReached = true, inFlight = refresh)
+        render(GlobalSearchResultsContent(state = state, rows = listOf(presentation())))
+
+        composeRule.onNodeWithText("End of results").assertIsDisplayed()
+        composeRule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertDoesNotExist()
+    }
+
     /** The live-region mode on the node showing [text], or null when it has none. */
     private fun liveRegion(text: String): LiveRegionMode? =
         composeRule

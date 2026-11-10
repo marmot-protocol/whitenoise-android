@@ -4,10 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -54,7 +59,10 @@ internal fun rememberGlobalSearchResults(
             )
         }
     DisposableEffect(controller) { onDispose { controller.close() } }
-    GlobalSearchResultsRecheckEffects(appState, active, controller)
+    // Rechecks run only while the screen is visible; a return to it rechecks once.
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val started = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    if (started) GlobalSearchResultsRecheckEffects(appState, active, controller)
     LaunchedEffect(controller, query) {
         val resume = extent?.resumeCount(owner, query) ?: 0
         // A returning session rereads at once; a changed query waits out the keystroke debounce.
@@ -116,9 +124,10 @@ internal fun globalSearchResultsContent(
 }
 
 /**
- * Rechecks loaded rows on the same triggers the files and media library uses: any projection update of the
- * account (a deletion, an edit, a new match), a block-list change, and the earliest disappearing deadline among
- * the loaded rows. Wakeups coalesce and wait briefly, so a burst of updates costs one bounded reread.
+ * Rechecks loaded rows on the files and media library's triggers, narrowed to what can change them: a projection
+ * update that removes, deletes, edits or invalidates a listed row or brings a new match, a block-list change, and
+ * the earliest disappearing deadline among the loaded rows. Wakeups coalesce and wait briefly, so a burst of
+ * updates costs one bounded reread.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -140,7 +149,12 @@ private fun GlobalSearchResultsRecheckEffects(
         // A runtime that cannot open a subscription is retried a few times, then left to the other triggers.
         var failures = 0
         while (failures < GLOBAL_SEARCH_OBSERVER_ATTEMPTS) {
-            failures = if (observeLibraryChanges(runtime, account, wakeups)) 0 else failures + 1
+            val opened =
+                observeLibraryChanges(runtime, account, wakeups) { event ->
+                    val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update
+                    update?.accountLabel == account && controller.isTouchedBy(update.update)
+                }
+            failures = if (opened) 0 else failures + 1
             delay(GLOBAL_SEARCH_OBSERVER_RETRY_MS)
         }
     }

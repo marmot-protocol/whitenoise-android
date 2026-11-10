@@ -1,11 +1,16 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.marmotkit.TimelineRemoveReasonFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.GlobalSearchEpochBounds
@@ -395,6 +400,110 @@ class GlobalSearchResultsControllerTest {
         assertEquals(0, extent.resumeCount("account-a" to 2, query))
         assertEquals(0, extent.resumeCount("account-a" to 1, query.copy(needle = "other")))
     }
+
+    /** A same-second, same-id twin in another scoped chat at the merged page edge is listed, not skipped. */
+    @Test
+    fun smallScopeTakesATwinRowAtThePageEdge() =
+        runTest {
+            // Chat b fills its 25-row share exactly down to (100, "x"); chat a holds the twin (100, "x").
+            val chatB =
+                (1..24).map { record("b", "b%02d".format(it), at = 100uL + it.toULong()) } +
+                    record("b", "x", at = 100uL) +
+                    (1..30).map { record("b", "old%02d".format(it), at = 50uL - it.toULong()) }
+            val chatA = listOf(record("a", "x", at = 100uL), record("a", "a1", at = 99uL), record("a", "a2", at = 98uL))
+            val store = StoreReader(chatB + chatA)
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello", groups = setOf("a", "b")))
+            advanceUntilIdle()
+            while (!controller.state.endReached) {
+                controller.loadMore()
+                advanceUntilIdle()
+            }
+
+            val expected = (chatB + chatA).sortedWith(ACCOUNT_ORDER).map { "${it.groupIdHex}:${it.messageIdHex}" }
+            assertEquals(expected, keys(controller))
+            assertTrue("a:x" in keys(controller))
+        }
+
+    /** A tap on Retry or Search older during a background refresh runs after it instead of being dropped. */
+    @Test
+    fun pageAskedForDuringARefreshRunsAfterIt() =
+        runTest {
+            val store = StoreReader((0 until 60).map { record("g", "m%02d".format(it), at = 100uL + it.toULong()) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertEquals(50, controller.state.results.size)
+
+            controller.refresh()
+            assertTrue(controller.state.refreshing)
+            assertFalse(controller.state.loading)
+            controller.loadMore()
+            advanceUntilIdle()
+
+            assertEquals(60, controller.state.results.size)
+            assertTrue(controller.state.endReached)
+        }
+
+    /** A new query forgets a refresh queued for the previous one. */
+    @Test
+    fun newQueryDropsAQueuedRefresh() =
+        runTest {
+            val store = StoreReader((0 until 60).map { record("g", "m%02d".format(it), at = 100uL + it.toULong()) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            controller.loadMore()
+            controller.refresh()
+            controller.search(GlobalSearchResultsQuery(needle = "there"))
+            advanceUntilIdle()
+
+            // The new query reads its first page once; the old query's queued refresh never runs after it.
+            assertEquals(1, store.queries.count { it.search == "there" })
+            assertEquals(50, controller.state.results.size)
+        }
+
+    /** Only changes that can alter the list wake a reread: not reactions, receipts or unrelated messages. */
+    @Test
+    fun onlyRelevantProjectionUpdatesTouchTheResults() =
+        runTest {
+            val listed = record("g", "listed", at = 5uL, text = "hello there")
+            val controller = controller(FakeReader({ page(listed) }))
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+
+            fun upsert(
+                record: TimelineMessageRecordFfi,
+                trigger: TimelineUpdateTriggerFfi,
+            ) = update(record.groupIdHex, TimelineMessageChangeFfi.Upsert(trigger, record))
+
+            assertFalse(controller.isTouchedBy(upsert(listed, TimelineUpdateTriggerFfi.REACTION_ADDED)))
+            assertFalse(controller.isTouchedBy(upsert(listed, TimelineUpdateTriggerFfi.RECEIPT_CHANGED)))
+            val deleted = listed.copy(deleted = true)
+            assertTrue(controller.isTouchedBy(upsert(deleted, TimelineUpdateTriggerFfi.MESSAGE_DELETED)))
+            assertTrue(
+                controller.isTouchedBy(
+                    update("g", TimelineMessageChangeFfi.Remove("listed", TimelineRemoveReasonFfi.entries.first())),
+                ),
+            )
+            val other = record("g", "other", at = 6uL, text = "unrelated words")
+            assertFalse(controller.isTouchedBy(upsert(other, TimelineUpdateTriggerFfi.NEW_MESSAGE)))
+            val match = record("g2", "match", at = 7uL, text = "hello again")
+            assertTrue(controller.isTouchedBy(upsert(match, TimelineUpdateTriggerFfi.NEW_MESSAGE)))
+            assertFalse(controller.isTouchedBy(upsert(match, TimelineUpdateTriggerFfi.REACTION_ADDED)))
+        }
+
+    /** One projection update of [group] carrying [change]. */
+    private fun update(
+        group: String,
+        change: TimelineMessageChangeFfi,
+    ) = TimelineProjectionUpdateFfi(
+        groupIdHex = group,
+        messages = emptyList(),
+        changes = listOf(change),
+        chatListRow = null,
+        chatListTrigger = ChatListUpdateTriggerFfi.entries.first(),
+    )
 
     /** One of the two scoped chats, alternating by index. */
     private fun chosen(index: Int) = if (index % 2 == 0) "chosen-a" else "chosen-b"

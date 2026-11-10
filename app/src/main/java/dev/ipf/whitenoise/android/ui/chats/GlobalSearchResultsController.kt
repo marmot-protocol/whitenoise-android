@@ -3,9 +3,12 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +41,7 @@ internal class GlobalSearchResultsEnvironment(
 internal class GlobalSearchResultsController(
     private val reader: GlobalSearchTimelineReader,
     private val scope: CoroutineScope,
-    private val environment: GlobalSearchResultsEnvironment = GlobalSearchResultsEnvironment(),
+    internal val environment: GlobalSearchResultsEnvironment = GlobalSearchResultsEnvironment(),
 ) {
     /** What the screen renders for the current generation. */
     var state by mutableStateOf(GlobalSearchResultsState())
@@ -51,6 +54,7 @@ internal class GlobalSearchResultsController(
     private var job: Job? = null
     private var closed = false
     private var refreshPending = false
+    private var loadPending = false
 
     /**
      * Starts a generation for [next] unless it is already the current query. [debounceMillis] delays only the
@@ -63,6 +67,8 @@ internal class GlobalSearchResultsController(
     ) {
         if (closed || (next == query && state.generation > 0)) return
         job?.cancel()
+        refreshPending = false
+        loadPending = false
         query = next
         val restarted = GlobalSearchResultsReducer.restart(state, resumeTarget)
         // A scope with no chats cannot match, so it ends at once instead of reading the whole account.
@@ -97,6 +103,8 @@ internal class GlobalSearchResultsController(
     /** Cancels the batch in flight and fences every later completion. */
     fun close() {
         closed = true
+        refreshPending = false
+        loadPending = false
         job?.cancel()
         query = null
     }
@@ -104,6 +112,8 @@ internal class GlobalSearchResultsController(
     /** Starts one batch for the current generation, unless one is in flight or MDK reported the end. */
     private fun read(debounceMillis: Long) {
         val current = query?.takeUnless { closed } ?: return
+        // A page or Retry asked for during a background refresh runs once the refresh lands, never dropped.
+        if (state.inFlight?.refresh == true) loadPending = true
         val (next, request) = GlobalSearchResultsReducer.begin(state) ?: return
         state = next
         launch(current, request, debounceMillis, refreshBudget = 0)
@@ -167,12 +177,16 @@ internal class GlobalSearchResultsController(
             GlobalSearchResultsReducer.applyFailure(state, request)
         }
 
-    /** Runs a refresh that arrived during the batch, else continues a returning session's bounded reread. */
+    /**
+     * Runs a refresh that arrived during the batch, else a page asked for during a refresh, else continues a
+     * returning session's bounded reread.
+     */
     private fun continueAfter() {
         if (refreshPending) {
             refreshPending = false
             refresh()
-        } else if (GlobalSearchResultsReducer.needsResumeRead(state)) {
+        } else if (loadPending || GlobalSearchResultsReducer.needsResumeRead(state)) {
+            loadPending = false
             read(0L)
         }
     }
@@ -266,15 +280,13 @@ private fun batchSource(
     )
 }
 
-/** The smallest per-chat page a merged read asks for, so a wide fan-out still makes progress each read. */
-private const val GLOBAL_SEARCH_FAN_OUT_MIN_PAGE = 5
-
 /**
- * One merged page over a small chat scope: each chat is read directly (MDK pages one chat by time and message id)
- * with an equal share of [limit], and the pages are merged into account-search order. Only rows down to the
- * newest "last row" among chats that still have older rows are safe to consume, since an unread row from such a
- * chat could be newer than anything below that frontier; the rest are read again next time. Every fetched row
- * counts against the batch budget.
+ * One merged page over a small chat scope: each chat is read directly with an equal share of [limit] (at least one
+ * row each, so a read of n chats can exceed a [limit] below n by at most n - 1 rows), and the pages are merged into
+ * account-search order. A per-chat MDK read pages by (time, message id) alone, so the frontier compares that pair:
+ * only rows at or above the newest "last row" among chats that still have older rows are consumed — including its
+ * same-second, same-id twins in other chats, which the next per-chat cursor would otherwise skip — and the rest
+ * are read again next time. Every fetched row counts against the batch budget.
  */
 private suspend fun readScopedPage(
     reader: GlobalSearchTimelineReader,
@@ -283,13 +295,66 @@ private suspend fun readScopedPage(
     cursor: GlobalSearchCursor?,
     limit: UInt,
 ): GlobalSearchRawPage<TimelineMessageRecordFfi> {
-    val perChat = (limit.toInt() / groups.size).coerceAtLeast(GLOBAL_SEARCH_FAN_OUT_MIN_PAGE).toUInt()
+    val perChat = (limit.toInt() / groups.size).coerceAtLeast(1).toUInt()
     val pages = groups.map { group -> reader.page(current.toFfi(cursor, perChat, groupIdHex = group)) }
     val frontier =
         pages
             .filter { it.hasMoreBefore && it.messages.isNotEmpty() }
-            .maxOfOrNull { page -> page.messages.minOf { it.globalSearchCursor() } }
+            .maxOfOrNull { page -> page.messages.minOf { it.chatCursor() } }
     val fetched = pages.flatMap { it.messages }
-    val consumed = if (frontier == null) fetched else fetched.filter { it.globalSearchCursor() >= frontier }
+    val consumed = if (frontier == null) fetched else fetched.filter { it.chatCursor() >= frontier }
     return GlobalSearchRawPage(consumed, hasMoreBefore = frontier != null, rowsRead = fetched.size)
+}
+
+/** A row's position in a single-chat MDK read, which orders by time and message id without the group. */
+private fun TimelineMessageRecordFfi.chatCursor(): GlobalSearchCursor =
+    GlobalSearchCursor(timelineAt = timelineAt, messageIdHex = messageIdHex, groupIdHex = "")
+
+/** Triggers that never change whether a loaded row is listed or what its snippet says. */
+private val GLOBAL_SEARCH_INERT_TRIGGERS =
+    setOf(
+        TimelineUpdateTriggerFfi.REACTION_ADDED,
+        TimelineUpdateTriggerFfi.REACTION_REMOVED,
+        TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
+        TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
+        TimelineUpdateTriggerFfi.AGENT_ACTIVITY,
+        TimelineUpdateTriggerFfi.AGENT_OPERATION,
+    )
+
+/** Triggers through which a message not yet listed can become a match. */
+private val GLOBAL_SEARCH_MATCHING_TRIGGERS =
+    setOf(
+        TimelineUpdateTriggerFfi.NEW_MESSAGE,
+        TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
+        TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
+        TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
+    )
+
+/**
+ * Whether a timeline projection update can change what this session lists: the removal of a loaded row, a
+ * deletion, edit, send-state or snapshot change of one, or a new or edited message the query would now admit.
+ * Reactions, receipts and activity elsewhere never cause a reread, so a busy account does not keep rereading.
+ */
+internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectionUpdateFfi): Boolean {
+    val current = query ?: return false
+    val loaded = state.seenKeys
+    return update.changes.any { change ->
+        when (change) {
+            is TimelineMessageChangeFfi.Remove -> globalSearchKey(update.groupIdHex, change.messageIdHex) in loaded
+            is TimelineMessageChangeFfi.Upsert -> {
+                val listed = globalSearchKey(update.groupIdHex, change.message.messageIdHex) in loaded
+                if (listed) {
+                    change.trigger !in GLOBAL_SEARCH_INERT_TRIGGERS
+                } else {
+                    change.trigger in GLOBAL_SEARCH_MATCHING_TRIGGERS &&
+                        current.admit(
+                            change.message,
+                            environment.hiddenMessageIds,
+                            environment.nowMillis(),
+                            needleMatchedByMdk = false,
+                        ) != null
+                }
+            }
+        }
+    }
 }
