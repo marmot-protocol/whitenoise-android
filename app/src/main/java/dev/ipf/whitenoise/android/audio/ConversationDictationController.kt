@@ -1148,9 +1148,18 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Idle
     }
 
-    /** Involuntary focus loss preserves input; an earlier Send choice is never submitted. */
+    /**
+     * Involuntary focus loss preserves input as a draft, including after automatic silence completion.
+     * After an explicit Send or Paste, capture is already sealed, so the chosen action continues under
+     * its own drain deadline. This deliberately narrows #3401 to choices the user did not make.
+     */
     fun interruptForAudioFocusLoss() {
         if (!inActiveRecognitionState || deliveryInProgress || completion.intent.committed) return
+        if (finishRequested && completion.intent.explicit) {
+            // Another app's audio cannot change the sealed speech, so finish the user's chosen action.
+            conversationDictationDiagnostic("event=audio_focus_lost_after_finish action=continued")
+            return
+        }
         completion.validation.reset()
         completion.dispatch.cancelBeforeTransport()
         completion.intent.reset()
@@ -2240,6 +2249,9 @@ internal class ConversationDictationController internal constructor(
                     if (!owns(sessionId, generationId)) return
                     unresolvedRecognitionFailure = failure
                     val currentSession = generation.session
+                    if (error.isEmptyRecognition && dropSilentFinalTail(sessionId, target, currentSession, failure)) {
+                        return
+                    }
                     val callerAudioPending =
                         currentSession?.usesCallerAudioCapture() == true ||
                             runCatching(platform::callerAudioHasPending).getOrDefault(false)
@@ -2372,6 +2384,30 @@ internal class ConversationDictationController internal constructor(
             finishRequested -> finalizeAccumulatedTranscript(sessionId, target)
             else -> scheduleRestart(sessionId, target, GENERATION_RESTART_DELAY_MILLIS, "no_speech_advanced")
         }
+    }
+
+    /**
+     * Releases a capture-side silent final chunk after Send or Paste when recognized text already exists.
+     *
+     * Silence is decided from the captured PCM, so this does not wait for the provider to be fully fed.
+     * A final chunk that may hold speech keeps the bounded retry and retained-audio recovery path.
+     * Returns true when the chunk was released and the transcript continues to delivery.
+     */
+    private fun dropSilentFinalTail(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        session: ConversationDictationRecognitionSession?,
+        failure: ConversationDictationFailure,
+    ): Boolean {
+        if (!finishRequested || accumulatedTranscript.isBlank() || session == null) return false
+        if (!runCatching(session::callerAudioIsFinalChunk).getOrDefault(false)) return false
+        if (runCatching(session::callerAudioContainsSpeech).getOrNull() != false) return false
+        if (!runCatching(session::acknowledgeCallerAudio).getOrDefault(false)) return false
+        conversationDictationDiagnostic("event=caller_audio_tail_dropped failure=${failure.name} reason=silence")
+        unresolvedRecognitionFailure = null
+        clearRecognitionGeneration(cancel = false)
+        advancePastConfirmedSilentCallerAudio(sessionId, target)
+        return true
     }
 
     /** Bounds exact-chunk recovery, then completes safe accumulated text through the chosen action. */
