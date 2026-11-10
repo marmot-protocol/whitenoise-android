@@ -882,6 +882,9 @@
     <string name="toast_couldnt_accept_invite">Davet kabul edilemedi</string>
     <string name="toast_invite_declined">Reddet</string>
     <string name="toast_couldnt_decline_invite">Davet reddedilemedi</string>
+    <string name="invite_decline_step_down_title">Yöneticilikten çekilip reddedilsin mi?</string>
+    <string name="invite_decline_step_down_message">Bu davet sizi yönetici yapıyor. Reddetmek için önce yöneticilikten çekileceksiniz ve grup üyeleri bunu görecek.</string>
+    <string name="invite_decline_step_down_confirm">Çekil ve reddet</string>
     <string name="toast_chat_archived">Sohbet arşivlendi</string>
     <string name="toast_chat_restored">Sohbet geri yüklendi</string>
     <string name="toast_couldnt_update_chat">Sohbet güncellenemedi</string>
@@ -2133,6 +2136,10 @@
     <string name="group_recovery_failed_reinvites">Bazı davetler geri yüklenemedi. Bu kişileri Grup Ayrıntıları’ndan yeniden davet edin.</string>
     <string name="group_recovery_review_invitation_from">%1$s kişisinin davetini incele · dönem %2$s</string>
     <string name="group_recovery_check_failed">Grup kurtarma denetlenemedi. Tekrar deneyin.</string>
+    <string name="group_convergence_parked">Bu sohbetin eşitlenmesi durdu. Gönderdiğiniz mesajlar sohbet güncellenene kadar bekleyecek.</string>
+    <string name="group_convergence_retrying">Yeniden deneniyor…</string>
+    <string name="group_convergence_retry_still_parked">Bu sohbet hâlâ eşitlenmiyor. Daha sonra tekrar deneyin.</string>
+    <string name="group_convergence_retry_failed">Bu sohbetin eşitlenmesi yeniden denenemedi. Daha sonra tekrar deneyin.</string>
     <string name="group_history_may_be_incomplete">Bu sohbetteki bazı eski mesajlar eksik olabilir.</string>
     <string name="group_history_before_rejoin">Bu sohbete yeniden katıldınız. Yeniden katılmanızdan önceki mesajlar eksik olabilir.</string>
     <string name="account_history_may_be_incomplete">Bu hesapta bazı mesajlar eksik olabilir. White Noise tüm mesajların ulaştığını doğrulayamadı.</string>

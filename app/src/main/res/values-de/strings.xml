@@ -882,6 +882,9 @@
     <string name="toast_couldnt_accept_invite">Einladung konnte nicht angenommen werden</string>
     <string name="toast_invite_declined">Ablehnen</string>
     <string name="toast_couldnt_decline_invite">Einladung konnte nicht abgelehnt werden</string>
+    <string name="invite_decline_step_down_title">Zurücktreten und ablehnen?</string>
+    <string name="invite_decline_step_down_message">Mit dieser Einladung bist du Admin. Um abzulehnen, trittst du zuerst als Admin zurück, und die Mitglieder der Gruppe sehen, dass du zurückgetreten bist.</string>
+    <string name="invite_decline_step_down_confirm">Zurücktreten und ablehnen</string>
     <string name="toast_chat_archived">Chat archiviert</string>
     <string name="toast_chat_restored">Chat wiederhergestellt</string>
     <string name="toast_couldnt_update_chat">Chat konnte nicht aktualisiert werden</string>
@@ -2152,6 +2155,10 @@
     <string name="group_recovery_failed_reinvites">Einige Einladungen konnten nicht wiederhergestellt werden. Lade diese Personen in den Gruppendetails erneut ein.</string>
     <string name="group_recovery_review_invitation_from">Einladung von %1$s prüfen · Epoche %2$s</string>
     <string name="group_recovery_check_failed">Die Gruppenwiederherstellung konnte nicht geprüft werden. Versuche es erneut.</string>
+    <string name="group_convergence_parked">Dieser Chat wird nicht mehr synchronisiert. Nachrichten, die du sendest, warten, bis er aufgeholt hat.</string>
+    <string name="group_convergence_retrying">Wird erneut versucht…</string>
+    <string name="group_convergence_retry_still_parked">Dieser Chat wird immer noch nicht synchronisiert. Versuche es später erneut.</string>
+    <string name="group_convergence_retry_failed">Die Synchronisierung dieses Chats konnte nicht erneut versucht werden. Versuche es später erneut.</string>
     <string name="group_history_may_be_incomplete">In diesem Chat fehlen möglicherweise einige ältere Nachrichten.</string>
     <string name="group_history_before_rejoin">Du bist diesem Chat erneut beigetreten. Nachrichten von vor deinem erneuten Beitritt fehlen möglicherweise.</string>
     <string name="account_history_may_be_incomplete">Möglicherweise fehlen in diesem Konto einige Nachrichten. White Noise konnte nicht bestätigen, dass alle Nachrichten angekommen sind.</string>

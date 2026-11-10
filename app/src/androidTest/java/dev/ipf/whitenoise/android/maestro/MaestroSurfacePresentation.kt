@@ -12,6 +12,7 @@ internal fun MaestroSurfacePresentation(fixture: MaestroPresentationFixture) {
             fixture.scenario.startsWith("surface-addprofile-") ||
             fixture.scenario.startsWith("surface-profile-qr-") -> MaestroEntryPresentation(fixture)
         fixture.scenario.startsWith("surface-rejoin-") ||
+            fixture.scenario.startsWith("surface-stepdown-") ||
             fixture.scenario.startsWith("surface-date-review-") -> MaestroRecoveryPresentation(fixture)
         else -> MaestroPickerPresentation(fixture)
     }

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
@@ -54,16 +58,41 @@ internal fun ConversationGroupRecoveryCard(
         readFailed = controller.groupRecoveryReadFailed,
         onRetry = { appState.launchMutation { controller.retryGroupRecoveryStatus() } },
         onDismissHistoryNotices = { appState.launchMutation { controller.dismissGroupHistoryNotices() } },
+        convergence =
+            GroupConvergenceNotice(
+                parked = controller.groupConvergenceParked,
+                retrying = controller.groupConvergenceRetrying,
+                retryFailure = controller.groupConvergenceRetryFailure,
+            ),
+        onRetryConvergence = { appState.launchMutation { controller.retryGroupConvergence() } },
     )
 }
 
-/** Whether the engine status contains information that belongs in the conversation UI. */
-internal fun GroupRecoveryStatusFfi.hasVisibleRecoveryState(): Boolean =
-    automaticRecoveryFailed ||
-        pendingReinvites > 0u ||
-        failedReinvites > 0u ||
-        rejoinInvitations.isNotEmpty() ||
-        historyMayBeIncomplete
+/** What the card shows about a chat whose convergence MDK parked: the parked flag, retry progress and its failure. */
+internal data class GroupConvergenceNotice(
+    val parked: Boolean = false,
+    val retrying: Boolean = false,
+    @param:StringRes val retryFailure: Int? = null,
+)
+
+/** Whether the conversation shows the recovery card for [status] and the parked flag [convergenceParked]. */
+internal fun hasVisibleGroupRecoveryCard(
+    status: GroupRecoveryStatusFfi?,
+    readFailed: Boolean,
+    convergenceParked: Boolean,
+): Boolean = readFailed || status.hasVisibleRecoveryState(convergenceParked)
+
+/** Whether the engine status, or a parked convergence, contains information that belongs in the conversation UI. */
+internal fun GroupRecoveryStatusFfi?.hasVisibleRecoveryState(convergenceParked: Boolean = false): Boolean =
+    convergenceParked ||
+        this != null &&
+        (
+            automaticRecoveryFailed ||
+                pendingReinvites > 0u ||
+                failedReinvites > 0u ||
+                rejoinInvitations.isNotEmpty() ||
+                historyMayBeIncomplete
+        )
 
 /** Presents engine-owned recovery state without interpreting it as membership evidence. */
 @Composable
@@ -79,11 +108,14 @@ internal fun GroupRecoveryCard(
     onRetry: () -> Unit = {},
     onDismissHistoryNotices: () -> Unit = {},
     historyRejoined: Boolean = false,
+    convergence: GroupConvergenceNotice = GroupConvergenceNotice(),
+    onRetryConvergence: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (!readFailed && status?.hasVisibleRecoveryState() != true) return
+    if (!hasVisibleGroupRecoveryCard(status, readFailed, convergence.parked)) return
     var selectedInvitation by remember(status?.groupIdHex) { mutableStateOf<GroupRejoinInvitationFfi?>(null) }
     RecoveryNoticeSurface(modifier) {
+        GroupConvergenceParkedNotice(convergence, busy, onRetryConvergence)
         if (status?.automaticRecoveryFailed == true) {
             Text(
                 stringResource(R.string.group_recovery_automatic_failed),
@@ -138,6 +170,43 @@ internal fun GroupRecoveryCard(
             onConfirm = onConfirm,
             onDecline = onDecline,
         )
+    }
+}
+
+/**
+ * Tells the user that this chat stopped syncing and that their messages wait, with a Retry that shows progress and,
+ * when it did not help, a localized reason.
+ */
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupConvergenceParkedNotice(
+    convergence: GroupConvergenceNotice,
+    busy: Boolean,
+    onRetry: () -> Unit,
+) {
+    if (!convergence.parked) return
+    Text(
+        stringResource(R.string.group_convergence_parked),
+        style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+    )
+    convergence.retryFailure?.takeUnless { convergence.retrying }?.let { failure ->
+        Text(
+            stringResource(failure),
+            // The retry's outcome appears without focus moving, so TalkBack announces it politely.
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+    val retryingLabel = stringResource(R.string.group_convergence_retrying)
+    WhiteNoiseButton(
+        onClick = onRetry,
+        enabled = !busy,
+        loading = convergence.retrying,
+        loadingLabel = retryingLabel,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(R.string.retry))
     }
 }
 

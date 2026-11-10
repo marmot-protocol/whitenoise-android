@@ -1,0 +1,144 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+  "legacy_sha256": "5ca88f6483e9bdeb90c3c3cc0babd196e7118b782ce2ae5081dc202f70502a17",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: InvitePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "InvitationActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "fun InvitationActions(",
+        "test_ids": [
+          "CON-001",
+          "GRP-040"
+        ]
+      },
+      {
+        "surface": "InviteAcceptanceResolutionStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "fun InviteAcceptanceResolutionStatus(",
+        "test_ids": [
+          "GRP-011",
+          "GRP-012",
+          "GRP-014"
+        ]
+      },
+      {
+        "surface": "InviteDeclineStepDownDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "fun InviteDeclineStepDownDialog(",
+        "test_ids": [
+          "GRP-040"
+        ]
+      },
+      {
+        "surface": "InvitePreviewPlaceholder",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "fun InvitePreviewPlaceholder(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "documentation_contracts": [
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.couldnt_check_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.couldnt_check_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-011"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:accept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.accept",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-040"
+        ]
+      },
+      {
+        "surface": "string:decline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.decline",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "string:invite_decline_step_down_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.invite_decline_step_down_confirm",
+        "test_ids": [
+          "GRP-040"
+        ]
+      },
+      {
+        "surface": "string:invite_decline_step_down_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.invite_decline_step_down_message",
+        "test_ids": [
+          "GRP-040"
+        ]
+      },
+      {
+        "surface": "string:invite_decline_step_down_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.invite_decline_step_down_title",
+        "test_ids": [
+          "GRP-040"
+        ]
+      },
+      {
+        "surface": "string:invited_to_chat_by",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.invited_to_chat_by",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "string:someone",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.someone",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

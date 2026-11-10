@@ -90,6 +90,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
@@ -4540,10 +4542,7 @@ internal fun ConversationScreen(
                                 routeTransitionInProgress = routeTransitionInProgress,
                             )
                         renderedTimeline.isEmpty() &&
-                            (
-                                controller.groupRecoveryReadFailed ||
-                                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
-                            ) ->
+                            controller.conversationGroupRecoveryRowVisible() ->
                             Column(modifier = Modifier.fillMaxSize()) {
                                 ConversationGroupRecoveryCard(controller, appState)
                                 ConversationEmptyMessage(
@@ -5264,6 +5263,24 @@ internal fun ConversationScreen(
                     pendingContactShare = null
                     mediaSender.sendSharedContact(selected)
                 },
+            )
+        }
+
+        // MDK's event firehose skips events when it lags, so each return to the foreground re-reads the parked flag.
+        LifecycleEventEffect(Lifecycle.Event.ON_START) {
+            scope.launch { controller.refreshGroupConvergenceOnStart() }
+        }
+
+        if (controller.inviteDeclineStepDownRequested) {
+            InviteDeclineStepDownDialog(
+                // Confirm waits, visibly disabled, while another change runs or the invitation is still resolving.
+                busy = controller.mutationInFlight || controller.inviteAcceptanceResolutionPending,
+                onConfirm = {
+                    appState.launchMutation {
+                        if (controller.confirmInviteDeclineStepDown()) exitConversation()
+                    }
+                },
+                onDismiss = controller::cancelInviteDeclineStepDown,
             )
         }
 
