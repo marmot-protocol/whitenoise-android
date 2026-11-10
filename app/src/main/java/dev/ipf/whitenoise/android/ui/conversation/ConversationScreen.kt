@@ -2657,6 +2657,7 @@ internal fun ConversationScreen(
             restoreAnchor = {
                 scrollCoordinator.restoreReaderAfterLanding(
                     bookmark = before,
+                    ownsNavigation = { request.isCurrent() },
                     resolveAnchorIndex = ::resolveScrollAnchorIndex,
                     rematerialize = { id ->
                         controller.loadMessageAvailability(id) == MessageAvailability.AVAILABLE

@@ -79,9 +79,9 @@ internal class SearchResultLandingSteps(
  * Lands one global-search result: loads only the bounded window around the exact message (MDK's window jump, never
  * a walk through intervening history), then centers it and applies the temporary highlight, whose polite live
  * region tells TalkBack where the reader landed. A window that loaded but holds nothing to show, or could not load,
- * restores the reader's previous position before reporting. A message that loaded but could not be centered is
- * offered for Retry rather than dropped silently. Returns the landing, or null when a newer navigation superseded
- * this one, in which case nothing is highlighted or reported.
+ * is reported first and then restores the reader's previous position. A message that loaded but could not be
+ * centered is offered for Retry rather than dropped silently. Returns the landing, or null when a newer navigation
+ * superseded this one, in which case nothing is highlighted or reported.
  */
 @Suppress("ReturnCount") // Each supersession point ends the landing where it was detected.
 internal suspend fun landSearchResult(steps: SearchResultLandingSteps): SearchTargetLanding? {
@@ -91,12 +91,13 @@ internal suspend fun landSearchResult(steps: SearchResultLandingSteps): SearchTa
     val landing = searchTargetLanding(hidden, availability, steps.loadedRecord(), steps.nowMillis())
     when (landing) {
         SearchTargetLanding.UNAVAILABLE -> {
-            if (availability != null) steps.restoreAnchor()
+            // Feedback first, so it is not delayed by a window reload.
             steps.unavailable()
+            if (availability != null) steps.restoreAnchor()
         }
         SearchTargetLanding.RETRY -> {
-            steps.restoreAnchor()
             steps.failed()
+            steps.restoreAnchor()
         }
         SearchTargetLanding.NAVIGATE -> {
             val centered = steps.center()
@@ -116,23 +117,29 @@ internal suspend fun landSearchResult(steps: SearchResultLandingSteps): SearchTa
  * The window jump may have recentered the bounded window on the dead target, so the saved anchor is resolved in the
  * current window only: a reader who was following the newest rows returns to them through [returnToNewest], and a
  * reader deeper in history has their anchor message loaded again by [rematerialize] first. It never falls back to
- * a raw list index from another window; when the anchor cannot be brought back, the reader stays put.
+ * a raw list index from another window; when the anchor cannot be brought back, the reader stays put. Both reloads
+ * suspend, so [ownsNavigation] is checked after each and right before any scroll: a drag or a newer reply or
+ * mention jump meanwhile wins, and nothing is scrolled over it.
  */
-@Suppress("ReturnCount") // Each unrecoverable step leaves the reader where the failed landing left them.
+@Suppress("ReturnCount") // Each unrecoverable or superseded step leaves the reader where they are.
 internal suspend fun ConversationScrollCoordinator.restoreReaderAfterLanding(
     bookmark: ConversationScrollBookmark,
+    ownsNavigation: () -> Boolean,
     resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
     rematerialize: suspend (messageId: String) -> Boolean,
     returnToNewest: suspend () -> Int?,
 ): Boolean {
     if (bookmark.settledMode is ConversationScrollMode.FollowingTail) {
-        val tail = returnToNewest() ?: return false
+        val tail = returnToNewest()
+        if (tail == null || !ownsNavigation()) return false
         return jumpToNewest(targetIndex = tail)
     }
     if (resolveAnchorIndex(bookmark.anchor) == null) {
         val messageId = bookmark.anchor.messageId ?: return false
-        if (!rematerialize(messageId) || resolveAnchorIndex(bookmark.anchor) == null) return false
+        val reloaded = rematerialize(messageId)
+        if (!reloaded || !ownsNavigation() || resolveAnchorIndex(bookmark.anchor) == null) return false
     }
-    // The window move itself may have recorded an intent; only a user gesture should cancel this restore.
+    if (!ownsNavigation()) return false
+    // The window move itself may have recorded an intent; ownership, not intent, says whether a gesture won.
     return restoreBookmark(bookmark, expectedIntent = intentToken) { saved -> resolveAnchorIndex(saved) }
 }

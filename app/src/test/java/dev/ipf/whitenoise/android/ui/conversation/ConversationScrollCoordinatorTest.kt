@@ -2506,6 +2506,7 @@ class ConversationScrollCoordinatorTest {
             val restored =
                 coordinator.restoreReaderAfterLanding(
                     bookmark = bookmark,
+                    ownsNavigation = { true },
                     resolveAnchorIndex = { saved -> saved.messageId?.let(window::get) },
                     rematerialize = { id ->
                         reloads++
@@ -2536,6 +2537,7 @@ class ConversationScrollCoordinatorTest {
             val restored =
                 coordinator.restoreReaderAfterLanding(
                     bookmark = bookmark,
+                    ownsNavigation = { true },
                     resolveAnchorIndex = { null },
                     rematerialize = { false },
                     returnToNewest = { error("not following the tail") },
@@ -2558,6 +2560,7 @@ class ConversationScrollCoordinatorTest {
             val restored =
                 coordinator.restoreReaderAfterLanding(
                     bookmark = bookmark,
+                    ownsNavigation = { true },
                     resolveAnchorIndex = { null },
                     rematerialize = { error("the tail is restored through the newest window") },
                     returnToNewest = {
@@ -2577,6 +2580,64 @@ class ConversationScrollCoordinatorTest {
                     }
                 }
             assertEquals(setOf(40), indexes.toSet())
+        }
+
+    /** A drag while the anchor message is being loaded back wins: the restore scrolls nothing over it. */
+    @Test
+    fun aGestureDuringTheAnchorReloadCancelsTheRestore() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 48),
+                )
+            val bookmark = coordinator.bookmark(anchor(messageId = "reader", listIndex = 12, pixelOffset = 48))
+            val window = mutableMapOf<String, Int>()
+            var owned = true
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    ownsNavigation = { owned },
+                    resolveAnchorIndex = { saved -> saved.messageId?.let(window::get) },
+                    rematerialize = { id ->
+                        window[id] = 31
+                        // The reader drags while the window is reloading.
+                        owned = false
+                        true
+                    },
+                    returnToNewest = { error("not following the tail") },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+        }
+
+    /** A newer jump while the newest window is being reloaded wins: the tail restore scrolls nothing over it. */
+    @Test
+    fun aGestureDuringTheNewestReloadCancelsTheTailRestore() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = writer, initialMode = ConversationScrollMode.FollowingTail)
+            val bookmark = coordinator.bookmark(anchor(messageId = "newest", listIndex = 0))
+            var owned = true
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    ownsNavigation = { owned },
+                    resolveAnchorIndex = { null },
+                    rematerialize = { error("the tail is restored through the newest window") },
+                    returnToNewest = {
+                        owned = false
+                        40
+                    },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
         }
 
     private sealed interface ScrollWrite {

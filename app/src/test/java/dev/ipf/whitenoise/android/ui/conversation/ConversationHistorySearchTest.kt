@@ -173,22 +173,22 @@ class ConversationHistorySearchTest {
             assertEquals(listOf("unavailable"), steps.calls)
         }
 
-    /** A loaded window whose target is gone puts the reader back before saying it is unavailable. */
+    /** A loaded window whose target is gone says so at once, then puts the reader back. */
     @Test
     fun goneTargetRestoresThePreviousPositionBeforeReporting() =
         runBlocking {
             val steps = RecordingLanding(target = record("g", "m", at = 10uL).copy(deleted = true))
             assertEquals(SearchTargetLanding.UNAVAILABLE, landSearchResult(steps.steps()))
-            assertEquals(listOf("load", "restore", "unavailable"), steps.calls)
+            assertEquals(listOf("load", "unavailable", "restore"), steps.calls)
         }
 
-    /** A window that could not load restores the reader and asks for Retry instead of claiming the message is gone. */
+    /** A window that could not load offers Retry at once, then restores the reader; never "gone". */
     @Test
     fun retryableWindowOffersRetryNotUnavailable() =
         runBlocking {
             val steps = RecordingLanding(availability = MessageAvailability.RETRYABLE)
             assertEquals(SearchTargetLanding.RETRY, landSearchResult(steps.steps()))
-            assertEquals(listOf("load", "restore", "failed"), steps.calls)
+            assertEquals(listOf("load", "failed", "restore"), steps.calls)
         }
 
     /** A loaded target that could not be centered is offered for Retry instead of landing silently. */
