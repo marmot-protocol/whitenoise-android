@@ -1126,6 +1126,8 @@
     <string name="media_downloading">Téléchargement</string>
     <string name="media_cancel_download">Annuler le téléchargement</string>
     <string name="media_download_cancelled">Téléchargement annulé. Appuyez pour télécharger à nouveau</string>
+    <string name="media_removed_download_again">Supprimé de cet appareil. Appuyez pour télécharger à nouveau</string>
+    <string name="floating_attachment_removed">Supprimé de cet appareil. Ouvrez l\'original pour le télécharger à nouveau</string>
     <string name="media_opening">Ouverture</string>
     <string name="media_save">Enregistrer</string>
     <string name="media_saved">Enregistré dans la galerie</string>

@@ -19,6 +19,7 @@ internal enum class SettingsDetail {
     CustomEmoji,
     EmojiSets,
     Data,
+    ManageStorage,
     Profile,
     AccountKeys,
     Relays,

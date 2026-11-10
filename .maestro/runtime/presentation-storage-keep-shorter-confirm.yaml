@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-storage-keep-shorter-confirm
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Keep media
+- tapOn:
+    text: 30 days
+- assertVisible:
+    text: Keep media for 30 days\?
+- tapOn:
+    id: confirmation.confirm
+- assertVisible:
+    id: presentation.complete

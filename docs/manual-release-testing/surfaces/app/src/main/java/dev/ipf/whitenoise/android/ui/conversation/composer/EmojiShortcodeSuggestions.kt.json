@@ -26,7 +26,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiShortcodeSuggestions.kt",
         "anchor": "custom.composerShortcodes",
         "test_ids": [
-          "SET-048"
+          "SET-051"
         ]
       }
     ]

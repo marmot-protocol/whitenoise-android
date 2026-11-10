@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/InstalledEmojiPicker.kt",
         "anchor": "fun ComposerEmojiLibrary(",
         "test_ids": [
-          "SET-048"
+          "SET-051"
         ]
       }
     ]

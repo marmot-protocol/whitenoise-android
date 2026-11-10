@@ -1431,7 +1431,7 @@
         "SCR-002",
         "SCR-003",
         "SCR-004",
-        "SET-048"
+        "SET-051"
       ]
     },
     {
@@ -1924,6 +1924,34 @@
         "SCR-004",
         "SET-042",
         "SET-044"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
       ]
     }
   ],

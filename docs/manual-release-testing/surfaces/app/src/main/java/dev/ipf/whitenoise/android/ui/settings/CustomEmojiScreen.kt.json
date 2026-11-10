@@ -25,7 +25,7 @@
         "anchor": "fun CustomEmojiAddActions(",
         "test_ids": [
           "SET-030",
-          "SET-048"
+          "SET-051"
         ]
       },
       {
@@ -212,7 +212,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
         "anchor": "R.string.emoji_sets_title",
         "test_ids": [
-          "SET-048"
+          "SET-051"
         ]
       }
     ],
@@ -230,7 +230,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
         "anchor": "row(\"emoji_sets\")",
         "test_ids": [
-          "SET-048"
+          "SET-051"
         ]
       }
     ]

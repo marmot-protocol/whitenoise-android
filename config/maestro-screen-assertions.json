@@ -3723,7 +3723,7 @@
           "selector": {
             "text": "Find sets"
           },
-          "scope": "Browser search field and Find sets action only; discovery, previews and installs remain manual (SET-048).",
+          "scope": "Browser search field and Find sets action only; discovery, previews and installs remain manual (SET-051).",
           "entry_assertion": {
             "text": "Find sets"
           },
@@ -3748,6 +3748,131 @@
           },
           "opened_by": {
             "text": "Data & storage"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+      "symbol": "KeepMediaDialogs",
+      "bindings": [
+        {
+          "case": "presentation-storage-keep-shorter-confirm",
+          "selector": {
+            "text": "Keep media for 30 days\\?"
+          },
+          "scope": "Production Keep media picker with a Forever window; choosing 30 days opens the shorter-window confirmation and Remove dispatches only the fixture callback.",
+          "entry_assertion": {
+            "text": "Keep media"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+      "symbol": "RemoveAttachmentsDialog",
+      "bindings": [
+        {
+          "case": "presentation-storage-remove-attachments-cancel",
+          "selector": {
+            "id": "confirmation.confirm",
+            "enabled": true
+          },
+          "scope": "Production removal confirmation for a fixed count and size shows an enabled Remove; Cancel dispatches dismissal and no removal.",
+          "entry_assertion": {
+            "text": "Remove 3 attachments\\?"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+      "symbol": "RemoveChatAttachmentsDialog",
+      "bindings": [
+        {
+          "case": "presentation-storage-remove-chat-cancel",
+          "selector": {
+            "id": "confirmation.confirm",
+            "enabled": true
+          },
+          "scope": "Production remove-all-in-chat confirmation without known figures shows an enabled Remove; Cancel dispatches dismissal and no removal.",
+          "entry_assertion": {
+            "text": "Remove all attachments in this chat\\?"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+      "symbol": "RemoveOlderDialogs",
+      "bindings": [
+        {
+          "case": "presentation-storage-remove-older-confirm",
+          "selector": {
+            "text": "Remove older attachments\\?"
+          },
+          "scope": "Production age picker and dated account-wide confirmation; Remove dispatches only the fixture callback, no attachment store.",
+          "entry_assertion": {
+            "text": "Remove older attachments"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+      "symbol": "StorageOverviewDialogs",
+      "bindings": [
+        {
+          "case": "presentation-storage-keep-shorter-confirm",
+          "selector": {
+            "text": "Keep media for 30 days\\?"
+          },
+          "scope": "Overview dialog owner rendering the Keep media picker and shorter-window confirmation from fixed usage; no MarmotKit call.",
+          "entry_assertion": {
+            "text": "Keep media"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageScreen.kt",
+      "symbol": "ManageStorageScreen",
+      "bindings": [
+        {
+          "case": "settings-manage-storage",
+          "selector": {
+            "id": "storage.free_up"
+          },
+          "scope": "Manage storage opened from Data & storage on the native fixture account: Free up space group and Back.",
+          "entry_assertion": {
+            "id": "storage.free_up"
+          },
+          "opened_by": {
+            "id": "data_usage.manage_storage"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+      "symbol": "StorageUsagePanel",
+      "bindings": [
+        {
+          "case": "settings-manage-storage",
+          "selector": {
+            "id": "storage.usage"
+          },
+          "scope": "Usage panel present on the native fixture account; figures and TalkBack sentence remain manual (SET-047).",
+          "entry_assertion": {
+            "id": "storage.usage"
+          },
+          "opened_by": {
+            "id": "data_usage.manage_storage"
           }
         }
       ]

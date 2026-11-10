@@ -49,6 +49,17 @@ class SettingsDetailNavigationTest {
         assertNull(settingsDetailParent(SettingsDetail.DevicePrivacy))
     }
 
+    /** Manage storage returns to Data Usage, which returns home, and its search entries open it in place. */
+    @Test
+    fun manageStorageReturnsToDataUsage() {
+        assertEquals(SettingsDetail.Data, settingsDetailParent(SettingsDetail.ManageStorage))
+        assertNull(settingsDetailParent(SettingsDetail.Data))
+        val catalog = settingsSearchCatalog().associateBy { it.id }
+        assertEquals(SettingsDetail.Data, catalog.getValue("Data.manage_storage").destination)
+        assertEquals(SettingsDetail.ManageStorage, catalog.getValue("ManageStorage.largest").destination)
+        assertEquals(SettingsDetail.ManageStorage, catalog.getValue("ManageStorage.keep_media").destination)
+    }
+
     @Test
     fun topLevelDetailsReturnToHome() {
         listOf(
