@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +48,11 @@ import org.robolectric.annotation.GraphicsMode
 class ComposerEmojiPaneEditingLayoutCoverageTest {
     @get:Rule val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
+
+    @Before
+    fun clearRememberedKeyboardHeight() {
+        composerImePaneHeightMemory.clear()
+    }
 
     @Test
     fun emptyComposerStaysExpandedWhenTheEmojiPaneReplacesTheKeyboard() =

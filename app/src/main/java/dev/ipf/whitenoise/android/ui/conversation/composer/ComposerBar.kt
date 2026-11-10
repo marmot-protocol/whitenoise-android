@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
@@ -418,7 +419,9 @@ internal class ComposerAcceptanceToken(
 // device and IME, not to a conversation, so a freshly entered chat can reserve
 // the real keyboard space on its first emoji-pane open instead of guessing
 // with the fallback height.
-private val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
+// Tests clear it so a run does not inherit a height from an earlier test.
+@VisibleForTesting
+internal val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
 
 @Composable
 internal fun rememberComposerTextState(
