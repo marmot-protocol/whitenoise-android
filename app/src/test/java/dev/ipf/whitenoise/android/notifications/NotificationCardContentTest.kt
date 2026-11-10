@@ -52,8 +52,9 @@ class NotificationCardContentTest {
         assertNull(content.renamedSenderNotification(messagingCard(), "different-sender", "New name"))
     }
 
+    /** The final-write refresh reads each sender's choice under the card's stamped scope, in groups too (#3635). */
     @Test
-    fun contactRefreshReadsTheStampedOpaqueScopeAndSkipsGroupSenderChoices() {
+    fun contactRefreshReadsTheStampedOpaqueScopeForDirectAndGroupSenders() {
         val calls = mutableListOf<Pair<String, String>>()
         val content =
             NotificationCardContent(context) { account, contact ->
@@ -70,7 +71,7 @@ class NotificationCardContentTest {
                 extras.putString(CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA, "opaque-scope")
             }
         assertSame(group, content.withCurrentContactPictures(group))
-        assertEquals(emptyList<Pair<String, String>>(), calls)
+        assertEquals(listOf("opaque-scope" to "sender"), calls)
     }
 
     @Test

@@ -15,7 +15,15 @@ internal data class ContactPictureReference(
     val contact: String,
     val fileName: String,
 ) {
-    val cacheKey: String get() = "${STORED_AVATAR_KEY_PREFIX}private:$owner:$contact:$fileName"
+    val cacheKey: String get() = cacheKeyPrefix(owner, contact) + fileName
+
+    companion object {
+        /** The cache-key prefix every picture [owner] chose for [contact] shares, current or replaced. */
+        fun cacheKeyPrefix(
+            owner: String,
+            contact: String,
+        ): String = "${STORED_AVATAR_KEY_PREFIX}private:$owner:$contact:"
+    }
 }
 
 /** An editor keeps existing bytes, clears the selection, or replaces it with normalized static pixels. */
@@ -216,6 +224,19 @@ internal class ContactPictureStore(
                 info.width == info.height &&
                 info.width in 1..dev.ipf.whitenoise.android.media.PRIVATE_CONTACT_PICTURE_EDGE
         }
+
+        /**
+         * The cache-key prefix of every private picture [account] chose for [contact], so a Save or Clear retires
+         * only that contact's pixels (#3635). Null for an account or contact that can hold no picture.
+         */
+        fun cacheKeyPrefix(
+            account: String,
+            contact: String,
+        ): String? =
+            key(account, contact)?.let {
+                val contactDigest = digest(contact.trim().lowercase(java.util.Locale.ROOT))
+                ContactPictureReference.cacheKeyPrefix(owner(account), contactDigest)
+            }
 
         /** Identical account/contact normalization to private nickname keys, with filenames containing neither. */
         private fun key(

@@ -63,7 +63,32 @@ internal class NotificationCardContent(
         return builder.setConversationIdentityImage(identity).build()
     }
 
-    /** Copies an active MessagingStyle while replacing the matching sender's rich Person metadata. */
+    /**
+     * Updates the reactor's Person in the native template, or keeps the fallback's artwork views, in one silent write.
+     */
+    fun reactorPictureNotification(
+        active: Notification,
+        reactor: NotificationIdentityImage,
+    ): Notification {
+        val builder =
+            NotificationCompat
+                .Builder(context, active)
+                .setGroupAlertBehavior(active.groupAlertBehavior)
+                .setOnlyAlertOnce(true)
+                .keepingCustomViews(active)
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active)
+        if (style == null) builder.setConversationIdentityImage(reactor)
+        style?.messages?.singleOrNull()?.person?.let { person ->
+            val sender = contactAvatarPerson(person, reactor.bitmap)
+            builder.setStyle(copiedMessagingStyle(style, sender, repaint = true))
+        }
+        return builder.build()
+    }
+
+    /**
+     * Copies an active MessagingStyle while replacing the matching sender's rich Person metadata, repainting that
+     * sender's lines so SystemUI draws a picture that arrived after the post (#3635).
+     */
     private fun enrichedMessagingStyle(
         notification: Notification,
         enrichedSender: Person,
@@ -71,16 +96,21 @@ internal class NotificationCardContent(
         val existing =
             NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
                 ?: return null
-        return copiedMessagingStyle(existing, enrichedSender)
+        return copiedMessagingStyle(existing, enrichedSender, repaint = true)
     }
 
-    /** Rebuilds an active card only when a stable sender key can be relabeled safely. */
+    /**
+     * Relabels active message senders by stable key. Reaction cards keep their event title and matching shortcut label.
+     */
     fun renamedSenderNotification(
         notification: Notification,
         senderAccountIdHex: String,
         senderName: String,
     ): Notification? =
-        if (notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) {
+        if (
+            notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true ||
+            notification.shortcutId?.let(::isReactionShortcutId) == true
+        ) {
             null
         } else {
             NotificationCompat.MessagingStyle
@@ -155,22 +185,26 @@ internal class NotificationCardContent(
         var style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
         if (style != null) {
             var changedAny = false
-            // Group cards draw no member's picture (withoutGroupSenderPictures), so their senders' choices go unread.
-            val people =
-                if (style.isGroupConversation) {
-                    emptyList()
-                } else {
-                    (style.messages + style.historicMessages).mapNotNull { it.person }.distinctBy { it.key }
-                }
+            // Group rows draw each member's picture (#3635), so every sender's private choice applies.
+            val people = (style.messages + style.historicMessages).mapNotNull { it.person }.distinctBy { it.key }
             people.forEach { person ->
                 val (changed, bitmap) = person.key?.let { contactAvatarOverride(account, it) } ?: (false to null)
                 if (changed) {
                     changedAny = true
-                    style = copiedMessagingStyle(checkNotNull(style), contactAvatarPerson(person, bitmap))
+                    style =
+                        copiedMessagingStyle(
+                            checkNotNull(style),
+                            contactAvatarPerson(person, bitmap),
+                            repaint = notification.shortcutId?.let(::isReactionShortcutId) == true,
+                        )
                 }
             }
             return if (changedAny) {
-                NotificationCompat.Builder(context, notification).setStyle(style).build()
+                NotificationCompat
+                    .Builder(context, notification)
+                    .setGroupAlertBehavior(notification.groupAlertBehavior)
+                    .setStyle(style)
+                    .build()
             } else {
                 notification
             }
@@ -192,7 +226,11 @@ internal class NotificationCardContent(
     fun withCurrentContactPictures(notification: Notification): Notification {
         val people = withCurrentContactAvatars(notification)
         val account = people.extras?.getString(CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA)
-        return if (account == null || people.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) {
+        return if (
+            account == null ||
+            people.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true ||
+            people.shortcutId?.let(::isReactionShortcutId) == true
+        ) {
             people
         } else {
             withCurrentIdentityContact(context, people) { contact -> contactAvatarOverride(account, contact) }
@@ -238,7 +276,9 @@ internal class NotificationCardContent(
                 style.addMessage(
                     copiedMessage(
                         message = message,
-                        replacement = sender.takeIf { replacement -> message.person?.key == replacement.key },
+                        replacement =
+                            sender.takeIf { replacement -> message.person?.key == replacement.key }
+                                ?: message.person?.let { withoutBlankGroupSenderPicture(context, it) },
                         boundedText = true,
                     ),
                 )
@@ -246,8 +286,8 @@ internal class NotificationCardContent(
         style.isGroupConversation = content.isGroupConversation
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
-        (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let {
-            style.conversationTitle = it
+        if (content.isGroupConversation) {
+            style.conversationTitle = conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle
         }
         newMessages.forEach(style::addMessage)
         return style
@@ -277,4 +317,23 @@ internal class NotificationCardContent(
                 )
             }
         }
+}
+
+/** Uses the single-sender template so the actor's picture sits next to the existing reaction title. */
+internal fun reactionStyle(
+    content: LocalNotificationContent,
+    reactor: NotificationIdentityImage,
+    timestampMs: Long,
+): NotificationCompat.MessagingStyle {
+    val self =
+        Person
+            .Builder()
+            .setName(content.selfName)
+            .setKey(content.selfKey)
+            .build()
+    val sender = reactionSenderPerson(content, reactor.bitmap)
+    return NotificationCompat
+        .MessagingStyle(self)
+        .setGroupConversation(false)
+        .addMessage(content.body, timestampMs, sender)
 }

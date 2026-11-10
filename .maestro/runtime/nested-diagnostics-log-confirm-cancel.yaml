@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-diagnostics-log-confirm-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Privacy & Security"
+    direction: DOWN
+- tapOn: "Privacy & Security"
+- scrollUntilVisible:
+    element:
+      text: "Diagnostics & Improvements"
+    direction: DOWN
+- tapOn: "Diagnostics & Improvements"
+- assertVisible:
+    id: "diagnostics.choices.group"
+- tapOn: "Share group diagnostic logs"
+- assertVisible: "Share group diagnostic logs with White Noise[?]"
+- tapOn: "Cancel"
+- assertVisible:
+    id: "diagnostics.choices.group"
+- assertNotVisible: "Share group diagnostic logs with White Noise[?]"

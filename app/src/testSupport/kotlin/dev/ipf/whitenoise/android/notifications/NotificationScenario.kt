@@ -96,6 +96,7 @@ internal object NotificationScenario {
         updatedAt = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = false,
         conversationKind = ChatConversationKindFfi.GROUP,
         muted = false,

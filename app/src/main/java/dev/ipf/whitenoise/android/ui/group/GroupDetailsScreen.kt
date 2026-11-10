@@ -1356,7 +1356,17 @@ internal fun GroupDetailsScreen(
         }
         // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.
         val leaveBlockedNotice: @Composable (Modifier) -> Unit = { modifier ->
-            if (abandonment.leaveBlocked && controller.group.offersLocalAbandonment()) {
+            if (controller.showsBlockedLeave) {
+                Box(modifier) {
+                    BlockedLeaveCancelNotice(
+                        enabled = controller.canCancelBlockedLeave && !mutationsBlocked,
+                        refreshingMembership = controller.blockedLeaveNeedsReadback,
+                        onCancel = {
+                            runGroupMutation(GroupMutationAction.CancelLeave, controller::cancelBlockedLeave)
+                        },
+                    )
+                }
+            } else if (abandonment.leaveBlocked && controller.group.offersLocalAbandonment()) {
                 Box(modifier) {
                     GroupLeaveBlockedNotice(isDm = isDm, enabled = !mutationsBlocked, onAbandon = ::requestAbandonment)
                 }
@@ -2165,7 +2175,7 @@ internal fun GroupDetailsScreen(
 
                 /** Leave row. */
                 fun SettingsGroupScope.leaveRow() {
-                    if (controller.isSelfMember) {
+                    if (controller.isSelfMember && !controller.showsBlockedLeave) {
                         row("leave") { rowContext ->
                             SettingsAction(
                                 context = rowContext,
@@ -2889,6 +2899,7 @@ private enum class GroupMutationAction {
     Delete,
     Reset,
     Leave,
+    CancelLeave,
     EnableDisbanding,
     Disband,
 }

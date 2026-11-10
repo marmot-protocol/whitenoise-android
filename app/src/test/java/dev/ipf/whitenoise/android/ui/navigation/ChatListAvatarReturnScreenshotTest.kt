@@ -119,10 +119,15 @@ class ChatListAvatarReturnScreenshotTest {
             rule.waitForIdle()
             rule.onNodeWithTag("chat.row.${fixture.rows.first().groupIdHex}").assertDoesNotExist()
             holdReads.set(true)
-            val readsBeforeReturn = fixture.avatarReads.get()
-            AvatarCacheDiagnostics.start()
-            evictWorkingSet()
-            assertCapacityEviction(fixture)
+            val readsBeforeReturn =
+                rule.runOnIdle {
+                    val reads = fixture.avatarReads.get()
+                    AvatarCacheDiagnostics.start()
+                    // Keep avatar observers from touching the LRU partway through synthetic cache pressure.
+                    evictWorkingSet()
+                    assertCapacityEviction(fixture)
+                    reads
+                }
 
             if (refresh) {
                 revision.set(2)
@@ -329,11 +334,9 @@ class ChatListAvatarReturnScreenshotTest {
 
     /** Exceeds the existing 16 MiB LRU without calling the explicit cache-clear invalidation boundary. */
     private fun evictWorkingSet() {
+        val image = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888).asImageBitmap()
         repeat(20) { index ->
-            AvatarImageLoader.putCached(
-                "marmot-avatar:churn:$index@1",
-                Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888).asImageBitmap(),
-            )
+            AvatarImageLoader.putCached("marmot-avatar:churn:$index@1", image)
         }
     }
 

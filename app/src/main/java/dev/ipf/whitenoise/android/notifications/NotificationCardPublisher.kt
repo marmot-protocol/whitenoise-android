@@ -119,7 +119,7 @@ internal class NotificationCardPublisher
                             )
                         // Rewrites of a card posted by the earlier expanded-choice build
                         // return to the standard template.
-                        val standard = withoutGroupSenderPictures(context, withoutLegacyReactionRail(context, payload))
+                        val standard = withoutLegacyReactionRail(context, payload)
                         val revision = ConversationCardPostedRegistry.newPayloadRevision()
                         // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
                         // the final platform payload so the revision describes exactly the card Android receives.

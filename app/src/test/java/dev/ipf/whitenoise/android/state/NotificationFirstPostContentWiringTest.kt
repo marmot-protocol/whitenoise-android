@@ -91,11 +91,6 @@ class NotificationFirstPostContentWiringTest {
             "firstPost.content ?:" !in enrichment &&
                 "notificationContentResolution.firstPost.resolve(candidate, localOnly = false)" in enrichment,
         )
-        assertTrue(
-            "avatar lookup must remain behind the content-routing decision",
-            "notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)" in
-                source.functionBody("prepareLateNotificationIdentity"),
-        )
         val pictureRefresh = source.functionBody("refreshLateNotificationIdentity")
         assertTrue(
             "the late-picture refresh keeps the late-correction fences",
@@ -168,7 +163,7 @@ class NotificationFirstPostContentWiringTest {
                 .substringBefore("private suspend fun showRedactedNotificationUpdate")
         val latePost = source.functionBody("postNotificationLateCorrection")
         for (post in listOf(firstPost, latePost)) {
-            assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm)" in post)
+            assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(useDirectLayout)" in post)
             assertTrue("senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap" in post)
         }
         assertTrue("postNotificationAvatarCorrection" !in source)

@@ -72,7 +72,7 @@ class NotificationReactionArtworkTest {
             assertNotNull(card.deleteIntent)
             assertTrue(card.actions.isNullOrEmpty())
             assertPicture(card, ":marmot:", context.getString(R.string.emoji_name_marmot))
-            assertNoArtwork(card.publicVersion)
+            assertGeneric(card.publicVersion)
         }
 
     /** Another bundled custom emoji uses its own artwork, including on Android 11. */
@@ -203,10 +203,10 @@ class NotificationReactionArtworkTest {
     @Test
     fun hiddenPreviewsNeverExposeArtwork() =
         runBlocking {
-            assertNoArtwork(post(":marmot:", redacted = true))
+            assertGeneric(post(":marmot:", redacted = true))
             NotificationPreviewPreferences.setEnabled(context, false, scrub = { true })
             val card = post(":marmot:")
-            assertNoArtwork(card)
+            assertGeneric(card)
             val hiddenText = card.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
             assertFalse(hiddenText.contains(":marmot:"))
             assertFalse(hiddenText.contains(context.getString(R.string.emoji_name_marmot)))
@@ -218,7 +218,7 @@ class NotificationReactionArtworkTest {
         runBlocking {
             val card = post(":marmot:")
             val hidden = notificationWithoutPreview(context, card)
-            assertNoArtwork(hidden)
+            assertGeneric(hidden)
             assertEquals(card.channelId, hidden.channelId)
             assertEquals(card.group, hidden.group)
             assertEquals(card.contentIntent, hidden.contentIntent)
@@ -326,6 +326,7 @@ class NotificationReactionArtworkTest {
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context,
+            shortcutPublisher = { error("reaction shortcut unavailable") },
             groupReconciliation = {},
             enrichmentLauncher = {},
             emojiArtworkTimeoutMs = 5_000L,
@@ -393,7 +394,9 @@ class NotificationReactionArtworkTest {
             "android.app.Notification\$DecoratedCustomViewStyle",
             card.extras.getString(Notification.EXTRA_TEMPLATE),
         )
-        assertNull(card.getLargeIcon())
+        // The card's own picture shows who reacted (#3635); the artwork stays inline, never a big picture.
+        assertNotNull(card.getLargeIcon())
+        assertNotNull(card.extras.getBundle(EXTRA_IDENTITY_IMAGE))
         assertFalse(card.extras.containsKey(Notification.EXTRA_PICTURE))
         val root = requireNotNull(card.contentView).apply(context, null)
         val icon = root.findViewById<ImageView>(R.id.reaction_notification_body_light)
@@ -411,9 +414,14 @@ class NotificationReactionArtworkTest {
         }
     }
 
-    /** No private artwork may remain in hidden or public payloads. */
-    private fun assertNoArtwork(card: Notification) {
+    /** A redacted, hidden or public payload carries neither artwork nor anyone's picture. */
+    private fun assertGeneric(card: Notification) {
         assertNull(card.getLargeIcon())
+        assertNoArtwork(card)
+    }
+
+    /** No reaction artwork remains; a readable card may still show who reacted (#3635). */
+    private fun assertNoArtwork(card: Notification) {
         assertNull(card.contentView)
         assertNull(card.bigContentView)
         assertNull(card.headsUpContentView)
