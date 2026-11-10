@@ -1,0 +1,34 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalSearchResultRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "fun GlobalSearchResultRow(",
+        "test_ids": [
+          "FIND-003",
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "GlobalSearchResultOrigin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "fun GlobalSearchResultOrigin(",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "GlobalSearchResultAttachmentLine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "fun GlobalSearchResultAttachmentLine(",
+        "test_ids": [
+          "FIND-018"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

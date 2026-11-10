@@ -1,0 +1,98 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalSearchResultsFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "fun GlobalSearchResultsFooter(",
+        "test_ids": [
+          "FIND-015",
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "GlobalSearchResultsBoundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "fun GlobalSearchResultsBoundary(",
+        "test_ids": [
+          "FIND-015",
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "BoundaryProgress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "fun BoundaryProgress(",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "BoundaryMessage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "fun BoundaryMessage(",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "SearchOlderButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "fun SearchOlderButton(",
+        "test_ids": [
+          "FIND-018"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Message results heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.notification_channel_messages",
+        "test_ids": [
+          "CHL-017",
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Message results loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.search_message_content_loading",
+        "test_ids": [
+          "FIND-003",
+          "FIND-015",
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Message results failure keeps loaded rows and offers retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.search_message_content_failed",
+        "test_ids": [
+          "FIND-003",
+          "FIND-015",
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Message results end",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.global_search_results_end",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Search older messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.global_search_results_search_older",
+        "test_ids": [
+          "FIND-018"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
