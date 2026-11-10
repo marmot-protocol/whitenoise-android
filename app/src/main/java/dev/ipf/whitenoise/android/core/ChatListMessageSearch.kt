@@ -22,6 +22,9 @@ object ChatListMessageSearch {
     // machine-authored content or raw JSON the user never typed.
     private val SearchableBodyKinds: Set<ULong> = setOf(1uL, 9uL, 1209uL)
 
+    /** Whether records of [kind] are user-authored conversation text that search can list. */
+    fun isSearchableKind(kind: ULong): Boolean = kind in SearchableBodyKinds
+
     /**
      * Whether a timeline record's body is eligible to match a chat-list
      * query. Deleted messages are skipped -- their plaintext is gone and a

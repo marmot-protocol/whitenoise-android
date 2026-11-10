@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -331,19 +332,24 @@ private val GLOBAL_SEARCH_MATCHING_TRIGGERS =
         TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
     )
 
-/** Triggers that rewrite or remove a row that already existed, which a read in flight may be holding. */
+/**
+ * Triggers that rewrite or remove a row that already existed, which a read in flight may be holding. MDK also
+ * reprojects existing rows as a snapshot refresh, for a moderator deletion or a history import.
+ */
 private val GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS =
     setOf(
         TimelineUpdateTriggerFfi.MESSAGE_DELETED,
         TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
+        TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
     )
 
 /**
  * Whether a timeline projection update can change what this session lists: the removal of a loaded row, a
  * deletion, edit, send-state or snapshot change of one, or a new or edited message the query would now admit.
  * Reactions, receipts and activity elsewhere never cause a reread, so a busy account does not keep rereading.
- * While a page or refresh is in flight it may hold rows that are not listed yet, so a removal, deletion, edit or
- * invalidation of any in-scope row also counts then; a new message is only ever counted when the query admits it,
+ * While a page or refresh is in flight it may hold rows that are not listed yet, so a removal, or a deletion, edit,
+ * snapshot reprojection or invalidation of an in-scope row of a searchable kind, also counts then. Other kinds
+ * (poll responses, reports) never sit in a held read, and a new message counts only when the query admits it,
  * so a refresh never queues another one for unrelated traffic.
  */
 internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectionUpdateFfi): Boolean {
@@ -372,7 +378,13 @@ internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectio
     }
 }
 
-/** A deletion or edit of an existing row, or a send-state change that invalidated it. */
-private fun TimelineMessageChangeFfi.Upsert.rewritesExistingRow(): Boolean =
-    trigger in GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS ||
-        (trigger == TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED && message.invalidationStatus != null)
+/**
+ * A deletion, edit or snapshot reprojection of an existing row of a searchable kind, or a send-state change that
+ * invalidated one — the only rows a read in flight can be holding.
+ */
+private fun TimelineMessageChangeFfi.Upsert.rewritesExistingRow(): Boolean {
+    val invalidated =
+        trigger == TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED && message.invalidationStatus != null
+    val rewrite = trigger in GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS || invalidated
+    return rewrite && ChatListMessageSearch.isSearchableKind(message.kind)
+}

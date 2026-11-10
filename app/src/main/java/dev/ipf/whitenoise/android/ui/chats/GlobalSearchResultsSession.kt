@@ -165,8 +165,10 @@ private fun GlobalSearchResultsRecheckEffects(
                         val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update
                         update?.accountLabel == account && controller.isTouchedBy(update.update)
                     },
-                    // Before the first page lands, that page already reads current data.
-                    wakeOnOpen = controller.state.batches > 0,
+                    // A fresh query's first page reads current data after its debounce, so its opening probe is
+                    // skipped; a returning session's undebounced reread may have started before the subscription
+                    // opened, so it still wakes, as does any session with rows loaded.
+                    wakeOnOpen = controller.state.batches > 0 || controller.state.resuming,
                 )
             failures = if (opened) 0 else failures + 1
             delay(GLOBAL_SEARCH_OBSERVER_RETRY_MS)

@@ -591,6 +591,45 @@ class GlobalSearchResultsControllerTest {
             assertEquals(2, reads)
         }
 
+    /** A moderator deletion delivered as a snapshot reprojection of a held row queues a recheck that drops it. */
+    @Test
+    fun snapshotReprojectionDuringAPageReadIsRecheckedAfterIt() =
+        runTest {
+            val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
+            val (reader, gate) = holdingFirstRead(store)
+            val controller = controller(reader)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+
+            store.replace("m2") { it.copy(deleted = true) }
+            val change = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH, store.row("m2"))
+            assertTrue(controller.isTouchedBy(update("g", change)))
+            controller.refresh()
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(listOf("g:m1", "g:m0"), keys(controller))
+        }
+
+    /** Reprojections of rows search never lists, such as poll responses, do not queue a refresh during one. */
+    @Test
+    fun nonSearchableReprojectionsDuringARefreshDoNotQueueAnother() =
+        runTest {
+            val store = StoreReader((0 until 2).map { record("g", "m$it", at = 100uL + it.toULong()) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            controller.refresh()
+            assertTrue(controller.state.refreshing)
+
+            val pollResponse = record("g", "vote", at = 200uL, text = "hello", kind = POLL_RESPONSE_KIND)
+            val reprojected = TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED
+            val change = TimelineMessageChangeFfi.Upsert(reprojected, pollResponse)
+            assertFalse(controller.isTouchedBy(update("g", change)))
+            val snapshot = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH, pollResponse)
+            assertFalse(controller.isTouchedBy(update("g", snapshot)))
+        }
+
     /** A reader that holds its first read after taking the page from [store], with the gate that releases it. */
     private fun holdingFirstRead(store: StoreReader): Pair<GlobalSearchTimelineReader, CompletableDeferred<Unit>> {
         val gate = CompletableDeferred<Unit>()
@@ -710,6 +749,9 @@ class GlobalSearchResultsControllerTest {
 
     private companion object {
         const val NOW_MILLIS = 1_000_000L
+
+        /** A poll response, which search never lists. */
+        const val POLL_RESPONSE_KIND = 1018uL
         val SENDER = "aa".repeat(32)
         val OTHER_SENDER = "bb".repeat(32)
 
