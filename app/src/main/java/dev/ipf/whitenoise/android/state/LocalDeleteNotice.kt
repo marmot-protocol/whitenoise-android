@@ -5,7 +5,7 @@ import dev.ipf.whitenoise.android.R
 
 /**
  * The wording of one chat-list local removal: its failure title and detail, and the confirmation of a success. A
- * failed removal's retry keeps the same wording, so a retried abandonment never reads as a delete (#3310).
+ * failed removal's retry keeps the same wording, so a retried group reset never reads as a delete (#3310).
  */
 internal data class LocalRemovalWording(
     @StringRes val failureTitle: Int,
@@ -21,14 +21,10 @@ internal data class LocalRemovalWording(
                 success = R.string.toast_chat_deleted_local,
             )
 
-        /** MDK's forget: abandoning a direct chat, or resetting a group to wait for a new invite. */
+        /** MDK's forget: a direct chat reads as Delete from this device, and a group as a reset awaiting an invite. */
         fun abandonment(isDm: Boolean): LocalRemovalWording =
             if (isDm) {
-                LocalRemovalWording(
-                    failureTitle = R.string.toast_couldnt_abandon_chat,
-                    failureDetail = R.string.local_abandon_retry_detail,
-                    success = R.string.toast_chat_abandoned,
-                )
+                Delete
             } else {
                 LocalRemovalWording(
                     failureTitle = R.string.toast_couldnt_reset_group,

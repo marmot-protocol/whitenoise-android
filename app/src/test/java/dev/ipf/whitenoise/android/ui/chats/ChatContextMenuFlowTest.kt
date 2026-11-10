@@ -27,6 +27,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
@@ -109,9 +110,9 @@ class ChatContextMenuFlowTest {
             assertEquals(0, opens())
         }
 
-    /** Delete still enters the shared confirmation; cancellation retains the exact native history. */
+    /** A left chat's Delete enters the shared confirmation; cancellation retains the exact native history. */
     @Test fun deleteCancelRetainsCanonicalRow() =
-        withScreen { opens, _, _ ->
+        withScreen(membership = SelfMembershipFfi.LEFT) { opens, _, _ ->
             openMenu()
             composeRule.onNodeWithTag("chat.action.Delete").performClick()
             composeRule.onNodeWithTag("chat.menu.a").assertDoesNotExist()
@@ -243,6 +244,7 @@ class ChatContextMenuFlowTest {
     /** Runs the block with the screen composed. */
     private fun withScreen(
         playback: Boolean = false,
+        membership: SelfMembershipFfi = SelfMembershipFfi.MEMBER,
         assertions: (() -> Int, (Boolean) -> Unit, WhiteNoiseAppState) -> Unit,
     ) {
         context
@@ -253,7 +255,7 @@ class ChatContextMenuFlowTest {
         val app = ChatRowPortFixtures.state(context)
         val rows =
             ('a'..'z').mapIndexed { index, id ->
-                val row = leftScopeRow(id.toString())
+                val row = leftScopeRow(id.toString(), membership)
                 row.copy(projection = checkNotNull(row.projection).copy(activitySortAt = (1000 - index).toULong()))
             }
         val controller = leftScopeController(app, rows)

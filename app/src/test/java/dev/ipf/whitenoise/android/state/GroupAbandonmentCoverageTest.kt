@@ -135,6 +135,24 @@ class GroupAbandonmentCoverageTest {
     }
 
     /**
+     * A chat this account still receives never offers a history-only delete, which its next message would undo: the
+     * row menu shows Delete only without the forget, and bulk Leave and delete forgets a direct chat that still
+     * receives, so a selection of direct chats alone needs no separate bulk forget. Bulk Delete removes only left
+     * chats.
+     */
+    @Test
+    fun receivingChatsAreForgottenNotHistoryDeleted() {
+        val menu = source("ui/chats/ChatActionSheet.kt").substringAfter("internal fun ChatContextMenu(")
+        assertTrue("row Delete must yield to the forget", "onAbandon == null && actions?.canDeleteLocal" in menu)
+        val screen = source("ui/chats/ChatsScreen.kt")
+        val forgetGate = screen.substringAfter("val abandonableSelection =").substringBefore("?.map")
+        assertTrue("the bulk forget is for selections with a group", "!item.isDm()" in forgetGate)
+        val batch = source("ui/chats/ChatDepartureBatchDialog.kt")
+        assertTrue("a receiving direct chat is forgotten", "it.isDm() && it.offersLocalAbandonment()" in batch)
+        assertTrue("bulk direct-chat removal must forward the forget", "forgetProtocol = target.forgetsDm" in batch)
+    }
+
+    /**
      * The chat-list bulk action reaches the same journaled forget as the row action: it opens only for a selection
      * that offers abandonment, through the captured departure request and its busy set, reviews every chat in the
      * shared confirmation, and each step calls abandonChatFromList, never a departure or a receiving delete.

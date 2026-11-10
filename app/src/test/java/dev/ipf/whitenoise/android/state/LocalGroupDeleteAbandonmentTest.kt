@@ -1,8 +1,13 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.ui.chats.ChatDepartureTarget
+import dev.ipf.whitenoise.android.ui.chats.ChatDepartureUi
+import dev.ipf.whitenoise.android.ui.chats.PendingChatDeparture
 import dev.ipf.whitenoise.android.ui.chats.abandonmentDepartureCallbacks
+import dev.ipf.whitenoise.android.ui.chats.departureCallbacks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -47,7 +52,7 @@ class LocalGroupDeleteAbandonmentTest {
             assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
             assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
             assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
-            assertGlobalNotice(fixture, R.string.toast_chat_abandoned)
+            assertGlobalNotice(fixture, R.string.toast_chat_deleted_local)
         }
 
     /**
@@ -112,7 +117,7 @@ class LocalGroupDeleteAbandonmentTest {
             assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
             assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
             assertTrue(fixture.controller.items.none { it.id == GROUP })
-            assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
+            assertEquals(AppText.Resource(R.string.toast_chat_deleted_local), fixture.state.transientNotice?.title)
         }
 
     /**
@@ -132,15 +137,15 @@ class LocalGroupDeleteAbandonmentTest {
                 flushLocalDeleteChatRows()
                 assertTrue("a failed forget restores the row", fixture.controller.items.any { it.id == GROUP })
                 val failure = requireNotNull(fixture.state.toast)
-                assertEquals(AppText.Resource(R.string.toast_couldnt_abandon_chat), failure.title)
-                assertEquals(AppText.Resource(R.string.local_abandon_retry_detail), failure.detail)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_delete_chat), failure.title)
+                assertEquals(AppText.Resource(R.string.local_delete_retry_detail), failure.detail)
                 fixture.failureMethod.set(null)
                 val forgetsBefore = fixture.calls.count { it == "forgetGroupLocal" }
                 retry(fixture, failure)
                 assertEquals(forgetsBefore + 1, fixture.calls.count { it == "forgetGroupLocal" })
                 assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
                 assertEquals(null, fixture.state.toast)
-                assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
+                assertEquals(AppText.Resource(R.string.toast_chat_deleted_local), fixture.state.transientNotice?.title)
             } finally {
                 Dispatchers.resetMain()
             }
@@ -188,6 +193,31 @@ class LocalGroupDeleteAbandonmentTest {
         }
 
     /**
+     * Bulk Leave and delete on a direct chat still receiving, shaped as MDK presents it (a member row whose
+     * `canDeleteLocal` is false), forgets it so the next message cannot bring it back. A history-only delete would.
+     */
+    @Test
+    fun bulkLeaveAndDeleteOfAReceivingDirectChatForgetsIt() =
+        runTest {
+            val fixture = fixture()
+            val dm =
+                fixture.controller.items.single().let {
+                    it.copy(
+                        projection = it.projection?.copy(conversationKind = ChatConversationKindFfi.DIRECT),
+                        actions = noChatRowActions(),
+                    )
+                }
+            val request = PendingChatDeparture(listOf(dm), fixture.controller, fixture.state, GroupTitleCopy.Default)
+            val target = request.targets.single()
+            assertTrue("the review names the forget", target.forgetsDm)
+            val steps = departureCallbacks(request, fixture.controller, ChatDepartureUi(), { true }, { false })
+            assertTrue(steps.remove(target, null))
+            flushLocalDeleteChatRows()
+            assertEquals(1, fixture.calls.count { it == "forgetGroupLocal" })
+            assertTrue(fixture.calls.none { it in DEPARTURE_MUTATIONS || it == "deleteGroupLocal" })
+        }
+
+    /**
      * A failed bulk step reports unfinished to the batch, which shows the reset wording and owns the one Retry, so the
      * step posts no notice of its own whose Retry would bypass the batch's busy set. The row is restored.
      */
@@ -217,7 +247,7 @@ class LocalGroupDeleteAbandonmentTest {
             assertTrue(fixture.controller.items.none { it.id == GROUP })
             assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
             assertEquals(null, fixture.state.toast)
-            assertEquals(AppText.Resource(R.string.toast_chat_abandoned), fixture.state.transientNotice?.title)
+            assertEquals(AppText.Resource(R.string.toast_chat_deleted_local), fixture.state.transientNotice?.title)
         }
 
     /** Runs the failure notice's own Retry, as its action button does, and waits for the launched mutation. */

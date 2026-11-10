@@ -110,15 +110,17 @@ internal fun ChatContextMenu(
                     },
                 )
             }
-            if (actions?.canDeleteLocal != false) {
+            // A chat the account still receives offers the forget below instead: a history-only delete there
+            // returns with the next message, so it is offered only once nothing more can arrive.
+            if (onAbandon == null && actions?.canDeleteLocal != false) {
                 add(
                     chatMenuItem(R.string.delete_from_device, R.drawable.ic_delete, "Delete", destructive = true) {
                         onDelete()
                     },
                 )
             }
-            // #3310: local abandonment stays distinct from leaving and from the receiving local delete above.
-            if (onAbandon != null && actions?.canDeleteLocal != false) {
+            // #3310: local abandonment stays distinct from leaving.
+            if (onAbandon != null) {
                 add(
                     chatMenuItem(
                         groupAbandonmentActionLabel(onAbandon.isDm),

@@ -2248,11 +2248,15 @@ internal fun ChatsScreen(
                 val selectionAccount = appState.activeAccountRef
                 val selectionRuntime = appState.runtimeGeneration
                 val selectionIds = selectedChatIds.toSet()
-                // The review names the acting account, so a selection with no bound account offers nothing.
+                // The review names the acting account, so a selection with no bound account offers nothing. Direct
+                // chats alone need no separate entry: Leave and delete already forgets them.
                 val abandonableSelection =
                     selectedVisibleItems
                         .takeIf {
-                            !selectionBeyondLoaded && controller.accountRef != null && it.offerLocalAbandonment()
+                            !selectionBeyondLoaded &&
+                                controller.accountRef != null &&
+                                it.any { item -> !item.isDm() } &&
+                                it.offerLocalAbandonment()
                         }?.map { it.isDm() }
                 dev.ipf.whitenoise.android.ui.common.AdaptiveContent(
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
