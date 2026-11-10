@@ -82,7 +82,10 @@ class NotificationIdentityShortcutBeforePostTest {
         assertEquals(notificationMonogramBackgroundColor(seed), iconPixel(withoutPicture.shortcuts.single()))
     }
 
-    /** Private member pictures cannot reappear in a group's final shortcut Person or replace its group icon. */
+    /**
+     * A member's private picture never reaches the group's shortcut Person or replaces its group icon, while the card's
+     * row for that member shows it (#3635).
+     */
     @Test
     fun groupShortcutKeepsSenderNamesWithoutPrivateMemberPixels() {
         val recorder = Recorder()
@@ -103,13 +106,11 @@ class NotificationIdentityShortcutBeforePostTest {
             ).messages.single().person!!
         assertEquals(person.name.toString(), cardPerson.name.toString())
         assertEquals(
-            0,
-            Color.alpha(
-                cardPerson.icon!!
-                    .loadDrawable(context)!!
-                    .toBitmap()
-                    .getPixel(0, 0),
-            ),
+            Color.RED,
+            cardPerson.icon!!
+                .loadDrawable(context)!!
+                .toBitmap()
+                .getPixel(0, 0),
         )
     }
 
@@ -252,6 +253,24 @@ class NotificationIdentityShortcutBeforePostTest {
         assertTrue("the presenter published a Person", publishedPersons.isNotEmpty())
         assertEquals("and the refresh kept it", publishedPersons, personsOf(refreshed.single()))
         assertFalse("nothing was rebuilt bare", InFlightConversationShortcuts.consumeIdentityLost(shortcutId))
+    }
+
+    /**
+     * #3635: the presenter records whether its publication carried the conversation picture, so a share refresh that
+     * rebuilds it with the monogram has the next post publish the picture again, while a monogram publication stays.
+     */
+    @Test
+    fun shareRefreshThatDropsThePublishedPictureIsPublishedAgain() {
+        val presenter = presenter(Recorder())
+        post(presenter, update(isDm = false), picture = solid(Color.BLUE))
+        val pictured = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        InFlightConversationShortcuts.markIdentityLost(pictured, ifPictured = true)
+        assertTrue("the picture is published again", InFlightConversationShortcuts.consumeIdentityLost(pictured))
+
+        post(presenter, update(isDm = false, groupIdHex = OTHER_GROUP), sender = solid(Color.GREEN))
+        val monogram = checkNotNull(conversationShortcutId(ACCOUNT, OTHER_GROUP))
+        InFlightConversationShortcuts.markIdentityLost(monogram, ifPictured = true)
+        assertFalse("a monogram loses nothing", InFlightConversationShortcuts.consumeIdentityLost(monogram))
     }
 
     /**

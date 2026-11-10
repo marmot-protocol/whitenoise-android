@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.maestro
 
 import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
+import dev.ipf.whitenoise.android.ui.ChatLinkAccountChoice
+import dev.ipf.whitenoise.android.ui.ChatLinkAccountChooserDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
 import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
@@ -40,6 +42,16 @@ internal fun MaestroBoundaryPresentation(fixture: MaestroPresentationFixture) {
             LargeGroupInviteConfirmationDialog(
                 onContinue = { fixture.finish("continue") },
                 onDismiss = { fixture.finish("dismiss") },
+            )
+        "chat-link-choose-cancel", "chat-link-choose-select" ->
+            ChatLinkAccountChooserDialog(
+                choice = ChatLinkAccountChoice("0123456789abcdef0123456789abcdef", listOf("work", "personal")),
+                accountLabel = { mapOf("work" to "Work", "personal" to "Personal").getValue(it) },
+                onDismiss = { fixture.finish("dismiss") },
+                onSelect = {
+                    check(it == "personal")
+                    fixture.finish("select")
+                },
             )
         else -> error("Unknown boundary presentation")
     }

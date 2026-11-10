@@ -498,6 +498,7 @@ class ChatListContinuityAndroidTest {
         updatedAt = activity,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = false,
         conversationKind = ChatConversationKindFfi.GROUP,
         muted = false,

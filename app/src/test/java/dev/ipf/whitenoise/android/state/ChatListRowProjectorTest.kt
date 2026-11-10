@@ -231,6 +231,7 @@ class ChatListRowProjectorTest {
             mutedUntilMs = null,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
         )
 
     /** Builds the matching authoritative group record with default encrypted-media capabilities. */
@@ -257,6 +258,7 @@ class ChatListRowProjectorTest {
             selfMembership = SelfMembershipFfi.MEMBER,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             welcomerAccountIdHex = null,
             viaWelcomeMessageIdHex = null,
             disbanding = false,

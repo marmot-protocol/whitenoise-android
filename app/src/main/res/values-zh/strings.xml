@@ -77,7 +77,7 @@
     <string name="error_loaded_content_kept">无法加载更多内容。你的消息仍然可用；请在方便时重试。</string>
     <string name="error_conversation_membership_unavailable">无法验证此对话的成员。请重试以显示你的消息。</string>
     <string name="error_conversation_membership_inconsistent">此对话的成员列表与此账户不符，因此消息仍会隐藏。请重试以重新检查。</string>
-    <string name="refresh">刷新转储</string>
+    <string name="refresh">刷新</string>
     <string name="retry">重试</string>
     <string name="creating_identity_title">正在创建身份</string>
     <string name="sign_in">登录</string>
@@ -348,6 +348,12 @@
     <string name="restoring_chat">正在恢复聊天...</string>
     <string name="leave_chat">退出对话</string>
     <string name="leaving_chat">正在离开聊天...</string>
+    <string name="group_leave_blocked">退出受阻</string>
+    <string name="group_leave_blocked_hint">你是唯一的管理员。取消退出即可留在此群组。</string>
+    <string name="group_cancel_leave">取消退出</string>
+    <string name="group_leave_refresh_hint">刷新以确认你是否仍在此群组中。</string>
+    <string name="group_leave_refresh_action">刷新</string>
+    <string name="toast_couldnt_cancel_leave">无法取消退出</string>
     <string name="export_conversation_transcript">导出会话记录</string>
     <string name="toast_couldnt_export_transcript">无法导出记录</string>
     <string name="no_share_target_available">没有可用的分享目标</string>
@@ -932,6 +938,8 @@
     <string name="scan_to_connect">扫码即可连接。</string>
     <string name="not_copied">未复制</string>
     <string name="copy_public_key">复制公钥</string>
+    <string name="copy_chat_link">复制聊天链接</string>
+    <string name="copy_chat_link_subtitle">为已在此聊天中的人打开此聊天</string>
     <string name="public_key_copy_action_with_value">复制公钥 %1$s</string>
     <string name="button_in_progress">进行中</string>
     <string name="private_key">私钥</string>
@@ -1063,6 +1071,9 @@
     <string name="toast_reply_draft_restore_failed">无法恢复回复。</string>
     <string name="toast_draft_save_failed">无法保存草稿。</string>
     <string name="toast_notification_conversation_unavailable">该对话已不可用</string>
+    <string name="chat_link_not_found">未找到聊天</string>
+    <string name="chat_link_invalid">此聊天链接无效</string>
+    <string name="chat_link_choose_account_title">在以下账户中打开聊天</string>
     <string name="toast_couldnt_decode_image">无法解码该图片</string>
     <string name="toast_couldnt_prepare_image">无法下载或处理该图片。</string>
     <string name="toast_reattach_to_retry_media">重新附加以重试</string>

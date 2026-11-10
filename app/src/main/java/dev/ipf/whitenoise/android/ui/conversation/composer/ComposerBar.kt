@@ -105,6 +105,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
+import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -1243,6 +1244,13 @@ internal fun ComposerBar(
             }
         }
 
+        val accessoryEntranceGate = rememberComposerAccessoryEntranceGate()
+        val accessoryMotionEnabled = rememberConversationMotionEnabled()
+        val replyExit =
+            rememberComposerAccessoryExit(
+                present = replyingTo != null && editingMessageId == null,
+                motionEnabled = accessoryMotionEnabled,
+            )
         Column(
             composerBottomClusterModifier(
                 showEmojiPane = showEmojiPane,
@@ -1281,17 +1289,39 @@ internal fun ComposerBar(
             ) {
                 val voiceReviewClip =
                     voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
+                val replyVisible = replyingTo != null || replyExit.exiting
                 val accessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
-                    if (editingMessageId == null && (replyingTo != null || attachmentContent != null)) {
+                    if (editingMessageId == null && (replyVisible || attachmentContent != null)) {
                         {
                             Column {
                                 attachmentContent?.invoke()
+                                if (replyingTo == null && replyExit.exiting) {
+                                    // The reply was cancelled or sent: its inert last frame plays the
+                                    // entrance in reverse while the slot keeps its height.
+                                    with(density) {
+                                        Box(
+                                            Modifier
+                                                .padding(8.dp)
+                                                .size(replyExit.widthPx.toDp(), replyExit.heightPx.toDp())
+                                                .composerAccessoryExitGhost(replyExit),
+                                        )
+                                    }
+                                }
                                 if (replyingTo != null) {
+                                    val replyEntrance =
+                                        rememberComposerAccessoryEntrance(
+                                            key = replyingTo.messageIdHex,
+                                            gate = accessoryEntranceGate,
+                                            motionEnabled = accessoryMotionEnabled,
+                                        )
                                     Box(
                                         // The accessory owns its shape. A second outer clip with a different
                                         // radius trims the AMOLED reply outline at all four corners.
-                                        Modifier.padding(8.dp),
+                                        Modifier
+                                            .padding(8.dp)
+                                            .composerAccessoryEntrance(replyEntrance)
+                                            .composerAccessoryExitSource(replyExit),
                                     ) {
                                         val mediaFallback =
                                             remember(replyingToMedia) { typedReplyMediaFallback(replyingToMedia) }

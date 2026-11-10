@@ -51,6 +51,17 @@ internal fun conversationShortcutId(
     return CONVERSATION_SHORTCUT_PREFIX + sha256Hex("$accountRef\u0000$groupIdHex").take(32)
 }
 
+/** Gives a reaction its own Android conversation identity without replacing the chat's shortcut. */
+internal fun reactionConversationShortcutId(
+    accountRef: String,
+    groupIdHex: String,
+): String? = conversationShortcutId(accountRef, groupIdHex)?.let { it + REACTION_SUFFIX }
+
+/** Identifies notification-only reaction shortcuts among the app's conversation shortcuts. */
+internal fun isReactionShortcutId(id: String): Boolean = isConversationShortcutId(id) && id.endsWith(REACTION_SUFFIX)
+
+private const val REACTION_SUFFIX = "-reaction"
+
 @SuppressLint("InlinedApi")
 internal fun conversationNotificationSettingsIntent(
     context: Context,

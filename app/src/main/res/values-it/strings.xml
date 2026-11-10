@@ -84,7 +84,7 @@
     <string name="error_loaded_content_kept">Impossibile caricare altri contenuti. I tuoi messaggi sono ancora disponibili; riprova quando vuoi.</string>
     <string name="error_conversation_membership_unavailable">Impossibile verificare i membri di questa conversazione. Riprova per mostrare i tuoi messaggi.</string>
     <string name="error_conversation_membership_inconsistent">L\'elenco dei membri di questa conversazione non corrisponde a questo account, quindi i messaggi restano nascosti. Riprova per controllare di nuovo.</string>
-    <string name="refresh">Aggiorna dump</string>
+    <string name="refresh">Aggiorna</string>
     <string name="retry">Riprova</string>
     <string name="creating_identity_title">Creazione identità</string>
     <string name="sign_in">Accedi</string>
@@ -363,6 +363,12 @@
     <string name="restoring_chat">Ripristino chat...</string>
     <string name="leave_chat">Esci dalla chat</string>
     <string name="leaving_chat">Uscita dalla chat...</string>
+    <string name="group_leave_blocked">Uscita bloccata</string>
+    <string name="group_leave_blocked_hint">Sei l\'unico amministratore. Annulla l\'uscita per restare in questo gruppo.</string>
+    <string name="group_cancel_leave">Annulla uscita</string>
+    <string name="group_leave_refresh_hint">Aggiorna per verificare se sei ancora in questo gruppo.</string>
+    <string name="group_leave_refresh_action">Aggiorna</string>
+    <string name="toast_couldnt_cancel_leave">Impossibile annullare l\'uscita</string>
     <string name="export_conversation_transcript">Esporta trascrizione della conversazione</string>
     <string name="toast_couldnt_export_transcript">Impossibile esportare la trascrizione</string>
     <string name="no_share_target_available">Nessuna destinazione di condivisione disponibile</string>
@@ -949,6 +955,8 @@
     <string name="scan_to_connect">Scansiona per connetterti.</string>
     <string name="not_copied">Non copiato</string>
     <string name="copy_public_key">Copia chiave pubblica</string>
+    <string name="copy_chat_link">Copia link della chat</string>
+    <string name="copy_chat_link_subtitle">Apre questa chat per chi ne fa già parte</string>
     <string name="public_key_copy_action_with_value">Copia chiave pubblica %1$s</string>
     <string name="button_in_progress">In corso</string>
     <string name="private_key">Chiave privata</string>
@@ -1084,6 +1092,9 @@
     <string name="toast_reply_draft_restore_failed">Impossibile ripristinare la risposta.</string>
     <string name="toast_draft_save_failed">Impossibile salvare la bozza.</string>
     <string name="toast_notification_conversation_unavailable">Quella conversazione non è più disponibile</string>
+    <string name="chat_link_not_found">Chat non trovata</string>
+    <string name="chat_link_invalid">Questo link alla chat non è valido</string>
+    <string name="chat_link_choose_account_title">Apri la chat in</string>
     <string name="toast_couldnt_decode_image">Impossibile decodificare l\'immagine</string>
     <string name="toast_couldnt_prepare_image">Impossibile scaricare o preparare l’immagine.</string>
     <string name="toast_reattach_to_retry_media">Riallega per riprovare</string>

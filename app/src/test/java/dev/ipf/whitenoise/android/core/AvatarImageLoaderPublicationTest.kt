@@ -122,6 +122,26 @@ class AvatarImageLoaderPublicationTest {
             assertNull(AvatarImageLoader.awaitCached(url, stale))
         }
 
+    /**
+     * #3635: a prefixed clear, as after one contact's Save or Clear, retires only that contact's private pixels and
+     * keeps every other stored avatar, such as a chat row's stored picture, and the public images decoded.
+     */
+    @Test
+    fun prefixedStoredClearRetiresOnlyTheKeysItNames() {
+        val private = "marmot-avatar:private:owner:contact:picture.png"
+        val otherContact = "marmot-avatar:private:owner:other:picture.png"
+        val row = "marmot-avatar:owner:row@1"
+        val public = "https://public.example/prefixed-clear.png"
+        listOf(private, otherContact, row, public).forEach { AvatarImageLoader.putCached(it, ImageBitmap(2, 2)) }
+
+        AvatarImageLoader.clearStoredAvatarsWithPrefix("marmot-avatar:private:owner:contact:")
+
+        assertNull(AvatarImageLoader.cachedImage(private))
+        assertNotNull(AvatarImageLoader.cachedImage(otherContact))
+        assertNotNull(AvatarImageLoader.cachedImage(row))
+        assertNotNull(AvatarImageLoader.peek(public))
+    }
+
     /** An already-published key is read straight away, so a publication made before the wait is not missed. */
     @Test
     fun alreadyCachedPixelsAreReturnedWithoutWaiting() =

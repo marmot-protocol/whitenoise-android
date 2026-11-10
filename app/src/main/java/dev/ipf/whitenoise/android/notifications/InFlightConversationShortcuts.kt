@@ -16,6 +16,8 @@ import androidx.core.content.pm.ShortcutInfoCompat
  * later post that reuses an unchanged publication holds the same rich copy, which the refresh retains as published.
  * The presenter forgets it with [forgetPublished] wherever it forgets its own publication snapshot. A refresh that had
  * to rebuild a card's shortcut without its picture marks it [markIdentityLost], so the presenter publishes it again.
+ * A refresh that targets the shortcut as a recent chat and finds no picture for it marks it the same way, which
+ * counts only when the presenter's latest publication carried a conversation picture (#3635).
  */
 internal object InFlightConversationShortcuts {
     /** How many pending posts hold one shortcut id, and when the latest of them took its hold. */
@@ -26,10 +28,14 @@ internal object InFlightConversationShortcuts {
 
     private val holds = HashMap<String, Hold>()
 
-    /** One presenter publication: the shortcut as published, and its twin for a refresh that retains it. */
+    /**
+     * One presenter publication: the shortcut as published, its twin for a refresh that retains it, and whether it
+     * carried a conversation picture.
+     */
     private data class Publication(
         val shortcut: ShortcutInfoCompat,
         val retained: ShortcutInfoCompat,
+        val pictured: Boolean = false,
     )
 
     private val published = HashMap<String, Publication>()
@@ -72,26 +78,29 @@ internal object InFlightConversationShortcuts {
         }
 
     /**
-     * What a Direct Share refresh keeps for a held [shortcutId] it does not target: the presenter's publication with
-     * its picture and Person, but without share eligibility, so a pending card for another account, or for a chat
-     * outside the active account's recent targets, never becomes a share suggestion. Null when it is not held.
+     * The presenter's share-ineligible shortcut for a pending post or a live reaction. Reactions never have a
+     * share target of their own, so a refresh must keep their group picture after the first post as well.
      */
     fun retainedShortcut(shortcutId: String): ShortcutInfoCompat? =
         synchronized(UserEventNotificationGroup.mutationLock) {
-            published[shortcutId]?.retained?.takeIf { shortcutId in holds }
+            published[shortcutId]
+                ?.retained
+                ?.takeIf { shortcutId in holds || isReactionShortcutId(shortcutId) }
         }
 
     /**
      * Keeps [shortcut] as the presenter's latest publication of [shortcutId], for holds that reuse it unchanged,
-     * with [retained] as its share-ineligible twin for refreshes that retain it.
+     * with [retained] as its share-ineligible twin for refreshes that retain it. [pictured] records whether it
+     * carried a conversation picture rather than the monogram.
      */
     fun rememberPublished(
         shortcutId: String,
         shortcut: ShortcutInfoCompat,
         retained: ShortcutInfoCompat = shortcut,
+        pictured: Boolean = false,
     ) {
         synchronized(UserEventNotificationGroup.mutationLock) {
-            published[shortcutId] = Publication(shortcut, retained)
+            published[shortcutId] = Publication(shortcut, retained, pictured)
         }
     }
 
@@ -105,9 +114,18 @@ internal object InFlightConversationShortcuts {
         synchronized(UserEventNotificationGroup.mutationLock) { published.clear() }
     }
 
-    /** Records that a refresh rebuilt [shortcutId] without the picture the presenter published. */
-    fun markIdentityLost(shortcutId: String) {
-        synchronized(UserEventNotificationGroup.mutationLock) { identityLost += shortcutId }
+    /**
+     * Records that a refresh rebuilt [shortcutId] without the picture the presenter published. With [ifPictured], a
+     * refresh that drew the monogram counts only when the presenter's latest publication carried a conversation
+     * picture, so a conversation that never had one is not published again (#3635).
+     */
+    fun markIdentityLost(
+        shortcutId: String,
+        ifPictured: Boolean = false,
+    ) {
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            if (!ifPictured || published[shortcutId]?.pictured == true) identityLost += shortcutId
+        }
     }
 
     /** Whether a refresh replaced [shortcutId]'s published picture since the last check, clearing the mark. */

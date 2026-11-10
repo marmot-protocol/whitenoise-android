@@ -310,6 +310,7 @@ internal data class NotificationAvatarPreWarmTarget(
     val preWarmRemoteImages: Boolean,
 )
 
+/** Another person's message or reaction that will post warms the pictures its card draws (#3635). */
 internal fun shouldPreWarmNotificationAvatars(
     update: NotificationUpdateFfi,
     shouldPost: Boolean,
@@ -318,9 +319,12 @@ internal fun shouldPreWarmNotificationAvatars(
     shouldPost &&
         canPost &&
         !update.isFromSelf &&
-        update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
-        !LocalNotificationFormatter.isReaction(update)
+        update.trigger == NotificationTriggerFfi.NEW_MESSAGE
 
+/**
+ * Every message card draws its sender's picture, in a group as well as a direct chat (#3635), so the sender is
+ * always warmed. A group message also warms the group picture; a reaction card draws only the person who reacted.
+ */
 internal fun notificationAvatarPreWarmTarget(
     update: NotificationUpdateFfi,
     appLockScreenVisible: Boolean,
@@ -329,9 +333,9 @@ internal fun notificationAvatarPreWarmTarget(
         senderAccountIdHex =
             update.sender.accountIdHex
                 .trim()
-                .takeIf { update.isDm && it.isNotEmpty() },
-        senderAvatarUrl = if (update.isDm) ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl) else null,
-        resolveGroupAvatar = !update.isDm,
+                .takeIf { it.isNotEmpty() },
+        senderAvatarUrl = ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl),
+        resolveGroupAvatar = !update.isDm && !LocalNotificationFormatter.isReaction(update),
         preWarmRemoteImages = !appLockScreenVisible,
     )
 

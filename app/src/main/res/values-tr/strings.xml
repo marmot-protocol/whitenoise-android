@@ -82,7 +82,7 @@
     <string name="error_loaded_content_kept">Daha fazla içerik yüklenemedi. Mesajlarınız hâlâ kullanılabilir; hazır olduğunuzda tekrar deneyin.</string>
     <string name="error_conversation_membership_unavailable">Bu sohbetin üyeleri doğrulanamadı. Mesajlarınızı göstermek için tekrar deneyin.</string>
     <string name="error_conversation_membership_inconsistent">Bu sohbetin üye listesi bu hesapla eşleşmiyor, bu yüzden mesajlar gizli kalıyor. Yeniden kontrol etmek için tekrar deneyin.</string>
-    <string name="refresh">Dökümü yenile</string>
+    <string name="refresh">Yenile</string>
     <string name="retry">Tekrar dene</string>
     <string name="creating_identity_title">Kimlik Oluşturuluyor</string>
     <string name="sign_in">Giriş Yap</string>
@@ -361,6 +361,12 @@
     <string name="restoring_chat">Sohbet geri yükleniyor...</string>
     <string name="leave_chat">Sohbetten ayrıl</string>
     <string name="leaving_chat">Sohbetten ayrılınıyor...</string>
+    <string name="group_leave_blocked">Ayrılma engellendi</string>
+    <string name="group_leave_blocked_hint">Tek yönetici sizsiniz. Bu grupta kalmak için ayrılmayı iptal edin.</string>
+    <string name="group_cancel_leave">Ayrılmayı iptal et</string>
+    <string name="group_leave_refresh_hint">Hâlâ bu grupta olup olmadığınızı görmek için yenileyin.</string>
+    <string name="group_leave_refresh_action">Yenile</string>
+    <string name="toast_couldnt_cancel_leave">Ayrılma iptal edilemedi</string>
     <string name="export_conversation_transcript">Konuşma dökümünü dışa aktar</string>
     <string name="toast_couldnt_export_transcript">Döküm dışa aktarılamadı</string>
     <string name="no_share_target_available">Kullanılabilir paylaşım hedefi yok</string>
@@ -947,6 +953,8 @@
     <string name="scan_to_connect">Bağlanmak için tarayın.</string>
     <string name="not_copied">Kopyalanmadı</string>
     <string name="copy_public_key">Genel anahtarı kopyala</string>
+    <string name="copy_chat_link">Sohbet bağlantısını kopyala</string>
+    <string name="copy_chat_link_subtitle">Bu sohbeti zaten içinde olanlar için açar</string>
     <string name="public_key_copy_action_with_value">Genel anahtarı kopyala: %1$s</string>
     <string name="button_in_progress">Devam ediyor</string>
     <string name="private_key">Özel anahtar</string>
@@ -1082,6 +1090,9 @@
     <string name="toast_reply_draft_restore_failed">Yanıt geri yüklenemedi.</string>
     <string name="toast_draft_save_failed">Taslak kaydedilemedi.</string>
     <string name="toast_notification_conversation_unavailable">Bu sohbet artık kullanılamıyor</string>
+    <string name="chat_link_not_found">Sohbet bulunamadı</string>
+    <string name="chat_link_invalid">Bu sohbet bağlantısı geçersiz</string>
+    <string name="chat_link_choose_account_title">Sohbeti şurada aç</string>
     <string name="toast_couldnt_decode_image">Resim çözülemedi</string>
     <string name="toast_couldnt_prepare_image">Görsel indirilemedi veya hazırlanamadı.</string>
     <string name="toast_reattach_to_retry_media">Tekrar denemek için yeniden ekleyin</string>

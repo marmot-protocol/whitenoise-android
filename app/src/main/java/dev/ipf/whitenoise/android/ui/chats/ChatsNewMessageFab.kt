@@ -38,9 +38,12 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
+import dev.ipf.whitenoise.android.ui.chats.newchat.newMessagePenOrigin
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
@@ -98,9 +101,16 @@ internal fun ChatsNewMessageFab(
             }
         if (current()) missing = chatsFabNeedsRelays(result)
     }
+    val penFlight = LocalNewMessagePenFlight.current
+    val motionAllowed = rememberSystemAnimationsEnabled()
     ChatsNewMessageFabContent(missing, minimumTopInWindow = minimumTopInWindow, onClick = {
         if (current()) {
-            if (missing) relayOpening = Any() else onNewMessage()
+            if (missing) {
+                relayOpening = Any()
+            } else {
+                penFlight?.launchFromPen(motionAllowed)
+                onNewMessage()
+            }
         }
     })
     val relayToken = relayOpening
@@ -157,6 +167,7 @@ internal fun ChatsNewMessageFabContent(
                 .padding(end = paneInset)
                 .alignWithComposer(composerHeight, minimumTopInWindow, placementTopInWindow, maxHeight, !missingRelays)
                 .floatingDictationAnchor(followsComposerFab = !missingRelays)
+                .newMessagePenOrigin()
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         val chrome =
             if (morphing || outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape)

@@ -92,7 +92,7 @@
     <string name="error_loaded_content_kept">Не удалось загрузить дополнительные данные. Ваши сообщения по-прежнему доступны; повторите попытку, когда будете готовы.</string>
     <string name="error_conversation_membership_unavailable">Не удалось проверить участников этой переписки. Повторите попытку, чтобы показать сообщения.</string>
     <string name="error_conversation_membership_inconsistent">Список участников этой переписки не совпадает с этим аккаунтом, поэтому сообщения скрыты. Повторите попытку, чтобы проверить снова.</string>
-    <string name="refresh">Обновить дамп</string>
+    <string name="refresh">Обновить</string>
     <string name="retry">Повторить</string>
     <string name="creating_identity_title">Создание идентичности</string>
     <string name="sign_in">Войти</string>
@@ -387,6 +387,12 @@
     <string name="restoring_chat">Восстановление чата...</string>
     <string name="leave_chat">Покинуть чат</string>
     <string name="leaving_chat">Выход из чата...</string>
+    <string name="group_leave_blocked">Выход заблокирован</string>
+    <string name="group_leave_blocked_hint">Вы единственный администратор. Отмените выход, чтобы остаться в этой группе.</string>
+    <string name="group_cancel_leave">Отменить выход</string>
+    <string name="group_leave_refresh_hint">Обновите, чтобы проверить, состоите ли вы ещё в этой группе.</string>
+    <string name="group_leave_refresh_action">Обновить</string>
+    <string name="toast_couldnt_cancel_leave">Не удалось отменить выход</string>
     <string name="export_conversation_transcript">Экспортировать стенограмму беседы</string>
     <string name="toast_couldnt_export_transcript">Не удалось экспортировать стенограмму</string>
     <string name="no_share_target_available">Нет доступной цели для отправки</string>
@@ -987,6 +993,8 @@
     <string name="scan_to_connect">Сканируйте для подключения.</string>
     <string name="not_copied">Не скопировано</string>
     <string name="copy_public_key">Скопировать открытый ключ</string>
+    <string name="copy_chat_link">Копировать ссылку на чат</string>
+    <string name="copy_chat_link_subtitle">Открывает этот чат для тех, кто уже в нём</string>
     <string name="public_key_copy_action_with_value">Скопировать открытый ключ %1$s</string>
     <string name="button_in_progress">В процессе</string>
     <string name="private_key">Закрытый ключ</string>
@@ -1130,6 +1138,9 @@
     <string name="toast_reply_draft_restore_failed">Не удалось восстановить ответ.</string>
     <string name="toast_draft_save_failed">Не удалось сохранить черновик.</string>
     <string name="toast_notification_conversation_unavailable">Этот разговор больше недоступен</string>
+    <string name="chat_link_not_found">Чат не найден</string>
+    <string name="chat_link_invalid">Эта ссылка на чат недействительна</string>
+    <string name="chat_link_choose_account_title">Открыть чат в</string>
     <string name="toast_couldnt_decode_image">Не удалось декодировать изображение</string>
     <string name="toast_couldnt_prepare_image">Не удалось загрузить или подготовить изображение.</string>
     <string name="toast_reattach_to_retry_media">Прикрепите ещё раз для повтора</string>

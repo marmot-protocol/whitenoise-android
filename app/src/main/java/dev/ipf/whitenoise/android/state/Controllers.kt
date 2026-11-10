@@ -42,6 +42,7 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
@@ -891,12 +892,33 @@ internal fun reconcileProvisionalOpenChat(
 
 /**
  * Whether [update] ends this device's membership. A [SelfMembershipFfi.DEVICE_REMOVED] copy counts: this device takes
- * no more sends, while its account stays on the roster through another device.
+ * no more sends, while its account stays on the roster through another device. A durable
+ * pending leave is provisional even when the record already says LEFT.
  */
 internal fun groupStateUpdateRemovesSelf(
     previous: AppGroupRecordFfi,
     update: AppGroupRecordFfi,
-): Boolean = !previous.selfMembership.isNonMember() && update.selfMembership.isNonMember()
+): Boolean = !previous.hasSettledDeparture() && update.hasSettledDeparture()
+
+/** Pending LEFT can still resolve to a joined account after cancellation. */
+private fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
+    selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
+
+/** Distinguishes an actual eviction from a provisional voluntary departure. */
+private fun SelfMembershipFfi.isGroupEviction(): Boolean =
+    when (this) {
+        SelfMembershipFfi.REMOVED, SelfMembershipFfi.DEVICE_REMOVED -> true
+        SelfMembershipFfi.MEMBER, SelfMembershipFfi.LEFT -> false
+    }
+
+/** A readback can rejoin only an active, confirmed group with no outstanding leave request. */
+private fun AppGroupRecordFfi.isJoinedAfterLeave(): Boolean =
+    selfMembership == SelfMembershipFfi.MEMBER &&
+        !leaveRequestPending &&
+        !leaveBlocked &&
+        !pendingConfirmation &&
+        !disbanded &&
+        !disbanding
 
 internal fun cacheAppliedGroupMembers(
     appState: WhiteNoiseAppState,
@@ -1173,6 +1195,16 @@ class ChatsController private constructor(
                 throwable = IllegalStateException("initial local projection exceeded presentation deadline"),
                 message = AppText.Resource(R.string.startup_taking_too_long),
             )
+    }
+
+    /** Publishes visible and archived rows as a projection would, for state readers of the chat list's rows. */
+    @VisibleForTesting
+    internal fun publishItemsForTest(
+        visible: List<ChatListItem>,
+        archived: List<ChatListItem> = emptyList(),
+    ) {
+        items = visible
+        archivedItems = archived
     }
 
     /** Publishes the terminal no-snapshot failure used by first-frame screen coverage. */
@@ -3827,16 +3859,17 @@ class ChatsController private constructor(
             val row = appState.marmotIo { chatListRow(attempt.account, attempt.groupId) }
             if (!attempt.isCurrent()) return@withGroupCommitLock false
             when {
-                row != null && row.selfMembership.isNonMember() -> {
+                row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
+                row.leaveRequestPending -> {
+                    foldChatRow(row)
+                    appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+                    false
+                }
+                row.selfMembership.isNonMember() -> {
                     foldChatRow(row)
                     attempt.cleanupOnly = true
                     attempt.onStage(ChatDepartureStage.LEFT)
                     true
-                }
-                row == null -> departWithoutChatRow(attempt, deleteAfterLeave)
-                row.leaveRequestPending -> {
-                    appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
-                    false
                 }
                 else -> departJoinedChat(attempt, deleteAfterLeave)
             }
@@ -3881,7 +3914,23 @@ class ChatsController private constructor(
         check(details.group.groupIdHex.equals(attempt.groupId, ignoreCase = true) && resolution.invariant == null) {
             "Authoritative group roster unavailable"
         }
+        return departResolvedChat(attempt, deleteAfterLeave, resolution)
+    }
+
+    /**
+     * Leaves a chat whose authoritative roster [resolution] has been read. A durable leave request already pending
+     * stays provisional, so it keeps the history and reports that the leave is not confirmed yet.
+     */
+    private suspend fun departResolvedChat(
+        attempt: ChatListDepartureAttempt,
+        deleteAfterLeave: Boolean,
+        resolution: GroupRosterResolution,
+    ): Boolean {
         val group = resolution.applied.group
+        if (group.leaveRequestPending) {
+            appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+            return false
+        }
         attempt.members = resolution.applied.members
         val count = resolution.uniqueMemberCount
         val sole = GroupProjector.shouldDissolveAsSoleMember(attempt.members, attempt.activeAccountId)
@@ -4012,6 +4061,7 @@ class ChatsController private constructor(
         return (deleted && !deferred).also { if (it) onStage(ChatDepartureStage.COMPLETED) }
     }
 
+    /** A durable leave request remains provisional even after MDK projects LEFT. */
     private suspend fun confirmChatListDeparture(
         account: String,
         groupIdHex: String,
@@ -4024,7 +4074,8 @@ class ChatsController private constructor(
             }.getOrNull()
         if (!isCurrent()) return false
         departureRow?.let { foldChatRow(it) }
-        val confirmed = departureRow?.selfMembership?.isNonMember() == true
+        val confirmed =
+            departureRow != null && !departureRow.leaveRequestPending && departureRow.selfMembership.isNonMember()
         if (!confirmed) appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
         return confirmed
     }
@@ -4191,8 +4242,8 @@ class ChatsController private constructor(
         val activeId = boundAccountIdHex()
         val row = appState.marmotIo { chatListRow(account, groupIdHex) }
         requireChatListDepartureCurrent(account, epoch, runtime)
-        if (row?.selfMembership?.isNonMember() == true) return emptyList()
         check(row?.leaveRequestPending != true) { "Departure is awaiting native confirmation" }
+        if (row?.selfMembership?.isNonMember() == true) return emptyList()
         val details = chatDepartureGroupDetails(account, groupIdHex)
         requireChatListDepartureCurrent(account, epoch, runtime)
         return if (details == null) {
@@ -4748,32 +4799,22 @@ class ChatsController private constructor(
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() }
         val hasReadTarget = lastId != null || item.projection?.manuallyMarkedUnread == true
+        val gid = item.group.groupIdHex
         return hasReadTarget &&
-            runCatchingCancellable {
-                var admitted = false
-                val row =
-                    appState.marmotIo {
-                        if (!chatListActionIsCurrent(owner)) return@marmotIo null
-                        admitted = true
-                        if (lastId != null) {
-                            markTimelineMessageRead(account, item.group.groupIdHex, lastId)
-                        } else {
-                            setChatManuallyUnread(account, item.group.groupIdHex, false)
-                        }
+            runAdmittedChatListAction(
+                owner,
+                "markAllRead",
+                command = {
+                    if (lastId != null) {
+                        markTimelineMessageRead(account, gid, lastId)
+                    } else {
+                        setChatManuallyUnread(account, gid, false)
                     }
-                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
+                },
+            ) { row ->
                 applyChatListActionRow(row)
-                appState.dismissConversationNotifications(account, item.group.groupIdHex)
-                true
-            }.onFailure {
-                // Quiet for the user (marking read is an idempotent
-                // affordance and surfacing a toast on every flake would be
-                // noisy) — but still log the failure so the trace surfaces
-                // in `adb logcat` when someone reports "mark read does
-                // nothing". `take(8)` on the group id keeps the privacy
-                // posture: no full ids in logs.
-                if (BuildConfig.DEBUG) Log.w("DMChatsController", "markAllRead failed", it)
-            }.getOrDefault(false)
+                appState.dismissConversationNotifications(account, gid)
+            }
     }
 
     /** Flag the chat unread until it is next read; the engine owns the clear. */
@@ -4784,24 +4825,11 @@ class ChatsController private constructor(
         if (owner == null || !chatListActionIsCurrent(owner)) return false
         val account = owner.accountRef
         return !item.removedFromGroup(appState.activeAccount?.accountIdHex) &&
-            runCatchingCancellable {
-                var admitted = false
-                val row =
-                    appState.marmotIo {
-                        if (chatListActionIsCurrent(owner)) {
-                            admitted = true
-                            setChatManuallyUnread(account, item.group.groupIdHex, true)
-                        } else {
-                            null
-                        }
-                    }
-                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
-                applyChatListActionRow(row)
-                true
-            }.onFailure {
-                // Same quiet posture as markAllRead: log-only, no toast.
-                if (BuildConfig.DEBUG) Log.w("DMChatsController", "markUnread failed", it)
-            }.getOrDefault(false)
+            runAdmittedChatListAction(
+                owner,
+                "markUnread",
+                command = { setChatManuallyUnread(account, item.group.groupIdHex, true) },
+            ) { row -> applyChatListActionRow(row) }
     }
 
     /** Pin or unpin one chat; newly pinned chats enter at the top of the pinned block. */
@@ -4811,23 +4839,46 @@ class ChatsController private constructor(
         owner: ChatListActionOwner? = captureChatListActionOwner(),
     ): Boolean {
         if (owner == null || !chatListActionIsCurrent(owner)) return false
-        return runCatchingCancellable {
-            val state =
-                appState.marmotIo {
-                    if (chatListActionIsCurrent(owner)) {
-                        setChatPinned(owner.accountRef, item.group.groupIdHex, pinned)
-                    } else {
-                        null
-                    }
-                }
-            if (state == null || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
+        return runAdmittedChatListAction(
+            owner,
+            "setPinned",
+            command = { setChatPinned(owner.accountRef, item.group.groupIdHex, pinned) },
+        ) { state ->
             applyPinState(state)
             scheduleRecompute()
-            true
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinned failed", it)
-        }.getOrDefault(false)
+        }
     }
+
+    /** Boxes a native result so a null row still counts as admitted. */
+    private class AdmittedChatListAction<T>(
+        val value: T,
+    )
+
+    /**
+     * Runs one chat-list row command: [command] only while [owner] is still current, and [apply]
+     * only while its session still owns the result. Failures stay quiet for the user and are
+     * logged in debug builds, since these are idempotent affordances.
+     */
+    private suspend fun <T> runAdmittedChatListAction(
+        owner: ChatListActionOwner,
+        label: String,
+        command: suspend MarmotInterface.() -> T,
+        apply: suspend (T) -> Unit,
+    ): Boolean =
+        runCatchingCancellable {
+            val admitted =
+                appState.marmotIo {
+                    if (chatListActionIsCurrent(owner)) AdmittedChatListAction(command()) else null
+                }
+            if (admitted == null || !chatListActionSessionIsCurrent(owner)) {
+                false
+            } else {
+                apply(admitted.value)
+                true
+            }
+        }.onFailure {
+            if (BuildConfig.DEBUG) Log.w("DMChatsController", "$label failed", it)
+        }.getOrDefault(false)
 
     /** Atomically replace the pinned block's manual order; ids must cover the pinned set exactly. */
     suspend fun setPinnedOrder(orderedGroupIds: List<String>): Boolean {
@@ -6711,6 +6762,7 @@ class ConversationController(
         get() =
             membersVerified &&
                 isSelfMember &&
+                !showsBlockedLeave &&
                 !group.unrecoverable &&
                 !group.disbanding &&
                 !group.disbanded &&
@@ -7157,7 +7209,7 @@ class ConversationController(
                             }
                         groupSnapshot?.let(::applyGroupState)
                         refreshGroupRecoveryStatus()
-                        refreshMembers(prefetchedRoster = rosterPrefetch)
+                        refreshMembersAfterGroupState(prefetchedRoster = rosterPrefetch)
                         isLoading = false
                         subscriptionError = null
                         connected = true
@@ -7230,6 +7282,11 @@ class ConversationController(
     private fun applyGroupState(incoming: AppGroupRecordFfi) {
         val update = localGroupNames.reconciled(incoming)
         val previousGroup = group
+        if (update.leaveBlocked) observedBlockedLeave = true
+        if (update.selfMembership.isGroupEviction()) {
+            observedBlockedLeave = false
+            cancelledLeaveAwaitingRoster = false
+        }
         groupRecoveryLifetime.advance()
         val previousRetention = group.disappearingMessageSecs
         mutationPresentation.authoritativeGroupApplied()
@@ -7445,7 +7502,15 @@ class ConversationController(
             if (groupStateUpdateRemovesSelf(previousGroup, update)) {
                 conversationAccountRef?.let(::markActiveAccountRemovedFromMembers)
             }
-            refreshMembers()
+            refreshMembersAfterGroupState()
+        }
+    }
+
+    /** The first snapshot and live updates both require full readback after a blocked leave clears. */
+    @VisibleForTesting
+    internal suspend fun refreshMembersAfterGroupState(prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null) {
+        if (!observedBlockedLeave || group.leaveRequestPending || !refreshManagementState()) {
+            refreshMembers(prefetchedRoster = prefetchedRoster)
         }
     }
 
@@ -7738,6 +7803,12 @@ class ConversationController(
         onPresentationAccepted: (String) -> Unit = {},
         onDurablyAccepted: () -> Unit = {},
     ) {
+        if (showsBlockedLeave) {
+            // Dictation's send action and the in-conversation wave and location shares reach here without the
+            // composer gate, so say why.
+            if (text.isNotBlank()) appState.presentTransient(blockedLeaveHint())
+            return
+        }
         val trimmed = text.trim()
         val accountRef = conversationAccountRef
         if (
@@ -9121,9 +9192,11 @@ class ConversationController(
         }
     }
 
+    /** Reactions must wait for a blocked leave to be resolved, even with seeded membership. */
     private fun reactionAccountIfAccepted(): String? {
         val accountRef = conversationAccountRef
         if (
+            showsBlockedLeave ||
             !canAcceptReaction(
                 accountRef = accountRef,
                 membersVerified = membersVerified,
@@ -10342,6 +10415,11 @@ class ConversationController(
      */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     suspend fun retryFailedSend(item: TimelineMessage) {
+        // A send that failed before the leave was blocked, or before a disband, stays failed while that state holds.
+        outboundRefusal()?.let {
+            appState.presentTransient(it)
+            return
+        }
         val key = item.id
         // A failed edit's bubble is the target's projected row (no
         // optimisticMessages entry); its retry re-runs the edit publish rather
@@ -11658,7 +11736,7 @@ class ConversationController(
         management: GroupManagementStateFfi,
     ): Boolean =
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-            val applied = applyMutationDetails(account, details)
+            val applied = applyMutationDetails(account, details, freshLeaveReadback = true)
             if (applied) {
                 managementState = management.takeIf { group == details.group }
             }
@@ -11862,6 +11940,91 @@ class ConversationController(
     var managementState by mutableStateOf<GroupManagementStateFfi?>(null)
         private set
     private val managementStateLifetime = StalenessGuard()
+    private var cancelledLeaveAwaitingRoster by mutableStateOf(false)
+    private var observedBlockedLeave by mutableStateOf(initialGroup.leaveBlocked)
+
+    /** A cleared block still needs verification before Android restores membership. */
+    internal val blockedLeaveNeedsReadback: Boolean
+        get() = cancelledLeaveAwaitingRoster || (observedBlockedLeave && !group.leaveRequestPending)
+
+    /** Keep the departure notice until native membership has been verified. */
+    internal val showsBlockedLeave: Boolean
+        get() = group.leaveBlocked || blockedLeaveNeedsReadback
+
+    /** MDK owns cancellation eligibility. An unresolved readback can retry without another mutation. */
+    internal val canCancelBlockedLeave: Boolean
+        get() = blockedLeaveNeedsReadback || (group.leaveBlocked && managementState?.canCancelLeave == true)
+
+    /** Cancel the durable leave for the bound account, then read membership from MDK. */
+    internal suspend fun cancelBlockedLeave(): Boolean =
+        withMutationLockResult(false) {
+            val account = conversationAccountRef ?: return@withMutationLockResult false
+            val groupId = group.groupIdHex
+            if (!ownsBlockedLeaveAction(account, groupId) || !canCancelBlockedLeave) return@withMutationLockResult false
+            lastMutationError = null
+            val result = runCatchingCancellable { cancelNativeBlockedLeave(account, groupId) }
+            if (!ownsBlockedLeaveAction(account, groupId) || result.getOrNull() == false) {
+                return@withMutationLockResult false
+            }
+            // MDK can durably cancel before its membership projection is updated.
+            // Read back even after a native error or an already-cancelled request.
+            refreshManagementState()
+            if (!ownsBlockedLeaveAction(account, groupId)) return@withMutationLockResult false
+            val stayed = isSelfMember && !showsBlockedLeave && !group.leaveRequestPending
+            if (!stayed) {
+                result.exceptionOrNull()?.let {
+                    recordMutationFailure(R.string.toast_couldnt_cancel_leave, "GROUP_CANCEL_LEAVE", it)
+                }
+            }
+            stayed
+        }
+
+    /**
+     * Why ordinary outbound work is refused right now, or null when it may proceed: a blocked leave, or a group that is
+     * disbanding or disbanded, the terminal states [canSendMessages] also refuses. Shared by every send path that does
+     * not pass through the composer gate.
+     */
+    @StringRes
+    private fun outboundRefusal(): Int? =
+        when {
+            showsBlockedLeave -> blockedLeaveHint()
+            group.disbanded -> R.string.conversation_disbanded_notice
+            group.disbanding -> R.string.conversation_disbanding_notice
+            else -> null
+        }
+
+    /** Matches the blocked-leave notice: a cancelled or cleared block that only awaits readback asks for Refresh. */
+    @StringRes
+    private fun blockedLeaveHint(): Int =
+        when {
+            blockedLeaveNeedsReadback -> R.string.group_leave_refresh_hint
+            else -> R.string.group_leave_blocked_hint
+        }
+
+    /** Check the action owner again under the native group lock before canceling or retrying readback. */
+    private suspend fun cancelNativeBlockedLeave(
+        account: String,
+        groupId: String,
+    ): Boolean =
+        appState.withGroupCommitLock(account, groupId) {
+            if (!ownsBlockedLeaveAction(account, groupId) || !canCancelBlockedLeave) return@withGroupCommitLock false
+            if (!blockedLeaveNeedsReadback) {
+                appState.marmotIo { cancelLeave(account, groupId) }
+                memberRosterRefreshGeneration.advance()
+                managementStateLifetime.advance()
+                cancelledLeaveAwaitingRoster = observedBlockedLeave
+            }
+            true
+        }
+
+    /** Reject work from a retired conversation, account or runtime. */
+    private fun ownsBlockedLeaveAction(
+        account: String,
+        groupId: String,
+    ): Boolean =
+        acceptsConversationActionOwner(account, groupId) &&
+            appState.activeAccountRef == account &&
+            appState.runtimeGeneration == conversationRuntimeGeneration
 
     /** Details and capabilities share one native frontier; later group updates supersede this read. */
     suspend fun refreshManagementState(): Boolean {
@@ -12578,9 +12741,9 @@ class ConversationController(
         // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
         // publishing or a slid window would reorder history the reader is looking at.
         if (prepared.mode == WindowApplyMode.EXTEND) refreshAuthoritativeOrder(applied)
-        pruneReadAnchorsToWindow()
+        readAnchoredAtSeconds.retainTimelineWindow()
         pruneConfirmedOptimisticMessages()
-        pruneRetentionAtSendToWindow()
+        retentionAtSendByMessageId.retainTimelineWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
         pruneRetainedTimelineRows(prepared)
@@ -12595,8 +12758,11 @@ class ConversationController(
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
-        pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
-        pruneOptimisticEditsToWindow()
+        messageById.retainTimelineWindow()
+        // Edits whose target left the window: the status-based prune in
+        // publishTimelineFromIndexesInternal can't fire once aggregated[target]
+        // goes null, so a never-echoed Pending edit would otherwise leak (#691).
+        optimisticEdits.retainTimelineWindow()
         // The pass above already projected every record into the by-id and
         // order indexes (and reconciled optimistics), exactly like the live
         // update paths do — so publish directly. A second full rebuild here
@@ -12816,12 +12982,12 @@ class ConversationController(
         // after loadOlder(), deliberately-loaded history is preserved and only
         // post-pagination live Upserts are trimmed (#1163 / #537).
         trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)
-        pruneRetentionAtSendToWindow()
+        retentionAtSendByMessageId.retainTimelineWindow()
         // Live Upsert/Projection batches add to messageById but never trim it;
         // prune to the (now-bounded) window + optimistic records so it doesn't
         // grow unbounded for an actively-watched conversation (#373).
-        pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
-        pruneOptimisticEditsToWindow()
+        messageById.retainTimelineWindow()
+        optimisticEdits.retainTimelineWindow()
         pruneMessageOverlaysToWindow()
         publishTimelineFromIndexes()
         // Don't relaunch a watcher for a stream finalized in this same batch
@@ -13545,33 +13711,11 @@ class ConversationController(
         if (evictedIds.isNotEmpty()) {
             evictedIds.forEach(::removeProjectedRecord)
         }
-        pruneReadAnchorsToWindow()
+        readAnchoredAtSeconds.retainTimelineWindow()
     }
 
-    private fun pruneReadAnchorsToWindow() {
-        if (readAnchoredAtSeconds.isEmpty()) return
-        val retained = HashSet(timelineRecords.keys)
-        optimisticMessages.values.forEach { retained.add(it.record.messageIdHex) }
-        readAnchoredAtSeconds.keys.retainAll(retained)
-    }
-
-    private fun pruneRetentionAtSendToWindow() {
-        if (retentionAtSendByMessageId.isEmpty()) return
-        val retained = HashSet(timelineRecords.keys)
-        optimisticMessages.values.forEach { retained.add(it.record.messageIdHex) }
-        retentionAtSendByMessageId.keys.retainAll(retained)
-    }
-
-    // Drop optimistic edits whose target message has left the window (no longer
-    // in timelineRecords nor backed by an optimistic record). The status-based
-    // prune in publishTimelineFromIndexesInternal can't fire once aggregated[target]
-    // goes null, so a never-echoed Pending edit would otherwise leak (#691).
-    private fun pruneOptimisticEditsToWindow() {
-        if (optimisticEdits.isEmpty()) return
-        val present = HashSet(timelineRecords.keys)
-        optimisticMessages.values.forEach { present.add(it.record.messageIdHex) }
-        optimisticEdits.keys.retainAll { it in present }
-    }
+    /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */
+    private fun MutableMap<String, *>.retainTimelineWindow() = retainWindowMessageKeys(this, timelineRecords.keys, optimisticMessages.values)
 
     private fun pruneMessageOverlaysToWindow() {
         if (deletedMessageIds.isEmpty() && optimisticReactionChanges.isEmpty()) return
@@ -14166,6 +14310,8 @@ class ConversationController(
         val activeAccountIdHex = conversationAccountIdHex ?: return
         mutationPresentation.authoritativeGroupApplied()
         inviteConfirmationAuthority.invalidate()
+        observedBlockedLeave = false
+        cancelledLeaveAwaitingRoster = false
         // Engine-confirmed removal (UseAfterEviction). Record the same
         // authoritative local-left marker the leaveGroup() success path sets so
         // a later authoritative roster result that races ahead of eviction can't re-add
@@ -14214,6 +14360,7 @@ class ConversationController(
     private fun applyGroupDetails(
         account: String,
         details: GroupDetailsFfi,
+        freshLeaveReadback: Boolean,
     ): AppliedGroupDetails? {
         val resolution = resolveAuthoritativeGroupRoster(details, conversationAccountIdHex)
         return applyResolvedGroupRoster(
@@ -14221,6 +14368,7 @@ class ConversationController(
             resolution = resolution,
             returnedRowCount = details.members.size,
             returnedMembership = details.group.selfMembership,
+            freshLeaveReadback = freshLeaveReadback,
         )
     }
 
@@ -14243,6 +14391,7 @@ class ConversationController(
         resolution: GroupRosterResolution,
         returnedRowCount: Int,
         returnedMembership: SelfMembershipFfi,
+        freshLeaveReadback: Boolean = false,
     ): AppliedGroupDetails? {
         val previousRetention = group.disappearingMessageSecs
         val previousGroup = group
@@ -14258,12 +14407,11 @@ class ConversationController(
             return null
         }
         val applied = resolution.applied
+        val restoredAfterCancel = reconcileBlockedLeaveReadback(resolution, freshLeaveReadback)
         mutationPresentation.authoritativeGroupApplied()
-        group =
-            inviteConfirmationAuthority.reconcile(
-                reconcileTerminalSelfMembership(update = applied.group, previous = previousGroup),
-                establishesAcceptance = false,
-            )
+        val reconciled =
+            if (restoredAfterCancel) applied.group else reconcileTerminalSelfMembership(applied.group, previousGroup)
+        group = inviteConfirmationAuthority.reconcile(reconciled, establishesAcceptance = false)
         if (previousRetention != group.disappearingMessageSecs) {
             publishTimelineFromIndexes()
         }
@@ -14296,6 +14444,31 @@ class ConversationController(
         rosterBlockReason = null
         cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
         return AppliedGroupDetails(group = group, members = members)
+    }
+
+    /** Retires a provisional leave only after the current native roster proves the outcome. */
+    private fun reconcileBlockedLeaveReadback(
+        resolution: GroupRosterResolution,
+        freshLeaveReadback: Boolean,
+    ): Boolean {
+        val incoming = resolution.applied.group
+        if (incoming.leaveBlocked) observedBlockedLeave = true
+        val restored =
+            freshLeaveReadback &&
+                observedBlockedLeave &&
+                resolution.containsLocalMember &&
+                incoming.isJoinedAfterLeave() &&
+                !group.selfMembership.isGroupEviction()
+        val settled =
+            incoming.selfMembership.isGroupEviction() ||
+                incoming.disbanded ||
+                (freshLeaveReadback && incoming.hasSettledDeparture() && !resolution.containsLocalMember)
+        if (restored || settled) {
+            observedBlockedLeave = false
+            cancelledLeaveAwaitingRoster = false
+        }
+        if (restored) selfMembership.clearSelfLeft()
+        return restored
     }
 
     private fun logGroupRosterInvariant(
@@ -14346,9 +14519,10 @@ class ConversationController(
     private fun applyMutationDetails(
         account: String,
         details: GroupDetailsFfi,
+        freshLeaveReadback: Boolean = false,
     ): Boolean {
         memberRosterRefreshGeneration.advance()
-        val applied = applyGroupDetails(account, details) ?: return false
+        val applied = applyGroupDetails(account, details, freshLeaveReadback) ?: return false
         appState.applyLocalGroupDetails(account, applied.group, applied.members)
         return true
     }

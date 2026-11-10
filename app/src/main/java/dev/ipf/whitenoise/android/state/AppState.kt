@@ -31,6 +31,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EventsSubscription
@@ -1255,6 +1256,7 @@ class WhiteNoiseAppState private constructor(
                 dev.ipf.whitenoise.android.core.AvatarImageLoader
                     .attachActiveAccount { activeAccountRef }
             }
+    private val notificationContactRowPictures = NotificationContactRowPictures()
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
     internal val localGroupDeleteCleanupMutex = Mutex()
@@ -2684,13 +2686,7 @@ class WhiteNoiseAppState private constructor(
             resolveMime = { context, uri -> shareResolveMime(context, uri) },
         )
     private val shareShortcutPublisher =
-        ShareShortcutPublisher(appContext, avatarOverride = { account, item ->
-            val peer =
-                GroupProjector
-                    .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                    ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
-            peer?.let { contactAvatarOverride(account, it) } ?: (false to null)
-        })
+        ShareShortcutPublisher(appContext, avatarOverride = { account, item -> contactPictureOverride(account, item) })
     private var shareShortcutPublishJob: Job? = null
     private var pinnedShortcutRefreshJob: Job? = null
     private val pinnedShortcutPresentationRevision = AtomicLong()
@@ -2892,6 +2888,15 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
                 .getOrNull()
                 .orEmpty()
+
+        /** Uses the receiver's chat row, including when its chat list is cold or another account is active. */
+        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean {
+            val cachedKind = notificationChatListItem(update)?.projection?.conversationKind
+            val kind =
+                cachedKind?.takeUnless { it == ChatConversationKindFfi.UNKNOWN }
+                    ?: presentedNotificationChatRow(update)?.row?.conversationKind
+            return kind == ChatConversationKindFfi.DIRECT
+        }
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
             resolveNotificationMediaKind(
@@ -11838,7 +11843,11 @@ class WhiteNoiseAppState private constructor(
         return profile
     }
 
-    /** Pure cache snapshot used at the final Android write, including a cleared private choice. */
+    /**
+     * Pure cache snapshot used at the final Android write, including a cleared private choice. Without private pixels
+     * in memory, as after a Clear, the choice shows what the chat row shows: the public picture, or the row's stored
+     * copy (#3635), and only then the monogram. The app lock always shows the monogram.
+     */
     @Suppress("ReturnCount") // Reject ineligible or revoked owners before accessing private pixels.
     private fun contactAvatarOverride(
         account: String,
@@ -11853,8 +11862,28 @@ class WhiteNoiseAppState private constructor(
         if (appLockScreenVisible) return true to null
         val private = contactPictureStore.reference(account, contact)?.cacheKey?.let(AvatarImageLoader::cachedImage)
         val published = synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
-        return true to (private?.asAndroidBitmap() ?: AvatarImageLoader.peekBitmap(published))
+        return true to
+            (
+                private?.asAndroidBitmap()
+                    ?: AvatarImageLoader.peekBitmap(published)
+                    ?: contactRowPicture(account, contact)
+            )
     }
+
+    /**
+     * #3635: the stored picture [account]'s chat rows show for [contact], archived ones included, when the chat list
+     * already decoded it, else the one a notification's late refresh last decoded for their row, such as for a push
+     * into a dead process or an account whose chat list is not open.
+     */
+    private fun contactRowPicture(
+        account: String,
+        contact: String,
+    ): android.graphics.Bitmap? =
+        chatsController
+            ?.takeIf { it.boundAccountRef == account }
+            ?.let { it.items + it.archivedItems }
+            ?.readyContactRowPicture(account, contact)
+            ?: notificationContactRowPictures.ready(account, contact)
 
     /** Bounded local file decode shares the first-post deadline; it can never acquire a public URL. */
     private suspend fun warmPrivateContactAvatar(
@@ -11929,8 +11958,13 @@ class WhiteNoiseAppState private constructor(
         if (saved) {
             // The editor's scope may already be cancelled by a configuration change while the record has landed.
             withContext(NonCancellable) {
-                // A nickname-only Save changes no pixels, so every cached avatar stays decoded.
-                if (picture !is ContactPictureChange.Keep) AvatarImageLoader.clearStoredAvatars()
+                // A nickname-only Save changes no pixels, so every cached avatar stays decoded. A picture change
+                // retires only this contact's private pixels, so the stored chat row picture a Clear falls back to
+                // stays decoded (#3635).
+                val retired = ContactPictureStore.cacheKeyPrefix(account, contact)
+                if (picture !is ContactPictureChange.Keep && retired != null) {
+                    AvatarImageLoader.clearStoredAvatarsWithPrefix(retired)
+                }
                 warmPrivateContactAvatar(account, contact)
                 contactNicknameRevision += 1
                 bumpProfileAccountRevision(contact)
@@ -12242,6 +12276,19 @@ class WhiteNoiseAppState private constructor(
             }.getOrNull()
         }
     }
+
+    /**
+     * Signed-in accounts whose local chat list holds [groupIdHex], in account order (#3658). Null when any read
+     * fails, so a storage error is never reported as a missing chat or skips an account the user could pick.
+     */
+    internal suspend fun accountsHoldingChat(groupIdHex: String): List<String>? =
+        runCatchingCancellable {
+            accounts.filterNot { it.signedOut }.map { it.label }.filter { account ->
+                marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(account, groupIdHex) }
+                    ?.groupIdHex
+                    .equals(groupIdHex, ignoreCase = true)
+            }
+        }.getOrNull()
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
@@ -13227,6 +13274,8 @@ class WhiteNoiseAppState private constructor(
                     if (!isNotDismissed() || !isNotificationEnrichmentAllowed(candidate, firstPost)) {
                         return@withVerifiedReactionQuote false
                     }
+                    val useDirectLayout = candidate.isDm || content.isDirectConversation
+                    val peer = candidate.sender.accountIdHex.takeIf { useDirectLayout }
                     localNotificationPresenter.show(
                         update = candidate,
                         conversationTitleOverride = content.conversationTitle,
@@ -13236,8 +13285,10 @@ class WhiteNoiseAppState private constructor(
                         mediaKind = content.mediaKind,
                         recipientAccountSubtext = content.recipientAccountSubtext,
                         directShareEligible = candidate.accountRef == activeAccountRef,
-                        conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
+                        conversationAvatarBitmap = firstPost.avatars.conversationBitmap(useDirectLayout),
                         senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
+                        identityContact = firstPost.avatars.identityContact ?: peer,
+                        useDirectLayout = useDirectLayout,
                         silentUpdate = true,
                         replaceCurrentMessage = true,
                         shortNpub = ::shortNpub,
@@ -13295,9 +13346,16 @@ class WhiteNoiseAppState private constructor(
     private suspend fun enrichResolvedNotificationUpdate(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
-        content: NotificationFirstPostContent,
+        resolvedContent: NotificationFirstPostContent,
         deferPicture: (LateNotificationIdentity) -> Unit,
     ): NotificationLateCorrectionOutcome {
+        val content =
+            if (firstPost.content?.isDirectConversation == true && !resolvedContent.isDirectConversation) {
+                // A late local read can fail. Keep the direct layout already established for this post.
+                resolvedContent.copy(conversationTitle = null, isDirectConversation = true)
+            } else {
+                resolvedContent
+            }
         val resolvedPresentation =
             notificationContentPresentation(
                 context = appContext,
@@ -13341,30 +13399,123 @@ class WhiteNoiseAppState private constructor(
      * #3311: runs the post-write avatar prewarm and returns the late picture
      * refresh it enables for a card first drawn without its conversation or
      * sender picture, or null when no picture can still arrive. [content] is
-     * what the card shows.
+     * what the card shows. Unless the card already shows it, the stored
+     * picture the chat list draws is read first from MDK's copy (#3635), so a
+     * picture already on the device needs no download and replaces one the
+     * first post drew from elsewhere, such as a direct chat's published
+     * sender picture on an account whose chat list was not loaded. The row's
+     * peer, whose private picture the row shows instead, is carried along so
+     * the rewrite records them. A missing sender picture gets a loader with
+     * the late refresh's longer bound. Reaction cards show only the reactor's picture.
      */
     private suspend fun prepareLateNotificationIdentity(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
+        if (content == null) return null
+        val reaction = LocalNotificationFormatter.isReaction(update)
+        val isDm = !content.isGroupConversation
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-        val urlSources =
-            firstPost.avatars.lateIdentitySources(
-                warmed,
-                update.isDm,
-                dev.ipf.whitenoise.android.notifications
-                    .notificationConversationDomain(update),
-                dev.ipf.whitenoise.android.notifications
-                    .notificationSenderDomain(update),
-            )
-        val sources =
-            if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
-                urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))
+        val pictures =
+            firstPost.avatars
+                .lateIdentitySources(
+                    warmed,
+                    isDm,
+                    dev.ipf.whitenoise.android.notifications
+                        .notificationConversationDomain(update),
+                    dev.ipf.whitenoise.android.notifications
+                        .notificationSenderDomain(update),
+                    reactorOnly = reaction,
+                ).withLateLoaders(
+                    isDm = isDm,
+                    reactorOnly = reaction,
+                    storedShown = firstPost.avatars.storedConversationBitmap != null,
+                    row = {
+                        storedConversationIdentity(update)?.takeUnless { reaction && it.contact != null }
+                    },
+                    encryptedGroupLoader = { encryptedGroupIdentityLoader(update) },
+                    urlLoader = ::latePictureLoader,
+                )
+        return if (pictures.mayRefresh) LateNotificationIdentity(content, pictures) else null
+    }
+
+    /**
+     * #3635: loads a published picture, a sender's or a conversation's URL picture, for the late refresh through the
+     * same decoded cache and worker domain as the first post's fetch, without that fetch's short bound, so a cold
+     * download or a newly started decoder still reaches the card. Nothing new starts while the app lock shows, and a
+     * picture that finishes after the lock appears is dropped. The late refresh fetches only through such loaders,
+     * so a stop behind the lock is never followed by a raw URL fetch.
+     */
+    private fun latePictureLoader(
+        url: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+    ): suspend () -> Bitmap? =
+        lockCheckedPictureLoader(url, domain, { appLockScreenVisible }) { target, trust ->
+            AvatarImageLoader.loadBitmap(target, trust)
+        }
+
+    /**
+     * #3635: what the chat row adds to a late refresh, for any account and with no network, read from MDK's presented
+     * row by the chat list's own adoption rule, so a named group never borrows a member's face while a direct chat
+     * shows its contact: a loader for MDK's stored copy of the row's selected avatar, and the peer whose private
+     * picture the row shows instead. The loader warms that peer's private picture but never returns it. The card
+     * records the peer, and the final write applies their current choice, so a picture saved or cleared meanwhile
+     * is honored. A missing copy is never acquired here, so the URL and encrypted-download fallbacks still apply.
+     * Nothing new starts while the app lock shows, and a copy that finishes after the lock appears is dropped. Null
+     * when the row cannot be read.
+     */
+    private suspend fun storedConversationIdentity(update: NotificationUpdateFfi): LateRowIdentity? {
+        val row = presentedNotificationChatRow(update) ?: return null
+        val account = update.accountRef
+        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset)
+        return lateRowIdentity(account, item)
+    }
+
+    /** Reads the exact receiver-owned presentation without waiting for a chat list to bind. */
+    private suspend fun presentedNotificationChatRow(update: NotificationUpdateFfi) =
+        runCatchingCancellable { marmotIo { presentedChatListRow(update.accountRef, update.groupIdHex) } }.getOrNull()
+
+    /**
+     * #3635: [storedConversationIdentity] for a row already read. Once the loader decodes the row's stored picture, it
+     * records that picture for the row's peer, so a cleared private choice shows it while no chat list holds the row.
+     */
+    internal fun lateRowIdentity(
+        account: String,
+        item: ChatListItem,
+    ): LateRowIdentity {
+        val contact = item.privatePictureContact()
+        val stored = item.storedNotificationAvatar(account)
+        val loader: (suspend () -> Bitmap?)? =
+            if (contact == null && stored == null) {
+                null
             } else {
-                urlSources
+                {
+                    if (!appLockScreenVisible) contact?.let { warmPrivateContactAvatar(account, it) }
+                    stored?.takeUnless { appLockScreenVisible }?.let { row ->
+                        val picture =
+                            durableAvatar(row.asset, account, acquireMissing = false, domain = row.domain)
+                                ?.takeUnless { appLockScreenVisible }
+                        if (picture != null && contact != null) {
+                            notificationContactRowPictures.record(account, contact, row.asset)
+                        }
+                        picture?.asAndroidBitmap()
+                    }
+                }
             }
-        return if (content != null && sources.hasMissingPicture) LateNotificationIdentity(content, sources) else null
+        return LateRowIdentity(loader, contact)
+    }
+
+    /**
+     * #3635: the current private picture choice for [item]'s peer, by the chat row's own rule, which notifications
+     * share, so the Direct Share shortcut and a card never flip between the private and the stored picture.
+     */
+    private fun contactPictureOverride(
+        account: String,
+        item: ChatListItem,
+    ): Pair<Boolean, Bitmap?> {
+        val contact = item.privatePictureContact() ?: return false to null
+        return contactAvatarOverride(account, contact)
     }
 
     /**
@@ -13492,6 +13643,8 @@ class WhiteNoiseAppState private constructor(
         onNotificationWritten: () -> Unit,
     ): Boolean =
         withVerifiedReactionQuote(update, firstPost) { candidate, isNotDismissed ->
+            val useDirectLayout = candidate.isDm || firstPost.content?.isDirectConversation == true
+            val peer = candidate.sender.accountIdHex.takeIf { useDirectLayout }
             localNotificationPresenter.show(
                 update = candidate,
                 conversationTitleOverride = firstPost.content?.conversationTitle,
@@ -13500,8 +13653,10 @@ class WhiteNoiseAppState private constructor(
                 reactedToPreviewOverride = verifiedReactionPreview(candidate, firstPost.content?.reactedToPreview),
                 mediaKind = firstPost.content?.mediaKind ?: ReplyMediaKind.None,
                 recipientAccountSubtext = firstPost.content?.recipientAccountSubtext,
-                conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
+                conversationAvatarBitmap = firstPost.avatars.conversationBitmap(useDirectLayout),
                 senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
+                identityContact = firstPost.avatars.identityContact ?: peer,
+                useDirectLayout = useDirectLayout,
                 redactContent = redactContent,
                 directShareEligible = !redactContent && candidate.accountRef == activeAccountRef,
                 shortNpub = ::cachedShortNpubOrUnknown,
@@ -13944,9 +14099,8 @@ class WhiteNoiseAppState private constructor(
         val result =
             if (shouldPost && !appLockScreenVisible) {
                 notificationFirstPostContentCoordinator.resolve(stage) {
-                    if (update.isDm || update.trigger != NotificationTriggerFfi.NEW_MESSAGE) {
-                        warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
-                    }
+                    // Every card draws its sender, in a group too (#3635), so their private picture is warmed.
+                    warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
                     notificationContentResolution.firstPost.resolve(update, localOnly = true)
                 }
             } else {
@@ -13976,29 +14130,44 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    /** Snapshots decoded local imagery without hydration; the existing monogram covers misses. */
+    /**
+     * Snapshots decoded local imagery without hydration; the existing monogram covers misses. Every card's sender is
+     * drawn, in a group too (#3635). The conversation picture prefers the pixels the chat list already decoded for the
+     * row's stored selected avatar, before the URL and encrypted-image caches. The snapshot names the row's peer whose
+     * private picture the row shows instead, but never holds that picture: the card and its shortcut apply the choice
+     * current at each write.
+     */
     internal fun readyNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
         if (appLockScreenVisible) return PreWarmedNotificationAvatars(null, null)
         val senderUrl =
-            if (update.isDm || update.trigger != NotificationTriggerFfi.NEW_MESSAGE) {
-                synchronized(profilePresentationLock) {
-                    profilePresentations[update.sender.accountIdHex]?.avatarUrl
-                } ?: update.sender.pictureUrl
-            } else {
-                null
-            }
-        val group =
-            chatsController
-                ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }
-                ?.items
-                ?.firstOrNull { it.id.equals(update.groupIdHex, ignoreCase = true) }
-                ?.group
+            synchronized(profilePresentationLock) {
+                profilePresentations[update.sender.accountIdHex]?.avatarUrl
+            } ?: update.sender.pictureUrl
+        val item = notificationChatListItem(update)
+        val group = item?.group
         val ready = readyNotificationAvatarSnapshot(senderUrl, group?.avatarUrl)
         val encryptedKey = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) }
-        return ready.copy(
-            groupAvatarBitmap = ready.groupAvatarBitmap ?: GroupAvatarImageLoader.peek(encryptedKey)?.asAndroidBitmap(),
-        )
+        return ready
+            .copy(
+                groupAvatarBitmap =
+                    ready.groupAvatarBitmap ?: GroupAvatarImageLoader.peek(encryptedKey)?.asAndroidBitmap(),
+            ).withChatRow(item, update.accountRef)
     }
+
+    /**
+     * Reuses the receiver's bound row. A named group's message or reaction can arrive before the chat list
+     * replaces its pending invite, which still shows the inviter instead of the group.
+     */
+    private fun notificationChatListItem(update: NotificationUpdateFfi): ChatListItem? =
+        chatsController
+            ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }
+            ?.items
+            ?.firstOrNull { it.id.equals(update.groupIdHex, ignoreCase = true) }
+            ?.takeUnless {
+                it.group.pendingConfirmation &&
+                    update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
+                    !update.groupName.isNullOrBlank()
+            }
 
     /** Publishes one fixed-label timing event without notification identity or content. */
     private fun recordNotificationFirstPostTiming(

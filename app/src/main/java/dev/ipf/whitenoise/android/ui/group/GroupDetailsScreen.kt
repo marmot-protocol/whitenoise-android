@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,6 +68,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -88,6 +90,7 @@ import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.ChatLink
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -115,6 +118,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
@@ -122,6 +126,9 @@ import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
+import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
+import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
@@ -1346,7 +1353,17 @@ internal fun GroupDetailsScreen(
         }
         // #3310: the escape path after a Leave that did not finish, under the error banner wherever it shows.
         val leaveBlockedNotice: @Composable (Modifier) -> Unit = { modifier ->
-            if (abandonment.leaveBlocked && controller.group.offersLocalAbandonment()) {
+            if (controller.showsBlockedLeave) {
+                Box(modifier) {
+                    BlockedLeaveCancelNotice(
+                        enabled = controller.canCancelBlockedLeave && !mutationsBlocked,
+                        refreshingMembership = controller.blockedLeaveNeedsReadback,
+                        onCancel = {
+                            runGroupMutation(GroupMutationAction.CancelLeave, controller::cancelBlockedLeave)
+                        },
+                    )
+                }
+            } else if (abandonment.leaveBlocked && controller.group.offersLocalAbandonment()) {
                 Box(modifier) {
                     GroupLeaveBlockedNotice(isDm = isDm, enabled = !mutationsBlocked, onAbandon = ::requestAbandonment)
                 }
@@ -1398,18 +1415,31 @@ internal fun GroupDetailsScreen(
                                 )
                             }
                         }
-                        if (memberSearchOpen) {
-                            FlowSearchField(
-                                value = memberQuery,
-                                onValueChange = { memberQuery = it },
-                                placeholder = stringResource(R.string.search_members),
-                                clipboardInput = GroupMemberIdentitySearch::clipboardInput,
-                                modifier =
-                                    Modifier
-                                        .testTag("chat_info.member_search")
-                                        .padding(horizontal = Dimens.spaceLg)
-                                        .padding(bottom = Dimens.spaceSm),
-                            )
+                        val memberSearchCollapse = rememberSearchCollapse(memberSearchOpen)
+                        if (memberSearchOpen || memberSearchCollapse.closing) {
+                            // The slot keeps its height while the closed field shrinks into the icon.
+                            Box(Modifier.fillMaxWidth().searchCollapseHost(memberSearchCollapse)) {
+                                if (memberSearchOpen) {
+                                    CompositionLocalProvider(LocalSearchCollapse provides memberSearchCollapse) {
+                                        FlowSearchField(
+                                            value = memberQuery,
+                                            onValueChange = { memberQuery = it },
+                                            placeholder = stringResource(R.string.search_members),
+                                            clipboardInput = GroupMemberIdentitySearch::clipboardInput,
+                                            modifier =
+                                                Modifier
+                                                    .testTag("chat_info.member_search")
+                                                    .padding(horizontal = Dimens.spaceLg)
+                                                    .padding(bottom = Dimens.spaceSm)
+                                                    .searchExpandReveal(memberQuery),
+                                        )
+                                    }
+                                } else {
+                                    val heightDp =
+                                        with(LocalDensity.current) { memberSearchCollapse.hostHeightPx.toDp() }
+                                    Spacer(Modifier.fillMaxWidth().height(heightDp))
+                                }
+                            }
                         }
                         // #612: render members in a deterministic order — you first,
                         // then other admins alpha by display name, then non-admins
@@ -1927,6 +1957,22 @@ internal fun GroupDetailsScreen(
                             conversationTitle,
                         )
                     }
+                    // A chat link only opens for people already in the chat;
+                    // a DM shares its profile link instead (#3658).
+                    if (!isDm && !readOnlyInvite) {
+                        row("copy_chat_link") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.copy_chat_link),
+                                subtitle = stringResource(R.string.copy_chat_link_subtitle),
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(ChatLink.uri(controller.group.groupIdHex)))
+                                    appState.present(R.string.copied)
+                                },
+                                leading = { Icon(painterResource(R.drawable.ic_link), contentDescription = null) },
+                            )
+                        }
+                    }
                     row("collapse_long_messages") { rowContext ->
                         SettingsSwitch(
                             context = rowContext,
@@ -2114,7 +2160,7 @@ internal fun GroupDetailsScreen(
 
                 /** Leave row. */
                 fun SettingsGroupScope.leaveRow() {
-                    if (controller.isSelfMember) {
+                    if (controller.isSelfMember && !controller.showsBlockedLeave) {
                         row("leave") { rowContext ->
                             SettingsAction(
                                 context = rowContext,
@@ -2838,6 +2884,7 @@ private enum class GroupMutationAction {
     Delete,
     Reset,
     Leave,
+    CancelLeave,
     EnableDisbanding,
     Disband,
 }

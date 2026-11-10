@@ -28,24 +28,28 @@ internal fun retainFailedOptimisticTextSend(
 }
 
 /**
- * Trim [messageById] to the records still referenced by the loaded window
- * ([windowIds]) or by in-flight [optimisticMessages], dropping projected records
- * that have scrolled out of the window.
+ * Trim a message-keyed [map] to the ids still referenced by the loaded window
+ * ([windowIds]) or by in-flight [optimisticMessages].
  *
- * [messageById] holds full decrypted records (plaintext + parsed tokens). The
- * live Projection/Upsert path adds one per delivered message but never trims, so
- * a long-lived busy conversation accumulates decrypted content far beyond the
- * rendered window — a memory-growth and privacy-footprint issue (#373). This is
- * the same retain-set the window-replace path already applies on page load (#68).
+ * Every per-message map that sits beside the timeline window uses this one
+ * retain set: decrypted records, read anchors, retention-at-send values and
+ * optimistic edits. The live Projection/Upsert path adds entries but never
+ * removes ones that scroll out, so without this trim a long-lived busy
+ * conversation keeps decrypted content far beyond the rendered window (#373).
+ * This is the same retain set the window-replace path applies on page load (#68).
+ *
+ * Window rows can be evicted between calls on one apply pass, so the set is
+ * built from the current [windowIds] and [optimisticMessages] on each call.
  */
-internal fun pruneMessageByIdToWindow(
-    messageById: MutableMap<String, AppMessageRecordFfi>,
-    windowIds: Set<String>,
+internal fun retainWindowMessageKeys(
+    map: MutableMap<String, *>,
+    windowIds: Collection<String>,
     optimisticMessages: Collection<TimelineMessage>,
 ) {
+    if (map.isEmpty()) return
     val retain = HashSet(windowIds)
     optimisticMessages.forEach { retain.add(it.record.messageIdHex) }
-    messageById.keys.retainAll(retain)
+    map.keys.retainAll(retain)
 }
 
 internal fun retainedMessageOverlayTargets(

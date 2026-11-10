@@ -4364,16 +4364,16 @@
       "symbol": "AuditUploadConsentDialog",
       "bindings": [
         {
-          "case": "consent-log-confirm-cancel",
+          "case": "nested-diagnostics-log-confirm-cancel",
           "selector": {
             "text": "Share group diagnostic logs with White Noise[?]"
           },
-          "scope": "diagnostics consent confirmation dismisses without enabling log upload.",
+          "scope": "Diagnostics & Improvements log-sharing confirmation dismisses without enabling log upload.",
           "entry_assertion": {
             "text": "Share group diagnostic logs with White Noise[?]"
           },
           "opened_by": {
-            "text": "Share diagnostic logs"
+            "text": "Share group diagnostic logs"
           }
         }
       ]
@@ -4656,6 +4656,34 @@
           "opened_by": {
             "text": "Invoke sentence chooser"
           }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+      "symbol": "ChatLinkAccountChooserDialog",
+      "bindings": [
+        {
+          "case": "presentation-chat-link-choose-cancel",
+          "selector": {
+            "text": "Open chat in"
+          },
+          "scope": "account chooser and Cancel dispatch; no account switch.",
+          "entry_assertion": {
+            "text": "Open chat in"
+          },
+          "visible_on_entry": true
+        },
+        {
+          "case": "presentation-chat-link-choose-select",
+          "selector": {
+            "text": "Open chat in"
+          },
+          "scope": "account chooser and account selection dispatch; no chat opened.",
+          "entry_assertion": {
+            "text": "Open chat in"
+          },
+          "visible_on_entry": true
         }
       ]
     },

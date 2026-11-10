@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReplyReceivedEmoji
+import dev.ipf.whitenoise.android.ui.group.BlockedLeaveComposerNotice
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 
 private val ConversationTopInteractionClearance = 64.dp
@@ -174,6 +175,8 @@ internal fun ConversationBottomBar(
                                     appState.launchMutation { controller.retryInviteAcceptanceAuthority() }
                                 },
                             )
+                        } else if (controller.showsBlockedLeave) {
+                            BlockedLeaveComposerNotice(controller, appState)
                         } else {
                             Spacer(
                                 Modifier

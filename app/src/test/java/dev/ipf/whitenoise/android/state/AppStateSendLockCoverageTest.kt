@@ -537,11 +537,15 @@ class AppStateSendLockCoverageTest {
         val applyTimelineChanges = controllerFunctionBody("applyTimelineChanges")
         val trimLiveTimelineWindow = controllerFunctionBody("trimLiveTimelineWindow")
         val removeProjectedRecord = controllerFunctionBody("removeProjectedRecord")
-        val pruneReadAnchorsToWindow = controllerFunctionBody("pruneReadAnchorsToWindow")
+        val retainTimelineWindow =
+            Regex("""fun MutableMap<String, \*>\.retainTimelineWindow\(\)\s*=\s*([^\n]+)""")
+                .find(controllersSource().readText())
+                ?.value
+                ?: error("Missing retainTimelineWindow")
 
         assertTrue(
             "window replacements must prune read anchors after the authoritative page is applied",
-            "pruneReadAnchorsToWindow()" in applyTimelinePage,
+            "readAnchoredAtSeconds.retainTimelineWindow()" in applyTimelinePage,
         )
         assertTrue(
             "live timeline changes must trim the window even after loadOlder (#1163)",
@@ -550,7 +554,7 @@ class AppStateSendLockCoverageTest {
         )
         assertTrue(
             "live timeline trims must prune read anchors for removed messages",
-            "pruneReadAnchorsToWindow()" in trimLiveTimelineWindow,
+            "readAnchoredAtSeconds.retainTimelineWindow()" in trimLiveTimelineWindow,
         )
         assertTrue(
             "single-record removals must drop the removed message read anchor",
@@ -558,9 +562,7 @@ class AppStateSendLockCoverageTest {
         )
         assertTrue(
             "read-anchor pruning must retain current timeline records and optimistic records only",
-            "HashSet(timelineRecords.keys)" in pruneReadAnchorsToWindow &&
-                "optimisticMessages.values.forEach" in pruneReadAnchorsToWindow &&
-                "readAnchoredAtSeconds.keys.retainAll(retained)" in pruneReadAnchorsToWindow,
+            "retainWindowMessageKeys(this, timelineRecords.keys, optimisticMessages.values)" in retainTimelineWindow,
         )
     }
 

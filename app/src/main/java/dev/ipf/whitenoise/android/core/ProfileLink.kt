@@ -102,7 +102,7 @@ data class ProfileLink(
         // resolves when pasted into another, and always include this build's own
         // BuildConfig scheme so link generation and parsing can never silently
         // drift apart if a future flavor adds a scheme (#847).
-        private val PROFILE_SCHEMES =
+        internal val PROFILE_SCHEMES =
             setOf(
                 MARMOT_SCHEME,
                 "whitenoise",

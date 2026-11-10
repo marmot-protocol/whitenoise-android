@@ -531,6 +531,7 @@ private fun snapshot(
                     canEditGroup = false,
                     canLeave = true,
                     requiresSelfDemoteBeforeLeave = false,
+                    canCancelLeave = false,
                     canEnableDisbanding = false,
                     canDisband = false,
                 ),

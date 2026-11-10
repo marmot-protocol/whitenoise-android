@@ -1,8 +1,10 @@
 package dev.ipf.whitenoise.android.qualification
 
+import android.os.Bundle
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.Marmot
@@ -15,15 +17,19 @@ import dev.ipf.whitenoise.android.ManualDeviceFixture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.nio.file.Files
 
 /** Populates through MDK on the baseline, then reads that same root after an APK update and process death. */
 @ManualDeviceFixture
@@ -38,6 +44,20 @@ class MarmotUpgradeFixtureTest {
             check(context.packageName == "dev.ipf.whitenoise.android.mdkqualification")
             val arguments = InstrumentationRegistry.getArguments()
             val phase = requireNotNull(arguments.getString("qualificationPhase"))
+            val relay = "ws://127.0.0.1:${requireNotNull(arguments.getString("relayPort"))}"
+            if (phase == "stale-upload-retry") {
+                val root = Files.createTempDirectory(context.cacheDir.toPath(), "stale-upload-retry-").toFile()
+                val runtime = upgradeFixtureRuntime(context, root, relay)
+                try {
+                    withTimeout(120_000L) {
+                        runtime.start()
+                        verifyStaleUploadRetry(runtime, relay, requireNotNull(arguments.getString("blobPort")))
+                    }
+                } finally {
+                    runtime.shutdownAndClose()
+                }
+                return@runBlocking
+            }
             require(
                 phase in
                     setOf(
@@ -55,13 +75,7 @@ class MarmotUpgradeFixtureTest {
             )
             val receipt = File(context.filesDir, "upgrade-fixture.json")
             val root = File(context.filesDir, "Marmot")
-            if (phase == "seed") {
-                check(!root.exists() && !receipt.exists())
-            } else {
-                check(root.isDirectory && receipt.isFile)
-            }
-            if (phase in setOf("corrupt", "lost")) damageUpgradeMedia(root, receipt, phase)
-            val relay = "ws://127.0.0.1:${requireNotNull(arguments.getString("relayPort"))}"
+            prepareUpgradeFixture(root, receipt, phase)
             val runtime = upgradeFixtureRuntime(context, root, relay)
             try {
                 withTimeout(360_000L) {
@@ -112,6 +126,20 @@ class MarmotUpgradeFixtureTest {
             }
             recordClosedStorage(root, receipt, phase)
         }
+
+    /** Validates the fixture layout and applies media damage only for the two recovery phases. */
+    private fun prepareUpgradeFixture(
+        root: File,
+        receipt: File,
+        phase: String,
+    ) {
+        if (phase == "seed") {
+            check(!root.exists() && !receipt.exists())
+        } else {
+            check(root.isDirectory && receipt.isFile)
+        }
+        if (phase in setOf("corrupt", "lost")) damageUpgradeMedia(root, receipt, phase)
+    }
 
     /** Records database and baseline salt evidence only after the native runtime has fully closed. */
     private fun recordClosedStorage(
@@ -351,6 +379,130 @@ class MarmotUpgradeFixtureTest {
         }
     }
 
+    /** Forces an epoch change between upload and send, then retries from the same fixture plaintext. */
+    private suspend fun verifyStaleUploadRetry(
+        runtime: Marmot,
+        relay: String,
+        blobPort: String,
+    ) {
+        val sender = runtime.createIdentity(listOf(relay), listOf(relay))
+        val peer = runtime.createIdentity(listOf(relay), listOf(relay))
+        val group = runtime.createGroup(sender.label, "Stale upload retry", listOf(peer.accountIdHex), null)
+        while (runCatching { runtime.acceptGroupInvite(peer.label, group) }.isFailure) delay(100L)
+
+        val plaintext = payload(1)
+        val caption = "Stale upload retry fixture"
+        val request =
+            MediaUploadRequestFfi(
+                listOf(MediaUploadAttachmentRequestFfi("epoch-retry.txt", "text/plain", plaintext, null, null)),
+                null,
+                false,
+                "http://127.0.0.1:$blobPort",
+            )
+        val original =
+            runtime
+                .uploadMedia(sender.label, group, request)
+                .attachments
+                .single()
+                .reference
+        requireNotNull(original.sourceEpochIdentity)
+        runtime.updateGroupProfile(sender.label, group, "Stale upload retry advanced", null)
+        val epoch = awaitAdvancedEpoch(runtime, sender, peer, group, original.sourceEpoch)
+
+        val refusal =
+            try {
+                runtime.sendMediaReference(sender.label, group, original, caption)
+                error("The old attachment reference was accepted after the epoch changed")
+            } catch (failure: MarmotKitException.MediaReferenceStaleEpoch) {
+                failure
+            }
+        assertEquals(original.sourceEpoch, refusal.sourceEpoch)
+        assertEquals(epoch, refusal.currentEpoch)
+
+        val fresh =
+            runtime
+                .uploadMedia(sender.label, group, request)
+                .attachments
+                .single()
+                .reference
+        assertEquals(epoch, fresh.sourceEpoch)
+        assertNotEquals(original.ciphertextSha256, fresh.ciphertextSha256)
+        assertEquals(original.plaintextSha256, fresh.plaintextSha256)
+        val sent = runtime.sendMediaReference(sender.label, group, fresh, caption)
+        val message = sent.messageIds.single()
+        verifyRetriedAttachmentOnPeer(runtime, peer.label, group, message, caption, plaintext)
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply {
+                putString(
+                    "stale_upload_retry",
+                    "refused epoch ${original.sourceEpoch}, retried at epoch $epoch, " +
+                        "peer attachment count 1, bytes matched",
+                )
+            },
+        )
+    }
+
+    /** Verifies one received message and one readable attachment, including duplicates with a different message ID. */
+    private suspend fun verifyRetriedAttachmentOnPeer(
+        runtime: Marmot,
+        peer: String,
+        group: String,
+        message: String,
+        caption: String,
+        plaintext: ByteArray,
+    ) {
+        val target = awaitTarget(runtime, peer, group, message)
+        runtime.requestExplicitAttachment(peer, group, target)
+        var asset = runtime.attachmentLocalAssets(peer, group, listOf(target)).single().reference
+        while (asset == null) {
+            delay(100L)
+            asset = runtime.attachmentLocalAssets(peer, group, listOf(target)).single().reference
+        }
+        val read = runtime.readAttachmentAsset(peer, asset, 0uL, plaintext.size.toUInt() + 1u)
+        assertTrue(read.available)
+        assertArrayEquals(plaintext, read.bytes)
+        // Watch for a duplicate relay delivery over a bounded window, failing on the first observation that has one.
+        val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
+        repeat(DUPLICATE_OBSERVATIONS) {
+            val messages = runtime.timelineMessages(peer, query).messages
+            assertEquals(listOf(message), messages.filter { it.plaintext == caption }.map { it.messageIdHex })
+            delay(DUPLICATE_OBSERVATION_INTERVAL_MS)
+        }
+        val page = (runtime.attachmentHistoryPage(peer, group, 100u, null) as AttachmentPageReadFfi.Page).page
+        try {
+            assertFalse(page.hasMore)
+            assertEquals(listOf(message), page.entries.map { it.messageIdHex })
+        } finally {
+            page.nextCursor?.close()
+            page.version.close()
+        }
+    }
+
+    /**
+     * Waits until the sender's epoch has moved past [sourceEpoch] and the peer has reached it, and returns that epoch.
+     * Fails with the epochs it saw, before the outer timeout would hide which account fell behind.
+     */
+    private suspend fun awaitAdvancedEpoch(
+        runtime: Marmot,
+        sender: AccountSummaryFfi,
+        peer: AccountSummaryFfi,
+        group: String,
+        sourceEpoch: ULong,
+    ): ULong {
+        var epoch = runtime.groupDetails(sender.label, group).mlsState.epoch
+        withTimeoutOrNull(EPOCH_SYNC_TIMEOUT_MS) {
+            while (epoch <= sourceEpoch || runtime.groupDetails(peer.label, group).mlsState.epoch != epoch) {
+                delay(100L)
+                epoch = runtime.groupDetails(sender.label, group).mlsState.epoch
+            }
+        } ?: fail(
+            "Epoch did not advance past $sourceEpoch on both accounts: sender at $epoch, " +
+                "peer at ${runtime.groupDetails(peer.label, group).mlsState.epoch}",
+        )
+        return epoch
+    }
+
     /** The native account roster and usable chat projections must match what the baseline actually wrote. */
     private suspend fun verifyHistory(
         runtime: Marmot,
@@ -373,6 +525,13 @@ class MarmotUpgradeFixtureTest {
         const val PAYLOAD_SIZE = 16 * 1024 * 1024
         const val PENDING_SIZE = 1024
         const val READ_SIZE = 1024 * 1024
+
+        /** How long both accounts get to agree on the advanced epoch before the stale-upload phase fails. */
+        const val EPOCH_SYNC_TIMEOUT_MS = 60_000L
+
+        /** Timeline observations, and the spacing between them, that must each hold exactly one stale-retry message. */
+        const val DUPLICATE_OBSERVATIONS = 8
+        const val DUPLICATE_OBSERVATION_INTERVAL_MS = 250L
 
         /** Deterministic synthetic bytes let both runtime generations assert content, not just attachment counts. */
         fun payload(offset: Int = 0): ByteArray {

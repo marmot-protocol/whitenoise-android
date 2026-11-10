@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
@@ -52,7 +53,7 @@ private fun postLocalNotification(
 class LocalNotificationPresenter(
     private val context: Context,
     private val shortcutPublisher: (ShortcutInfoCompat) -> Unit = { shortcut ->
-        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        check(ShortcutManagerCompat.pushDynamicShortcut(context, shortcut))
     },
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val notificationPoster: (NotificationManagerCompat, String, Int, Notification) -> Unit =
@@ -334,6 +335,10 @@ class LocalNotificationPresenter(
      * write observer runs after the first successful platform notification write.
      * A quiet write settles its alert flags at that final write, against the live
      * same-key card, so it never ends a heads-up banner that card is still showing.
+     * [identityContact] is the chat row's peer for a direct chat MDK reports as a
+     * group (#3635). The card and its shortcut record them, and each write applies
+     * their private picture as chosen at that moment, as for any direct chat.
+     * [useDirectLayout] selects Android's single-peer presentation without changing alert routing.
      */
     @SuppressLint("MissingPermission")
     suspend fun show(
@@ -350,6 +355,8 @@ class LocalNotificationPresenter(
         conversationAvatarBitmap: Bitmap? = null,
         senderAvatarUrl: String? = null,
         senderAvatarBitmap: Bitmap? = null,
+        identityContact: String? = null,
+        useDirectLayout: Boolean = false,
         silentUpdate: Boolean = false,
         replaceCurrentMessage: Boolean = false,
         onNotificationWritten: (() -> Unit)? = null,
@@ -368,6 +375,7 @@ class LocalNotificationPresenter(
                 reactedToPreviewOverride = reactedToPreviewOverride,
                 mediaKind = mediaKind,
                 conversationTitleOverride = conversationTitleOverride,
+                useDirectLayout = useDirectLayout,
                 shortNpub = shortNpub,
             )
         val formatterReturnedContent = formattedContent != null
@@ -439,7 +447,6 @@ class LocalNotificationPresenter(
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
-        var reactionInlineArtwork = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
@@ -663,24 +670,17 @@ class LocalNotificationPresenter(
 
                     builder.addExtras(contactPictureAccountExtras(update.accountRef))
                     var messagingPost: MessagingPostContext? = null
+                    var reactorIdentity: NotificationIdentityImage? = null
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
                         // reactions channel, see LocalNotificationFormatter) so they're muted
-                        // independently of messages. Artwork replaces its shortcode in a decorated inline row;
-                        // the card keeps its existing actions and never becomes a conversation.
+                        // independently of messages. Android can use the message template for that separate card.
                         NotificationStyleChoice.Plain -> {
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
                                 builder
                                     .setContentText(notificationContent.body)
                                     .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
-                                reactionInlineArtwork =
-                                    previewToken.allowed &&
-                                    applyReactionNotificationArtwork(
-                                        context,
-                                        builder,
-                                        notificationContent,
-                                    )
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
@@ -689,6 +689,14 @@ class LocalNotificationPresenter(
                                         .setBigContentTitle("")
                                         .bigText(notificationContent.title),
                                 )
+                            }
+                            // #3635: a reaction card shows who reacted. A missing picture arrives through the late
+                            // identity refresh, and redacted or hidden-preview cards get none.
+                            if (notificationContent.isReactionPreview && !redactContent && previewToken.allowed) {
+                                reactorIdentity =
+                                    notificationContent.reactorImage(
+                                        senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl),
+                                    )
                             }
                         }
 
@@ -700,17 +708,14 @@ class LocalNotificationPresenter(
                                     null to null
                                 } else {
                                     (conversationAvatarBitmap ?: cachedAvatarBitmap(conversationAvatarUrl)) to
-                                        if (notificationContent.isGroupConversation) {
-                                            null
-                                        } else {
-                                            senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl)
-                                        }
+                                        (senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl))
                                 }
+                            // #3635: a group row shows its member's picture, or their monogram until it arrives.
                             val sender =
                                 notificationSenderPerson(
                                     notificationContent,
                                     resolvedSenderAvatarBitmap
-                                        ?: if (redactContent || notificationContent.isGroupConversation) {
+                                        ?: if (redactContent) {
                                             null
                                         } else {
                                             notificationMonogramBitmap(
@@ -731,6 +736,7 @@ class LocalNotificationPresenter(
                                         titleOverride = conversationTitleOverride,
                                         conversationAvatar = resolvedConversationAvatarBitmap,
                                         senderAvatar = resolvedSenderAvatarBitmap,
+                                        contact = identityContact,
                                     ),
                                 )
                             }
@@ -783,9 +789,9 @@ class LocalNotificationPresenter(
                                     shortcutId = messagingShortcutId,
                                     conversationAvatarUrl = conversationAvatarUrl,
                                     conversationAvatarBitmap = resolvedConversationAvatarBitmap,
-                                    senderAvatarUrl =
-                                        senderAvatarUrl.takeUnless { notificationContent.isGroupConversation },
+                                    senderAvatarUrl = senderAvatarUrl,
                                     senderAvatarBitmap = resolvedSenderAvatarBitmap,
+                                    identityContact = identityContact,
                                 )
                         }
 
@@ -813,7 +819,26 @@ class LocalNotificationPresenter(
                             publishShortcutBeforePost(update, notificationContent, messaging, directShareEligible) {
                                 profileAllowsPost() && showGenerationAllowsPost()
                             }
+                        } ?: reactorIdentity?.let {
+                            publishReactionShortcutBeforePost(update, notificationContent) {
+                                profileAllowsPost() && showGenerationAllowsPost()
+                            }?.also(builder::setShortcutId)
                         }
+                    val reactionInlineArtwork =
+                        reactorIdentity?.let { reactor ->
+                            if (heldShortcutId != null) {
+                                builder.recordIdentityImage(reactor)
+                                false
+                            } else {
+                                builder.setConversationIdentityImage(reactor)
+                                applyReactionNotificationArtwork(
+                                    context,
+                                    builder,
+                                    notificationContent,
+                                    reservesPicture = true,
+                                )
+                            }
+                        } ?: false
 
                     // Builds under the card lock, so the quiet flags see the card the platform will update.
                     val buildSettled = { afterOwnCancel: Boolean ->
@@ -1016,6 +1041,15 @@ class LocalNotificationPresenter(
                                         }
                                         val presentationTimestampMs = nowMillis()
                                         stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                                        reactorIdentity?.takeIf { heldShortcutId != null }?.let { reactor ->
+                                            builder.setStyle(
+                                                reactionStyle(
+                                                    notificationContent,
+                                                    reactor,
+                                                    presentationTimestampMs,
+                                                ),
+                                            )
+                                        }
                                         val notification = buildSettled(false)
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
                                             ConversationCardOp.SHOW_NOTIFY,
@@ -1175,8 +1209,30 @@ class LocalNotificationPresenter(
                 directShareEligible = directShareEligible,
                 isPublishAllowed = isPublishAllowed,
                 holdForPost = true,
+                identityContact = messaging.identityContact,
             )
         }.takeIf { it }?.let { shortcutId }
+    }
+
+    /** Publishes the separate reaction shortcut before Android classifies the card for its template. */
+    private suspend fun publishReactionShortcutBeforePost(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        isPublishAllowed: () -> Boolean,
+    ): String? {
+        val id =
+            reactionConversationShortcutId(update.accountRef, update.groupIdHex)
+                ?.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.R } ?: return null
+        val published =
+            withContext(Dispatchers.Default) {
+                conversationShortcuts.publishReactionShortcut(
+                    update,
+                    content,
+                    id,
+                    isPublishAllowed,
+                )
+            }
+        return id.takeIf { published }
     }
 
     /** Hands optional picture work to its execution owner while keeping content and write checks here. */
@@ -1227,12 +1283,7 @@ class LocalNotificationPresenter(
         val enrichedSender =
             notificationSenderPerson(
                 content,
-                senderAvatarBitmap
-                    ?: if (content.isGroupConversation) {
-                        null
-                    } else {
-                        notificationMonogramBitmap(content.senderName, content.senderKey)
-                    },
+                senderAvatarBitmap ?: notificationMonogramBitmap(content.senderName, content.senderKey),
             )
         postEnrichedMessagingNotification(
             update = update,
@@ -1268,31 +1319,34 @@ class LocalNotificationPresenter(
         )
 
     /**
-     * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it. A
-     * conversation picture with no URL, such as a group's encrypted image, comes from the sources' loader. That loader
-     * downloads and decrypts through MDK and runs only in the late refresh, after the enrichment permit is released,
-     * so it gets a longer bound than a URL picture and a slow network or busy device still gets the picture. A loader
-     * that fails yields no group picture without cancelling the sender slot.
+     * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it.
+     * The conversation slot first reads MDK's stored copy of the picture the chat list draws (#3635), so a picture
+     * already on the device never depends on the network, and it replaces a picture the first post drew from
+     * elsewhere, which stays when the store has none. A missing picture then comes from the slot's loader, or from
+     * its raw URL only when the slot has no loader, as on the first post. Loaders run only in the late refresh, after
+     * the enrichment permit is released, so they get a longer bound than a URL picture and a slow network or a newly
+     * started decoder still gets the picture. A loader that stops behind the app lock or fails is never followed by
+     * a URL fetch (#3635). A loader that fails yields no picture for its slot without cancelling the other.
      */
     private suspend fun resolveAvatars(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?> =
         withContext(Dispatchers.Default) {
             coroutineScope {
                 val conversationAvatar =
                     async {
-                        sources.conversationBitmap
-                            ?: withContext(MediaTrustScope.element(sources.conversationDomain)) {
-                                avatarBitmapResolver(sources.conversationUrl)
-                            }
-                            ?: sources.conversationLoader?.let { load ->
-                                withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) {
-                                    runCatchingCancellable { load() }.getOrNull()
+                        sources.storedConversationLoader?.let { boundedIdentityLoad(it) }
+                            ?: sources.conversationBitmap
+                            ?: sources.conversationLoader?.let { boundedIdentityLoad(it) }
+                            ?: sources.conversationUrl.takeUnless { sources.hasConversationLoader }?.let { url ->
+                                withContext(MediaTrustScope.element(sources.conversationDomain)) {
+                                    avatarBitmapResolver(url)
                                 }
                             }
                     }
                 val senderAvatar =
                     async {
                         sources.senderBitmap
-                            ?: sources.senderUrl?.let { url ->
+                            ?: sources.senderLoader?.let { boundedIdentityLoad(it) }
+                            ?: sources.senderUrl.takeIf { sources.senderLoader == null }?.let { url ->
                                 withContext(MediaTrustScope.element(sources.senderDomain)) {
                                     avatarBitmapResolver(url)
                                 }
@@ -1300,6 +1354,12 @@ class LocalNotificationPresenter(
                     }
                 conversationAvatar.await() to senderAvatar.await()
             }
+        }
+
+    /** Runs one late picture loader within its bound; a failure yields no picture, never a crash. */
+    private suspend fun boundedIdentityLoad(load: suspend () -> Bitmap?): Bitmap? =
+        withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) {
+            runCatchingCancellable { load() }.getOrNull()
         }
 
     /** Rewrites one live card with avatars that changed after its post, preserving dismissal ownership. */
@@ -1360,6 +1420,7 @@ class LocalNotificationPresenter(
                             ConversationCardPostSynchronizer.isShowCurrent(showToken) &&
                             publisher.canPublishPreviewShortcut(content, active)
                     },
+                    identityContact = messaging.identityContact,
                 )
             }
             // The late picture replaces the identity image and the sender together, for either card template.
@@ -1369,6 +1430,7 @@ class LocalNotificationPresenter(
                     titleOverride = messaging.conversationTitleOverride,
                     conversationAvatar = conversationAvatarBitmap,
                     senderAvatar = senderAvatarBitmap,
+                    contact = messaging.identityContact,
                 )
             postEnrichedAvatarCard(content, active, enrichedSender, identity, showToken)
         }
@@ -1436,9 +1498,24 @@ class LocalNotificationPresenter(
             // Nothing is fetched or decrypted for a card that can no longer take it, and the card is checked again
             // once the pictures arrive, since it may have been dismissed, read or replaced meanwhile.
             val refreshable = { isRefreshCurrent() && refreshableIdentityCard(update, content) != null }
-            val visiblePictures =
-                if (content.isGroupConversation) pictures.copy(senderBitmap = null, senderUrl = null) else pictures
-            val arrived = if (refreshable()) arrivedPictures(visiblePictures)?.takeIf { refreshable() } else null
+            val card = refreshableIdentityCard(update, content)?.notification?.takeIf { isRefreshCurrent() }
+            val sources =
+                if (content.isReactionPreview) {
+                    pictures.copy(
+                        conversationBitmap = null,
+                        conversationUrl = null,
+                        conversationLoader = null,
+                        storedConversationLoader = null,
+                        identityContact = null,
+                    )
+                } else {
+                    pictures
+                }
+            val arrived =
+                card?.let {
+                    (arrivedPictures(sources) ?: unrecordedContactPictures(update, content, sources))
+                        ?.takeIf { refreshable() }
+                }
             if (arrived == null) {
                 false
             } else {
@@ -1450,26 +1527,57 @@ class LocalNotificationPresenter(
                     content.notificationId,
                     ConversationCardOp.SHOW_ENRICH,
                 ) {
-                    val refresh = LateIdentityRefresh(update, content, arrived, directShareEligible, isRefreshCurrent)
+                    val refresh =
+                        LateIdentityRefresh(
+                            update,
+                            content,
+                            arrived,
+                            directShareEligible,
+                            isRefreshCurrent,
+                            sources.identityContact,
+                        )
                     refreshableIdentityCard(update, content)
                         ?.takeIf { isRefreshCurrent() }
-                        ?.let { live -> rewriteWithLatePictures(refresh, live) } == true
+                        ?.let { live ->
+                            if (content.isReactionPreview) {
+                                rewriteWithLateReactorPicture(refresh, live, sources)
+                            } else {
+                                rewriteWithLatePictures(refresh, live)
+                            }
+                        } == true
                 }
             }
         }
 
     /**
      * The card's final pictures once at least one it was drawn without has arrived, or null when none has. Nothing is
-     * fetched while previews are hidden, and a picture the card already showed is never fetched again.
+     * fetched while previews are hidden, and a picture the card already showed is never fetched again. A stored
+     * conversation picture with the same pixels as the one the card shows changes nothing.
      */
     private suspend fun arrivedPictures(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?>? =
-        if (!sources.hasMissingPicture || !NotificationPreviewPreferences.capture(context).allowed) {
+        if (!sources.mayUpdatePictures || !NotificationPreviewPreferences.capture(context).allowed) {
             null
         } else {
             resolveAvatars(sources).takeIf { (conversation, sender) ->
-                conversation !== sources.conversationBitmap || sender !== sources.senderBitmap
+                val shown = sources.conversationBitmap
+                (conversation !== shown && conversation?.sameAs(shown) != true) || sender !== sources.senderBitmap
             }
         }
+
+    /**
+     * #3635: the card's own pictures when the late refresh found the peer whose private picture the card follows, and
+     * the live card does not record them yet, as on an account whose chat list was not loaded at the post. The
+     * rewrite records the peer, so the final write and every later Save or Clear apply their current choice.
+     */
+    private fun unrecordedContactPictures(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        sources: NotificationIdentityPictureSources,
+    ): Pair<Bitmap?, Bitmap?>? {
+        val contact = sources.identityContact ?: return null
+        val recorded = refreshableIdentityCard(update, content)?.notification?.recordedIdentityContact()
+        return (sources.conversationBitmap to sources.senderBitmap).takeIf { recorded != contact }
+    }
 
     /**
      * The live card a late picture may rewrite: this message's card, the app's latest write for its key and not
@@ -1519,12 +1627,14 @@ class LocalNotificationPresenter(
         val sender =
             senderPicture?.let { livePerson.toBuilder().setIcon(IconCompat.createWithBitmap(it)).build() } ?: livePerson
         val (title, seed) = inputs
+        val contact = card.recordedIdentityContact() ?: refresh.identityContact
         val identity =
             refresh.content.identityImage(
                 seed = seed,
                 titleOverride = title,
                 conversationAvatar = conversation,
                 senderAvatar = senderPicture,
+                contact = contact,
             )
         card.shortcutId?.let { shortcutId ->
             conversationShortcuts.publishConversationShortcut(
@@ -1541,20 +1651,43 @@ class LocalNotificationPresenter(
                 isPublishAllowed = {
                     refresh.isCurrent() && publisher.canPublishPreviewShortcut(refresh.content, card)
                 },
+                identityContact = contact,
             )
         }
         return cardContent.enrichedIdentityNotification(card, sender, identity)?.let { rewritten ->
-            publisher.postNotificationSafely(
-                NotificationManagerCompat.from(context),
-                live.tag.orEmpty(),
-                live.id,
-                rewritten,
-                recordedAtMs = dismissalTime(live),
-                mustBeLive = true,
-                finalPostAllowed = refresh.isCurrent,
-            ) == NotificationCardWriteResult.WRITTEN
+            postLateIdentityRewrite(refresh, live, rewritten)
         } == true
     }
+
+    /** Refreshes only the reactor's picture, retaining the live card's layout, artwork and grouping. */
+    private fun rewriteWithLateReactorPicture(
+        refresh: LateIdentityRefresh,
+        live: StatusBarNotification,
+        sources: NotificationIdentityPictureSources,
+    ): Boolean {
+        val reactor =
+            refresh.pictures.second
+                ?.takeUnless { it === sources.senderBitmap }
+                ?.let(refresh.content::reactorImage) ?: return false
+        val rewritten = cardContent.reactorPictureNotification(live.notification, reactor)
+        return postLateIdentityRewrite(refresh, live, rewritten)
+    }
+
+    /** Writes one late picture rewrite over the same live card, under the refresh's fences up to the platform write. */
+    private fun postLateIdentityRewrite(
+        refresh: LateIdentityRefresh,
+        live: StatusBarNotification,
+        rewritten: Notification,
+    ): Boolean =
+        publisher.postNotificationSafely(
+            NotificationManagerCompat.from(context),
+            live.tag.orEmpty(),
+            live.id,
+            rewritten,
+            recordedAtMs = dismissalTime(live),
+            mustBeLive = true,
+            finalPostAllowed = refresh.isCurrent,
+        ) == NotificationCardWriteResult.WRITTEN
 
     /**
      * Applies the quiet flags at write time for a post that already decided to stay quiet, or whose ring a later
@@ -1765,6 +1898,7 @@ private data class MessagingPostContext(
     val conversationAvatarBitmap: Bitmap?,
     val senderAvatarUrl: String?,
     val senderAvatarBitmap: Bitmap?,
+    val identityContact: String?,
 ) {
     val requiresRemoteAvatarResolution: Boolean
         get() =
@@ -1772,18 +1906,22 @@ private data class MessagingPostContext(
                 (!senderAvatarUrl.isNullOrBlank() && senderAvatarBitmap == null)
 }
 
-/** One late identity-picture rewrite (#3311): the message, its posted content and the card's final pictures. */
+/**
+ * One late identity-picture rewrite (#3311): the message, its posted content and the card's final pictures, and the
+ * peer whose private picture the chat row shows, which the rewrite records when the card does not yet (#3635).
+ */
 private data class LateIdentityRefresh(
     val update: NotificationUpdateFfi,
     val content: LocalNotificationContent,
     val pictures: Pair<Bitmap?, Bitmap?>,
     val directShareEligible: Boolean,
     val isCurrent: () -> Boolean,
+    val identityContact: String?,
 )
 
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
 
-/** Bound for a group's encrypted picture in the late refresh; it delays no other card, only this silent rewrite. */
+/** Bound for a late-refresh picture loader; it delays no other card, only this silent rewrite. */
 private const val GROUP_IDENTITY_LOAD_TIMEOUT_MS = 15_000L
 internal const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 

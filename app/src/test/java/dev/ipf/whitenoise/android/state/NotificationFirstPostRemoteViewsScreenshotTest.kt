@@ -4,15 +4,20 @@ import android.app.Activity
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.drawable.Icon
 import android.os.Looper
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.toBitmap
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.notifications.ConversationCardBarrier
 import dev.ipf.whitenoise.android.notifications.ConversationCardOp
@@ -86,9 +91,11 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
     @Test
     fun cachedGroupAvatarRendersOnTheFirstPlatformCard() = captureFirstPost(cachedAvatar = true, isDm = false)
 
-    /** Pins the long first message to the same native template and identity slot as short messages. */
+    /** A stored DM still uses the existing single-peer template when the notification reports a group. */
     @Test
-    fun longFirstMessageRendersInTheConversationTemplate() = captureFirstPost(cachedAvatar = true, longBody = true)
+    fun longFirstMessageRendersInTheConversationTemplate() {
+        captureFirstPost(cachedAvatar = true, longBody = true, reportedAsGroup = true)
+    }
 
     /** Pins the group picture rather than a member picture for the long first group message. */
     @Test
@@ -99,11 +106,34 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             longBody = true,
         )
 
+    /** #3635: the group's picture and its member's keep their own slots in the dark theme. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h800dp-night-xhdpi")
+    fun groupPicturesKeepTheirSlotsInTheDarkTheme() =
+        captureFirstPost(
+            cachedAvatar = true,
+            isDm = false,
+            snapshotPath = GROUP_DARK_SNAPSHOT_PATH,
+        )
+
+    /**
+     * #3635: the group's picture and its member's keep their own slots at a 200% font. Robolectric lays these platform
+     * templates out left to right even under an RTL configuration, so right to left stays a manual check (NTF-042).
+     */
+    @Test
+    fun groupPicturesKeepTheirSlotsAtALargeFont() {
+        RuntimeEnvironment.setFontScale(2.0f)
+        restartActivity()
+        captureFirstPost(cachedAvatar = true, isDm = false, snapshotPath = GROUP_LARGE_SNAPSHOT_PATH)
+    }
+
     /** Exercises the same typed first-post path for ready-image and intentional-monogram rendering. */
     private fun captureFirstPost(
         cachedAvatar: Boolean,
         isDm: Boolean = true,
         longBody: Boolean = false,
+        snapshotPath: String = snapshotPath(cachedAvatar, isDm, longBody),
+        reportedAsGroup: Boolean = false,
     ) = runBlocking {
         val writes = AtomicInteger(0)
         val events = CopyOnWriteArrayList<NotificationFirstPostTimingEvent>()
@@ -118,7 +148,14 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             NotificationBootstrapTestFixture(
                 context = context,
                 previewText = preview,
-                isDm = isDm,
+                isDm = isDm && !reportedAsGroup,
+                chatListRows =
+                    if (reportedAsGroup) {
+                        val row = notificationChatListRow()
+                        listOf(row.copy(groupIdHex = "group-a", conversationKind = ChatConversationKindFfi.DIRECT))
+                    } else {
+                        emptyList()
+                    },
                 accounts = listOf(AccountSummaryFfi("account-a", "self", true, false, false, true, false)),
                 notificationUsersHaveDisplayNames = false,
                 localDisplayName = null,
@@ -147,16 +184,7 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
                         chats = attachReadyGroup(fixture)
                     }
                 }
-            val card = assertFirstPostTemplate(notification, preview, isDm)
-            card.captureRoboImage(
-                when {
-                    longBody && !isDm -> LONG_GROUP_SNAPSHOT_PATH
-                    longBody -> LONG_DM_SNAPSHOT_PATH
-                    !isDm -> GROUP_AVATAR_SNAPSHOT_PATH
-                    cachedAvatar -> AVATAR_SNAPSHOT_PATH
-                    else -> SNAPSHOT_PATH
-                },
-            )
+            assertFirstPostTemplate(notification, preview, isDm).captureRoboImage(snapshotPath)
         } finally {
             fixture.appState.attachChatsController(null)
             chats?.onCleared()
@@ -164,13 +192,45 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         }
     }
 
-    /** Checks the resolved payload and visible sender/body before capturing the platform template. */
+    /** The baseline a light, left-to-right capture of this card shape is compared with. */
+    private fun snapshotPath(
+        cachedAvatar: Boolean,
+        isDm: Boolean,
+        longBody: Boolean,
+    ): String =
+        when {
+            longBody && !isDm -> LONG_GROUP_SNAPSHOT_PATH
+            longBody -> LONG_DM_SNAPSHOT_PATH
+            !isDm -> GROUP_AVATAR_SNAPSHOT_PATH
+            cachedAvatar -> AVATAR_SNAPSHOT_PATH
+            else -> SNAPSHOT_PATH
+        }
+
+    /** Rebuilds the rendering activity so it takes a configuration the test changed, such as its font scale. */
+    private fun restartActivity() {
+        activityController.pause().stop().destroy()
+        activityController = Robolectric.buildActivity(Activity::class.java).setup()
+    }
+
+    /**
+     * Checks the resolved payload and visible sender/body before capturing the platform template. A group card shows
+     * the group's picture as its own and the member's picture on the member's row (#3635).
+     */
     private fun assertFirstPostTemplate(
         notification: Notification,
         preview: String,
         isDm: Boolean,
     ): View {
-        if (!isDm) assertTrue("Group image must be in the first payload", notification.getLargeIcon() != null)
+        val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertEquals(!isDm, style.isGroupConversation)
+        if (!isDm) {
+            assertTrue("Group image must be in the first payload", notification.getLargeIcon() != null)
+            assertEquals("the group's own picture", Color.BLUE, pixel(notification.getLargeIcon()))
+            val member = style.messages.last().person
+            assertEquals("the member's own picture on their row", Color.RED, pixel(member?.icon?.toIcon(context)))
+        } else {
+            assertEquals(null, style.conversationTitle)
+        }
         val body = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
         assertEquals(preview.replace("**", ""), body)
         assertFalse(body.contains("**"))
@@ -183,15 +243,24 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         return card
     }
 
-    /** Supplies a real owner-bound group projection with its decoded avatar already cached. */
+    /** The top-left pixel of [icon], or 0 when there is none. */
+    private fun pixel(icon: Icon?): Int = icon?.loadDrawable(context)?.toBitmap()?.getPixel(0, 0) ?: 0
+
+    /**
+     * Supplies a real owner-bound group projection with its decoded avatar already cached. The group's picture differs
+     * from its member's, so neither can stand in for the other unnoticed.
+     */
     private fun attachReadyGroup(fixture: NotificationBootstrapTestFixture): ChatsController =
         ChatsController(
             fixture.appState,
             fixture.update.accountRef,
             memberSnapshotLoader = { _, _ -> emptyList() },
         ).also { chats ->
+            AvatarImageLoader.putCached(GROUP_PICTURE_URL, AvatarScreenshotFixtures.distinctAvatarBitmap(Color.BLUE))
             chats.setChatListVisible(false)
-            chats.applyChatListRow(notificationChatListRow().copy(groupIdHex = "group-a", avatarUrl = AVATAR_URL))
+            chats.applyChatListRow(
+                notificationChatListRow().copy(groupIdHex = "group-a", avatarUrl = GROUP_PICTURE_URL),
+            )
             chats.setChatListVisible(true)
             fixture.appState.attachChatsController(chats)
         }
@@ -262,10 +331,15 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             }
         }
 
-    /** Recovers and lays out Android's real API 30 notification RemoteViews on a light shade surface. */
+    /**
+     * Recovers and lays out Android's real API 30 notification RemoteViews on a light shade surface, or a dark one in
+     * the dark theme.
+     */
     private fun renderPlatformTemplate(notification: Notification): View {
         val activity = activityController.get()
-        val parent = FrameLayout(activity).apply { setBackgroundColor(Color.WHITE) }
+        val nightMode = activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val night = nightMode == Configuration.UI_MODE_NIGHT_YES
+        val parent = FrameLayout(activity).apply { setBackgroundColor(if (night) DARK_SHADE else Color.WHITE) }
         activity.setContentView(parent)
         val remoteViews = Notification.Builder.recoverBuilder(activity, notification).createContentView()
         val card = remoteViews.apply(activity, parent)
@@ -322,7 +396,11 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         const val SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_remote_views_api30.png"
         const val AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_cached_avatar_api30.png"
         const val GROUP_AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_avatar_api30.png"
+        const val GROUP_DARK_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_dark_api30.png"
+        const val GROUP_LARGE_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_large_font_api30.png"
+        val DARK_SHADE = Color.rgb(32, 33, 36)
         const val AVATAR_URL = "https://profiles.example/first-card.png"
+        const val GROUP_PICTURE_URL = "https://profiles.example/first-card-group.png"
         const val FIRST_POST_CONTENT_DEADLINE_MS = 100L
         const val ONE_MINUTE_MS = 60_000L
         val YEAR_OFFSET = Regex("\\b\\d+y\\b")

@@ -638,7 +638,8 @@ class ShareShortcutPublisherTest {
     }
 }
 
-private fun chat(
+/** A one-member legacy group row for [groupId], the recent-chat fixture the share publisher tests rank and target. */
+internal fun chat(
     groupId: String,
     pending: Boolean,
     name: String = "Chat $groupId",
@@ -669,6 +670,7 @@ private fun chat(
                 disappearingMessageSecs = 0uL,
                 leaveRequestPending = false,
                 leaveRequestedAtMs = null,
+                leaveBlocked = false,
                 disbanding = false,
                 disbanded = false,
                 disbandRequest = null,
