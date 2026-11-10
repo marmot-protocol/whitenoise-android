@@ -2475,51 +2475,6 @@ internal fun ConversationScreen(
         ) { true }
     }
 
-    /**
-     * The conversation's steps for landing the global-search result [target] (#1945). The landing stays current
-     * only while [request] owns navigation and no user scroll intent arrived after [intent]. Message ids are matched
-     * without regard to case, and the reader's position before the window load is kept so a target that turns out
-     * to be gone can put them back.
-     */
-    fun searchResultLandingSteps(
-        target: String,
-        request: MessageTargetNavigationOwner.Request,
-        intent: ConversationScrollIntentToken,
-    ): SearchResultLandingSteps {
-        val before = scrollCoordinator.bookmark(currentScrollAnchor())
-
-        /** The transcript's own spelling of [target], once its row is loaded. */
-        fun loaded(): TimelineMessage? {
-            val rows = controller.timeline
-            return rows.firstOrNull { it.record.messageIdHex.equals(target, ignoreCase = true) }
-        }
-
-        return SearchResultLandingSteps(
-            isCurrent = { request.isCurrent() && scrollCoordinator.intentToken.revision == intent.revision },
-            ownsNavigation = { request.isCurrent() },
-            hidden = {
-                appState
-                    .hiddenMessageIdsInGroup(conversationAccountRef, controller.group.groupIdHex)
-                    .any { it.equals(target, ignoreCase = true) }
-            },
-            loadWindow = { controller.loadMessageAvailability(target) },
-            loadedRecord = { loaded()?.projected },
-            center = {
-                val id = loaded()?.record?.messageIdHex
-                val index = id?.let(::currentTimelineListIndex)
-                index != null && centerTimelineItemAt(id, index, ConversationScrollReason.FocusMessage)
-            },
-            highlight = { showTransientMessageHighlight(loaded()?.record?.messageIdHex ?: target) },
-            unavailable = { appState.present(R.string.search_result_unavailable) },
-            failed = { navigationState.focusTargetRetry.failed(request) },
-            restoreAnchor = {
-                scrollCoordinator.restoreBookmark(before, expectedIntent = intent) { saved ->
-                    resolveScrollAnchorIndex(saved)
-                }
-            },
-        )
-    }
-
     /** Persists the chosen quick-reaction emojis. */
     fun saveQuickReactionEmojis(choices: List<String>) {
         quickReactionEmojisTouched = true
@@ -2665,6 +2620,60 @@ internal fun ConversationScreen(
             hasPendingMembership = controller.pendingMembershipActivity != null,
         ) ?: 0
     val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
+
+    /**
+     * The conversation's steps for landing the global-search result [target] (#1945). The landing stays current
+     * only while [request] owns navigation and no user scroll intent arrived after [intent]. [target] is the
+     * canonical lowercase id the open recorded, and the reader's position before the window load is kept so a
+     * target that turns out to be gone can put them back.
+     */
+    fun searchResultLandingSteps(
+        target: String,
+        request: MessageTargetNavigationOwner.Request,
+        intent: ConversationScrollIntentToken,
+    ): SearchResultLandingSteps {
+        val before = scrollCoordinator.bookmark(currentScrollAnchor())
+
+        /** The loaded row of [target], whose id the open already canonicalized. */
+        fun loaded(): TimelineMessage? = controller.timeline.firstOrNull { it.record.messageIdHex == target }
+
+        return SearchResultLandingSteps(
+            isCurrent = { request.isCurrent() && scrollCoordinator.intentToken.revision == intent.revision },
+            ownsNavigation = { request.isCurrent() },
+            hidden = {
+                appState
+                    .hiddenMessageIdsInGroup(conversationAccountRef, controller.group.groupIdHex)
+                    .any { canonicalMessageId(it) == target }
+            },
+            loadWindow = { controller.loadMessageAvailability(target) },
+            loadedRecord = { loaded()?.projected },
+            center = {
+                val index = currentTimelineListIndex(target)
+                index != null && centerTimelineItemAt(target, index, ConversationScrollReason.FocusMessage)
+            },
+            highlight = { showTransientMessageHighlight(target) },
+            unavailable = { appState.present(R.string.search_result_unavailable) },
+            failed = { navigationState.focusTargetRetry.failed(request) },
+            restoreAnchor = {
+                scrollCoordinator.restoreReaderAfterLanding(
+                    bookmark = before,
+                    resolveAnchorIndex = ::resolveScrollAnchorIndex,
+                    rematerialize = { id ->
+                        controller.loadMessageAvailability(id) == MessageAvailability.AVAILABLE
+                    },
+                    returnToNewest = {
+                        loadConversationTimelineToNewest(
+                            hasMoreAfter = { controller.hasMoreAfterTimeline },
+                            loadNewer = controller::loadNewerTimelinePage,
+                            returnToLatest = controller::returnToLatestWindow,
+                        )
+                        withFrameNanos { }
+                        currentTailIndex
+                    },
+                )
+            },
+        )
+    }
     val seededTailAlignmentReady =
         firstFrameSeed.anchorTailImmediately &&
             (!navigationState.seedTailAwaitingAuthoritative || controller.hasPublishedAuthoritativeTimeline)

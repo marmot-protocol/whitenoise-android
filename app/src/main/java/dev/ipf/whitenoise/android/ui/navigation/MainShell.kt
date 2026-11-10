@@ -82,6 +82,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberRetainedGroupAvatarPreparati
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
+import dev.ipf.whitenoise.android.ui.conversation.canonicalMessageId
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
 import dev.ipf.whitenoise.android.ui.conversation.hasVisibleComposer
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentInstallerHandoffEffect
@@ -1739,7 +1740,8 @@ internal fun MainShell(
         // A chat-list open names a message to focus only for a search result, so its focus lands as one (#1945).
         selectedChatOpenContext =
             ConversationOpenContext(
-                focusMessageId = request.focusMessageId,
+                // Canonicalized once here, so every lookup during the landing compares exact ids.
+                focusMessageId = request.focusMessageId?.let(::canonicalMessageId),
                 focusFromSearch = request.focusMessageId != null,
             )
         selectedChatJustCreated = request.justCreated

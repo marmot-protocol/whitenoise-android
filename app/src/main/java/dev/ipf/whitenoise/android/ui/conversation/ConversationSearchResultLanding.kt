@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
+import java.util.Locale
 
 /** Where a global-search result lands once its conversation is open (#1945). */
 internal enum class SearchTargetLanding {
@@ -38,6 +39,9 @@ internal fun searchTargetLanding(
 /** Whether a loaded row may no longer be presented as the message search found. */
 private fun TimelineMessageRecordFfi.noLongerShowable(nowMillis: Long): Boolean =
     deleted || invalidationStatus != null || isRetentionExpiredForSearch(this, nowMillis)
+
+/** The canonical spelling of a message id, as MDK stores it: trimmed lowercase hex. */
+internal fun canonicalMessageId(messageIdHex: String): String = messageIdHex.trim().lowercase(Locale.ROOT)
 
 /**
  * Whether an opened conversation lands its focus target as a global-search result. Only an open that came from
@@ -105,4 +109,30 @@ internal suspend fun landSearchResult(steps: SearchResultLandingSteps): SearchTa
         }
     }
     return landing
+}
+
+/**
+ * Puts the reader back where they were before a landing loaded a window that turned out to hold nothing to show.
+ * The window jump may have recentered the bounded window on the dead target, so the saved anchor is resolved in the
+ * current window only: a reader who was following the newest rows returns to them through [returnToNewest], and a
+ * reader deeper in history has their anchor message loaded again by [rematerialize] first. It never falls back to
+ * a raw list index from another window; when the anchor cannot be brought back, the reader stays put.
+ */
+@Suppress("ReturnCount") // Each unrecoverable step leaves the reader where the failed landing left them.
+internal suspend fun ConversationScrollCoordinator.restoreReaderAfterLanding(
+    bookmark: ConversationScrollBookmark,
+    resolveAnchorIndex: (ConversationScrollAnchor) -> Int?,
+    rematerialize: suspend (messageId: String) -> Boolean,
+    returnToNewest: suspend () -> Int?,
+): Boolean {
+    if (bookmark.settledMode is ConversationScrollMode.FollowingTail) {
+        val tail = returnToNewest() ?: return false
+        return jumpToNewest(targetIndex = tail)
+    }
+    if (resolveAnchorIndex(bookmark.anchor) == null) {
+        val messageId = bookmark.anchor.messageId ?: return false
+        if (!rematerialize(messageId) || resolveAnchorIndex(bookmark.anchor) == null) return false
+    }
+    // The window move itself may have recorded an intent; only a user gesture should cancel this restore.
+    return restoreBookmark(bookmark, expectedIntent = intentToken) { saved -> resolveAnchorIndex(saved) }
 }

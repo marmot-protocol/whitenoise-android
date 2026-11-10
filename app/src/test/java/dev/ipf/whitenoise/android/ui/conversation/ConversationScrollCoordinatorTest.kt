@@ -2485,6 +2485,100 @@ class ConversationScrollCoordinatorTest {
             assertTrue(second.await())
         }
 
+    /**
+     * After a landing moved the window onto a gone target, the reader's anchor is no longer in the window. It is
+     * loaded back first and restored at its own index, never at the raw index it had in the earlier window.
+     */
+    @Test
+    fun restoreAfterAMovedWindowReloadsTheAnchorInsteadOfUsingItsOldIndex() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 48),
+                )
+            val bookmark = coordinator.bookmark(anchor(messageId = "reader", listIndex = 12, pixelOffset = 48))
+            // The landing's window jump replaced the window around the dead target: "reader" is no longer in it.
+            val window = mutableMapOf("dead" to 3)
+            var reloads = 0
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    resolveAnchorIndex = { saved -> saved.messageId?.let(window::get) },
+                    rematerialize = { id ->
+                        reloads++
+                        window.clear()
+                        window[id] = 31
+                        true
+                    },
+                    returnToNewest = { error("a reader in history does not return to the newest rows") },
+                )
+
+            assertTrue(restored)
+            assertEquals(1, reloads)
+            assertEquals(listOf(ScrollWrite.Snap(31, 48)), writer.writes)
+        }
+
+    /** When the anchor cannot be loaded back, the reader stays put rather than landing on an arbitrary row. */
+    @Test
+    fun restoreThatCannotReloadTheAnchorWritesNothing() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(
+                    writer = writer,
+                    initialMode = ConversationScrollMode.ReadingHistory("reader", 48),
+                )
+            val bookmark = coordinator.bookmark(anchor(messageId = "reader", listIndex = 12, pixelOffset = 48))
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    resolveAnchorIndex = { null },
+                    rematerialize = { false },
+                    returnToNewest = { error("not following the tail") },
+                )
+
+            assertFalse(restored)
+            assertTrue(writer.writes.isEmpty())
+        }
+
+    /** A reader who was following the newest rows returns to them through the newest window, not an old index. */
+    @Test
+    fun restoreForATailFollowingReaderReturnsToTheNewestRows() =
+        runTest {
+            val writer = RecordingScrollWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer = writer, initialMode = ConversationScrollMode.FollowingTail)
+            val bookmark = coordinator.bookmark(anchor(messageId = "newest", listIndex = 0))
+            var returnedToNewest = false
+
+            val restored =
+                coordinator.restoreReaderAfterLanding(
+                    bookmark = bookmark,
+                    resolveAnchorIndex = { null },
+                    rematerialize = { error("the tail is restored through the newest window") },
+                    returnToNewest = {
+                        returnedToNewest = true
+                        40
+                    },
+                )
+
+            assertTrue(restored)
+            assertTrue(returnedToNewest)
+            assertTrue(coordinator.isFollowingTail)
+            val indexes =
+                writer.writes.map { write ->
+                    when (write) {
+                        is ScrollWrite.Snap -> write.index
+                        is ScrollWrite.Animate -> write.index
+                    }
+                }
+            assertEquals(setOf(40), indexes.toSet())
+        }
+
     private sealed interface ScrollWrite {
         data class Snap(
             val index: Int,
