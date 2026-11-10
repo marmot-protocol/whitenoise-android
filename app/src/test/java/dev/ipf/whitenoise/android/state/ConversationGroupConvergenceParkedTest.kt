@@ -205,6 +205,38 @@ class ConversationGroupConvergenceParkedTest {
             assertFalse(controller.groupRecoveryMutationInFlight)
         }
 
+    /** A retry whose read an edge makes stale reads again, so the card and its reason reflect the newer answer. */
+    @Test
+    fun aRetryReadMadeStaleByAnEdgeIsReadAgain() =
+        runBlocking {
+            lateinit var controller: ConversationController
+            var parked = true
+            var retried = false
+            var staleReads = 0
+            controller =
+                controller(
+                    testAppState(),
+                    parked = {
+                        if (retried && staleReads++ == 0) {
+                            controller.applyGroupStateForTest(conversationTimelineTestGroup())
+                        }
+                        parked
+                    },
+                    retry = { _, _ ->
+                        retried = true
+                        parked = false
+                    },
+                )
+            controller.retryGroupRecoveryStatus()
+            assertTrue(controller.groupConvergenceParked)
+
+            controller.retryGroupConvergence()
+
+            assertEquals("the stale retry read was not read again", 2, staleReads)
+            assertFalse(controller.groupConvergenceParked)
+            assertNull(controller.groupConvergenceRetryFailure)
+        }
+
     /** A retry that fails maps the failure to a localized reason and keeps the chat parked. */
     @Test
     fun aFailedRetryShowsALocalizedReason() =

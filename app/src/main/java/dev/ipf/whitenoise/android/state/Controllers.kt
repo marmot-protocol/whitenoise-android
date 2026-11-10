@@ -7570,6 +7570,24 @@ class ConversationController(
     }
 
     /**
+     * Reads the parked flag for Retry through the same gate as event reads, so a reread that a stale answer asks for
+     * still runs. Returns the newest published answer, or null when none was published.
+     */
+    private suspend fun readGroupConvergenceParkedAfterRetry(): Boolean? {
+        val answer =
+            groupConvergenceReadGate.withLock {
+                var latest = refreshGroupConvergenceParked()
+                while (groupConvergenceReadRequested.getAndSet(false)) {
+                    refreshGroupConvergenceParked()?.let { latest = it }
+                }
+                latest
+            }
+        // A request made just as the gate was released still gets its read.
+        if (groupConvergenceReadRequested.get()) requestGroupConvergenceRead()
+        return answer
+    }
+
+    /**
      * Reads whether MDK parked this chat's convergence and publishes the answer under the recovery guards. Returns
      * the published answer, or null when the read failed or lost ownership. A failed read keeps the last known
      * answer, since it says nothing about whether the chat is parked.
@@ -7669,7 +7687,7 @@ class ConversationController(
                     Log.w("DMConversation", releaseFailureMarker("GROUP_CONVERGENCE_RETRY", throwable))
                     throwable
                 }
-            val stillParked = refreshGroupConvergenceParked()
+            val stillParked = readGroupConvergenceParkedAfterRetry()
             if (ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)) {
                 groupConvergenceRetryFailure = groupConvergenceRetryFailureMessage(failure, stillParked)
             }
