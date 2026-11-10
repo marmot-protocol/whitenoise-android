@@ -56,6 +56,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
 import dev.ipf.whitenoise.android.state.conversationSourceGroup
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
+import dev.ipf.whitenoise.android.state.folderQueries
+import dev.ipf.whitenoise.android.state.folderQuery
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
@@ -718,6 +720,33 @@ internal fun MainShell(
             ?.let { it != dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT } == true
 
     SideEffect { chatsController.folderSource.complete.value = completeChatList }
+
+    // A selected rule folder opens its own native windows so its chats load beyond the plain windows, unless the
+    // plain window already is the folder.
+    val selectedFolderQuery =
+        remember(folderState, chatListBindAccountRef, selectedChatListFolderId) {
+            chatListBindAccountRef
+                ?.let { account ->
+                    selectedChatListFolderId?.let { appState.chatFolderPreferences.folderQuery(account, it) }
+                }?.takeUnless { it.wholeView }
+        }
+    SideEffect { chatsController.folderSource.folder.value = selectedFolderQuery }
+
+    // Folder counts and members come from MarmotKit over every chat; read them again whenever the list or a folder
+    // changes. The membership store coalesces bursts and drops a superseded or other account's read.
+    val folderQueries =
+        remember(folderState, chatListBindAccountRef) {
+            chatListBindAccountRef?.let(appState.chatFolderPreferences::folderQueries).orEmpty()
+        }
+    LaunchedEffect(
+        chatsController,
+        chatListBindAccountRef,
+        folderQueries,
+        chatsController.items,
+        chatsController.archivedItems,
+    ) {
+        chatsController.folderMembership.refresh(chatListBindAccountRef, folderQueries)
+    }
 
     LaunchedEffect(
         chatsController,

@@ -3689,6 +3689,9 @@ class WhiteNoiseAppState private constructor(
     /** The attached chat list's current rows, read to name the worker domain of a durable avatar. */
     internal fun chatListItemsForAvatarDomains(): List<ChatListItem> = chatsController?.items.orEmpty()
 
+    /** The bound chat list's native folder memberships, or null before a chat list exists. */
+    internal val chatFolderMembership: ChatFolderMembership? get() = chatsController?.folderMembership
+
     /** Attaches or permanently detaches the chat-list projection without transferring private row state. */
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller

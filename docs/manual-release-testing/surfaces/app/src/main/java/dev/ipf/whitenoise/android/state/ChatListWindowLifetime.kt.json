@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListWindowLifetime.kt",
+  "legacy_sha256": "e05b545c9f50193e783f34e21d6dcdadd53354188857ed08a22e9556cecffbbc",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Chat-list native handles outlive admitted calls while receive workers cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListWindowLifetime.kt",
+        "anchor": "internal class ChatListWindowLifetime<K>(",
+        "test_ids": [
+          "CHL-016",
+          "NAV-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

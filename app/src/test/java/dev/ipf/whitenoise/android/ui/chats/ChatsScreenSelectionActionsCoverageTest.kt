@@ -128,7 +128,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         val flat = source.replace(Regex("\\s+"), " ")
         assertTrue(
             "select all reads the complete view with not-ready retries",
-            "resolveCompleteChatListIds { controller.completeChatListIds(view, owner) }" in source,
+            "resolveCompleteChatListIds { controller.completeChatListIds(target, owner) }" in source,
         )
         assertTrue(
             "a superseded select-all read is discarded",
@@ -140,18 +140,18 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "commands revalidate the complete selection before running and start nothing without that answer",
-            "controller.revalidateCompleteChatListIds( view, request.ids, request.owner, )" in flat &&
+            "controller.revalidateCompleteChatListIds( completeScope, request.ids, request.owner, )" in flat &&
                 "ids?.let { controller.runChatListBatch(it, request.command, request.owner) }" in source &&
-                "completeView = completeSelection?.takeIf { it.resolved }?.view," in source,
+                "completeScope = completeSelection?.takeIf { it.resolved }?.scope," in source,
         )
         assertTrue(
             "window movement prunes only chats native revalidation drops",
-            "controller.revalidateCompleteChatListIds(complete.view, sent.toList(), owner)" in source &&
+            "controller.revalidateCompleteChatListIds(complete.scope, sent.toList(), owner)" in source &&
                 "retainRevalidatedChatListIds(sent, kept)" in source,
         )
         assertTrue(
             "changing scope cancels the complete claim",
-            "LaunchedEffect(completeSelectAllView) { completeSelection = null }" in source,
+            "LaunchedEffect(completeSelectAllScope) { completeSelection = null }" in source,
         )
         assertTrue("delete is hidden beyond loaded chats", "showDelete = !selectionBeyondLoaded," in source)
         assertTrue(

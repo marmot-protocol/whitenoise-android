@@ -10,6 +10,12 @@ import kotlinx.coroutines.selects.select
 internal class ChatFolderLiveSource {
     val complete = MutableStateFlow(false)
 
+    /**
+     * The selected folder's native query. Its windows open and close beside the plain ones without reopening them,
+     * so its chats load beyond the plain windows (#3652).
+     */
+    val folder = MutableStateFlow<ChatFolderQuery?>(null)
+
     /** Retires the current receive pair promptly, awaiting cancellation before the owner closes its handles. */
     suspend fun receiveUntilChanged(
         expected: Boolean,
