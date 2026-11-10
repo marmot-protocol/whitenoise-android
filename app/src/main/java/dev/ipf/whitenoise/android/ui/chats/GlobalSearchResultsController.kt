@@ -85,13 +85,14 @@ internal class GlobalSearchResultsController(
     /**
      * Rechecks the loaded rows after a change that can delete, expire, hide or add a match: a projection update,
      * a block change or a disappearing deadline. It rereads the loaded range from the head within a bounded
-     * budget and replaces rows in place; a request while a later batch is in flight runs once that batch ends.
-     * Before the first batch lands there is nothing to recheck, since that batch reads current data anyway.
+     * budget and replaces rows in place. A request while anything is in flight, the first page included, runs
+     * once that read ends, since the read may already hold a row the change affects.
      */
     fun refresh() {
         val current = query?.takeUnless { closed } ?: return
         val started = GlobalSearchResultsReducer.beginRefresh(state)
-        if (state.inFlight != null && state.batches > 0) {
+        // Anything in flight, the first page included, may already hold a row a later change affects.
+        if (state.inFlight != null) {
             refreshPending = true
         } else if (started != null) {
             val budget = state.results.size / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES
@@ -334,15 +335,20 @@ private val GLOBAL_SEARCH_MATCHING_TRIGGERS =
  * Whether a timeline projection update can change what this session lists: the removal of a loaded row, a
  * deletion, edit, send-state or snapshot change of one, or a new or edited message the query would now admit.
  * Reactions, receipts and activity elsewhere never cause a reread, so a busy account does not keep rereading.
+ * While a page or refresh is in flight, any removal or non-inert change counts, since that read may hold the row.
  */
 internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectionUpdateFfi): Boolean {
     val current = query ?: return false
     val loaded = state.seenKeys
+    // A read in flight may already hold a row this change removes or rewrites, before it is listed, so while one
+    // is in flight every removal and non-inert change counts and queues a recheck after that read.
+    val reading = state.inFlight != null
     return update.changes.any { change ->
         when (change) {
-            is TimelineMessageChangeFfi.Remove -> globalSearchKey(update.groupIdHex, change.messageIdHex) in loaded
+            is TimelineMessageChangeFfi.Remove ->
+                reading || globalSearchKey(update.groupIdHex, change.messageIdHex) in loaded
             is TimelineMessageChangeFfi.Upsert -> {
-                val listed = globalSearchKey(update.groupIdHex, change.message.messageIdHex) in loaded
+                val listed = reading || globalSearchKey(update.groupIdHex, change.message.messageIdHex) in loaded
                 if (listed) {
                     change.trigger !in GLOBAL_SEARCH_INERT_TRIGGERS
                 } else {

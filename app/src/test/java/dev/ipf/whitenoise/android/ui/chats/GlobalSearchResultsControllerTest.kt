@@ -505,6 +505,53 @@ class GlobalSearchResultsControllerTest {
         chatListTrigger = ChatListUpdateTriggerFfi.entries.first(),
     )
 
+    /** A row deleted while its page is still being read is not left listed: the queued recheck drops it. */
+    @Test
+    fun deletionDuringAPageReadIsRecheckedAfterIt() =
+        runTest {
+            val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
+            val gate = CompletableDeferred<Unit>()
+            var held = true
+            // The first page is read from the store at once, then held, as an IO read in flight would be.
+            val reader =
+                GlobalSearchTimelineReader { query ->
+                    val page = store.page(query)
+                    if (held) {
+                        held = false
+                        gate.await()
+                    }
+                    page
+                }
+            val controller = controller(reader)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertTrue(controller.state.loading)
+
+            store.replace("m1") { it.copy(deleted = true) }
+            val deleted = store.row("m1")
+            val change = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, deleted)
+            assertTrue(controller.isTouchedBy(update("g", change)))
+            controller.refresh()
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(listOf("g:m2", "g:m0"), keys(controller))
+        }
+
+    /** A wakeup during the very first page is queued, not dropped. */
+    @Test
+    fun refreshDuringTheFirstPageIsQueued() =
+        runTest {
+            val store = StoreReader((0 until 2).map { record("g", "m$it", at = 100uL + it.toULong()) })
+            val controller = controller(store)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            controller.refresh()
+            advanceUntilIdle()
+
+            assertEquals(2, store.queries.size)
+            assertEquals(listOf("g:m1", "g:m0"), keys(controller))
+        }
+
     /** One of the two scoped chats, alternating by index. */
     private fun chosen(index: Int) = if (index % 2 == 0) "chosen-a" else "chosen-b"
 
@@ -547,6 +594,9 @@ class GlobalSearchResultsControllerTest {
             val index = rows.indexOfFirst { it.messageIdHex == id }
             rows[index] = change(rows[index])
         }
+
+        /** The stored row with [id]. */
+        fun row(id: String): TimelineMessageRecordFfi = rows.first { it.messageIdHex == id }
 
         /** Stores a new row. */
         fun add(record: TimelineMessageRecordFfi) {
