@@ -90,6 +90,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
@@ -5188,13 +5190,14 @@ internal fun ConversationScreen(
         }
 
         // MDK's event firehose skips events when it lags, so each return to the foreground re-reads the parked flag.
-        androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_START) {
+        LifecycleEventEffect(Lifecycle.Event.ON_START) {
             scope.launch { controller.refreshGroupConvergenceOnStart() }
         }
 
         if (controller.inviteDeclineStepDownRequested) {
             InviteDeclineStepDownDialog(
-                busy = controller.mutationInFlight,
+                // Confirm waits, visibly disabled, while another change runs or the invitation is still resolving.
+                busy = controller.mutationInFlight || controller.inviteAcceptanceResolutionPending,
                 onConfirm = {
                     appState.launchMutation {
                         if (controller.confirmInviteDeclineStepDown()) exitConversation()

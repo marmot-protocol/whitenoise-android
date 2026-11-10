@@ -11443,10 +11443,10 @@ class ConversationController(
     }
 
     /**
-     * Whether this account is the invitation's only admin. The admin list comes from MDK's group record, which a
-     * pending invitation has before its roster loads, so the roster-based check alone could miss a sole admin.
+     * Whether this account is the invitation's only admin, from MDK's admin list, which a pending invitation has
+     * before its roster loads.
      */
-    private fun isSoleAdminInvitee(): Boolean = isSoleAdminWithOtherMembers || (isSelfAdmin && group.admins.distinctBy { it.lowercase() }.size <= 1)
+    private fun isSoleAdminInvitee(): Boolean = isSelfAdmin && GroupProjector.uniqueAdminCount(group) <= 1
 
     /** Explains a failed decline, giving a sole admin the same guidance as Leave instead of a generic failure. */
     private fun presentInviteDeclineFailure(
