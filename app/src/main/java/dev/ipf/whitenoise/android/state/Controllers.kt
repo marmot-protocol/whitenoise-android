@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
@@ -1851,6 +1852,27 @@ class ChatsController private constructor(
     private var isCleared = false
 
     internal val folderSource = ChatFolderLiveSource()
+
+    /** Folder memberships MarmotKit computes over every chat, refreshed as the list and folders change (#3652). */
+    internal val folderMembership by lazy { ChatFolderMembership(recomputeScope, liveSubscriptions.chatListQueryIds) }
+
+    /** The selected folder's own windows, open beside [chatListWindows] while a folder is selected (#3652). */
+    @Volatile
+    internal var folderWindows: ChatListWindowSet? = null
+        private set
+
+    /** Whether [folderWindows] is open, as snapshot state so the chat list switches its paging when it changes. */
+    internal var folderWindowsOpen by mutableStateOf(false)
+        private set
+
+    /** Installs or clears the selected folder's windows, closing any set it replaces. */
+    internal fun replaceFolderWindows(windows: ChatListWindowSet?) {
+        val previous = folderWindows
+        folderWindows = windows
+        folderWindowsOpen = windows != null
+        if (previous !== windows) previous?.close()
+    }
+
     private val subscriptionOwner = ChatListSubscriptionOwner()
     private val liveSubscriptionLock get() = subscriptionOwner.lock
     internal val chatListWindows: ChatListWindowSet? get() = subscriptionOwner.windows
@@ -2019,7 +2041,7 @@ class ChatsController private constructor(
                             subscriptionOwner.install(subscriptionAttempt)
                         }
                     }
-                    val initialFrame = chatListStream.frame()
+                    val initialFrame = chatListStream.frame().withFolder(folderWindows)
                     requireCompleteChatListWindowRows(
                         validateChatListWindowRows(accountRef, chatListStream, initialFrame.rows) &&
                             !chatListStream.closed &&
@@ -2069,51 +2091,62 @@ class ChatsController private constructor(
                     folderSourceChanged =
                         folderSource.receiveUntilChanged(completeChatList) {
                             coroutineScope {
-                                runUntilFirstLiveSubscriptionEnds(
-                                    first = {
-                                        chatListStream.receive { view, replacement ->
-                                            appState.recoveryDiagnostics
-                                                .recordChatListSubscriptionReceived()
-                                                ?.let { generation ->
-                                                    pendingRecoveryProjectionGeneration.publish(generation)
+                                // Bounded windows only, the complete stream already holds every folder chat.
+                                val folderJob =
+                                    if (completeChatList) {
+                                        null
+                                    } else {
+                                        launch { runFolderWindows(accountRef, chatListStream) }
+                                    }
+                                try {
+                                    runUntilFirstLiveSubscriptionEnds(
+                                        first = {
+                                            chatListStream.receive { view, replacement ->
+                                                appState.recoveryDiagnostics
+                                                    .recordChatListSubscriptionReceived()
+                                                    ?.let { generation ->
+                                                        pendingRecoveryProjectionGeneration.publish(generation)
+                                                    }
+                                                chatsDebug {
+                                                    "chat list window view=$view sequence=${replacement.sequence} " +
+                                                        "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
                                                 }
-                                            chatsDebug {
-                                                "chat list window view=$view sequence=${replacement.sequence} " +
-                                                    "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
+                                                requireCompleteChatListWindowRows(
+                                                    applyChatListWindowRows(accountRef, chatListStream),
+                                                )
+                                                receivedLiveUpdate = true
+                                                connectionOwner.noteLiveUpdate(connectionAttempt)
+                                                appState.schedulePendingLocalGroupDeleteCleanup()
                                             }
-                                            requireCompleteChatListWindowRows(
-                                                applyChatListWindowRows(accountRef, chatListStream),
+                                            connectionOwner.noteSubscriptionBoundary(
+                                                connectionAttempt,
+                                                PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
                                             )
-                                            receivedLiveUpdate = true
-                                            connectionOwner.noteLiveUpdate(connectionAttempt)
-                                            appState.schedulePendingLocalGroupDeleteCleanup()
-                                        }
-                                        connectionOwner.noteSubscriptionBoundary(
-                                            connectionAttempt,
-                                            PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
-                                        )
-                                    },
-                                    second = {
-                                        while (isActive) {
-                                            val update =
-                                                withContext(Dispatchers.IO) {
-                                                    chatStream.next()
-                                                } ?: break
-                                            if (!isActiveBindEpoch(epoch) || !isActive) break
-                                            receivedLiveUpdate = true
-                                            connectionOwner.noteLiveUpdate(connectionAttempt)
-                                            requestGroupProfiles(update)
-                                            chatsDebug {
-                                                "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                        },
+                                        second = {
+                                            while (isActive) {
+                                                val update =
+                                                    withContext(Dispatchers.IO) {
+                                                        chatStream.next()
+                                                    } ?: break
+                                                if (!isActiveBindEpoch(epoch) || !isActive) break
+                                                receivedLiveUpdate = true
+                                                connectionOwner.noteLiveUpdate(connectionAttempt)
+                                                requestGroupProfiles(update)
+                                                chatsDebug {
+                                                    "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                                }
+                                                foldGroup(update)
                                             }
-                                            foldGroup(update)
-                                        }
-                                        connectionOwner.noteSubscriptionBoundary(
-                                            connectionAttempt,
-                                            PerformancePhase.CONNECTION_CHATS_COMPLETED,
-                                        )
-                                    },
-                                )
+                                            connectionOwner.noteSubscriptionBoundary(
+                                                connectionAttempt,
+                                                PerformancePhase.CONNECTION_CHATS_COMPLETED,
+                                            )
+                                        },
+                                    )
+                                } finally {
+                                    folderJob?.cancel()
+                                }
                             }
                         }
                     if (folderSourceChanged) {
@@ -3214,14 +3247,19 @@ class ChatsController private constructor(
         accountRef: String,
         windows: ChatListWindowSet,
     ): Boolean {
-        val frame = windows.frame()
+        val folder = folderWindows
+        val folderRevision = folder?.currentRevision
+        val frame = windows.frame().withFolder(folder)
         val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+        // The plain revision guards only the plain rows; a folder swap or install since capture makes this frame
+        // stale too, and the change that superseded it publishes its own frame.
+        val folderCurrent = folderWindows === folder && folder?.currentRevision == folderRevision
         return when {
             windows.closed || chatListWindows !== windows -> {
                 windows.close()
                 false
             }
-            !windows.isCurrent(frame) -> true
+            !windows.isCurrent(frame) || !folderCurrent -> true
             !valid -> {
                 windows.close()
                 false
@@ -4700,28 +4738,41 @@ class ChatsController private constructor(
     }
 
     /**
-     * The complete native membership of [view] for select all (#2925), or null when this owner is stale.
+     * The complete native membership of [scope] for select all (#2925, #3652), or null when this owner is stale.
      * MDK throws ChatPresentationNotReady rather than returning a partial list; callers retry.
      */
     internal suspend fun completeChatListIds(
-        view: ChatListViewFfi,
+        scope: ChatListSelectAllScope,
         owner: ChatListActionOwner,
     ): List<String>? {
-        val read = liveSubscriptions.chatListIds?.takeIf { chatListActionIsCurrent(owner) } ?: return null
-        val ids = read(owner.accountRef, view)
+        val folder = scope.folder
+        val readFolder = liveSubscriptions.chatListQueryIds
+        val readView = liveSubscriptions.chatListIds
+        val available = if (folder != null) readFolder != null else readView != null
+        if (!available || !chatListActionIsCurrent(owner)) return null
+        val ids =
+            if (folder != null) {
+                folder.views.flatMap { requireNotNull(readFolder)(owner.accountRef, folder.forView(it)) }.distinct()
+            } else {
+                requireNotNull(readView)(owner.accountRef, scope.view)
+            }
         return ids.takeIf { chatListActionIsCurrent(owner) }
     }
 
     /**
-     * Drops captured IDs that left [view]; keeps caller order and never adds chats (#2925). Departed groups
+     * Drops captured IDs that left [scope]; keeps caller order and never adds chats (#2925). Departed groups
      * render inside Chats and Archived but MDK places them in LEFT, so a loaded departed row that was
-     * selected stays selected while it is still departed.
+     * selected stays selected while it is still departed. A folder rechecks against its own query in every
+     * view it covers.
      */
     internal suspend fun revalidateCompleteChatListIds(
-        view: ChatListViewFfi,
+        scope: ChatListSelectAllScope,
         groupIds: List<String>,
         owner: ChatListActionOwner,
     ): List<String>? {
+        val folder = scope.folder
+        if (folder != null) return revalidateFolderChatListIds(folder, groupIds, owner)
+        val view = scope.view
         val revalidate = liveSubscriptions.revalidateChatListIds?.takeIf { chatListActionSessionIsCurrent(owner) }
         return when {
             groupIds.isEmpty() -> emptyList()
@@ -4731,6 +4782,38 @@ class ChatsController private constructor(
                 val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
                 if (outside.isNotEmpty()) {
                     revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside)
+                        .mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
+            }
+        }
+    }
+
+    /**
+     * Drops captured IDs that no longer match [folder] in any view it covers; keeps caller order, never adds. A
+     * departed group the folder showed from loaded rows stays selected while MarmotKit still files it under Left.
+     */
+    private suspend fun revalidateFolderChatListIds(
+        folder: ChatFolderQuery,
+        groupIds: List<String>,
+        owner: ChatListActionOwner,
+    ): List<String>? {
+        val revalidate = liveSubscriptions.revalidateChatListQueryIds?.takeIf { chatListActionSessionIsCurrent(owner) }
+        return when {
+            groupIds.isEmpty() -> emptyList()
+            revalidate == null -> null
+            else -> {
+                val kept = hashSetOf<String>()
+                folder.views.forEach { view ->
+                    val matching = revalidate(owner.accountRef, folder.forView(view), groupIds)
+                    matching.mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
+                // Deliberately unfiltered, like the plain path: a departed chat the folder showed was matched by the
+                // loaded-rows evaluator, and MarmotKit's Left scope cannot re-evaluate rules such as Unread there, so
+                // a selected departed chat stays selected for as long as it is still departed.
+                if (outside.isNotEmpty()) {
+                    revalidate(owner.accountRef, ChatListViewQueryFfi(ChatListViewFfi.LEFT, emptyList()), outside)
                         .mapTo(kept) { it.lowercase(Locale.ROOT) }
                 }
                 groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }

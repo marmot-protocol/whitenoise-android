@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.state.folderMemberIds
 
 internal data class SearchFolderContext(
     val folders: List<ChatFolder>,
@@ -38,22 +39,27 @@ internal fun rememberSearchFolderContext(
             archivedItems,
             titleCopy,
             appState.profileRevisionForCompose,
+            appState.chatFolderMembership?.folders,
         ) {
             { folderId ->
                 account
                     ?.let { owner ->
-                        val rule = appState.chatFolderPreferences.folderRule(owner, folderId)
-                        val items = chatFolderSource(rule, activeItems, archivedItems)
-                        val mutedIds = items.filter { it.engineMuted() }.mapTo(mutableSetOf()) { it.group.groupIdHex }
-                        chatFolderChatIds(
-                            items = items,
-                            manualChatIds = appState.chatFolderPreferences.membershipFor(owner, folderId),
-                            excludedChatIds = appState.chatFolderPreferences.excludedChats(owner, folderId),
-                            rule = rule,
-                            activeAccountIdHex = appState.accounts.firstOrNull { it.label == owner }?.accountIdHex,
-                            isMuted = { it in mutedIds },
-                            displayTitle = { chatListItemDisplayTitle(it, appState, titleCopy) },
-                        )
+                        // MarmotKit's answer covers every chat, loaded or not; loaded rows answer until it lands.
+                        appState.folderMemberIds(owner, folderId) {
+                            val rule = appState.chatFolderPreferences.folderRule(owner, folderId)
+                            val items = chatFolderSource(rule, activeItems, archivedItems)
+                            val mutedIds =
+                                items.filter { it.engineMuted() }.mapTo(mutableSetOf()) { it.group.groupIdHex }
+                            chatFolderChatIds(
+                                items = items,
+                                manualChatIds = appState.chatFolderPreferences.membershipFor(owner, folderId),
+                                excludedChatIds = appState.chatFolderPreferences.excludedChats(owner, folderId),
+                                rule = rule,
+                                activeAccountIdHex = appState.accounts.firstOrNull { it.label == owner }?.accountIdHex,
+                                isMuted = { it in mutedIds },
+                                displayTitle = { chatListItemDisplayTitle(it, appState, titleCopy) },
+                            )
+                        }
                     }.orEmpty()
             }
         }

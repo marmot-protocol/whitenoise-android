@@ -6,13 +6,14 @@ import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.FolderField
+import dev.ipf.whitenoise.android.state.NativeFolderMembership
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.references
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 
-/** Restore the newest loaded windows before the prototype disables native paging and anchor reports. */
+/** Restore the newest plain windows before an advanced folder pages its own windows instead of these. */
 internal suspend fun ChatsController.returnSmartFolderWindowsToTop() {
     returnChatListToTop(ChatListViewFfi.CHATS)
     returnChatListToTop(ChatListViewFfi.ARCHIVED)
@@ -53,23 +54,19 @@ internal fun chatFolderChipModels(
     pendingFolderIds: Set<String> = emptySet(),
     selectedFolderId: String? = null,
     excludedOf: (String) -> Set<String> = { emptySet() },
+    nativeOf: (folderId: String) -> NativeFolderMembership? = { null },
 ): List<ChatFolderChipModel> =
     folders
         .sortedBy { it.order }
         .mapNotNull { folder ->
-            val source = chatFolderSource(ruleOf(folder.id), activeItems, archivedItems)
-            val ids = membershipOf(folder.id)
-            // One pass per folder: the chip needs only "does anything match"
-            // and the matched unread count, so neither the intermediate member
-            // list nor a per-row lowercase copy of the group id is needed.
-            var memberCount = 0
-            var unreadCount = 0
-            source.forEach { item ->
-                if (item.foldedId in ids) {
-                    memberCount++
-                    if (item.effectiveHasUnread(activeAccountIdHex)) unreadCount++
-                }
-            }
+            // MarmotKit counts every chat in the folder, including those beyond the loaded rows.
+            val (memberCount, unreadCount) =
+                nativeOf(folder.id)?.let { it.ids.size to it.unreadCount }
+                    ?: loadedFolderCounts(
+                        chatFolderSource(ruleOf(folder.id), activeItems, archivedItems),
+                        membershipOf(folder.id),
+                        activeAccountIdHex,
+                    )
             val pending = folder.id in pendingFolderIds
             val hiddenWhenEmpty = memberCount == 0 && !folder.showWhenEmpty
             if (hiddenWhenEmpty && folder.id != selectedFolderId && !pending) {
@@ -93,6 +90,26 @@ internal fun chatFolderChipModels(
                 )
             }
         }
+
+/**
+ * A folder's member and unread counts over loaded rows, in one pass: the chip needs only "does anything match" and
+ * the matched unread count, so neither the intermediate member list nor a per-row lowercase id copy is needed.
+ */
+private fun loadedFolderCounts(
+    source: List<ChatListItem>,
+    ids: Set<String>,
+    activeAccountIdHex: String?,
+): Pair<Int, Int> {
+    var memberCount = 0
+    var unreadCount = 0
+    source.forEach { item ->
+        if (item.foldedId in ids) {
+            memberCount++
+            if (item.effectiveHasUnread(activeAccountIdHex)) unreadCount++
+        }
+    }
+    return memberCount to unreadCount
+}
 
 /** An unresolved roster is not an authoritative empty member-rule answer. */
 internal fun memberBasedFolderPending(

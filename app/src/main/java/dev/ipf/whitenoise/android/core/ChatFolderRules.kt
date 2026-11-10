@@ -8,7 +8,8 @@ import dev.ipf.whitenoise.android.state.references
 import java.util.Locale
 
 /**
- * Effective membership of one folder against the loaded chat list: the
+ * Effective membership of one folder against the loaded chat list, used where MarmotKit's native folder query
+ * cannot answer yet: participant rules, and any folder before its first native read lands. The
  * manually added chat ids plus every chat the folder's rule currently
  * matches. Purely derived — nothing is persisted, so membership follows the
  * live list: a chat joins the folder the moment a rule starts matching it
