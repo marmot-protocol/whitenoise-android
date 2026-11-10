@@ -8,6 +8,9 @@ import dev.ipf.whitenoise.android.R
 /** How long a conversation waits before reopening a runtime event stream that ended or failed to open. */
 internal const val GROUP_CONVERGENCE_EVENT_RETRY_MILLIS = 5_000L
 
+/** Follow-up reads allowed in a row when group-state edges keep making the parked answer stale. */
+internal const val MAX_GROUP_CONVERGENCE_STALE_REREADS = 2
+
 /**
  * Whether [this] is MDK's raw group-state event for [groupIdHex] under [accountRef]. MDK fires it when a chat's
  * convergence parks or resumes, even though the group record itself stays the same, so the conversation's own

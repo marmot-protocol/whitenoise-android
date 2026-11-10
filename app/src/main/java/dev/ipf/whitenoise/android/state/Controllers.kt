@@ -6592,6 +6592,9 @@ class ConversationController(
     private val groupConvergenceReadGate = Mutex()
     private val groupConvergenceReadRequested = AtomicBoolean(false)
 
+    /** Rereads in a row that were scheduled because a group-state edge made the previous answer stale. */
+    private var groupConvergenceStaleRereads = 0
+
     // Completes once the conversation's first open settles, so the parked read never waits ahead of it.
     private val groupConvergenceOpenSettled = CompletableDeferred<Unit>()
     private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
@@ -7593,6 +7596,18 @@ class ConversationController(
                 if (!parked) groupConvergenceRetryFailure = null
                 published = true
             }
+        }
+        // A group-state edge during the read only made this answer stale, so read again while this chat is still owned.
+        // The rereads are bounded, so a steady stream of edges can't spin; the next event or foreground return reads.
+        if (published) {
+            groupConvergenceStaleRereads = 0
+        } else if (
+            groupConvergenceStaleRereads < MAX_GROUP_CONVERGENCE_STALE_REREADS &&
+            groupConvergenceReads.isCurrent(readEpoch) &&
+            ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)
+        ) {
+            groupConvergenceStaleRereads++
+            groupConvergenceReadRequested.set(true)
         }
         return if (published) parked else null
     }

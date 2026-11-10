@@ -90,6 +90,44 @@ class ConversationGroupConvergenceParkedTest {
             assertFalse(controller.groupConvergenceParked)
         }
 
+    /** A read made stale by a group-state edge is read again, so the notice doesn't stay wrong until the next event. */
+    @Test
+    fun aReadMadeStaleByAnEdgeIsReadAgain() =
+        runBlocking {
+            lateinit var controller: ConversationController
+            var reads = 0
+            controller =
+                controller(testAppState(), parked = {
+                    reads++
+                    if (reads == 1) controller.applyGroupStateForTest(conversationTimelineTestGroup())
+                    true
+                })
+
+            controller.requestGroupConvergenceRead()
+
+            assertEquals(2, reads)
+            assertTrue(controller.groupConvergenceParked)
+        }
+
+    /** Edges during every read stop rereading after the bound, so a steady stream of updates can't spin. */
+    @Test
+    fun staleRereadsAreBounded() =
+        runBlocking {
+            lateinit var controller: ConversationController
+            var reads = 0
+            controller =
+                controller(testAppState(), parked = {
+                    reads++
+                    controller.applyGroupStateForTest(conversationTimelineTestGroup())
+                    true
+                })
+
+            controller.requestGroupConvergenceRead()
+
+            assertEquals(1 + MAX_GROUP_CONVERGENCE_STALE_REREADS, reads)
+            assertFalse(controller.groupConvergenceParked)
+        }
+
     /** Replacing the Marmot runtime while the read is in flight rejects its answer. */
     @Test
     fun aReplacedRuntimeCannotPublishTheParkedFlag() =
