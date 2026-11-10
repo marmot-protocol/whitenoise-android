@@ -12,7 +12,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.ui.navigation.FLOATING_CONTROL_MOTION_MILLIS
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationCapsuleClearance
@@ -40,8 +39,6 @@ internal fun BoxScope.ConversationNavigationStack(
         content = content,
     )
 }
-
-internal const val CONVERSATION_NAVIGATION_CONTROL_MOTION_MILLIS = FLOATING_CONTROL_MOTION_MILLIS
 
 /** One transcript navigation control on the shared floating control motion. */
 @Composable

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -28,8 +29,12 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNoticeContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
+import dev.ipf.whitenoise.android.ui.conversation.composer.DICTATION_ACTIONS_RESIZE_MILLIS
+import dev.ipf.whitenoise.android.ui.conversation.composer.DICTATION_ACTIVE_ACTIONS_WIDTH
+import dev.ipf.whitenoise.android.ui.conversation.composer.DICTATION_LISTENING_PULSE_WIDTH
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -38,6 +43,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import kotlin.math.abs
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession as RecognitionSession
 
 @RunWith(RobolectricTestRunner::class)
@@ -104,6 +110,62 @@ class ConversationDictationReadinessScreenshotTest {
         val fixture = fixture(appOwned = true)
         fixture.controller.paste()
         capture(fixture, "dictation_bottom_bar_finishing_light.png", fontScale = 1f, rtl = false)
+        assertActionsWidth(DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH)
+    }
+
+    @Test
+    fun finishingLargeFontRtlDark() {
+        val fixture = fixture(appOwned = true)
+        fixture.controller.paste()
+        capture(fixture, "dictation_bottom_bar_finishing_large_font_rtl_dark.png", darkTheme = true)
+        assertActionsWidth(DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH)
+    }
+
+    /**
+     * Paste stops capture: the pulse gives its width back while the capsule narrows on the same
+     * clock, so no blank slot remains and Send is never clipped while the width moves.
+     */
+    @Test
+    fun pasteNarrowsTheCapsuleWithoutClippingSend() {
+        val fixture = fixture(appOwned = true)
+        fixture.platform.listener.onReady()
+        composeRule.mainClock.autoAdvance = false
+        capture(fixture, "dictation_bottom_bar_listening_before_paste_light.png", fontScale = 1f, rtl = false)
+        assertActionsWidth(DICTATION_ACTIVE_ACTIONS_WIDTH)
+
+        fixture.controller.paste()
+        composeRule.mainClock.advanceTimeBy(DICTATION_ACTIONS_RESIZE_MILLIS / 2L)
+        val actions =
+            composeRule.onNodeWithTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG).fetchSemanticsNode().boundsInRoot
+        val send =
+            composeRule
+                .onNodeWithContentDescription(
+                    ApplicationProvider.getApplicationContext<Context>().getString(R.string.send),
+                ).fetchSemanticsNode()
+                .boundsInRoot
+        with(composeRule.density) {
+            val narrowed = (DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH).toPx()
+            assertTrue(
+                "Width moves between its two ends: ${actions.width}",
+                actions.width > narrowed && actions.width < DICTATION_ACTIVE_ACTIONS_WIDTH.toPx(),
+            )
+        }
+        assertTrue("Send stays inside the narrowing actions: $send in $actions", send.right <= actions.right + 1f)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_bottom_bar_paste_midpoint_light.png")
+
+        composeRule.mainClock.advanceTimeBy(DICTATION_ACTIONS_RESIZE_MILLIS.toLong())
+        assertActionsWidth(DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH)
+    }
+
+    private fun assertActionsWidth(expected: Dp) {
+        val width =
+            composeRule
+                .onNodeWithTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.width
+        with(composeRule.density) {
+            assertTrue("Compact actions fit their commands: $width vs $expected", abs(width - expected.toPx()) <= 1f)
+        }
     }
 
     @Test

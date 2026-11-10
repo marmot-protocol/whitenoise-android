@@ -72,6 +72,7 @@ internal const val DICTATION_PROGRESS_TAG = "dictation-progress"
 /** A compact 24dp listening pulse followed by three adjacent compact commands. */
 internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 132.dp
 internal const val DICTATION_ACTIONS_RESIZE_MILLIS = 200
+internal val DICTATION_LISTENING_PULSE_WIDTH = 24.dp
 
 /**
  * Controller facts the dictation commands paint from. The floating capsule's exit freezes them
@@ -173,10 +174,10 @@ internal fun ConversationDictationCompactActions(
             dictationStatusLabel(state, facts.captureInProgress)
         }
 
-    // Only recovery changes the command set; ease that edge instead of snapping it.
+    // Capture stopping and recovery both change the command width; ease each edge instead of snapping.
     val motion = rememberSystemAnimationsEnabled()
     val width by animateDpAsState(
-        targetValue = state.compactActionsWidth,
+        targetValue = state.compactActionsWidth(facts.captureInProgress),
         animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
         label = "dictation actions width",
     )
@@ -250,11 +251,15 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Processing
 
 /**
- * Keeps the listening pulse's width through processing: Paste or Send only fades the pulse, so the
- * capsule holds still until its single exit instead of narrowing first.
+ * Active recognition keeps room for the 24dp listening pulse only while capture runs. Paste or Send
+ * stops capture, and the capsule narrows with the pulse instead of keeping its blank slot.
  */
-private val ConversationDictationState.compactActionsWidth
-    get() = if (hasActiveRecognitionActions) DICTATION_ACTIVE_ACTIONS_WIDTH else 96.dp
+private fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
+    when {
+        !hasActiveRecognitionActions -> 96.dp
+        captureInProgress -> DICTATION_ACTIVE_ACTIONS_WIDTH
+        else -> DICTATION_ACTIVE_ACTIONS_WIDTH - DICTATION_LISTENING_PULSE_WIDTH
+    }
 
 /**
  * Keeps all three explicit outcomes visible for the lifetime of app-owned recognition.

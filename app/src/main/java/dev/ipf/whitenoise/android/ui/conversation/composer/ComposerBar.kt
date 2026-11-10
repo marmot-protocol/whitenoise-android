@@ -1903,11 +1903,15 @@ internal fun ComposerBar(
                             },
                         actionRowAccessoryHeightPx = with(density) { measuredComposerAccessoryHeight.roundToPx() },
                         compactMeasurementReservesTrailingAction = false,
+                        // The emoji pane is an input surface like the keyboard it replaces. Opening it
+                        // clears editor focus, which alone would fold an empty draft to the resting row
+                        // while the pane rises, then unfold it again on the way back to the keyboard.
                         forceEditingLayout =
                             editingMessageId != null ||
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
-                                hasPendingAttachments,
+                                hasPendingAttachments ||
+                                composerEmojiPickerOpen,
                         sendAccessoryContent =
                             if (editingMessageId != null) {
                                 { ComposerEditPill(onCancelEdit = onCancelEdit) }

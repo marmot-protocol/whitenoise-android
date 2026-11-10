@@ -2804,36 +2804,23 @@ internal fun ChatsScreen(
                                 }
                             else -> Unit
                         }
-                        // Jump-to-top control (#413): the top of the bottom-end floating stack. It rests
-                        // just above the navigation bar and lifts above the dictation capsule and the
-                        // pen, centred on the pen's column, so it never overlaps either of them.
-                        BoxWithConstraints(Modifier.matchParentSize()) {
-                            val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
-                            FloatingControlVisibility(
-                                visible = jumpToTopVisible && !selectionMode,
-                                motionEnabled = rememberSystemAnimationsEnabled(),
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .navigationBarsPadding()
-                                        .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
-                                        .floatingDictationCapsuleClearance(clearColumnObstacles = true),
-                            ) {
-                                ChatListJumpToTopButton(onClick = {
-                                    scope.launch {
-                                        programmaticViewportGeneration += 1L
-                                        // For a very deep scroll, animating every row to the top is a
-                                        // multi-second crawl. Snap to a near-top index first, then animate
-                                        // the final viewport so the motion stays short at any depth.
-                                        if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
-                                            chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
-                                        }
-                                        chatListState.animateScrollToItem(0)
-                                        controller.returnChatListToTop(chatListWindowView)
+                        ChatListJumpToTopOverlay(
+                            visible = jumpToTopVisible && !selectionMode,
+                            modifier = Modifier.matchParentSize(),
+                            onClick = {
+                                scope.launch {
+                                    programmaticViewportGeneration += 1L
+                                    // For a very deep scroll, animating every row to the top is a
+                                    // multi-second crawl. Snap to a near-top index first, then animate
+                                    // the final viewport so the motion stays short at any depth.
+                                    if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
+                                        chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
                                     }
-                                })
-                            }
-                        }
+                                    chatListState.animateScrollToItem(0)
+                                    controller.returnChatListToTop(chatListWindowView)
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -3067,6 +3054,35 @@ private fun ChatListIdentifierResult(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+    }
+}
+
+/**
+ * Jump-to-top control (#413): the top of the bottom-end floating stack. It rests just above the
+ * navigation bar and lifts above the dictation capsule and the pen, centred on the pen's column, so
+ * it never overlaps either of them.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListJumpToTopOverlay(
+    visible: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier) {
+        val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
+        FloatingControlVisibility(
+            visible = visible,
+            motionEnabled = rememberSystemAnimationsEnabled(),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
+                    .floatingDictationCapsuleClearance(clearColumnObstacles = true),
+        ) {
+            ChatListJumpToTopButton(onClick = onClick)
+        }
     }
 }
 

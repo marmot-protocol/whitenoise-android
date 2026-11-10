@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -132,17 +133,7 @@ internal class FloatingDictationAnchor {
     fun topInColumn(
         left: Float,
         right: Float,
-        movingComposerFab: Rect? = null,
-    ): Float? =
-        bounds
-            .filter { (_, rect) -> rect.left < right && rect.right > left }
-            .minOfOrNull { (token, rect) ->
-                if (composerFabObstacles[token] == true && movingComposerFab != null) {
-                    movingComposerFab.top
-                } else {
-                    rect.top
-                }
-            }
+    ): Float? = bounds.values.filter { it.left < right && it.right > left }.minOfOrNull { it.top }
 
     /**
      * Changes whenever an in-route obstacle such as a notice or footer registers or leaves, but not when
@@ -234,22 +225,28 @@ internal fun Modifier.floatingDictationAnchor(
 }
 
 /**
- * Where the shell placed the dictation control. [motion] is read lazily by each reader, so a handoff
- * animating on the frame clock moves the published bounds without re-placing the shell.
+ * Where the shell placed the dictation control. [motion] and [settle] are read lazily by each reader, so
+ * a handoff or settling glide animating on the frame clock moves the published bounds without re-placing
+ * the shell, and overlays stacked above the capsule follow it on that same clock.
  */
 internal data class FloatingCapsulePlacement(
     val placed: Rect,
     val inline: Boolean,
     val motion: MeasuredControlHandoff?,
     val rtl: Boolean,
+    val settle: State<Float>? = null,
 ) {
-    /** The painted rectangle: the placed one shifted by an active handoff, or null for an inline control at rest. */
+    /**
+     * The painted rectangle: the placed one shifted by an active handoff and the settling glide, or null
+     * for an inline control at rest.
+     */
     fun painted(): Rect? {
         val shift = motion?.capsuleHandoffShift(rtl)
+        val glide = settle?.value ?: 0f
         return when {
-            shift != null -> placed.translate(shift)
+            shift != null -> placed.translate(shift.x, shift.y + glide)
             inline -> null
-            else -> placed
+            else -> placed.translate(0f, glide)
         }
     }
 }
@@ -480,6 +477,7 @@ internal fun FloatingDictationLayout(
                             inline = inlineControl,
                             motion = controlMotion,
                             rtl = layoutDirection == LayoutDirection.Rtl,
+                            settle = settle.painted,
                         ),
                     )
                 }
@@ -506,14 +504,17 @@ internal fun FloatingDictationLayout(
 
 /**
  * Glides the floating capsule from its previous slot when bottom chrome appears or leaves, on the floating
- * control clock. Placement keeps reporting the settled slot, so overlays stacked above the capsule run
- * their own lift on the same clock instead of chasing each frame.
+ * control clock. The published capsule bounds include [painted], so overlays stacked above the capsule
+ * follow the glide frame by frame instead of running a clock of their own.
  */
 private class CapsuleSettle(
     private val scope: CoroutineScope,
     private val motionEnabled: Boolean,
 ) {
     private val offset = Animatable(0f)
+
+    /** The current glide, read lazily by whoever paints or stacks against the capsule. */
+    val painted: State<Float> get() = offset.asState()
     private var lastY: Int? = null
     private var lastGeneration = 0
     private var lastRouteGeneration = 0

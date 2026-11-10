@@ -27,6 +27,24 @@ class FloatingControlStackTest {
     }
 
     @Test
+    fun shrinkingCapsuleHandsTheJumpControlToThePenWithoutAStep() {
+        val penTop = 740f
+        val capsuleBottom = penTop - GAP
+
+        fun liftWithCapsuleHeight(height: Float) =
+            floatingControlStackClearancePx(
+                jump,
+                Rect(200f, capsuleBottom - height, 360f, capsuleBottom),
+                obstacleTop = penTop,
+                gapPx = GAP,
+            )
+        assertEquals(64, liftWithCapsuleHeight(40f))
+        assertEquals(24, liftWithCapsuleHeight(4f))
+        assertEquals(16, liftWithCapsuleHeight(0f))
+        assertEquals(16, floatingControlStackClearancePx(jump, capsule = null, obstacleTop = penTop, gapPx = GAP))
+    }
+
+    @Test
     fun capsuleInAnotherColumnDoesNotLiftTheJumpControl() {
         val capsule = Rect(0f, 720f, 120f, 760f)
         assertEquals(0, floatingControlStackClearancePx(jump, capsule, obstacleTop = null, gapPx = GAP))

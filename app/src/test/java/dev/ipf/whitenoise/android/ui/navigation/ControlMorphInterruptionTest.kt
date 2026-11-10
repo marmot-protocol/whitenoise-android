@@ -62,7 +62,7 @@ class ControlMorphInterruptionTest {
 
     @Test fun reversingAnIntermediateFrameKeepsItsBoundsAndCornerShape() = exerciseIntermediateFrame(false)
 
-    @Test fun movingComposerTargetKeepsTheSameFractionBounds() = exerciseIntermediateFrame(true)
+    @Test fun movingComposerTargetCarriesItsInFlightShape() = exerciseIntermediateFrame(true)
 
     /** A same-owner route interruption retains the actual intermediate geometry and opacity. */
     @Test
@@ -135,6 +135,18 @@ class ControlMorphInterruptionTest {
                 val target = requireNotNull(state.targetBounds)
                 state.report("editor", Any(), target.translate(Offset(0f, -72f)))
                 assertTrue(state.active)
+                // The in-flight shape is carried with its moving target at the same fraction.
+                val carried = requireNotNull(bounds).translate(Offset(0f, -72f))
+                val rendered = requireNotNull(state.renderedBounds)
+                assertEquals(carried.left, rendered.left, 0.01f)
+                assertEquals(carried.top, rendered.top, 0.01f)
+                assertEquals(carried.right, rendered.right, 0.01f)
+                assertEquals(carried.bottom, rendered.bottom, 0.01f)
+                assertEquals(radius, state.renderedRadius, 0f)
+                assertEquals(penAlpha, state.renderedDecorationAlpha, 0f)
+                state.finish()
+                assertFalse(state.active)
+                return@runOnIdle
             } else if (continueSameOwner) {
                 state.prepare("editor", true, continueActiveMotion = true)
                 assertTrue(state.active)

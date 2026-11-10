@@ -5,7 +5,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
@@ -17,8 +16,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -33,11 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.launch
 import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 /*
  * One stacking rule for every bottom-end floating control. From the top: jump controls, then the
@@ -111,8 +104,8 @@ private val InertControl =
  * bottom edge and stack above whichever of the capsule and pen is present.
  *
  * The read is one-way — the overlay never registers as an obstacle, so the capsule cannot chase the
- * overlay it just moved. Rising to clear new chrome happens in the same frame; settling back down glides
- * on the floating control clock, and reduced motion settles at once. It never carries the overlay above
+ * overlay it just moved. The overlay is placed against the painted capsule every frame, so it rises,
+ * settles and follows a shrinking capsule on the capsule's own clock. It never carries the overlay above
  * its parent's top edge: when a tall capsule leaves too little room — recovery text with the keyboard
  * open, a short landscape window — the overlay rises only as far as its parent allows rather than
  * leaving the screen.
@@ -121,17 +114,13 @@ private val InertControl =
 internal fun Modifier.floatingDictationCapsuleClearance(
     gap: Dp = FloatingControlGap,
     clearColumnObstacles: Boolean = false,
-    motionEnabled: Boolean = rememberSystemAnimationsEnabled(),
 ): Modifier {
     val anchor = LocalFloatingDictationAnchor.current ?: return this
-    val scope = rememberCoroutineScope()
-    val lift = remember { Animatable(0f) }
-    val target = remember { IntArray(1) { UNSETTLED } }
     return layout { measurable, constraints ->
         val placeable = measurable.measure(constraints)
         layout(placeable.width, placeable.height) {
             val origin = coordinates?.positionInWindow()
-            val wanted =
+            val lift =
                 if (origin == null) {
                     0
                 } else {
@@ -145,42 +134,18 @@ internal fun Modifier.floatingDictationCapsuleClearance(
                         topLimit = coordinates?.parentLayoutCoordinates?.positionInWindow()?.y ?: origin.y,
                     )
                 }
-            if (wanted != target[0]) {
-                val first = target[0] == UNSETTLED
-                val rising = wanted > lift.value
-                target[0] = wanted
-                scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    if (first || rising || !motionEnabled) {
-                        lift.snapTo(wanted.toFloat())
-                    } else {
-                        lift.animateTo(wanted.toFloat(), floatingControlMotionSpec())
-                    }
-                }
-            }
-            // Rising is immediate so the overlay never overlaps the capsule or pen for a frame; only
-            // settling back down after they shrink or leave glides on the shared clock.
-            placeable.place(0, -maxOf(lift.value.roundToInt(), wanted))
+            placeable.place(0, -lift)
         }
     }
 }
-
-private const val UNSETTLED = Int.MIN_VALUE
-
-/**
- * Upward shift that leaves [gapPx] between [overlay] and [capsule], or zero when they never meet. The
- * shift is capped so the overlay's top never rises above [topLimit].
- */
-internal fun floatingCapsuleClearancePx(
-    overlay: Rect,
-    capsule: Rect,
-    gapPx: Float,
-    topLimit: Float = Float.NEGATIVE_INFINITY,
-): Int = floatingControlStackClearancePx(overlay, capsule, obstacleTop = null, gapPx = gapPx, topLimit = topLimit)
 
 /**
  * Upward shift that leaves [gapPx] between [overlay] and the highest of [capsule] (when it shares the
  * overlay's column) and [obstacleTop] (already filtered to that column), or zero when neither is in the
  * way. The shift is capped so the overlay's top never rises above [topLimit].
+ *
+ * A capsule shorter than the gap shares its gap with the chrome below it, so an overlay riding a
+ * shrinking capsule lands exactly one gap above that chrome as the capsule vanishes, without a final step.
  */
 internal fun floatingControlStackClearancePx(
     overlay: Rect,
@@ -189,10 +154,13 @@ internal fun floatingControlStackClearancePx(
     gapPx: Float,
     topLimit: Float = Float.NEGATIVE_INFINITY,
 ): Int {
-    val capsuleTop = capsule?.takeIf { overlay.left < it.right && overlay.right > it.left }?.top
-    val ceiling = listOfNotNull(capsuleTop, obstacleTop).minOrNull()
+    val capsuleCeiling =
+        capsule
+            ?.takeIf { overlay.left < it.right && overlay.right > it.left }
+            ?.let { it.top - minOf(gapPx, it.height.coerceAtLeast(0f)) }
+    val ceiling = listOfNotNull(capsuleCeiling, obstacleTop?.minus(gapPx)).minOrNull()
     if (overlay.width <= 0f || ceiling == null) return 0
-    val wanted = ceil(overlay.bottom + gapPx - ceiling).toInt().coerceAtLeast(0)
+    val wanted = ceil(overlay.bottom - ceiling).toInt().coerceAtLeast(0)
     val room = (overlay.top - topLimit).toInt().coerceAtLeast(0)
     return minOf(wanted, room)
 }

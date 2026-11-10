@@ -13,6 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
 
 /** Endpoint admission prevents previously hidden controls from reviving a stale decorative origin. */
 class MeasuredControlHandoffTest {
@@ -262,6 +263,45 @@ class MeasuredControlHandoffTest {
         assertFalse(removable.presentationActive)
         assertNull(removable.presentationBounds)
     }
+
+    /** Both endpoints ride the page slide; the shape tracks the sliding target and lands on it. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun morphFollowsATargetCarriedByThePageSlide() =
+        runTest {
+            val state = MeasuredControlHandoff("composer", morphSurface = true, followMovingTarget = true)
+            state.report("composer", Any(), Rect(0f, 900f, 400f, 960f))
+            val members = Any()
+            val request = state.prepare("members", true)
+            val slide = 48f
+            state.report("members", members, Rect(16f + slide, 300f, 384f + slide, 600f))
+            val frames = BroadcastFrameClock()
+            val animation = launch(frames) { state.animatePrepared(request) }
+            runCurrent()
+            frames.sendFrame(0L)
+            runCurrent()
+            var gap = Float.MAX_VALUE
+            for (frame in 1..12) {
+                frames.sendFrame(frame * 16_000_000L)
+                runCurrent()
+                val offset = slide * (1f - frame / 12f)
+                state.report("members", members, Rect(16f + offset, 300f, 384f + offset, 600f))
+                assertTrue("A moving target must not settle the morph early", state.active)
+                val trailing = abs(state.renderedBounds!!.top - state.targetBounds!!.top)
+                assertTrue("The shape must close on its sliding target every frame", trailing <= gap)
+                gap = trailing
+            }
+            val landing = state.renderedBounds!!
+            // The slide has already stopped: the carried edge sits on the target, not 48px behind it.
+            assertEquals(16f, landing.left, 1f)
+            // Only the last 8ms of the 200ms morph clock remain on the 600px vertical travel.
+            assertEquals(300f, landing.top, 8f)
+            frames.sendFrame(240_000_000L)
+            runCurrent()
+            animation.cancelAndJoin()
+            assertFalse(state.active)
+            assertEquals(Rect(16f, 300f, 384f, 600f), state.targetBounds)
+        }
 
     private fun phaseFixture() =
         MeasuredControlHandoff("pen", morphSurface = true).also { state ->

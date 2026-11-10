@@ -30,6 +30,14 @@
         ]
       },
       {
+        "surface": "ChatListJumpToTopOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListJumpToTopOverlay(",
+        "test_ids": [
+          "CHL-035"
+        ]
+      },
+      {
         "surface": "ChatListSearchSectionHeader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatListSearchSectionHeader(",

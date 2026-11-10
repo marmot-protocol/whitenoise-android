@@ -3,9 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import android.content.Context
 import android.provider.Settings
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -25,19 +23,24 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
-import dev.ipf.whitenoise.android.ui.navigation.FLOATING_CONTROL_MOTION_MILLIS
+import dev.ipf.whitenoise.android.audio.ConversationDictationMode
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.ConversationDictationTarget
+import dev.ipf.whitenoise.android.ui.conversation.composer.DictationControlFacts
+import dev.ipf.whitenoise.android.ui.navigation.ConversationDictationControlOwner
+import dev.ipf.whitenoise.android.ui.navigation.DICTATION_CONTROL_EXIT_MILLIS
+import dev.ipf.whitenoise.android.ui.navigation.DictationControlExit
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.FloatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.navigation.FloatingDictationLayout
 import dev.ipf.whitenoise.android.ui.navigation.LocalFloatingDictationAnchor
-import dev.ipf.whitenoise.android.ui.navigation.floatingDictationCapsuleClearance
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -53,8 +56,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * The chat list's bottom-end stack reads jump-to-top, dictation capsule, pen from the top, with one gap
- * between each present layer. When the capsule leaves, the jump control settles down onto the pen on the
- * shared floating control clock instead of staying high or overlapping it.
+ * between each present layer. When the capsule shrinks away through its production exit, the jump control
+ * follows it down on the capsule's own clock and lands one gap above the pen instead of staying high or
+ * overlapping it.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h420dp-mdpi")
@@ -104,7 +108,8 @@ class ChatListFloatingStackScreenshotTest {
     @Test fun jumpControlSettlesOntoThePenWhenTheCapsuleLeavesDark() {
         render(dark = true)
         update { capsule.value = false }
-        advanceFrames(FLOATING_CONTROL_MOTION_MILLIS / 2L)
+        advanceFrames(DICTATION_CONTROL_EXIT_MILLIS / 2L)
+        assertFollowsShrinkingCapsule(bounds(JUMP), bounds(CAPSULE))
         capture("chat_list_floating_stack_capsule_leaving_dark")
         advanceFrames(SETTLE_MILLIS)
         assertGap(bounds(JUMP), penBounds())
@@ -125,6 +130,23 @@ class ChatListFloatingStackScreenshotTest {
         assertGap(bounds(CAPSULE), penBounds())
     }
 
+    /**
+     * While the capsule shrinks, the jump control rides one gap above it; a capsule shorter than the gap
+     * shares its gap, so the control reaches the pen's resting place exactly as the capsule vanishes.
+     */
+    private fun assertFollowsShrinkingCapsule(
+        jump: Rect,
+        capsule: Rect,
+    ) {
+        assertTrue("capsule=$capsule should be mid-exit", capsule.height > 0f && capsule.height < 48f)
+        val expectedBottom = capsule.top - minOf(FloatingControlGap.value, capsule.height)
+        assertTrue(
+            "jump=$jump should follow capsule=$capsule, expected bottom $expectedBottom",
+            kotlin.math.abs(jump.bottom - expectedBottom) <= 1f,
+        )
+        assertTrue("jump=$jump must stay clear of the pen", penBounds().top - jump.bottom >= FloatingControlGap.value - 0.5f)
+    }
+
     private fun assertGap(
         upper: Rect,
         lower: Rect,
@@ -138,6 +160,16 @@ class ChatListFloatingStackScreenshotTest {
     }
 
     private fun bounds(tag: String): Rect =
+        if (tag == JUMP) {
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.scroll_to_top))
+                .fetchSemanticsNode()
+                .boundsInWindow
+        } else {
+            tagBounds(tag)
+        }
+
+    private fun tagBounds(tag: String): Rect =
         composeRule
             .onNodeWithTag(tag, useUnmergedTree = true)
             .fetchSemanticsNode()
@@ -169,13 +201,27 @@ class ChatListFloatingStackScreenshotTest {
                             anchor = anchor,
                             content = { ChatListFixture() },
                             control = {
-                                FloatingControlVisibility(visible = capsule.value, motionEnabled = true) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        modifier = Modifier.size(width = 168.dp, height = 48.dp).testTag(CAPSULE),
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) { Text("0:04") }
+                                val live = capsule.value
+                                DictationControlExit(
+                                    owner =
+                                        if (live) {
+                                            ConversationDictationControlOwner.Persistent
+                                        } else {
+                                            ConversationDictationControlOwner.Hidden
+                                        },
+                                    state = if (live) LISTENING else ConversationDictationState.Idle,
+                                    facts = FACTS,
+                                    motionAllowed = true,
+                                ) { _, _, exitModifier ->
+                                    // The tag sits outside the exit's cleared semantics, on the shrinking slot.
+                                    Box(Modifier.testTag(CAPSULE)) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            modifier = exitModifier.size(width = 168.dp, height = 48.dp),
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) { Text("0:04") }
+                                        }
                                     }
                                 }
                             },
@@ -199,21 +245,11 @@ class ChatListFloatingStackScreenshotTest {
                 }
             },
         ) { padding ->
-            BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-                val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
-                FloatingControlVisibility(
-                    visible = jump.value,
-                    motionEnabled = true,
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .navigationBarsPadding()
-                            .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
-                            .floatingDictationCapsuleClearance(clearColumnObstacles = true),
-                ) {
-                    ChatListJumpToTopButton(onClick = {}, modifier = Modifier.testTag(JUMP))
-                }
-            }
+            ChatListJumpToTopOverlay(
+                visible = jump.value,
+                onClick = {},
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
         }
     }
 
@@ -248,5 +284,19 @@ class ChatListFloatingStackScreenshotTest {
         const val PEN = "stack.pen"
         const val SETTLE_MILLIS = 600L
         const val FRAME_MILLIS = 16L
+        val LISTENING =
+            ConversationDictationState.Listening(
+                1L,
+                ConversationDictationTarget("account", "group", TextFieldValue(), 0, ConversationDictationMode.InApp),
+                startedAtElapsedMillis = 0L,
+            )
+        val FACTS =
+            DictationControlFacts(
+                captureInProgress = true,
+                deliveryInProgress = false,
+                completionActionsEnabled = false,
+                processingDeliveryMode = null,
+                recoveryHandedToComposer = false,
+            )
     }
 }
