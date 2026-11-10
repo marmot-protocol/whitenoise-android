@@ -93,7 +93,8 @@ private const val COMPOSER_FIXTURE_TRANSLATION = "Fixture translated text"
 
 /**
  * Actual composer Translate line, its one-time privacy notice and its target dialog: the first turn-on asks for the
- * notice before any text reaches the engine, and turning the mode on without a saved language opens the picker, and the chosen language must yield exactly the controlled engine's text as Send's outgoing text.
+ * notice before any text reaches the engine, turning the mode on without a saved language opens the picker, and the
+ * chosen language must yield exactly the controlled engine's text as Send's outgoing text.
  */
 @Composable
 @Suppress("FunctionNaming")

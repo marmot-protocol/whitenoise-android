@@ -46,7 +46,7 @@
       {
         "surface": "ComposerTranslationContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
-        "anchor": "private fun ComposerTranslationContent(",
+        "anchor": "fun ComposerTranslationContent(",
         "test_ids": [
           "CON-045"
         ]
@@ -105,6 +105,14 @@
         "surface": "R.string.translation_target_language",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
         "anchor": "R.string.translation_target_language",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "R.string.accept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+        "anchor": "R.string.accept",
         "test_ids": [
           "CON-045"
         ]

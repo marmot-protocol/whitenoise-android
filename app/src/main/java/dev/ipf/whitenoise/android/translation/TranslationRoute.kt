@@ -89,6 +89,7 @@ internal fun WhiteNoiseAppState.translationOwnerCurrent(
  * or changed, because a result started before then may come from another engine or be shown to someone else.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun TranslationOwnerResetEffect(
     owner: Any,
     onReset: () -> Unit,
