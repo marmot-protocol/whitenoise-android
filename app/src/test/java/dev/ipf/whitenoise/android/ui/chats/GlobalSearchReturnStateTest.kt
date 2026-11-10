@@ -18,6 +18,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
@@ -197,6 +198,101 @@ class GlobalSearchReturnStateTest {
         assertEquals(399, shown.size)
         assertEquals(shown.size, shown.toSet().size)
         assertEquals(false, returned.stale)
+        holder.close()
+    }
+
+    /**
+     * A held session that never reached MDK's end stays hidden, read by read, until verification reaches its old
+     * continuation, and then shows every surviving loaded row once without the row deleted beyond the cap.
+     */
+    @Test
+    fun aCappedRecheckShortOfTheEndStaysHiddenUntilVerificationReachesTheOldContinuation() {
+        val store = StoreReader((0 until 600).map { record("g", "m%03d".format(it), at = 1_000uL + it.toULong()) })
+        val permits = Channel<Unit>(Channel.UNLIMITED)
+        var gated = false
+        val reader =
+            GlobalSearchTimelineReader { query ->
+                if (gated) permits.receive()
+                store.page(query)
+            }
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        session.search(query)
+        idleMain()
+        while (session.state.results.size < 400) {
+            session.loadMore()
+            idleMain()
+        }
+        val loaded = session.state.results.map { it.key }
+        assertTrue(!session.state.endReached && session.state.nextCursor != null)
+        holder.detach()
+        // The oldest loaded rows sit beyond what a capped recheck rereads from the head.
+        store.replace(loaded[390].removePrefix("g:")) { it.copy(deleted = true) }
+
+        gated = true
+        session.refresh()
+        idleMain()
+        var reads = 0
+        while (session.stale) {
+            assertEquals(null, session.shownState(query))
+            permits.trySend(Unit)
+            idleMain()
+            reads++
+            assertTrue("verification never finished", reads < 100)
+        }
+
+        // The capped reread alone could not reach the old continuation, so paging had to carry it there.
+        assertTrue(reads > GLOBAL_SEARCH_REFRESH_MAX_BATCHES)
+        val shown = requireNotNull(session.shownState(query)).results.map { it.key }
+        assertTrue(loaded[390] !in shown)
+        assertTrue(shown.containsAll(loaded - loaded[390]))
+        assertEquals(shown.size, shown.toSet().size)
+        assertTrue(!session.state.endReached)
+        holder.close()
+    }
+
+    /** Retry after a failed verification page resumes where verification stopped instead of rereading the head. */
+    @Test
+    fun retryAfterAFailedVerificationPageResumesWhereItStopped() {
+        val store = StoreReader((0 until 600).map { record("g", "m%03d".format(it), at = 1_000uL + it.toULong()) })
+        var failDeep = false
+        val reader =
+            GlobalSearchTimelineReader { query ->
+                // Only verification paging reaches this deep: the capped reread stops well above it.
+                val deep = query.before?.let { it <= 1_300uL } == true
+                if (failDeep && deep) {
+                    failDeep = false
+                    error("relay went away")
+                }
+                store.page(query)
+            }
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        session.search(query)
+        idleMain()
+        while (session.state.results.size < 400) {
+            session.loadMore()
+            idleMain()
+        }
+        val loaded = session.state.results.map { it.key }
+        holder.detach()
+
+        failDeep = true
+        session.refresh()
+        idleMain()
+        assertTrue(session.recheckFailed)
+        // The unverified rows stay hidden behind the Retry boundary.
+        val failed = requireNotNull(session.shownState(query))
+        assertTrue(failed.failed && failed.results.isEmpty())
+        val readsBeforeRetry = store.queries.size
+        session.retry()
+        idleMain()
+
+        assertTrue(store.queries[readsBeforeRetry].before != null)
+        assertEquals(false, session.stale)
+        assertEquals(loaded, requireNotNull(session.shownState(query)).results.map { it.key })
         holder.close()
     }
 

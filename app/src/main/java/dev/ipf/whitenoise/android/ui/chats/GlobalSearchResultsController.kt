@@ -71,9 +71,9 @@ internal class GlobalSearchResultsController(
     private var refreshPending = false
     private var loadPending = false
 
-    // While a stale session's capped recheck re-reads its range page by page, the old continuation it must reach,
-    // or null when the old range had reached MDK's end (#1945).
-    private var verifying = false
+    // Whether a stale session is paging on after a capped recheck to re-read the rest of its old range, and the old
+    // continuation that paging must reach, or null when the old range had reached MDK's end (#1945).
+    private var pagingToVerify = false
     private var verifyTarget: GlobalSearchCursor? = null
 
     /**
@@ -90,7 +90,7 @@ internal class GlobalSearchResultsController(
         loadPending = false
         stale = false
         recheckFailed = false
-        verifying = false
+        pagingToVerify = false
         verifyTarget = null
         query = next
         val restarted = GlobalSearchResultsReducer.restart(state)
@@ -102,14 +102,13 @@ internal class GlobalSearchResultsController(
     /** Reads the next bounded batch unless one is in flight or MDK reported the end. */
     fun loadMore() = read(debounceMillis = 0L)
 
-    /** Rechecks a [stale] session again, or reads the failed batch again from its cursor; loaded rows stay. */
+    /**
+     * Rechecks a [stale] session again, or reads the failed batch again from its cursor; loaded rows stay. A failed
+     * verification page resumes where verification stopped instead of rereading from the head.
+     */
     fun retry() {
-        if (stale) {
-            recheckFailed = false
-            refresh()
-        } else {
-            loadMore()
-        }
+        if (stale) recheckFailed = false
+        if (stale && !pagingToVerify) refresh() else loadMore()
     }
 
     /**
@@ -127,7 +126,7 @@ internal class GlobalSearchResultsController(
         } else if (started != null) {
             val budget = refreshBatchBudget(state.results.size)
             // A stale recheck must cover the whole range the reader had; a retry keeps the original target.
-            if (stale && !verifying) verifyTarget = state.nextCursor
+            if (stale && !pagingToVerify) verifyTarget = state.nextCursor
             state = started.first
             launch(current, started.second, debounceMillis = 0L, refreshBudget = budget)
         }
@@ -211,12 +210,12 @@ internal class GlobalSearchResultsController(
         request: GlobalSearchPageRequest,
         succeeded: Boolean,
     ) {
-        val confirming = request.verifying || verifying
+        val confirming = request.verifying || pagingToVerify
         when {
-            !succeeded -> if (stale && (request.refresh || verifying)) recheckFailed = true
+            !succeeded -> if (stale && (request.refresh || pagingToVerify)) recheckFailed = true
             confirming -> {
-                verifying = !verificationReached(state, verifyTarget)
-                if (!verifying) stale = false
+                pagingToVerify = !verificationReached(state, verifyTarget)
+                if (!pagingToVerify) stale = false
             }
             request.refresh -> stale = false
         }
@@ -224,7 +223,7 @@ internal class GlobalSearchResultsController(
 
     /** Runs a refresh that arrived during the batch, else a page asked for during a refresh. */
     private fun continueAfter() {
-        val verificationOwed = verifying && stale && !recheckFailed
+        val verificationOwed = pagingToVerify && stale && !recheckFailed
         if (verificationOwed && state.inFlight == null) {
             read(0L)
         } else if (refreshPending) {
