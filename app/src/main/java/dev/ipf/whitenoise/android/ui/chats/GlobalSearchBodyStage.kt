@@ -1,22 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.AppText
-import dev.ipf.whitenoise.android.state.ErrorPresentation
-import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 
 /** A remounted deep result viewport must not measure a shorter list before its anchor returns. */
 internal fun preserveSearchBodyAnchor(
@@ -64,26 +53,3 @@ internal fun blockLocalSearchRows(
     hasLocalRows: Boolean,
     preservePendingAnchor: Boolean,
 ): Boolean = loading && (!hasLocalRows || preservePendingAnchor)
-
-/** Body work has its own status; it does not replace already available local name matches. */
-@Composable
-@Suppress("FunctionNaming")
-internal fun GlobalSearchBodyStage(
-    loading: Boolean,
-    failure: ErrorPresentation?,
-    onRetry: () -> Unit,
-) {
-    if (failure != null) {
-        InlineErrorBanner(
-            error = failure.copy(message = AppText.Resource(R.string.search_message_content_failed)),
-            onRetry = onRetry,
-        )
-    } else if (loading) {
-        Text(
-            text = stringResource(R.string.search_message_content_loading),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-        )
-    }
-}

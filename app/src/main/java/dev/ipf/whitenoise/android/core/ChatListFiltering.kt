@@ -21,7 +21,6 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.Lud16Resolver
 import dev.ipf.whitenoise.android.core.MentionComposer
-import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageDebugCategory
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageDebugStyle
@@ -224,13 +223,6 @@ internal fun projectChatListSearchSections(
         messageOnly = messageOnly,
     )
 }
-
-internal fun canonicalChatListBodyMatches(matches: Map<String, MessageBodyMatch>): Map<String, MessageBodyMatch> =
-    buildMap {
-        matches.forEach { (groupId, match) ->
-            putIfAbsent(canonicalChatListGroupId(groupId), match)
-        }
-    }
 
 internal fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
