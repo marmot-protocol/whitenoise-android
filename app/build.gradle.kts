@@ -326,8 +326,9 @@ val productionPushRelayHint =
 
 // PR preview inputs. The default "stable" channel deliberately keeps one
 // applicationId so every PR preview updates the same app and retains its data.
-// The "isolated" channel remains available when a reviewer needs side-by-side
-// installs or a clean data directory. Both are signed later by a privileged,
+// The "isolated" channel remains buildable (opt-in via include_isolated) for
+// side-by-side installs or a clean data directory, but PR preview CI no longer
+// signs, publishes or links it by default. Stable is signed later by a privileged,
 // base-branch-only workflow; Gradle never receives the preview signing key.
 val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
 val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }

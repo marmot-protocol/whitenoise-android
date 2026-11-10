@@ -24,7 +24,8 @@ requests while preserving exact-head/current-base validation and testing gates.
 Pushing a PR does not automatically build previews. When debugging or required
 human/device testing needs the current candidate, first look for existing trusted
 artifacts for that exact head and a matching active request. One request builds
-both the stable (update-compatible) and isolated channels:
+the stable (update-compatible) channel only; add `-f include_isolated=true`
+only for an opt-in qualification that consumes the unsigned isolated artifact:
 
 ```sh
 gh workflow run android-pr-apk.yml --repo marmot-protocol/whitenoise-android \
@@ -35,7 +36,7 @@ Hermes agents use the maintained authenticated CLI at `/opt/data/.local/bin/gh`
 with `HERMES_GH_NO_CACHE=1` for live reads and writes. Dispatch from the trusted
 default branch, not PR-controlled workflow code. The workflow resolves and
 rechecks the open internal PR's exact head; the separate trusted publisher
-validates both candidates before signing, upload and description updates.
+validates the stable candidate before signing, upload and description updates.
 
 Play-flavor release packaging and minification are checked by the requested
 preview build; core debug checks do not replace that coverage. For Play-specific

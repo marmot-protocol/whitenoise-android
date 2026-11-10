@@ -21,10 +21,8 @@ case "$command" in
   application-id)
     if [[ "${FAKE_BAD_PACKAGE:-}" == "$channel" ]]; then
       printf 'invalid.preview.package\n'
-    elif [[ "$channel" == stable ]]; then
-      printf 'dev.ipf.whitenoise.android.preview\n'
     else
-      printf 'dev.ipf.whitenoise.android.preview.pr%s\n' "$PR_NUMBER"
+      printf 'dev.ipf.whitenoise.android.preview\n'
     fi
     ;;
   version-code) printf '%s\n' "${FAKE_VERSION_CODE:-2000000000}" ;;
@@ -68,7 +66,7 @@ export BUILD_RUN_NUMBER=73
 make_candidates() {
   local root=$1
   rm -rf "$root"
-  for channel in stable isolated; do
+  for channel in stable; do
     mkdir -p "$root/$channel"
     printf 'valid candidate %s\n' "$channel" > "$root/$channel/preview.apk"
     (cd "$root/$channel" && sha256sum preview.apk > SHA256SUMS)
@@ -93,18 +91,23 @@ candidates="$tmp/candidates"
 make_candidates "$candidates"
 PATH="$fake_bin:$PATH" "$verifier" "$candidates" >/dev/null
 
+# The trusted publisher consumes only the stable channel. An opt-in isolated
+# artifact from the same run (here deliberately invalid) must be ignored, never
+# verified, signed, staged or published.
+mkdir -p "$candidates/isolated"
+printf 'unchecked isolated candidate\n' > "$candidates/isolated/preview.apk"
+PATH="$fake_bin:$PATH" "$verifier" "$candidates" >/dev/null
+
 expect_rejection 'wrong package' env PATH="$fake_bin:$PATH" FAKE_BAD_PACKAGE=stable "$verifier" "$candidates"
 expect_rejection 'wrong version code' env PATH="$fake_bin:$PATH" FAKE_VERSION_CODE=7 "$verifier" "$candidates"
 expect_rejection 'wrong PR/SHA version name' env PATH="$fake_bin:$PATH" FAKE_VERSION_NAME=wrong "$verifier" "$candidates"
 expect_rejection 'wrong ABI' env PATH="$fake_bin:$PATH" FAKE_ABI=x86_64 "$verifier" "$candidates"
 expect_rejection 'native extraction disabled' env PATH="$fake_bin:$PATH" FAKE_EXTRACT_NATIVE_LIBS=false "$verifier" "$candidates"
 expect_rejection 'test-only stable candidate' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable "$verifier" "$candidates"
-expect_rejection 'test-only isolated candidate' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=isolated "$verifier" "$candidates"
 expect_rejection 'unrecognised test-only value' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable FAKE_TEST_ONLY_VALUE=0xffffffff "$verifier" "$candidates"
 # An explicit android:testOnly="false" is the normal installable contract; the
 # baseline run above already covers the attribute being absent entirely.
 env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable FAKE_TEST_ONLY_VALUE=false "$verifier" "$candidates" >/dev/null
-env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=isolated FAKE_TEST_ONLY_VALUE=false "$verifier" "$candidates" >/dev/null
 expect_rejection 'uncompressed native library' env PATH="$fake_bin:$PATH" FAKE_NATIVE_COMPRESSION=stor "$verifier" "$candidates"
 expect_rejection 'invalid ZIP' env PATH="$fake_bin:$PATH" FAKE_INVALID_ZIP=true "$verifier" "$candidates"
 
@@ -160,15 +163,15 @@ expected_cert_digest=aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaab
 export PR_PREVIEW_CERT_SHA256=$expected_cert_digest
 "$signer" "$candidates" "$tmp/signed" "$tmp/test.p12"
 "$stager" "$tmp/signed" "$candidates" "$tmp/signed-check"
-for channel in stable isolated; do
+for channel in stable; do
   checksum_path=$(awk '{print $2}' "$tmp/signed-check/$channel/SHA256SUMS")
   [[ "$checksum_path" == "whitenoise-pr-${PR_NUMBER}-${channel}.apk" ]]
 done
+[[ ! -e "$tmp/signed/isolated" && ! -e "$tmp/signed-check/isolated" ]]
 PATH="$fake_bin:$PATH" "$verifier" "$tmp/signed-check" >/dev/null
 # The signed pass repeats the test-only assertion, so a test-only APK cannot
 # reach the release-asset publisher even if it slipped past the candidate pass.
 expect_rejection 'test-only stable signed output' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=stable "$verifier" "$tmp/signed-check"
-expect_rejection 'test-only isolated signed output' env PATH="$fake_bin:$PATH" FAKE_TEST_ONLY_CHANNEL=isolated "$verifier" "$tmp/signed-check"
 rm -rf "$tmp/signed-check"
 rm -rf "$tmp/signed"
 
