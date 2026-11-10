@@ -235,25 +235,6 @@ class GlobalSearchResultsControllerTest {
             assertFalse(controller.state.loading)
         }
 
-    /** A returning session rereads until it holds as many rows as before. */
-    @Test
-    fun resumeRereadsUpToThePreviousExtent() =
-        runTest {
-            val first = (0 until 50).map { record("g", "m%02d".format(it), at = 100uL + it.toULong()) }
-            val reader =
-                FakeReader(
-                    { TimelinePageFfi(first, hasMoreBefore = true, hasMoreAfter = false) },
-                    { page(record("g", "older", at = 1uL)) },
-                )
-            val controller = controller(reader)
-            controller.search(GlobalSearchResultsQuery(needle = "hello"), resumeTarget = 51)
-            advanceUntilIdle()
-
-            assertEquals(2, reader.queries.size)
-            assertEquals(51, controller.state.results.size)
-            assertFalse(controller.state.resuming)
-        }
-
     /** Repeating the current query does not restart its generation. */
     @Test
     fun repeatingTheCurrentQueryKeepsItsGeneration() =
@@ -317,34 +298,6 @@ class GlobalSearchResultsControllerTest {
             val expected = rows.sortedWith(ACCOUNT_ORDER).map { "${it.groupIdHex}:${it.messageIdHex}" }
             assertEquals(expected, keys(controller))
         }
-
-    /** A return whose rows were all deleted meanwhile reads a bounded number of pages and shows what it found. */
-    @Test
-    fun resumeAfterRowsVanishedIsBounded() =
-        runTest {
-            val reactions = (0 until 2_000).map { record("g", "r%04d".format(it), at = it.toULong(), kind = 7uL) }
-            val store = StoreReader(reactions)
-            val controller = controller(store)
-            controller.search(GlobalSearchResultsQuery(needle = "hello"), resumeTarget = 300)
-            advanceUntilIdle()
-
-            assertFalse(controller.state.resuming)
-            assertTrue(controller.state.results.isEmpty())
-            assertEquals(GLOBAL_SEARCH_AUTO_EMPTY_BATCHES * GLOBAL_SEARCH_BATCH_PAGES, store.queries.size)
-        }
-
-    /** The resume extent belongs to one account and runtime; another owner starts at the top. */
-    @Test
-    fun resumeExtentIsKeyedByOwner() {
-        val extent = GlobalSearchResultsExtent()
-        val query = GlobalSearchResultsQuery(needle = "gm")
-        extent.record("account-a" to 1, query, loaded = 40)
-
-        assertEquals(40, extent.resumeCount("account-a" to 1, query))
-        assertEquals(0, extent.resumeCount("account-b" to 1, query))
-        assertEquals(0, extent.resumeCount("account-a" to 2, query))
-        assertEquals(0, extent.resumeCount("account-a" to 1, query.copy(needle = "other")))
-    }
 
     /** A same-second, same-id twin in another scoped chat at the merged page edge is listed, not skipped. */
     @Test

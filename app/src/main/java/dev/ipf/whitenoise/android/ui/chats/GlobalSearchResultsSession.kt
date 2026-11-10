@@ -19,14 +19,17 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import java.util.Locale
 
 /**
- * Owns the account's global message-search session while message results are showing (#1944), and closes it on
- * account switch, runtime replacement or when results stop showing. Query changes reuse the session: they
- * cancel the batch in flight and start the next generation after the keystroke debounce.
+ * The account's global message-search session while message results are showing (#1944). With a shell [holder]
+ * the session outlives the chat list, so opening a result and pressing Back returns to the same loaded pages
+ * (#1945); without one it lives as long as this composition. Account or runtime changes and leaving message
+ * results close it. Query changes reuse it: they cancel the batch in flight and start the next generation after
+ * the keystroke debounce, while recomposing with the query it already answers changes nothing.
  */
 @Composable
 internal fun rememberGlobalSearchResults(
@@ -34,43 +37,49 @@ internal fun rememberGlobalSearchResults(
     account: String?,
     query: GlobalSearchResultsQuery,
     enabled: Boolean,
-    extent: GlobalSearchResultsExtent? = null,
+    holder: GlobalSearchResultsHolder? = null,
 ): GlobalSearchResultsController? {
-    SideEffect { if (!enabled) extent?.clear() }
+    SideEffect { if (!enabled) holder?.close() }
     val active = account?.takeIf { enabled && it == appState.activeAccountRef } ?: return null
     val generation = appState.runtimeGeneration
-    // The extent belongs to one account and runtime; a switch never resumes another owner's row count.
-    val owner = active to generation
-    val scope = rememberCoroutineScope()
-    val controller =
-        remember(active, generation) {
-            GlobalSearchResultsController(
-                reader = { pageQuery ->
-                    appState.measureHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEARCH) {
-                        appState.marmotIo(MarmotTraceSection.MESSAGE_SEARCH) { timelineMessages(active, pageQuery) }
-                    }
-                },
-                scope = scope,
-                environment =
-                    GlobalSearchResultsEnvironment(
-                        hiddenMessageIds = { group -> appState.hiddenMessageIdsInGroup(active, group) },
-                        isCurrent = { appState.runtimeGeneration == generation && appState.activeAccountRef == active },
-                    ),
-            )
-        }
-    DisposableEffect(controller) { onDispose { controller.close() } }
+    val create: (CoroutineScope) -> GlobalSearchResultsController = { scope ->
+        GlobalSearchResultsController(
+            reader = { pageQuery ->
+                appState.measureHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEARCH) {
+                    appState.marmotIo(MarmotTraceSection.MESSAGE_SEARCH) { timelineMessages(active, pageQuery) }
+                }
+            },
+            scope = scope,
+            environment =
+                GlobalSearchResultsEnvironment(
+                    hiddenMessageIds = { group -> appState.hiddenMessageIdsInGroup(active, group) },
+                    isCurrent = { appState.runtimeGeneration == generation && appState.activeAccountRef == active },
+                ),
+        )
+    }
+    val controller = rememberHeldOrLocalSession(holder, active to generation, create)
     // Rechecks run only while the screen is visible; a return to it rechecks once.
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val started = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
     if (started) GlobalSearchResultsRecheckEffects(appState, active, controller)
-    LaunchedEffect(controller, query) {
-        val resume = extent?.resumeCount(owner, query) ?: 0
-        // A returning session rereads at once; a changed query waits out the keystroke debounce.
-        val debounce = if (controller.query == null && resume > 0) 0L else CHAT_LIST_SEARCH_DEBOUNCE_MS
-        controller.search(query, debounceMillis = debounce, resumeTarget = resume)
-    }
-    val settled = controller.state.takeIf { !it.loading && !it.resuming && controller.query == query }
-    SideEffect { if (settled != null) extent?.record(owner, query, settled.results.size) }
+    LaunchedEffect(controller, query) { controller.search(query, debounceMillis = CHAT_LIST_SEARCH_DEBOUNCE_MS) }
+    return controller
+}
+
+/**
+ * The shell-held session for [owner] when a [holder] exists, else one owned and closed by this composition. A
+ * held session is closed by its holder, never when the chat list leaves composition.
+ */
+@Composable
+private fun rememberHeldOrLocalSession(
+    holder: GlobalSearchResultsHolder?,
+    owner: Any,
+    create: (CoroutineScope) -> GlobalSearchResultsController,
+): GlobalSearchResultsController {
+    val localScope = rememberCoroutineScope()
+    val controller =
+        remember(holder, owner) { holder?.obtain(owner, create) ?: create(localScope) }
+    DisposableEffect(controller) { onDispose { if (holder == null) controller.close() } }
     return controller
 }
 
@@ -173,12 +182,11 @@ private fun GlobalSearchResultsRecheckEffects(
                         val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update
                         update?.accountLabel == account && controller.isTouchedBy(update.update)
                     },
-                    // Asked after the subscription opened, so a returning session's resume, which the search effect
-                    // starts after this one, is already visible. A fresh query skips the probe: in practice its first
-                    // read starts only after the 275 ms keystroke debounce, so the subscription is usually open by
-                    // then, though nothing orders the two. A returning session's undebounced reread can start
-                    // first, so it wakes, as does any session with rows loaded.
-                    wakeOnOpen = { controller.state.batches > 0 || controller.state.resuming },
+                    // Asked after the subscription opened. A fresh query skips the probe: in practice its first read
+                    // starts only after the 275 ms keystroke debounce, so the subscription is usually open by then,
+                    // though nothing orders the two. A session with rows loaded — a return to a held session — wakes,
+                    // so rows changed while the reader was away are rechecked.
+                    wakeOnOpen = { controller.state.batches > 0 },
                 )
             failures = if (opened) 0 else failures + 1
             delay(GLOBAL_SEARCH_OBSERVER_RETRY_MS)

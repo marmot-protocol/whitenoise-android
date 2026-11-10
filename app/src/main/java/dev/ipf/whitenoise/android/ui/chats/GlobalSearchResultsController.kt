@@ -15,6 +15,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -59,21 +61,20 @@ internal class GlobalSearchResultsController(
 
     /**
      * Starts a generation for [next] unless it is already the current query. [debounceMillis] delays only the
-     * first read, so typing does not read a page per keystroke; [resumeTarget] rereads that many rows first.
+     * first read, so typing does not read a page per keystroke.
      */
     fun search(
         next: GlobalSearchResultsQuery,
         debounceMillis: Long = 0L,
-        resumeTarget: Int = 0,
     ) {
         if (closed || (next == query && state.generation > 0)) return
         job?.cancel()
         refreshPending = false
         loadPending = false
         query = next
-        val restarted = GlobalSearchResultsReducer.restart(state, resumeTarget)
+        val restarted = GlobalSearchResultsReducer.restart(state)
         // A scope with no chats cannot match, so it ends at once instead of reading the whole account.
-        state = if (next.matchesNothing) restarted.copy(endReached = true, resumeTarget = 0) else restarted
+        state = if (next.matchesNothing) restarted.copy(endReached = true) else restarted
         read(debounceMillis)
     }
 
@@ -179,15 +180,12 @@ internal class GlobalSearchResultsController(
             GlobalSearchResultsReducer.applyFailure(state, request)
         }
 
-    /**
-     * Runs a refresh that arrived during the batch, else a page asked for during a refresh, else continues a
-     * returning session's bounded reread.
-     */
+    /** Runs a refresh that arrived during the batch, else a page asked for during a refresh. */
     private fun continueAfter() {
         if (refreshPending) {
             refreshPending = false
             refresh()
-        } else if (loadPending || GlobalSearchResultsReducer.needsResumeRead(state)) {
+        } else if (loadPending) {
             loadPending = false
             read(0L)
         }
@@ -198,37 +196,41 @@ internal class GlobalSearchResultsController(
 }
 
 /**
- * How far the message results had read for one query in this account's search session. A session reopened for
- * the same query, account and runtime rereads this many rows before it shows the list, so Back lands on the row
- * the user opened; any other owner starts at the top. It keeps a count only, never rows or cursors.
+ * Keeps one account's global message-search session alive in the shell while the chat list is away (#1945): opening
+ * a result disposes the chat list, and Back recomposes it on the same session, so the query, filters, loaded pages,
+ * cursor and scroll position return as they were without reading those pages again. The session's own recheck
+ * then rereads the loaded range quietly in the background, so a row that was deleted, hidden or expired while the
+ * reader was away never comes back. A different account or runtime, leaving message results, or the shell's
+ * account scope ending closes the held session; process death drops it, like the rest of the in-memory results.
  */
-internal class GlobalSearchResultsExtent {
+internal class GlobalSearchResultsHolder {
     private var owner: Any? = null
-    private var query: GlobalSearchResultsQuery? = null
-    private var loaded = 0
+    private var held: GlobalSearchResultsController? = null
+    private var scope: CoroutineScope? = null
 
-    /** Records the rows a settled session of [owner] holds for [query]. */
-    fun record(
+    /** The held session for [owner], creating it with [create] on a scope the holder owns when there is none. */
+    fun obtain(
         owner: Any,
-        query: GlobalSearchResultsQuery,
-        loaded: Int,
-    ) {
+        create: (CoroutineScope) -> GlobalSearchResultsController,
+    ): GlobalSearchResultsController {
+        val current = held?.takeIf { owner == this.owner }
+        if (current != null) return current
+        close()
+        val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val created = create(sessionScope)
         this.owner = owner
-        this.query = query
-        this.loaded = loaded
+        held = created
+        scope = sessionScope
+        return created
     }
 
-    /** The rows to reread for [query] under [owner]: the recorded count for the same pair, otherwise none. */
-    fun resumeCount(
-        owner: Any,
-        query: GlobalSearchResultsQuery,
-    ): Int = if (owner == this.owner && query == this.query) loaded else 0
-
-    /** Forgets the extent once message results end, so the next search starts at the top. */
-    fun clear() {
+    /** Closes the held session and cancels its work. */
+    fun close() {
+        held?.close()
+        scope?.cancel()
+        held = null
+        scope = null
         owner = null
-        query = null
-        loaded = 0
     }
 }
 

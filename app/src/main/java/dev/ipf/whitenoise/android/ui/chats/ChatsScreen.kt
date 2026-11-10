@@ -829,12 +829,13 @@ internal fun ChatsScreen(
             controller.boundAccountRef,
             messageResultsQuery,
             messageResultsMode,
-            searchViewport?.messageResultsExtent,
+            searchViewport?.messageResults,
         )
     val messageResultsState = messageResults?.state?.takeIf { messageResults.query == messageResultsQuery }
-    // Pending until the session adopts this query, and while a return rereads its earlier rows, so a
-    // restored deep viewport never measures a shorter list. Rows of an older query are never shown.
-    val messageResultsPending = messageResultsMode && messageResultsState?.resuming != false
+    // Pending until the session adopts this query, so a restored deep viewport never measures a shorter list. A
+    // return to a held session (#1945) is not pending: its loaded rows are there at once. Rows of an older query
+    // are never shown.
+    val messageResultsPending = messageResultsMode && messageResultsState == null
     val messageResultChats =
         rememberSearchChats(
             controller,

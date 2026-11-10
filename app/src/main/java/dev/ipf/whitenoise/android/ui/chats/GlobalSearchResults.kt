@@ -177,10 +177,8 @@ internal data class GlobalSearchPageRequest(
 )
 
 /**
- * Transient results of one search generation. Only admitted rows are kept, never raw pages. [resumeTarget] is
- * the row count a returning session rereads before it shows the list, so Back lands where the user left, within
- * [resumeBatchesLeft] batches so rows that vanished meanwhile never walk the whole account;
- * [emptyBatches] counts consecutive batches that showed nothing and [batches] increases with every finished one,
+ * Transient results of one search generation. Only admitted rows are kept, never raw pages. [emptyBatches] counts
+ * consecutive batches that showed nothing and [batches] increases with every finished one,
  * so paging effects relaunch even when a batch completes within one frame.
  */
 internal data class GlobalSearchResultsState(
@@ -193,8 +191,6 @@ internal data class GlobalSearchResultsState(
     val failed: Boolean = false,
     val emptyBatches: Int = 0,
     val batches: Int = 0,
-    val resumeTarget: Int = 0,
-    val resumeBatchesLeft: Int = 0,
 ) {
     /** The earliest deadline of a loaded disappearing match, when the rows must be checked again. */
     val nextExpiry: ULong? = results.mapNotNull { it.expiresAt }.minOrNull()
@@ -208,9 +204,6 @@ internal data class GlobalSearchResultsState(
     /** MDK returned a continuation, or the first batch has not finished yet. */
     val hasMore: Boolean get() = !endReached
 
-    /** A returning session is still rereading the rows it had before. */
-    val resuming: Boolean get() = resumeTarget > 0 && !failed
-
     /** Nothing has been shown for this generation yet, and no failure has ended the first read. */
     val initialLoading: Boolean get() = batches == 0 && !failed
 
@@ -221,18 +214,9 @@ internal data class GlobalSearchResultsState(
 /** Pure transitions of the global message results; the controller owns I/O and cancellation. */
 internal object GlobalSearchResultsReducer {
     /** A new query, filter set or account: drops every row, cursor and request, and opens the next generation. */
-    fun restart(
-        state: GlobalSearchResultsState,
-        resumeTarget: Int = 0,
-    ): GlobalSearchResultsState {
-        val target = resumeTarget.coerceAtLeast(0)
-        // Enough batches for the earlier rows at the batch target, plus the empty-batch allowance.
-        val budget = if (target > 0) target / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES else 0
-        return GlobalSearchResultsState(
-            generation = state.generation + 1,
-            resumeTarget = target,
-            resumeBatchesLeft = budget,
-        )
+    fun restart(state: GlobalSearchResultsState): GlobalSearchResultsState {
+        val generation = state.generation + 1
+        return GlobalSearchResultsState(generation = generation)
     }
 
     /** Starts the next batch, or returns null while one is in flight or after MDK's end. */
@@ -253,13 +237,6 @@ internal object GlobalSearchResultsReducer {
         val results = state.results + fresh
         val ended = batch.nextCursor == null
         val emptyBatches = if (fresh.isEmpty()) state.emptyBatches + 1 else 0
-        val budgetLeft = (state.resumeBatchesLeft - 1).coerceAtLeast(0)
-        // A resume ends at its target, at MDK's end, or once its budget or the empty-batch allowance runs out.
-        val resumeDone =
-            ended ||
-                results.size >= state.resumeTarget ||
-                budgetLeft == 0 ||
-                emptyBatches >= GLOBAL_SEARCH_AUTO_EMPTY_BATCHES
         return state.copy(
             results = results,
             seenKeys = state.seenKeys + fresh.map { it.key },
@@ -268,8 +245,6 @@ internal object GlobalSearchResultsReducer {
             inFlight = null,
             emptyBatches = emptyBatches,
             batches = state.batches + 1,
-            resumeTarget = if (resumeDone) 0 else state.resumeTarget,
-            resumeBatchesLeft = if (resumeDone) 0 else budgetLeft,
         )
     }
 
@@ -315,7 +290,7 @@ internal object GlobalSearchResultsReducer {
         request: GlobalSearchPageRequest,
     ): GlobalSearchResultsState {
         val current = request == state.inFlight
-        return if (current) state.copy(inFlight = null, failed = true, resumeTarget = 0) else state
+        return if (current) state.copy(inFlight = null, failed = true) else state
     }
 
     /** Forgets a cancelled request without marking a failure, so the same cursor can be read again. */
@@ -323,10 +298,4 @@ internal object GlobalSearchResultsReducer {
         state: GlobalSearchResultsState,
         request: GlobalSearchPageRequest,
     ): GlobalSearchResultsState = if (request != state.inFlight) state else state.copy(inFlight = null)
-
-    /** Whether a returning session still has rows to reread before it shows its list. */
-    fun needsResumeRead(state: GlobalSearchResultsState): Boolean {
-        val idle = state.inFlight == null && !state.endReached
-        return state.resuming && idle
-    }
 }

@@ -272,7 +272,7 @@ class GlobalSearchResultsRecheckTest {
             assertFalse(controller.isTouchedBy(update("g", snapshot)))
         }
 
-    /** The observer asks whether to wake only after subscribing, so a resume begun meanwhile still counts. */
+    /** The observer asks whether to wake only after subscribing, so state reached meanwhile still counts. */
     @Test
     fun observerAsksWhetherToWakeAfterSubscribing() =
         runTest {
@@ -297,19 +297,6 @@ class GlobalSearchResultsRecheckTest {
             assertEquals(listOf("subscribeEvents", "wakeOnOpen"), order.map { it.substringBefore('-') })
             assertTrue(wakeups.tryReceive().isSuccess)
         }
-
-    /** A returning session reports resuming as soon as its search starts, before any page is read. */
-    @Test
-    fun resumeIsVisibleAsSoonAsSearchStarts() =
-        runTest {
-            val controller = controller(StoreReader(listOf(record("g", "m", at = 1uL))))
-            controller.search(GlobalSearchResultsQuery(needle = "hello"), resumeTarget = 40)
-
-            assertEquals(0, controller.state.batches)
-            assertTrue(controller.state.resuming)
-            advanceUntilIdle()
-        }
-
     /** An empty first page asks for one recheck, which finds a match that arrived after that read. */
     @Test
     fun emptyFirstPageProbesOnceAndFindsALateMatch() =
