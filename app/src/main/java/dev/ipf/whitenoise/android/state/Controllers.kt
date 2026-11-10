@@ -8364,8 +8364,8 @@ class ConversationController(
         trace: PerformanceTrace?,
         clientToken: String,
         optimisticKey: String,
-    ): dev.ipf.marmotkit.SendSummaryFfi {
-        return appState.withConversationTextSendOrder(account, group.groupIdHex) {
+    ): dev.ipf.marmotkit.SendSummaryFfi =
+        appState.withConversationTextSendOrder(account, group.groupIdHex) {
             // Replies and injected publishers keep their plain-text path. A message that uses the user's
             // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
             // Resolving its artwork inside the text order keeps a later message from publishing first.
@@ -8451,7 +8451,6 @@ class ConversationController(
                 }
             }
         }
-    }
 
     /**
      * Trace a transient send retry with the current relay-health snapshot.
