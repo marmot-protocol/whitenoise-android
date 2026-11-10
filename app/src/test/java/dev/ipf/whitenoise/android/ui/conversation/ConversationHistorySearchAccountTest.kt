@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
@@ -10,9 +11,11 @@ import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.conversationTimelineTestAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.timelineRecord
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.record
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -143,4 +146,32 @@ class ConversationHistorySearchAccountTest {
     private companion object {
         const val PINNED_ACCOUNT = "notification-target"
     }
+
+    /** By me in one chat sends the sender to MDK and steps only through the account's own messages, oldest first. */
+    @Test
+    fun byMeHistorySearchSendsTheSenderNativelyAndKeepsOnlyOwnMessages() =
+        runBlocking {
+            val self = "ab".repeat(32)
+            val queries = mutableListOf<TimelineMessageQueryFfi>()
+            val stamps = listOf("mine-old" to 10uL, "mine-new" to 30uL)
+            val own = stamps.map { (id, at) -> record("g", id, at = at, sender = self) }
+            val other = record("g", "theirs", at = 20uL, sender = "cd".repeat(32))
+            val matches =
+                searchConversationHistoryMatches(
+                    appState = testAppState(),
+                    accountRef = "account",
+                    groupIdHex = "g",
+                    query = "",
+                    constraints = MessageSearchConstraints(senderIds = setOf(self)),
+                    readPage = { _, query ->
+                        queries += query
+                        TimelinePageFfi(own + other, hasMoreBefore = false, hasMoreAfter = false)
+                    },
+                )
+
+            assertEquals(self, queries.single().sender)
+            assertEquals(listOf("mine-old", "mine-new"), matches?.map { it.messageIdHex })
+            val status = conversationSearchScanStatus("", matches, scanFailed = false, filtersActive = true)
+            assertTrue(status.allowsSearchSteps(2))
+        }
 }
