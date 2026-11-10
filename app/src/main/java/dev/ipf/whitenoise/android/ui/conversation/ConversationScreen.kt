@@ -174,7 +174,9 @@ import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
 import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
+import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
+import dev.ipf.whitenoise.android.ui.chats.toggleGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -4121,11 +4123,17 @@ internal fun ConversationScreen(
                                 )
                             },
                             searchFilterControls = {
+                                val byMeLabel = stringResource(R.string.you)
                                 dev.ipf.whitenoise.android.ui.chats.GlobalSearchAttachmentModes(
                                     state = conversationSearchState,
                                     onSelectionChange = { selection ->
                                         updateConversationSearch { it.copy(contentFilterSelection = selection) }
                                     },
+                                    // By me keeps the chat scope, so the arrows step through this chat's own messages.
+                                    byMe =
+                                        rememberGlobalSearchByMe(conversationSelfAccountIdHex, byMeLabel) { self ->
+                                            updateConversationSearch { toggleGlobalSearchByMe(it, self, byMeLabel) }
+                                        },
                                 )
                                 GlobalSearchFilterControlsRow(
                                     state = conversationSearchState,

@@ -463,4 +463,76 @@ class GlobalSearchStateTest {
         assertTrue(textOnly.isCategoryActive(GlobalSearchFilterCategory.Content))
         assertFalse(textOnly.isBrowsingAttachments())
     }
+
+    /** By me adds the active identity as a sender filter and removes it again, keeping other senders. */
+    @Test
+    fun byMeTogglesTheActiveIdentityAsASenderFilter() {
+        val self = "AbCd".repeat(16)
+        val alice = GlobalSearchSenderFilter("aa".repeat(32), "Alice")
+        val base = GlobalSearchState(isOpen = true, senderFilters = setOf(alice))
+
+        val on = toggleGlobalSearchByMe(base, self, "You")
+        assertTrue(on.byMeActive(self))
+        assertTrue(on.byMeActive(self.lowercase()))
+        assertEquals(setOf(alice, GlobalSearchSenderFilter(self.lowercase(), "You")), on.senderFilters)
+        assertTrue(on.messageFiltersActive)
+
+        val off = toggleGlobalSearchByMe(on, self, "You")
+        assertFalse(off.byMeActive(self))
+        assertEquals(setOf(alice), off.senderFilters)
+    }
+
+    /** By me is an ordinary sender chip: removable by its chip, saved and restored with the search state. */
+    @Test
+    fun byMeIsARemovableSenderChipThatSurvivesSaveAndRestore() {
+        val self = "ab".repeat(32)
+        val on = toggleGlobalSearchByMe(GlobalSearchState(isOpen = true, query = "gm"), self, "You")
+        val chip = GlobalSearchActiveChips.from(on).items.single()
+        assertEquals(GlobalSearchFilterCategory.Sender, chip.category)
+
+        assertEquals(on, decodeGlobalSearchState(encodeGlobalSearchState(on)))
+        assertFalse(GlobalSearchTransitions.removeFilter(on, chip.chipId).byMeActive(self))
+    }
+
+    /** An account switch clears By me with the other account-scoped sender filters. */
+    @Test
+    fun accountSwitchClearsByMe() {
+        val scoped = GlobalSearchState(isOpen = true, accountScopeToken = accountScope("a", 1).encodeToken())
+        val on = toggleGlobalSearchByMe(scoped, "ab".repeat(32), "You")
+
+        val switched = GlobalSearchTransitions.reconcileAccountScope(on, accountScope("b", 1))
+
+        assertFalse(switched.byMeActive("ab".repeat(32)))
+    }
+
+    /** Only a single canonical account id is filtered natively by MDK; anything else stays a host check. */
+    @Test
+    fun onlyACanonicalSingleSenderIsSentToMdk() {
+        val self = "ab".repeat(32)
+        assertEquals(
+            self,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf(self)),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf(self, "cd".repeat(32))),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf("AB".repeat(32))),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(setOf("corrupt")),
+        )
+        assertEquals(
+            null,
+            dev.ipf.whitenoise.android.state
+                .nativeSenderFilter(null),
+        )
+    }
 }
