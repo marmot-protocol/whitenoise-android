@@ -243,19 +243,27 @@ class ConversationGroupRecoveryPresentationTest {
             assertTrue(controller.lastMutationError != null)
         }
 
-    /** Only a first notice the account list marks as a rejoin earns the rejoin wording, a failed list read never. */
+    /**
+     * MDK lists parked and ledger notices before rejoin notices, so the rejoin wording shows only when every notice is
+     * a rejoin, and never after a failed list read.
+     */
     @Test
     fun rejoinWordingFollowsTheFirstNoticeCause() =
         runTest {
             val rejoin = HistoryNoticeFfi("aa", HistoryNoticeCauseFfi.BEFORE_REJOIN, groupIdHex(), 1uL)
             val gap = HistoryNoticeFfi("bb", HistoryNoticeCauseFfi.EPOCH_GAP, groupIdHex(), 2uL)
-            var notices: () -> List<HistoryNoticeFfi> = { listOf(gap, rejoin) }
-            var noticeIds = listOf("aa", "bb")
+            val secondRejoin = HistoryNoticeFfi("cc", HistoryNoticeCauseFfi.BEFORE_REJOIN, groupIdHex(), 3uL)
+            var notices: () -> List<HistoryNoticeFfi> = { listOf(gap, rejoin, secondRejoin) }
+            var noticeIds = listOf("aa")
             val controller =
                 controller(testAppState(), notices = { notices() }) { recoveryStatus(noticeIds = noticeIds) }
 
             controller.retryGroupRecoveryStatus()
             assertTrue(controller.groupHistoryNoticeRejoined)
+
+            noticeIds = listOf("aa", "cc")
+            controller.retryGroupRecoveryStatus()
+            assertTrue("a second rejoin keeps the rejoin wording", controller.groupHistoryNoticeRejoined)
 
             noticeIds = listOf("bb", "aa")
             controller.retryGroupRecoveryStatus()

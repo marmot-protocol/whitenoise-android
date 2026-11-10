@@ -8,11 +8,11 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
  */
 internal fun TimelineMessageQueryFfi.Companion.page(
     groupIdHex: String?,
-    search: String? = null,
-    before: ULong? = null,
-    beforeMessageId: String? = null,
-    after: ULong? = null,
-    afterMessageId: String? = null,
+    search: String?,
+    before: ULong?,
+    beforeMessageId: String?,
+    after: ULong?,
+    afterMessageId: String?,
     limit: UInt?,
 ) = TimelineMessageQueryFfi(
     groupIdHex = groupIdHex,

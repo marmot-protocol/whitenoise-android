@@ -36,7 +36,7 @@ Kotlin diff changes two things Android consumes:
 
 - `TimelineMessageQueryFfi` gains required `sender`, `since`, `until` and
   `cursorGroupId` fields and defaulted `attachmentType`/`searchWallClock` fields
-  for advanced search. Every Android query goes through
+  for advanced search. Every production query goes through
   `TimelineMessageQueryFfi.page`, which leaves the new filters unset, so each
   read returns the same page as before. Android does not adopt advanced search here.
 - `HistoryNoticeCauseFfi` gains `BEFORE_REJOIN`. MDK lists a rejoin's notice
@@ -59,7 +59,7 @@ maintenance no longer repeating finished housekeeping (#3035), dropped relay
 transport release (#3249), SQL-filtered cached user search (#3257), hint-less
 event previews (#3213) and bare-domain profile links in onboarding (#3260).
 
-Sign Out and Delete Data can now wait up to about 30 seconds more while it leaves
+Sign Out & Wipe can now wait up to about 30 seconds more while it leaves
 chats. The wipe progress sheet says it can take up to a minute and asks to keep
 White Noise open. An interrupted wipe that reports `localCleanup.completed == false`
 already keeps the account on Android.
