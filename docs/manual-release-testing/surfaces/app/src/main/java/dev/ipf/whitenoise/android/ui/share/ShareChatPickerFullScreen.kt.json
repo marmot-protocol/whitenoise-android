@@ -128,6 +128,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Open a shared emoji set link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "R.string.emoji_sets_open",
+        "test_ids": [
+          "SET-051"
+        ]
       }
     ]
   },

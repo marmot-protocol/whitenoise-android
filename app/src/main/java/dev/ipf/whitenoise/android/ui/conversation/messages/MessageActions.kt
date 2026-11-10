@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
+import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
@@ -336,8 +337,9 @@ internal fun destinationFolderMembershipRows(
     return store
         .foldersFor(accountRef)
         .map { folder ->
+            val native = appState.nativeFolderMembership(accountRef, folder.id)?.idSet
             val memberIds =
-                chatFolderChatIds(
+                native ?: chatFolderChatIds(
                     items = targets,
                     manualChatIds = store.membershipFor(accountRef, folder.id),
                     excludedChatIds = store.excludedChats(accountRef, folder.id),

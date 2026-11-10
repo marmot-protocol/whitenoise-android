@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="manage_storage_title">Gerenciar armazenamento</string>
+    <string name="manage_storage_entry_subtitle">Veja o que está armazenado neste dispositivo e libere espaço</string>
+    <string name="storage_calculating">Calculando…</string>
+    <string name="storage_used_by_profile">Usado por este perfil neste dispositivo</string>
+    <string name="storage_usage_description">Armazenamento usado: %1$s. %2$s</string>
+    <string name="storage_usage_category">%1$s: %2$s.</string>
+    <string name="storage_usage_category_detail">%1$s: %2$s, %3$s.</string>
+    <string name="storage_attachments">Anexos</string>
+    <plurals name="storage_attachment_count">
+        <item quantity="one">%d anexo</item>
+        <item quantity="other">%d anexos</item>
+    </plurals>
+    <string name="storage_chat_data">Mensagens e dados das conversas</string>
+    <string name="storage_unused_space">Espaço não usado do banco de dados</string>
+    <string name="storage_pictures">Fotos de perfil e de grupo</string>
+    <string name="storage_temporary">Arquivos temporários</string>
+    <string name="storage_temporary_detail">Compartilhados por todos os perfis deste dispositivo</string>
+    <string name="storage_load_failed">Não foi possível carregar o uso do armazenamento</string>
+    <string name="storage_retry">Tentar novamente</string>
+    <string name="storage_migration_moving_title">Atualizando o armazenamento de anexos</string>
+    <string name="storage_migration_moving">Faltam %1$s para mover. Nada é excluído.</string>
+    <string name="storage_migration_paused_title">Atualização do armazenamento de anexos pausada</string>
+    <string name="storage_migration_paused">Libere %1$s neste dispositivo ou remova anexos abaixo para continuar. Nada é excluído.</string>
+    <string name="storage_migration_compacting_title">Devolvendo o espaço liberado</string>
+    <string name="storage_migration_compacting">As conversas podem pausar por um momento.</string>
+    <string name="storage_free_up_space">Liberar espaço</string>
+    <string name="storage_largest_attachments">Maiores anexos</string>
+    <string name="storage_remove_older">Remover anexos antigos</string>
+    <string name="storage_clear_cache">Limpar fotos e arquivos temporários</string>
+    <string name="storage_clear_cache_subtitle">As fotos são baixadas de novo quando você precisar</string>
+    <string name="storage_removal_help">Os anexos removidos continuam nas mensagens. Você pode baixá-los de novo enquanto a cópia do remetente ainda estiver disponível.</string>
+    <string name="storage_keep_media">Manter mídia</string>
+    <string name="storage_keep_media_help">Anexos mais antigos que esse período são removidos deste dispositivo agora e conforme envelhecem. Baixar um de novo o mantém pelo período completo.</string>
+    <string name="storage_keep_media_failed">Não foi possível carregar</string>
+    <string name="storage_keep_forever">Para sempre</string>
+    <string name="storage_keep_one_year">1 ano</string>
+    <string name="storage_keep_six_months">6 meses</string>
+    <string name="storage_keep_thirty_days">30 dias</string>
+    <string name="storage_keep_confirm_title">Manter mídia: %1$s?</string>
+    <string name="storage_keep_confirm_message">Anexos com mais de %1$s são removidos deste dispositivo agora e conforme envelhecem. As mensagens continuam, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
+    <string name="storage_older_one_week">Mais de 1 semana</string>
+    <string name="storage_older_one_month">Mais de 1 mês</string>
+    <string name="storage_older_three_months">Mais de 3 meses</string>
+    <string name="storage_older_six_months">Mais de 6 meses</string>
+    <string name="storage_older_one_year">Mais de 1 ano</string>
+    <string name="storage_remove_older_title">Remover anexos antigos?</string>
+    <string name="storage_remove_older_message">Os anexos recebidos antes de %1$s são removidos deste dispositivo em todas as conversas. As mensagens continuam, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
+    <string name="storage_remove_older_chat_message">Os anexos desta conversa recebidos antes de %1$s são removidos deste dispositivo. As mensagens continuam, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
+    <string name="storage_clear_cache_title">Limpar fotos e arquivos temporários?</string>
+    <string name="storage_clear_cache_message">Isso libera até %1$s. As fotos de perfil e de grupo são baixadas de novo quando você precisar.</string>
+    <string name="storage_clear">Limpar</string>
+    <string name="storage_chats">Conversas</string>
+    <string name="storage_chats_help">Um anexo compartilhado em mais de uma conversa conta em cada uma.</string>
+    <string name="storage_chat_unavailable">Conversa indisponível</string>
+    <string name="storage_no_attachments">Nenhum anexo neste dispositivo</string>
+    <string name="storage_chats_failed">Não foi possível carregar as conversas</string>
+    <string name="storage_attachments_failed">Não foi possível carregar os anexos</string>
+    <string name="storage_remove_all_in_chat">Remover todos os anexos</string>
+    <string name="storage_largest_first">Maiores primeiro</string>
+    <string name="storage_remove">Remover</string>
+    <string name="storage_removing">Removendo</string>
+    <string name="storage_select_all">Selecionar tudo</string>
+    <string name="storage_select_shown">Selecionar todos os exibidos</string>
+    <string name="storage_clear_selection">Limpar seleção</string>
+    <plurals name="storage_selected">
+        <item quantity="one">%1$d selecionado · %2$s</item>
+        <item quantity="other">%1$d selecionados · %2$s</item>
+    </plurals>
+    <plurals name="storage_remove_attachments_title">
+        <item quantity="one">Remover %d anexo?</item>
+        <item quantity="other">Remover %d anexos?</item>
+    </plurals>
+    <string name="storage_remove_attachments_message">Isso libera até %1$s. As mensagens continuam, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
+    <string name="storage_remove_chat_title">Remover todos os anexos desta conversa?</string>
+    <string name="storage_remove_chat_message">Todos os anexos desta conversa são removidos deste dispositivo. As mensagens continuam, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
+    <string name="storage_attachment_photo">Foto</string>
+    <string name="storage_attachment_video">Vídeo</string>
+    <string name="storage_attachment_audio">Áudio</string>
+    <string name="storage_attachment_file">Arquivo</string>
+    <plurals name="storage_removed_freed">
+        <item quantity="one">%1$d anexo removido · %2$s liberados</item>
+        <item quantity="other">%1$d anexos removidos · %2$s liberados</item>
+    </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">%d anexo removido</item>
+        <item quantity="other">%d anexos removidos</item>
+    </plurals>
+    <string name="storage_nothing_removed">Nenhum anexo correspondeu, então nada foi removido</string>
+    <string name="storage_keep_media_saved">Configuração «Manter mídia» salva</string>
+    <string name="storage_cache_cleared">%1$s liberados</string>
+    <string name="storage_caches_cleared">Fotos e arquivos temporários limpos</string>
+    <string name="storage_action_failed">Não foi possível liberar espaço. Tente novamente.</string>
+</resources>

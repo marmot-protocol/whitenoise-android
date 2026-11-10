@@ -84,7 +84,7 @@
     <string name="error_loaded_content_kept">Não foi possível carregar mais conteúdo. Suas mensagens continuam disponíveis; tente novamente quando quiser.</string>
     <string name="error_conversation_membership_unavailable">Não foi possível verificar os membros desta conversa. Tente novamente para exibir suas mensagens.</string>
     <string name="error_conversation_membership_inconsistent">A lista de membros desta conversa não corresponde a esta conta, então as mensagens continuam ocultas. Tente novamente para verificar outra vez.</string>
-    <string name="refresh">Atualizar dump</string>
+    <string name="refresh">Atualizar</string>
     <string name="retry">Tentar novamente</string>
     <string name="creating_identity_title">Criando identidade</string>
     <string name="sign_in">Entrar</string>
@@ -363,6 +363,12 @@
     <string name="restoring_chat">Restaurando chat...</string>
     <string name="leave_chat">Sair da conversa</string>
     <string name="leaving_chat">Saindo do chat...</string>
+    <string name="group_leave_blocked">Saída bloqueada</string>
+    <string name="group_leave_blocked_hint">Você é o único administrador. Cancele a saída para continuar neste grupo.</string>
+    <string name="group_cancel_leave">Cancelar saída</string>
+    <string name="group_leave_refresh_hint">Atualize para verificar se você ainda está neste grupo.</string>
+    <string name="group_leave_refresh_action">Atualizar</string>
+    <string name="toast_couldnt_cancel_leave">Não foi possível cancelar a saída</string>
     <string name="export_conversation_transcript">Exportar transcrição da conversa</string>
     <string name="toast_couldnt_export_transcript">Não foi possível exportar a transcrição</string>
     <string name="no_share_target_available">Nenhum destino de compartilhamento disponível</string>
@@ -1120,6 +1126,8 @@
     <string name="media_downloading">Baixando</string>
     <string name="media_cancel_download">Cancelar o download</string>
     <string name="media_download_cancelled">Download cancelado. Toque para baixar novamente</string>
+    <string name="media_removed_download_again">Removido deste dispositivo. Toque para baixar novamente</string>
+    <string name="floating_attachment_removed">Removido deste dispositivo. Abra o original para baixar novamente</string>
     <string name="media_opening">Abrindo</string>
     <string name="media_save">Salvar</string>
     <string name="media_saved">Salvo na galeria</string>
@@ -1627,6 +1635,35 @@
 
     <string name="chat_bubble_colors">Cores dos balões</string>
     <string name="custom_emoji">Emoji personalizados</string>
+    <string name="emoji_sets_title">Conjuntos de emoji</string>
+    <string name="emoji_sets_account_required">Escolha um perfil para explorar e instalar conjuntos de emoji.</string>
+    <string name="emoji_sets_query">Pesquise ou cole um link de conjunto</string>
+    <string name="emoji_sets_find">Encontrar conjuntos</string>
+    <string name="emoji_sets_open">Abrir conjunto de emoji</string>
+    <string name="emoji_sets_empty">Nenhum conjunto ainda. Encontre conjuntos nos seus relays ou cole um link compartilhado.</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="one">%1$d emoji</item>
+        <item quantity="other">%1$d emoji</item>
+    </plurals>
+    <string name="emoji_sets_installed">Instalado</string>
+    <string name="emoji_sets_update_available">Atualização disponível</string>
+    <string name="emoji_sets_load_image">Carregar imagem de prévia</string>
+    <string name="emoji_sets_image_privacy">Carregar uma prévia ou instalar um conjunto compartilha seu endereço IP com os servidores de imagens dele.</string>
+    <string name="emoji_sets_preview_host">Servidor da imagem de prévia: %1$s</string>
+    <string name="emoji_sets_install">Instalar conjunto</string>
+    <string name="emoji_sets_update">Atualizar conjunto</string>
+    <string name="emoji_sets_check_update">Verificar atualização</string>
+    <string name="emoji_sets_preparing_install">Preparando instalação…</string>
+    <string name="emoji_sets_install_progress">%1$d de %2$d emoji processados</string>
+    <string name="emoji_sets_error">Não foi possível concluir a solicitação. Tente novamente.</string>
+    <string name="emoji_sets_not_found">Conjunto ou imagem não encontrado. Verifique o link ou tente novamente.</string>
+    <string name="emoji_sets_changed">Este conjunto mudou. Revise a nova versão antes de instalar.</string>
+    <string name="emoji_sets_cancelled">Instalação cancelada.</string>
+    <string name="emoji_sets_discovery_incomplete">Alguns relays não puderam ser alcançados. Os resultados podem estar incompletos.</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="one">Instalado com %1$d item ignorado.</item>
+        <item quantity="other">Instalado com %1$d itens ignorados.</item>
+    </plurals>
     <string name="custom_emoji_detail">As imagens aqui viram emojis :shortcode: guardados neste dispositivo. Uma nova mensagem (não resposta) que use um envia a imagem, criptografada, à conversa. Reações, respostas e edições enviam só o shortcode.</string>
     <string name="custom_emoji_empty">Nenhum emoji personalizado ainda.</string>
     <string name="custom_emoji_name_title">Dê um nome a este emoji</string>

@@ -1270,6 +1270,8 @@ class LocalizationResourceTest {
                     ),
                 "values-es" to
                     setOf(
+                        // "emoji" is the loan word used for emoji counts in this locale.
+                        "emoji_sets_item_count",
                         // "chat"/"chats" are common loan words in Spanish.
                         "archived_chats_count",
                         "chat_folder_chat_count",
@@ -1284,6 +1286,8 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     setOf(
+                        // "emoji" is the loan word used for emoji counts in this locale.
+                        "emoji_sets_item_count",
                         // "Date" is also the French word for the date-format group label.
                         "date_time_format_date",
                         // "minute"/"minutes" is the French word for the spoken read-aloud unit.
@@ -1324,6 +1328,8 @@ class LocalizationResourceTest {
                     ),
                 "values-it" to
                     setOf(
+                        // "emoji" is the loan word used for emoji counts in this locale.
+                        "emoji_sets_item_count",
                         // "File" is the standard Italian computing term, as in attachment_type_file.
                         "text_attachment_reader_title",
                         // "Password" is the standard Italian loan word.
@@ -1348,6 +1354,8 @@ class LocalizationResourceTest {
                     ),
                 "values-pt" to
                     setOf(
+                        // "emoji" is the loan word used for emoji counts in this locale.
+                        "emoji_sets_item_count",
                         // The counted-preview format is punctuation-only here.
                         "media_counted_format",
                         // "Emoji" is the standard Portuguese loan word.
@@ -1360,6 +1368,8 @@ class LocalizationResourceTest {
                     ),
                 "values-tr" to
                     setOf(
+                        // "emoji" is the loan word used for emoji counts in this locale.
+                        "emoji_sets_item_count",
                         // The counted-preview format is punctuation-only here.
                         "media_counted_format",
                         // "Video" is the standard Turkish media-type term.

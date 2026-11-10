@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
+import dev.ipf.whitenoise.android.ui.installedEmojiArtwork
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -125,14 +126,19 @@ private fun rememberEmojiPickerModel(
     val customEmoji = LocalCustomEmoji.current
     val custom =
         remember(customEmoji, purpose) {
-            if (purpose == EmojiPickerPurpose.GROUP_IMAGE) emptyList() else customEmoji.sendable.map { it.shortcode }
+            if (purpose == EmojiPickerPurpose.GROUP_IMAGE) emptyList() else customEmoji.composerShortcodes
         }
     val recents =
-        remember(recentEmojis, purpose) {
+        remember(recentEmojis, purpose, custom) {
+            val available =
+                if (purpose == EmojiPickerPurpose.GROUP_IMAGE) {
+                    emptySet()
+                } else {
+                    (custom + EmojiShortcodes.builtins).toSet()
+                }
             recentEmojis
-                .filter {
-                    it.isNotBlank() && (purpose != EmojiPickerPurpose.GROUP_IMAGE || !EmojiShortcodes.isShortcode(it))
-                }.distinct()
+                .filter { it.isNotBlank() && (!EmojiShortcodes.isShortcode(it) || it in available) }
+                .distinct()
         }
     val browseSections = remember(entries, recents, custom) { emojiBrowseSections(entries, recents, custom) }
     var searchSections by remember { mutableStateOf<List<EmojiSection>>(emptyList()) }
@@ -208,10 +214,13 @@ internal fun EmojiPickerContent(
     )
     EmojiSearchEffects(search)
 
-    // Delivers a picked emoji and records it as used when the picker serves the composer.
+    // The existing recents store is device-wide. Keep account-owned set codes out of it.
+    val emojiLibrary = LocalCustomEmoji.current
     val pick: (String) -> Unit = { emoji ->
         if (selectionEnabled) {
-            if (purpose != EmojiPickerPurpose.CONFIGURE_QUICK_REACTION) onEmojiUsed(emoji)
+            if (purpose != EmojiPickerPurpose.CONFIGURE_QUICK_REACTION && !emojiLibrary.usesInstalledArtwork(emoji)) {
+                onEmojiUsed(emoji)
+            }
             onEmojiPicked(emoji)
         }
     }
@@ -408,7 +417,13 @@ internal fun EmojiGlyph(
             baseStyle = baseStyle,
             densityFontScale = LocalDensity.current.fontScale,
         )
-    val art = EmojiShortcodes.art(emoji, LocalCustomEmoji.current, emptyMap())
+    val customEmoji = LocalCustomEmoji.current
+    val art =
+        if (customEmoji.usesInstalledArtwork(emoji)) {
+            installedEmojiArtwork(emoji)
+        } else {
+            EmojiShortcodes.art(emoji, customEmoji, emptyMap())
+        }
     if (art != null) {
         val artSize =
             if (fitPickerArtwork && art is EmojiArt.Bundled && art.drawable == R.drawable.builtin_emoji_marmot) {

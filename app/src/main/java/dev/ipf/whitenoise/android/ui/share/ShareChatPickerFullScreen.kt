@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -90,6 +91,7 @@ internal fun ShareChatPickerFullScreenContent(
     controllerBinder: suspend (ChatsController, String) -> Unit = { controller, accountRef ->
         controller.bind(accountRef)
     },
+    onOpenEmojiSet: ((String) -> Unit)? = null,
 ) {
     val pickerState =
         rememberShareChatPickerState(
@@ -116,6 +118,7 @@ internal fun ShareChatPickerFullScreenContent(
         actions = scaffoldActions,
         snackbarHostState = snackbarHostState,
         overlayBackRegistrar = overlayBackRegistrar,
+        onOpenEmojiSet = onOpenEmojiSet,
     )
     if (pickerState.accountSelectorOpen) {
         ShareChatPickerAccountSheet(
@@ -137,6 +140,7 @@ private fun ShareChatPickerScaffold(
     actions: ShareChatPickerScaffoldActions,
     snackbarHostState: SnackbarHostState,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar?,
+    onOpenEmojiSet: ((String) -> Unit)?,
 ) {
     val shareToTitle = stringResource(R.string.share_to)
     ShareChatPickerBackAwareScreen(
@@ -167,6 +171,14 @@ private fun ShareChatPickerScaffold(
                     TopAppBar(
                         title = { Text(shareToTitle) },
                         navigationIcon = { ShareChatPickerCloseButton(actions.dismiss) },
+                        actions = {
+                            val selected = pickerState.selectedAccountRef
+                            if (onOpenEmojiSet != null && selected != null) {
+                                TextButton(onClick = { onOpenEmojiSet(selected) }) {
+                                    Text(stringResource(R.string.emoji_sets_open))
+                                }
+                            }
+                        },
                     )
                     TopNoticeSlot()
                     WhiteNoiseSnackbarHost(snackbarHostState)

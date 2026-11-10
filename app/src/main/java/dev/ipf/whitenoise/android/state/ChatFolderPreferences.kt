@@ -31,8 +31,10 @@ data class ChatFolder(
 )
 
 /**
- * Optional automatic-membership rule for one folder, evaluated against the
- * loaded chat list by `chatFolderChatIds`. Absent fields in a stored rule
+ * Optional automatic-membership rule for one folder. `chatFolderQuery` turns
+ * it into a native chat-list query that MarmotKit matches over every chat;
+ * participant rules, which MarmotKit cannot match yet, are evaluated against
+ * the loaded chat list by `chatFolderChatIds`. Absent fields in a stored rule
  * (and a folder with no stored rule at all) fall back to these defaults —
  * folders saved before rules existed stay manual-only.
  */

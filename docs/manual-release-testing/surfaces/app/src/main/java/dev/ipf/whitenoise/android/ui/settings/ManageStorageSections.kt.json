@@ -1,0 +1,222 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StorageChatRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "fun StorageChatRow(",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "StorageMigrationCallout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "fun StorageMigrationCallout(",
+        "test_ids": [
+          "SET-047"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "plurals:storage_attachment_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.plurals.storage_attachment_count",
+        "test_ids": [
+          "SET-047",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_calculating",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_calculating",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_chat_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_chat_unavailable",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_chats",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_chats_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_chats_failed",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_chats_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_chats_help",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_clear_cache",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_clear_cache",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_clear_cache_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_clear_cache_subtitle",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_free_up_space",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_free_up_space",
+        "test_ids": [
+          "SET-048",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_keep_media",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_media_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_keep_media_failed",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_media_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_keep_media_help",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_largest_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_largest_attachments",
+        "test_ids": [
+          "SET-048"
+        ]
+      },
+      {
+        "surface": "string:storage_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_load_failed",
+        "test_ids": [
+          "SET-047",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_migration_compacting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_migration_compacting",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_migration_compacting_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_migration_compacting_title",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_migration_moving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_migration_moving",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_migration_moving_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_migration_moving_title",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_migration_paused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_migration_paused",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_migration_paused_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_migration_paused_title",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_no_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_no_attachments",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_removal_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_removal_help",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_older",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_remove_older",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.storage_retry",
+        "test_ids": [
+          "SET-050"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

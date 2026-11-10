@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,7 @@ import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.state.attachmentCancellationState
 import dev.ipf.whitenoise.android.state.attachmentFilePresentationState
 import dev.ipf.whitenoise.android.state.attachmentNativeProgress
+import dev.ipf.whitenoise.android.state.attachmentNativeState
 import dev.ipf.whitenoise.android.state.cancelAttachmentTransfer
 import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -113,8 +115,17 @@ internal class TileTransfer(
                 storageBlocked ||
                 (unobstructed && state == AttachmentTransferState.Failed)
 
+    /**
+     * This device removed the body itself, from Manage storage or the Keep media window, so the tile offers Download
+     * again, which a deliberate retry performs while the sender's copy is still available.
+     */
+    val removed: Boolean get() = unobstructed && !failed && progress?.phase in LOCALLY_REMOVED_PHASES
+
+    /** Only a deliberate retry recovers the body: it failed, the reader cancelled it, or this device removed it. */
+    val needsDeliberateRetry: Boolean get() = failed || cancelled || removed
+
     /** The tile replaces its spinner or Download action with the transfer control. */
-    val visible: Boolean get() = cancelling || active || cancelled || failed
+    val visible: Boolean get() = cancelling || active || cancelled || failed || removed
 
     /** Determinate only while the engine reports a trustworthy total for the body being received. */
     val fraction: Float? get() = progress?.fraction?.takeIf { unobstructed }
@@ -158,8 +169,21 @@ internal fun rememberTileTransfer(
     val observed by remember(controller, key, reference.ciphertextSha256, reference.sourceEpoch, observing) {
         if (observing) controller.attachmentNativeProgress(messageIdHex, attachmentIndex) else emptyFlow()
     }.collectAsStateWithLifecycle(initialValue = null)
+    // An idle tile the cache cannot fill reads its native phase once, so a body this device removed offers Download
+    // again even in a conversation opened after the removal, without every idle tile holding a subscription.
+    val probing = tileProbesNative(observing, mine, host)
+    val probed by produceState<AttachmentTransferStateFfi?>(
+        null,
+        controller,
+        key,
+        reference.ciphertextSha256,
+        reference.sourceEpoch,
+        probing,
+    ) {
+        value = if (probing) controller.attachmentNativeState(messageIdHex, attachmentIndex) else null
+    }
     // A sample outlives its flow, so once observation stops the last one would describe a transfer that is over.
-    val native = if (observing) observed else null
+    val native = if (observing) observed else locallyRemovedProgress(probed.takeIf { probing })
     val state = attachmentFilePresentationState(tileHostState(host, native, materializing), native, cancellation)
     return remember(state, native, cancellation, suppressed, failedLocally, storageBlockedLocally, controller, key) {
         TileTransfer(state, native, cancellation, suppressed, failedLocally, storageBlockedLocally) {
@@ -194,8 +218,24 @@ internal fun tileObservesNative(
             materializing ||
                 host == AttachmentTransferState.Downloading ||
                 // MDK readmits a storage-parked body on its own, so the tile keeps watching for it.
-                host == AttachmentTransferState.StorageBlocked
+                host == AttachmentTransferState.StorageBlocked ||
+                // Only the native phase tells a body this device removed from one that is gone for good.
+                host == AttachmentTransferState.NotRetained
         )
+
+/** A progress sample for a body this device removed, as a one-shot read found it; null for any other phase. */
+internal fun locallyRemovedProgress(phase: AttachmentTransferStateFfi?): NativeAttachmentProgress? =
+    phase?.takeIf { it in LOCALLY_REMOVED_PHASES }?.let { NativeAttachmentProgress(it, 0uL, 0uL, null, null, null) }
+
+/**
+ * Whether an idle tile reads its native phase once: received media the cache cannot fill and that no feed already
+ * watches, so a body this device removed is told apart from one never downloaded.
+ */
+internal fun tileProbesNative(
+    observing: Boolean,
+    mine: Boolean,
+    host: AttachmentTransferState,
+): Boolean = !observing && !mine && host == AttachmentTransferState.Remote
 
 /**
  * A tile restarts its download without the coordinator that publishes Downloading for a file card, so a Cancelled left
@@ -235,9 +275,9 @@ internal fun tileTransferDescription(transfer: TileTransfer): String =
 /**
  * The tile's single transfer control in a fixed 52 dp slot: a progress ring with a Cancel glyph while a transfer is
  * queued or running, an indeterminate ring while Cancel awaits acknowledgement, Download again after a confirmed
- * Cancel and Retry after a failure. The whole slot is the target, so a tap on it never reaches the tile's own open
- * handler, including while Cancel awaits acknowledgement and the slot takes no action. With [showCaption] the step
- * and byte counts are also drawn for sighted readers, for tiles large enough.
+ * Cancel or a local removal, and Retry after a failure. The whole slot is the target, so a tap on it never reaches
+ * the tile's own open handler, including while Cancel awaits acknowledgement and the slot takes no action. With
+ * [showCaption] the step and byte counts are also drawn for sighted readers, for tiles large enough.
  */
 @Composable
 internal fun TileTransferControl(
@@ -321,7 +361,7 @@ internal fun TileTransferGlyph(
     val icon =
         when {
             transfer.active || transfer.cancelling -> Icons.Default.Close
-            transfer.cancelled -> Icons.Default.ArrowDownward
+            transfer.cancelled || transfer.removed -> Icons.Default.ArrowDownward
             else -> Icons.Default.Refresh
         }
     Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(glyphSize))
