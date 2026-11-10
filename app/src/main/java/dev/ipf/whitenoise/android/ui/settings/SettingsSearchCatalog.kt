@@ -479,6 +479,15 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
+                "CustomEmoji.emoji_sets",
+                R.string.emoji_sets_title,
+                R.string.custom_emoji,
+                SettingsDetail.EmojiSets,
+                accountRequired = true,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
                 "CustomEmoji.choose_photo",
                 R.string.choose_photos,
                 R.string.custom_emoji,

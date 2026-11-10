@@ -1617,6 +1617,33 @@
 
     <string name="chat_bubble_colors">聊天氣泡顏色</string>
     <string name="custom_emoji">自訂表情</string>
+    <string name="emoji_sets_title">表情包</string>
+    <string name="emoji_sets_account_required">選擇個人檔案以瀏覽及安裝表情包。</string>
+    <string name="emoji_sets_query">搜尋或貼上表情包連結</string>
+    <string name="emoji_sets_find">尋找表情包</string>
+    <string name="emoji_sets_open">開啟表情包</string>
+    <string name="emoji_sets_empty">還沒有表情包。在你的中繼站上尋找，或貼上分享的表情包連結。</string>
+    <plurals name="emoji_sets_item_count">
+        <item quantity="other">%1$d 個表情</item>
+    </plurals>
+    <string name="emoji_sets_installed">已安裝</string>
+    <string name="emoji_sets_update_available">有可用更新</string>
+    <string name="emoji_sets_load_image">載入預覽圖片</string>
+    <string name="emoji_sets_image_privacy">載入預覽或安裝表情包會向其圖片伺服器透露你的 IP 位址。</string>
+    <string name="emoji_sets_preview_host">預覽圖片伺服器：%1$s</string>
+    <string name="emoji_sets_install">安裝表情包</string>
+    <string name="emoji_sets_update">更新表情包</string>
+    <string name="emoji_sets_check_update">檢查更新</string>
+    <string name="emoji_sets_preparing_install">正在準備安裝…</string>
+    <string name="emoji_sets_install_progress">已處理 %1$d / %2$d 個表情</string>
+    <string name="emoji_sets_error">無法完成要求。請再試一次。</string>
+    <string name="emoji_sets_not_found">找不到此表情包或圖片。請檢查連結或再試一次。</string>
+    <string name="emoji_sets_changed">此表情包已變更。請先查看新版本再安裝。</string>
+    <string name="emoji_sets_cancelled">已取消安裝。</string>
+    <string name="emoji_sets_discovery_incomplete">部分中繼站無法連線。結果可能不完整。</string>
+    <plurals name="emoji_sets_skipped">
+        <item quantity="other">已安裝，略過了 %1$d 項。</item>
+    </plurals>
     <string name="custom_emoji_detail">此處的圖片會變成儲存在此裝置上的 :shortcode: 表情。使用其中之一的新訊息（非回覆）會把圖片加密上傳到該聊天。回應、回覆和編輯只傳送短代碼。</string>
     <string name="custom_emoji_empty">尚無自訂表情。</string>
     <string name="custom_emoji_name_title">為此表情命名</string>

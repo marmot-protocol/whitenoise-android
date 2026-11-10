@@ -109,6 +109,12 @@ class HostedStartupTraceTests(unittest.TestCase):
         self.assertLess(init.index('benchmark.initWith'),init.index('benchmark.buildConfigField'))
         self.assertLess(init.index('benchmark.buildConfigField'),init.index('if (benchmark.debuggable'))
 
+    def test_static_av_opt_in_read_does_not_mutate_project_properties(self):
+        """The AV opt-in read must not use Groovy's inserting Map.get, which throws when the -P flag is absent."""
+        init=(ROOT/'scripts/hosted-startup-trace.init.gradle').read_text()
+        self.assertIn("projectProperties.getOrDefault('mediaAvStartupTrace', 'false')",init)
+        self.assertNotRegex(init,r"projectProperties\.get\(\s*'mediaAvStartupTrace'\s*,")
+
     def test_default_benchmark_keeps_existing_identity_without_release_initialization(self):
         build=(ROOT/'app/build.gradle.kts').read_text().split('create("benchmarkRelease") {',1)[1].split('\n        }',1)[0]
         self.assertNotIn('initWith',build)
