@@ -6628,10 +6628,13 @@ class ConversationController(
      * again. Touched only on the main thread; a failed read is not kept, so the next composition tries again.
      */
     internal val nativeAttachmentStateReads = HashMap<String, dev.ipf.marmotkit.AttachmentTransferStateFfi>()
-    /** Sticker images load only while this conversation is open; [onCleared] cancels their downloads. */
-    private val stickerScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    internal val stickerLibrary: StickerLibrary = stickerLibraryFor(appState, conversationAccountRef)
-    internal val stickerAssets = stickerAssetCacheFor(appState, conversationAccountRef, mediaTrustDomain, stickerScope)
+    private val stickers = appState.stickersFor(conversationAccountRef)
+
+    /** The bound account's sticker packs, shared with its other conversations. */
+    internal val stickerLibrary: StickerLibrary get() = stickers.library
+
+    /** The bound account's decoded sticker images, shared with its other conversations. */
+    internal val stickerAssets get() = stickers.assets
 
     /** The installed native handle; paging and commits share the session's retirement authorities. */
     internal val timelineSubscription: ConversationTimelineSubscriptionHandle?
@@ -7630,7 +7633,6 @@ class ConversationController(
         inboundVisibleHostAttempt.cancel()
         outboundVisibleHostAttempts.cancelAll()
         inviteStreamScope.cancel()
-        stickerScope.cancel()
         attachmentPresentation.dispose()
     }
 

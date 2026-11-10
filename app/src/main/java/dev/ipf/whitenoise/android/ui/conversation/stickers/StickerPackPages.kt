@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.stickers
 
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
@@ -16,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,8 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -41,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StickerAssetCache
@@ -67,6 +74,7 @@ internal fun StickerBrowserPage(
 ) {
     val scope = rememberCoroutineScope()
     var link by rememberSaveable { mutableStateOf("") }
+    var linkOpen by rememberSaveable { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
     var opening by remember { mutableStateOf(false) }
     var discovered by remember { mutableStateOf<List<StickerPackFfi>>(emptyList()) }
@@ -88,7 +96,11 @@ internal fun StickerBrowserPage(
         StickerPresentation.lookupInput(link)?.takeUnless { opening }?.let { input ->
             opening = true
             scope.launch {
-                attemptSticker { onOpen(library.lookUp(input)).also { link = "" } }?.let {
+                attemptSticker {
+                    onOpen(library.lookUp(input))
+                    link = ""
+                    linkOpen = false
+                }?.let {
                     onFailure(R.string.sticker_pack_open_failed, "STICKER_PACK_OPEN", it)
                 }
                 opening = false
@@ -96,6 +108,13 @@ internal fun StickerBrowserPage(
         }
     }
     StickerSheetTopBar(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
+        IconToggleButton(
+            checked = linkOpen,
+            onCheckedChange = { linkOpen = it },
+            modifier = Modifier.testTag("sticker.link.toggle"),
+        ) {
+            Icon(painterResource(R.drawable.ic_link), stringResource(R.string.sticker_packs_add_by_link))
+        }
         IconButton(onClick = { refreshRequests++ }, enabled = !syncing) {
             Icon(painterResource(R.drawable.ic_refresh), stringResource(R.string.refresh))
         }
@@ -106,9 +125,9 @@ internal fun StickerBrowserPage(
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         modifier = Modifier.fillMaxWidth().testTag("sticker.browser"),
     ) {
-        item { StickerSectionTitle(stringResource(R.string.sticker_packs_add_by_link)) }
-        item { StickerLinkField(link, onLinkChange = { link = it }, opening = opening, onOpen = openLink) }
-        item { StickerDisclosure(stringResource(R.string.sticker_pack_link_footer)) }
+        if (linkOpen) {
+            item { StickerLinkField(link, onLinkChange = { link = it }, opening = opening, onOpen = openLink) }
+        }
         if (library.installed.isNotEmpty()) {
             item { StickerSectionTitle(stringResource(R.string.sticker_packs_installed)) }
             items(library.installed, key = { "installed:${it.coordinate}" }) { pack -> PackRow(pack) { onOpen(pack) } }
@@ -133,6 +152,8 @@ private fun StickerLinkField(
     opening: Boolean,
     onOpen: () -> Unit,
 ) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(focus) { focus.requestFocus() }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -146,7 +167,7 @@ private fun StickerLinkField(
             leadingIcon = { Icon(painterResource(R.drawable.ic_link), contentDescription = null) },
             containerColor = Color.Transparent,
             outlined = true,
-            modifier = Modifier.weight(1f).testTag("sticker.link"),
+            modifier = Modifier.weight(1f).focusRequester(focus).testTag("sticker.link"),
         )
         WhiteNoiseButton(
             onClick = onOpen,
@@ -235,14 +256,23 @@ internal fun StickerPackDetailPage(
     library: StickerLibrary,
     cache: StickerAssetCache<ImageBitmap>,
     authorName: String,
+    onOpenAuthor: () -> Unit,
+    onSend: (StickerFfi) -> Unit,
     onFailure: StickerFailureReporter,
     onBack: () -> Unit,
     onClose: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var working by remember(pack.coordinate) { mutableStateOf(false) }
     val installed = library.isInstalled(pack.coordinate)
     StickerSheetTopBar(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
+        IconButton(
+            onClick = { context.startActivity(stickerPackShareIntent(pack)) },
+            modifier = Modifier.testTag("sticker.pack.share"),
+        ) {
+            Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share))
+        }
         TextButton(
             enabled = !working,
             onClick = {
@@ -271,16 +301,23 @@ internal fun StickerPackDetailPage(
     StickerGrid(
         stickers = pack.stickers,
         cache = cache,
-        onPick = null,
+        onPick = onSend,
         header = {
             fullWidth {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         stringResource(R.string.sticker_pack_by, authorName),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier =
+                            Modifier
+                                .clickable(role = Role.Button, onClick = onOpenAuthor)
+                                .heightIn(min = 32.dp)
+                                .wrapContentHeight()
+                                .testTag("sticker.pack.author"),
                     )
                     if (description != null) Text(description, style = MaterialTheme.typography.bodyMedium)
+                    StickerDisclosure(stringResource(R.string.sticker_pack_tap_to_send))
                 }
             }
             // Shown above the stickers here, since opening a pack loads them all.
@@ -288,3 +325,16 @@ internal fun StickerPackDetailPage(
         },
     )
 }
+
+/**
+ * Shares [pack] as a Sonar viewer link: it opens in a browser for people without the app, and MDK reads it back
+ * when pasted into "Add by link". The system sheet offers Copy as well.
+ */
+private fun stickerPackShareIntent(pack: StickerPackFfi): Intent =
+    Intent.createChooser(
+        Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, StickerPresentation.shareLink(pack))
+        },
+        null,
+    )

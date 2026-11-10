@@ -92,9 +92,9 @@
         ]
       },
       {
-        "surface": "Sticker copy sticker pack link footer",
+        "surface": "Sticker copy sticker pack tap to send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
-        "anchor": "R.string.sticker_pack_link_footer",
+        "anchor": "R.string.sticker_pack_tap_to_send",
         "test_ids": [
           "MSG-046"
         ]
@@ -207,6 +207,14 @@
         "surface": "Sticker copy sticker packs unreachable",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
         "anchor": "R.string.sticker_packs_unreachable",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.share",
         "test_ids": [
           "MSG-046"
         ]

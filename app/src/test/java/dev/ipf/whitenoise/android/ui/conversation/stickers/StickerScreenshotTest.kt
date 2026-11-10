@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -83,12 +84,16 @@ class StickerScreenshotTest {
         capture("sticker_picker_empty_amoled")
     }
 
-    /** The browser lists add-by-link, installed packs and discoverable packs. */
+    /** The browser lists installed and discoverable packs; the link field stays behind its top-bar button. */
     @Test fun browserAmoled() = browser(rtlLarge = false, name = "sticker_browser_amoled")
+
+    /** The top-bar link button opens the paste field above the packs. */
+    @Test fun browserLinkOpenAmoled() =
+        browser(rtlLarge = false, name = "sticker_browser_link_open_amoled", linkOpen = true)
 
     @Test fun browserRtlLargeFont() = browser(rtlLarge = true, name = "sticker_browser_rtl_large")
 
-    /** A pack's detail shows its author, description, stickers and the add action. */
+    /** A pack's detail shows its tappable author, description, send hint, stickers, share and add actions. */
     @Test fun packDetailLight() {
         val pack = pack("cats", "Office cats", installed = false, description = "Cats who attend standups.")
         composeRule.setContent {
@@ -98,7 +103,9 @@ class StickerScreenshotTest {
                     library(installed = emptyList()),
                     cache(),
                     "Alice",
-                    { _, _, _ -> },
+                    onOpenAuthor = {},
+                    onSend = {},
+                    onFailure = { _, _, _ -> },
                     onBack = {},
                     onClose = {},
                 )
@@ -124,6 +131,7 @@ class StickerScreenshotTest {
     private fun browser(
         rtlLarge: Boolean,
         name: String,
+        linkOpen: Boolean = false,
     ) {
         val library =
             library(
@@ -136,6 +144,7 @@ class StickerScreenshotTest {
                 StickerBrowserPage(library, { _, _, _ -> }, onOpen = {}, onBack = {}, onClose = {})
             }
         }
+        if (linkOpen) composeRule.onNodeWithTag("sticker.link.toggle").performClick()
         capture(name)
     }
 

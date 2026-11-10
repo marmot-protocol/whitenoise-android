@@ -1485,6 +1485,25 @@ class WhiteNoiseAppState private constructor(
         if (plaintextRemoved > 0) bumpMediaCacheRevision()
         if (thumbnailsRemoved > 0) mediaThumbnailRevisionState.update { it + 1L }
         publicJpegPreviewLoader.trimMemory(trim)
+        accountStickers?.assets?.trimMemory(trim)
+    }
+
+    private var accountStickers: AccountStickers? = null
+
+    /**
+     * The sticker packs and images of [account], shared by its conversations. Main-confined; one account's are kept
+     * at a time, so opening another account's chat releases them.
+     */
+    internal fun stickersFor(account: String?): AccountStickers {
+        accountStickers?.takeIf { it.account == account }?.let { return it }
+        accountStickers?.close()
+        return AccountStickers(account, this).also { accountStickers = it }
+    }
+
+    private fun forgetStickers(account: String) {
+        if (accountStickers?.account != account) return
+        accountStickers?.close()
+        accountStickers = null
     }
 
     /** Holds an actively displayed kept thumbnail through cache trims, never through explicit invalidation. */
@@ -7671,6 +7690,7 @@ class WhiteNoiseAppState private constructor(
         pendingMessageEditHandoff.removeAccount(account)
         notificationReplyDraftHandoff.removeAccount(account)
         draftWriter.removeAccount(account)
+        forgetStickers(account)
         conversationDictation.onAccountUnavailable(account)
         stopTtsForRemovedAccount(account)
     }
@@ -7774,6 +7794,7 @@ class WhiteNoiseAppState private constructor(
             pendingMessageEditHandoff.removeAccount(wipedRef)
             notificationReplyDraftHandoff.removeAccount(wipedRef)
             draftWriter.removeAccount(wipedRef)
+            forgetStickers(wipedRef)
             clearRevokedConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },

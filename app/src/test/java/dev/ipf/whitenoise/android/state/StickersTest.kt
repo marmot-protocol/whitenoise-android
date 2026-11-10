@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
+import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
@@ -57,6 +58,57 @@ class StickersTest {
             assertEquals("image", cache.retry(KEY)?.image)
             assertFalse(cache.hasFailed(KEY))
             assertEquals(2, loads)
+        }
+
+    @Test
+    fun aDownloadWhoseCallerLeftStillLandsInTheCache() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val cache =
+                StickerAssetCache(backgroundScope, load = { key ->
+                    gate.await()
+                    LoadedSticker("image", sticker(key.shortcode))
+                }, maxBytes = 1_000, sizeOf = { 1 })
+
+            val caller = async { cache.image(KEY) }
+            runCurrent()
+            caller.cancel()
+            gate.complete(Unit)
+            runCurrent()
+
+            assertEquals("image", cache.cached(KEY)?.image)
+        }
+
+    @Test
+    fun memoryTrimDropsDecodedStickers() =
+        runTest {
+            val cache =
+                StickerAssetCache(backgroundScope, load = { key ->
+                    LoadedSticker("image", sticker(key.shortcode))
+                }, maxBytes = 1_000, sizeOf = { 1 })
+
+            cache.image(KEY)
+            cache.trimMemory(PresentationMemoryTrim.EMPTY)
+
+            assertNull(cache.cached(KEY))
+        }
+
+    @Test
+    fun aFailedInstalledReadStillSettlesTheLibrary() =
+        runTest {
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> error("offline") },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = { error("unused") },
+                )
+
+            assertFalse(library.hasTriedInstalled)
+            library.loadInstalledIfNeeded()
+            assertTrue(library.hasTriedInstalled)
+            assertFalse(library.hasLoadedInstalled)
         }
 
     @Test

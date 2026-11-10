@@ -48,15 +48,16 @@ internal val StickerTileShape = RoundedCornerShape(16.dp)
 private enum class StickerPhase { Idle, Loading, WaitingForTap, Failed }
 
 /**
- * One sticker image. Loads by itself only when [loadsAutomatically]; otherwise a
- * tap loads it, since loading contacts the pack author's server. [onClick] applies
- * once the image is shown, so a sticker that finishes loading becomes tappable.
+ * One sticker image. Loads by itself only when [loadsAutomatically]; when false a
+ * tap loads it, since loading contacts the pack author's server, and while null it
+ * shows an empty frame. [onClick] applies once the image is shown, so a sticker that
+ * finishes loading becomes tappable.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerImage(
     key: StickerKey,
-    loadsAutomatically: Boolean,
+    loadsAutomatically: Boolean?,
     cache: StickerAssetCache<ImageBitmap>,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
@@ -66,10 +67,14 @@ internal fun StickerImage(
     var explicitRequests by remember(key) { mutableIntStateOf(0) }
     LaunchedEffect(key, loadsAutomatically, explicitRequests) {
         if (loaded != null) return@LaunchedEffect
+        if (loadsAutomatically == null && explicitRequests == 0) {
+            phase = StickerPhase.Idle
+            return@LaunchedEffect
+        }
         val explicit = explicitRequests > 0
         phase =
             when {
-                !loadsAutomatically && !explicit -> StickerPhase.WaitingForTap
+                loadsAutomatically == false && !explicit -> StickerPhase.WaitingForTap
                 cache.hasFailed(key) && !explicit -> StickerPhase.Failed
                 else -> StickerPhase.Loading
             }
@@ -169,12 +174,13 @@ internal fun StickerMessageContent(
     val key = remember(ref) { StickerKey.from(ref) }
     val library = controller.stickerLibrary
     LaunchedEffect(library) { library.loadInstalledIfNeeded() }
+    val packInstalled = library.isInstalled(key.packCoordinate).takeIf { library.hasTriedInstalled }
     StickerImage(
         key = key,
         loadsAutomatically =
             StickerPresentation.loadsAutomatically(
                 isFromMe = mine,
-                packInstalled = library.isInstalled(key.packCoordinate),
+                packInstalled = packInstalled,
                 autoDownloadImages = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
             ),
         cache = controller.stickerAssets,

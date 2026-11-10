@@ -102,6 +102,14 @@ internal fun StickerSheet(
                         library = library,
                         cache = cache,
                         authorName = appState.networkDisplayName(current.pack.authorPubkeyHex),
+                        onOpenAuthor = {
+                            val npub = appState.npubForDisplay(current.pack.authorPubkeyHex)
+                            if (npub.isNotBlank()) {
+                                onDismiss()
+                                appState.presentProfile(npub)
+                            }
+                        },
+                        onSend = onSend,
                         onFailure = reportFailure,
                         onBack = back,
                         onClose = onDismiss,

@@ -7,7 +7,9 @@ import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.marmotkit.StickerRefFfi
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
+import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
@@ -25,11 +27,14 @@ data class StickerKey(
     val shortcode: String,
     val plaintextSha256: String,
 ) {
+    /** The MDK reference for this sticker. */
     val ref: StickerRefFfi get() = StickerRefFfi(packCoordinate, shortcode, plaintextSha256)
 
     companion object {
+        /** The key of a received sticker reference. */
         fun from(ref: StickerRefFfi) = StickerKey(ref.packCoordinate, ref.shortcode, ref.plaintextSha256)
 
+        /** The key of a sticker from a pack. */
         fun from(sticker: StickerFfi) = StickerKey(sticker.packCoordinate, sticker.shortcode, sticker.plaintextSha256)
     }
 }
@@ -41,8 +46,9 @@ data class LoadedSticker<I>(
 )
 
 /**
- * The account's sticker packs as the picker and timeline need them. Main-confined;
- * MDK owns the packs, this only holds the last installed list it returned.
+ * One account's sticker packs as the picker and timeline need them, shared by all
+ * of its conversations. Main-confined; MDK owns the packs, this only holds the last
+ * installed list it returned.
  */
 class StickerLibrary(
     private val packs: suspend (installedOnly: Boolean, search: String?) -> List<StickerPackFfi>,
@@ -51,15 +57,23 @@ class StickerLibrary(
     private val installPack: suspend (input: String) -> StickerPackFfi,
     private val uninstallPack: suspend (input: String) -> Unit,
 ) {
+    /** The installed packs from the last successful read. */
     var installed: List<StickerPackFfi> by mutableStateOf(emptyList())
         private set
+
+    /** Whether [installed] holds a successful read. */
     var hasLoadedInstalled: Boolean by mutableStateOf(false)
+        private set
+
+    /** Whether the first read has finished, successfully or not, so [installed] can decide a received sticker. */
+    var hasTriedInstalled: Boolean by mutableStateOf(false)
         private set
 
     private val loadMutex = Mutex()
     private val syncMutex = Mutex()
     private var synced = false
 
+    /** Whether the pack at [coordinate] was in the last installed list. */
     fun isInstalled(coordinate: String): Boolean = installed.any { it.coordinate == coordinate }
 
     /** Reads the installed packs once; concurrent callers share the first read. */
@@ -77,9 +91,10 @@ class StickerLibrary(
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
         }
+        hasTriedInstalled = true
     }
 
-    /** Fetches pack events from relays once per conversation unless [force]d; throws when relays fail. */
+    /** Fetches pack events from relays once per account unless [force]d; throws when relays fail. */
     suspend fun sync(force: Boolean = false) {
         if (synced && !force) return
         syncMutex.withLock {
@@ -99,10 +114,13 @@ class StickerLibrary(
         }
     }
 
+    /** The pack an naddr or share link names, fetched from relays. */
     suspend fun lookUp(input: String): StickerPackFfi = fetchPack(input)
 
+    /** Installs [pack] and rereads the installed list. */
     suspend fun install(pack: StickerPackFfi): StickerPackFfi = installPack(pack.coordinate).also { reloadInstalled() }
 
+    /** Uninstalls [pack] and rereads the installed list. */
     suspend fun uninstall(pack: StickerPackFfi) {
         uninstallPack(pack.coordinate)
         reloadInstalled()
@@ -110,10 +128,11 @@ class StickerLibrary(
 }
 
 /**
- * Loads and caches decoded sticker images for one conversation. MDK keeps no copy
- * of a sticker image, so this keeps a byte-bounded in-memory cache. Concurrent
- * requests for one sticker share one download, and a failed load stays failed
- * until [retry], so a broken sticker never re-dials its server from scrolling.
+ * Loads and caches decoded sticker images for one account. MDK keeps no copy of a
+ * sticker image, so this keeps a byte-bounded in-memory cache. Concurrent requests
+ * for one sticker share one download, and a failed load stays failed until [retry],
+ * so a broken sticker never re-dials its server from scrolling. A download finishes
+ * and is kept even when every caller leaves; [scope] ends with the account.
  * Main-confined.
  */
 class StickerAssetCache<I : Any>(
@@ -122,12 +141,15 @@ class StickerAssetCache<I : Any>(
     maxBytes: Long,
     sizeOf: (I) -> Int,
 ) {
+    private val capacity = maxBytes
     private val images = ByteSizeLruCache<StickerKey, LoadedSticker<I>>(maxBytes, sizeOf = { sizeOf(it.image) })
     private val failures = HashSet<StickerKey>()
     private val inFlight = HashMap<StickerKey, Deferred<LoadedSticker<I>?>>()
 
+    /** The decoded image when it is in memory. */
     fun cached(key: StickerKey): LoadedSticker<I>? = images.get(key)
 
+    /** Whether the last load of [key] failed. */
     fun hasFailed(key: StickerKey): Boolean = key in failures
 
     /** The sticker's image, downloading it unless it already failed. */
@@ -136,20 +158,27 @@ class StickerAssetCache<I : Any>(
         return if (cached != null || key in failures) cached else download(key)
     }
 
-    private suspend fun download(key: StickerKey): LoadedSticker<I>? {
-        val pending = inFlight.getOrPut(key) { scope.async { loadOrNull(key) } }
-        val loaded = pending.await()
-        if (inFlight[key] === pending) {
-            inFlight.remove(key)
-            if (loaded != null) images.put(key, loaded) else failures.add(key)
-        }
-        return loaded
-    }
+    private suspend fun download(key: StickerKey): LoadedSticker<I>? =
+        inFlight
+            .getOrPut(key) {
+                // Lazy, so the entry is in place before the download can finish and remove it.
+                scope.async(start = CoroutineStart.LAZY) {
+                    loadOrNull(key).also { loaded ->
+                        inFlight.remove(key)
+                        if (loaded != null) images.put(key, loaded) else failures.add(key)
+                    }
+                }
+            }.await()
 
     /** Clears an earlier failure and downloads again, for an explicit tap. */
     suspend fun retry(key: StickerKey): LoadedSticker<I>? {
         failures.remove(key)
         return image(key)
+    }
+
+    /** Releases cached images down to [trim]'s share of the budget; shown stickers keep their bitmaps. */
+    internal fun trimMemory(trim: PresentationMemoryTrim) {
+        images.trimToSize(trim.targetBytes(capacity))
     }
 
     @Suppress("TooGenericExceptionCaught")

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.stickers
 import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.isEmojiPresentation
+import java.net.URLEncoder
 import java.text.BreakIterator
 
 internal object StickerMetrics {
@@ -10,8 +11,11 @@ internal object StickerMetrics {
     const val GRID_MINIMUM_DP = 76
     const val PACK_TAB_SIDE_DP = 36
 
-    /** Large enough for a timeline sticker at 3x density. */
-    const val DECODE_EDGE_PX = 480
+    /**
+     * Sharp for a timeline sticker on common phone densities (about 2.6x), and small enough that a whole large pack
+     * stays decoded while the grid scrolls.
+     */
+    const val DECODE_EDGE_PX = 400
 }
 
 /** Presentation rules for peer-controlled sticker and pack text. */
@@ -21,6 +25,7 @@ internal object StickerPresentation {
     private const val MAX_TITLE_CHARS = 80
     private const val MAX_DESCRIPTION_CHARS = 500
     private const val MAX_LOOKUP_BYTES = 2_048
+    private const val SHARE_LINK_BASE = "https://sonarprivacy.xyz/stickers?a="
 
     /**
      * A sticker replaces the bubble only when its kind-9 carries nothing else.
@@ -37,13 +42,19 @@ internal object StickerPresentation {
      * Whether a sticker in the timeline loads without a tap. Loading contacts the
      * pack author's server, so a received sticker loads by itself only from a pack
      * the person installed, and only while image auto-download allows it. Their own
-     * stickers were already loaded to send them.
+     * stickers were already loaded to send them. Null while the installed packs
+     * ([packInstalled] null) are still being read and they would decide it.
      */
     fun loadsAutomatically(
         isFromMe: Boolean,
-        packInstalled: Boolean,
+        packInstalled: Boolean?,
         autoDownloadImages: Boolean,
-    ): Boolean = isFromMe || (packInstalled && autoDownloadImages)
+    ): Boolean? =
+        when {
+            isFromMe -> true
+            !autoDownloadImages -> false
+            else -> packInstalled
+        }
 
     /** The pack's emoji for this sticker when it is a short emoji run, else null. */
     fun labelEmoji(emoji: String?): String? =
@@ -59,6 +70,9 @@ internal object StickerPresentation {
         val input = raw.trim()
         return input.takeIf { it.isNotEmpty() && it.toByteArray().size <= MAX_LOOKUP_BYTES }
     }
+
+    /** A link to [pack] that opens on the web and that MDK reads back when pasted into "Add by link". */
+    fun shareLink(pack: StickerPackFfi): String = "$SHARE_LINK_BASE${URLEncoder.encode(pack.coordinate, "UTF-8")}"
 
     /** The pack's title, or null when it has none and the caller shows the generic name. */
     fun title(pack: StickerPackFfi): String? = bounded(pack.title, MAX_TITLE_CHARS)

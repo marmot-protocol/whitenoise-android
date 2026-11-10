@@ -2239,8 +2239,10 @@ internal fun MessageBubble(
                         displayedBody = displayedBody,
                         deleted = deleted,
                         persistedFailure = persistedFailure,
+                        // A bare sticker draws no text: its "Sticker" label is only for previews and notifications.
                         structuredShareOwnsBody =
                             captionIsContactText ||
+                                (stickerRef != null && MessageProjector.isBareSticker(record)) ||
                                 sharedLocationOwnsBody ||
                                 sharedUser != null ||
                                 remoteGiphyMedia != null,
@@ -3109,7 +3111,7 @@ internal fun MessageBubble(
                             FocusedTextMessagePreview(
                                 presentation = bubblePresentation,
                                 mine = mine,
-                                text = bodyTextToRender ?: displayedBody.takeUnless { hasMedia }.orEmpty(),
+                                text = bodyTextToRender ?: displayedBody.takeUnless { hasMedia || stickerRef != null }.orEmpty(),
                                 document = displayedMarkdownDocument,
                                 time = rememberedMessageBubbleTime(record.recordedAt),
                                 status = item.status,
