@@ -30,7 +30,7 @@ grep -Fq 'Configure transport-safe preview packaging' "$build"
 grep -Fq 'packaging.jniLibs.useLegacyPackaging = true' "$build"
 grep -Fq -- '-I "$PR_PREVIEW_INIT_SCRIPT"' "$build"
 # The ABI injection alone makes AGP stamp android:testOnly="true", which would
-# limit both preview channels to ADB installs. Keep the explicit override.
+# limit preview APKs to ADB installs. Keep the explicit override.
 grep -Fq -- '-Pandroid.injected.testOnly=false' "$build"
 reject '-Pandroid.injected.testOnly=true' "$build"
 grep -Fq 'include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")' "$gradle"
@@ -52,7 +52,7 @@ grep -Fq "github.event_name == 'workflow_dispatch' ||" "$build"
 grep -Fq 'github.event.pull_request.head.repo.full_name == github.repository' "$build"
 grep -Fq 'Resolve exact candidate provenance and current PR' "$workflow"
 grep -Fq 'stable_pr=$(provenance_value "$stable" pr_number)' "$workflow"
-grep -Fq '[[ "$stable_pr" == "$isolated_pr"' "$workflow"
+reject 'isolated' "$workflow"
 reject 'branches: [master]' "$build"
 grep -Fq 'Update PR description with preview links' "$workflow"
 grep -Fq '.github/scripts/update-pr-preview-links.js' "$workflow"
@@ -89,10 +89,13 @@ reject 'BLOSSOM_UPLOAD_NSEC' "$workflow"
 # before checkout with "not a git repository" and no preview links are posted.
 candidate_downloads=$(grep -Fc 'gh run download "$BUILD_RUN_ID"' "$workflow")
 scoped_candidate_downloads=$(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY"' "$workflow")
-[[ "$candidate_downloads" -eq 4 ]]
+[[ "$candidate_downloads" -eq 2 ]]
 [[ "$scoped_candidate_downloads" -eq "$candidate_downloads" ]]
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable' "$workflow") -eq 2 ]]
-[[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated' "$workflow") -eq 2 ]]
+# Only the stable channel is signed and linked by default; the isolated channel
+# is built solely by an explicit include_isolated dispatch for opt-in tests.
+grep -Fq 'channel: ${{ fromJSON(inputs.include_isolated && '"'"'["stable","isolated"]'"'"' || '"'"'["stable"]'"'"') }}' "$build"
+grep -Fq 'include_isolated:' "$build"
 
 # The public link must be a stable, per-PR APK asset and publication must fail
 # closed if the final browser response regresses to an inline ZIP.

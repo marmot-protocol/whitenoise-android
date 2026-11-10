@@ -326,8 +326,9 @@ val productionPushRelayHint =
 
 // PR preview inputs. The default "stable" channel deliberately keeps one
 // applicationId so every PR preview updates the same app and retains its data.
-// The "isolated" channel remains available when a reviewer needs side-by-side
-// installs or a clean data directory. Both are signed later by a privileged,
+// The "isolated" channel remains buildable (opt-in via include_isolated) for
+// side-by-side installs or a clean data directory, but PR preview CI no longer
+// signs, publishes or links it by default. Stable is signed later by a privileged,
 // base-branch-only workflow; Gradle never receives the preview signing key.
 val prNumber: String? = System.getenv("PR_NUMBER")?.takeIf { it.isNotBlank() }
 val prPreviewChannel: String? = System.getenv("PR_PREVIEW_CHANNEL")?.takeIf { it.isNotBlank() }
@@ -349,6 +350,13 @@ val buildShortSha =
 
 android {
     namespace = "dev.ipf.whitenoise.android"
+
+    // android-ci lints production sources on PRs, the merge queue and master pushes, and the
+    // daily scheduled run lints test sources too. Unset locally, so a local lint covers both.
+    lint {
+        ignoreTestSources =
+            providers.gradleProperty("whitenoise.lintMainSourcesOnly").map { it == "true" }.getOrElse(false)
+    }
     ndkVersion = "29.0.14206865"
     compileSdk {
         version =
@@ -1070,6 +1078,13 @@ tasks
         }
     }
 
+// android-ci shards unit tests across jobs; its coverage job feeds the other shards' binary
+// reports into the same verify and report tasks. Unset locally, so nothing changes there.
+val koverShardBinaryReports =
+    providers.gradleProperty("whitenoise.koverShardReportsDir").map { directory ->
+        fileTree(directory) { include("*.ic") }.files
+    }
+
 kover {
     currentProject {
         createVariant("statePackageFloor") {
@@ -1108,7 +1123,11 @@ kover {
                 }
             }
         }
+        variant("devZapstoreDebug") {
+            additionalBinaryReports.addAll(koverShardBinaryReports)
+        }
         variant("statePackageFloor") {
+            additionalBinaryReports.addAll(koverShardBinaryReports)
             filters {
                 excludes {
                     classes(

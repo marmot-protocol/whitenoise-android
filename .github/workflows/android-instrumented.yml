@@ -13,7 +13,8 @@ name: Android Instrumented Tests
 # distributions; an unreadable diff runs both lanes.
 #
 # Ordinary runs use dev debug. The opt-in review demo and document matrix use
-# unsigned isolated preview debug builds and disposable identities.
+# unsigned isolated preview debug builds and disposable identities. Dispatch the
+# Android PR APK run with include_isolated=true; previews are stable-only by default.
 
 on:
   workflow_dispatch:
@@ -29,7 +30,7 @@ on:
         type: boolean
         default: false
       mdk_preview_build_run:
-        description: Successful trusted-dispatch Android PR APK run for this exact candidate
+        description: Successful trusted-dispatch Android PR APK run for this exact candidate, dispatched with include_isolated=true
         required: false
         type: string
       mdk_adoption_only:

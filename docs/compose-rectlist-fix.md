@@ -44,8 +44,8 @@ dependency verification mechanism.
 - `BubbleFooterRectListReuseTest`: five production footer/Markdown reuse,
   reactivation and far-snap cases.
 - Existing scrolling, jump-to-bottom, unread-marker and screenshot coverage is
-  retained. CI retains results as `compose-rectlist-regressions-Play` and
-  `compose-rectlist-regressions-Zapstore`.
+  retained. CI retains results per unit shard as
+  `compose-rectlist-regressions-<flavor>-<shard>`.
 - [CON-029](manual-release-testing/cases/CON-029.md) remains the manual acceptance
   scenario for minified candidates on both distributions, including Android 17.
 

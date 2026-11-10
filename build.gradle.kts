@@ -36,6 +36,22 @@ subprojects {
         // android-ci sets the worker count per runner; local and other workflow runs stay serial.
         maxParallelForks = providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)
 
+        // android-ci splits the app unit suite across parallel jobs. Each shard runs the test
+        // classes whose top-level class name hashes to its index, keeping nested classes with
+        // their outer class. String.hashCode is specified, so every runner selects the same set.
+        val shard = providers.gradleProperty("ciTestShard").map(String::toInt)
+        val shardCount = providers.gradleProperty("ciTestShardCount").map(String::toInt)
+        if (shard.isPresent && name.matches(Regex("test.*UnitTest"))) {
+            val index = shard.get()
+            val count = shardCount.get()
+            require(count > 0 && index in 0 until count) { "ciTestShard $index is outside 0 until $count" }
+            exclude { element ->
+                val path = element.relativePath.pathString
+                !element.isDirectory && path.endsWith(".class") &&
+                    Math.floorMod(path.removeSuffix(".class").substringBefore('$').hashCode(), count) != index
+            }
+        }
+
         // Reuse compilation/analysis outputs, but execute assertions in each
         // fresh CI job, including screenshot comparisons against the baselines.
         outputs.doNotCacheIf("CI test assertions must execute") {

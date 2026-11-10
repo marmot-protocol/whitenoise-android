@@ -650,7 +650,9 @@ class AvStreamPreferredProtocolTest {
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
             while (released.count != 0L && System.nanoTime() < deadline) {
                 try {
-                    shadowOf(callbacks.looper).idleFor(Duration.ofMillis(50))
+                    // A HandlerThread reports no Looper once cleanup has let it exit.
+                    val looper = checkNotNull(callbacks.looper) { "Callback thread already exited" }
+                    shadowOf(looper).idleFor(Duration.ofMillis(50))
                 } catch (failure: IllegalStateException) {
                     // Cleanup quits this Looper before its final released latch acknowledgment.
                     val cleaned = field(stream, "cleaned") as AtomicBoolean

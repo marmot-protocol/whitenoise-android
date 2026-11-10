@@ -35,9 +35,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p candidates/stable candidates/isolated
+          mkdir -p candidates/stable
           gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable --dir candidates/stable
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated --dir candidates/isolated
 
       # Resolve the validated PR number before the publisher starts so job-level
       # concurrency cannot couple distinct PRs that happen to share a branch.
@@ -58,14 +57,9 @@ jobs:
             printf '%s' "$value"
           }
           stable=candidates/stable/provenance.env
-          isolated=candidates/isolated/provenance.env
           stable_pr=$(provenance_value "$stable" pr_number)
-          isolated_pr=$(provenance_value "$isolated" pr_number)
           stable_sha=$(provenance_value "$stable" head_sha)
-          isolated_sha=$(provenance_value "$isolated" head_sha)
           stable_run=$(provenance_value "$stable" run_number)
-          isolated_run=$(provenance_value "$isolated" run_number)
-          [[ "$stable_pr" == "$isolated_pr" && "$stable_sha" == "$isolated_sha" && "$stable_run" == "$isolated_run" ]]
           [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
           [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
           if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
@@ -121,9 +115,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p candidates/stable candidates/isolated
+          mkdir -p candidates/stable
           gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable --dir candidates/stable
-          gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated --dir candidates/isolated
 
       # Recheck the freshly downloaded untrusted artifacts against the values
       # that selected this PR's concurrency group before exposing any secret.
@@ -143,14 +136,9 @@ jobs:
             printf '%s' "$value"
           }
           stable=candidates/stable/provenance.env
-          isolated=candidates/isolated/provenance.env
           stable_pr=$(provenance_value "$stable" pr_number)
-          isolated_pr=$(provenance_value "$isolated" pr_number)
           stable_sha=$(provenance_value "$stable" head_sha)
-          isolated_sha=$(provenance_value "$isolated" head_sha)
           stable_run=$(provenance_value "$stable" run_number)
-          isolated_run=$(provenance_value "$isolated" run_number)
-          [[ "$stable_pr" == "$isolated_pr" && "$stable_sha" == "$isolated_sha" && "$stable_run" == "$isolated_run" ]]
           [[ "$stable_pr" =~ ^[1-9][0-9]*$ && "$stable_sha" =~ ^[0-9a-f]{40}$ && "$stable_run" =~ ^[1-9][0-9]*$ ]]
           [[ "$stable_run" == "$BUILD_RUN_NUMBER" ]]
           if [[ "$WORKFLOW_EVENT" == pull_request ]]; then
@@ -195,7 +183,7 @@ jobs:
         shell: bash
         run: .github/scripts/verify-pr-preview-candidates.sh candidates
 
-      - name: Decode isolated preview signing key
+      - name: Decode preview signing key
         env:
           PR_PREVIEW_KEYSTORE_BASE64: ${{ secrets.PR_PREVIEW_KEYSTORE_BASE64 }}
         shell: bash
@@ -242,18 +230,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for channel in stable isolated; do
-            apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
-            url=$(APK_PATH="$apk" PREVIEW_CHANNEL="$channel" \
-              .github/scripts/publish-pr-apk-to-github-release.sh)
-            remote_sha=$(curl --fail --location --retry 3 --retry-all-errors --max-time 240 "$url" | sha256sum | awk '{print $1}')
-            local_sha=$(sha256sum "$apk" | awk '{print $1}')
-            [[ "$remote_sha" == "$local_sha" ]] || {
-              printf 'Published %s APK digest does not match the signed file.\n' "$channel" >&2
-              exit 1
-            }
-            printf '%s_url=%s\n' "$channel" "$url" >> "$GITHUB_OUTPUT"
-          done
+          channel=stable
+          apk=$(find "signed/$channel" -type f -name '*.apk' -print -quit)
+          url=$(APK_PATH="$apk" PREVIEW_CHANNEL="$channel" \
+            .github/scripts/publish-pr-apk-to-github-release.sh)
+          remote_sha=$(curl --fail --location --retry 3 --retry-all-errors --max-time 240 "$url" | sha256sum | awk '{print $1}')
+          local_sha=$(sha256sum "$apk" | awk '{print $1}')
+          [[ "$remote_sha" == "$local_sha" ]] || {
+            printf 'Published %s APK digest does not match the signed file.\n' "$channel" >&2
+            exit 1
+          }
+          printf '%s_url=%s\n' "$channel" "$url" >> "$GITHUB_OUTPUT"
 
       # A push can land while validation/signing/upload runs. Do not let a
       # superseded run overwrite the description with stale APK links.
@@ -277,7 +264,6 @@ jobs:
           PR_NUMBER: ${{ env.PR_NUMBER }}
           HEAD_SHA: ${{ env.HEAD_SHA }}
           STABLE_URL: ${{ steps.publish.outputs.stable_url }}
-          ISOLATED_URL: ${{ steps.publish.outputs.isolated_url }}
         with:
           script: |
             const updater = require('./.github/scripts/update-pr-preview-links.js')

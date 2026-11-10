@@ -1,5 +1,7 @@
 """Validate direct UI assertions and report source-bound screen execution separately from release proof."""
 
+import copy
+import functools
 import hashlib
 import json
 from pathlib import Path
@@ -22,6 +24,19 @@ def has_substitution(value):
     return False
 
 
+@functools.lru_cache(maxsize=None)
+def _parsed_flow(text):
+    tokens = list(yaml.scan(text))
+    if any(isinstance(token, (yaml.tokens.AnchorToken, yaml.tokens.AliasToken)) for token in tokens):
+        raise ValueError('Screen assertion flows cannot use aliases')
+    return list(yaml.safe_load_all(text))
+
+
+def parsed_flow(text):
+    """Parse each distinct flow text once per process; callers get an independent copy."""
+    return copy.deepcopy(_parsed_flow(text))
+
+
 def flow_steps(path, root, active=None):
     """Collect unconditional assertions; optional, conditional and substituted paths grant no credit."""
     if any(part.is_symlink() for part in [path, *path.parents]):
@@ -34,10 +49,7 @@ def flow_steps(path, root, active=None):
     if path in active:
         raise ValueError('Recursive screen assertion flow')
     active = active | {path}
-    tokens = list(yaml.scan(path.read_text()))
-    if any(isinstance(token, (yaml.tokens.AnchorToken, yaml.tokens.AliasToken)) for token in tokens):
-        raise ValueError('Screen assertion flows cannot use aliases')
-    documents = list(yaml.safe_load_all(path.read_text()))
+    documents = parsed_flow(path.read_text())
     if len(documents) != 2 or not isinstance(documents[1], list):
         raise ValueError('Expected a Maestro header and command list')
     assertions, hashes = [], {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()}

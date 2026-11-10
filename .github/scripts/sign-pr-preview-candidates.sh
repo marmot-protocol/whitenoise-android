@@ -26,7 +26,7 @@ if [[ ! "$expected_digest" =~ ^[[:xdigit:]]{64}$ ]]; then
   exit 1
 fi
 
-for channel in stable isolated; do
+for channel in stable; do
   input=$(find "$candidate_root/$channel" -maxdepth 1 -type f -name '*.apk' -print -quit)
   mkdir -p "$output_root/$channel"
   output="$output_root/$channel/whitenoise-pr-${PR_NUMBER}-${channel}.apk"

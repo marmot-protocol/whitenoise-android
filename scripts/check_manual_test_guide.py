@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import re
 import subprocess
@@ -403,6 +404,7 @@ def consume_kotlin_template_expression(text: str, offset: int) -> int:
     return len(text)
 
 
+@functools.lru_cache(maxsize=None)
 def kotlin_code_mask(text: str) -> str:
     """Blank Kotlin comments and literals while preserving source offsets."""
     masked = list(text)
@@ -476,6 +478,11 @@ def composable_declaration_name(text: str, offset: int) -> str | None:
 
 def composable_names(text: str) -> set[str]:
     """Find visual and receiver-qualified Compose function declarations."""
+    return set(_composable_names(text))
+
+
+@functools.lru_cache(maxsize=None)
+def _composable_names(text: str) -> frozenset[str]:
     found: set[str] = set()
     for composable in re.finditer(r"@Composable\b", kotlin_code_mask(text)):
         offset = skip_kotlin_trivia(text, composable.end())
@@ -488,7 +495,7 @@ def composable_names(text: str) -> set[str]:
         name = composable_declaration_name(text, offset)
         if name:
             found.add(name)
-    return found
+    return frozenset(found)
 
 
 def current_composable_surfaces() -> set[tuple[str, str]]:
