@@ -779,7 +779,8 @@ jobs:
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
     name: Android lint (${{ matrix.flavor }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A full lint analysis without a cache hit runs 20 to 25 minutes, so 30 left no room for a slow runner.
+    timeout-minutes: 45
     strategy:
       # Lint each distribution while build-contracts runs the shared style checks.
       # PRs lint Zapstore only; secondary-variant compiles Play.
