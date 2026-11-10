@@ -22,6 +22,7 @@ internal fun MarmotInterface.timelineRowTags(
         return null
     }
 
+    /** The single row next to [cursor] in this group, or the newest row when [cursor] is null. */
     fun adjacent(cursor: TimelineCursor?): TimelineMessageRecordFfi? {
         val query =
             TimelineMessageQueryFfi.page(

@@ -40,6 +40,7 @@ object ConversationTranscriptExport {
         var before: ULong? = null
         var beforeMessageId: String? = null
 
+        /** Adds each message not already collected, keeping the first copy of a repeated id. */
         fun appendUnique(messages: List<TimelineMessageRecordFfi>) {
             messages.forEach { message ->
                 if (!collected.containsKey(message.messageIdHex)) {

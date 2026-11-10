@@ -29,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -1420,8 +1421,9 @@ internal fun WipeProgressSheet() {
         properties = ModalBottomSheetProperties(shouldDismissOnBackPress = false),
         dragHandle = null,
     ) {
+        // Large text can push the keep-open note past the screen, so the sheet scrolls.
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.wipe_progress_title), style = MaterialTheme.typography.titleLarge)

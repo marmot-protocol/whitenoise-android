@@ -42,6 +42,7 @@ import java.util.UUID
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class DocumentProviderRelayMatrixTest {
+    /** Document grants survive reads and relay delivery, and revoking and plaintext cleanup still work. */
     @Test
     @Suppress("LongMethod") // One disposable sender/receiver pair must own the full real-device sequence.
     fun providerGrantsSurviveReadAndRelayDeliveryButRevokeAndPlaintextCleanupWork() =

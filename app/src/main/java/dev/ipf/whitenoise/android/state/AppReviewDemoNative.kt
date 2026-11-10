@@ -149,6 +149,7 @@ internal class AppReviewDemoNative(
         }
     }
 
+    /** Reads the demo chat's newest messages from MarmotKit for the review demo's checks. */
     override suspend fun timeline(
         ref: String,
         groupId: String,

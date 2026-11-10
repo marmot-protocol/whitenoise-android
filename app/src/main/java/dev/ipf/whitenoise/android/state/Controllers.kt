@@ -5850,6 +5850,7 @@ internal fun conversationLoadFailureMessage(
         else -> R.string.error_try_again
     }
 
+/** Whether a failed conversation open may offer Try again, which a terminal failure never does. */
 internal fun shouldOfferConversationLoadRetry(throwable: Throwable): Boolean = !isTerminalOpenFailure(throwable)
 
 internal typealias MediaUploader =
@@ -6434,9 +6435,10 @@ class ConversationController(
     var hasPublishedAuthoritativeTimeline by mutableStateOf(false)
         private set
 
-    // Test-only seam: navigation promotes a chat-list tap only after the
-    // authoritative page publishes, and screen-level tests can't run the FFI
-    // subscription that flips this in production.
+    /**
+     * Test-only seam: navigation promotes a chat-list tap only after the authoritative page publishes, and
+     * screen-level tests can't run the FFI subscription that flips this in production.
+     */
     @VisibleForTesting
     internal fun markAuthoritativeTimelinePublishedForTest() {
         hasPublishedAuthoritativeTimeline = true

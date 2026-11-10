@@ -10235,6 +10235,7 @@ class WhiteNoiseAppState private constructor(
         }.getOrElse(::notificationReactionSendFailureOutcome)
     }
 
+    /** Checks whether a notification reply already landed after the recovery boundary, so a retry never sends twice. */
     private suspend fun notificationReplyCommitState(
         account: String,
         group: String,
@@ -12829,6 +12830,7 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
+    /** The stored timeline row for a notification's message, or null when it has no id or the read fails. */
     private suspend fun notificationTimelineRecord(update: NotificationUpdateFfi) =
         update.messageIdHex?.let { messageId ->
             runCatchingCancellable {

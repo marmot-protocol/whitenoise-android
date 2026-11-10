@@ -33,6 +33,7 @@ import java.util.UUID
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ForwardMediaReferenceFfiIntegrationTest {
+    /** Forwarding each media kind gives every destination its own fresh reference that the recipient can decrypt. */
     @Test
     @Suppress("LongMethod") // Keep the end-to-end native boundary in one auditable sequence.
     fun everyDestinationGetsFreshDecryptablePhotoVideoAudioAndDocumentReferences() =
