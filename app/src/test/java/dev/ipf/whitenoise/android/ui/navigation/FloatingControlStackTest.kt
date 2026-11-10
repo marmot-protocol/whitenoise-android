@@ -79,11 +79,4 @@ class FloatingControlStackTest {
     private companion object {
         const val GAP = 8f
     }
-
-    @Test
-    fun onlyGroupDetailsReceiveTheComposerAsTheMembersSection() {
-        assertEquals(ComposerFabEndpoint.GroupMembers, openChatComposerFabEndpoint(isDm = false, showDetails = true))
-        assertEquals(ComposerFabEndpoint.Composer, openChatComposerFabEndpoint(isDm = true, showDetails = true))
-        assertEquals(ComposerFabEndpoint.Composer, openChatComposerFabEndpoint(isDm = false, showDetails = false))
-    }
 }

@@ -1,4 +1,4 @@
-package dev.ipf.whitenoise.android.ui.navigation
+package dev.ipf.whitenoise.android.ui.conversation
 
 import android.app.Application
 import android.provider.Settings
@@ -13,7 +13,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -39,7 +41,6 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
@@ -50,8 +51,6 @@ import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -63,16 +62,16 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Temporal pixels for the composer-to-members morph that opens and closes group details.
+ * Temporal pixels for the details page growing out of the composer and shrinking back into it.
  *
- * The production shell host, route slide, composer and details screen are reused; only the
- * group record and roster are fixtures.
+ * The production morph, route slide, composer and details screen are reused for a group and a
+ * direct message; only the conversation record and roster are fixtures.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 @OptIn(ExperimentalCoroutinesApi::class)
-class ComposerMembersHandoffScreenshotTest {
+class ChatDetailsMorphScreenshotTest {
     private val scheduler = TestCoroutineScheduler()
 
     @get:Rule val rule = createComposeRule(effectContext = StandardTestDispatcher(scheduler))
@@ -84,7 +83,8 @@ class ComposerMembersHandoffScreenshotTest {
     private var showDetails by mutableStateOf(false)
     private var committedDetails = false
     private var draft = TextFieldValue(DRAFT, selection = TextRange(DRAFT.length))
-    private var handoff: MeasuredControlHandoff? = null
+    private var composer: LayoutCoordinates? = null
+    private var morph: ChatDetailsMorph? = null
 
     /** Enabled system motion makes temporal pixels independent of the runner's animator default. */
     @Before
@@ -100,30 +100,45 @@ class ComposerMembersHandoffScreenshotTest {
     }
 
     @Test
-    fun membersRoundTripLight() = captureRoundTrip("light", dark = false)
+    fun groupRoundTripLight() = captureRoundTrip("group_light", dm = false, dark = false)
 
     @Test
-    fun membersRoundTripDark() = captureRoundTrip("dark", dark = true)
+    fun groupRoundTripDark() = captureRoundTrip("group_dark", dm = false, dark = true)
 
     @Test
-    fun membersRoundTripAmoled() = captureRoundTrip("amoled", dark = true, amoled = true)
+    fun groupRoundTripAmoled() = captureRoundTrip("group_amoled", dm = false, dark = true, amoled = true)
 
     @Test
-    fun membersRoundTripRtl() = captureRoundTrip("rtl", dark = false, rtl = true)
+    fun groupRoundTripRtl() = captureRoundTrip("group_rtl", dm = false, dark = false, rtl = true)
 
+    @Test
+    fun dmRoundTripLight() = captureRoundTrip("dm_light", dm = true, dark = false)
+
+    @Test
+    fun dmRoundTripAmoled() = captureRoundTrip("dm_amoled", dm = true, dark = true, amoled = true)
+
+    @Suppress("LongParameterList")
     private fun captureRoundTrip(
         variant: String,
+        dm: Boolean,
         dark: Boolean,
         amoled: Boolean = false,
         rtl: Boolean = false,
     ) {
-        renderRoute(dark, amoled, rtl)
-        captureTransition(variant, open = true)
-        captureTransition(variant, open = false)
+        renderRoute(dm, dark, amoled, rtl)
+        val settledTranscript = pixels()
+        captureOpen(variant)
+        captureClose(variant)
+        assertTrue(
+            "The round trip must land on the same transcript pixels",
+            settledTranscript.contentEquals(pixels()),
+        )
+        assertEquals(DRAFT, draft.text)
     }
 
-    /** Mirrors ConversationScreen: one route-motion owner swaps the transcript composer for group details. */
+    /** Mirrors ConversationScreen: the morph owns the details change and the route slide stays still. */
     private fun renderRoute(
+        dm: Boolean,
         dark: Boolean,
         amoled: Boolean,
         rtl: Boolean,
@@ -132,8 +147,8 @@ class ComposerMembersHandoffScreenshotTest {
         val controller =
             ConversationController(
                 appState = appState,
-                initialGroup = group(),
-                initialMemberSnapshot = GroupMemberSnapshot(members()),
+                initialGroup = group(dm),
+                initialMemberSnapshot = GroupMemberSnapshot(members(dm)),
             )
         rule.setContent {
             CompositionLocalProvider(
@@ -142,38 +157,39 @@ class ComposerMembersHandoffScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
                     Surface(Modifier.fillMaxSize().testTag(TAG)) {
-                        MainShellNoticeLayout(
-                            notice = null,
-                            dictationController = appState.conversationDictation,
-                            dictationComposerRoute =
-                                ConversationDictationComposerRoute(null, null, null, ACCOUNT_REF, true, true),
-                            appLockScreenVisible = false,
-                            handoffOwner = ACCOUNT_REF,
-                            handoffDestination = openChatComposerFabEndpoint(isDm = false, showDetails = showDetails),
-                        ) {
-                            handoff = LocalComposerFabHandoff.current
-                            SideEffect { committedDetails = showDetails }
-                            val routeMotion =
-                                rememberRouteMotionModifier(
-                                    target = showDetails,
-                                    depth = if (showDetails) 1 else 0,
-                                    ownerKey = controller,
-                                    animationsEnabled = true,
+                        SideEffect { committedDetails = showDetails }
+                        val detailsMorph =
+                            rememberChatDetailsMorph(
+                                showDetails = showDetails,
+                                ownerKey = controller,
+                                motionEnabled = true,
+                                composerBounds = { composer?.takeIf { it.isAttached }?.boundsInWindow() },
+                            )
+                        morph = detailsMorph
+                        val routeMotion =
+                            rememberRouteMotionModifier(
+                                target = showDetails,
+                                depth = if (showDetails) 1 else 0,
+                                ownerKey = controller,
+                                animationsEnabled = true,
+                                suppressMotion = detailsMorph.active,
+                            )
+                        Box(Modifier.fillMaxSize().then(detailsMorph.modifier).then(routeMotion)) {
+                            if (showDetails) {
+                                GroupDetailsScreen(appState, controller, onBack = {}, onLeft = {})
+                            } else {
+                                ComposerBar(
+                                    replyingTo = null,
+                                    messageTextCopy = MessageTextCopy.Default,
+                                    onCancelReply = {},
+                                    onSend = { _, _ -> error("The temporal fixture must never send") },
+                                    initialDraft = draft,
+                                    onDraftChange = { value, _ -> draft = value },
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .onGloballyPositioned { composer = it },
                                 )
-                            Box(Modifier.fillMaxSize().then(routeMotion)) {
-                                if (showDetails) {
-                                    GroupDetailsScreen(appState, controller, onBack = {}, onLeft = {})
-                                } else {
-                                    ComposerBar(
-                                        replyingTo = null,
-                                        messageTextCopy = MessageTextCopy.Default,
-                                        onCancelReply = {},
-                                        onSend = { _, _ -> error("The temporal fixture must never send") },
-                                        initialDraft = draft,
-                                        onDraftChange = { value, _ -> draft = value },
-                                        modifier = Modifier.align(Alignment.BottomCenter).testTag(COMPOSER_TAG),
-                                    )
-                                }
                             }
                         }
                     }
@@ -184,70 +200,67 @@ class ComposerMembersHandoffScreenshotTest {
         rule.mainClock.autoAdvance = false
     }
 
-    /** First committed frame, measured interpolation and retired decoration on a paused clock. */
-    private fun captureTransition(
-        variant: String,
-        open: Boolean,
-    ) {
-        val source = rule.runOnIdle { requireNotNull(handoff?.captureOrigin()) }
+    private fun captureOpen(variant: String) {
         val start = rule.mainClock.currentTime
         rule.runOnIdle {
-            showDetails = open
+            showDetails = true
             Snapshot.sendApplyNotifications()
         }
-        scheduler.runCurrent()
-        rule.mainClock.advanceTimeByFrame()
-        rule.waitForIdle()
-        assertEquals(open, committedDetails)
-        assertEquals(start + 16L, rule.mainClock.currentTime)
-        val direction = if (open) "open" else "close"
-        capture("${direction}_first_$variant")
-        rule.mainClock.advanceTimeBy(80)
-        rule.waitForIdle()
-        assertEquals(start + 96L, rule.mainClock.currentTime)
-        val middle = assertInterpolating(source)
-        val middlePixels = pixels()
-        capture("${direction}_mid_$variant")
-        rule.mainClock.advanceTimeBy(176)
-        rule.waitForIdle()
-        assertEquals(start + 272L, rule.mainClock.currentTime)
-        rule.runOnIdle { assertNull("The morph must retire after the route settles", handoff?.renderedBounds) }
-        val landed = endpointBounds(open)
-        assertEquals(
-            "Opening rises to the members card and closing falls to the composer",
-            open,
-            landed.top < source.top,
-        )
-        assertTrue(
-            "The in-flight shape must sit strictly between its endpoints",
-            middle.top in minOf(source.top, landed.top)..maxOf(source.top, landed.top) &&
-                middle.top != source.top &&
-                middle.top != landed.top,
-        )
-        assertFalse(
-            "The container morph must change actual pixels before retiring",
-            middlePixels.contentEquals(pixels()),
-        )
-        capture("${direction}_settled_$variant")
-        assertEquals(DRAFT, draft.text)
+        captureFrames("open_$variant", start, expectDetails = true)
     }
 
-    private fun assertInterpolating(source: Rect): Rect =
-        rule.runOnIdle {
-            val middle = handoff?.renderedBounds
-            assertNotNull("The measured handoff must be active at the captured midpoint", middle)
-            requireNotNull(middle).also { assertTrue(it != source) }
+    /** Back asks the morph first; the page records one inert frame before the route really changes. */
+    private fun captureClose(variant: String) {
+        rule.runOnIdle { requireNotNull(morph).close { showDetails = false } }
+        var frames = 0
+        while (committedDetails) {
+            assertTrue("The close must commit within the capture frame limit", frames++ < MAX_CAPTURE_FRAMES)
+            // The runner draws only on capture; a device draws every frame, which is when the page records.
+            pixels()
+            scheduler.runCurrent()
+            rule.mainClock.advanceTimeByFrame()
+            rule.waitForIdle()
         }
+        // The first close frame has already committed; time the remaining frames from it.
+        captureFrames(
+            "close_$variant",
+            rule.mainClock.currentTime - FRAME_MILLIS,
+            expectDetails = false,
+            committed = true,
+        )
+    }
 
-    private fun endpointBounds(open: Boolean): Rect =
-        rule
-            .onNodeWithTag(if (open) MEMBERS_TAG else COMPOSER_TAG, useUnmergedTree = true)
-            .fetchSemanticsNode()
-            .boundsInWindow
+    /** First committed frame, measured interpolation and the settled route on a paused clock. */
+    private fun captureFrames(
+        name: String,
+        start: Long,
+        expectDetails: Boolean,
+        committed: Boolean = false,
+    ) {
+        if (!committed) {
+            scheduler.runCurrent()
+            rule.mainClock.advanceTimeByFrame()
+            rule.waitForIdle()
+        }
+        assertEquals(expectDetails, committedDetails)
+        rule.runOnIdle { assertTrue("The morph must own this change", requireNotNull(morph).active) }
+        capture("first_$name")
+        val first = pixels()
+        rule.mainClock.advanceTimeBy(start + MID_MILLIS - rule.mainClock.currentTime)
+        rule.waitForIdle()
+        val middle = pixels()
+        capture("mid_$name")
+        rule.mainClock.advanceTimeBy(start + SETTLED_MILLIS - rule.mainClock.currentTime)
+        rule.waitForIdle()
+        val settled = pixels()
+        capture("settled_$name")
+        assertFalse("The card must move between the first frame and the midpoint", first.contentEquals(middle))
+        assertFalse("The midpoint must still be in flight", middle.contentEquals(settled))
+    }
 
     private fun capture(name: String) {
         visualErrors.checkSucceeds {
-            rule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_members_motion_$name.png")
+            rule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/chat_details_morph_$name.png")
         }
     }
 
@@ -276,14 +289,14 @@ class ComposerMembersHandoffScreenshotTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
-    private fun group() =
+    private fun group(dm: Boolean) =
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
             groupIdHex = GROUP_HEX,
             protocolProfile = AppProtocolProfileFfi.LEGACY,
             profilePresent = false,
             endpoint = "endpoint",
-            name = "Weekend hikers",
+            name = if (dm) "" else "Weekend hikers",
             description = "Plans, trail conditions and carpools.",
             admins = listOf(SELF_HEX),
             relays = listOf("wss://relay.example.com"),
@@ -316,8 +329,8 @@ class ComposerMembersHandoffScreenshotTest {
             disbandRequest = null,
         )
 
-    private fun members() =
-        listOf(SELF_HEX, "a", "b", "c").map { id ->
+    private fun members(dm: Boolean) =
+        (if (dm) listOf(SELF_HEX, "a") else listOf(SELF_HEX, "a", "b", "c")).map { id ->
             val local = id == SELF_HEX
             AppGroupMemberRecordFfi(
                 memberIdHex = if (local) id else id.repeat(64),
@@ -340,8 +353,10 @@ class ComposerMembersHandoffScreenshotTest {
         const val SELF_HEX = "1111111111111111111111111111111111111111111111111111111111111111"
         const val GROUP_HEX = "group-a"
         const val DRAFT = "Trail plan for Saturday"
-        const val TAG = "composer-members-motion-viewport"
-        const val COMPOSER_TAG = "temporal-composer"
-        const val MEMBERS_TAG = "chat_info.members"
+        const val TAG = "chat-details-morph-viewport"
+        const val FRAME_MILLIS = 16L
+        const val MID_MILLIS = 112L
+        const val SETTLED_MILLIS = CHAT_DETAILS_MORPH_MILLIS + 64L
+        const val MAX_CAPTURE_FRAMES = 6
     }
 }

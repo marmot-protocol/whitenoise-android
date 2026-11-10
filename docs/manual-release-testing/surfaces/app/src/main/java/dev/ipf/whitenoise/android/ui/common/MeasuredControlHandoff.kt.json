@@ -40,8 +40,7 @@
         "test_ids": [
           "FIND-001",
           "NCH-001",
-          "NCH-008",
-          "GRP-038"
+          "NCH-008"
         ]
       },
       {
@@ -49,8 +48,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/MeasuredControlHandoff.kt",
         "anchor": "fun Modifier.controlMorphSurface(",
         "test_ids": [
-          "NCH-008",
-          "GRP-038"
+          "NCH-008"
         ]
       }
     ]

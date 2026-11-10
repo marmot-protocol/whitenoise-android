@@ -69,6 +69,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
@@ -3701,6 +3702,14 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
+    // Details grow out of the composer and shrink back into it, for groups and direct messages alike.
+    val detailsMorph =
+        rememberChatDetailsMorph(
+            showDetails = showDetails,
+            ownerKey = controller to appState.runtimeGeneration,
+            motionEnabled = surfaceMotionEnabled && !routeTransitionInProgress && !routePresentationFrozen,
+            composerBounds = { composerSendMotion.sourceSurface?.takeIf { it.isAttached }?.boundsInWindow() },
+        )
     // One motion owner for the transcript and both full-screen routes, so Back animates the return.
     val transcriptRouteMotion =
         rememberRouteMotionModifier(
@@ -3708,7 +3717,7 @@ internal fun ConversationScreen(
             depth = if (transcriptRoutedAway) 1 else 0,
             ownerKey = controller to appState.runtimeGeneration,
             animationsEnabled = surfaceMotionEnabled,
-            suppressMotion = routeTransitionInProgress || routePresentationFrozen,
+            suppressMotion = routeTransitionInProgress || routePresentationFrozen || detailsMorph.active,
         )
     if (transcriptRoutedAway) {
         if (showDetails) {
@@ -3719,31 +3728,37 @@ internal fun ConversationScreen(
                     appState = appState,
                     controller = controller,
                     onBack = {
-                        showDetails = false
-                        openAddMemberOnDetails = false
+                        detailsMorph.close {
+                            showDetails = false
+                            openAddMemberOnDetails = false
+                        }
                     },
                     onLeft = exitConversation,
                     onJumpToMessage = { messageId ->
-                        showDetails = false
-                        scrollToSearchMatch(messageId)
+                        detailsMorph.close {
+                            showDetails = false
+                            scrollToSearchMatch(messageId)
+                        }
                     },
                     autoOpenAddMember = openAddMemberOnDetails,
                     onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
                     onOpenSearch = {
-                        showDetails = false
-                        presentationState.searchState.value =
-                            conversationSearchPreset(
-                                conversationAccountRef,
-                                appState.runtimeGeneration,
-                                chat.id,
-                                controller.title(groupTitleCopy),
-                            )
-                        navigationState.searchOpen = true
+                        detailsMorph.close {
+                            showDetails = false
+                            presentationState.searchState.value =
+                                conversationSearchPreset(
+                                    conversationAccountRef,
+                                    appState.runtimeGeneration,
+                                    chat.id,
+                                    controller.title(groupTitleCopy),
+                                )
+                            navigationState.searchOpen = true
+                        }
                     },
                     onStartGroupWithPeer = onStartGroupWithPeer,
                 )
             }
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) { groupDetailsRoute() }
+            Box(Modifier.fillMaxSize().then(detailsMorph.modifier).then(transcriptRouteMotion)) { groupDetailsRoute() }
         } else {
             // The same full-screen editor as Settings; Back returns to this conversation.
             Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) {
@@ -3994,6 +4009,7 @@ internal fun ConversationScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .then(detailsMorph.modifier)
                     .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                     .dismissTextSelectionOnOutsideTap(

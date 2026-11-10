@@ -31,9 +31,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.dp
@@ -58,6 +56,7 @@ internal class MeasuredControlHandoff(
     private var originSurface: ControlMorphSurface? = null
     private var originRadius = 0f
     private var originDecorationAlpha = 0f
+    private var boundsStartFraction by mutableStateOf(0f)
     private var request: Any? = null
     private var prepared = false
     private var enteringFromLauncher = false
@@ -122,7 +121,7 @@ internal class MeasuredControlHandoff(
         key: Any,
         surface: ControlMorphSurface,
     ) {
-        if (surfaces[key] != surface) surfaces[key] = surface
+        surfaces[key] = surface
     }
 
     /** An input gesture immediately exposes the settled, authoritative endpoint. */
@@ -162,6 +161,7 @@ internal class MeasuredControlHandoff(
         originDecorationAlpha =
             if (active) renderedDecorationAlpha else surfaces[source]?.decorationAlpha ?: 0f
         retirement = null
+        boundsStartFraction = 0f
         originSurface = surfaces[source]
         previous = destination
         enabled = allowed
@@ -228,7 +228,10 @@ internal class MeasuredControlHandoff(
         get() =
             start?.let { from ->
                 (if (morphSurface) targetBounds ?: end else end)?.let { to ->
-                    lerp(from, to, if (morphSurface) fraction else progress.value)
+                    val remaining = 1f - boundsStartFraction
+                    val boundsFraction =
+                        if (remaining > 0f) ((fraction - boundsStartFraction) / remaining).coerceIn(0f, 1f) else 1f
+                    lerp(from, to, if (morphSurface) boundsFraction else progress.value)
                 }
             }
 
@@ -237,9 +240,6 @@ internal class MeasuredControlHandoff(
 
     /** A subtle outline leaves the authoritative live control readable and immediately usable. */
     val opacity: Float get() = (1f - progress.value) * 0.55f
-
-    /** A running morph whose target endpoint may still move under it. */
-    private val followingTarget: Boolean get() = active && !awaitingFrame
 
     /** Reports measured window bounds; zero-sized or clipped endpoints cannot admit a handoff. */
     fun report(
@@ -250,18 +250,18 @@ internal class MeasuredControlHandoff(
         val positiveSize = bounds.width > 0f && bounds.height > 0f
         val finiteOrigin = bounds.left.isFinite() && bounds.top.isFinite()
         if (positiveSize && finiteOrigin) {
-            val movedFrom = live[key]?.second?.takeIf { key == previous && it != bounds }
-            if (followingTarget && movedFrom != null) {
-                val from = start
-                if (followMovingTarget && fraction < 1f && from != null) {
-                    // The in-flight shape rides the same page slide or inset change as its target, so it
-                    // neither trails the moving endpoint nor restarts the clock, and lands on it exactly.
-                    start = from.carriedBy(movedFrom, bounds)
+            val movingTarget = active && !awaitingFrame && key == previous
+            val moved = live[key]?.second?.let { it != bounds } == true
+            if (movingTarget && moved) {
+                if (followMovingTarget && fraction < 1f) {
+                    // Follow composer insets without restarting the clock or jumping to its new placement.
+                    start = renderedBounds
+                    boundsStartFraction = fraction
                 } else {
                     finish()
                 }
             }
-            if (live[key]?.let { it.first !== token || it.second != bounds } != false) live[key] = token to bounds
+            live[key] = token to bounds
         } else {
             remove(key, token)
         }
@@ -326,51 +326,25 @@ internal fun rememberMeasuredControlHandoff(
         MeasuredControlHandoff(destination, morphSurface, followMovingTarget)
     }
 
-/**
- * Measures the actual endpoint without changing its size, focus, hit target or semantics. A clipped
- * endpoint normally cannot admit a handoff; with [clipToVisible] a tall section scrolled partly out of
- * its viewport reports only its on-screen part, so the morph lands on what the user can see.
- */
+/** Measures the actual endpoint without changing its size, focus, hit target or semantics. */
 @Composable
 internal fun Modifier.controlHandoffEndpoint(
     state: MeasuredControlHandoff?,
     key: Any,
-    clipToVisible: Boolean = false,
-    followLayerMotion: Boolean = false,
 ): Modifier {
     val token = remember(state, key) { Any() }
     DisposableEffect(state, key, token) { onDispose { state?.remove(key, token) } }
-    val measure: (LayoutCoordinates) -> Unit = {
-        state?.report(key, token, endpointBounds(it, clipToVisible, followLayerMotion))
-    }
-    // A page slide moves endpoints with a layer transform, which does not place them again.
-    return if (followLayerMotion) onGloballyPositioned(measure) else onPlaced(measure)
-}
-
-/**
- * Reports the whole endpoint, its visible part with [clipToVisible], or nothing for a clipped endpoint.
- * With [followLayerMotion] a sideways page slide past the window edge only moves the endpoint, so
- * clipping is judged vertically, where a scrolling container hides part of it.
- */
-private fun endpointBounds(
-    coordinates: LayoutCoordinates,
-    clipToVisible: Boolean,
-    followLayerMotion: Boolean,
-): Rect {
-    val raw = Rect(coordinates.positionInWindow(), coordinates.size.toSize())
-    val visible = coordinates.boundsInWindow()
-
-    fun same(
-        a: Float,
-        b: Float,
-    ) = kotlin.math.abs(a - b) < SAME_EDGE_TOLERANCE_PX
-    val unclippedX = followLayerMotion || (same(raw.left, visible.left) && same(raw.right, visible.right))
-    val unclippedY = same(raw.top, visible.top) && same(raw.bottom, visible.bottom)
-    return when {
-        unclippedX && unclippedY -> raw
-        clipToVisible && followLayerMotion -> Rect(raw.left, visible.top, raw.right, visible.bottom)
-        clipToVisible -> visible
-        else -> Rect.Zero
+    return onPlaced {
+        val raw = Rect(it.positionInWindow(), it.size.toSize())
+        val visible = it.boundsInWindow()
+        val unclippedStart =
+            kotlin.math.abs(raw.left - visible.left) < 0.5f &&
+                kotlin.math.abs(raw.top - visible.top) < 0.5f
+        val unclippedEnd =
+            kotlin.math.abs(raw.right - visible.right) < 0.5f &&
+                kotlin.math.abs(raw.bottom - visible.bottom) < 0.5f
+        val whole = unclippedStart && unclippedEnd
+        state?.report(key, token, if (whole) raw else Rect.Zero)
     }
 }
 
@@ -443,7 +417,6 @@ internal fun Modifier.controlMorphSurface(
     key: Any,
     artwork: ControlMorphSurface,
     nativeChromeSettled: Boolean,
-    clipToVisible: Boolean = false,
 ): Modifier {
     val fill = artwork.fill
     val retirementToken = state?.retirementToken
@@ -453,10 +426,9 @@ internal fun Modifier.controlMorphSurface(
         if (nativeChromeSettled) state?.acknowledgeRetirement(retirementToken, key)
     }
     var bounds by remember(state, key) { mutableStateOf(Rect.Zero) }
-    return controlHandoffEndpoint(state, key, clipToVisible, followLayerMotion = true)
-        .onGloballyPositioned {
-            // The local draw origin follows the page slide with the reported target.
-            bounds = Rect(it.positionInWindow(), it.size.toSize())
+    return controlHandoffEndpoint(state, key)
+        .onPlaced {
+            bounds = it.boundsInWindow()
             state?.reportSurface(key, artwork)
         }.onPreviewKeyEvent {
             state?.finish()
@@ -486,22 +458,7 @@ internal fun Modifier.controlMorphSurface(
         }
 }
 
-/** Moves a shape by the same edge offsets its endpoint moved from [before] to [after]. */
-private fun Rect.carriedBy(
-    before: Rect,
-    after: Rect,
-): Rect =
-    Rect(
-        left + after.left - before.left,
-        top + after.top - before.top,
-        right + after.right - before.right,
-        bottom + after.bottom - before.bottom,
-    )
-
 private const val CONTROL_MORPH_MILLIS = 200
-
-/** Sub-pixel rounding between layout and window bounds is not a clip. */
-private const val SAME_EDGE_TOLERANCE_PX = 0.5f
 
 /** Outgoing route pixels have no live controls or editor semantics. */
 internal val LocalControlHandoffEndpointCurrent = staticCompositionLocalOf { true }
