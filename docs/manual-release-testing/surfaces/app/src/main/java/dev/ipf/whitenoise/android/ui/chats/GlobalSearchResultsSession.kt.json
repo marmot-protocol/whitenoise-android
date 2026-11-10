@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsSession.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "Message search results label the account's own messages as You.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsSession.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "FIND-018"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

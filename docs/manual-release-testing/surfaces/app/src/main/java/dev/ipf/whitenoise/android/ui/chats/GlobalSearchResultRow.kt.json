@@ -28,6 +28,56 @@
           "FIND-018"
         ]
       }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Paginated message search results: attachment type audio.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "R.string.attachment_type_audio",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Paginated message search results: attachment type file.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "R.string.attachment_type_file",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Paginated message search results: attachment type image.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "R.string.attachment_type_image",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Paginated message search results: attachment type video.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "R.string.attachment_type_video",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Paginated message search results: go to message.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "R.string.go_to_message",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Paginated message search results: library sender in chat.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultRow.kt",
+        "anchor": "R.string.library_sender_in_chat",
+        "test_ids": [
+          "FIND-018"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

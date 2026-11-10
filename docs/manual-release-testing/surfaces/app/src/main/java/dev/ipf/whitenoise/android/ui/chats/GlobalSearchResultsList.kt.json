@@ -91,6 +91,30 @@
         "test_ids": [
           "FIND-018"
         ]
+      },
+      {
+        "surface": "Paginated message search results: chat rows no results detail.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.chat_rows_no_results_detail",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Paginated message search results: no results.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.no_results",
+        "test_ids": [
+          "FIND-018"
+        ]
+      },
+      {
+        "surface": "Paginated message search results: retry.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchResultsList.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "FIND-018"
+        ]
       }
     ]
   },
