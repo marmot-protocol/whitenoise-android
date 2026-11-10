@@ -61,7 +61,12 @@ internal class PendingChatDeparture(
     val reviewItems = items.toList()
     val targets =
         items.distinctBy { it.group.groupIdHex.lowercase() }.map {
-            ChatDepartureTarget(it.group.groupIdHex, chatListItemDisplayTitle(it, appState, titleCopy), it.isDm())
+            ChatDepartureTarget(
+                it.group.groupIdHex,
+                chatListItemDisplayTitle(it, appState, titleCopy),
+                it.isDm(),
+                forgetsDm = it.isDm() && it.offersLocalAbandonment(),
+            )
         }
     val abandonmentTargets: List<GroupAbandonmentTarget> =
         controller.accountRef
@@ -147,6 +152,7 @@ internal fun ChatDepartureBatchDialog(
         ChatDepartureReview(
             abandonmentTargets = request.abandonmentTargets.takeIf { request.abandon },
             targetCount = request.targets.size,
+            forgetsDm = request.targets.any { it.forgetsDm },
             actionLabel = actionLabel,
             onConfirm = { start(request.targets) },
             onDismiss = actions.onDismiss,
@@ -196,7 +202,8 @@ private fun PendingChatDeparture.actionLabel(): Int =
 /**
  * The confirmation before anything is submitted. An abandonment, given its [abandonmentTargets], uses the shared review
  * that names every chat and the acting account (#3282), and closes instead when it was captured without an account. A
- * departure, with null targets, keeps its handover-aware confirmation for [targetCount] chats.
+ * departure, with null targets, keeps its handover-aware confirmation for [targetCount] chats, adding what forgetting a
+ * direct chat means when [forgetsDm].
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -208,6 +215,7 @@ internal fun ChatDepartureReview(
     onDismiss: () -> Unit,
     identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
+    forgetsDm: Boolean = false,
 ) {
     if (abandonmentTargets != null) {
         // Never review an abandonment without its acting account and chats, captured with the request.
@@ -225,7 +233,9 @@ internal fun ChatDepartureReview(
     } else {
         ConfirmDialog(
             title = actionLabel,
-            message = stringResource(R.string.chat_departure_confirm, targetCount),
+            message =
+                stringResource(R.string.chat_departure_confirm, targetCount) +
+                    if (forgetsDm) " " + stringResource(R.string.chat_departure_forget_dm) else "",
             confirmLabel = actionLabel,
             identity = identity,
             confirmEnabled = confirmEnabled,
@@ -241,7 +251,7 @@ internal fun ChatDepartureReview(
  * delete (#3310), and a departure prepares and confirms any handover before it leaves, pausing its step budget while
  * [questionOpen] reports a group-change question about one of the departing chats.
  */
-private fun departureCallbacks(
+internal fun departureCallbacks(
     request: PendingChatDeparture,
     controller: ChatsController,
     ui: ChatDepartureUi,
@@ -289,6 +299,7 @@ private suspend fun removeChatDepartureTarget(
                 controller.deleteGroupLocalFromChatList(
                     target.groupId,
                     notify = false,
+                    forgetProtocol = target.forgetsDm,
                     observer =
                         LocalChatDeleteObserver(onCleanupDeferred = {
                             deferred = true

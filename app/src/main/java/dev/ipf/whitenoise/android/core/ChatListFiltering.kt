@@ -21,7 +21,6 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.Lud16Resolver
 import dev.ipf.whitenoise.android.core.MentionComposer
-import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.MessageDebugCategory
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageDebugStyle
@@ -84,18 +83,21 @@ internal data class ChatListSearchCandidate<T>(
     val description: String,
 )
 
+/**
+ * The chat rows a search shows: identifier, title and metadata matches in that order. Matching messages are not
+ * chat rows; they are paged separately as message results (#1944).
+ */
 internal data class ChatListSearchSections<T>(
     val groups: List<T>,
-    val messages: List<T>,
 ) {
-    fun orderedItems(): List<T> = groups + messages
+    /** The rows in display order. */
+    fun orderedItems(): List<T> = groups
 }
 
 private enum class ChatListSynchronousSearchMatch {
     IDENTIFIER,
     TITLE,
     METADATA,
-    MESSAGE,
     NONE,
 }
 
@@ -105,7 +107,6 @@ private val ChatListSynchronousSearchMatch.priority: Int
             ChatListSynchronousSearchMatch.IDENTIFIER -> 4
             ChatListSynchronousSearchMatch.TITLE -> 3
             ChatListSynchronousSearchMatch.METADATA -> 2
-            ChatListSynchronousSearchMatch.MESSAGE -> 1
             ChatListSynchronousSearchMatch.NONE -> 0
         }
 
@@ -127,19 +128,18 @@ private fun <T> ChatListSearchCandidate<T>.synchronousMatch(ciNeedle: String): C
 }
 
 /**
- * Classifies candidates by title, metadata or body match (the strongest wins per canonical id) into groups and
- * messages.
+ * Classifies candidates by identifier, title or metadata match, the strongest winning per canonical id. With
+ * [messageOnly] — a sender, date or content filter, which only messages can satisfy — only a copied group
+ * identifier still lists its chat.
  */
 internal fun <T> projectChatListSearchCandidates(
     candidates: List<ChatListSearchCandidate<T>>,
     rawQuery: String,
-    bodyMatchGroupIds: Set<String> = emptySet(),
     folderChatIds: Set<String>? = null,
     messageOnly: Boolean = false,
 ): ChatListSearchSections<T> {
     val ciNeedle = localeInvariantFold(rawQuery.trim())
     val canonicalFolderIds = folderChatIds?.mapTo(mutableSetOf(), ::canonicalChatListGroupId)
-    val canonicalBodyIds = bodyMatchGroupIds.mapTo(mutableSetOf(), ::canonicalChatListGroupId)
     val classifiedById = linkedMapOf<String, Pair<T, ChatListSynchronousSearchMatch>>()
 
     candidates.forEach { candidate ->
@@ -150,14 +150,7 @@ internal fun <T> projectChatListSearchCandidates(
         val match =
             when {
                 synchronousMatch == ChatListSynchronousSearchMatch.IDENTIFIER -> synchronousMatch
-                messageOnly ->
-                    if (canonicalId in canonicalBodyIds) {
-                        ChatListSynchronousSearchMatch.MESSAGE
-                    } else {
-                        ChatListSynchronousSearchMatch.NONE
-                    }
-                synchronousMatch == ChatListSynchronousSearchMatch.NONE && canonicalId in canonicalBodyIds ->
-                    ChatListSynchronousSearchMatch.MESSAGE
+                messageOnly -> ChatListSynchronousSearchMatch.NONE
                 else -> synchronousMatch
             }
         val previous = classifiedById[canonicalId]
@@ -176,10 +169,6 @@ internal fun <T> projectChatListSearchCandidates(
                 classifiedById.values
                     .filter { it.second == ChatListSynchronousSearchMatch.METADATA }
                     .map(Pair<T, ChatListSynchronousSearchMatch>::first),
-        messages =
-            classifiedById.values
-                .filter { it.second == ChatListSynchronousSearchMatch.MESSAGE }
-                .map(Pair<T, ChatListSynchronousSearchMatch>::first),
     )
 }
 
@@ -189,10 +178,9 @@ internal fun projectChatListSearchSections(
     rawQuery: String,
     appState: WhiteNoiseAppState,
     titleCopy: GroupTitleCopy,
-    bodyMatchGroupIds: Set<String> = emptySet(),
     folderChatIds: Set<String>? = null,
     // The prototype hides plain chat rows while a sender / date / content
-    // filter is active: only chats with a matching message remain, as messages.
+    // filter is active: the matching messages are listed as message results.
     messageOnly: Boolean = false,
 ): ChatListSearchSections<ChatListItem> {
     if (rawQuery.trim().isEmpty() && !messageOnly) {
@@ -203,7 +191,7 @@ internal fun projectChatListSearchSections(
             } else {
                 source.filter { canonicalChatListGroupId(it.group.groupIdHex) in canonicalFolderIds }
             }
-        return ChatListSearchSections(groups = folderItems, messages = emptyList())
+        return ChatListSearchSections(groups = folderItems)
     }
 
     return projectChatListSearchCandidates(
@@ -219,25 +207,17 @@ internal fun projectChatListSearchSections(
                 )
             },
         rawQuery = rawQuery,
-        bodyMatchGroupIds = bodyMatchGroupIds,
         folderChatIds = folderChatIds,
         messageOnly = messageOnly,
     )
 }
 
-internal fun canonicalChatListBodyMatches(matches: Map<String, MessageBodyMatch>): Map<String, MessageBodyMatch> =
-    buildMap {
-        matches.forEach { (groupId, match) ->
-            putIfAbsent(canonicalChatListGroupId(groupId), match)
-        }
-    }
-
+/** The chat rows a search and folder scope leave visible, in display order. */
 internal fun applyChatListSearchAndFilter(
     source: List<ChatListItem>,
     rawQuery: String,
     appState: WhiteNoiseAppState,
     titleCopy: GroupTitleCopy,
-    bodyMatchGroupIds: Set<String> = emptySet(),
     // Non-null when a folder chip is selected: the effective chat ids
     // (lowercased, manual plus rule matches) that folder contains. Every
     // folder — seeded defaults included — filters through this one path.
@@ -248,6 +228,5 @@ internal fun applyChatListSearchAndFilter(
         rawQuery = rawQuery,
         appState = appState,
         titleCopy = titleCopy,
-        bodyMatchGroupIds = bodyMatchGroupIds,
         folderChatIds = folderChatIds,
     ).orderedItems()

@@ -102,14 +102,6 @@
         ]
       },
       {
-        "surface": "chat abandon action",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.chat_abandon_action",
-        "test_ids": [
-          "GRP-033"
-        ]
-      },
-      {
         "surface": "chat abandon dialog title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
         "anchor": "R.string.chat_abandon_dialog_title",
@@ -153,14 +145,6 @@
         "surface": "abandon identity account",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
         "anchor": "R.string.abandon_identity_account",
-        "test_ids": [
-          "GRP-033"
-        ]
-      },
-      {
-        "surface": "toast couldnt abandon chat",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.toast_couldnt_abandon_chat",
         "test_ids": [
           "GRP-033"
         ]
@@ -286,6 +270,33 @@
         "test_ids": [
           "GRP-010",
           "GRP-033"
+        ]
+      },
+      {
+        "surface": "direct chat delete action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.delete_from_device",
+        "test_ids": [
+          "GRP-033",
+          "CHL-035"
+        ]
+      },
+      {
+        "surface": "direct chat delete confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.delete_group_confirm",
+        "test_ids": [
+          "GRP-033",
+          "CHL-035"
+        ]
+      },
+      {
+        "surface": "direct chat delete failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
+        "anchor": "R.string.toast_couldnt_delete_chat",
+        "test_ids": [
+          "GRP-033",
+          "CHL-035"
         ]
       }
     ]

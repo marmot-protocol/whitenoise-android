@@ -115,11 +115,11 @@ internal fun abandonmentAccount(
     activeAccount: String?,
 ): String? = conversationAccount?.takeIf { it == activeAccount }
 
-/** The one label for MDK's local forget: abandoning a direct chat, or resetting a group to await a new invite. */
+/** The one label for MDK's local forget: a direct chat's Delete from this device, or a group reset for a new invite. */
 @StringRes
 internal fun groupAbandonmentActionLabel(isDm: Boolean): Int =
     when {
-        isDm -> R.string.chat_abandon_action
+        isDm -> R.string.delete_from_device
         else -> R.string.group_reset_action
     }
 
@@ -135,7 +135,7 @@ internal fun groupAbandonmentBatchLabel(dmFlags: Collection<Boolean>): Int =
     }
 
 /**
- * Group Details entry for MDK 0.10.0's local forget (#3310): a direct chat is abandoned on this device and a group
+ * Group Details entry for MDK 0.10.0's local forget (#3310): a direct chat is deleted from this device and a group
  * is reset to wait for a Welcome created after the reset. It is deliberately separate from leaving, which tells the
  * other members, and from the ordinary local delete, which keeps receiving. Opening it only asks for confirmation.
  */
@@ -225,7 +225,8 @@ internal fun GroupAbandonmentReviewDialog(
     val confirmLabel =
         when {
             failed -> R.string.retry
-            targets.size > 1 || anyDm -> R.string.chat_abandon_confirm
+            targets.size > 1 -> R.string.chat_abandon_confirm
+            anyDm -> R.string.delete_group_confirm
             else -> R.string.group_reset_confirm
         }
     WhiteNoiseAlertDialog(
@@ -307,7 +308,7 @@ private fun GroupAbandonmentFailure(
         ) {
             Icon(Icons.Default.ErrorOutline, contentDescription = null)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val summary = if (isDm) R.string.toast_couldnt_abandon_chat else R.string.toast_couldnt_reset_group
+                val summary = if (isDm) R.string.toast_couldnt_delete_chat else R.string.toast_couldnt_reset_group
                 Text(stringResource(summary), style = MaterialTheme.typography.bodySmall)
                 if (error != null) {
                     SelectionContainer(Modifier.testTag("group.abandon.error.detail")) {

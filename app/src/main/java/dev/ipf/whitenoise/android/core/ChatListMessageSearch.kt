@@ -5,18 +5,13 @@ import dev.ipf.whitenoise.android.search.GlobalSearchEpochBounds
 import java.util.Locale
 
 /**
- * Pure logic for the chat-list message-body search (issue #290).
+ * Pure logic for message search (issues #290 and #1944): which locally stored timeline records are searchable
+ * plaintext, whether a record satisfies the needle and the sender, date and content filters, and the snippet with
+ * its highlight range that shows *why* a message matched.
  *
- * The chat-list search field (PR #128) matched only on the row's title and
- * last-message preview. This object adds the message-body half: classifying
- * which locally-persisted timeline records are searchable plaintext, picking
- * the snippet to surface under a matched row, and computing the highlight
- * range so the user can see *why* a chat appeared in the results.
- *
- * No Marmot/FFI, Android, or Compose types are referenced here on purpose --
- * everything is plain Kotlin so it can be unit-tested directly. The
- * controller feeds it `(kind, plaintext, deleted)` triples read from the
- * `timelineMessages` FFI search query; the UI consumes [MessageBodyMatch].
+ * No Marmot/FFI, Android, or Compose types are referenced here on purpose -- everything is plain Kotlin so it can
+ * be unit-tested directly. Global message results and in-chat search feed it records read from the
+ * `timelineMessages` FFI query.
  */
 object ChatListMessageSearch {
     // Kinds whose plaintext body is user-authored conversation text and is
@@ -26,6 +21,9 @@ object ChatListMessageSearch {
     // group-system events (1210) -- is excluded so search never matches on
     // machine-authored content or raw JSON the user never typed.
     private val SearchableBodyKinds: Set<ULong> = setOf(1uL, 9uL, 1209uL)
+
+    /** Whether records of [kind] are user-authored conversation text that search can list. */
+    fun isSearchableKind(kind: ULong): Boolean = kind in SearchableBodyKinds
 
     /**
      * Whether a timeline record's body is eligible to match a chat-list
@@ -55,33 +53,7 @@ object ChatListMessageSearch {
     }
 
     /**
-     * Whether a row's match is fully explained by its title, last-message
-     * preview, or group description (the synchronous match the chat-list
-     * filter already performs). When true, the body-match snippet line and
-     * tap-to-message focus must be suppressed: the issue/PR contract restricts
-     * the secondary snippet and scroll-to-message tap-through to rows that
-     * matched *only* on an older message body, so a chat surfacing on its
-     * title/preview/description keeps the normal single-line row and a normal
-     * conversation open. Tokenized identically to the title/preview/description
-     * match in `applyChatListSearchAndFilter` (lowercase + substring
-     * containment). `description` defaults to empty so existing callers that
-     * predate the description-search extension (#388) keep their behaviour.
-     */
-    fun titleOrPreviewMatches(
-        displayTitle: String,
-        previewText: String,
-        ciNeedle: String,
-        description: String = "",
-    ): Boolean =
-        ciNeedle.isNotEmpty() &&
-            (
-                displayTitle.lowercase(Locale.ROOT).contains(ciNeedle) ||
-                    previewText.lowercase(Locale.ROOT).contains(ciNeedle) ||
-                    description.lowercase(Locale.ROOT).contains(ciNeedle)
-            )
-
-    /**
-     * Build the snippet to show under a matched chat row. Centers a window of
+     * Build the snippet to show under a matched message. Centers a window of
      * up to [maxLength] characters on the first occurrence of the needle so
      * the match is visible even in a long message, collapsing internal
      * whitespace/newlines to single spaces (a chat-list row is single-line).
@@ -183,27 +155,6 @@ object ChatListMessageSearch {
     }
 
     /**
-     * The first record in [records] (engine order, newest-first) that is both
-     * an eligible searchable body ([isSearchableBody]) and contains the needle
-     * ([bodyMatches]). Returns null when none qualify.
-     *
-     * This is the per-page selection used by the chat-list body search. The
-     * engine's `search` field pre-filters to needle-matching rows but cannot
-     * filter by kind/deleted, so a page can be full of excluded rows
-     * (reactions, deletes, kind:1210 system events) ahead of an eligible body.
-     * Critically, selection scans the *entire* list — it does not stop at the
-     * page-size cap — so an older eligible body that sits behind several newer
-     * excluded hits in the same page is still found, and the caller's backward
-     * paging continues across pages until one surfaces (issue #290).
-     * Without a needle (filters only) any searchable body or attachment-bearing chat message is eligible.
-     */
-    fun firstEligibleBodyMatch(
-        records: List<SearchableRecord>,
-        ciNeedle: String,
-        constraints: MessageSearchConstraints? = null,
-    ): SearchableRecord? = records.firstOrNull { record -> isEligibleMatch(record, ciNeedle, constraints) }
-
-    /**
      * A row counts when it is a searchable body kind, satisfies the needle (or carries content without one) and
      * the filters.
      */
@@ -259,24 +210,6 @@ data class SnippetHighlight(
     val text: String,
     val highlightStart: Int,
     val highlightEnd: Int,
-)
-
-/**
- * The chat-list search result for a chat that matched on a message *body*
- * (not its title or preview). Carries the matched message so the row can
- * render the highlighted snippet and tap-through can scroll to it.
- */
-data class MessageBodyMatch(
-    val groupIdHex: String,
-    val messageIdHex: String,
-    val snippet: SnippetHighlight,
-    /**
-     * Timeline timestamp (unix seconds) of the matched message — *not* the
-     * chat's last-message time. A body-match row surfaces this so its
-     * timestamp points at the message the search actually found, which can be
-     * far older than the conversation's latest activity (#594).
-     */
-    val timelineAt: ULong,
 )
 
 /**

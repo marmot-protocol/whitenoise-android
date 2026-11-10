@@ -253,27 +253,37 @@ internal fun rememberGlobalAttachmentPager(
     return pager
 }
 
-/** Subscribes before probing so a change during the first read is not lost; any chat of the account counts. */
-private suspend fun observeLibraryChanges(
+/**
+ * Subscribes before probing so a change during the first read is not lost; any chat of the account counts. Global
+ * message results (#1944) pass a narrower [touched] that wakes only for changes that can alter their rows. Returns
+ * whether the subscription opened at all, so a caller can stop retrying a runtime that offers none. [wakeOnOpen]
+ * is asked once the subscription call returns; when it says no, the opening probe is skipped, for a caller whose
+ * pending read will see current data anyway.
+ */
+internal suspend fun observeLibraryChanges(
     runtime: MarmotInterface,
     account: String,
     wakeups: Channel<Unit>,
-) = withContext(Dispatchers.IO) {
-    val subscription = runCatchingCancellable { runtime.subscribeEvents() }.getOrNull()
-    try {
-        wakeups.send(Unit)
-        if (subscription != null) {
-            runCatchingCancellable {
-                while (true) {
-                    val event = subscription.next() ?: break
-                    if (libraryProjectionTouched(event, account)) wakeups.send(Unit)
+    touched: (MarmotEventFfi) -> Boolean = { libraryProjectionTouched(it, account) },
+    wakeOnOpen: () -> Boolean = { true },
+): Boolean =
+    withContext(Dispatchers.IO) {
+        val subscription = runCatchingCancellable { runtime.subscribeEvents() }.getOrNull()
+        try {
+            if (wakeOnOpen()) wakeups.send(Unit)
+            if (subscription != null) {
+                runCatchingCancellable {
+                    while (true) {
+                        val event = subscription.next() ?: break
+                        if (touched(event)) wakeups.send(Unit)
+                    }
                 }
             }
+        } finally {
+            subscription?.let { withContext(NonCancellable) { runCatching { it.destroy() } } }
         }
-    } finally {
-        subscription?.let { withContext(NonCancellable) { runCatching { it.destroy() } } }
+        subscription != null
     }
-}
 
 /**
  * The chats the library can name and open (#2000). The chat list holds only a bounded window of rows, active
@@ -285,12 +295,24 @@ internal fun rememberLibraryChats(
     controller: ChatsController,
     entries: List<AccountAttachmentEntryFfi>,
 ): List<ChatListItem> {
+    val groupIds = remember(entries) { entries.mapTo(HashSet()) { it.groupIdHex } }
+    return rememberSearchChats(controller, groupIds)
+}
+
+/**
+ * The chats a search surface lists results from — the chat-list window plus every listed chat outside it, each
+ * resolved from MDK once per chat per account. Global message results (#1944) and the library share it.
+ */
+@Composable
+internal fun rememberSearchChats(
+    controller: ChatsController,
+    groupIds: Set<String>,
+): List<ChatListItem> {
     val window = remember(controller.items, controller.archivedItems) { controller.items + controller.archivedItems }
     val known = remember(window) { window.mapTo(HashSet()) { it.group.groupIdHex.lowercase(Locale.ROOT) } }
     val resolved = remember(controller.boundAccountRef) { mutableStateMapOf<String, ChatListItem>() }
     // Keyed on the listed chats outside the window only, so a finished lookup never cancels the next one.
-    val outside =
-        remember(entries, known) { entries.mapTo(HashSet()) { it.groupIdHex.lowercase(Locale.ROOT) } - known }
+    val outside = remember(groupIds, known) { groupIds.mapTo(HashSet()) { it.lowercase(Locale.ROOT) } - known }
     LaunchedEffect(outside) {
         // A lookup can miss while the chat list is changing underneath it, so the misses are tried again.
         repeat(LIBRARY_CHAT_LOOKUP_ATTEMPTS) { attempt ->

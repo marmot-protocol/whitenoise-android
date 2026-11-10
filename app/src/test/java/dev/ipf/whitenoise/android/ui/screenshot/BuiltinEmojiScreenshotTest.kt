@@ -7,7 +7,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -22,12 +21,13 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
-import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
-import dev.ipf.whitenoise.android.ui.chats.ChatRow
 import dev.ipf.whitenoise.android.ui.chats.ChatRowPortFixtures
 import dev.ipf.whitenoise.android.ui.chats.ChatRowPreviewLine
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchResult
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchResultPresentation
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchResultRow
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderSelectablePlainText
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -52,32 +52,40 @@ class BuiltinEmojiScreenshotTest {
 
     @Test fun largeFontRtl() = capture(Variant.LargeRtl)
 
+    /** A search result row renders emoji shortcodes in its snippet beside the highlight. */
     @Test fun searchLight() = captureSearch(Variant.Light)
 
     @Test fun searchDark() = captureSearch(Variant.Dark)
 
     @Test fun searchLargeRtl() = captureSearch(Variant.LargeRtl)
 
+    /** Captures a global search result whose snippet mixes emoji shortcodes with the highlighted match. */
     private fun captureSearch(mode: Variant) {
         val rtl = mode == Variant.LargeRtl
         val body = ":marmot: matching :wn:"
         val start = body.indexOf("matching")
         val match =
-            MessageBodyMatch(
-                "g1",
-                "emoji-search",
-                SnippetHighlight(body, start, start + "matching".length),
-                (System.currentTimeMillis() / 1000).toULong(),
+            GlobalSearchResultPresentation(
+                result =
+                    GlobalSearchResult(
+                        groupIdHex = "g1",
+                        messageIdHex = "emoji-search",
+                        senderIdHex = ChatRowPortFixtures.ACCOUNT_HEX,
+                        timelineAt = 1uL,
+                        snippet = SnippetHighlight(body, start, start + "matching".length),
+                    ),
+                senderLabel = "Alice",
+                chatTitle = "Hiking crew",
+                timeLabel = "10:42",
             )
         composeRule.setContent {
-            val state = ChatRowPortFixtures.state(LocalContext.current)
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, if (rtl) 1.6f else 1f),
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = mode == Variant.Dark) {
                     Surface(Modifier.width(360.dp).testTag("emoji-search")) {
-                        ChatRow(ChatRowPortFixtures.item(), state, onClick = {}, onOpenProfile = {}, bodyMatch = match)
+                        GlobalSearchResultRow(match, onOpen = {})
                     }
                 }
             }

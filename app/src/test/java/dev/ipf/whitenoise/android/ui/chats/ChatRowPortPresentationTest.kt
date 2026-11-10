@@ -11,8 +11,6 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.MessageBodyMatch
-import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -28,30 +26,6 @@ import org.robolectric.annotation.Config
 class ChatRowPortPresentationTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
-
-    /** A body hit replaces the latest preview and displays the matched message's own timestamp. */
-    @Test fun bodyMatchKeepsItsOwnPreviewAndTimestamp() {
-        val item =
-            ChatRowPortFixtures.item().let { original ->
-                original.copy(
-                    projection =
-                        requireNotNull(original.projection).copy(
-                            lastMessage = requireNotNull(original.projection?.lastMessage).copy(timelineAt = 1uL),
-                        ),
-                )
-            }
-        val match =
-            MessageBodyMatch(
-                "g1",
-                "match-id",
-                SnippetHighlight("The matching words", 4, 12),
-                (System.currentTimeMillis() / 1000).toULong(),
-            )
-        render(item, match)
-        composeRule.onNodeWithText("The matching words").assertExists()
-        composeRule.onNodeWithText(ChatRowPortFixtures.PREVIEW).assertDoesNotExist()
-        composeRule.onNodeWithText(context.getString(R.string.relative_time_now)).assertExists()
-    }
 
     /** Removed membership suppresses the old unread alert while keeping its precise accessibility description. */
     @Test fun removedRowRetainsRemovalMeaningAndSuppressesUnread() {
@@ -114,14 +88,13 @@ class ChatRowPortPresentationTest {
     /** Composes the surface under test with the given fixture. */
     private fun render(
         item: ChatListItem,
-        bodyMatch: MessageBodyMatch? = null,
         muted: Boolean = false,
     ) {
         val state = ChatRowPortFixtures.state(context)
         composeRule.setContent {
             WhiteNoiseTheme {
                 Column(Modifier.fillMaxWidth()) {
-                    ChatRow(item, state, onClick = {}, onOpenProfile = {}, isMuted = muted, bodyMatch = bodyMatch)
+                    ChatRow(item, state, onClick = {}, onOpenProfile = {}, isMuted = muted)
                 }
             }
         }

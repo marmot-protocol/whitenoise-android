@@ -8,7 +8,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingControlStack.kt",
         "anchor": "fun FloatingControlVisibility(",
         "test_ids": [
-          "CHL-035",
+          "CHL-036",
           "NAV-012"
         ]
       },
@@ -18,7 +18,7 @@
         "anchor": "fun Modifier.floatingDictationCapsuleClearance(",
         "test_ids": [
           "DIC-002",
-          "CHL-035",
+          "CHL-036",
           "NAV-012"
         ]
       }

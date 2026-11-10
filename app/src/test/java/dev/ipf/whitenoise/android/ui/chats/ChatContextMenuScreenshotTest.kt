@@ -67,18 +67,23 @@ class ChatContextMenuScreenshotTest {
     @Config(sdk = [36], qualifiers = "en-w640dp-h300dp-land-mdpi")
     fun shortLandscapeLargeRtl() = capture("chat_context_menu_landscape_rtl_200", rtl = true)
 
-    /** #3310: a group whose leave is still queued keeps the reset action, since that leave may never finish. */
+    /**
+     * #3310: a group whose leave is still queued keeps the reset action, since that leave may never finish, and offers
+     * no history-only delete, which the group's next message would undo.
+     */
     @Test
     fun queuedLeaveKeepsTheResetAction() =
         withOpenMenu(leavePending = true) {
             composeRule.onNodeWithTag("chat.action.Abandon", useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithTag("chat.action.Delete", useUnmergedTree = true).assertDoesNotExist()
         }
 
-    /** A group this account has confirmed it left has nothing to reset, so its menu omits the action. */
+    /** A group this account has confirmed it left has nothing to reset, so its menu offers only the local delete. */
     @Test
     fun confirmedLeftGroupOffersNoResetAction() =
         withOpenMenu(left = true) {
             composeRule.onNodeWithTag("chat.action.Abandon", useUnmergedTree = true).assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.action.Delete", useUnmergedTree = true).assertExists()
         }
 
     /** Renders the fixture and records its screenshot baseline. */
