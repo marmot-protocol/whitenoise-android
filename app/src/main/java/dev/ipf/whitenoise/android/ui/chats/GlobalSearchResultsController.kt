@@ -56,6 +56,18 @@ internal class GlobalSearchResultsController(
 
     private var job: Job? = null
     private var closed = false
+
+    /**
+     * The loaded rows were last read before this session was detached from the screen, so a message deleted,
+     * hidden or expired meanwhile may still be among them. The screen shows none of them until the first recheck
+     * after the return lands; the holder sets it on detach (#1945).
+     */
+    var stale by mutableStateOf(false)
+
+    /** The recheck of a [stale] session failed, so its unverified rows stay hidden behind a Retry. */
+    var recheckFailed by mutableStateOf(false)
+        private set
+
     private var refreshPending = false
     private var loadPending = false
 
@@ -71,6 +83,8 @@ internal class GlobalSearchResultsController(
         job?.cancel()
         refreshPending = false
         loadPending = false
+        stale = false
+        recheckFailed = false
         query = next
         val restarted = GlobalSearchResultsReducer.restart(state)
         // A scope with no chats cannot match, so it ends at once instead of reading the whole account.
@@ -81,8 +95,15 @@ internal class GlobalSearchResultsController(
     /** Reads the next bounded batch unless one is in flight or MDK reported the end. */
     fun loadMore() = read(debounceMillis = 0L)
 
-    /** Reads the failed batch again from the cursor it stopped at; loaded rows stay. */
-    fun retry() = loadMore()
+    /** Rechecks a [stale] session again, or reads the failed batch again from its cursor; loaded rows stay. */
+    fun retry() {
+        if (stale) {
+            recheckFailed = false
+            refresh()
+        } else {
+            loadMore()
+        }
+    }
 
     /**
      * Rechecks the loaded rows after a change that can delete, expire, hide or add a match: a projection update,
@@ -135,13 +156,20 @@ internal class GlobalSearchResultsController(
                 try {
                     if (debounceMillis > 0L) delay(debounceMillis)
                     val next = withContext(environment.ioDispatcher) { complete(current, request, refreshBudget) }
-                    if (accepts(current)) state = next(state)
+                    if (accepts(current)) {
+                        state = next(state)
+                        // A landed recheck verified every row the screen will show.
+                        if (request.refresh) stale = false
+                    }
                 } catch (cancel: CancellationException) {
                     if (accepts(current)) state = GlobalSearchResultsReducer.cancel(state, request)
                     throw cancel
                 } catch (_: Exception) {
                     // The failure kind is the whole outcome; the message never reaches the screen.
-                    if (accepts(current)) state = failed(state, request)
+                    if (accepts(current)) {
+                        state = failed(state, request)
+                        if (request.refresh && stale) recheckFailed = true
+                    }
                 }
                 if (accepts(current)) continueAfter()
             }
@@ -222,6 +250,11 @@ internal class GlobalSearchResultsHolder {
         held = created
         scope = sessionScope
         return created
+    }
+
+    /** Marks the held session [GlobalSearchResultsController.stale] when the chat list leaves composition. */
+    fun detach() {
+        held?.takeIf { it.state.batches > 0 }?.stale = true
     }
 
     /** Closes the held session and cancels its work. */
@@ -407,3 +440,16 @@ internal fun shouldProbeAfterFirstPage(state: GlobalSearchResultsState): Boolean
 
 /** The most batches one refresh rereads, about a thousand raw rows. */
 internal const val GLOBAL_SEARCH_REFRESH_MAX_BATCHES = 5
+
+/**
+ * What the screen may show of this session for the [asked] query: nothing until the session adopted the query, nothing
+ * while a held session's rows await their first recheck after a return, and a failure boundary with no rows when
+ * that recheck failed — never rows that were not verified since the reader came back (#1945).
+ */
+internal fun GlobalSearchResultsController.shownState(asked: GlobalSearchResultsQuery): GlobalSearchResultsState? =
+    when {
+        query != asked -> null
+        recheckFailed -> GlobalSearchResultsState(generation = state.generation, batches = 1, failed = true)
+        stale -> null
+        else -> state
+    }

@@ -103,10 +103,11 @@ internal data class GlobalSearchResetOwners(
 )
 
 /**
- * Shell-lived search viewport state. Coordinates and ids are kept for the library, whose extent is a row count for
- * one query so a return rereads that far instead of keeping pages. Global message results (#1945) instead keep
- * their session in [messageResults] while the chat list is away, so Back restores loaded pages without reading
- * them again; it is scoped to this shell's account and runtime and closed with it.
+ * Shell-lived search viewport state: list and grid coordinates, the selected result, and the library's extent, a
+ * row count for one query so a return rereads that far instead of keeping pages. Global message results (#1945)
+ * are the exception that retains message rows: their session stays in [messageResults] while the chat list is
+ * away, keeping the loaded pages and cursor, and on Back its rows stay hidden until one recheck confirms them. It
+ * is scoped to this shell's account and runtime and closed with it.
  */
 internal class GlobalSearchViewport(
     private val active: LazyListState,

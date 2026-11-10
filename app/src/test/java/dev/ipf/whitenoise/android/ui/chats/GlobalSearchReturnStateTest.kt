@@ -60,6 +60,59 @@ class GlobalSearchReturnStateTest {
         holder.close()
     }
 
+    /** A row deleted while the reader was in the opened chat never shows on Back: rows wait for the recheck. */
+    @Test
+    fun deletedRowNeverShowsOnBackBeforeItsRecheck() {
+        val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(store, scope) }
+        session.search(query)
+        idleMain()
+        holder.detach()
+        store.replace("m1") { it.copy(deleted = true) }
+
+        val returned = holder.obtain(ACCOUNT_A) { scope -> controller(store, scope) }
+        assertEquals("unverified rows are not presented", null, returned.shownState(query))
+        returned.refresh()
+        idleMain()
+
+        val shown = requireNotNull(returned.shownState(query)).results.map { it.key }
+        assertEquals(listOf("g:m2", "g:m0"), shown)
+        holder.close()
+    }
+
+    /** A failed recheck after Back shows a failure boundary with no rows, and Retry rechecks again. */
+    @Test
+    fun failedRecheckShowsNoUnverifiedRowsAndRetries() {
+        var failing = false
+        val store = StoreReader((0 until 2).map { record("g", "m$it", at = 100uL + it.toULong()) })
+        val reader =
+            GlobalSearchTimelineReader { query ->
+                check(!failing) { "local read failed" }
+                store.page(query)
+            }
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        session.search(query)
+        idleMain()
+        holder.detach()
+        failing = true
+
+        session.refresh()
+        idleMain()
+        val failed = requireNotNull(session.shownState(query))
+        assertTrue(failed.failed)
+        assertTrue("no unverified row is shown", failed.results.isEmpty())
+
+        failing = false
+        session.retry()
+        idleMain()
+        assertEquals(listOf("g:m1", "g:m0"), requireNotNull(session.shownState(query)).results.map { it.key })
+        holder.close()
+    }
+
     /** An account or runtime switch replaces the held session, and the old one can no longer publish. */
     @Test
     fun accountSwitchReplacesTheHeldSession() {
@@ -162,9 +215,9 @@ class GlobalSearchReturnStateTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    /** A session over [store] on [scope], reading on an immediate dispatcher. */
+    /** A session reading [store] on [scope], with an immediate dispatcher. */
     private fun controller(
-        store: StoreReader,
+        store: GlobalSearchTimelineReader,
         scope: CoroutineScope,
     ) = GlobalSearchResultsController(
         reader = store,

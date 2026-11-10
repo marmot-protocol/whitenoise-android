@@ -63,6 +63,8 @@ internal fun rememberGlobalSearchResults(
     val started = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
     if (started) GlobalSearchResultsRecheckEffects(appState, active, controller)
     LaunchedEffect(controller, query) { controller.search(query, debounceMillis = CHAT_LIST_SEARCH_DEBOUNCE_MS) }
+    // A return to a held session rechecks its rows at once, without the lifecycle wakeup's coalescing delay.
+    LaunchedEffect(controller) { if (controller.stale) controller.refresh() }
     return controller
 }
 
@@ -79,7 +81,9 @@ private fun rememberHeldOrLocalSession(
     val localScope = rememberCoroutineScope()
     val controller =
         remember(holder, owner) { holder?.obtain(owner, create) ?: create(localScope) }
-    DisposableEffect(controller) { onDispose { if (holder == null) controller.close() } }
+    DisposableEffect(controller, holder) {
+        onDispose { if (holder == null) controller.close() else holder.detach() }
+    }
     return controller
 }
 
@@ -152,7 +156,8 @@ private fun GlobalSearchResultsRecheckEffects(
     // real block change, or a return to a screen whose rows may be stale.
     val firstLaunch = remember(controller) { booleanArrayOf(true) }
     LaunchedEffect(controller, appState.runtimeMirrors.blocks.users) {
-        val initialProbe = firstLaunch[0] && controller.state.batches == 0
+        // A return to a held session already rechecks at once, so its first launch is not another probe.
+        val initialProbe = firstLaunch[0] && (controller.state.batches == 0 || controller.stale)
         firstLaunch[0] = false
         if (!initialProbe) wakeups.send(Unit)
     }
