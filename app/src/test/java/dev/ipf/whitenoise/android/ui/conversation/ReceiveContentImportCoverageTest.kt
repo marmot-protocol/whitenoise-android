@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
@@ -23,6 +24,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,6 +45,9 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ReceiveContentImportCoverageTest {
+    @get:Rule
+    val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
+
     // Robolectric builds the test instance before it sets up this test's application, so anything bound to the
     // application is resolved lazily from inside the test.
     private val context by lazy { ApplicationProvider.getApplicationContext<Context>() }
@@ -117,7 +122,7 @@ class ReceiveContentImportCoverageTest {
         var current = true
 
         importDrop(listOf(dropUri(1)), isCurrent = { current })
-        assertTrue("copy never started", provider.openEntered.await(WAIT_SECONDS, TimeUnit.SECONDS))
+        awaitCopyStarted()
         current = false
         provider.openGate.countDown()
         pumpMainUntil { !dropImport.isImporting }
@@ -158,7 +163,7 @@ class ReceiveContentImportCoverageTest {
         provider.openGate = CountDownLatch(1)
 
         importDrop(listOf(dropUri(1), dropUri(2)), maxItems = 2)
-        assertTrue("copy never started", provider.openEntered.await(WAIT_SECONDS, TimeUnit.SECONDS))
+        awaitCopyStarted()
         importDrop(listOf(dropUri(3)), maxItems = 2)
         pumpMainUntil { delivered.isNotEmpty() }
 
@@ -178,7 +183,7 @@ class ReceiveContentImportCoverageTest {
         var staged = 0
 
         importDrop(listOf(dropUri(1), dropUri(2)), maxItems = 2, stagedCount = { staged })
-        assertTrue("copy never started", provider.openEntered.await(WAIT_SECONDS, TimeUnit.SECONDS))
+        awaitCopyStarted()
         staged = 1
         provider.openGate.countDown()
         pumpMainUntil { !dropImport.isImporting }
@@ -211,6 +216,9 @@ class ReceiveContentImportCoverageTest {
         stagedCount: () -> Int = { 0 },
         isCurrent: () -> Boolean = { true },
     ) = dropImport.import(uris, maxItems, stagedCount, isCurrent) { delivered += it }
+
+    /** The copy starts only after the main thread admits the batch, so the main looper runs while it waits. */
+    private fun awaitCopyStarted() = pumpMainUntil { provider.openEntered.count == 0L }
 
     private fun pumpMainUntil(condition: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_SECONDS)
