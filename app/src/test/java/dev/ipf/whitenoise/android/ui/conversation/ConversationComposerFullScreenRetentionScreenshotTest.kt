@@ -190,7 +190,8 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
     fun speakerOffStopsPausedManualSpeechInThisConversation() = assertManualSpeakerStop(paused = true, sameGroup = true)
 
     @Test
-    fun speakerOffPreservesManualSpeechInAnotherConversation() = assertManualSpeakerStop(paused = false, sameGroup = false)
+    fun speakerOffPreservesManualSpeechInAnotherConversation() =
+        assertManualSpeakerStop(paused = false, sameGroup = false)
 
     private fun assertManualSpeakerStop(
         paused: Boolean,
@@ -203,7 +204,8 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         mountConversation(appState, chat)
         try {
             composeRule.runOnIdle {
-                assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("manual", "Sender", "Manual playback.")), Locale.US))
+                val entries = listOf(TtsSpeakableEntry("manual", "Sender", "Manual playback."))
+                assertTrue(appState.speakAloud(entries, Locale.US))
                 appState.ttsHistorySession.onConversationSessionStarted(ACCOUNT_A, if (sameGroup) GROUP_A else GROUP_B)
                 if (paused) appState.ttsController.pause()
             }

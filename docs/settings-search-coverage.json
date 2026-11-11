@@ -289,6 +289,10 @@
           "represented_by": "TextToSpeech.auto_read"
         },
         {
+          "declaration": "\"composer_shortcut\"",
+          "represented_by": "TextToSpeech.composer_shortcut"
+        },
+        {
           "declaration": "\"engine\"",
           "represented_by": "TextToSpeech.engine"
         },
