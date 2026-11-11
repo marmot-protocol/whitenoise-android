@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.group
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
@@ -33,6 +35,7 @@ import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.robolectric.Shadows.shadowOf
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -47,6 +50,9 @@ internal class GroupEditGifFixture {
     val firstGroup = "04" + "00".repeat(31)
     val secondGroup = "05" + "00".repeat(31)
     val uploads = AtomicInteger()
+
+    /** The MIME type of each admitted upload, in order. */
+    val uploadMimeTypes: MutableList<String> = CopyOnWriteArrayList()
     val registry = GifDocumentRegistry()
     val mounted = mutableStateOf(true)
     val entered = CountDownLatch(1)
@@ -80,14 +86,17 @@ internal class GroupEditGifFixture {
     fun uri(
         name: String,
         hold: Boolean = false,
+        still: Boolean = false,
     ): Uri {
-        val uri = Uri.parse("content://whitenoise.synthetic/gif-editor/$name.gif")
+        val extension = if (still) "png" else "gif"
+        val uri = Uri.parse("content://whitenoise.synthetic/gif-editor/$name.$extension")
+        val bytes = if (still) stillPng() else twoFrameGif()
         shadowOf(context.contentResolver).registerInputStreamSupplier(uri) {
             if (hold) {
                 entered.countDown()
                 check(release.await(5, TimeUnit.SECONDS)) { "Held document was not released" }
             }
-            object : ByteArrayInputStream(twoFrameGif()) {
+            object : ByteArrayInputStream(bytes) {
                 override fun close() {
                     super.close()
                     closedStreams.incrementAndGet()
@@ -95,6 +104,15 @@ internal class GroupEditGifFixture {
             }
         }
         return uri
+    }
+
+    /** A decodable still image, which goes through the crop editor rather than straight to upload. */
+    private fun stillPng(): ByteArray {
+        val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        return ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
+        }
     }
 
     /** Release held provider I/O before retiring fixture-owned jobs and controllers. */
@@ -112,7 +130,7 @@ internal class GroupEditGifFixture {
             when (method.name) {
                 "uploadProfileImage" -> {
                     assertEquals(account, args!![0])
-                    assertEquals("image/gif", args[2])
+                    uploadMimeTypes += args[2] as String
                     uploads.incrementAndGet()
                     error("Synthetic upload refusal after admission")
                 }

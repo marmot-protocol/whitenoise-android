@@ -46,6 +46,31 @@ class LocalGroupNameAuthorityTest {
         assertEquals("Three", authority.reconcile(GROUP, "Two"))
     }
 
+    /** Renaming back to an earlier name lets the agreeing snapshot retire the record (#3703). */
+    @Test
+    fun renamingBackToAnEarlierNameRetiresOnAgreement() {
+        val authority = LocalGroupNameAuthority()
+        authority.record(GROUP, previousName = "A", committedName = "B")
+        authority.record(GROUP, previousName = "B", committedName = "A")
+
+        assertNull(authority.retainedFor(GROUP, "A"))
+        assertEquals("A", authority.reconcile(GROUP, "B"))
+        assertEquals("A", authority.reconcile(GROUP, "A"))
+        assertEquals("B", authority.reconcile(GROUP, "B"))
+    }
+
+    /** A rename made elsewhere after the cycle settles is not overwritten by a stale local commit. */
+    @Test
+    fun laterRemoteRenameWinsAfterACycleSettles() {
+        val authority = LocalGroupNameAuthority()
+        authority.record(GROUP, previousName = "A", committedName = "B")
+        authority.record(GROUP, previousName = "B", committedName = "A")
+
+        assertEquals("A", authority.reconcile(GROUP, "A"))
+        assertNull(authority.retainedFor(GROUP, "B"))
+        assertEquals("B", authority.reconcile(GROUP, "B"))
+    }
+
     /** A commit that does not change the name installs nothing. */
     @Test
     fun unchangedNameIsNotRecorded() {

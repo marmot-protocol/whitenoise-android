@@ -320,8 +320,6 @@
     <string name="dismiss">Fermer</string>
     <string name="edit">Modifier</string>
     <string name="edit_group_info_title">Modifier le groupe</string>
-    <string name="group_private_image">Photo privée du groupe</string>
-    <string name="group_private_image_detail">Visible par les membres du groupe.</string>
     <string name="group_description">Description (facultatif)</string>
     <string name="save_group">Enregistrer le groupe</string>
     <string name="saving_group">Enregistrement du groupe...</string>

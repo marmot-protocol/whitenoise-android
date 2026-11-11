@@ -10,7 +10,8 @@ import java.util.Locale
  * The names one locally committed rename installed and replaced.
  *
  * [superseded] accumulates every name this group has been renamed away from since the engine last
- * agreed, so a burst of renames still recognises a snapshot carrying any of the older values.
+ * agreed, so a burst of renames still recognises a snapshot carrying any of the older values. It
+ * never contains [committed] itself.
  */
 private data class LocalGroupNameCommit(
     val committed: String,
@@ -49,7 +50,9 @@ internal class LocalGroupNameAuthority {
         if (previousName == committedName) return
         val existing = commitsByGroup[key]
         val carried = existing?.superseded.orEmpty() + setOfNotNull(existing?.committed)
-        commitsByGroup[key] = LocalGroupNameCommit(committedName, carried + previousName)
+        // Renaming back to an earlier name must not leave that name marked superseded, or the
+        // snapshot that agrees with the new commit would be read as stale and never retire it.
+        commitsByGroup[key] = LocalGroupNameCommit(committedName, carried + previousName - committedName)
     }
 
     /** The name [groupIdHex] should display given an authoritative [incomingName]. */
@@ -109,10 +112,15 @@ internal fun LocalGroupNameAuthority.reconciledPresentation(
     return presentation.withLocalGroupTitle(retained)
 }
 
-/** [presentation] carrying [name] as its literal title. */
+/** [presentation] carrying [name] as its literal title, or the unnamed-group title once cleared. */
 internal fun ConversationPresentationFfi.withLocalGroupTitle(name: String): ConversationPresentationFfi {
-    val literal = PresentationTextFfi.Literal(name)
-    return copy(title = literal)
+    val title =
+        if (name.isBlank()) {
+            PresentationTextFfi.UnnamedGroup(memberCount = null)
+        } else {
+            PresentationTextFfi.Literal(name)
+        }
+    return copy(title = title)
 }
 
 /** [record] with the newest locally committed name applied; the same instance when nothing changed. */

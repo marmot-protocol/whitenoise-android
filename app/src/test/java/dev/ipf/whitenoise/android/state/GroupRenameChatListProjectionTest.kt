@@ -254,6 +254,45 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
+    /** Clearing the name drops the old title from the row, search and sort, even against a stale snapshot. */
+    @Test
+    fun clearedNameLeavesEveryChatListProjection() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = OLD_NAME))
+            flushChatListRecompute()
+
+            val item = chats.items.single()
+            assertTrue(item.group.name.isBlank())
+            assertEquals(null, item.sanitizedNamedTitle)
+            assertTrue(chatListItemDisplayTitle(item, appState, GroupTitleCopy.Default) != OLD_NAME)
+            assertTrue(
+                applyChatListSearchAndFilter(chats.items, OLD_NAME, appState, GroupTitleCopy.Default).isEmpty(),
+            )
+            chats.onCleared()
+        }
+
+    /** A rejected clear leaves the existing description in place. */
+    @Test
+    fun failedClearLeavesTheDescription() =
+        runBlocking {
+            val appState = testAppState()
+            val conversation =
+                conversationController(
+                    appState,
+                    description = "Weekly plans",
+                    updater = { _, _, _, _ -> error("rejected") },
+                )
+
+            assertFalse(conversation.updateGroupProfile(OLD_NAME, ""))
+
+            assertEquals("Weekly plans", conversation.group.description)
+        }
+
     /** The immediate patch is scoped to the account that renamed the group. */
     @Test
     fun renameDoesNotReachAnotherAccountsChatList() =

@@ -145,21 +145,54 @@
         ]
       },
       {
-        "surface": "string:group_private_image",
+        "surface": "string:group_photo_encrypted_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.group_private_image",
+        "anchor": "R.string.group_photo_encrypted_detail",
         "test_ids": [
           "GRP-001",
           "GRP-025"
         ]
       },
       {
-        "surface": "string:group_private_image_detail",
+        "surface": "string:group_photo_public_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
-        "anchor": "R.string.group_private_image_detail",
+        "anchor": "R.string.group_photo_public_detail",
         "test_ids": [
           "GRP-001",
           "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_photo_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_photo_title",
+        "test_ids": [
+          "GRP-001",
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "string:group_photo_upload_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_photo_upload_confirm",
+        "test_ids": [
+          "GRP-035"
+        ]
+      },
+      {
+        "surface": "string:group_photo_upload_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_photo_upload_notice",
+        "test_ids": [
+          "GRP-035"
+        ]
+      },
+      {
+        "surface": "string:group_photo_upload_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+        "anchor": "R.string.group_photo_upload_title",
+        "test_ids": [
+          "GRP-035"
         ]
       },
       {

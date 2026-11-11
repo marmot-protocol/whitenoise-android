@@ -2946,15 +2946,19 @@ class ChatsController private constructor(
     /**
      * Patches [row] from a locally committed [record].
      *
-     * A rename also moves the prepared row title and the selected presentation the list displays,
-     * searches and sorts by, and is retained against a stale pre-rename snapshot (#2696).
+     * A rename, including clearing the name, also moves the prepared row title and the selected
+     * presentation the list displays, searches and sorts by, and is retained against a stale
+     * pre-rename snapshot (#2696).
      */
     private fun locallyProjectedChatRow(
         rowKey: String,
         row: ChatListRowFfi,
         record: AppGroupRecordFfi,
     ): ChatListRowFfi {
-        val projectedName = record.name.ifBlank { row.groupName }
+        // A blank name clears the profile only when the group was named before; otherwise the record
+        // simply carries no name yet and the row keeps what it already shows.
+        val cleared = record.name.isBlank() && !groupRecordsById[record.groupIdHex]?.name.isNullOrBlank()
+        val projectedName = if (cleared) "" else record.name.ifBlank { row.groupName }
         val renamed = projectedName != row.groupName
         if (renamed) {
             localGroupNames.record(record.groupIdHex, row.groupName, projectedName)
