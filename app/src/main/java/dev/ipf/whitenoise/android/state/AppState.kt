@@ -5284,7 +5284,7 @@ class WhiteNoiseAppState private constructor(
         // Resuming the backlog is a resume-everything signal, and it is the one
         // point where per-file cancel records can be dropped in bulk instead of
         // accumulating for attachments the user never opens again.
-        attachmentDownloadIntents.clearSuppressedAutomatic()
+        attachmentDownloadIntents.clearSuppressedAutomatic(accountRef)
         attachmentDownloadPolicyRevision += 1
     }
 

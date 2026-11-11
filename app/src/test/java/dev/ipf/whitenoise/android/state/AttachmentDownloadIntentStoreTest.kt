@@ -346,16 +346,49 @@ class AttachmentDownloadIntentStoreTest {
     }
 
     @Test
-    fun restartingTheBacklogDropsEveryCancelRecord() {
+    fun restartingOneAccountBacklogKeepsOtherAccountsCancels() {
+        val second = REQUEST_A.copy(attachmentIndex = 1)
         val store = AttachmentDownloadIntentStore(preferences)
         store.suppressAutomatic(REQUEST_A)
+        store.suppressAutomatic(second)
         store.suppressAutomatic(REQUEST_B)
 
-        store.clearSuppressedAutomatic()
+        AttachmentDownloadIntentStore(preferences).clearSuppressedAutomatic(ACCOUNT_A)
 
         val recreated = AttachmentDownloadIntentStore(preferences)
         assertFalse(recreated.isAutomaticSuppressed(REQUEST_A))
-        assertFalse(recreated.isAutomaticSuppressed(REQUEST_B))
+        assertFalse(recreated.isAutomaticSuppressed(second))
+        assertTrue("another account's cancel survives", recreated.isAutomaticSuppressed(REQUEST_B))
+
+        recreated.clearSuppressedAutomatic(ACCOUNT_B)
+        assertFalse(AttachmentDownloadIntentStore(preferences).isAutomaticSuppressed(REQUEST_B))
+    }
+
+    @Test
+    fun restoredCancelIsNotResurrectedOrClearedByALaterAccountRestart() {
+        val store = AttachmentDownloadIntentStore(preferences)
+        store.suppressAutomatic(REQUEST_A)
+        store.restoreAutomatic(REQUEST_A)
+        store.suppressAutomatic(REQUEST_B)
+
+        store.clearSuppressedAutomatic(ACCOUNT_A)
+
+        assertFalse(store.isAutomaticSuppressed(REQUEST_A))
+        assertTrue(store.isAutomaticSuppressed(REQUEST_B))
+    }
+
+    @Test
+    fun cancelRecordedWithoutAnOwnerSurvivesAccountRestart() {
+        AttachmentDownloadIntentStore(preferences).suppressAutomatic(REQUEST_A)
+        preferences.edit().remove(CANCELLED_OWNERS_KEY).commit()
+
+        val upgraded = AttachmentDownloadIntentStore(preferences)
+        upgraded.clearSuppressedAutomatic(ACCOUNT_A)
+
+        assertTrue(
+            "an unowned cancel cannot be attributed to the resumed account",
+            AttachmentDownloadIntentStore(preferences).isAutomaticSuppressed(REQUEST_A),
+        )
     }
 
     @Test
@@ -382,6 +415,7 @@ class AttachmentDownloadIntentStoreTest {
     private companion object {
         const val ACCOUNT_A = "account-a"
         const val ACCOUNT_B = "account-b"
+        const val CANCELLED_OWNERS_KEY = "attachment_download_cancelled_owners"
         val REQUEST_A =
             AttachmentTransferRequest(
                 accountRef = ACCOUNT_A,
