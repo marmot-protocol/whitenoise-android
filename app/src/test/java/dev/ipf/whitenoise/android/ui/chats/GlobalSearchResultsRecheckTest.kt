@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.FakeReader
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.POLL_RESPONSE_KIND
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.StoreReader
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.controller
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.deliver
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.holdingFirstRead
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.keys
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.page
@@ -133,13 +134,14 @@ class GlobalSearchResultsRecheckTest {
 
             assertFalse(controller.isTouchedBy(upsert(listed, TimelineUpdateTriggerFfi.REACTION_ADDED)))
             assertFalse(controller.isTouchedBy(upsert(listed, TimelineUpdateTriggerFfi.RECEIPT_CHANGED)))
-            val deleted = listed.copy(deleted = true)
-            assertTrue(controller.isTouchedBy(upsert(deleted, TimelineUpdateTriggerFfi.MESSAGE_DELETED)))
-            assertTrue(
-                controller.isTouchedBy(
-                    update("g", TimelineMessageChangeFfi.Remove("listed", TimelineRemoveReasonFfi.entries.first())),
-                ),
-            )
+            // A deletion or removal is withdrawn directly (see the revocation gate), so it needs no reread.
+            val deleted = upsert(listed.copy(deleted = true), TimelineUpdateTriggerFfi.MESSAGE_DELETED)
+            assertFalse(controller.isTouchedBy(deleted))
+            assertEquals(setOf("g:listed"), globalSearchRemovedKeys(deleted))
+            val removal =
+                update("g", TimelineMessageChangeFfi.Remove("listed", TimelineRemoveReasonFfi.entries.first()))
+            assertFalse(controller.isTouchedBy(removal))
+            assertEquals(setOf("g:listed"), globalSearchRemovedKeys(removal))
             val other = record("g", "other", at = 6uL, text = "unrelated words")
             assertFalse(controller.isTouchedBy(upsert(other, TimelineUpdateTriggerFfi.NEW_MESSAGE)))
             val match = record("g2", "match", at = 7uL, text = "hello again")
@@ -147,9 +149,9 @@ class GlobalSearchResultsRecheckTest {
             assertFalse(controller.isTouchedBy(upsert(match, TimelineUpdateTriggerFfi.REACTION_ADDED)))
         }
 
-    /** A row deleted while its page is still being read is not left listed: the queued recheck drops it. */
+    /** A row deleted while its page is still being read is withdrawn, so it never lists, without another read. */
     @Test
-    fun deletionDuringAPageReadIsRecheckedAfterIt() =
+    fun deletionDuringAPageReadIsWithdrawnWithoutAReread() =
         runTest {
             val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
             // The first page is read from the store at once, then held, as an IO read in flight would be.
@@ -162,17 +164,17 @@ class GlobalSearchResultsRecheckTest {
             store.replace("m1") { it.copy(deleted = true) }
             val deleted = store.row("m1")
             val change = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, deleted)
-            assertTrue(controller.isTouchedBy(update("g", change)))
-            controller.refresh()
+            assertFalse(controller.deliver(update("g", change)))
             gate.complete(Unit)
             advanceUntilIdle()
 
+            assertEquals(1, store.queries.size)
             assertEquals(listOf("g:m2", "g:m0"), keys(controller))
         }
 
-    /** A removal arriving during the very first page queues a recheck instead of being dropped. */
+    /** A removal arriving during the very first page withdraws the row that page holds instead of being dropped. */
     @Test
-    fun removalDuringTheFirstPageIsQueued() =
+    fun removalDuringTheFirstPageIsWithdrawn() =
         runTest {
             val store = StoreReader((0 until 2).map { record("g", "m$it", at = 100uL + it.toULong()) })
             val (reader, gate) = holdingFirstRead(store)
@@ -183,12 +185,11 @@ class GlobalSearchResultsRecheckTest {
 
             store.replace("m1") { it.copy(deleted = true) }
             val removal = TimelineMessageChangeFfi.Remove("m1", TimelineRemoveReasonFfi.entries.first())
-            assertTrue(controller.isTouchedBy(update("g", removal)))
-            controller.refresh()
+            assertFalse(controller.deliver(update("g", removal)))
             gate.complete(Unit)
             advanceUntilIdle()
 
-            assertEquals(2, store.queries.size)
+            assertEquals(1, store.queries.size)
             assertEquals(listOf("g:m0"), keys(controller))
         }
 
@@ -233,9 +234,9 @@ class GlobalSearchResultsRecheckTest {
             assertEquals(2, reads)
         }
 
-    /** A moderator deletion delivered as a snapshot reprojection of a held row queues a recheck that drops it. */
+    /** A moderator deletion delivered as a snapshot reprojection of a held row withdraws it before it lists. */
     @Test
-    fun snapshotReprojectionDuringAPageReadIsRecheckedAfterIt() =
+    fun snapshotDeletionDuringAPageReadIsWithdrawn() =
         runTest {
             val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
             val (reader, gate) = holdingFirstRead(store)
@@ -245,8 +246,7 @@ class GlobalSearchResultsRecheckTest {
 
             store.replace("m2") { it.copy(deleted = true) }
             val change = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH, store.row("m2"))
-            assertTrue(controller.isTouchedBy(update("g", change)))
-            controller.refresh()
+            assertFalse(controller.deliver(update("g", change)))
             gate.complete(Unit)
             advanceUntilIdle()
 

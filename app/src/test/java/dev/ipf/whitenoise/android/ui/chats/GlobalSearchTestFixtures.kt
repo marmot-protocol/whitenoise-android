@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.chats
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -48,6 +50,19 @@ internal object GlobalSearchTestFixtures {
 
     /** The keys of the loaded results in display order. */
     fun keys(controller: GlobalSearchResultsController) = controller.state.results.map { it.key }
+
+    /**
+     * Delivers [update] for the session's account the way the session's observer does: removed and deleted keys are
+     * withdrawn first, then the answer says whether a recheck is still needed.
+     */
+    fun GlobalSearchResultsController.deliver(update: TimelineProjectionUpdateFfi): Boolean =
+        touchesLoadedRows(
+            MarmotEventFfi.ProjectionUpdated(RuntimeProjectionUpdateFfi("ff".repeat(32), ACCOUNT, update)),
+            ACCOUNT,
+            this,
+        ) { revoke(it) }
+
+    private const val ACCOUNT = "personal"
 
     /** A controller whose batches run as children of the test, with the given local hides, owner check and clock. */
     fun TestScope.controller(

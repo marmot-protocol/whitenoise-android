@@ -4,15 +4,20 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineRemoveReasonFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.NOW_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.StoreReader
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.controller
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.deliver
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.holdingFirstRead
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.keys
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.record
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -88,9 +93,8 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertTrue("the first page is held", controller.state.inFlight != null)
             val removal =
                 update("g", TimelineMessageChangeFfi.Remove("m0299", TimelineRemoveReasonFfi.entries.first()))
-            assertTrue("a removal while a read is held counts", controller.isTouchedBy(removal))
+            assertFalse("withdrawn directly, with no reread", controller.deliver(removal))
 
-            controller.revoke(globalSearchRemovedKeys(removal))
             gate.complete(Unit)
             advanceUntilIdle()
             assertTrue("the held page landed", controller.state.results.isNotEmpty())
@@ -103,17 +107,111 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertFalse("a lagging reread never restores it", "g:m0299" in keys(controller))
         }
 
-    /** Only Remove changes yield keys, each scoped to its group. */
+    /** Only Remove changes and upserts MDK marks deleted yield keys, each scoped to its group. */
     @Test
-    fun removedKeysCoverEveryRemoveAndNothingElse() {
+    fun removedKeysCoverEveryRemoveAndDeletionAndNothingElse() {
+        val edited = TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED
         val removal =
             update(
                 "g",
                 TimelineMessageChangeFfi.Remove("a", TimelineRemoveReasonFfi.entries.first()),
                 TimelineMessageChangeFfi.Remove("b", TimelineRemoveReasonFfi.entries.last()),
+                TimelineMessageChangeFfi.Upsert(
+                    TimelineUpdateTriggerFfi.MESSAGE_DELETED,
+                    record("g", "c", at = 1uL, deleted = true),
+                ),
+                TimelineMessageChangeFfi.Upsert(edited, record("g", "d", at = 1uL)),
             )
-        assertEquals(setOf("g:a", "g:b"), globalSearchRemovedKeys(removal))
+        assertEquals(setOf("g:a", "g:b", "g:c"), globalSearchRemovedKeys(removal))
     }
+
+    /**
+     * A delete for everyone arrives as an upsert MDK marks deleted. Through the session's hand-off it withdraws a
+     * loaded row far below the refresh cap at once, with no reread, and a store that has not caught up cannot
+     * restore it.
+     */
+    @Test
+    fun aDeletedUpsertThroughTheSessionHandOffLeavesAtOnce() =
+        runTest {
+            val store = StoreReader(rows())
+            val controller = controller(store)
+            loadAll(controller)
+            val readsBefore = store.queries.size
+            val deleted = record("g", "m0000", at = 1uL, deleted = true)
+            val change = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, deleted)
+
+            assertFalse("no reread is asked for", controller.deliver(update("g", change)))
+            assertFalse("withdrawn before any reread", "g:m0000" in keys(controller))
+            assertEquals(readsBefore, store.queries.size)
+            repeat(3) {
+                controller.refresh()
+                advanceUntilIdle()
+            }
+            assertFalse("a stale reread never restores it", "g:m0000" in keys(controller))
+        }
+
+    /** The session's deadline wait drops the expired row the moment it expires, without starting a reread. */
+    @Test
+    fun theDeadlineWaitDropsTheExpiredRowWithoutAReread() =
+        runTest {
+            var start: Long? = null
+            val store = StoreReader(rows(expiring = "m0000", expiresAt = NOW_MILLIS / 1_000 + 60))
+            val controller =
+                controller(store, nowMillis = { NOW_MILLIS + (start?.let { testScheduler.currentTime - it } ?: 0L) })
+            loadAll(controller)
+            start = testScheduler.currentTime
+            val readsBefore = store.queries.size
+            val launchesBefore = controller.state.launches
+
+            val waiting = launch { controller.revokeAtDeadline(controller.state.nextExpiry) }
+            advanceTimeBy(59_999)
+            runCurrent()
+            assertTrue("still listed before its deadline", "g:m0000" in keys(controller))
+            advanceTimeBy(2)
+            runCurrent()
+
+            assertFalse("dropped at its deadline", "g:m0000" in keys(controller))
+            assertTrue(waiting.isCompleted)
+            assertEquals("no reread", readsBefore, store.queries.size)
+            assertEquals("no recheck pass", launchesBefore, controller.state.launches)
+        }
+
+    /** While a failed page shows, a change still rereads the newest rows instead of waiting behind the chain. */
+    @Test
+    fun aChangeWhileAPageFailureShowsRereadsTheHead() =
+        runTest {
+            var failNext = false
+            val store =
+                StoreReader((0 until LOADED * 2).map { record("g", "m%04d".format(it), at = (it + 1).toULong()) })
+            val reader =
+                GlobalSearchTimelineReader { query ->
+                    if (failNext) {
+                        failNext = false
+                        error("read failed")
+                    }
+                    store.page(query)
+                }
+            val controller = controller(reader)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            while (controller.state.results.size < LOADED) {
+                controller.loadMore()
+                advanceUntilIdle()
+            }
+            failNext = true
+            controller.loadMore()
+            advanceUntilIdle()
+            assertTrue("the page failure shows", controller.state.failed)
+            controller.refresh()
+            advanceUntilIdle()
+            assertTrue("the capped chain waits for Retry", controller.state.validateFrom != null)
+
+            store.add(record("g", "newest", at = 10_000uL))
+            controller.refresh()
+            advanceUntilIdle()
+            assertEquals("g:newest", keys(controller).first())
+            assertTrue("the failure still shows", controller.state.failed)
+        }
 
     /** A deletion and a local hide far below the cap are reached by chained bounded passes and dropped. */
     @Test

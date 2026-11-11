@@ -23,7 +23,6 @@ import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -142,8 +141,9 @@ internal fun globalSearchResultsContent(
 /**
  * Rechecks loaded rows on the files and media library's triggers, narrowed to what can change them: a projection
  * update that removes, deletes, edits or invalidates a listed row or brings a new match, a block-list change, and
- * the earliest disappearing deadline among the loaded rows. Wakeups coalesce and wait briefly, so a burst of
- * updates costs one bounded reread.
+ * the earliest disappearing deadline among the loaded rows. Removed and deleted rows, and rows past their
+ * deadline, leave at once without a reread. Wakeups coalesce and wait briefly, so a burst of updates costs one
+ * recheck chain.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -193,7 +193,7 @@ private fun GlobalSearchResultsRecheckEffects(
                     runtime = runtime,
                     account = account,
                     wakeups = wakeups,
-                    touched = { event -> touchesLoadedRows(event, account, controller, removals) },
+                    touched = { event -> touchesLoadedRows(event, account, controller) { removals.trySend(it) } },
                     // Asked after the subscription opened. A fresh query skips the probe: in practice its first read
                     // starts only after the 275 ms keystroke debounce, so the subscription is usually open by then,
                     // though nothing orders the two. A session with rows loaded — a return to a held session — wakes,
@@ -205,13 +205,17 @@ private fun GlobalSearchResultsRecheckEffects(
         }
     }
     val expiry = controller.state.nextExpiry
-    LaunchedEffect(controller, expiry) {
-        val deadline = expiry ?: return@LaunchedEffect
-        delay((deadline.toLong() * MILLIS_PER_SECOND - controller.environment.nowMillis()).coerceAtLeast(0L))
-        // The expired row leaves at once; the coalesced recheck that follows rereads the rest.
-        controller.revoke()
-        wakeups.send(Unit)
-    }
+    LaunchedEffect(controller, expiry) { controller.revokeAtDeadline(expiry) }
+}
+
+/**
+ * Waits for [deadline], the earliest disappearing deadline among the loaded rows, then drops every row past it.
+ * An expiry changes no other row, so it never starts a reread.
+ */
+internal suspend fun GlobalSearchResultsController.revokeAtDeadline(deadline: ULong?) {
+    if (deadline == null) return
+    delay((deadline.toLong() * MILLIS_PER_SECOND - environment.nowMillis()).coerceAtLeast(0L))
+    revoke()
 }
 
 private const val GLOBAL_SEARCH_RECHECK_COALESCE_MS = 750L
@@ -221,25 +225,30 @@ private const val MILLIS_PER_SECOND = 1_000L
 
 /**
  * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Every key it
- * removes goes to [removals] first, so a loaded row leaves before the recheck lands and a held one never lists.
+ * removes or deletes goes to [withdraw] first, so a loaded row leaves before the recheck lands and a held one never
+ * lists.
  */
-private fun touchesLoadedRows(
+internal fun touchesLoadedRows(
     event: MarmotEventFfi,
     account: String,
     controller: GlobalSearchResultsController,
-    removals: SendChannel<Set<String>>,
+    withdraw: (Set<String>) -> Unit,
 ): Boolean {
     val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update?.takeIf { it.accountLabel == account }
     val removed = update?.let { globalSearchRemovedKeys(it.update) }.orEmpty()
-    if (removed.isNotEmpty()) removals.trySend(removed)
+    if (removed.isNotEmpty()) withdraw(removed)
     return update != null && controller.isTouchedBy(update.update)
 }
 
 /**
- * Result keys of every message [update] removes, loaded or not. Reads no list state, so it is safe on the event
- * thread; a removed message never returns, so withdrawing a key no row holds is harmless.
+ * Result keys of every message [update] removes or reports deleted by MDK's own deleted flag (a delete for
+ * everyone arrives as an upsert), loaded or not. Reads no list state, so it is safe on the event thread; a removed
+ * or deleted message never returns, so withdrawing a key no row holds is harmless.
  */
 internal fun globalSearchRemovedKeys(update: TimelineProjectionUpdateFfi): Set<String> =
-    update.changes
-        .filterIsInstance<TimelineMessageChangeFfi.Remove>()
-        .mapTo(HashSet()) { globalSearchKey(update.groupIdHex, it.messageIdHex) }
+    update.changes.mapNotNullTo(HashSet()) { change ->
+        when (change) {
+            is TimelineMessageChangeFfi.Remove -> change.messageIdHex
+            is TimelineMessageChangeFfi.Upsert -> change.message.messageIdHex.takeIf { change.message.deleted }
+        }?.let { globalSearchKey(update.groupIdHex, it) }
+    }

@@ -121,11 +121,11 @@ internal class GlobalSearchResultsController(
 
     /**
      * Rechecks the loaded rows after a change that can delete, expire, hide or add a match: a projection update,
-     * a block change or a disappearing deadline. Rows past their disappearing deadline drop at once. It then
+     * a block change or a return to the screen. Rows past their disappearing deadline drop at once. It then
      * rereads the loaded range from the head within a bounded budget and replaces rows in place; a capped reread
-     * continues in further bounded passes until every loaded row was rechecked. A request while anything is in
-     * flight, the first page included, runs once that read ends, since the read may already hold a row the change
-     * affects.
+     * continues in further bounded passes until every loaded row was rechecked. While a failed page shows, those
+     * passes pause until Retry, so each change rereads the head instead. A request while anything is in flight, the
+     * first page included, runs once that read ends, since the read may already hold a row the change affects.
      */
     fun refresh() {
         if (query == null || closed) return
@@ -133,7 +133,7 @@ internal class GlobalSearchResultsController(
         // Anything in flight, the first page included, may already hold a row a later change affects.
         if (state.inFlight != null) {
             refreshPending = true
-        } else if (state.validateFrom != null && !stale) {
+        } else if (state.validateFrom != null && !stale && !state.failed) {
             // Finish covering the older rows first, so a busy account cannot keep the recheck at the head.
             headOwed = true
             recheck(continuing = true)
@@ -482,13 +482,13 @@ private val GLOBAL_SEARCH_EXISTING_ROW_TRIGGERS =
     )
 
 /**
- * Whether a timeline projection update can change what this session lists: the removal of a loaded row, a
- * deletion, edit, send-state or snapshot change of one, or a new or edited message the query would now admit.
- * Reactions, receipts and activity elsewhere never cause a reread, so a busy account does not keep rereading.
- * While a page or refresh is in flight it may hold rows that are not listed yet, so a removal, or a deletion, edit,
- * snapshot reprojection or invalidation of an in-scope row of a searchable kind, also counts then. Other kinds
- * (poll responses, reports) never sit in a held read, and a new message counts only when the query admits it,
- * so a refresh never queues another one for unrelated traffic.
+ * Whether a timeline projection update can change what this session lists: an edit, send-state or snapshot change
+ * of a loaded row, or a new or edited message the query would now admit. Reactions, receipts and activity elsewhere
+ * never cause a reread, so a busy account does not keep rereading. A removed or deleted message never counts: its
+ * key is withdrawn directly, loaded or held by a read, so it needs no reread. While a page or refresh is in flight
+ * it may hold rows that are not listed yet, so an edit, snapshot reprojection or invalidation of an in-scope row of
+ * a searchable kind also counts then. Other kinds (poll responses, reports) never sit in a held read, and a new
+ * message counts only when the query admits it, so a refresh never queues another one for unrelated traffic.
  */
 internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectionUpdateFfi): Boolean {
     val current = query ?: return false
@@ -496,10 +496,10 @@ internal fun GlobalSearchResultsController.isTouchedBy(update: TimelineProjectio
     val heldByRead = state.inFlight != null && current.coversGroup(update.groupIdHex)
     return update.changes.any { change ->
         when (change) {
-            is TimelineMessageChangeFfi.Remove ->
-                heldByRead || globalSearchKey(update.groupIdHex, change.messageIdHex) in loaded
+            is TimelineMessageChangeFfi.Remove -> false
             is TimelineMessageChangeFfi.Upsert ->
                 when {
+                    change.message.deleted -> false
                     globalSearchKey(update.groupIdHex, change.message.messageIdHex) in loaded ->
                         change.trigger !in GLOBAL_SEARCH_INERT_TRIGGERS
                     heldByRead && change.rewritesExistingRow() -> true
@@ -529,8 +529,8 @@ private fun TimelineMessageChangeFfi.Upsert.rewritesExistingRow(): Boolean {
 
 /**
  * Batches one refresh may read: enough for [loadedRows] at the batch target plus the empty-batch allowance, capped
- * at [GLOBAL_SEARCH_REFRESH_MAX_BATCHES] so a long scrolled session stays cheap. Rows below where a capped refresh
- * stopped keep their previous state and are rechecked by a later refresh.
+ * at [GLOBAL_SEARCH_REFRESH_MAX_BATCHES] so each pass stays bounded. Where a capped pass stopped, the next pass
+ * continues once it lands, until every loaded row was rechecked.
  */
 internal fun refreshBatchBudget(loadedRows: Int): Int {
     val wanted = loadedRows / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES
