@@ -11,7 +11,6 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.chatRow
-import dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,7 +63,9 @@ class GlobalSearchScopeCoverageTest {
     /** Groups scopes the message search to every group, including off-window ones, and never a direct chat. */
     @Test fun groupsFilterScopesMessageSearchToCompleteGroups() {
         val model = prepared()
-        openSearch(GlobalSearchState(isOpen = true, query = "hello", chatTypeFilters = setOf(GlobalSearchChatType.GROUPS)))
+        openSearch(
+            GlobalSearchState(isOpen = true, query = "hello", chatTypeFilters = setOf(GlobalSearchChatType.GROUPS)),
+        )
         awaitReads { scopedGroups(model).size >= 3 }
         assertEquals(setOf(ACTION_TARGET, ACTION_SURVIVOR, GROUP_EXTRA), scopedGroups(model))
     }
@@ -72,7 +73,9 @@ class GlobalSearchScopeCoverageTest {
     /** Direct scopes the message search to the off-window direct chat. */
     @Test fun directFilterScopesMessageSearchToCompleteDirectChats() {
         val model = prepared()
-        openSearch(GlobalSearchState(isOpen = true, query = "hello", chatTypeFilters = setOf(GlobalSearchChatType.DIRECT)))
+        openSearch(
+            GlobalSearchState(isOpen = true, query = "hello", chatTypeFilters = setOf(GlobalSearchChatType.DIRECT)),
+        )
         awaitReads { scopedGroups(model).isNotEmpty() }
         assertEquals(setOf(DIRECT_EXTRA), scopedGroups(model))
     }
@@ -90,13 +93,14 @@ class GlobalSearchScopeCoverageTest {
     /** Explicitly chosen chats stay in scope, whether in the snapshot or in no row at all. */
     @Test fun explicitlySelectedChatsAreNeverDropped() {
         val model = prepared()
-        val chosen = setOf(GlobalSearchChatFilter(ACTION_TARGET, "Target"), GlobalSearchChatFilter(EVICTED_CHAT, "Evicted"))
+        val chosen =
+            setOf(GlobalSearchChatFilter(ACTION_TARGET, "Target"), GlobalSearchChatFilter(EVICTED_CHAT, "Evicted"))
         openSearch(GlobalSearchState(isOpen = true, query = "hello", chatFilters = chosen))
         awaitReads { scopedGroups(model).size >= 2 }
         assertEquals(setOf(ACTION_TARGET, EVICTED_CHAT), scopedGroups(model))
     }
 
-    /** An unready folder scope shows loading, never No Results or a window-only search, then resolves. */
+    /** An unready folder scope shows the results boundary progress, never No Results or a window-only search. */
     @Test fun notReadyScopeShowsLoadingThenResolvesOnTheNextRevision() {
         val model = prepared()
         var ready = false
@@ -112,7 +116,7 @@ class GlobalSearchScopeCoverageTest {
             rule.waitForIdle()
         }
         assertTrue("no query may run on an unproven scope", model.timelineQueries.isEmpty())
-        rule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertExists()
+        rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
         assertTrue(
             rule.onAllNodesWithText(rule.activity.getString(R.string.no_results)).fetchSemanticsNodes().isEmpty(),
         )

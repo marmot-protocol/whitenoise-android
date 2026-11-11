@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
+import dev.ipf.whitenoise.android.state.ChatFolderQuery
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatListSelectAllScope
@@ -29,7 +30,6 @@ import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.departedFolderMatches
 import dev.ipf.whitenoise.android.state.folderQuery
 import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
@@ -47,7 +47,8 @@ internal class GlobalSearchCompleteScope(
     val folderChatIds: Set<String>?,
 ) {
     /** The chats global search is scoped to: filtered complete rows, plus explicit chats no complete row knows. */
-    fun scopedChats(state: GlobalSearchState): List<ChatListItem> = globalSearchScopedChats(source, state, folderChatIds)
+    fun scopedChats(state: GlobalSearchState): List<ChatListItem> =
+        globalSearchScopedChats(source, state, folderChatIds)
 
     /**
      * Group ids for a message or attachment query. An explicitly chosen chat is an identity, so one that is in no
@@ -102,10 +103,31 @@ internal fun rememberGlobalSearchCompleteScope(
     folderFilters: Set<String>,
     folderStore: Any?,
 ): GlobalSearchCompleteScope? {
+    val fence =
+        GlobalSearchScopeFence(
+            controller,
+            appState.activeAccountRef,
+            appState.runtimeGeneration,
+            homeFolderId,
+            folderFilters,
+            folderStore,
+        )
+    val own = rememberScopeSnapshot(appState, controller, enabled, seed)
+    val snapshot = listOfNotNull(own, seed).firstOrNull { it.isCurrent && it.coversCurrentMembership }
+    val produced = rememberResolvedScope(appState, controller, titleCopy, enabled, snapshot, fence)
+    return produced?.takeIf { enabled && it.first == fence }?.second
+}
+
+/** This screen's own account-wide snapshot, reread on each scope revision unless a covering [seed] opens search. */
+@Composable
+private fun rememberScopeSnapshot(
+    appState: WhiteNoiseAppState,
+    controller: ChatsController,
+    enabled: Boolean,
+    seed: AccountWideForwardTargets?,
+): AccountWideForwardTargets? {
     val account = appState.activeAccountRef
     val generation = appState.runtimeGeneration
-    val fence = GlobalSearchScopeFence(controller, account, generation, homeFolderId, folderFilters, folderStore)
-    val currentFence by rememberUpdatedState(fence)
     var own by remember(controller, account, generation) { mutableStateOf<AccountWideForwardTargets?>(null) }
     val currentSeed by rememberUpdatedState(seed)
     LaunchedEffect(controller, account, generation, enabled) {
@@ -114,29 +136,33 @@ internal fun rememberGlobalSearchCompleteScope(
         snapshotFlow { controller.scopeRevisions() }
             .conflate()
             .collect {
-                val covered = currentSeed?.takeIf { it.isCurrent && it.coversCurrentMembership }
                 // A prepared unread snapshot that still covers membership opens search with no read.
-                if (first && covered != null) {
-                    first = false
-                    return@collect
-                }
+                val seeded = first && currentSeed?.let { it.isCurrent && it.coversCurrentMembership } == true
                 first = false
+                if (seeded) return@collect
                 val read = controller.readAccountWideForwardTargets()
-                if (read is AccountWideRead.Loaded &&
-                    read.snapshot.isCurrent &&
-                    appState.activeAccountRef == account &&
-                    appState.runtimeGeneration == generation
-                ) {
-                    own = read.snapshot
-                }
+                val sameRuntime = appState.activeAccountRef == account && appState.runtimeGeneration == generation
+                if (read is AccountWideRead.Loaded && read.snapshot.isCurrent && sameRuntime) own = read.snapshot
             }
     }
+    return own
+}
+
+/** The scope resolved off the main thread for [fence]; a late result for a fence that has moved on is dropped. */
+@Composable
+private fun rememberResolvedScope(
+    appState: WhiteNoiseAppState,
+    controller: ChatsController,
+    titleCopy: GroupTitleCopy,
+    enabled: Boolean,
+    snapshot: AccountWideForwardTargets?,
+    fence: GlobalSearchScopeFence,
+): Pair<GlobalSearchScopeFence, GlobalSearchCompleteScope>? {
+    val currentFence by rememberUpdatedState(fence)
     val revisions = controller.scopeRevisions()
     val items = controller.items
     val archived = controller.archivedItems
     val profileRevision = appState.profileRevisionForCompose
-    val snapshot =
-        listOfNotNull(own, seed).firstOrNull { it.isCurrent && it.coversCurrentMembership }
     val produced: State<Pair<GlobalSearchScopeFence, GlobalSearchCompleteScope>?> =
         produceState<Pair<GlobalSearchScopeFence, GlobalSearchCompleteScope>?>(
             null,
@@ -149,64 +175,84 @@ internal fun rememberGlobalSearchCompleteScope(
             profileRevision,
             enabled,
         ) {
-            if (!enabled || snapshot == null) {
-                value = null
-                return@produceState
-            }
-            val owner = controller.captureChatListActionOwner()
             val scope =
-                owner?.let {
-                    withContext(Dispatchers.Default) {
-                        resolveCompleteScope(appState, controller, it, snapshot, items, archived, titleCopy, fence)
+                snapshot?.takeIf { enabled }?.let { covering ->
+                    controller.captureChatListActionOwner()?.let { owner ->
+                        withContext(Dispatchers.Default) {
+                            val rows = CompleteScopeRows(appState, controller, owner, covering, items + archived)
+                            rows.resolve(titleCopy, fence)
+                        }?.takeIf { controller.chatListActionIsCurrent(owner) }
                     }
                 }
             // A late result for an account, binding or folder state that has moved on is dropped.
-            if (scope != null && owner != null && controller.chatListActionIsCurrent(owner) && fence == currentFence) {
-                value = fence to scope
-            } else if (value?.first != fence) {
-                value = null
+            when {
+                snapshot == null || !enabled -> value = null
+                scope != null && fence == currentFence -> value = fence to scope
+                value?.first != fence -> value = null
             }
         }
-    return produced.value?.takeIf { enabled && it.first == fence }?.second
+    return produced.value
 }
 
-/** Builds the complete rows and folder scope, or null when native folder membership is not ready or stale. */
-private suspend fun resolveCompleteScope(
-    appState: WhiteNoiseAppState,
-    controller: ChatsController,
-    owner: ChatListActionOwner,
-    snapshot: AccountWideForwardTargets,
-    items: List<ChatListItem>,
-    archivedItems: List<ChatListItem>,
-    titleCopy: GroupTitleCopy,
-    fence: GlobalSearchScopeFence,
-): GlobalSearchCompleteScope? {
-    val account = owner.accountRef
+/** The complete rows of [snapshot] for [owner]'s account, from which folder scopes are resolved. */
+private class CompleteScopeRows(
+    private val appState: WhiteNoiseAppState,
+    private val controller: ChatsController,
+    private val owner: ChatListActionOwner,
+    private val snapshot: AccountWideForwardTargets,
+    windowItems: List<ChatListItem>,
+) {
     val rows =
-        snapshot.chatListItems(items + archivedItems) { item ->
+        snapshot.chatListItems(windowItems) { item ->
             controller.boundAccountRef?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
         }
-    if (rows.isEmpty() && !snapshot.isCurrent) return null
-    val active = rows.filterNot { it.group.archived }
-    val archived = rows.filter { it.group.archived }
-    val preferences = appState.chatFolderPreferences
-    val accountIdHex = controller.boundAccountIdHex()
-    val displayTitle: (ChatListItem) -> String = { chatListItemDisplayTitle(it, appState, titleCopy) }
+    private val active = rows.filterNot { it.group.archived }
+    private val archived = rows.filter { it.group.archived }
+    private val preferences = appState.chatFolderPreferences
+    private val account = owner.accountRef
 
-    suspend fun resolve(folderId: String): Set<String>? {
+    /**
+     * The complete scope for [fence], or null when a folder's native membership is not ready or the snapshot or
+     * binding is no longer current.
+     */
+    suspend fun resolve(
+        titleCopy: GroupTitleCopy,
+        fence: GlobalSearchScopeFence,
+    ): GlobalSearchCompleteScope? {
+        val displayTitle: (ChatListItem) -> String = { chatListItemDisplayTitle(it, appState, titleCopy) }
+        val home = fence.homeFolderId?.let { folderChatIds(it, displayTitle) }
+        val filters = fence.folderFilters.map { folderChatIds(it, displayTitle) }
+        val ready = (fence.homeFolderId == null || home != null) && filters.none { it == null }
+        val current = (rows.isNotEmpty() || snapshot.isCurrent) && controller.chatListActionIsCurrent(owner)
+        val filtered = filters.takeIf { it.isNotEmpty() }?.flatMapTo(HashSet()) { it.orEmpty() }
+        val homeRule = fence.homeFolderId?.let { preferences.folderRule(account, it) }
+        return if (ready && current) {
+            GlobalSearchCompleteScope(
+                fence = fence,
+                source = chatFolderSource(homeRule, active, archived),
+                allRows = rows,
+                folderChatIds = intersectChatScopes(home, filtered),
+            )
+        } else {
+            null
+        }
+    }
+
+    /** A folder's complete membership, or null while its native membership is not ready. */
+    private suspend fun folderChatIds(
+        folderId: String,
+        displayTitle: (ChatListItem) -> String,
+    ): Set<String>? {
         val rule = preferences.folderRule(account, folderId)
         val manual = preferences.membershipFor(account, folderId)
         val excluded = preferences.excludedChats(account, folderId)
         val query = preferences.folderQuery(account, folderId)
+        val accountIdHex = controller.boundAccountIdHex()
         return if (query != null) {
-            val native =
-                try {
-                    resolveCompleteChatListIds { controller.completeChatListIds(ChatListSelectAllScope.of(query), owner) }
-                } catch (_: MarmotKitException.ChatPresentationNotReady) {
-                    null
-                } ?: return null
-            native.toSet() +
-                departedFolderMatches(rule, manual, excluded, active, archived, accountIdHex, displayTitle)
+            nativeChatIds(query)?.let { native ->
+                native.toSet() +
+                    departedFolderMatches(rule, manual, excluded, active, archived, accountIdHex, displayTitle)
+            }
         } else {
             val source = chatFolderSource(rule, active, archived)
             val muted = source.filter { it.engineMuted() }.mapTo(HashSet()) { it.group.groupIdHex }
@@ -222,21 +268,14 @@ private suspend fun resolveCompleteScope(
         }
     }
 
-    val home = fence.homeFolderId?.let { resolve(it) ?: return null }
-    val filtered =
-        fence.folderFilters.takeIf { it.isNotEmpty() }?.let { ids ->
-            val union = HashSet<String>()
-            for (id in ids) union += resolve(id) ?: return null
-            union
+    private suspend fun nativeChatIds(query: ChatFolderQuery): List<String>? =
+        try {
+            resolveCompleteChatListIds {
+                controller.completeChatListIds(ChatListSelectAllScope.of(query), owner)
+            }
+        } catch (_: MarmotKitException.ChatPresentationNotReady) {
+            null
         }
-    if (!controller.chatListActionIsCurrent(owner)) return null
-    val homeRule = fence.homeFolderId?.let { preferences.folderRule(account, it) }
-    return GlobalSearchCompleteScope(
-        fence = fence,
-        source = chatFolderSource(homeRule, active, archived),
-        allRows = rows,
-        folderChatIds = intersectChatScopes(home, filtered),
-    )
 }
 
 /**
@@ -256,9 +295,15 @@ internal fun rememberCompleteChatSearchSections(
     searchActive: Boolean,
 ): ChatListSearchSections<ChatListItem>? {
     val token =
-        remember(scope, normalizedQuery, titleCopy, profileRevision, messageOnly, state.chatTypeFilters, state.chatFilters) {
-            Any()
-        }
+        remember(
+            scope,
+            normalizedQuery,
+            titleCopy,
+            profileRevision,
+            messageOnly,
+            state.chatTypeFilters,
+            state.chatFilters,
+        ) { Any() }
     val produced =
         produceState<Pair<Any, ChatListSearchSections<ChatListItem>>?>(null, token) {
             val complete = scope ?: return@produceState
@@ -270,6 +315,7 @@ internal fun rememberCompleteChatSearchSections(
                         } else {
                             null
                         }
+                    var succeeded = false
                     try {
                         projectChatListSearchSections(
                             source = complete.scopedChats(state),
@@ -278,13 +324,12 @@ internal fun rememberCompleteChatSearchSections(
                             titleCopy = titleCopy,
                             folderChatIds = complete.folderChatIds,
                             messageOnly = messageOnly,
-                        ).also { attempt?.success() }
-                    } catch (cancelled: CancellationException) {
-                        attempt?.failure()
-                        throw cancelled
-                    } catch (throwable: Throwable) {
-                        attempt?.failure()
-                        throw throwable
+                        ).also {
+                            succeeded = true
+                            attempt?.success()
+                        }
+                    } finally {
+                        if (!succeeded) attempt?.failure()
                     }
                 }
             value = token to sections

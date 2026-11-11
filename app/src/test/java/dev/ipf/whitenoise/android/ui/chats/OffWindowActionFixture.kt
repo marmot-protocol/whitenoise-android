@@ -41,7 +41,7 @@ internal class OffWindowActionFixture(
     scope: TestScope,
     ioDispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
     memberLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi> = { _, _ -> emptyList() },
-    nativeFolderReads: Boolean = false,
+    private val nativeFolderReads: Boolean = false,
 ) {
     val calls = ConcurrentLinkedQueue<String>()
     val row = AtomicReference(chatRow(ACTION_TARGET).copy(manuallyMarkedUnread = true))
@@ -61,7 +61,10 @@ internal class OffWindowActionFixture(
     var targetReadUnavailable = false
     var targetMuteEligible = true
 
-    /** Native folder query reader when [nativeFolderReads]; may throw `ChatPresentationNotReady`. */
+    /**
+     * Native folder query reader when [nativeFolderReads]; may throw `ChatPresentationNotReady`. The same flag answers
+     * message-search pages with an empty page; otherwise a message search fails as an unexpected native call.
+     */
     var chatListQueryIds: (suspend (String, ChatListViewQueryFfi) -> List<String>)? = null
 
     /** Every native message-search page query, with the account it was issued for. */
@@ -232,6 +235,7 @@ internal class OffWindowActionFixture(
                 "chatListRow" -> row.get()
                 "listMedia" -> emptyList<Any>()
                 "timelineMessages" -> {
+                    check(nativeFolderReads) { "Unexpected unread action native call" }
                     timelineQueries += (args!![0] as String) to (args[1] as TimelineMessageQueryFfi)
                     TimelinePageFfi(emptyList(), hasMoreBefore = false, hasMoreAfter = false)
                 }
