@@ -74,11 +74,16 @@ private fun DrawScope.drawSettingsCard(
 
 /** Draws the content and keeps a copy of the frame for the next close. */
 private fun ContentDrawScope.drawAndRecord(snapshot: SettingsCardSnapshot) {
+    val picture = snapshot.picture ?: Picture().also { snapshot.picture = it }
+    drawAndRecord(picture)
+}
+
+/** Draws the content and records the same frame into [picture]. */
+internal fun ContentDrawScope.drawAndRecord(picture: Picture) {
     drawContent()
     val width = ceil(size.width).toInt()
     val height = ceil(size.height).toInt()
     if (width <= 0 || height <= 0) return
-    val picture = snapshot.picture ?: Picture().also { snapshot.picture = it }
     val recording = Canvas(picture.beginRecording(width, height))
     draw(this, layoutDirection, recording, size) { this@drawAndRecord.drawContent() }
     picture.endRecording()
