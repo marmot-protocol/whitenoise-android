@@ -20,6 +20,21 @@ internal fun conversationAutoReadCursor(timeline: List<TimelineMessage>): Conver
     )
 }
 
+/** Paging into older history must not rewind the live-arrival watermark. */
+internal fun advanceConversationAutoReadCursor(
+    cursor: ConversationAutoReadCursor,
+    timeline: List<TimelineMessage>,
+): ConversationAutoReadCursor {
+    val tail = conversationAutoReadCursor(timeline)
+    // Native rows can have zero optimistic order; a loaded anchor still proves list-relative progress.
+    val anchorLoaded = timeline.any { it.id == cursor.timelineItemId }
+    return if (cursor.timelineItemId == null || anchorLoaded || tail.timelineOrder > cursor.timelineOrder) {
+        tail
+    } else {
+        cursor
+    }
+}
+
 /**
  * Rows that arrived after [cursor]. Exact item identity is preferred while the
  * anchor remains loaded; timeline order keeps the cursor usable if the bounded

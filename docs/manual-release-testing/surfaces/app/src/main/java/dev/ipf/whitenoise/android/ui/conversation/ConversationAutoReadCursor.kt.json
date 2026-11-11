@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationAutoReadCursor.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [],
+    "source_coverage": [
+      {
+        "surface": "Live read-aloud cursor advances by loaded identity without replaying replies or comparing rebased native ordinals",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationAutoReadCursor.kt",
+        "anchor": "val anchorLoaded =",
+        "test_ids": ["TTS-006"]
+      }
+    ],
+    "settings_controls": []
+  },
+  "discovery_exceptions": []
+}

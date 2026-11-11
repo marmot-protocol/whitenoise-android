@@ -1,0 +1,21 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TtsAutoReadPreferences.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Use default restores global speech policy and shortcut visibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TtsAutoReadPreferences.kt",
+        "anchor": "fun clearConversationOverride(",
+        "test_ids": ["TTS-006"]
+      },
+      {
+        "surface": "Global and account/chat speech-driven speaker shortcut visibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TtsAutoReadPreferences.kt",
+        "anchor": "fun isComposerShortcutVisibleFor(",
+        "test_ids": ["TTS-006"]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

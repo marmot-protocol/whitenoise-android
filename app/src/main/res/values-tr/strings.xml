@@ -1761,6 +1761,8 @@
     <string name="tts_bar_history_loading">Diğer mesajlar yükleniyor…</string>
     <string name="tts_bar_history_error">Diğer mesajlar yüklenemedi. Yeniden denemek için tekrar dokunun.</string>
     <string name="tts_auto_read_title">Mesajları sesli oku</string>
+    <string name="tts_composer_shortcut_title">Hoparlör kısayolunu göster</string>
+    <string name="tts_composer_shortcut_subtitle">Sohbet başlığında sesli okuma düğmesini göster.</string>
     <string name="tts_auto_read_default_global_title">Mesajları varsayılan olarak sesli oku</string>
     <string name="tts_auto_read_default_global_subtitle">Sohbet açılınca okunmamış mesajları okur; sohbet geçersiz kılmadıkça</string>
     <string name="tts_auto_read_use_default_off">Varsayılanı kullan (Kapalı)</string>

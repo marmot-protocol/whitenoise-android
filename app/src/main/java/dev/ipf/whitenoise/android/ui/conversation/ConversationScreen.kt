@@ -4079,6 +4079,7 @@ internal fun ConversationScreen(
                 ConversationHeaderFrame(
                     header = {
                         ConversationTopBar(
+                            showAutoReadShortcut = composerGate == ComposerGate.COMPOSER,
                             selectionMode = selectionMode,
                             selectedCount = batchSelectionUi.actionItems.size,
                             onCloseSelection = {

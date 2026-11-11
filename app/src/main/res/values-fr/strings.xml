@@ -1781,6 +1781,8 @@
     <string name="tts_bar_history_loading">Chargement d\'autres messages…</string>
     <string name="tts_bar_history_error">Impossible de charger d\'autres messages. Touchez à nouveau pour réessayer.</string>
     <string name="tts_auto_read_title">Lire les messages à voix haute</string>
+    <string name="tts_composer_shortcut_title">Afficher le raccourci du haut-parleur</string>
+    <string name="tts_composer_shortcut_subtitle">Afficher le bouton de lecture à voix haute dans l’en-tête de la discussion.</string>
     <string name="tts_auto_read_default_global_title">Lire les messages à voix haute par défaut</string>
     <string name="tts_auto_read_default_global_subtitle">Lit les messages non lus à l’ouverture d’une discussion, sauf si la discussion en décide autrement</string>
     <string name="tts_auto_read_use_default_off">Utiliser la valeur par défaut (Désactivé)</string>

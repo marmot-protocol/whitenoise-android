@@ -109,6 +109,15 @@ class TtsVoiceMediaSettingsScreenshotTest {
                         subtitle = stringResource(R.string.tts_auto_read_default_global_subtitle),
                     )
                 }
+                row("composer_shortcut") { context ->
+                    SettingsSwitch(
+                        context = context,
+                        title = stringResource(R.string.tts_composer_shortcut_title),
+                        checked = false,
+                        onCheckedChange = {},
+                        subtitle = stringResource(R.string.tts_composer_shortcut_subtitle),
+                    )
+                }
                 row("media_mix") { context ->
                     SettingsSwitch(
                         context = context,

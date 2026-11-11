@@ -17,7 +17,8 @@
         "anchor": "fun ConversationTopBar(",
         "test_ids": [
           "CON-001",
-          "PRO-006"
+          "PRO-006",
+          "TTS-006"
         ]
       },
       {

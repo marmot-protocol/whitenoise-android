@@ -93,6 +93,12 @@
     ],
     "source_coverage": [
       {
+        "surface": "Dictation width without a competing composer speaker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "val minimumDictationWidth =",
+        "test_ids": ["TTS-006"]
+      },
+      {
         "surface": "Composer compact draft navigation icon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "R.drawable.ic_jump_to_edge",

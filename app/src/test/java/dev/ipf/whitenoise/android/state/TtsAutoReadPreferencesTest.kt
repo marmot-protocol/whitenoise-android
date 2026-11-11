@@ -37,8 +37,134 @@ class TtsAutoReadPreferencesTest {
         val prefs = TtsAutoReadPreferences(context)
 
         assertFalse(prefs.state.value.globalDefaultEnabled)
+        assertFalse(prefs.state.value.showComposerShortcut)
         assertEquals(emptyMap<String, TtsAutoReadOverride>(), prefs.state.value.overrides)
         assertFalse(prefs.isConversationAutoRead("account-a", "group-a"))
+    }
+
+    @Test
+    fun composerShortcutVisibilityPersistsWithoutChangingSpeechPolicy() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.setComposerShortcutVisible(true)
+        assertTrue(prefs.state.value.showComposerShortcut)
+        assertTrue(TtsAutoReadPreferences(context).state.value.showComposerShortcut)
+
+        prefs.setComposerShortcutVisible(false)
+        val reloaded = TtsAutoReadPreferences(context)
+        assertFalse(reloaded.state.value.showComposerShortcut)
+        assertTrue(reloaded.isConversationAutoRead("account-a", "group-a"))
+        assertFalse(reloaded.state.value.globalDefaultEnabled)
+    }
+
+    @Test
+    fun enablingConversationRevealsShortcutOnlyForThatOwnerAndDisablingHidesIt() {
+        val prefs = TtsAutoReadPreferences(context)
+        assertFalse(prefs.isComposerShortcutVisibleFor("account-a", "group-a"))
+
+        prefs.setConversationOverride("account-a", "GROUP-A", TtsAutoReadOverride.ON)
+        assertTrue(prefs.isComposerShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(prefs.isComposerShortcutVisibleFor("account-a", "group-b"))
+        assertFalse(prefs.isComposerShortcutVisibleFor("account-b", "group-a"))
+        assertFalse(prefs.state.value.showComposerShortcut)
+
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        val reloaded = TtsAutoReadPreferences(context)
+        assertFalse(reloaded.isComposerShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(reloaded.isConversationAutoRead("account-a", "group-a"))
+    }
+
+    @Test
+    fun returningToDefaultHidesOnlyThatConversationsShortcutAndPersists() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        prefs.setConversationOverride("account-b", "group-a", TtsAutoReadOverride.ON)
+        prefs.setConversationOverride("account-a", "group-b", TtsAutoReadOverride.ON)
+
+        prefs.clearConversationOverride("account-a", "group-a")
+
+        val reloaded = TtsAutoReadPreferences(context)
+        assertFalse(reloaded.isComposerShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(reloaded.isConversationAutoRead("account-a", "group-a"))
+        assertNull(reloaded.overrideFor("account-a", "group-a"))
+        assertTrue(reloaded.isComposerShortcutVisibleFor("account-b", "group-a"))
+        assertTrue(reloaded.isComposerShortcutVisibleFor("account-a", "group-b"))
+    }
+
+    @Test
+    fun obsoleteStickyShortcutWithoutAnOverrideDoesNotRevealIcon() {
+        context
+            .getSharedPreferences(TtsAutoReadPreferences.PREFERENCES_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet("composerShortcutConversations", setOf("account-a|group-a"))
+            .commit()
+        val prefs = TtsAutoReadPreferences(context)
+        assertNull(prefs.overrideFor("account-a", "group-a"))
+        assertFalse(TtsAutoReadPreferences(context).isComposerShortcutVisibleFor("account-a", "group-a"))
+    }
+
+    @Test
+    fun returningToDefaultStillHonorsGlobalShortcutAndSpeechSettings() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setGlobalDefaultEnabled(true)
+        prefs.setComposerShortcutVisible(true)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.clearConversationOverride("account-a", "group-a")
+        assertTrue(prefs.isComposerShortcutVisibleFor("account-a", "group-a"))
+        assertTrue(prefs.isConversationAutoRead("account-a", "group-a"))
+
+        prefs.setComposerShortcutVisible(false)
+        assertTrue(TtsAutoReadPreferences(context).isComposerShortcutVisibleFor("account-a", "group-a"))
+        assertTrue(prefs.isConversationAutoRead("account-a", "group-a"))
+    }
+
+    @Test
+    fun disablingNeverEnabledConversationDoesNotRevealShortcut() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        assertFalse(TtsAutoReadPreferences(context).isComposerShortcutVisibleFor("account-a", "group-a"))
+    }
+
+    @Test
+    fun existingEnabledConversationRevealsShortcutBeforeItIsDisabled() {
+        context
+            .getSharedPreferences(TtsAutoReadPreferences.PREFERENCES_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet("overrideOnConversations", setOf("account-a|group-a"))
+            .commit()
+
+        val prefs = TtsAutoReadPreferences(context)
+        assertTrue(prefs.isComposerShortcutVisibleFor("account-a", "group-a"))
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        assertFalse(TtsAutoReadPreferences(context).isComposerShortcutVisibleFor("account-a", "group-a"))
+    }
+
+    @Test
+    fun globalShortcutSettingKeepsOffConversationVisibleUntilGlobalSettingIsDisabled() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        prefs.setComposerShortcutVisible(true)
+        assertTrue(prefs.isComposerShortcutVisibleFor("account-a", "group-b"))
+        prefs.setComposerShortcutVisible(false)
+        assertFalse(prefs.isComposerShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(prefs.isComposerShortcutVisibleFor("account-a", "group-b"))
+        assertFalse(prefs.isComposerShortcutVisibleFor("", "group-a"))
+    }
+
+    @Test
+    fun globalSpeechDefaultKeepsShortcutVisibleForConversationWithSpeechOff() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setGlobalDefaultEnabled(true)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        val reloaded = TtsAutoReadPreferences(context)
+        assertTrue(reloaded.isComposerShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(reloaded.isConversationAutoRead("account-a", "group-a"))
+        assertTrue(reloaded.isComposerShortcutVisibleFor("account-a", "group-b"))
+
+        prefs.setGlobalDefaultEnabled(false)
+        assertFalse(prefs.isComposerShortcutVisibleFor("account-a", "group-a"))
     }
 
     @Test
@@ -60,6 +186,7 @@ class TtsAutoReadPreferencesTest {
         )
         assertTrue(prefs.isConversationAutoRead("account-a", "group-a"))
         assertFalse(prefs.isConversationAutoRead("account-a", "group-c"))
+        assertTrue(prefs.isComposerShortcutVisibleFor("account-a", "group-a"))
 
         val reloaded = TtsAutoReadPreferences(context)
         assertEquals(prefs.state.value.overrides, reloaded.state.value.overrides)

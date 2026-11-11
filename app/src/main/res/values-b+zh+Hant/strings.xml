@@ -1741,6 +1741,8 @@
     <string name="tts_bar_history_loading">正在載入更多訊息…</string>
     <string name="tts_bar_history_error">無法載入更多訊息。再次點按即可重試。</string>
     <string name="tts_auto_read_title">朗讀訊息</string>
+    <string name="tts_composer_shortcut_title">顯示喇叭快捷按鈕</string>
+    <string name="tts_composer_shortcut_subtitle">在聊天標題列中顯示朗讀開關。</string>
     <string name="tts_auto_read_default_global_title">預設朗讀訊息</string>
     <string name="tts_auto_read_default_global_subtitle">開啟聊天時朗讀未讀訊息，除非該聊天另有設定</string>
     <string name="tts_auto_read_use_default_off">使用預設（關）</string>

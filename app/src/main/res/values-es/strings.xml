@@ -1768,6 +1768,8 @@
     <string name="tts_bar_history_loading">Cargando más mensajes…</string>
     <string name="tts_bar_history_error">No se pudieron cargar más mensajes. Toca de nuevo para reintentar.</string>
     <string name="tts_auto_read_title">Leer mensajes en voz alta</string>
+    <string name="tts_composer_shortcut_title">Mostrar acceso directo al altavoz</string>
+    <string name="tts_composer_shortcut_subtitle">Muestra el control de lectura en voz alta en la cabecera del chat.</string>
     <string name="tts_auto_read_default_global_title">Leer mensajes en voz alta por defecto</string>
     <string name="tts_auto_read_default_global_subtitle">Lee los mensajes no leídos al abrir un chat, salvo que el chat lo cambie</string>
     <string name="tts_auto_read_use_default_off">Usar predeterminado (Desactivado)</string>

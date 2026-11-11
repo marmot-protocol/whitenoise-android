@@ -1,0 +1,22 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAutoReadToggle.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerAutoReadToggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAutoReadToggle.kt",
+        "anchor": "checkedContainerColor = Color.Transparent",
+        "test_ids": ["TTS-006"]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Conversation-header speaker accessible label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAutoReadToggle.kt",
+        "anchor": "R.string.tts_auto_read_title",
+        "test_ids": ["TTS-006"]
+      }
+    ]
+  }
+}

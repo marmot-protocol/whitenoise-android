@@ -8,6 +8,7 @@ enum class TtsAutoReadOverride {
 data class TtsAutoReadPreferenceState(
     val globalDefaultEnabled: Boolean = false,
     val overrides: Map<String, TtsAutoReadOverride> = emptyMap(),
+    val showComposerShortcut: Boolean = false,
 )
 
 /** Effective auto-read: per-chat override when set, otherwise the global default. */

@@ -5,9 +5,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -16,9 +18,13 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -63,6 +69,133 @@ class ConversationTopBarSemanticsTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    /** The speaker is an independent header action, not part of the title/details target. */
+    @Test
+    fun readAloudShortcutAppearsAtHeaderEndAndToggles() {
+        val state = appState()
+        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        val controller = ConversationController(state, group())
+        var detailsCalls = 0
+        render(state, controller, onOpenDetails = { detailsCalls += 1 })
+
+        val speaker = composeRule.onNodeWithContentDescription("Read messages aloud")
+        speaker.assertIsOff().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        val header = composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
+        val bounds = speaker.fetchSemanticsNode().boundsInRoot
+        assertTrue(bounds.left >= header.center.x)
+        assertTrue(bounds.right <= header.right)
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_speaker_off_light.png")
+        speaker.performClick().assertIsOn()
+        composeRule.runOnIdle {
+            assertTrue(state.conversationAutoReadFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(0, detailsCalls)
+        }
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_speaker_on_light.png")
+        speaker.performClick().assertIsOff()
+    }
+
+    /** Both speaker states remain legible in the existing dark header theme. */
+    @Test
+    fun readAloudShortcutDarkStates() {
+        val state = appState()
+        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        render(state, ConversationController(state, group()), darkTheme = true)
+        val speaker = composeRule.onNodeWithContentDescription("Read messages aloud")
+        speaker.assertIsOff()
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_speaker_off_dark.png")
+        speaker.performClick().assertIsOn()
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_speaker_on_dark.png")
+    }
+
+    /** Long LTR titles leave the speaker visible and independently tappable in both states. */
+    @Test
+    fun readAloudShortcutLongLtrHeader() {
+        val state = appState()
+        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        val controller =
+            ConversationController(state, group().copy(name = "White Noise friends and family community group"))
+        render(state, controller, darkTheme = true)
+        val speaker = composeRule.onNodeWithContentDescription("Read messages aloud")
+        speaker.assertIsOff().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp)
+        val header = composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
+        val bounds = speaker.fetchSemanticsNode().boundsInRoot
+        val details =
+            composeRule
+                .onNodeWithTag(PerformanceTestTags.OPEN_GROUP_DETAILS)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(bounds.left >= details.right && bounds.right <= header.right)
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_speaker_off_long_ltr_dark.png")
+        speaker.performClick().assertIsOn()
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_speaker_on_long_ltr_dark.png")
+    }
+
+    /** Narrow RTL headers keep the speaker's complete touch target clear of a long title. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
+    fun readAloudShortcutLargeRtlHeader() {
+        val state = appState()
+        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        val controller = ConversationController(state, group().copy(name = "A long conversation title"))
+        render(state, controller, compactHeight = true, fontScale = 2f, rtl = true)
+        val speaker = composeRule.onNodeWithContentDescription("Read messages aloud")
+        speaker
+            .assertHeightIsAtLeast(48.dp)
+            .assertWidthIsAtLeast(48.dp)
+            .performClick()
+            .assertIsOn()
+        val header = composeRule.onNodeWithTag(CONVERSATION_TOP_BAR_TAG).fetchSemanticsNode().boundsInRoot
+        val bounds = speaker.fetchSemanticsNode().boundsInRoot
+        val details =
+            composeRule
+                .onNodeWithTag(PerformanceTestTags.OPEN_GROUP_DETAILS)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        assertTrue(bounds.left >= header.left && bounds.right <= details.left)
+        assertTrue(bounds.top >= header.top && bounds.bottom <= header.bottom)
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_speaker_on_large_rtl.png")
+    }
+
+    /** An opted-out chat leaves the header action absent rather than reserving a blank button. */
+    @Test
+    fun readAloudShortcutHiddenWhenNotConfigured() {
+        val state = appState()
+        render(state, ConversationController(state, group()))
+        composeRule.onNodeWithContentDescription("Read messages aloud").assertDoesNotExist()
+    }
+
+    /** Message selection retains its own commands instead of competing with the speaker action. */
+    @Test
+    fun readAloudShortcutHiddenDuringSelection() {
+        val state = appState()
+        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        render(state, ConversationController(state, group()), selectionMode = true)
+        composeRule.onNodeWithContentDescription("Read messages aloud").assertDoesNotExist()
+    }
+
+    /** Search retains its query and filter actions without a duplicate read-aloud button. */
+    @Test
+    fun readAloudShortcutHiddenDuringSearch() {
+        val state = appState()
+        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        render(state, ConversationController(state, group()), searchOpen = true)
+        composeRule.onNodeWithContentDescription("Read messages aloud").assertDoesNotExist()
+    }
 
     /**
      * The full title is one accessible 48dp heading action that reads the chat name, offers Details as its
@@ -219,33 +352,41 @@ class ConversationTopBarSemanticsTest {
         frozen: State<Boolean> = mutableStateOf(false),
         onOpenDetails: () -> Unit = {},
         fontScale: Float = 1f,
+        darkTheme: Boolean = false,
+        rtl: Boolean = false,
+        selectionMode: Boolean = false,
+        searchOpen: Boolean = false,
     ) {
         val searchFocusRequester = FocusRequester()
         composeRule.setContent {
-            WhiteNoiseTheme(fontScale = fontScale) {
-                Surface {
-                    ConversationTopBar(
-                        selectionMode = false,
-                        selectedCount = 0,
-                        onCloseSelection = {},
-                        searchOpen = false,
-                        searchQuery = "",
-                        onSearchQueryChange = {},
-                        onClearSearch = {},
-                        onCloseSearch = {},
-                        onSearchAction = {},
-                        searchFocusRequester = searchFocusRequester,
-                        appState = appState,
-                        controller = controller,
-                        groupTitleCopy = GroupTitleCopy.Default,
-                        openedAsDmHint = false,
-                        freezeRoutePresentation = frozen.value,
-                        openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
-                        onOpenDetails = onOpenDetails,
-                        onBack = {},
-                        compactHeight = compactHeight,
-                        performanceSelectorsEnabled = true,
-                    )
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(fontScale = fontScale, darkTheme = darkTheme) {
+                    Surface {
+                        ConversationTopBar(
+                            selectionMode = selectionMode,
+                            selectedCount = 0,
+                            onCloseSelection = {},
+                            searchOpen = searchOpen,
+                            searchQuery = "",
+                            onSearchQueryChange = {},
+                            onClearSearch = {},
+                            onCloseSearch = {},
+                            onSearchAction = {},
+                            searchFocusRequester = searchFocusRequester,
+                            appState = appState,
+                            controller = controller,
+                            groupTitleCopy = GroupTitleCopy.Default,
+                            openedAsDmHint = false,
+                            freezeRoutePresentation = frozen.value,
+                            openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
+                            onOpenDetails = onOpenDetails,
+                            onBack = {},
+                            compactHeight = compactHeight,
+                            performanceSelectorsEnabled = true,
+                        )
+                    }
                 }
             }
         }
