@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
@@ -36,7 +37,9 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.DICTATION_ACTIONS_RES
 import dev.ipf.whitenoise.android.ui.conversation.composer.DICTATION_ACTIVE_ACTIONS_WIDTH
 import dev.ipf.whitenoise.android.ui.conversation.composer.DICTATION_LISTENING_PULSE_WIDTH
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +55,20 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession 
 class ConversationDictationReadinessScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
+    private var oldScale: String? = null
+
+    /** Midpoint widths assume the default animator scale, whatever the host reports. */
+    @Before fun pinMotion() {
+        oldScale = Settings.Global.getString(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE)
+        Settings.Global.putFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+    }
+
+    /** Restores the animator scale the test found. */
+    @After fun restoreMotion() {
+        Settings.Global.putString(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, oldScale)
+    }
 
     @Test
     fun notificationRecoveryWrapsAtLargeFontRtl() {

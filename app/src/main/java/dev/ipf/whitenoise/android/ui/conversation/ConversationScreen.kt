@@ -3778,7 +3778,10 @@ internal fun ConversationScreen(
     // container transform as Settings. Nothing travels with the closing keyboard.
     val routeMorph =
         remember(controller, appState.runtimeGeneration) {
-            SettingsCardMorph().apply { anchor = ConversationMorphAnchor.Details }
+            // Composer settings survive recreation, so their Back must still fold into the pill.
+            SettingsCardMorph().apply {
+                anchor = if (showComposerSettings) ConversationMorphAnchor.Composer else ConversationMorphAnchor.Details
+            }
         }
     val transcriptRouteMotion =
         rememberSettingsCardMorphHost(

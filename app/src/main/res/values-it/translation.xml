@@ -29,7 +29,7 @@
     <string name="translation_install_open_failed">Nessuna app è riuscita ad aprire Offline Translator o la sua pagina di download. Installa un browser web e riprova.</string>
     <string name="translation_composer_toggle">Traduci</string>
     <string name="translation_composer_will_send">Verrà inviato</string>
-    <string name="translation_composer_dictation_off">Traduci mentre scrivi è disattivato durante la dettatura</string>
+    <string name="translation_composer_dictation_off">La traduzione è disattivata durante la dettatura</string>
     <string name="translation_composer_placeholder">La traduzione appare qui</string>
     <string name="translation_composer_detection_failed">Lingua non rilevata. Scrivi ancora un po\'.</string>
 </resources>

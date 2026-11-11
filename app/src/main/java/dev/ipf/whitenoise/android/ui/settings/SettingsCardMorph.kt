@@ -41,7 +41,8 @@ internal val SettingsCardMorphEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.
  * fans that one shape out into all of its cards, and its cards fold back into the anchor over the
  * live route underneath. The old route is still disposed immediately, so no Back handler, focus,
  * editable state or protected content outlives it; only card pictures of the route being left are kept,
- * never pixels of a route without cards such as a chat transcript.
+ * never those of a route holding the window's secure flag or pixels of a route without cards such as
+ * a chat transcript.
  */
 internal class SettingsCardMorph {
     private val live = LinkedHashMap<Any, Rect>()
@@ -49,6 +50,7 @@ internal class SettingsCardMorph {
     private var host = Rect.Zero
     private var from: List<SettingsMorphCard> = emptyList()
     private var fan = false
+    private var secureHolds = 0
 
     /**
      * The control a whole route grows out of, such as a chat header. With an anchor on screen and no
@@ -86,12 +88,28 @@ internal class SettingsCardMorph {
     /** The picture [token]'s card records each frame, kept as its look if the route is left. */
     fun picture(token: Any): Picture = pictures.getOrPut(token, ::Picture)
 
+    /** Whether cards record pictures: never while a route on this host holds the window's secure flag. */
+    val recording: Boolean get() = secureHolds == 0
+
+    /**
+     * Marks a route on this host as protected until the returned release runs. Its cards are not
+     * recorded and leave as bare shapes, so no picture of them outlives the window's secure flag.
+     */
+    fun holdSecure(): () -> Unit {
+        secureHolds++
+        pictures.clear()
+        return { secureHolds-- }
+    }
+
+    /** Cards kept from the route being left that carry a picture of their last frame. */
+    internal val keptPictures: Int get() = from.count { it.picture != null }
+
     /**
      * Keeps the on-screen cards of the route being left as the next morph's starting shapes and
      * returns whether there is anything to morph from.
      */
     fun begin(animate: Boolean): Boolean {
-        val leaving = cardTokens.map { SettingsMorphCard(live.getValue(it), pictures[it]) }
+        val leaving = cardTokens.map { SettingsMorphCard(live.getValue(it), pictures[it]?.takeIf { recording }) }
         val origin = anchorBounds
         fan = leaving.isEmpty() && origin != null
         from =
@@ -109,17 +127,17 @@ internal class SettingsCardMorph {
         from = emptyList()
     }
 
-    private fun running(): Boolean = from.isNotEmpty() && time() < 1f
+    private val running: Boolean get() = from.isNotEmpty() && time() < 1f
 
     /** Labels and other non-card content of an arriving route fade in as its cards start to travel. */
-    fun pageAlpha(): Float = if (!running() || folding) 1f else settingsMorphContentIn(time())
+    fun pageAlpha(): Float = if (!running || folding) 1f else settingsMorphContentIn(time())
 
     /**
      * The arriving card [token]'s settled bounds and the travelling card it is drawn in this frame,
      * both in window coordinates, or null when it is settled or has no partner to travel from.
      */
     fun travel(token: Any): Pair<Rect, Rect>? {
-        val end = live[token]?.takeIf { running() } ?: return null
+        val end = live[token]?.takeIf { running } ?: return null
         val start = if (fan) from.singleOrNull() else from.getOrNull(cardTokens.indexOf(token))
         return start?.let { end to lerp(it.bounds, end, SettingsCardMorphEasing.transform(time())) }
     }
@@ -129,7 +147,7 @@ internal class SettingsCardMorph {
      * into an anchor, over the live route beneath them.
      */
     fun ContentDrawScope.drawMorph(colors: SettingsMorphColors) {
-        if (!running()) {
+        if (!running) {
             drawContent()
             return
         }
@@ -211,7 +229,7 @@ internal fun Modifier.settingsCardMorph(anchor: SettingsMorphAnchor? = null): Mo
     } else {
         positioned
             .graphicsLayer { applySettingsMorphTravel(morph.travel(token)) }
-            .drawWithContent { drawAndRecord(morph.picture(token)) }
+            .drawWithContent { if (morph.recording) drawAndRecord(morph.picture(token)) else drawContent() }
     }
 }
 

@@ -29,7 +29,7 @@
     <string name="translation_install_open_failed">Hiçbir uygulama Offline Translator’ı veya indirme sayfasını açamadı. Bir web tarayıcısı yükleyip tekrar deneyin.</string>
     <string name="translation_composer_toggle">Çevir</string>
     <string name="translation_composer_will_send">Gönderilecek</string>
-    <string name="translation_composer_dictation_off">Dikte sırasında Yazarken çevir kapalı</string>
+    <string name="translation_composer_dictation_off">Dikte sırasında çeviri kapalı</string>
     <string name="translation_composer_placeholder">Çeviri burada görünür</string>
     <string name="translation_composer_detection_failed">Dil algılanamadı. Biraz daha yazın.</string>
 </resources>

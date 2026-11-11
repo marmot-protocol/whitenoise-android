@@ -29,7 +29,7 @@
     <string name="translation_install_open_failed">No app could open Offline Translator or its download page. Install a web browser, then retry.</string>
     <string name="translation_composer_toggle">Translate</string>
     <string name="translation_composer_will_send">Will send</string>
-    <string name="translation_composer_dictation_off">Translate as you type is off while dictating</string>
+    <string name="translation_composer_dictation_off">Translation is off while dictating</string>
     <string name="translation_composer_placeholder">Translation appears here</string>
     <string name="translation_composer_detection_failed">Couldn\'t detect the language. Type a bit more.</string>
 </resources>
