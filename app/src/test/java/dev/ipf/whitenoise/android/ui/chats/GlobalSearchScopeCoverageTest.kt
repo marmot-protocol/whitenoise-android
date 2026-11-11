@@ -126,6 +126,27 @@ class GlobalSearchScopeCoverageTest {
         assertEquals(setOf(ACTION_TARGET), scopedGroups(model))
     }
 
+    /** A refresh that cannot prove the folder again withdraws the published scope instead of searching with it. */
+    @Test fun failedRefreshWithdrawsThePublishedScope() {
+        val model = prepared()
+        var ready = true
+        model.chatListQueryIds = { _, _ ->
+            if (!ready) throw MarmotKitException.ChatPresentationNotReady()
+            listOf(ACTION_TARGET)
+        }
+        val folder = createFolder(model, ChatFolderRule(includeMuted = true))
+        openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
+        awaitReads { scopedGroups(model).isNotEmpty() }
+        ready = false
+        rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
+        settle()
+        model.timelineQueries.clear()
+        openSearch(GlobalSearchState(isOpen = true, query = "hello again", folderFilters = setOf(folder)))
+        settle()
+        assertTrue("a withdrawn scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
+        rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
+    }
+
     /** A scope answered after the account changed is dropped, so no query runs for the old account's chats. */
     @Test fun lateScopeAfterAccountSwitchIsDropped() {
         val model = prepared()
@@ -158,8 +179,9 @@ class GlobalSearchScopeCoverageTest {
         assertTrue(model.timelineQueries.all { it.second.groupIdHex == null })
     }
 
-    private fun scopedGroups(model: OffWindowActionFixture): Set<String> =
-        model.timelineQueries.mapNotNull { it.second.groupIdHex }.toSet()
+    private fun scopedGroups(model: OffWindowActionFixture): Set<String> = model.timelineQueries
+        .mapNotNull { it.second.groupIdHex }
+        .toSet()
 
     private fun createFolder(
         model: OffWindowActionFixture,
@@ -174,6 +196,14 @@ class GlobalSearchScopeCoverageTest {
     private fun openSearch(state: GlobalSearchState) {
         rule.runOnIdle { search.value = state }
         rule.waitForIdle()
+    }
+
+    private fun settle() {
+        repeat(40) {
+            scope.testScheduler.runCurrent()
+            ShadowLooper.idleMainLooper(50, TimeUnit.MILLISECONDS)
+            rule.waitForIdle()
+        }
     }
 
     private fun awaitReads(ready: () -> Boolean) {

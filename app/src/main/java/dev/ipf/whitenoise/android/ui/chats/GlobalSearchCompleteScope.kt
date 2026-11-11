@@ -192,12 +192,8 @@ private fun rememberResolvedScope(
                         }?.takeIf { controller.chatListActionIsCurrent(owner) }
                     }
                 }
-            // A late result for an account, binding or folder state that has moved on is dropped.
-            when {
-                snapshot == null || !enabled -> value = null
-                scope != null && fence == currentFence -> value = fence to scope
-                value?.first != fence -> value = null
-            }
+            // A late result for a fence that has moved on is dropped; a failed refresh withdraws the previous scope.
+            if (fence == currentFence) value = scope?.let { fence to it }
         }
     return produced.value
 }
@@ -231,7 +227,7 @@ private class CompleteScopeRows(
         val home = fence.homeFolderId?.let { folderChatIds(it, displayTitle) }
         val filters = fence.folderFilters.map { folderChatIds(it, displayTitle) }
         val ready = (fence.homeFolderId == null || home != null) && filters.none { it == null }
-        val current = (rows.isNotEmpty() || snapshot.isCurrent) && controller.chatListActionIsCurrent(owner)
+        val current = snapshot.coversCurrentMembership && controller.chatListActionIsCurrent(owner)
         val filtered = filters.takeIf { it.isNotEmpty() }?.flatMapTo(HashSet()) { it.orEmpty() }
         val homeRule = fence.homeFolderId?.let { preferences.folderRule(account, it) }
         return if (ready && current) {
