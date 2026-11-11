@@ -52,7 +52,7 @@ class RecipientConfirmationNativeDeviceTest {
         runBlocking {
             MarmotAndroid.initialize(context)
             check(root.mkdirs())
-            LoopbackNostrRelay().use { relay ->
+            LoopbackNostrRelay(advertisedMaxLimit = DEPLOYED_RELAY_LIMIT).use { relay ->
                 withTimeout(210_000L) {
                     val sender = participant("sender", relay)
                     var peer = participant("peer", relay)
@@ -285,5 +285,8 @@ class RecipientConfirmationNativeDeviceTest {
     private companion object {
         const val GROUP_KIND = 445
         const val BODY = "A real peer receipt settles this failed send"
+
+        // The seeded envelope reaches the peer as stored history, which MDK only replays from a relay with known caps.
+        const val DEPLOYED_RELAY_LIMIT = 500
     }
 }
