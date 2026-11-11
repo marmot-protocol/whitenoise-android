@@ -89,7 +89,7 @@
       {
         "surface": "Global message results Retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "onRetry = { messageResults?.retry() }",
+        "anchor": "onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() }",
         "test_ids": [
           "FIND-015",
           "FIND-018"

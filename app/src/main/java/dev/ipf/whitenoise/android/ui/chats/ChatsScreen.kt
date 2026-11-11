@@ -799,10 +799,34 @@ internal fun ChatsScreen(
         globalSearchState.folderFilters.isNotEmpty() ||
             globalSearchState.chatTypeFilters.isNotEmpty() ||
             globalSearchState.chatFilters.isNotEmpty()
+    // Search covers every chat of the account, not just the retained Home window (#3720).
+    val completeScopeState =
+        rememberGlobalSearchCompleteScope(
+            appState = appState,
+            controller = controller,
+            titleCopy = groupTitleCopy,
+            enabled = searchOpen && searchActive,
+            seed = completeUnreadSnapshot,
+            homeFolderId = selectedFolder?.id,
+            folderFilters = globalSearchState.folderFilters,
+            folderStore = folderStoreState,
+            // A changed query or filter waits for a proven scope; the same one keeps its last scope meanwhile.
+            queryKey = globalSearchState.copy(query = trimmedQuery, openFilterCategory = null),
+        )
+    val completeScope = completeScopeState.scope
+    val scopedChatIds =
+        remember(completeScope, libraryChatScoped, globalSearchState) {
+            completeScope?.takeIf { libraryChatScoped }?.scopedChatIds(globalSearchState)
+        }
+    // A chat-scoped search never runs on a window-only or empty scope while the complete one resolves.
+    val scopeUnresolved = searchOpen && searchActive && libraryChatScoped && completeScope == null
+    // A scope that failed to resolve shows the existing error state with Retry rather than loading forever.
+    val scopeFailed = scopeUnresolved && completeScopeState.failed
+    val scopePending = scopeUnresolved && !scopeFailed
     val libraryQuery =
-        remember(libraryChatScoped, scopedSourceList, messageSearchConstraints, libraryKinds, trimmedQuery) {
+        remember(libraryChatScoped, scopedChatIds, messageSearchConstraints, libraryKinds, trimmedQuery) {
             globalAttachmentLibraryQuery(
-                scopedChatIds = scopedSourceList.takeIf { libraryChatScoped }?.map { it.group.groupIdHex },
+                scopedChatIds = scopedChatIds,
                 constraints = messageSearchConstraints,
                 kinds = libraryKinds,
                 rawQuery = trimmedQuery,
@@ -816,11 +840,11 @@ internal fun ChatsScreen(
             messageFiltersActive = messageSearchConstraints != null,
         )
     val messageResultsQuery =
-        remember(trimmedQuery, messageSearchConstraints, libraryChatScoped, scopedSourceList) {
+        remember(trimmedQuery, messageSearchConstraints, scopedChatIds) {
             globalSearchResultsQuery(
                 rawQuery = trimmedQuery,
                 constraints = messageSearchConstraints,
-                scopedChatIds = scopedSourceList.takeIf { libraryChatScoped }?.map { it.group.groupIdHex },
+                scopedChatIds = scopedChatIds,
             )
         }
     val messageResults =
@@ -830,14 +854,21 @@ internal fun ChatsScreen(
             messageResultsQuery,
             messageResultsMode,
             searchViewport?.messageResults,
+            paused = scopeUnresolved,
         )
-    val messageResultsState = messageResults?.shownState(messageResultsQuery)
+    val messageResultsState =
+        if (scopeFailed) {
+            GlobalSearchResultsState(generation = 0, batches = 1, failed = true)
+        } else {
+            messageResults?.shownState(messageResultsQuery)
+        }
     // Pending until the session adopts this query, and on a return to a held session (#1945) until its first
     // recheck lands, so a restored deep viewport never measures a shorter list and no row unverified since the
     // reader came back is shown. Rows of an older query are never shown.
     // A failed recheck stays pending too, so a restored deep anchor keeps its guard until Retry succeeds.
     val messageResultsPending =
-        messageResultsMode && (messageResultsState == null || messageResults?.recheckFailed == true)
+        messageResultsMode &&
+            (scopePending || messageResultsState == null || messageResults?.recheckFailed == true)
     val messageResultChats =
         rememberSearchChats(
             controller,
@@ -851,7 +882,7 @@ internal fun ChatsScreen(
             appState,
             libraryAccount,
             libraryQuery,
-            browsingAttachments,
+            browsingAttachments && !scopeUnresolved,
             searchViewport?.libraryExtent,
         )
     // A returning session holds its rows back until it has reread as far as before, so the grid keeps its place.
@@ -874,8 +905,19 @@ internal fun ChatsScreen(
             val fallback = groupTitleCopy.unavailableConversationTitle
             libraryEntries.mapNotNull { entry -> entry.toLibraryItem { libraryTitles[it.lowercase()] ?: fallback } }
         }
-    val libraryLoading = browsingAttachments && !libraryQuery.matchesNothing && libraryPager?.state?.loading != false
-    val libraryContent = GlobalAttachmentLibraryContent(libraryItems, libraryKinds, libraryLoading, libraryPager)
+    val libraryLoading =
+        browsingAttachments &&
+            !scopeFailed &&
+            (scopePending || (!libraryQuery.matchesNothing && libraryPager?.state?.loading != false))
+    val libraryContent =
+        GlobalAttachmentLibraryContent(
+            libraryItems,
+            libraryKinds,
+            libraryLoading,
+            libraryPager,
+            scopeFailed = browsingAttachments && scopeFailed,
+            onRetryScope = completeScopeState.retry,
+        )
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
     // address shows a loading state, then a `/.well-known/nostr.json` lookup
@@ -951,7 +993,19 @@ internal fun ChatsScreen(
     }
     var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
-    val searchSections =
+    val completeSearchSections =
+        rememberCompleteChatSearchSections(
+            appState = appState,
+            scope = completeScope,
+            state = globalSearchState,
+            rawQuery = trimmedQuery,
+            normalizedQuery = normalizedSearchQuery,
+            titleCopy = groupTitleCopy,
+            profileRevision = profileRev,
+            messageOnly = messageSearchConstraints != null,
+            searchActive = searchActive,
+        )
+    val windowSearchSections =
         // Keyed on the normalized query: whitespace and case-only edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
         remember(
@@ -963,7 +1017,7 @@ internal fun ChatsScreen(
             messageSearchConstraints,
         ) {
             val attempt =
-                if (searchActive) {
+                if (searchActive && completeScope == null) {
                     appState.beginHostPerformance(HostPerformanceOperationFfi.CONVERSATION_SEARCH)
                 } else {
                     null
@@ -982,6 +1036,7 @@ internal fun ChatsScreen(
                 throw throwable
             }
         }
+    val searchSections = completeSearchSections ?: windowSearchSections
     val visibleItems =
         remember(
             searchSections,
@@ -1881,11 +1936,11 @@ internal fun ChatsScreen(
         openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
     }
     val messageResultsActions =
-        remember(messageResults) {
+        remember(messageResults, scopeFailed, completeScopeState) {
             GlobalSearchResultsActions(
                 onOpen = { openMessageResult(it) },
                 onLoadMore = { messageResults?.loadMore() },
-                onRetry = { messageResults?.retry() },
+                onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() },
             )
         }
     val messageResultSelected =
