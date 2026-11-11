@@ -160,10 +160,20 @@ internal fun rememberGlobalSearchCompleteScope(
         when {
             !enabled -> GlobalSearchScopeStatus.Pending
             snapshot == null -> if (read.failed) GlobalSearchScopeStatus.Failed else GlobalSearchScopeStatus.Pending
-            else -> produced?.takeIf { it.first == fence }?.second ?: GlobalSearchScopeStatus.Pending
+            else -> {
+                produced?.takeIf { it.fence == fence && it.snapshot === snapshot }?.status
+                    ?: GlobalSearchScopeStatus.Pending
+            }
         }
     return GlobalSearchScopeState(status) { retryRevision += 1 }
 }
+
+/** A scope [status] and the [fence] and [snapshot] it was resolved from; it applies only while both are current. */
+private class ResolvedScope(
+    val fence: GlobalSearchScopeFence,
+    val snapshot: AccountWideForwardTargets,
+    val status: GlobalSearchScopeStatus,
+)
 
 /** The account-wide read this screen holds for the scope: its snapshot, and whether the latest read failed. */
 private class ScopeRead {
@@ -223,8 +233,9 @@ private fun rememberScopeSnapshot(
 }
 
 /**
- * The scope status resolved for [fence]; a late result for a fence that has moved on is dropped. Participant
- * folders re-resolve when a roster arrives, so the revision that publishes it is a key only for such folders.
+ * The scope status resolved for [fence] and [snapshot]; a late result for a fence that has moved on is dropped, and
+ * a status resolved from an earlier snapshot never applies to a newer one. Participant folders re-resolve when a
+ * roster arrives, so the revision that publishes it is a key only for such folders.
  */
 @Composable
 private fun rememberResolvedScope(
@@ -235,7 +246,7 @@ private fun rememberResolvedScope(
     snapshot: AccountWideForwardTargets?,
     fence: GlobalSearchScopeFence,
     retryRevision: Int,
-): Pair<GlobalSearchScopeFence, GlobalSearchScopeStatus>? {
+): ResolvedScope? {
     val currentFence by rememberUpdatedState(fence)
     val items = controller.items
     val archived = controller.archivedItems
@@ -252,7 +263,7 @@ private fun rememberResolvedScope(
     // once instead of being requested again on every revision.
     val attempted = remember(snapshot, fence, retryRevision) { HashSet<String>() }
     val produced =
-        produceState<Pair<GlobalSearchScopeFence, GlobalSearchScopeStatus>?>(
+        produceState<ResolvedScope?>(
             null,
             snapshot,
             items,
@@ -264,14 +275,14 @@ private fun rememberResolvedScope(
             rosterRevision,
             retryRevision,
         ) {
-            val publish = { status: GlobalSearchScopeStatus ->
-                // A late result for a fence that has moved on is dropped; a failed refresh withdraws the old scope.
-                if (fence == currentFence) value = fence to status
-            }
             val owner = snapshot?.takeIf { enabled }?.let { controller.captureChatListActionOwner() }
             if (snapshot == null || owner == null) {
-                publish(GlobalSearchScopeStatus.Pending)
+                value = null
                 return@produceState
+            }
+            val publish = { status: GlobalSearchScopeStatus ->
+                // A late result for a fence that has moved on is dropped; a failed refresh withdraws the old scope.
+                if (fence == currentFence) value = ResolvedScope(fence, snapshot, status)
             }
             val status =
                 runCatchingCancellable {

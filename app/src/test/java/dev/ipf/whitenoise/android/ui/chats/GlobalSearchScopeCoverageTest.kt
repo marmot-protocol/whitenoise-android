@@ -155,6 +155,35 @@ class GlobalSearchScopeCoverageTest {
         rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
     }
 
+    /** After a membership change, the scope proved for the previous snapshot is not searched while the new resolves. */
+    @Test fun previousScopeIsNotAppliedToANewerSnapshot() {
+        val model = prepared()
+        var calls = 0
+        val release = CompletableDeferred<Unit>()
+        model.chatListQueryIds = { _, _ ->
+            calls += 1
+            if (calls == 1) {
+                listOf(ACTION_TARGET)
+            } else {
+                release.await()
+                listOf(ACTION_TARGET, GROUP_EXTRA)
+            }
+        }
+        val folder = createFolder(model, ChatFolderRule(includeMuted = true))
+        openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
+        awaitReads { calls >= 2 }
+        model.timelineQueries.clear()
+        openSearch(GlobalSearchState(isOpen = true, query = "hello again", folderFilters = setOf(folder)))
+        settle()
+        assertTrue("the old scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
+        rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
+        release.complete(Unit)
+        awaitReads { model.scopedGroups.size >= 2 }
+        assertEquals(setOf(ACTION_TARGET, GROUP_EXTRA), model.scopedGroups)
+    }
+
     /** A scope answered after the account changed is dropped, so no query runs for the old account's chats. */
     @Test fun lateScopeAfterAccountSwitchIsDropped() {
         val model = prepared()
