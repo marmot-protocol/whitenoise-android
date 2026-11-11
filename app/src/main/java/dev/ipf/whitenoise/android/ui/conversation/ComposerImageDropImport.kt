@@ -120,10 +120,14 @@ internal class ComposerImageDropImport(
                 staged = fit.toSet()
             } finally {
                 reservedSlots -= reservation
-                activeImports -= 1
-                val undelivered = synchronized(copies) { copies.filterNot { it in staged } }
-                if (undelivered.isNotEmpty()) {
-                    withContext(NonCancellable + io) { undelivered.forEach { runCatching { discard(it) } } }
+                // The import stays active until its unstaged copies are gone, so nothing observes it half-cleaned.
+                try {
+                    val undelivered = synchronized(copies) { copies.filterNot { it in staged } }
+                    if (undelivered.isNotEmpty()) {
+                        withContext(NonCancellable + io) { undelivered.forEach { runCatching { discard(it) } } }
+                    }
+                } finally {
+                    activeImports -= 1
                 }
             }
         }
