@@ -1,0 +1,430 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+  "legacy_sha256": "2b55715d5634c9e94a1d50d96b64c9557d30bcf3b82bbf08486aa88ba3814575",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DiagnosticRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "fun DiagnosticRow(",
+        "test_ids": [
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "DiagnosticsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "fun DiagnosticsContent(",
+        "test_ids": [
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "DiagnosticsHealthSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "fun DiagnosticsHealthSheet(",
+        "test_ids": [
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "DiagnosticsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "fun DiagnosticsScreen(",
+        "test_ids": [
+          "SET-001",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "DiagnosticsStreamIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "fun DiagnosticsStreamIndicator(",
+        "test_ids": [
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "PerformanceDiagnosticsGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "fun PerformanceDiagnosticsGroup(",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "diagnosticValueLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "fun diagnosticValueLabel(",
+        "test_ids": [
+          "SET-021"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:accounts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.accounts",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.actions",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:active_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.active_account",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:attempts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.attempts",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:bootstrap_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.bootstrap_relays",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.clear",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:connected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.connected",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:connecting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.connecting",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:diagnostic_send_to_self_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.diagnostic_send_to_self_failed",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:diagnostic_sent_ping_to_self",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.diagnostic_sent_ping_to_self",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.diagnostics",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_events",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.diagnostics_events",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_health",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.diagnostics_health",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:diagnostics_no_events",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.diagnostics_no_events",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:disconnected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.disconnected",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:idle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.idle",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:live",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.live",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:no_relay_snapshot_yet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.no_relay_snapshot_yet",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:none",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.none",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:performance_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.performance_logs",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:performance_logs_active",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.performance_logs_active",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:performance_logs_export_included",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.performance_logs_export_included",
+        "test_ids": [
+          "SET-021",
+          "SEC-009"
+        ]
+      },
+      {
+        "surface": "string:performance_logs_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.performance_logs_description",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:performance_logs_inactive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.performance_logs_inactive",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.refresh",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:send_to_self",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.send_to_self",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:successes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.successes",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:total",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.total",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:waiting_for_events",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.waiting_for_events",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:copy_performance_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.copy_performance_logs",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:copy_performance_logs_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.copy_performance_logs_detail",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:relay_health",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.relay_health",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      },
+      {
+        "surface": "string:runtime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.runtime",
+        "test_ids": [
+          "NTF-024",
+          "SET-020",
+          "SET-021"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: DiagnosticsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "Diagnostics event stream released on every exit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "streamDiagnosticEvents(",
+        "test_ids": [
+          "SET-021"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

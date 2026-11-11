@@ -3333,11 +3333,14 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
 
-    /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
-    internal fun refreshDraftSummaries(accountRef: String) {
+    /**
+     * Refreshes draft summaries behind account, request, and local-fingerprint fences. Returns the
+     * refresh job, so tests can wait for its fenced publication rather than only the native read.
+     */
+    internal fun refreshDraftSummaries(accountRef: String): Job {
         val refresh = draftSummaryRefreshLifetime.advance()
         val expected = draftStore.captureSummaryRefresh(accountRef)
-        mutationsScope.launch {
+        return mutationsScope.launch {
             messageDraftRepository
                 .summaries(accountRef)
                 .onSuccess { summaries ->
@@ -6425,11 +6428,20 @@ class WhiteNoiseAppState private constructor(
         unreadCount: ULong,
     ) = accountUnreadStore.updateCount(accountRef, unreadCount)
 
+    /**
+     * Publishes a chat-list row fold only while no complete native total exists for [accountRef]. The fold sees
+     * just the bounded loaded rows, so it must not replace a Ready total that also counts chats outside the
+     * window, such as an older unread chat or a manual reminder (#3729).
+     */
     internal fun updateAccountUnreadProjection(
         accountRef: String?,
         unreadCount: ULong,
         hasManualUnread: Boolean,
-    ) = accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    ) {
+        val accountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+        if (accountIdHex != null && runtimeMirrors.attention.latest?.hasReadyTotal(accountIdHex) == true) return
+        accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    }
 
     /**
      * Accounts with at least one manually-marked-unread chat. A boolean
@@ -8415,7 +8427,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
+    /**
+     * Clears audit, dictation, and performance files while surfacing native deletion failures. Every
+     * listed file is attempted, but any failed native deletion makes the result a failure, so a
+     * deleted sibling never reports logs that are still on disk as cleared (#3705).
+     */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
@@ -8443,7 +8459,6 @@ class WhiteNoiseAppState private constructor(
             presentTransient(R.string.toast_no_audit_logs_to_delete)
             return false
         }
-        var anyDeleted = false
         for (file in files) {
             val outcome =
                 runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
@@ -8451,22 +8466,20 @@ class WhiteNoiseAppState private constructor(
                         if (engineFailure == null) engineFailure = it
                         appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
                     }.getOrNull() ?: continue
-            anyDeleted = true
             appStateDebug { "audit log deleted still_recording=${outcome.stillRecording}" }
         }
         cacheFailure?.let {
             presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             return false
         }
-        val deleted = anyDeleted || (preparedDeleted && engineFailure == null)
-        if (deleted) {
+        // Files were listed, so every one was deleted exactly when no native deletion failed.
+        val failure = engineFailure
+        if (failure == null) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
-            engineFailure?.let {
-                presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
-            } ?: present(R.string.toast_couldnt_delete_audit_logs)
+            presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", failure)
         }
-        return deleted
+        return failure == null
     }
 
     fun updateThemeMode(mode: AppThemeMode) {

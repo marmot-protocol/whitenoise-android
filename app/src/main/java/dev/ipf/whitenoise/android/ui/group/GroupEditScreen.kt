@@ -140,6 +140,10 @@ internal fun GroupEditScreen(
                 mutableStateOf(TextFieldValue(controller.group.name))
             }
         var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
+        // The values the editor opened with: a field the user left alone is not sent, even when
+        // another admin changes it while the editor is open (#3704).
+        val openedName = rememberSaveable(controller.group.groupIdHex) { controller.group.name }
+        val openedDescription = rememberSaveable(controller.group.groupIdHex) { controller.group.description }
         var showEmojiPicker by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
         var showImageSearch by remember { mutableStateOf(false) }
         var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
@@ -199,7 +203,7 @@ internal fun GroupEditScreen(
             controller.clearLastMutationError()
             appState.launchMutation {
                 try {
-                    if (controller.updateGroupProfile(name.text, description)) onBack()
+                    if (controller.updateGroupProfile(name.text, description, openedName, openedDescription)) onBack()
                 } finally {
                     saving = false
                 }

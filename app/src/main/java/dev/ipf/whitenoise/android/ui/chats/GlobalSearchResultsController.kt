@@ -52,7 +52,10 @@ internal class GlobalSearchResultsController(
     var state by mutableStateOf(GlobalSearchResultsState())
         private set
 
-    /** The query the current generation answers, or null before the first search and after [close]. */
+    /**
+     * The query the current generation answers, or null before the first search, after [close] and after a first
+     * page was dropped on [detach].
+     */
     var query: GlobalSearchResultsQuery? = null
         private set
 
@@ -204,12 +207,19 @@ internal class GlobalSearchResultsController(
      * after the return may. A page dropped here is read again from its cursor later.
      */
     fun detach() {
-        if (state.batches == 0) return
+        val firstPage = state.batches == 0
+        // With no batch yet there is nothing to recheck; only a first page in flight needs dropping.
+        if (firstPage && state.inFlight == null) return
         job?.cancel()
         refreshPending = false
         loadPending = false
         headOwed = false
         state.inFlight?.let { state = GlobalSearchResultsReducer.cancel(state, it) }
+        if (firstPage) {
+            // A dropped first page leaves no rows, so the return searches again from the start.
+            query = null
+            return
+        }
         stale = true
         recheckFailed = false
     }

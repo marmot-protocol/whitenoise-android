@@ -19,6 +19,16 @@
           "NTF-043"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Replacement posted after the open cutoff survives",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationRetirement.kt",
+        "anchor": "ConversationCardPostedRegistry.hasPostedAfter(key.tag, key.id, cutoffMs)",
+        "test_ids": [
+          "NTF-010"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

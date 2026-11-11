@@ -799,10 +799,34 @@ internal fun ChatsScreen(
         globalSearchState.folderFilters.isNotEmpty() ||
             globalSearchState.chatTypeFilters.isNotEmpty() ||
             globalSearchState.chatFilters.isNotEmpty()
+    // Search covers every chat of the account, not just the retained Home window (#3720).
+    val completeScopeState =
+        rememberGlobalSearchCompleteScope(
+            appState = appState,
+            controller = controller,
+            titleCopy = groupTitleCopy,
+            enabled = searchOpen && searchActive,
+            seed = completeUnreadSnapshot,
+            homeFolderId = selectedFolder?.id,
+            folderFilters = globalSearchState.folderFilters,
+            folderStore = folderStoreState,
+            // A changed query or filter waits for a proven scope; the same one keeps its last scope meanwhile.
+            queryKey = globalSearchState.copy(query = trimmedQuery, openFilterCategory = null),
+        )
+    val completeScope = completeScopeState.scope
+    val scopedChatIds =
+        remember(completeScope, libraryChatScoped, globalSearchState) {
+            completeScope?.takeIf { libraryChatScoped }?.scopedChatIds(globalSearchState)
+        }
+    // A chat-scoped search never runs on a window-only or empty scope while the complete one resolves.
+    val scopeUnresolved = searchOpen && searchActive && libraryChatScoped && completeScope == null
+    // A scope that failed to resolve shows the existing error state with Retry rather than loading forever.
+    val scopeFailed = scopeUnresolved && completeScopeState.failed
+    val scopePending = scopeUnresolved && !scopeFailed
     val libraryQuery =
-        remember(libraryChatScoped, scopedSourceList, messageSearchConstraints, libraryKinds, trimmedQuery) {
+        remember(libraryChatScoped, scopedChatIds, messageSearchConstraints, libraryKinds, trimmedQuery) {
             globalAttachmentLibraryQuery(
-                scopedChatIds = scopedSourceList.takeIf { libraryChatScoped }?.map { it.group.groupIdHex },
+                scopedChatIds = scopedChatIds,
                 constraints = messageSearchConstraints,
                 kinds = libraryKinds,
                 rawQuery = trimmedQuery,
@@ -816,11 +840,11 @@ internal fun ChatsScreen(
             messageFiltersActive = messageSearchConstraints != null,
         )
     val messageResultsQuery =
-        remember(trimmedQuery, messageSearchConstraints, libraryChatScoped, scopedSourceList) {
+        remember(trimmedQuery, messageSearchConstraints, scopedChatIds) {
             globalSearchResultsQuery(
                 rawQuery = trimmedQuery,
                 constraints = messageSearchConstraints,
-                scopedChatIds = scopedSourceList.takeIf { libraryChatScoped }?.map { it.group.groupIdHex },
+                scopedChatIds = scopedChatIds,
             )
         }
     val messageResults =
@@ -830,14 +854,21 @@ internal fun ChatsScreen(
             messageResultsQuery,
             messageResultsMode,
             searchViewport?.messageResults,
+            paused = scopeUnresolved,
         )
-    val messageResultsState = messageResults?.shownState(messageResultsQuery)
+    val messageResultsState =
+        if (scopeFailed) {
+            GlobalSearchResultsState(generation = 0, batches = 1, failed = true)
+        } else {
+            messageResults?.shownState(messageResultsQuery)
+        }
     // Pending until the session adopts this query, and on a return to a held session (#1945) until its first
     // recheck lands, so a restored deep viewport never measures a shorter list and no row unverified since the
     // reader came back is shown. Rows of an older query are never shown.
     // A failed recheck stays pending too, so a restored deep anchor keeps its guard until Retry succeeds.
     val messageResultsPending =
-        messageResultsMode && (messageResultsState == null || messageResults?.recheckFailed == true)
+        messageResultsMode &&
+            (scopePending || messageResultsState == null || messageResults?.recheckFailed == true)
     val messageResultChats =
         rememberSearchChats(
             controller,
@@ -851,7 +882,7 @@ internal fun ChatsScreen(
             appState,
             libraryAccount,
             libraryQuery,
-            browsingAttachments,
+            browsingAttachments && !scopeUnresolved,
             searchViewport?.libraryExtent,
         )
     // A returning session holds its rows back until it has reread as far as before, so the grid keeps its place.
@@ -874,8 +905,19 @@ internal fun ChatsScreen(
             val fallback = groupTitleCopy.unavailableConversationTitle
             libraryEntries.mapNotNull { entry -> entry.toLibraryItem { libraryTitles[it.lowercase()] ?: fallback } }
         }
-    val libraryLoading = browsingAttachments && !libraryQuery.matchesNothing && libraryPager?.state?.loading != false
-    val libraryContent = GlobalAttachmentLibraryContent(libraryItems, libraryKinds, libraryLoading, libraryPager)
+    val libraryLoading =
+        browsingAttachments &&
+            !scopeFailed &&
+            (scopePending || (!libraryQuery.matchesNothing && libraryPager?.state?.loading != false))
+    val libraryContent =
+        GlobalAttachmentLibraryContent(
+            libraryItems,
+            libraryKinds,
+            libraryLoading,
+            libraryPager,
+            scopeFailed = browsingAttachments && scopeFailed,
+            onRetryScope = completeScopeState.retry,
+        )
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
     // address shows a loading state, then a `/.well-known/nostr.json` lookup
@@ -951,7 +993,19 @@ internal fun ChatsScreen(
     }
     var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
-    val searchSections =
+    val completeSearchSections =
+        rememberCompleteChatSearchSections(
+            appState = appState,
+            scope = completeScope,
+            state = globalSearchState,
+            rawQuery = trimmedQuery,
+            normalizedQuery = normalizedSearchQuery,
+            titleCopy = groupTitleCopy,
+            profileRevision = profileRev,
+            messageOnly = messageSearchConstraints != null,
+            searchActive = searchActive,
+        )
+    val windowSearchSections =
         // Keyed on the normalized query: whitespace and case-only edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
         remember(
@@ -963,7 +1017,7 @@ internal fun ChatsScreen(
             messageSearchConstraints,
         ) {
             val attempt =
-                if (searchActive) {
+                if (searchActive && completeScope == null) {
                     appState.beginHostPerformance(HostPerformanceOperationFfi.CONVERSATION_SEARCH)
                 } else {
                     null
@@ -982,6 +1036,7 @@ internal fun ChatsScreen(
                 throw throwable
             }
         }
+    val searchSections = completeSearchSections ?: windowSearchSections
     val visibleItems =
         remember(
             searchSections,
@@ -1183,11 +1238,11 @@ internal fun ChatsScreen(
             } ?: loaded
         }
     val bulkArchiveAction = selectionActions.archiveAction
-    // Engine-normalized manual order of the pinned block, for the selection
-    // bar's move actions. Ids keep the projection's casing — they round-trip
-    // straight back into setPinnedChatOrder, which must receive the pinned
-    // set exactly. Active items suffice: the engine only pins unarchived
-    // chats and clears a pin on archive, so no archived row can be pinned.
+    // Engine-normalized order of the loaded pinned rows, which decides where a
+    // row sits for its Move up/down menu. It covers only the loaded window, so
+    // moves themselves read MDK's complete pin order (#3709). Active items
+    // suffice: the engine only pins unarchived chats and clears a pin on
+    // archive, so no archived row can be pinned.
     val pinnedOrderedIds =
         remember(controller.items) {
             controller.items
@@ -1334,20 +1389,44 @@ internal fun ChatsScreen(
         }
     }
 
+    /**
+     * Moves [ids] by [delta] within MDK's complete pin order, never the loaded window, and tells the
+     * user when the order did not change. Selection and single-row moves share this path (#3709).
+     */
+    fun movePinnedChats(
+        ids: Set<String>,
+        delta: Int,
+        fromSelection: Boolean = true,
+    ) {
+        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
+        appState.launchMutation {
+            val result =
+                runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
+                    .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
+            // The unchanged notice describes a selection; a single row already at the end just stays put.
+            val quiet =
+                result == ChatListPinMoveResult.MOVED ||
+                    (!fromSelection && result == ChatListPinMoveResult.UNCHANGED)
+            if (controller.chatListActionIsCurrent(owner) && !quiet) {
+                val message =
+                    when (result) {
+                        ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
+                        ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
+                        else -> R.string.chat_batch_order_failed
+                    }
+                appState.presentTransient(resources.getString(message))
+            }
+        }
+    }
+
+    /** Moves one pinned row from its long-press menu through the complete-order path. */
     fun movePinnedChat(
         item: ChatListItem,
         delta: Int,
     ) {
-        val index = pinnedIndex(item) ?: return
-        val target = index + delta
-        if (target !in pinnedOrderedIds.indices) return
-        val reordered =
-            pinnedOrderedIds.toMutableList().also { ids ->
-                val id = ids.removeAt(index)
-                ids.add(target, id)
-            }
+        if (pinnedIndex(item) == null) return
         clearSelection()
-        appState.launchMutation { controller.setPinnedOrder(reordered) }
+        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta, fromSelection = false)
     }
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
@@ -1857,11 +1936,11 @@ internal fun ChatsScreen(
         openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
     }
     val messageResultsActions =
-        remember(messageResults) {
+        remember(messageResults, scopeFailed, completeScopeState) {
             GlobalSearchResultsActions(
                 onOpen = { openMessageResult(it) },
                 onLoadMore = { messageResults?.loadMore() },
-                onRetry = { messageResults?.retry() },
+                onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() },
             )
         }
     val messageResultSelected =
@@ -2084,7 +2163,8 @@ internal fun ChatsScreen(
                             pinned = item.pinned(),
                             showPinToggle = !item.group.archived,
                             showMovePinnedUp = (pinnedIndex ?: 0) > 0,
-                            showMovePinnedDown = pinnedIndex != null && pinnedIndex < pinnedOrderedIds.lastIndex,
+                            // Pins below the loaded window still count; a move at the true end leaves the row in place.
+                            showMovePinnedDown = pinnedIndex != null,
                             onMarkRead = { markChatRead(item, unread = false) },
                             onMarkUnread = { markChatRead(item, unread = true) },
                             onAddToFolder = { openFolderPicker(listOf(item)) },
@@ -2396,30 +2476,7 @@ internal fun ChatsScreen(
                         },
                         onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
                         onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
-                        onMovePinned = { delta ->
-                            val owner = controller.captureChatListActionOwner { batchScope.get() }
-                            val ids = selectedChatIds.toSet()
-                            if (owner != null) {
-                                appState.launchMutation {
-                                    val result =
-                                        runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
-                                            .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-                                    if (
-                                        controller.chatListActionIsCurrent(owner) &&
-                                        result != ChatListPinMoveResult.MOVED
-                                    ) {
-                                        val message =
-                                            when (result) {
-                                                ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
-                                                ChatListPinMoveResult.UNCONFIRMED ->
-                                                    R.string.chat_batch_order_unconfirmed
-                                                else -> R.string.chat_batch_order_failed
-                                            }
-                                        appState.presentTransient(resources.getString(message))
-                                    }
-                                }
-                            }
-                        },
+                        onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) },
                         onSelectAll = {
                             selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
                             // #2925: extend past the loaded window to MDK's complete view where it owns membership.

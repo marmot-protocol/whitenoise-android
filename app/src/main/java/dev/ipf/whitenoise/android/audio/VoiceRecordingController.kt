@@ -150,6 +150,9 @@ class VoiceRecordingController internal constructor(
     private var restarting = false
     private var restartJob: Job? = null
     private var startJob: Job? = null
+
+    // A discarded take's native close. A new take waits for it before opening a recorder (#3707).
+    private var discardJob: Job? = null
     private val startRequests = StalenessGuard()
 
     /** Starts or resumes the single recording request accepted by this controller. */
@@ -193,7 +196,7 @@ class VoiceRecordingController internal constructor(
         // stop/cancel. A denied grant means the mic is unavailable (e.g. an
         // active call) — surface it rather than capture competing audio.
         if (!requestRecordingFocus()) {
-            releaseMicrophoneLease()
+            releaseMicrophoneLeaseUnlessDiscarding()
             onError(IllegalStateException("Couldn't start recording — audio is in use"))
             return false
         }
@@ -201,12 +204,20 @@ class VoiceRecordingController internal constructor(
         isRecording = true
         resetRecordingUiState()
         val generation = nextStartGeneration()
-        val launched = scope.launch(mainDispatcher) { beginRecording(generation) }
+        val discarding = discardJob?.takeIf { it.isActive }
+        val launched =
+            scope.launch(mainDispatcher) {
+                // Opening a second recorder while a discarded one still holds the mic can fail on devices
+                // without concurrent capture, so wait for that close first.
+                discarding?.join()
+                beginRecording(generation)
+            }
         startJob = launched
         launched.invokeOnCompletion {
             if (startJob === launched) startJob = null
             val captureStopped = !isRecording && recorder == null
-            val noPendingFinalize = finalizeJob?.isActive != true && restartJob?.isActive != true
+            val noPendingFinalize =
+                finalizeJob?.isActive != true && restartJob?.isActive != true && discardJob?.isActive != true
             if (captureStopped && noPendingFinalize) {
                 releaseMicrophoneLease()
             }
@@ -472,7 +483,7 @@ class VoiceRecordingController internal constructor(
             resetRecordingUiState()
             abandonRecordingFocus()
             val pendingStart = startJob
-            if (pendingStart == null) releaseMicrophoneLease() else pendingStart.cancel()
+            if (pendingStart == null) releaseMicrophoneLeaseUnlessDiscarding() else pendingStart.cancel()
             return
         }
         recorder = null
@@ -497,14 +508,22 @@ class VoiceRecordingController internal constructor(
         if (r != null) {
             // A discarded take is still closing until the native recorder has released the microphone.
             finalizingTakes++
-            recorderScope.launch {
-                try {
-                    r.cancel()
-                } finally {
-                    releaseMicrophoneLease()
-                    withContext(NonCancellable + mainDispatcher) { finalizingTakes-- }
+            discardJob =
+                recorderScope.launch {
+                    try {
+                        r.cancel()
+                    } finally {
+                        withContext(NonCancellable + mainDispatcher) {
+                            finalizingTakes--
+                            // A newer take that holds a recorder or is still opening one owns the shared lease
+                            // and releases it itself. A start that is only cancelling leaves the lease here,
+                            // since it defers to this still-active job, and so does a stale isRecording flag.
+                            if (recorder == null && startJob?.isActive != true && restartJob?.isActive != true) {
+                                releaseMicrophoneLease()
+                            }
+                        }
+                    }
                 }
-            }
         } else if (finalizeJob?.isActive == true) {
             // stop() already detached the recorder into its finalize job. End
             // the tail and cancel delivery, but keep the lease until that job's
@@ -512,7 +531,7 @@ class VoiceRecordingController internal constructor(
             tailCut?.complete(Unit)
             finalizeJob?.cancel()
         } else {
-            releaseMicrophoneLease()
+            releaseMicrophoneLeaseUnlessDiscarding()
         }
     }
 
@@ -554,6 +573,15 @@ class VoiceRecordingController internal constructor(
             microphoneLeaseHeld = acquired
             acquired
         }
+    }
+
+    /**
+     * Releases the lease now unless a discarded take is still closing its recorder, in which case that
+     * cleanup releases it once the microphone is actually free (#3707).
+     */
+    private fun releaseMicrophoneLeaseUnlessDiscarding() {
+        if (discardJob?.isActive == true) return
+        releaseMicrophoneLease()
     }
 
     private fun releaseMicrophoneLease() {

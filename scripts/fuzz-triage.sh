@@ -31,6 +31,7 @@ Usage: scripts/fuzz-triage.sh <gradle-task> [reproducer-file] [subtarget-name]
 Supported tasks:
   :fuzz:fuzzZapstoreProtocol
   :fuzz:fuzzIdentityReference
+  :fuzz:fuzzGroupSystemEvent
   :fuzz:fuzzNip55SignerProtocol
   :fuzz:fuzzImageContainerBytes
   :fuzz:fuzzTriageSelfCheck
@@ -151,6 +152,9 @@ subtarget_name_for_id() {
         *) return 1 ;;
       esac
       ;;
+    :fuzz:fuzzGroupSystemEvent)
+      printf '%s' "Json"
+      ;;
     :fuzz:fuzzNip55SignerProtocol)
       subtarget_id=$((subtarget_id % 3))
       case "$subtarget_id" in
@@ -183,6 +187,11 @@ lookup_mapping() {
       ENTRY_METHOD="fuzzIdentityReference"
       GRADLE_TASK="fuzzIdentityReference"
       ;;
+    :fuzz:fuzzGroupSystemEvent)
+      TEST_CLASS="dev.ipf.whitenoise.android.fuzz.GroupSystemEventFuzzTest"
+      ENTRY_METHOD="fuzzGroupSystemEvent"
+      GRADLE_TASK="fuzzGroupSystemEvent"
+      ;;
     :fuzz:fuzzNip55SignerProtocol)
       TEST_CLASS="dev.ipf.whitenoise.android.fuzz.Nip55SignerProtocolFuzzTest"
       ENTRY_METHOD="fuzzNip55SignerProtocol"
@@ -214,6 +223,7 @@ lookup_mapping() {
     RecipientNormalize) SUBTARGET_ID=1 ;;
     RecipientTokenize) SUBTARGET_ID=2 ;;
     PlausibleClipboard) SUBTARGET_ID=3 ;;
+    Json) SUBTARGET_ID=0 ;;
     ParseContentRow) SUBTARGET_ID=0 ;;
     ParseActivityResult) SUBTARGET_ID=1 ;;
     SignedEventPubkeyHelpers) SUBTARGET_ID=2 ;;
@@ -345,7 +355,29 @@ self_check_passing_replay() {
     "fuzz/src/test/resources/dev/ipf/whitenoise/android/fuzz/Nip55SignerProtocolFuzzTestInputs/fuzzNip55SignerProtocol/parse_activity_result.input"
 }
 
+campaign_targets() {
+  sed -n '/^TARGETS=($/,/^)$/{/^  [A-Za-z0-9]*$/p;}' scripts/fuzz-run-campaign.sh
+}
+
+self_check_campaign_mappings() {
+  local targets
+  targets="$(campaign_targets)"
+  if [[ -z "$targets" ]]; then
+    log "self_check=failed step=campaign_mapping reason=no_campaign_targets"
+    exit 1
+  fi
+  local target name
+  for target in $targets; do
+    if ! name="$(subtarget_name_for_id ":fuzz:$target" 0)" ||
+      ! (lookup_mapping ":fuzz:$target" "$name"); then
+      log "self_check=failed step=campaign_mapping target=:fuzz:$target"
+      exit 1
+    fi
+  done
+}
+
 self_check() {
+  self_check_campaign_mappings
   local mapped_name
   if ! mapped_name="$(subtarget_name_for_id :fuzz:fuzzZapstoreProtocol 253)" ||
     [[ "$mapped_name" != "RelayEnvelopeFrames" ]]; then
@@ -403,12 +435,17 @@ if [[ -n "$REPRO" ]]; then
     log "ERROR: reproducer not found: $REPRO"
     exit 1
   fi
+  REPRO_DIGEST="$(digest "$REPRO")"
+  TRIAGE_STAGE="resolve"
   if ! resolve_subtarget "$TARGET" "$REPRO" "$SUBTARGET"; then
     log "ERROR: unknown task/subtarget combination: $TARGET ${SUBTARGET:-$REPRO}"
+    # Record a digest-only receipt so a campaign never loses an unmapped
+    # finding; the raw input is not copied anywhere.
+    TRIAGE_STATUS="unsupported_target"
+    write_triage_metadata
     usage
     exit 1
   fi
-  REPRO_DIGEST="$(digest "$REPRO")"
   if [[ -n "${SUBTARGET:-}" ]]; then
     log "subtarget=$SUBTARGET id=$SUBTARGET_ID digest=$REPRO_DIGEST"
   else

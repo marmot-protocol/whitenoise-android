@@ -20,7 +20,7 @@ class AccountSetupRelayPreviewTest {
         runTest {
             val preview = relayPreviewSnapshot().let { it.copy(proposal = it.proposal!!.copy(relayRepair = null)) }
             val client = previewClient(preview)
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -44,7 +44,15 @@ class AccountSetupRelayPreviewTest {
             client.hold = previewWait
             client.beforeSnapshot = { if (client.snapshotReads > 1) client.hold = cleanupWait }
             var current = true
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { current }, {}, {})
+            val controller =
+                AccountSetupController(
+                    SETUP_TEST_ACCOUNT,
+                    client,
+                    backgroundScope,
+                    { current },
+                    { true },
+                    {},
+                )
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -91,7 +99,7 @@ class AccountSetupRelayPreviewTest {
             val client = FakeSetupClient(relayDecision()).apply { hold = CompletableDeferred() }
             val newer = preview.copy(revision = 5uL)
             client.executeResult = { preview }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)

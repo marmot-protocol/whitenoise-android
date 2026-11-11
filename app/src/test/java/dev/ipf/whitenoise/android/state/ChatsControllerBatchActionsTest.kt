@@ -231,6 +231,22 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /**
+     * A single-row move of the only loaded pin submits the complete native order, so the pins outside
+     * the retained window keep their relative order instead of the move failing as partial (#3709).
+     */
+    @Test fun singleRowMoveKeepsHiddenPinsInTheSubmittedOrder() =
+        runTest {
+            val fixture = Fixture(this, setOf(B))
+            listOf(A, B, C).forEachIndexed { index, id ->
+                fixture.rows[id] = fixture.rows.getValue(id).copy(pinned = true, pinnedPosition = index.toUInt())
+            }
+            val owner = fixture.controller.captureChatListActionOwner()!!
+            assertEquals(ChatListPinMoveResult.MOVED, fixture.controller.movePinnedSelection(setOf(B), 1, owner))
+            assertEquals(listOf(A, C, B), fixture.lastPinOrder)
+            fixture.controller.onCleared()
+        }
+
     /** Native unread counters already satisfy Mark unread without another setter. */
     @Test fun numericUnreadTargetsStayUnreadWithoutAnotherSetterOrToggle() =
         runTest {

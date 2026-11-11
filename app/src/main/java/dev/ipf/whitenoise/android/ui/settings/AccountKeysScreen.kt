@@ -153,12 +153,14 @@ private class ProfileKeysUiState {
     var saveErrorDialog by mutableStateOf(false)
     var expiredExportDialog by mutableStateOf(false)
     var exportBusy by mutableStateOf(false)
+    var savingExport by mutableStateOf(false)
     var wipeSheet by mutableStateOf(false)
     var wipeConfirm by mutableStateOf(false)
     var wipeConfirmInput by mutableStateOf("")
     val exportOperation = ProfileKeyOperation()
     val copyOperation = ProfileKeyOperation()
     val revealOperation = ProfileKeyOperation()
+    val saveOperation = ProfileKeyOperation()
     val password = TextFieldState()
     val confirmation = TextFieldState()
 
@@ -179,9 +181,18 @@ private class ProfileKeysUiState {
         clearPasswords()
     }
 
-    /** Prevents delayed exports, clipboard writes and reveals after backgrounding or leaving this account. */
+    /** True when no export is being prepared, picked or written. */
+    val exportIdle: Boolean
+        get() = !exportBusy && pendingExport == null && !savingExport
+
+    /**
+     * Prevents delayed exports, file saves and feedback, clipboard writes and reveals after backgrounding or leaving
+     * this account.
+     */
     fun stopSensitiveOperations() {
         cancelExport()
+        saveOperation.cancel()
+        savingExport = false
         copyOperation.cancel()
         hidePrivateKey()
         copiedKey = null
@@ -245,6 +256,23 @@ internal fun AccountKeysScreen(
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
+    /** Writes the picked document on IO; only the still-owning, started screen hears whether it failed. */
+    fun saveExport(
+        uri: Uri,
+        content: String,
+    ) {
+        ui.savingExport = true
+        val started =
+            ui.saveOperation.start(
+                scope = scope,
+                canDeliver = ::canDeliverSecret,
+                load = { writeKeyExport(content) { context.contentResolver.openOutputStream(uri) } },
+                onResult = { saved -> ui.saveErrorDialog = !saved },
+                onFinished = { ui.savingExport = false },
+            )
+        if (!started) ui.savingExport = false
+    }
+
     val exportLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
             val request = ui.pendingExport
@@ -252,7 +280,7 @@ internal fun AccountKeysScreen(
             when {
                 uri == null || !canDeliverSecret() -> Unit
                 request == null || request.isExpired() -> ui.expiredExportDialog = true
-                else -> ui.saveErrorDialog = !writeExport(context, uri, request.content)
+                else -> saveExport(uri, request.content)
             }
         }
 
@@ -277,8 +305,7 @@ internal fun AccountKeysScreen(
         encrypted: Boolean,
         destination: KeyExportDestination,
     ) {
-        val exportIdle = !ui.exportBusy && ui.pendingExport == null
-        if (!hasLocalKey || !exportIdle || !canDeliverSecret()) return
+        if (!hasLocalKey || !ui.exportIdle || !canDeliverSecret()) return
         if (encrypted &&
             !encryptedBackupPassphraseInputsValid(
                 ui.password.text.toString(),
@@ -494,7 +521,7 @@ private fun ProfileKeysList(
     onSignOut: () -> Unit,
 ) {
     val revealed = ui.privateKey != null
-    val exportsEnabled = ui.pendingExport == null && !ui.exportBusy
+    val exportsEnabled = ui.exportIdle
     SettingsList {
         if (identity == null) {
             item(key = "search.AccountKeys.1") { SettingsExplainer(stringResource(R.string.no_active_account_period)) }
@@ -1006,16 +1033,6 @@ private fun sharePrivateKey(
                 clipData = clip
             }
         context.startActivity(Intent.createChooser(intent, title))
-    }.isSuccess
-
-/** Writes an export to the document the user picked; false when the stream could not be written. */
-private fun writeExport(
-    context: Context,
-    uri: Uri,
-    content: String,
-): Boolean =
-    runCatching {
-        checkNotNull(context.contentResolver.openOutputStream(uri)).bufferedWriter().use { it.write(content) }
     }.isSuccess
 
 /** Copies [text] to the clipboard; sensitive clips stay out of the clipboard preview and history. */

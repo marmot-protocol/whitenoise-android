@@ -15,12 +15,21 @@ class AuditLogDeleteSemanticsCoverageTest {
                 .substringBefore("fun updateThemeMode")
 
         assertFalse(body.contains("var anyDeleted = preparedDeleted"))
-        assertTrue(body.contains("var anyDeleted = false"))
         assertTrue(body.contains("cacheFailure?.let"))
         assertTrue(body.contains("if (preparedDeleted)"))
         assertTrue(body.indexOf("cacheFailure?.let") < body.indexOf("if (preparedDeleted)"))
-        assertTrue(body.contains("engineFailure?.let"))
-        assertTrue(body.contains("preparedDeleted && engineFailure == null"))
+    }
+
+    /** Checks that one deleted file cannot turn a failed sibling deletion into a cleared result (#3705). */
+    @Test
+    fun anyFailedNativeDeletionMakesTheResultAFailure() {
+        val body =
+            appStateSource()
+                .substringAfter("suspend fun deleteAuditLogs(): Boolean {")
+                .substringBefore("fun updateThemeMode")
+
+        assertFalse("a successful sibling must not override a recorded failure", body.contains("anyDeleted ||"))
+        assertTrue(body.contains("val failure = engineFailure") && body.contains("return failure == null"))
     }
 
     /** Reads the production delete path from either Gradle's module or repository working directory. */

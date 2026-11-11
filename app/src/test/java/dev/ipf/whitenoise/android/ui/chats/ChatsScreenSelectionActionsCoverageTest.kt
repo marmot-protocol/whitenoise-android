@@ -49,7 +49,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val source = chatsScreenSource().readText()
         assertTrue(
             "message results own their failure at the list boundary, never a full-screen error",
-            "messageResultsMode -> Unit" in source && "onRetry = { messageResults?.retry() }" in source,
+            "messageResultsMode -> Unit" in source &&
+                "onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() }" in source,
         )
         val list = File(chatsScreenSource().parentFile, "GlobalSearchResultsList.kt").readText()
         assertTrue(
@@ -59,7 +60,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val library = File(chatsScreenSource().parentFile, "GlobalAttachmentLibraryHost.kt").readText()
         assertTrue(
             "attachment failures have recoverable presentation",
-            "failed = failure != null," in library && "onRetry = loadMore," in library,
+            "failed = failure != null || library.scopeFailed," in library &&
+                "onRetry = if (library.scopeFailed) library.onRetryScope else loadMore," in library,
         )
         val controller = File(chatsScreenSource().parentFile, "GlobalSearchResultsController.kt").readText()
         assertTrue(
@@ -114,7 +116,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "ordering uses complete native universe",
-            "controller.movePinnedSelection(ids, delta, owner)" in controls,
+            "onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) }" in controls &&
+                "controller.movePinnedSelection(ids, delta, owner)" in source,
         )
         assertFalse(
             "bulk never forwards to a selection-clearing helper",
@@ -236,6 +239,11 @@ class ChatsScreenSelectionActionsCoverageTest {
             "showMovePinnedUp" in actionSheet &&
                 "showMovePinnedDown" in actionSheet &&
                 "onMovePinned = { delta -> movePinnedChat(item, delta) }" in actionSheet,
+        )
+        val singleMove = source.requiredSection(start = "fun movePinnedChat(", end = "\n    }\n")
+        assertTrue(
+            "a single-row move submits through the complete native pin order, not the loaded window (#3709)",
+            "movePinnedChats(setOf(" in singleMove && "pinnedOrderedIds" !in singleMove,
         )
     }
 

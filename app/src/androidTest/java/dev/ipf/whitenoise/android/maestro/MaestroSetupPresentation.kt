@@ -28,7 +28,14 @@ internal fun MaestroSetupPresentation(fixture: MaestroPresentationFixture) {
     val client = remember { PresentationSetupClient(fixture) }
     val controller =
         remember {
-            AccountSetupController(client.account, client, lifetime, { true }, {}, { fixture.finish("cancelled") })
+            AccountSetupController(
+                client.account,
+                client,
+                lifetime,
+                { true },
+                { true },
+                { fixture.finish("cancelled") },
+            )
         }
     DisposableEffect(controller) {
         onDispose { lifetime.cancel() }

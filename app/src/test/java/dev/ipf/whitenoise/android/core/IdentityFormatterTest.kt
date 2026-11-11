@@ -435,4 +435,28 @@ class IdentityFormatterTest {
     private companion object {
         val FIXED_NOW: Instant = Instant.parse("2025-06-30T12:00:00Z")
     }
+
+    @Test
+    fun localDateIsNullForUnrepresentableReceivedStamps() {
+        val kiritimati = ZoneId.of("Pacific/Kiritimati")
+        val samoaWest = ZoneId.of("Etc/GMT+12")
+        assertEquals(java.time.LocalDate.of(1970, 1, 1), IdentityFormatter.localDate(0uL, ZoneOffset.UTC))
+        assertEquals(java.time.LocalDate.of(1969, 12, 31), IdentityFormatter.localDate(0uL, samoaWest))
+        assertEquals(java.time.LocalDate.of(2026, 6, 6), IdentityFormatter.localDate(1_780_787_662uL, ZoneOffset.UTC))
+        assertEquals(java.time.LocalDate.of(10000, 1, 1), IdentityFormatter.localDate(253_402_300_799uL, kiritimati))
+        val invalid =
+            listOf(
+                253_402_300_800uL,
+                40_000_000_000_000_000uL,
+                Instant.MAX.epochSecond.toULong(),
+                Long.MAX_VALUE.toULong(),
+                ULong.MAX_VALUE,
+            )
+        for (stamp in invalid) {
+            assertEquals(null, IdentityFormatter.localDate(stamp, kiritimati))
+            assertEquals(java.time.LocalDate.of(10000, 1, 1), IdentityFormatter.clampedLocalDate(stamp, kiritimati))
+            val utc = IdentityFormatter.clampedLocalDate(stamp, ZoneOffset.UTC)
+            assertEquals(java.time.LocalDate.of(9999, 12, 31), utc)
+        }
+    }
 }

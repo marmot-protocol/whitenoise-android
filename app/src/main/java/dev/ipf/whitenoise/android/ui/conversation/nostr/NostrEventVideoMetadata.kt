@@ -46,16 +46,18 @@ private fun String?.isPlayableVideoMimeType(): Boolean {
     return startsWith("video/") || this in PLAYLIST_VIDEO_MIME_TYPES
 }
 
-internal fun imetaProperties(tag: List<String>): Map<String, List<String>> =
-    buildMap {
-        tag.drop(1).forEach { field ->
-            val separator = field.indexOf(' ')
-            if (separator <= 0 || separator == field.lastIndex) return@forEach
-            val name = field.substring(0, separator).lowercase(Locale.ROOT)
-            val value = field.substring(separator + 1).trim()
-            if (value.isNotEmpty()) put(name, get(name).orEmpty() + value)
-        }
+/** Each `name value` field's values in author order. A repeated name appends in place, so a long tag stays linear. */
+internal fun imetaProperties(tag: List<String>): Map<String, List<String>> {
+    val properties = mutableMapOf<String, MutableList<String>>()
+    tag.drop(1).forEach { field ->
+        val separator = field.indexOf(' ')
+        if (separator <= 0 || separator == field.lastIndex) return@forEach
+        val name = field.substring(0, separator).lowercase(Locale.ROOT)
+        val value = field.substring(separator + 1).trim()
+        if (value.isNotEmpty()) properties.getOrPut(name, ::mutableListOf).add(value)
     }
+    return properties
+}
 
 /** Initial and redirected playback requests enforce the same public-HTTPS policy at dial time. */
 internal fun safeNostrMediaUrl(raw: String?): String? {

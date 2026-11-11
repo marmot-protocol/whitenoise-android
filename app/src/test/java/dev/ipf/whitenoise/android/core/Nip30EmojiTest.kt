@@ -169,4 +169,59 @@ class Nip30EmojiTest {
     fun tagNamesTheShortcodeWithoutColonsAndTheUrl() {
         assertEquals(listOf("emoji", "party", "https://a/party"), Nip30Emoji.tag(":party:", "https://a/party"))
     }
+
+    /** Reads of each element, so a test can bound work without timing it. */
+    private class CountingList<T>(
+        private val items: List<T>,
+    ) : AbstractList<T>() {
+        var reads = 0
+        override val size: Int get() = items.size
+
+        override fun get(index: Int): T {
+            reads++
+            return items[index]
+        }
+    }
+
+    /** Many definitions against many locators that never match read each locator once and stop at the code budget. */
+    @Test
+    fun allMissDefinitionsIndexLocatorsOnceWithinTheCodeBudget() {
+        val count = 10_000
+        val locators = CountingList(List(count) { MediaLocatorFfi("x", "x:a") })
+        val image = reference("image/png").copy(locators = locators)
+        val tags = CountingList(List(count) { tag("emoji", "e%05d".format(it), "x:b") })
+
+        val defined = Nip30Emoji.attachmentShortcodes(tags, listOf(IndexedValue(0, image)))
+
+        assertEquals(emptyMap<Int, List<String>>(), defined)
+        assertEquals(count, locators.reads)
+        assertEquals(Nip30Emoji.MAX_TAGS, tags.reads)
+    }
+
+    /** Every code naming every image cannot grow the result past the code and image budgets. */
+    @Test
+    fun manyMatchesStayWithinTheCodeAndImageBudgets() {
+        val over = Nip30Emoji.MAX_TAGS + 36
+        val attachments = List(over) { IndexedValue(it * 2, reference("image/png", "https://a/same")) }
+        val tags = List(over) { tag("emoji", "c$it", "https://a/same") }
+
+        val defined = Nip30Emoji.attachmentShortcodes(tags, attachments)
+
+        val codes = List(Nip30Emoji.MAX_TAGS) { ":c$it:" }
+        assertEquals(List(Nip30Emoji.MAX_TAGS) { it * 2 }, defined.keys.toList())
+        defined.values.forEach { assertEquals(codes, it) }
+    }
+
+    /** A definition after malformed and repeated rows still resolves; only distinct valid codes use the budget. */
+    @Test
+    fun malformedAndRepeatedRowsDoNotSpendTheCodeBudget() {
+        val attachments = listOf(IndexedValue(0, reference("image/png", "https://a/x")))
+        val noise =
+            List(Nip30Emoji.MAX_TAGS * 2) {
+                if (it % 2 == 0) tag("emoji", "bad code", "https://a/x") else tag("emoji", "x", "https://a/y")
+            }
+        val tags = noise + tag("emoji", "late", "https://a/x")
+
+        assertEquals(mapOf(0 to listOf(":late:")), Nip30Emoji.attachmentShortcodes(tags, attachments))
+    }
 }

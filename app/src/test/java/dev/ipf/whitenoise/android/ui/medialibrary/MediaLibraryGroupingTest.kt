@@ -35,4 +35,16 @@ class MediaLibraryGroupingTest {
         month: Int,
         day: Int,
     ): ULong = ZonedDateTime.of(year, month, day, 12, 0, 0, 0, ZoneId.systemDefault()).toEpochSecond().toULong()
+
+    @Test
+    fun unrepresentableStampsGroupAsTheNewestMonthInsteadOfThrowing() {
+        val ordinary = epochSeconds(2024, 2, 10)
+        val items = listOf(ULong.MAX_VALUE, 40_000_000_000_000_000uL, ordinary)
+
+        val sections = groupIntoMonthSections(items) { it }
+
+        assertEquals(2, sections.size)
+        assertEquals(listOf(ULong.MAX_VALUE, 40_000_000_000_000_000uL), sections[0].items)
+        assertEquals(listOf(ordinary), sections[1].items)
+    }
 }
