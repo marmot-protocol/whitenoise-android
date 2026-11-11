@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -129,6 +130,11 @@ class TtsSentenceAccessibilityTest {
         composeRule.onNodeWithText("Next").performClick()
         composeRule.onNodeWithText("1. Line 0.").assertDoesNotExist()
         composeRule.onNodeWithText("Next").assertDoesNotExist()
+        // Back returns to the first page, and each page opens at its top.
+        composeRule.onNodeWithText("Back").performClick()
+        composeRule.onNodeWithText("1. Line 0.").assertIsDisplayed()
+        composeRule.onNodeWithText("Next").performClick()
+        composeRule.onNodeWithText("201. Line 200.").assertIsDisplayed()
         composeRule.onNodeWithText("250. Line 249.").performScrollTo().performClick()
         assertEquals(listOf(choices.last()), selected)
     }

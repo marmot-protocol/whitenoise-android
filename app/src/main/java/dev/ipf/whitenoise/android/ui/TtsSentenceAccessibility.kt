@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -8,6 +9,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -138,7 +140,8 @@ private fun sentenceChooserActions(
             onDismissRequest = { choosing = false },
             title = { Text(chooseLabel) },
             text = {
-                Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
+                // Each page starts at its top rather than the previous page's scroll position.
+                Column(Modifier.fadingVerticalScroll(key(page) { rememberScrollState() })) {
                     pages.getOrNull(page).orEmpty().forEach { choice ->
                         TextButton(onClick = {
                             owner?.select?.invoke(choice)
@@ -150,8 +153,16 @@ private fun sentenceChooserActions(
                 }
             },
             confirmButton = {
-                if (page < pages.lastIndex) {
-                    TextButton(onClick = { page += 1 }) { Text(stringResource(R.string.next)) }
+                // A single page keeps the dialog's original button row.
+                if (pages.size > 1) {
+                    Row {
+                        if (page > 0) {
+                            TextButton(onClick = { page -= 1 }) { Text(stringResource(R.string.back)) }
+                        }
+                        if (page < pages.lastIndex) {
+                            TextButton(onClick = { page += 1 }) { Text(stringResource(R.string.next)) }
+                        }
+                    }
                 }
             },
             dismissButton = {
