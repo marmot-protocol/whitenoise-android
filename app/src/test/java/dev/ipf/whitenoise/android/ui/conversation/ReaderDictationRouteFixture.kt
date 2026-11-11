@@ -15,8 +15,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -29,6 +27,8 @@ import kotlinx.coroutines.cancel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.robolectric.util.ReflectionHelpers
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener as RecognitionListener
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession as RecognitionSession
 
 /** Uses the production draft and mounted send route with synthetic recognition and target validation. */
 internal class ReaderDictationRouteFixture(
@@ -131,17 +131,15 @@ internal class ReaderDictationRouteFixture(
 }
 
 private class ReaderDictationPlatform : ConversationDictationPlatform {
-    lateinit var listener: ConversationDictationRecognitionListener
+    lateinit var listener: RecognitionListener
 
     override fun hasRecordAudioPermission() = true
 
     override fun recognitionAvailable() = true
 
-    override fun createSession(
-        listener: ConversationDictationRecognitionListener,
-    ): ConversationDictationRecognitionSession {
+    override fun createSession(listener: RecognitionListener): RecognitionSession {
         this.listener = listener
-        return object : ConversationDictationRecognitionSession {
+        return object : RecognitionSession {
             override fun start() = Unit
 
             override fun stop() = Unit
