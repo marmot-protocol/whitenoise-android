@@ -92,7 +92,8 @@ internal fun LocationPickerScreen(
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
         val scope = rememberCoroutineScope()
-        val lookups = remember(scope) { LocationLookupOwner(scope) }
+        // The picker looks up the device location as soon as it opens, so it starts in progress.
+        val lookups = remember(scope) { LocationLookupOwner(scope, initiallyLocating = true) }
         var selectedCenter by remember { mutableStateOf<SharedLocation?>(null) }
         val mapView =
             remember {
@@ -152,6 +153,10 @@ internal fun LocationPickerScreen(
         }
 
         fun centerOnCurrent() {
+            // Finish any fling or earlier animation first: its scroll frames would otherwise count as a
+            // manual pan and retire this explicit request.
+            mapView.controller.stopPanning()
+            mapView.controller.stopAnimation(false)
             lookups.start(lookup = { locationLookup(context, hasFineGrant) }) { current ->
                 selectedCenter = current
                 mapView.controller.animateTo(GeoPoint(current.latitude, current.longitude))

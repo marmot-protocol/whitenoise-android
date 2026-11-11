@@ -94,6 +94,20 @@ class LocationLookupOwnerTest {
             assertFalse(owner.locating)
         }
 
+    /** A lookup that throws ends its progress without publishing, instead of leaving the spinner running. */
+    @Test
+    fun failedLookupEndsProgress() =
+        runTest {
+            val published = mutableListOf<SharedLocation>()
+            val owner = LocationLookupOwner(this, initiallyLocating = true)
+
+            owner.start(lookup = { throw SecurityException("permission revoked") }, publish = published::add)
+            runCurrent()
+
+            assertTrue(published.isEmpty())
+            assertFalse(owner.locating)
+        }
+
     /** A provider that ignores cancellation and still answers after its request was retired. */
     private suspend fun staleReply(reply: Reply): SharedLocation? = withContext(NonCancellable) { reply.await() }
 

@@ -61,7 +61,7 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
-    /** Erasing only the description sends an explicit empty description, the native clear, not "keep". */
+    /** Erasing only the description sends an explicit empty description, the native clear, and keeps the name. */
     @Test
     fun clearingTheDescriptionSendsAnExplicitEmptyValue() =
         runBlocking {
@@ -74,28 +74,54 @@ class GroupRenameChatListProjectionTest {
 
             assertTrue(conversation.updateGroupProfile(" $OLD_NAME ", "   "))
 
-            assertEquals(listOf<Pair<String?, String?>>(OLD_NAME to ""), sent)
+            assertEquals(listOf<Pair<String?, String?>>(null to ""), sent)
             assertEquals("", conversation.group.description)
             assertEquals(OLD_NAME, conversation.group.name)
         }
 
-    /** Erasing the name is sent as an explicit empty name, so native validation decides instead of keeping it. */
+    /** A rename leaves the untouched description null, so MDK keeps the canonical one instead of this projection's. */
     @Test
-    fun clearingTheNameSendsAnExplicitEmptyValue() =
+    fun renameLeavesTheUntouchedDescriptionToNativeState() =
+        runBlocking {
+            val appState = testAppState()
+            val sent = mutableListOf<Pair<String?, String?>>()
+            val conversation =
+                conversationController(appState) { _, _, name, description -> sent += name to description }
+
+            assertTrue(conversation.updateGroupProfile(NEW_NAME, ""))
+
+            assertEquals(listOf<Pair<String?, String?>>(NEW_NAME to null), sent)
+        }
+
+    /** Erasing both fields clears both: MDK accepts an empty group name and description. */
+    @Test
+    fun clearingBothFieldsSendsTwoExplicitClears() =
         runBlocking {
             val appState = testAppState()
             val sent = mutableListOf<Pair<String?, String?>>()
             val conversation =
                 conversationController(appState, description = "old details") { _, _, name, description ->
                     sent += name to description
-                    error("group name is required")
                 }
 
-            assertFalse(conversation.updateGroupProfile("", "old details"))
+            assertTrue(conversation.updateGroupProfile("", ""))
 
-            assertEquals(listOf<Pair<String?, String?>>("" to "old details"), sent)
-            assertEquals(OLD_NAME, conversation.group.name)
-            assertEquals("old details", conversation.group.description)
+            assertEquals(listOf<Pair<String?, String?>>("" to ""), sent)
+            assertEquals("", conversation.group.name)
+            assertEquals("", conversation.group.description)
+        }
+
+    /** Saving without a change makes no native call. */
+    @Test
+    fun unchangedProfileMakesNoNativeCall() =
+        runBlocking {
+            val appState = testAppState()
+            var calls = 0
+            val conversation = conversationController(appState, description = "same") { _, _, _, _ -> calls += 1 }
+
+            assertTrue(conversation.updateGroupProfile(OLD_NAME, "same"))
+
+            assertEquals(0, calls)
         }
 
     /** A folder scoped to this chat, and the archived list, both carry the new name. */

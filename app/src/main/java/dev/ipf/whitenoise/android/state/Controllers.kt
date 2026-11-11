@@ -11469,9 +11469,10 @@ class ConversationController(
         }
 
     /**
-     * Commits both fields of the group editor. A field the user erased is sent as an explicit empty
-     * string, which MDK applies as a clear, because a null field means "keep" and would leave the
-     * old value on every member's device (#3704). Clearing both is left to native validation.
+     * Commits the fields the user changed in the group editor. An unchanged field is sent as null, so
+     * MDK carries it forward from canonical group state rather than from this possibly lagging
+     * projection. A changed field is sent as its trimmed text, so an erased one arrives as the
+     * explicit empty string MDK applies as a clear (#3704).
      */
     suspend fun updateGroupProfile(
         name: String,
@@ -11480,8 +11481,9 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val updatedName = name.trim()
-            val updatedDescription = description.trim()
+            val updatedName = name.trim().takeIf { it != group.name }
+            val updatedDescription = description.trim().takeIf { it != group.description }
+            if (updatedName == null && updatedDescription == null) return@withMutationLockResult true
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     groupProfileUpdater(account, group.groupIdHex, updatedName, updatedDescription)
@@ -11489,7 +11491,7 @@ class ConversationController(
                 // Reflect the committed profile locally so the header and every chat-list
                 // projection agree immediately, rather than after the group-state
                 // subscription converges (#2696).
-                applyLocalGroupProfile(updatedName, updatedDescription, account)
+                applyLocalGroupProfile(updatedName ?: group.name, updatedDescription ?: group.description, account)
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {

@@ -1183,11 +1183,11 @@ internal fun ChatsScreen(
             } ?: loaded
         }
     val bulkArchiveAction = selectionActions.archiveAction
-    // Engine-normalized manual order of the pinned block, for the selection
-    // bar's move actions. Ids keep the projection's casing — they round-trip
-    // straight back into setPinnedChatOrder, which must receive the pinned
-    // set exactly. Active items suffice: the engine only pins unarchived
-    // chats and clears a pin on archive, so no archived row can be pinned.
+    // Engine-normalized order of the loaded pinned rows, which decides where a
+    // row sits for its Move up/down menu. It covers only the loaded window, so
+    // moves themselves read MDK's complete pin order (#3709). Active items
+    // suffice: the engine only pins unarchived chats and clears a pin on
+    // archive, so no archived row can be pinned.
     val pinnedOrderedIds =
         remember(controller.items) {
             controller.items
@@ -2103,7 +2103,8 @@ internal fun ChatsScreen(
                             pinned = item.pinned(),
                             showPinToggle = !item.group.archived,
                             showMovePinnedUp = (pinnedIndex ?: 0) > 0,
-                            showMovePinnedDown = pinnedIndex != null && pinnedIndex < pinnedOrderedIds.lastIndex,
+                            // Pins below the loaded window still count; a move at the true end reports unchanged.
+                            showMovePinnedDown = pinnedIndex != null,
                             onMarkRead = { markChatRead(item, unread = false) },
                             onMarkUnread = { markChatRead(item, unread = true) },
                             onAddToFolder = { openFolderPicker(listOf(item)) },

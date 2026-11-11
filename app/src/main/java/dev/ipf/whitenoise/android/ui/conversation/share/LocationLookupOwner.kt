@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.share
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -14,12 +15,13 @@ import kotlinx.coroutines.launch
  */
 internal class LocationLookupOwner(
     private val scope: CoroutineScope,
+    initiallyLocating: Boolean = false,
 ) {
     private var request = 0
     private var job: Job? = null
 
     /** Whether the current request is still looking up the device location. */
-    var locating by mutableStateOf(false)
+    var locating by mutableStateOf(initiallyLocating)
         private set
 
     /** Cancels the outstanding lookup, if any; whatever it returns later is ignored. */
@@ -30,7 +32,10 @@ internal class LocationLookupOwner(
         locating = false
     }
 
-    /** Starts a lookup that replaces any older one and hands a found location to [publish] while still current. */
+    /**
+     * Starts a lookup that replaces any older one and hands a found location to [publish] while still
+     * current. A lookup that throws counts as no fix, so its progress always ends.
+     */
     fun start(
         lookup: suspend () -> SharedLocation?,
         publish: (SharedLocation) -> Unit,
@@ -40,7 +45,7 @@ internal class LocationLookupOwner(
         locating = true
         job =
             scope.launch {
-                val found = lookup()
+                val found = runCatchingCancellable { lookup() }.getOrNull()
                 if (owned != request) return@launch
                 found?.let(publish)
                 locating = false

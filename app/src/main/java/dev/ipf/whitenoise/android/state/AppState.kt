@@ -8461,15 +8461,13 @@ class WhiteNoiseAppState private constructor(
             return false
         }
         // Files were listed, so every one was deleted exactly when no native deletion failed.
-        val deleted = engineFailure == null
-        if (deleted) {
+        val failure = engineFailure
+        if (failure == null) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
-            engineFailure?.let {
-                presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
-            } ?: present(R.string.toast_couldnt_delete_audit_logs)
+            presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", failure)
         }
-        return deleted
+        return failure == null
     }
 
     fun updateThemeMode(mode: AppThemeMode) {
