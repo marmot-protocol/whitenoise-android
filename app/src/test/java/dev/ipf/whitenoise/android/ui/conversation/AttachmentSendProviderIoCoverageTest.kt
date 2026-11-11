@@ -79,12 +79,15 @@ class AttachmentSendProviderIoCoverageTest {
             assertAllGetTypeOffMain()
         }
 
-    /** Cancelling the send while the provider is held ends preparation without a result once getType returns. */
+    /**
+     * Cancelling the send while the provider is held ends preparation without a result once getType returns. The
+     * failed video pick is what makes preparation classify, and so read the provider, at all.
+     */
     @Test
     fun cancellingWhileTheProviderIsHeldEndsPreparation() =
         providerFixture { sender ->
             BlockingTypeProvider.held += PHOTO
-            val prepared = prepare(sender, listOf(slot(PHOTO)), mapOf(PHOTO to photo()))
+            val prepared = prepare(sender, listOf(slot(PHOTO), slot(VIDEO)), mapOf(PHOTO to photo()))
 
             awaitHeldGetType()
             prepared.cancel()
