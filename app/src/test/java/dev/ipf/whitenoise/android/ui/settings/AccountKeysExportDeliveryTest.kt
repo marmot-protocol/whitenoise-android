@@ -192,7 +192,10 @@ class AccountKeysExportDeliveryTest {
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
     }
 
-    /** A slow provider is opened off the main thread; the screen stays responsive and export stays locked until it ends. */
+    /**
+     * A slow provider is opened off the main thread; the screen stays responsive and export stays locked until it
+     * ends.
+     */
     @Test
     fun slowProviderWritesOffMainAndHoldsExportUntilSaved() {
         val provider = BlockingProvider(fail = false)

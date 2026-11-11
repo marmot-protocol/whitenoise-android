@@ -898,6 +898,15 @@
         ]
       },
       {
+        "surface": "Key export file save runs off the main thread and keeps export locked until it ends",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun saveExport(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011"
+        ]
+      },
+      {
         "surface": "button:profile_keys.wipe_confirm",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "testTag(\"profile_keys.wipe_confirm\")",

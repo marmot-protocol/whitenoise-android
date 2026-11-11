@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * thread, because a slow or remote document provider would freeze the app while it holds secret material.
  */
 class KeyExportProviderDispatchCoverageTest {
-    /** The returned-URI callback hands the provider only to [writeKeyExport], through the cancellable save operation. */
+    /** The returned-URI callback hands the provider only to [writeKeyExport] through the cancellable save operation. */
     @Test
     fun pickerCallbackReachesTheProviderOnlyThroughTheOffMainWriter() {
         val screen = appModuleSource(ACCOUNT_KEYS)

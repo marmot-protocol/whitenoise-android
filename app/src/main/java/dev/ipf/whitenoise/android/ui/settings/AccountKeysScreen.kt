@@ -185,7 +185,10 @@ private class ProfileKeysUiState {
     val exportIdle: Boolean
         get() = !exportBusy && pendingExport == null && !savingExport
 
-    /** Prevents delayed exports, file feedback, clipboard writes and reveals after backgrounding or leaving this account. */
+    /**
+     * Prevents delayed exports, file saves and feedback, clipboard writes and reveals after backgrounding or leaving
+     * this account.
+     */
     fun stopSensitiveOperations() {
         cancelExport()
         saveOperation.cancel()
