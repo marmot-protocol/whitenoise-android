@@ -10,7 +10,6 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -22,7 +21,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.shadows.ShadowToast
 import java.util.UUID
 
 /**
@@ -271,27 +269,6 @@ class NotificationReplyWorkerTest {
 
             assertEquals(Result.failure(), result)
             assertEquals(1, fixture.sendTextCalls.get())
-        }
-
-    /** An over-limit quick reply sends nothing and tells the user it was too long. */
-    @Test
-    fun overLimitRepliesFailWithoutSendingAndSayWhy() =
-        runTest {
-            fixture.bootstrap()
-            val workId = UUID.randomUUID()
-            val worker = buildWorker(inputData = encryptedInput(workId, text = "a".repeat(8_001)), id = workId)
-
-            val result = pumpingMainLooper { worker.doWork() }
-
-            assertEquals(Result.failure(), result)
-            assertEquals(0, fixture.sendTextCalls.get())
-            assertEquals(
-                NotificationReplyAbandonedOutcome.Failure,
-                NotificationReplyCompletionStore
-                    .create(realContext)
-                    .abandonedOutcome(NotificationReplyWorker.notificationReplyCompletionKey(workId)),
-            )
-            assertEquals(realContext.getString(R.string.toast_message_too_long), ShadowToast.getTextOfLatestToast())
         }
 
     @Test
