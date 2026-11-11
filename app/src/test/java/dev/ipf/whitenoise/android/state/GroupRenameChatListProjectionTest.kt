@@ -344,6 +344,47 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
+    /** A newer name on the group-record stream ends a clear's fence, so a later rename back is shown. */
+    @Test
+    fun newerGroupRecordEndsTheClearFence() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.foldGroupRecordForTest(group(name = NEW_NAME))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            val item = chats.items.single()
+            assertEquals(OLD_NAME, item.group.name)
+            chats.onCleared()
+        }
+
+    /** A description-only save does not fence a name the subscription changed during the commit. */
+    @Test
+    fun descriptionSaveLeavesANameChangedDuringTheCommitUnfenced() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            lateinit var conversation: ConversationController
+            conversation =
+                conversationController(appState) { _, _, _, _ ->
+                    conversation.applyGroupStateForTest(group(name = ""))
+                }
+
+            assertTrue(conversation.updateGroupProfile(OLD_NAME, "described"))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.applyChatListRow(row(groupName = OLD_NAME))
+            flushChatListRecompute()
+
+            val item = chats.items.single()
+            assertEquals(OLD_NAME, item.group.name)
+            chats.onCleared()
+        }
+
     /** A rejected clear leaves the existing description in place. */
     @Test
     fun failedClearLeavesTheDescription() =

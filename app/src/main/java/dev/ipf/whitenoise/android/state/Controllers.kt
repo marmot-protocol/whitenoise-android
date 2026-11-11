@@ -2282,9 +2282,14 @@ class ChatsController private constructor(
         scheduleRecompute()
     }
 
-    /** [record] carrying the retained local name in place of one this device just renamed away from. */
-    private fun withRetainedName(record: AppGroupRecordFfi): AppGroupRecordFfi =
-        localGroupNames.retainedFor(record.groupIdHex, record.name)?.let { record.copy(name = it) } ?: record
+    /**
+     * [record] carrying the retained local name in place of one this device just renamed away from.
+     * A newer name ends the fence.
+     */
+    private fun withRetainedName(record: AppGroupRecordFfi): AppGroupRecordFfi {
+        val name = localGroupNames.reconcileRecord(record.groupIdHex, record.name)
+        return if (name == record.name) record else record.copy(name = name)
+    }
 
     /** Invalidates authoritative roster state while retaining display-only continuity. */
     private fun invalidateMemberCacheForGroup(groupIdHex: String) {
@@ -11523,8 +11528,8 @@ class ConversationController(
                 // subscription converges (#2696).
                 applyLocalGroupProfile(
                     before = before,
-                    name = updatedName ?: group.name,
-                    description = updatedDescription ?: group.description,
+                    updatedName = updatedName,
+                    updatedDescription = updatedDescription,
                     account = account,
                 )
                 presentConversationTransient(R.string.toast_group_updated)
@@ -11542,17 +11547,24 @@ class ConversationController(
      */
     private fun applyLocalGroupProfile(
         before: AppGroupRecordFfi,
-        name: String,
-        description: String,
+        updatedName: String?,
+        updatedDescription: String?,
         account: String,
     ) {
         // [before] is the record the edit was made against: the subscription may already have applied
-        // the committed profile, and the fences still need the values it replaced.
-        if (before.name == name && before.description == description) return
-        localGroupNames.record(group.groupIdHex, previousName = before.name, committedName = name)
-        localGroupDescriptions.record(group.groupIdHex, previousName = before.description, committedName = description)
-        val clearedName = before.name.takeIf { name.isBlank() && it.isNotBlank() }
-        group = group.copy(name = name, description = description)
+        // the committed profile, and the fences still need the values it replaced. Only the fields
+        // this save changed are fenced; the other one keeps whatever the subscription last applied.
+        val newName = updatedName?.takeIf { it != before.name }
+        val newDescription = updatedDescription?.takeIf { it != before.description }
+        if (newName == null && newDescription == null) return
+        newName?.let { localGroupNames.record(group.groupIdHex, before.name, it) }
+        newDescription?.let { localGroupDescriptions.record(group.groupIdHex, before.description, it) }
+        val clearedName = before.name.takeIf { newName?.isBlank() == true && it.isNotBlank() }
+        group =
+            group.copy(
+                name = updatedName ?: group.name,
+                description = updatedDescription ?: group.description,
+            )
         appState.applyLocalGroupUpdate(group, account, clearedName = clearedName)
     }
 

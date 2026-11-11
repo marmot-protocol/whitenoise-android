@@ -71,6 +71,22 @@ internal class LocalGroupNameAuthority {
     }
 
     /**
+     * The name a group record should carry given its authoritative [incomingName].
+     *
+     * The record stream answers a superseded name like [reconcile], but only a name other than the
+     * committed one ends the fence there; agreement is left to the chat-list row.
+     */
+    fun reconcileRecord(
+        groupIdHex: String,
+        incomingName: String,
+    ): String {
+        retainedFor(groupIdHex, incomingName)?.let { return it }
+        val committed = key(groupIdHex)?.let(commitsByGroup::get)?.committed
+        if (committed != null && incomingName != committed) forget(groupIdHex)
+        return incomingName
+    }
+
+    /**
      * The retained name to show instead of a superseded [incomingName], else null.
      *
      * Unlike [reconcile] this never retires a record, so the row and its prepared presentation can
