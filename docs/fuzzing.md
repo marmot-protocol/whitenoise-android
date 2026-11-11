@@ -128,7 +128,7 @@ Manual follow-up before retention:
 2. Copy the privacy-reviewed minimized input into `fuzz/regression-corpus/<target>/`
 3. Re-run `./gradlew :fuzz:replayAllFuzzRegression`
 
-Uploaded triage metadata contains only target/subtarget names, digests, engine version, elapsed time, stage/status, and sanitized exception class. Full Jazzer engine logs stay local under the gitignored build directory.
+Uploaded triage metadata contains only target/subtarget names, digests, engine version, elapsed time, stage/status, and sanitized exception class. A reproducer whose task or subtarget has no mapping still leaves a digest-only receipt with `triage_stage=resolve` and `triage_status=unsupported_target`; `--self-check` fails when a campaign target lacks a mapping. Full Jazzer engine logs stay local under the gitignored build directory.
 
 ### Sensitive findings
 

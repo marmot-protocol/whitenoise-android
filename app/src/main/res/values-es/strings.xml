@@ -884,6 +884,9 @@
     <string name="toast_couldnt_accept_invite">No se pudo aceptar la invitación</string>
     <string name="toast_invite_declined">Rechazar</string>
     <string name="toast_couldnt_decline_invite">No se pudo rechazar la invitación</string>
+    <string name="invite_decline_step_down_title">¿Dejar de ser admin y rechazar?</string>
+    <string name="invite_decline_step_down_message">Esta invitación te hace admin. Para rechazarla, primero dejarás de ser admin y los miembros del grupo lo verán.</string>
+    <string name="invite_decline_step_down_confirm">Dejar de ser admin y rechazar</string>
     <string name="toast_chat_archived">Chat archivado</string>
     <string name="toast_chat_restored">Chat restaurado</string>
     <string name="toast_couldnt_update_chat">No se pudo actualizar el chat</string>
@@ -1921,6 +1924,9 @@
     <string name="global_search_content_any_attachment">Cualquier adjunto</string>
     <string name="global_search_results_end">Fin de los resultados</string>
     <string name="global_search_results_search_older">Buscar mensajes anteriores</string>
+    <string name="search_quick_filter_by_me">Míos</string>
+    <string name="search_result_unavailable">Este mensaje ya no está disponible</string>
+    <string name="search_result_open_failed_retry">No se pudo abrir el mensaje. Reintentar</string>
     <string name="text_attachment_open_external">Abrir en otra aplicación</string>
     <string name="text_attachment_filename">Nombre del archivo</string>
     <string name="text_attachment_view_full_filename">Ver nombre completo</string>
@@ -2138,6 +2144,10 @@
     <string name="group_recovery_failed_reinvites">No se pudieron restaurar algunas invitaciones. Vuelve a invitar a esas personas desde Detalles del grupo.</string>
     <string name="group_recovery_review_invitation_from">Revisar invitación de %1$s · época %2$s</string>
     <string name="group_recovery_check_failed">No se pudo comprobar la recuperación del grupo. Inténtalo de nuevo.</string>
+    <string name="group_convergence_parked">Este chat dejó de sincronizarse. Los mensajes que envíes esperarán hasta que se ponga al día.</string>
+    <string name="group_convergence_retrying">Reintentando…</string>
+    <string name="group_convergence_retry_still_parked">Este chat todavía no se sincroniza. Inténtalo de nuevo más tarde.</string>
+    <string name="group_convergence_retry_failed">No se pudo reintentar la sincronización de este chat. Inténtalo de nuevo más tarde.</string>
     <string name="group_history_may_be_incomplete">Es posible que falten algunos mensajes anteriores en este chat.</string>
     <string name="group_history_before_rejoin">Te has vuelto a unir a este chat. Es posible que falten mensajes de antes de que volvieras a unirte.</string>
     <string name="account_history_may_be_incomplete">Es posible que falten algunos mensajes en esta cuenta. White Noise no pudo confirmar que llegaran todos los mensajes.</string>

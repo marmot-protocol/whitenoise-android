@@ -39,6 +39,7 @@ import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -2146,6 +2147,9 @@ class ConversationSendRetryIntegrationTest {
                     appState = appState,
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
+                    // The default parser hops to Dispatchers.IO, which runCurrent never waits for, and the send
+                    // finishes only after its bubble is parsed, so a slow runner failed the completion check below.
+                    markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
                     customEmojiReader = { text ->
                         if (':' !in text) return@ConversationController listOf(partyArtwork())
                         lookupStarted.complete(Unit)

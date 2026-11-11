@@ -920,6 +920,9 @@
     <string name="toast_couldnt_accept_invite">Не удалось принять приглашение</string>
     <string name="toast_invite_declined">Отклонить</string>
     <string name="toast_couldnt_decline_invite">Не удалось отклонить приглашение</string>
+    <string name="invite_decline_step_down_title">Сложить права админа и отклонить?</string>
+    <string name="invite_decline_step_down_message">По этому приглашению вы админ. Чтобы отклонить его, вы сначала сложите права админа, и участники группы это увидят.</string>
+    <string name="invite_decline_step_down_confirm">Сложить права и отклонить</string>
     <string name="toast_chat_archived">Чат в архиве</string>
     <string name="toast_chat_restored">Чат восстановлен</string>
     <string name="toast_couldnt_update_chat">Не удалось обновить чат</string>
@@ -2003,6 +2006,9 @@
     <string name="global_search_content_any_attachment">Любое вложение</string>
     <string name="global_search_results_end">Больше результатов нет</string>
     <string name="global_search_results_search_older">Искать в более ранних сообщениях</string>
+    <string name="search_quick_filter_by_me">Мои</string>
+    <string name="search_result_unavailable">Это сообщение больше недоступно</string>
+    <string name="search_result_open_failed_retry">Не удалось открыть сообщение. Повторить</string>
     <string name="text_attachment_open_external">Открыть в другом приложении</string>
     <string name="text_attachment_filename">Имя файла</string>
     <string name="text_attachment_view_full_filename">Показать полное имя</string>
@@ -2207,6 +2213,10 @@
     <string name="group_recovery_failed_reinvites">Некоторые приглашения не удалось восстановить. Пригласите этих людей снова в разделе сведений о группе.</string>
     <string name="group_recovery_review_invitation_from">Проверить приглашение от %1$s · эпоха %2$s</string>
     <string name="group_recovery_check_failed">Не удалось проверить восстановление группы. Повторите попытку.</string>
+    <string name="group_convergence_parked">Этот чат перестал синхронизироваться. Отправленные вами сообщения будут ждать, пока он не обновится.</string>
+    <string name="group_convergence_retrying">Повторная попытка…</string>
+    <string name="group_convergence_retry_still_parked">Этот чат всё ещё не синхронизируется. Повторите попытку позже.</string>
+    <string name="group_convergence_retry_failed">Не удалось повторить синхронизацию этого чата. Повторите попытку позже.</string>
     <string name="group_history_may_be_incomplete">В этом чате могут отсутствовать некоторые более ранние сообщения.</string>
     <string name="group_history_before_rejoin">Вы снова присоединились к этому чату. Сообщения до повторного вступления могут отсутствовать.</string>
     <string name="account_history_may_be_incomplete">В этом аккаунте могут отсутствовать некоторые сообщения. White Noise не удалось подтвердить, что все сообщения были получены.</string>

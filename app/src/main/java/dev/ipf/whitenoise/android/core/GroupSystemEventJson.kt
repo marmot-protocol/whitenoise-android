@@ -77,10 +77,11 @@ object GroupSystemEventJson {
 
     /**
      * A linear pre-scan prevents excessive strings, nesting, and collections
-     * from reaching org.json. Malformed inputs that stay inside the limits are
-     * still handed to the parser so fuzzing exercises its error paths.
+     * from reaching org.json. Lenient syntax that could hide brackets from the
+     * count is rejected here; other malformed inputs that stay inside the
+     * limits still reach the parser so fuzzing exercises its error paths.
      */
-    private fun withinResourceBounds(plaintext: String): Boolean =
+    internal fun withinResourceBounds(plaintext: String): Boolean =
         !utf8LengthExceedsLimit(plaintext) &&
             JsonStructureBoundsScanner().scan(plaintext)
 
@@ -107,11 +108,23 @@ object GroupSystemEventJson {
         return false
     }
 
+    /**
+     * Rejects the lenient syntax that could make the counted structure differ
+     * from the structure org.json parses.
+     *
+     * Android's JSONTokener also accepts comments, single-quoted strings,
+     * `;` and `=` separators and unquoted literals that may contain quotes.
+     * Each of those can hide brackets from a counting scanner, so they are
+     * rejected rather than modelled: kind-1210 content is produced by a
+     * strict JSON serializer. Unquoted literals without quotes still pass,
+     * because they end at the first structural character and cannot hide one.
+     */
     private class JsonStructureBoundsScanner {
         private val membersByDepth = IntArray(MAX_JSON_DEPTH + 1)
         private var depth = 0
-        private var quote: Char? = null
+        private var inString = false
         private var escaped = false
+        private var afterLiteral = false
 
         fun scan(plaintext: String): Boolean {
             plaintext.forEach { character ->
@@ -121,34 +134,34 @@ object GroupSystemEventJson {
         }
 
         private fun consume(character: Char): Boolean {
-            val activeQuote = quote
-            if (activeQuote != null) {
-                consumeQuoted(character, activeQuote)
+            if (inString) {
+                consumeQuoted(character)
                 return true
             }
+            val previousWasLiteral = afterLiteral
+            afterLiteral = isLiteralCharacter(character)
             return when (character) {
-                '\'', '"' -> startQuote(character)
+                '"' -> startString(previousWasLiteral)
                 '{', '[' -> startContainer()
                 '}', ']' -> endContainer()
-                ',', ';' -> consumeSeparator()
-                else -> true
+                ',' -> consumeSeparator()
+                ':', ' ', '\t', '\n', '\r' -> true
+                else -> afterLiteral
             }
         }
 
-        private fun consumeQuoted(
-            character: Char,
-            activeQuote: Char,
-        ) {
+        private fun consumeQuoted(character: Char) {
             when {
                 escaped -> escaped = false
                 character == '\\' -> escaped = true
-                character == activeQuote -> quote = null
+                character == '"' -> inString = false
             }
         }
 
-        private fun startQuote(character: Char): Boolean {
-            quote = character
-            return true
+        /** A quote glued to a literal is part of that literal on Android, not a string. */
+        private fun startString(previousWasLiteral: Boolean): Boolean {
+            inString = true
+            return !previousWasLiteral
         }
 
         private fun startContainer(): Boolean {
@@ -160,10 +173,9 @@ object GroupSystemEventJson {
         }
 
         private fun endContainer(): Boolean {
-            if (depth > 0) {
-                membersByDepth[depth] = 0
-                depth--
-            }
+            if (depth == 0) return false
+            membersByDepth[depth] = 0
+            depth--
             return true
         }
 
@@ -171,6 +183,14 @@ object GroupSystemEventJson {
             if (depth > 0) membersByDepth[depth]++
             return depth == 0 || membersByDepth[depth] <= MAX_COLLECTION_ELEMENTS
         }
+
+        private fun isLiteralCharacter(character: Char): Boolean =
+            character in 'a'..'z' ||
+                character in 'A'..'Z' ||
+                character in '0'..'9' ||
+                character == '+' ||
+                character == '-' ||
+                character == '.'
     }
 
     private const val ASCII_MAX = 0x7F

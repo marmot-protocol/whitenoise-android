@@ -30,7 +30,31 @@ internal fun nostrEventReferences(document: MarkdownDocumentFfi): List<NostrEven
  */
 internal fun mayNameNostrEventCardReference(text: String): Boolean =
     EVENT_ENTITY_PREFIX.containsMatchIn(text) &&
-        (NOSTR_EVENT_URI.containsMatchIn(text) || HTTP_EVENT_LINK.containsMatchIn(text.withoutMarkdownEscapes()))
+        (NOSTR_EVENT_URI.containsMatchIn(text) || text.withoutMarkdownEscapes().containsHttpEventLink())
+
+/**
+ * Whether an unbroken run of non-whitespace carries an HTTP(S) scheme and, after it, the NIP-19 event segment
+ * [NostrEventReferenceCollector] reads a card from. Each matcher only moves forward through the text, so the work stays
+ * linear: a repeated scheme never rescans the rest of its run, and no matcher is reset or given a region, which on
+ * Android copies the whole input again.
+ */
+private fun String.containsHttpEventLink(): Boolean {
+    val scheme = HTTP_SCHEME.toPattern().matcher(this)
+    val segment = NIP19_EVENT_SEGMENT.toPattern().matcher(this)
+    val whitespace = WHITESPACE.toPattern().matcher(this)
+    var hasSegment = segment.find()
+    var hasWhitespace = whitespace.find()
+    var runEnd = -1
+    while (hasSegment && scheme.find()) {
+        // A later scheme in the run already searched from an earlier one can only find less.
+        if (scheme.start() < runEnd) continue
+        while (hasWhitespace && whitespace.start() < scheme.end()) hasWhitespace = whitespace.find()
+        runEnd = if (hasWhitespace) whitespace.start() else length
+        while (hasSegment && segment.start() < scheme.end()) hasSegment = segment.find()
+        if (hasSegment && segment.start() < runEnd) return true
+    }
+    return false
+}
 
 /**
  * [this] with every backslash that escapes an ASCII punctuation character removed, as CommonMark, and MDK's
@@ -204,12 +228,7 @@ private val EVENT_ENTITY_PREFIX = Regex("(?i)$NIP19_EVENT_HRP")
 private val NOSTR_EVENT_URI =
     Regex("(?<![A-Za-z0-9_/])nostr:$NIP19_EVENT_HRP[$NIP19_BODY_CHARS]{6,}(?![A-Za-z0-9_/])")
 
-/** An HTTP(S) URL whose unbroken text carries the segment [NostrEventReferenceCollector] reads a card from. */
-private val HTTP_EVENT_LINK =
-    Regex(
-        "(?i)https?://\\S*?(?<![$NIP19_BODY_CHARS])$NIP19_EVENT_HRP" +
-            "[$NIP19_BODY_CHARS]+(?![$NIP19_BODY_CHARS])",
-    )
+private val HTTP_SCHEME = Regex("(?i)https?://")
 private val NIP19_EVENT_SEGMENT =
     Regex(
         "(?i)(?<![$NIP19_BODY_CHARS])(?:note|nevent|naddr)1" +

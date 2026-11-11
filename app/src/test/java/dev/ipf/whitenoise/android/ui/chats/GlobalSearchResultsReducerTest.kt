@@ -21,13 +21,12 @@ class GlobalSearchResultsReducerTest {
         val (loading, request) = begin(GlobalSearchResultsReducer.restart(GlobalSearchResultsState()))
         val firstBatch = batch(listOf(result("g1", "m1")), cursor(1))
         val loaded = GlobalSearchResultsReducer.applyBatch(loading, request, firstBatch)
-        val restarted = GlobalSearchResultsReducer.restart(loaded, resumeTarget = 7)
+        val restarted = GlobalSearchResultsReducer.restart(loaded)
 
         assertEquals(loaded.generation + 1, restarted.generation)
         assertTrue(restarted.results.isEmpty() && restarted.seenKeys.isEmpty())
         assertNull(restarted.nextCursor)
         assertNull(restarted.inFlight)
-        assertEquals(7, restarted.resumeTarget)
     }
 
     /** A page that completes after the query or filters changed cannot reach the new generation. */
@@ -150,21 +149,6 @@ class GlobalSearchResultsReducerTest {
         assertTrue(state.autoReads)
     }
 
-    /** A returning session keeps reading until it holds as many rows as before, or the history ends. */
-    @Test
-    fun resumeTargetKeepsReadingUntilReached() {
-        var state = GlobalSearchResultsReducer.restart(GlobalSearchResultsState(), resumeTarget = 3)
-        val (first, firstRequest) = begin(state)
-        state = GlobalSearchResultsReducer.applyBatch(first, firstRequest, batch(listOf(result("g", "1")), cursor(8)))
-        assertTrue(state.resuming)
-        assertTrue(GlobalSearchResultsReducer.needsResumeRead(state))
-        val (second, secondRequest) = begin(state)
-        val rows = listOf(result("g", "2"), result("g", "3"))
-        state = GlobalSearchResultsReducer.applyBatch(second, secondRequest, batch(rows, cursor(4)))
-        assertFalse(state.resuming)
-        assertFalse(GlobalSearchResultsReducer.needsResumeRead(state))
-    }
-
     /** Same-second rows across chats page with no duplicate, gap or reordering at any page edge. */
     @Test
     fun sameSecondPageBoundariesHaveNoDuplicateGapOrReordering() =
@@ -277,40 +261,6 @@ class GlobalSearchResultsReducerTest {
             assertTrue(job.isCancelled)
             assertEquals(1, reads)
         }
-
-    /** A return whose rows vanished meanwhile stops after a few empty batches instead of walking the account. */
-    @Test
-    fun resumeStopsAfterEmptyBatchesWhenRowsVanished() {
-        var state = GlobalSearchResultsReducer.restart(GlobalSearchResultsState(), resumeTarget = 400)
-        var batches = 0
-        while (GlobalSearchResultsReducer.needsResumeRead(state) || batches == 0) {
-            val (loading, request) = begin(state)
-            val empty = batch(emptyList(), cursor(1_000L - batches))
-            state = GlobalSearchResultsReducer.applyBatch(loading, request, empty)
-            batches++
-        }
-        assertEquals(GLOBAL_SEARCH_AUTO_EMPTY_BATCHES, batches)
-        assertFalse(state.resuming)
-        assertTrue(state.hasMore)
-    }
-
-    /** A sparse return that keeps finding a row per batch still stops within its batch budget. */
-    @Test
-    fun resumeStopsWithinItsBatchBudget() {
-        val target = 100
-        var state = GlobalSearchResultsReducer.restart(GlobalSearchResultsState(), resumeTarget = target)
-        val budget = state.resumeBatchesLeft
-        var batches = 0
-        while (GlobalSearchResultsReducer.needsResumeRead(state) || batches == 0) {
-            val (loading, request) = begin(state)
-            val rows = listOf(result("g", "m$batches"))
-            state = GlobalSearchResultsReducer.applyBatch(loading, request, batch(rows, cursor(1_000L - batches)))
-            batches++
-        }
-        assertEquals(target / GLOBAL_SEARCH_BATCH_TARGET + GLOBAL_SEARCH_AUTO_EMPTY_BATCHES, budget)
-        assertEquals(budget, batches)
-        assertFalse(state.resuming)
-    }
 
     /** A refresh replaces the loaded range in place: gone rows drop, a newer match joins at the head. */
     @Test

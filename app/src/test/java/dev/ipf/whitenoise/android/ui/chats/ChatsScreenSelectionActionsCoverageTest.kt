@@ -19,7 +19,7 @@ class ChatsScreenSelectionActionsCoverageTest {
             "the fence receives available local rows",
             "hasLocalRows = visibleItems.isNotEmpty() || messageResultsMode" in source,
         )
-        assertTrue("the fence waits for resumed message results", "loading = messageResultsPending" in source)
+        assertTrue("the fence waits until message results adopt the query", "loading = messageResultsPending" in source)
         assertTrue("the dataset owns restoration", "rememberSearchBodyAnchorRestoration(" in source)
         val stage = File(chatsScreenSource().parentFile, "GlobalSearchAnchorRestoration.kt").readText()
         assertTrue("restoration survives request-only retry", "remember(datasetKey)" in stage)

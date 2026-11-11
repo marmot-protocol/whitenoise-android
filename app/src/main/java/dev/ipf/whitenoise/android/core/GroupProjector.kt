@@ -335,7 +335,7 @@ object GroupProjector {
      * misread a sole admin as two and unlock leave/transfer gates that should
      * stay closed.
      */
-    private fun uniqueAdminCount(group: AppGroupRecordFfi): Int =
+    internal fun uniqueAdminCount(group: AppGroupRecordFfi): Int =
         group.admins
             .asSequence()
             .filter { it.isNotBlank() }

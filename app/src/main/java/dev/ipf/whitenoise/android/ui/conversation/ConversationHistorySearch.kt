@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isRetentionExpiredForSearch
+import dev.ipf.whitenoise.android.state.nativeSenderFilter
 import dev.ipf.whitenoise.android.state.page
 import dev.ipf.whitenoise.android.state.searchableTimelineRecord
 import kotlinx.coroutines.CancellationException
@@ -113,15 +114,19 @@ private suspend fun scanHistoryForNeedle(
             runCatching {
                 readPage(
                     account,
-                    TimelineMessageQueryFfi.page(
-                        groupIdHex = groupIdHex,
-                        search = needle.takeIf { it.isNotEmpty() },
-                        before = cursorBefore,
-                        beforeMessageId = cursorMessageId,
-                        after = null,
-                        afterMessageId = null,
-                        limit = HISTORY_SEARCH_PAGE_SIZE,
-                    ),
+                    TimelineMessageQueryFfi
+                        .page(
+                            groupIdHex = groupIdHex,
+                            search = needle.takeIf { it.isNotEmpty() },
+                            before = cursorBefore,
+                            beforeMessageId = cursorMessageId,
+                            after = null,
+                            afterMessageId = null,
+                            limit = HISTORY_SEARCH_PAGE_SIZE,
+                        )
+                        // One selected sender, such as By me (#3349), is filtered natively by MDK; the host check
+                        // below still applies every constraint, so several senders stay correct.
+                        .copy(sender = nativeSenderFilter(constraints?.senderIds)),
                 )
             }.getOrElse { throwable ->
                 // A cancelled scan must propagate, not resolve to a value the

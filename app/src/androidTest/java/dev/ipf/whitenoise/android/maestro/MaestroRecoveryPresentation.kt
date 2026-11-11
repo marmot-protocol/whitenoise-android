@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.ui.conversation.GroupRecoveryCard
+import dev.ipf.whitenoise.android.ui.conversation.InviteDeclineStepDownDialog
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchDateCustomStage
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchDateFilterDialog
 import java.time.LocalDate
@@ -42,6 +43,12 @@ internal fun MaestroRecoveryPresentation(fixture: MaestroPresentationFixture) {
                 check(it == invitation)
                 fixture.finish("rejoin-declined")
             },
+        )
+    } else if (fixture.scenario.startsWith("surface-stepdown-")) {
+        // The admin invitee's step-down question: each answer reaches only its own production callback.
+        InviteDeclineStepDownDialog(
+            onConfirm = { fixture.finish("stepdown-confirmed") },
+            onDismiss = { fixture.finish("stepdown-cancelled") },
         )
     } else {
         val from = LocalDate.of(2027, 1, 2)

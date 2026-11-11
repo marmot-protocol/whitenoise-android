@@ -927,6 +927,34 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+      "symbol": "InviteDeclineStepDownDialog",
+      "bindings": [
+        {
+          "case": "presentation-surface-stepdown-cancel",
+          "selector": {
+            "text": "Step down and decline\\?"
+          },
+          "scope": "admin invitee step-down question; validates the production cancel and confirm callbacks without native step-down or decline.",
+          "entry_assertion": {
+            "text": "Step down and decline\\?"
+          },
+          "visible_on_entry": true
+        },
+        {
+          "case": "presentation-surface-stepdown-confirm",
+          "selector": {
+            "text": "Step down and decline\\?"
+          },
+          "scope": "admin invitee step-down question; validates the production cancel and confirm callbacks without native step-down or decline.",
+          "entry_assertion": {
+            "text": "Step down and decline\\?"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
       "symbol": "GroupSystemSummaryMenu",
       "bindings": [

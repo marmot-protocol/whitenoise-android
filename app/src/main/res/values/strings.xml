@@ -1231,6 +1231,9 @@
     <string name="toast_couldnt_accept_invite">Couldn\'t accept invite</string>
     <string name="toast_invite_declined">Invite declined</string>
     <string name="toast_couldnt_decline_invite">Couldn\'t decline invite</string>
+    <string name="invite_decline_step_down_title">Step down and decline?</string>
+    <string name="invite_decline_step_down_message">This invitation makes you an admin. To decline, you’ll step down as admin first, and the group’s members will see that you stepped down.</string>
+    <string name="invite_decline_step_down_confirm">Step down and decline</string>
     <string name="toast_chat_archived">Chat archived</string>
     <string name="toast_chat_restored">Chat restored</string>
     <string name="toast_couldnt_update_chat">Couldn\'t update chat</string>
@@ -1294,6 +1297,10 @@
     <string name="group_recovery_failed_reinvites">Some invitations could not be restored. Invite those people again from Group Details.</string>
     <string name="group_recovery_review_invitation_from">Review invitation from %1$s · epoch %2$s</string>
     <string name="group_recovery_check_failed">Couldn’t check group recovery. Try again.</string>
+    <string name="group_convergence_parked">This chat stopped syncing. Messages you send will wait until it catches up.</string>
+    <string name="group_convergence_retrying">Retrying…</string>
+    <string name="group_convergence_retry_still_parked">This chat still isn’t syncing. Try again later.</string>
+    <string name="group_convergence_retry_failed">Couldn’t retry syncing this chat. Try again later.</string>
     <string name="group_history_may_be_incomplete">Some earlier messages in this chat may be missing.</string>
     <string name="group_history_before_rejoin">You rejoined this chat. Messages from before you rejoined may be missing.</string>
     <string name="account_history_may_be_incomplete">Some messages may be missing from this account. White Noise couldn’t confirm that every message arrived.</string>
@@ -2169,6 +2176,9 @@
     <string name="global_search_content_any_attachment">Any Attachment</string>
     <string name="global_search_results_end">End of results</string>
     <string name="global_search_results_search_older">Search older messages</string>
+    <string name="search_quick_filter_by_me">By me</string>
+    <string name="search_result_unavailable">This message is no longer available</string>
+    <string name="search_result_open_failed_retry">Couldn’t open the message. Retry</string>
     <string name="text_attachment_open_external">Open in another app</string>
     <string name="text_attachment_filename">File name</string>
     <string name="text_attachment_view_full_filename">View full file name</string>

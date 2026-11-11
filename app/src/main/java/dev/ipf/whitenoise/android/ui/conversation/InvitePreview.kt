@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -123,6 +125,39 @@ internal fun InvitationActions(
 }
 
 private val InvitationActionsMaximumWidth = 520.dp
+
+/**
+ * Asks an admin invitee before declining: MDK lets an admin leave only after stepping down, which the group's
+ * members see, so Decline steps down first only when the user agrees here. While another conversation change is
+ * [busy] the confirm action waits, visibly disabled, instead of dropping the answer.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun InviteDeclineStepDownDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    busy: Boolean = false,
+) {
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("invite.decline.stepDown.dialog"),
+        title = { Text(stringResource(R.string.invite_decline_step_down_title)) },
+        text = { Text(stringResource(R.string.invite_decline_step_down_message)) },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = !busy,
+                modifier = Modifier.testTag("invite.decline.stepDown.confirm"),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(R.string.invite_decline_step_down_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("invite.decline.stepDown.cancel")) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
 
 /**
  * Shows progress or the existing localized roster retry when a stale Join was

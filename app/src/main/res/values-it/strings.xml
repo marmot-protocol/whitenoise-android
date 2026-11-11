@@ -884,6 +884,9 @@
     <string name="toast_couldnt_accept_invite">Impossibile accettare l’invito</string>
     <string name="toast_invite_declined">Rifiuta</string>
     <string name="toast_couldnt_decline_invite">Impossibile rifiutare l’invito</string>
+    <string name="invite_decline_step_down_title">Rinunciare al ruolo admin e rifiutare?</string>
+    <string name="invite_decline_step_down_message">Questo invito ti rende admin. Per rifiutarlo, rinuncerai prima al ruolo admin e i membri del gruppo lo vedranno.</string>
+    <string name="invite_decline_step_down_confirm">Rinuncia e rifiuta</string>
     <string name="toast_chat_archived">Chat archiviata</string>
     <string name="toast_chat_restored">Chat ripristinata</string>
     <string name="toast_couldnt_update_chat">Impossibile aggiornare la chat</string>
@@ -1934,6 +1937,9 @@
     <string name="global_search_content_any_attachment">Qualsiasi allegato</string>
     <string name="global_search_results_end">Fine dei risultati</string>
     <string name="global_search_results_search_older">Cerca messaggi meno recenti</string>
+    <string name="search_quick_filter_by_me">Miei</string>
+    <string name="search_result_unavailable">Questo messaggio non è più disponibile</string>
+    <string name="search_result_open_failed_retry">Impossibile aprire il messaggio. Riprova</string>
     <string name="text_attachment_open_external">Apri in un’altra app</string>
     <string name="text_attachment_filename">Nome file</string>
     <string name="text_attachment_view_full_filename">Visualizza il nome completo</string>
@@ -2138,6 +2144,10 @@
     <string name="group_recovery_failed_reinvites">Non è stato possibile ripristinare alcuni inviti. Invita di nuovo queste persone da Dettagli gruppo.</string>
     <string name="group_recovery_review_invitation_from">Esamina l’invito di %1$s · epoca %2$s</string>
     <string name="group_recovery_check_failed">Impossibile verificare il recupero del gruppo. Riprova.</string>
+    <string name="group_convergence_parked">Questa chat ha smesso di sincronizzarsi. I messaggi che invii resteranno in attesa finché non si aggiorna.</string>
+    <string name="group_convergence_retrying">Nuovo tentativo…</string>
+    <string name="group_convergence_retry_still_parked">Questa chat ancora non si sincronizza. Riprova più tardi.</string>
+    <string name="group_convergence_retry_failed">Impossibile riprovare la sincronizzazione di questa chat. Riprova più tardi.</string>
     <string name="group_history_may_be_incomplete">Alcuni messaggi precedenti di questa chat potrebbero mancare.</string>
     <string name="group_history_before_rejoin">Sei rientrato in questa chat. I messaggi precedenti al tuo rientro potrebbero mancare.</string>
     <string name="account_history_may_be_incomplete">Alcuni messaggi di questo account potrebbero mancare. White Noise non è riuscito a confermare che tutti i messaggi siano arrivati.</string>

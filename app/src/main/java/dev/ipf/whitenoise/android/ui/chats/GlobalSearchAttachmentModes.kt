@@ -41,13 +41,15 @@ internal fun GlobalSearchState.isBrowsingAttachments(): Boolean =
 
 /**
  * The prototype's mode chips under the search bar: All (messages), Photos & videos, Files, Audio and
- * All attachments. A mode writes the content filter, so the chips and the filter menu stay one state.
+ * All attachments. A mode writes the content filter, so the chips and the filter menu stay one state. With
+ * [byMe] the row leads with the "By me" quick filter (#3349), which writes the sender filter the same way.
  */
 @Composable
 internal fun GlobalSearchAttachmentModes(
     state: GlobalSearchState,
     onSelectionChange: (GlobalSearchContentFilterSelection) -> Unit,
     modifier: Modifier = Modifier,
+    byMe: GlobalSearchByMe? = null,
 ) {
     val choices =
         listOf(
@@ -62,6 +64,12 @@ internal fun GlobalSearchAttachmentModes(
         contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
+        if (byMe != null) {
+            item(key = GLOBAL_SEARCH_BY_ME_TAG) {
+                val active = state.byMeActive(byMe.selfIdHex)
+                GlobalSearchByMeChip(byMe, selected = active)
+            }
+        }
         items(choices, key = { it.first?.name ?: "Messages" }) { (kind, label) ->
             val selected =
                 if (kind == null) {
