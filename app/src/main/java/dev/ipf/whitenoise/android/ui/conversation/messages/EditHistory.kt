@@ -163,7 +163,7 @@ internal fun editHistoryRevisionTime(
     zone: ZoneId,
     display: DateTimeDisplay = DateTimeDisplay.LocaleDefault,
 ): String {
-    if (seconds > Instant.MAX.epochSecond.toULong()) return ""
+    if (seconds > IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return ""
     return IdentityFormatter
         .dateTime(
             Instant.ofEpochSecond(seconds.toLong()),

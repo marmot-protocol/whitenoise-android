@@ -20,8 +20,8 @@ class MessageInfoFormatTest {
 
     @Test
     fun formatTimestamp_emptyForULongAboveInstantMax() {
-        // Above Instant.MAX would throw DateTimeException at runtime; the
-        // guard returns the same empty-string sentinel as the unset case.
+        // Past the 9999-12-31 window (including above Instant.MAX) the guard
+        // returns the same empty-string sentinel as the unset case.
         val justPastMax = Instant.MAX.epochSecond.toULong() + 1uL
         assertEquals("", formatExactTimestamp(justPastMax, UTC, US))
         assertEquals("", formatExactTimestamp(ULong.MAX_VALUE, UTC, US))
@@ -172,6 +172,15 @@ class MessageInfoFormatTest {
         assertEquals("r", labelFor(MessageStatus.Received, labels))
         assertEquals("f", labelFor(MessageStatus.Failed, labels))
         assertEquals("stream", labelFor(MessageStatus.Streaming, labels))
+    }
+
+    @Test
+    fun formatTimestamp_emptyWhereTheZonedDateWouldOverflow() {
+        // Instant.MAX itself constructs, but its zoned date does not.
+        assertEquals("", formatExactTimestamp(Instant.MAX.epochSecond.toULong(), UTC, US))
+        assertEquals("", formatExactTimestamp(40_000_000_000_000_000uL, ZoneId.of("Pacific/Kiritimati"), US))
+        assertEquals("", formatExactTimestamp(Long.MAX_VALUE.toULong(), UTC, US))
+        assertTrue(formatExactTimestamp(253_402_300_799uL, ZoneId.of("Pacific/Kiritimati"), US).isNotEmpty())
     }
 
     private companion object {

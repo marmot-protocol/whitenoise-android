@@ -221,6 +221,19 @@ class ChatListMessageSearchTest {
         assertTrue(constraints.matches(photo.copy(mediaTypes = emptyList(), plaintext = "see https://x.y/z")))
     }
 
+    /** A stamp past the displayable bound matches no date range, even where its millisecond product wraps into one. */
+    @Test
+    fun undisplayableStampsMatchNoDateRange() {
+        val constraints = MessageSearchConstraints(dateBounds = GlobalSearchEpochBounds(0L, 2_000_000L))
+        val photo = Rec(9uL, false, "", "m1", timelineAt = 1_500uL)
+        assertTrue(constraints.matches(photo))
+        // 18_446_744_073_709_552 seconds is 384 ms once the signed millisecond product wraps.
+        val wrapping = listOf(18_446_744_073_709_552uL, IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS.toULong() + 1uL)
+        for (stamp in wrapping + ULong.MAX_VALUE) {
+            assertFalse("$stamp", constraints.matches(photo.copy(timelineAt = stamp)))
+        }
+    }
+
     /** Content kinds follow the prototype classification. */
     @Test
     fun contentKindsFollowThePrototypeClassification() {

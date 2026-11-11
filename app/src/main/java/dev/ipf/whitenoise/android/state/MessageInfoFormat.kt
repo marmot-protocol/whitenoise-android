@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -25,10 +26,9 @@ import java.util.Locale
  *
  * Returns an empty string for:
  *  - `recordedAtSeconds == 0` — the FFI's "unset" sentinel.
- *  - `recordedAtSeconds` past `Instant.MAX.epochSecond` — would either wrap on
- *    `toLong()` or throw `DateTimeException` from `Instant.ofEpochSecond`.
- *    Won't happen for plausible timestamps (`Instant.MAX` is ~1 billion years
- *    from now), but pinning the boundary stops the cast from being a footgun.
+ *  - `recordedAtSeconds` past 9999-12-31 — the stamp is untrusted peer input,
+ *    and larger values wrap on `toLong()`, overflow `Instant`, or overflow the
+ *    zoned date the formatter builds even at `Instant.MAX`.
  *
  * Callers should fall back to "—" or hide the row when this returns empty.
  */
@@ -38,7 +38,7 @@ fun formatExactTimestamp(
     locale: Locale,
 ): String {
     if (recordedAtSeconds == 0uL) return ""
-    if (recordedAtSeconds > Instant.MAX.epochSecond.toULong()) return ""
+    if (recordedAtSeconds > IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return ""
     val instant = Instant.ofEpochSecond(recordedAtSeconds.toLong())
     val formatter =
         DateTimeFormatter

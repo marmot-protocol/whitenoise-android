@@ -1,0 +1,106 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+  "legacy_sha256": "fca3d81df4728cf25f8546bae3227a9b664020d1fcffc10a9e729ec64ac519ff",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BoxScope.StickyDayRibbon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "fun BoxScope.StickyDayRibbon(",
+        "test_ids": [
+          "CON-002"
+        ]
+      },
+      {
+        "surface": "DaySeparator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "fun DaySeparator(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "EmptyGroupConversation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "fun EmptyGroupConversation(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "PinnedDayRibbonLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "fun PinnedDayRibbonLabel(",
+        "test_ids": [
+          "CON-002"
+        ]
+      },
+      {
+        "surface": "UnreadMessagesDivider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "fun UnreadMessagesDivider(",
+        "test_ids": [
+          "CON-001",
+          "CON-002"
+        ]
+      },
+      {
+        "surface": "ConversationEmptyMessage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "internal fun ConversationEmptyMessage(",
+        "test_ids": [
+          "GRP-017",
+          "CON-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:no_messages_yet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "R.string.no_messages_yet",
+        "test_ids": [
+          "GRP-021"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Empty-conversation retention explanation and its duration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "R.string.conversation_empty_disappearing_body",
+        "test_ids": [
+          "GRP-017",
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "Empty-conversation heading when disappearing messages are on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "R.string.conversation_empty_disappearing_title",
+        "test_ids": [
+          "GRP-017",
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "Empty-conversation wording when no retention policy is in force",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "R.string.no_messages_yet",
+        "test_ids": [
+          "GRP-017",
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "Day label and day boundary for an unrepresentable received timestamp",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationRows.kt",
+        "anchor": "internal fun messageDayLabel(",
+        "test_ids": [
+          "CON-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

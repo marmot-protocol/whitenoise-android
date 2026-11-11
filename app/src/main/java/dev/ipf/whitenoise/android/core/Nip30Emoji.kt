@@ -38,27 +38,44 @@ object Nip30Emoji {
      * The first well-formed tag for a code wins even when it names no attachment, so a repeated
      * code with another URL cannot rebind it. Every matching image slot is claimed, matching native
      * attachment-history roles; renderers may still choose the first image for each shortcode.
+     *
+     * Received tags and locators are untrusted and unbounded, so only the first [MAX_TAGS] codes and
+     * images are considered, and locators are indexed once instead of rescanned per code. Anything
+     * past that budget keeps its text and ordinary attachment fallbacks.
      */
     fun attachmentShortcodes(
         tags: List<MessageTagFfi>,
         attachments: List<IndexedAttachment>,
     ): Map<Int, List<String>> {
-        val images = attachments.filter { MediaReferenceSupport.isImageMedia(it.value) }
+        val images =
+            attachments
+                .asSequence()
+                .filter { MediaReferenceSupport.isImageMedia(it.value) }
+                .take(MAX_TAGS)
+                .toList()
         if (images.isEmpty()) {
             return emptyMap()
         }
-        val defined = linkedMapOf<Int, MutableList<String>>()
-        val seen = mutableSetOf<String>()
-        for ((shortcode, url) in tags.mapNotNull(::shortcodeAndUrl)) {
-            if (!seen.add(shortcode)) {
-                continue
-            }
-            for ((index, reference) in images) {
-                if (reference.locators.any { it.value == url }) {
-                    defined.getOrPut(index) { mutableListOf() }.add(shortcode)
+        val imagesByLocator = HashMap<String, MutableList<Int>>()
+        for ((position, image) in images.withIndex()) {
+            for (locator in image.value.locators) {
+                val claimants = imagesByLocator.getOrPut(locator.value) { mutableListOf() }
+                if (claimants.lastOrNull() != position) {
+                    claimants.add(position)
                 }
             }
         }
+        val defined = linkedMapOf<Int, MutableList<String>>()
+        tags
+            .asSequence()
+            .mapNotNull(::shortcodeAndUrl)
+            .distinctBy { (shortcode, _) -> shortcode }
+            .take(MAX_TAGS)
+            .forEach { (shortcode, url) ->
+                imagesByLocator[url]?.forEach { position ->
+                    defined.getOrPut(images[position].index) { mutableListOf() }.add(shortcode)
+                }
+            }
         return defined
     }
 
