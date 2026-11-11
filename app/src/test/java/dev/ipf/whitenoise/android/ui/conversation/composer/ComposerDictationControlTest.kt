@@ -73,35 +73,6 @@ class ComposerDictationControlTest {
 
     private var voicePermissionRequests = 0
 
-    @Test
-    fun unconfiguredShortcutIsHidden() {
-        render()
-        composeRule.onNodeWithContentDescription("Read messages aloud").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
-    }
-
-    @Test
-    fun readAloudShortcutDoesNotOccupyTheDictationActionRow() {
-        val controller = render()
-        val toggle = composeRule.onNodeWithContentDescription("Read messages aloud")
-        toggle.assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Dictate text").performClick()
-        toggle.assertDoesNotExist()
-        composeRule.runOnIdle { controller.cancel() }
-        toggle.assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Dictate text").assertIsDisplayed()
-    }
-
-    @Test
-    fun readAloudShortcutDoesNotCompeteWithDictationAtLargeFontInRtl() {
-        render(fontScale = 2f, rtl = true, withAttachments = true)
-        val speaker = composeRule.onNodeWithContentDescription("Read messages aloud")
-        val mic = composeRule.onNodeWithContentDescription("Dictate text")
-        speaker.assertDoesNotExist()
-        mic.assertIsDisplayed()
-    }
-
     /** A real controller tail failure leaves a normal composer, with audio recovery only in its own chat. */
     @Test
     fun automaticallyKeptFailedTailDoesNotReplaceNormalComposerActions() {

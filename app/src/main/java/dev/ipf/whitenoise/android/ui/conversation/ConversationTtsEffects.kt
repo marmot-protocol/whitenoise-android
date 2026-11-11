@@ -209,14 +209,12 @@ internal fun ConversationTtsAutoReadEffects(
                     } else {
                         emptyList()
                     }
+                val nativeAnchorMissing =
+                    cursor.timelineOrder == 0uL &&
+                        cursor.timelineItemId != null &&
+                        timeline.none { it.id == cursor.timelineItemId }
                 cursor =
-                    if (
-                        !hasMore &&
-                        (!wasAtTail ||
-                            (cursor.timelineOrder == 0uL &&
-                                cursor.timelineItemId != null &&
-                                timeline.none { it.id == cursor.timelineItemId }))
-                    ) {
+                    if (!hasMore && (!wasAtTail || nativeAnchorMissing)) {
                         // A disjoint live window establishes a baseline, not a batch of arrivals.
                         conversationAutoReadCursor(timeline)
                     } else {

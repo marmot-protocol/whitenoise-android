@@ -35,6 +35,9 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -61,6 +64,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Locale
 
 /** Production re-entry evidence for retained full-screen geometry under dense, narrow RTL layout. */
 @RunWith(RobolectricTestRunner::class)
@@ -177,6 +181,45 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         }
         composeRule.runOnIdle { appState.setTtsAutoReadGlobalDefault(false) }
         speaker.assertDoesNotExist()
+    }
+
+    @Test
+    fun speakerOffStopsManualSpeechInThisConversation() = assertManualSpeakerStop(paused = false, sameGroup = true)
+
+    @Test
+    fun speakerOffStopsPausedManualSpeechInThisConversation() = assertManualSpeakerStop(paused = true, sameGroup = true)
+
+    @Test
+    fun speakerOffPreservesManualSpeechInAnotherConversation() = assertManualSpeakerStop(paused = false, sameGroup = false)
+
+    private fun assertManualSpeakerStop(
+        paused: Boolean,
+        sameGroup: Boolean,
+    ) {
+        val appState = createAppState("")
+        val chat = createConversation(appState)
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        appState.setConversationAutoReadOverride(GROUP_A, TtsAutoReadOverride.ON)
+        mountConversation(appState, chat)
+        try {
+            composeRule.runOnIdle {
+                assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("manual", "Sender", "Manual playback.")), Locale.US))
+                appState.ttsHistorySession.onConversationSessionStarted(ACCOUNT_A, if (sameGroup) GROUP_A else GROUP_B)
+                if (paused) appState.ttsController.pause()
+            }
+            val manual = appState.ttsController.state.value
+            composeRule.onNodeWithContentDescription(context.getString(R.string.tts_auto_read_title)).performClick()
+            composeRule.runOnIdle {
+                val current = appState.ttsController.state.value
+                assertEquals(sameGroup, current is TtsState.Idle)
+                if (!sameGroup) {
+                    assertEquals(manual.sessionId, current.sessionId)
+                    assertEquals(manual.javaClass, current.javaClass)
+                }
+            }
+        } finally {
+            appState.stopSpeaking()
+        }
     }
 
     @Test

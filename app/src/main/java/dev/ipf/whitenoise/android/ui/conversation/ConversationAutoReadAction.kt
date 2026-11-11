@@ -44,6 +44,16 @@ internal fun ConversationAutoReadAction(
             enabled = visible && appState.activeAccountRef == accountRef,
             onClick = {
                 if (appState.activeAccountRef == accountRef) {
+                    if (checked) {
+                        val source = appState.ttsHistorySession.conversationSource.value
+                        if (
+                            source?.accountRef == accountRef &&
+                            source.groupIdHex == groupId &&
+                            source.sessionId == appState.ttsController.state.value.sessionId
+                        ) {
+                            appState.stopSpeaking()
+                        }
+                    }
                     appState.setConversationAutoReadOverride(
                         groupId,
                         if (checked) TtsAutoReadOverride.OFF else TtsAutoReadOverride.ON,
