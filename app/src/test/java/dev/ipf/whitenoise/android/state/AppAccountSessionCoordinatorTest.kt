@@ -149,7 +149,7 @@ class AppAccountSessionCoordinatorTest {
                     client,
                     backgroundScope,
                     { true },
-                    {},
+                    { true },
                     {},
                 )
             controller.reconnect()

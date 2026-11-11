@@ -198,7 +198,7 @@ private class ClosedMountPreviewFixture {
                     preview,
                 )
         }
-    val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, parent, mounted::get, {}, {})
+    val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, parent, mounted::get, { true }, {})
 
     /** Answers each expected native call, holding the proposal delivery and the owned-cleanup read. */
     private fun createNative(): MarmotInterface =

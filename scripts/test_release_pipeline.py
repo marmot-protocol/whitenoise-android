@@ -7,6 +7,7 @@ import json
 import os
 import re
 from pathlib import Path
+import shutil
 import struct
 import subprocess
 import sys
@@ -375,7 +376,10 @@ class ZapstoreIntegrationTests(unittest.TestCase):
                'BUNKER_CLIENT_KEY': 'c' * 64, 'ZSP_CALL_LOG': str(root / 'calls'),
                'PATH': str(root)+os.pathsep+os.environ['PATH'], 'GITHUB_RUN_ATTEMPT':'1',
                'GITHUB_RUN_ID':'123', 'ZSP_INTENT_RECORDED':'true',
-               'ZSP_PREFLIGHT_TIMEOUT_SECONDS': '1', 'ZSP_PUBLISH_TIMEOUT_SECONDS': '1', 'ZSP_READBACK_TIMEOUT_SECONDS':'1'}
+               'ZSP_PREFLIGHT_TIMEOUT_SECONDS': '1', 'ZSP_PUBLISH_TIMEOUT_SECONDS': '1', 'ZSP_READBACK_TIMEOUT_SECONDS':'1',
+               # The publisher appends to these runner files; keep its synthetic release messages in
+               # the fixture so a CI run never shows them as release evidence (#3725).
+               'GITHUB_STEP_SUMMARY': str(root / 'step-summary.md'), 'GITHUB_OUTPUT': str(root / 'github-output')}
         def publish(**overrides):
             fixture_env = {**env, **overrides}
             results = []
@@ -389,6 +393,59 @@ class ZapstoreIntegrationTests(unittest.TestCase):
             calls = (root / 'calls').read_text().splitlines() if (root / 'calls').exists() else []
             return result, calls
         return publish
+
+    def run_with_parent_runner_files(self, readback_body='', **overrides):
+        """Runs one fixture publication with sentinel parent runner files; returns (result, root, parent files)."""
+        parent = Path(tempfile.mkdtemp())
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, parent, True)
+        self.addCleanup(shutil.rmtree, root, True)
+        summary = parent / 'summary.md'
+        output = parent / 'output'
+        summary.write_text('parent summary\n')
+        output.write_text('parent=output\n')
+        saved = {key: os.environ.get(key) for key in ('GITHUB_STEP_SUMMARY', 'GITHUB_OUTPUT')}
+        os.environ.update(GITHUB_STEP_SUMMARY=str(summary), GITHUB_OUTPUT=str(output))
+        try:
+            result, _ = self.publication_fixture(root, readback_body=readback_body)(**overrides)
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+        return result, root, summary, output
+
+    def assert_parent_runner_files_untouched(self, summary, output):
+        """The runner's own summary and output files keep exactly their sentinel contents."""
+        self.assertEqual(summary.read_text(), 'parent summary\n')
+        self.assertEqual(output.read_text(), 'parent=output\n')
+
+    def test_fixture_runner_files_stay_inside_the_fixture(self):
+        """A successful fixture publication leaves the parent runner's summary and output files untouched."""
+        result, root, summary, output = self.run_with_parent_runner_files()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_parent_runner_files_untouched(summary, output)
+        self.assertIn('verified public', (root / 'step-summary.md').read_text())
+        self.assertIn('submit=true', (root / 'github-output').read_text())
+
+    def test_verification_only_fixture_writes_submit_false_inside_the_fixture(self):
+        """A verification-only fixture run records submit=false only in its own output file."""
+        result, root, summary, output = self.run_with_parent_runner_files(VERIFY_ONLY='true')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_parent_runner_files_untouched(summary, output)
+        self.assertIn('submit=false', (root / 'github-output').read_text())
+
+    def test_failed_readback_fixture_writes_nothing_outside_the_fixture(self):
+        """A fixture run whose readback fails claims no success and touches no parent runner file."""
+        body = 'if mode == "verify": print("error: CDN blob size differs", file=sys.stderr); sys.exit(1)'
+        result, root, summary, output = self.run_with_parent_runner_files(readback_body=body, VERIFY_ONLY='true')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('CDN blob size differs', result.stderr)
+        self.assertIn('submit=false', (root / 'github-output').read_text())
+        self.assert_parent_runner_files_untouched(summary, output)
+        fixture_summary = root / 'step-summary.md'
+        self.assertFalse(fixture_summary.exists() and 'verified public' in fixture_summary.read_text())
 
     def test_v2_pending_submission_is_verified_once_after_matching_preflight(self):
         for matches in (False, True):
