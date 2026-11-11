@@ -24,7 +24,9 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-internal typealias DocumentSaveFallback = suspend (source: File, fileName: String, mediaType: String) -> Unit
+/** Saves through a chosen destination; [beforeCopy] rechecks the save's owner once the picker returns. */
+internal typealias DocumentSaveFallback =
+    suspend (source: File, fileName: String, mediaType: String, beforeCopy: () -> Unit) -> Unit
 private typealias ExternalAttachmentOpen = suspend (File, String, String) -> OpenAttachmentResult
 internal typealias AttachmentOpener =
     suspend (File, String, String, InstallerPermissionPersistence?, AttachmentDispatchGuard?) -> OpenAttachmentResult
@@ -207,7 +209,7 @@ internal suspend fun saveDocumentWithFallback(
         val selectDestination = fallback ?: throw failure
         // A source revoked while Downloads failed must not reopen the save through the picker.
         beforePublish()
-        selectDestination(source, fileName, mediaType)
+        selectDestination(source, fileName, mediaType, beforePublish)
         true
     }
 

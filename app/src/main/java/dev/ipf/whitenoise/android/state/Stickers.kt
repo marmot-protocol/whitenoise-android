@@ -90,8 +90,8 @@ class StickerLibrary(
     }
 
     /**
-     * A failed read keeps the last list and settles as [installedReadFailed]; the next caller tries again. A read
-     * that overlapped an install or uninstall is dropped, because it may predate that change.
+     * A failed read keeps the last list and settles as [installedReadFailed]; the next caller tries again. A read,
+     * or a read failure, that overlapped an install or uninstall is dropped, because it may predate that change.
      */
     @Suppress("TooGenericExceptionCaught")
     suspend fun reloadInstalled() {
@@ -105,7 +105,7 @@ class StickerLibrary(
             }
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
-            installedReadFailed = true
+            if (generation == membershipGeneration) installedReadFailed = true
         }
         hasTriedInstalled = true
     }

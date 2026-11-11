@@ -73,7 +73,10 @@ private class DiscoveryResults {
         private set
     private var search: String? = null
 
-    /** Reads [query]; a failed read keeps this query's last results but never shows another query's. */
+    /**
+     * Reads [query]; a failed read keeps this query's last results, minus packs installed since, but never shows
+     * another query's.
+     */
     suspend fun read(
         library: StickerLibrary,
         query: String,
@@ -84,7 +87,10 @@ private class DiscoveryResults {
                 search = query
             }
         failed = failure != null
-        if (failure != null && search != query) packs = emptyList()
+        if (failure != null) {
+            // A pack installed since the last good read moves to the installed list instead of staying discoverable.
+            packs = if (search != query) emptyList() else packs.filterNot { library.isInstalled(it.coordinate) }
+        }
     }
 }
 
@@ -169,7 +175,8 @@ internal fun StickerBrowserPage(
         item { StickerSectionTitle(stringResource(R.string.sticker_packs_discover)) }
         item { StickerSearchField(search) { search = it } }
         discoveryResults(
-            state = StickerPresentation.discoveryState(syncing, discovery.packs.size, search, syncFailed, discovery.failed),
+            state =
+                StickerPresentation.discoveryState(syncing, discovery.packs.size, search, syncFailed, discovery.failed),
             packs = discovery.packs,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },

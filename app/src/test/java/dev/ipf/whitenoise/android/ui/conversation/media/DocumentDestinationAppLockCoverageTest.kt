@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.state.replaceActiveAccountForTest
 import dev.ipf.whitenoise.android.ui.group.ConversationTranscriptSaveAction
 import dev.ipf.whitenoise.android.ui.group.rememberConversationTranscriptSave
 import dev.ipf.whitenoise.android.ui.navigation.rememberProtectedShellSavedState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -108,6 +109,19 @@ class DocumentDestinationAppLockCoverageTest {
             assertArrayEquals(payload, documentFile().readBytes())
             assertNull("a completed save is not an interruption", app.toast)
         }
+    }
+
+    /** A save whose owner is gone once the picker returns writes nothing and removes the empty document. */
+    @Test
+    fun ownerRevokedWhilePickingWritesNothingAndRemovesTheEmptyDocument() {
+        mountFallback()
+        var owned = true
+        val save = startSave(beforeCopy = { if (!owned) throw CancellationException("owner changed") })
+        createDocument(empty = true)
+        owned = false
+        deliverCreated()
+        awaitIo { save.isCompleted && !documentFile().exists() }
+        composeRule.runOnIdle { assertTrue("a revoked owner must not finish the save", save.isCancelled) }
     }
 
     /** A destination returned while locked cancels the old caller, notices once and deletes the empty output. */
@@ -289,11 +303,11 @@ class DocumentDestinationAppLockCoverageTest {
     }
 
     /** Starts one Save as from a caller that outlives the protected subtree. */
-    private fun startSave(): Job {
+    private fun startSave(beforeCopy: () -> Unit = {}): Job {
         var job: Job? = null
         composeRule.runOnIdle {
             val save = checkNotNull(fallback)
-            job = checkNotNull(scope).launch { save(source, "saved.txt", "text/plain") }
+            job = checkNotNull(scope).launch { save(source, "saved.txt", "text/plain", beforeCopy) }
         }
         composeRule.waitForIdle()
         return checkNotNull(job)

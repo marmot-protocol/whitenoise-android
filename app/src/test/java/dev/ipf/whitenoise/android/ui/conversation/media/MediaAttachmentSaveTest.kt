@@ -216,7 +216,7 @@ class MediaAttachmentSaveTest {
                             source = source,
                             fileName = "notes.txt",
                             mediaType = "text/plain",
-                            fallback = { _, _, _ -> fallbackCalls += 1 },
+                            fallback = { _, _, _, _ -> fallbackCalls += 1 },
                             beforePublish = { throw CancellationException("owner changed") },
                         )
                     }.exceptionOrNull()
@@ -249,7 +249,7 @@ class MediaAttachmentSaveTest {
                             source = source,
                             fileName = "notes.txt",
                             mediaType = "text/plain",
-                            fallback = { _, _, _ -> fallbackCalls += 1 },
+                            fallback = { _, _, _, _ -> fallbackCalls += 1 },
                             beforePublish = { throw CancellationException("owner changed") },
                         )
                     }.exceptionOrNull()
@@ -509,7 +509,7 @@ class MediaAttachmentSaveTest {
                         source = source,
                         fileName = "agent-build.apk",
                         mediaType = ANDROID_PACKAGE_MIME,
-                        fallback = { fallbackSource, _, _ -> selectedSource = fallbackSource },
+                        fallback = { fallbackSource, _, _, _ -> selectedSource = fallbackSource },
                     )
 
                 assertTrue(saved)

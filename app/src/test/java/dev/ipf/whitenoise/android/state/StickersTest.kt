@@ -218,6 +218,42 @@ class StickersTest {
         }
 
     @Test
+    fun aFailureFromAReadThatStartedBeforeAnUninstallIsNotReported() =
+        runTest {
+            val staleRead = CompletableDeferred<Unit>()
+            var reads = 0
+            val library =
+                StickerLibrary(
+                    packs = { _, _ ->
+                        reads++
+                        when (reads) {
+                            1 -> listOf(pack("a", installed = true))
+                            2 -> {
+                                staleRead.await()
+                                error("relay timeout")
+                            }
+                            else -> emptyList()
+                        }
+                    },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = {},
+                )
+
+            library.loadInstalledIfNeeded()
+            val stale = async { library.reloadInstalled() }
+            runCurrent()
+            library.uninstall(pack("a"))
+            assertFalse(library.installedReadFailed)
+
+            staleRead.complete(Unit)
+            stale.await()
+            assertFalse(library.installedReadFailed)
+            assertFalse(library.isInstalled(coordinate("a")))
+        }
+
+    @Test
     fun aFailedUninstallKeepsThePackInstalled() =
         runTest {
             val library =
