@@ -7,16 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -118,13 +115,17 @@ class MediaPreviewExclusionCoverageTest {
     }
 
     private fun applyExclusions(draft: Draft) {
-        // Invoke the button's click action directly: a touch at its bounds can land on the filmstrip overlay.
-        composeRule
-            .onNode(hasText(app.getString(R.string.done)) and hasClickAction())
-            .assertIsEnabled()
-            .performSemanticsAction(SemanticsActions.OnClick)
-        // Removals apply one per recomposition; Done closes the screen once the last one lands.
-        runCatching { composeRule.waitUntil(timeoutMillis = 5_000L) { draft.closed >= 1 } }.onFailure { cause ->
+        composeRule.onNodeWithText(app.getString(R.string.done)).assertIsEnabled().performClick()
+        // Removals apply one per recomposition; Done closes the screen once the last one lands. The draft is
+        // plain state, so each poll idles Compose itself or the removal effects would never get to run.
+        val closedInTime =
+            runCatching {
+                composeRule.waitUntil(timeoutMillis = 5_000L) {
+                    composeRule.waitForIdle()
+                    draft.closed >= 1
+                }
+            }
+        closedInTime.onFailure { cause ->
             throw AssertionError(
                 "Done never closed the preview: closed=${draft.closed}, " +
                     "media=${draft.media.map { it.id }}, documents=${draft.documents.map { it.tag }}",
