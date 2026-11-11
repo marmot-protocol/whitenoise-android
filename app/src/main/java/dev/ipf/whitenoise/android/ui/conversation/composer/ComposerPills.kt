@@ -145,6 +145,7 @@ import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
@@ -371,6 +372,8 @@ internal fun ComposerPill(
     modifier: Modifier = Modifier,
     onDictation: (() -> Unit)? = null,
     dictationControls: (@Composable RowScope.() -> Unit)? = null,
+    // Width the dictation commands settle at; the composer reserves exactly this, never a stale slot.
+    dictationControlsWidth: Dp = DICTATION_ACTIVE_ACTIONS_WIDTH,
     // Gate inputs only: the sheet these open lives in ComposerBar, but the
     // attach button must appear whenever ANY attachment action is wired, not
     // just gallery/document.
@@ -724,7 +727,7 @@ internal fun ComposerPill(
             (if (trailingAction != null) ComposerToolbarSlotWidth else 0.dp)
     val minimumDictationWidth =
         when {
-            dictationControls != null -> DICTATION_ACTIVE_ACTIONS_WIDTH
+            dictationControls != null -> dictationControlsWidth
             onDictation != null && toolbar == null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
@@ -854,17 +857,19 @@ internal fun ComposerPill(
                 val optionalMinimum = if (toolbar != null) ComposerShortcutTarget else leadingControlsWidth
                 (navigationSurfaceWidth - optionalMinimum - toolbarGeometryPrimaryWidth).coerceAtLeast(0.dp)
             }
-        } ?: DICTATION_ACTIVE_ACTIONS_WIDTH
+        } ?: dictationControlsWidth
     val targetDictationControlWidth =
         when {
-            dictationControls != null -> minOf(DICTATION_ACTIVE_ACTIONS_WIDTH, availableDictationWidth)
+            dictationControls != null -> minOf(dictationControlsWidth, availableDictationWidth)
             onDictation != null && toolbar == null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
+    val dictationMotionEnabled = rememberSystemAnimationsEnabled()
     val dictationControlWidthState =
         animateDpAsState(
             targetValue = targetDictationControlWidth,
-            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+            // Same clock as the commands' own resize, so the bubble edge and the buttons land together.
+            animationSpec = if (dictationMotionEnabled) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
             label = "composer dictation control morph",
         )
     val dictationControlWidth by dictationControlWidthState
@@ -2032,7 +2037,7 @@ internal fun ComposerPill(
                                         // Row constraints already exclude preceding children such as draft navigation.
                                         val maximum =
                                             minOf(
-                                                DICTATION_ACTIVE_ACTIONS_WIDTH.roundToPx(),
+                                                dictationControlsWidth.roundToPx(),
                                                 availableDictationWidth.roundToPx(),
                                                 constraints.maxWidth,
                                             )

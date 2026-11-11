@@ -10,7 +10,8 @@
         "test_ids": [
           "CON-001",
           "DIC-002",
-          "NAV-011"
+          "NAV-011",
+          "NAV-012"
         ]
       },
       {
@@ -19,7 +20,8 @@
         "anchor": "fun ColumnScope.ConversationNavigationControl(",
         "test_ids": [
           "NAV-011",
-          "CON-001"
+          "CON-001",
+          "NAV-012"
         ]
       }
     ]

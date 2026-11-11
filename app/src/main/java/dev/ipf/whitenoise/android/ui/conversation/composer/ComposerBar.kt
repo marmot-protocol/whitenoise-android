@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
@@ -109,6 +110,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
+import dev.ipf.whitenoise.android.ui.conversation.ConversationMorphAnchor
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
@@ -118,6 +120,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.rememberInstalledEmojiPicker
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -426,7 +429,9 @@ internal class ComposerAcceptanceToken(
 // device and IME, not to a conversation, so a freshly entered chat can reserve
 // the real keyboard space on its first emoji-pane open instead of guessing
 // with the fallback height.
-private val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
+// Tests clear it so a run does not inherit a height from an earlier test.
+@VisibleForTesting
+internal val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
 
 @Composable
 internal fun rememberComposerTextState(
@@ -1128,13 +1133,15 @@ internal fun ComposerBar(
     }
 
     // Closing to the keyboard hands the bottom region straight to it; the pane
-    // only keeps whatever part the rising keyboard does not cover yet.
+    // only keeps whatever part the rising keyboard does not cover yet. Opening
+    // from the keyboard takes the keyboard's height on the same frame, before the
+    // animated height catches up, so the composer never drops behind the keyboard.
     val renderedEmojiPaneHeight =
-        if (showEmojiPane) {
-            emojiPaneHeightAnim.value
-        } else {
-            (emojiPaneHeightAnim.value - currentImePaneHeight).coerceAtLeast(0.dp)
-        }
+        resolveRenderedEmojiPaneHeight(
+            showEmojiPane = showEmojiPane,
+            animatedHeight = emojiPaneHeightAnim.value,
+            imePaneHeight = currentImePaneHeight,
+        )
     val emojiPaneRendered = showEmojiPane || renderedEmojiPaneHeight > 0.dp
     LaunchedEffect(emojiPaneRendered) {
         if (!emojiPaneRendered) customInputPaneHeightPx = 0f
@@ -1158,7 +1165,12 @@ internal fun ComposerBar(
             } else {
                 maxHeight
             }
-        val customInputPaneHeight = with(density) { customInputPaneHeightPx.toDp() }
+        // The measured pane height arrives a frame late; the rendered height bounds it on the swap frame.
+        val customInputPaneHeight =
+            maxOf(
+                with(density) { customInputPaneHeightPx.toDp() },
+                if (emojiPaneRendered) renderedEmojiPaneHeight else 0.dp,
+            )
         // The 6dp outer padding completes the prototype surface top gap of 24dp. A compact remainder
         // (landscape with the IME open) keeps that 18dp for the editor, mirroring the ceiling's compact allowance.
         val composerRemainder =
@@ -1905,6 +1917,8 @@ internal fun ComposerBar(
                                     )
                                 }
                             },
+                        dictationControlsWidth =
+                            dictationState.compactActionsWidth(activeDictationController?.captureInProgress == true),
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,
@@ -1979,11 +1993,15 @@ internal fun ComposerBar(
                             },
                         actionRowAccessoryHeightPx = with(density) { measuredComposerAccessoryHeight.roundToPx() },
                         compactMeasurementReservesTrailingAction = false,
+                        // The emoji pane is an input surface like the keyboard it replaces. Opening it
+                        // clears editor focus, which alone would fold an empty draft to the resting row
+                        // while the pane rises, then unfold it again on the way back to the keyboard.
                         forceEditingLayout =
                             editingMessageId != null ||
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
-                                hasPendingAttachments,
+                                hasPendingAttachments ||
+                                composerEmojiPickerOpen,
                         sendAccessoryContent =
                             if (editingMessageId != null) {
                                 { ComposerEditPill(onCancelEdit = onCancelEdit) }
@@ -2044,6 +2062,8 @@ internal fun ComposerBar(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
+                                // Customize unfolds composer settings from this pill.
+                                .settingsCardMorph(anchor = ConversationMorphAnchor.Composer)
                                 .then(
                                     if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
                                         Modifier

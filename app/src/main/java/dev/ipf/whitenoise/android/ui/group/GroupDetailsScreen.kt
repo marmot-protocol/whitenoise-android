@@ -167,6 +167,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -1716,52 +1717,56 @@ internal fun GroupDetailsScreen(
                     .testTag("chat_info.list")
                     .padding(bottom = 24.dp),
             ) {
-                GroupDetailsHeader(
-                    title = conversationTitle,
-                    subtitle =
-                        if (isDm) {
-                            ""
-                        } else if (!rosterReady) {
-                            stringResource(R.string.members)
-                        } else {
-                            stringResource(R.string.group_details_subtitle, controller.presentedMemberCount)
-                        },
-                    description =
-                        if (isDm) {
-                            dmPeerNpub
-                                ?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
-                                .orEmpty()
-                        } else {
-                            controller.group.description
-                        },
-                    // Show the DM peer's avatar + initials seed here — the same
-                    // peer metadata the top bar and chat-list row resolve (#837).
-                    // A group keeps its own avatar (controller.avatarUrl falls back
-                    // to the group avatar; avatarAccount is null for groups).
-                    seed = controller.avatarAccount ?: controller.group.groupIdHex,
-                    pictureUrl = groupAvatar.pictureUrl,
-                    picture = encryptedGroupAvatar,
-                    groupAnimation = groupAvatar.groupAnimation,
-                    archived = controller.presentedArchived,
-                    readLocalBytes = groupAvatar.readOriginalBytes,
-                    // A group's URL picture decodes single-use, a direct chat's peer picture in the public profiles.
-                    pictureDomain = groupAvatar.pictureDomain,
-                    onEdit =
-                        if (canShowEditAction) {
-                            { showEditGroup = true }
-                        } else {
-                            null
-                        },
-                    editEnabled = activeMutation == null && !controller.mutationInFlight,
-                    onAddDescription =
-                        if (!isDm && canEdit && controller.group.description.isBlank()) {
-                            { showEditGroup = true }
-                        } else {
-                            null
-                        },
-                    descriptionCopyValue = dmPeerNpub.takeIf { isDm },
-                    onNameBottom = { nameBottom = it },
-                )
+                // The chat header unfolds into this card, like the other details cards.
+                Box(Modifier.settingsCardMorph()) {
+                    GroupDetailsHeader(
+                        title = conversationTitle,
+                        subtitle =
+                            if (isDm) {
+                                ""
+                            } else if (!rosterReady) {
+                                stringResource(R.string.members)
+                            } else {
+                                stringResource(R.string.group_details_subtitle, controller.presentedMemberCount)
+                            },
+                        description =
+                            if (isDm) {
+                                dmPeerNpub
+                                    ?.let { IdentityFormatter.short(it, prefix = 12, suffix = 8) }
+                                    .orEmpty()
+                            } else {
+                                controller.group.description
+                            },
+                        // Show the DM peer's avatar + initials seed here — the same
+                        // peer metadata the top bar and chat-list row resolve (#837).
+                        // A group keeps its own avatar (controller.avatarUrl falls back
+                        // to the group avatar; avatarAccount is null for groups).
+                        seed = controller.avatarAccount ?: controller.group.groupIdHex,
+                        pictureUrl = groupAvatar.pictureUrl,
+                        picture = encryptedGroupAvatar,
+                        groupAnimation = groupAvatar.groupAnimation,
+                        archived = controller.presentedArchived,
+                        readLocalBytes = groupAvatar.readOriginalBytes,
+                        // A group's URL picture decodes single-use, a direct chat's peer picture
+                        // in the public profiles.
+                        pictureDomain = groupAvatar.pictureDomain,
+                        onEdit =
+                            if (canShowEditAction) {
+                                { showEditGroup = true }
+                            } else {
+                                null
+                            },
+                        editEnabled = activeMutation == null && !controller.mutationInFlight,
+                        onAddDescription =
+                            if (!isDm && canEdit && controller.group.description.isBlank()) {
+                                { showEditGroup = true }
+                            } else {
+                                null
+                            },
+                        descriptionCopyValue = dmPeerNpub.takeIf { isDm },
+                        onNameBottom = { nameBottom = it },
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
