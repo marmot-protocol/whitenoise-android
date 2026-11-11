@@ -139,6 +139,102 @@ class StickersTest {
         }
 
     @Test
+    fun aFailedInstalledReadIsReportedUntilARetrySucceeds() =
+        runTest {
+            var fail = true
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> if (fail) error("offline") else listOf(pack("a", installed = true)) },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = { error("unused") },
+                )
+
+            library.loadInstalledIfNeeded()
+            assertTrue(library.installedReadFailed)
+
+            fail = false
+            library.reloadInstalled()
+            assertFalse(library.installedReadFailed)
+            assertTrue(library.hasLoadedInstalled)
+            assertTrue(library.isInstalled(coordinate("a")))
+        }
+
+    @Test
+    fun anUninstalledPackIsDroppedEvenWhenTheRereadFails() =
+        runTest {
+            var fail = false
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> if (fail) error("offline") else listOf(pack("a", installed = true)) },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = { fail = true },
+                )
+
+            library.loadInstalledIfNeeded()
+            assertTrue(library.isInstalled(coordinate("a")))
+
+            library.uninstall(pack("a"))
+            assertFalse(library.isInstalled(coordinate("a")))
+            assertTrue(library.installedReadFailed)
+        }
+
+    @Test
+    fun aReadThatStartedBeforeAnUninstallCannotRestoreThePack() =
+        runTest {
+            val staleRead = CompletableDeferred<Unit>()
+            var reads = 0
+            val library =
+                StickerLibrary(
+                    packs = { _, _ ->
+                        reads++
+                        if (reads == 2) {
+                            staleRead.await()
+                            listOf(pack("a", installed = true))
+                        } else if (reads == 1) {
+                            listOf(pack("a", installed = true))
+                        } else {
+                            emptyList()
+                        }
+                    },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = {},
+                )
+
+            library.loadInstalledIfNeeded()
+            val stale = async { library.reloadInstalled() }
+            runCurrent()
+            library.uninstall(pack("a"))
+            assertFalse(library.isInstalled(coordinate("a")))
+
+            staleRead.complete(Unit)
+            stale.await()
+            assertFalse(library.isInstalled(coordinate("a")))
+        }
+
+    @Test
+    fun aFailedUninstallKeepsThePackInstalled() =
+        runTest {
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> listOf(pack("a", installed = true)) },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = { error("storage") },
+                )
+
+            library.loadInstalledIfNeeded()
+            assertTrue(runCatching { library.uninstall(pack("a")) }.isFailure)
+            assertTrue(library.isInstalled(coordinate("a")))
+        }
+
+    @Test
     fun discoveryHidesInstalledAndEmptyPacksAndInstallRefreshesTheList() =
         runTest {
             val installed = mutableListOf(pack("a", installed = true))
