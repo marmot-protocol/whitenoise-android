@@ -75,6 +75,15 @@ class NostrEventCardTriggerTest {
         assertTrue(mayNameNostrEventCard("[post](${schemes.replace("://", "\\://")}$note)"))
     }
 
+    /** Many short words, each its own run, are scanned in one forward pass rather than once per word. */
+    @Test(timeout = 5_000)
+    fun manyShortRunsStayLinear() {
+        assertFalse(mayNameNostrEventCard("x ".repeat(50_000) + "note1!"))
+        assertFalse(mayNameNostrEventCard("https:// ".repeat(50_000) + "note1!"))
+        assertTrue(mayNameNostrEventCard("https:// ".repeat(50_000) + "https://njump.me/$note"))
+        assertTrue(mayNameNostrEventCard("HTTPS://NJUMP.ME/${note.uppercase()}"))
+    }
+
     /** A segment counts only after a scheme in its own run, however many unrelated schemes come first. */
     @Test
     fun segmentMatchesOnlyAfterSchemeInItsOwnRun() {
