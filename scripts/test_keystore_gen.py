@@ -35,11 +35,15 @@ FAKE_OPENSSL = textwrap.dedent(
 
 
 def mode(path: pathlib.Path) -> int:
+    """Returns the permission bits of a path."""
     return stat.S_IMODE(path.stat().st_mode)
 
 
 class KeystoreGenTest(unittest.TestCase):
+    """Runs keystore-gen.sh in a scratch repository with stand-in keytool and openssl."""
+
     def setUp(self) -> None:
+        """Copies the script into a scratch repository and puts the stand-in tools on PATH."""
         self.root = pathlib.Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.root)
         self.repo = self.root / "repo"
@@ -57,6 +61,7 @@ class KeystoreGenTest(unittest.TestCase):
         self.props = self.repo / "local.properties"
 
     def run_script(self) -> subprocess.CompletedProcess:
+        """Runs the script under umask 022 and returns the finished process."""
         env = dict(os.environ, PATH=f"{self.bin}{os.pathsep}{os.environ['PATH']}", FAKE_LOG=str(self.log))
         env.pop("KEYSTORE_PASSWORD", None)
         # A permissive umask, as on many developer machines, must not leak the secrets.
@@ -70,6 +75,7 @@ class KeystoreGenTest(unittest.TestCase):
         )
 
     def assert_owner_only_outputs(self) -> str:
+        """Checks both outputs are 0600 with no leftovers, and returns local.properties."""
         self.assertEqual(0o600, mode(self.keystore))
         self.assertEqual(0o600, mode(self.props))
         self.assertEqual("synthetic keystore", self.keystore.read_text())
@@ -78,6 +84,7 @@ class KeystoreGenTest(unittest.TestCase):
         return self.props.read_text()
 
     def test_new_files_are_owner_only_under_a_permissive_umask(self) -> None:
+        """A new keystore and local.properties are 0600 under umask 022 and hold the password."""
         result = self.run_script()
         self.assertEqual(0, result.returncode, result.stderr)
         props = self.assert_owner_only_outputs()
@@ -88,6 +95,7 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertIn(f"WHITENOISE_KEYSTORE_PATH={self.keystore}", props)
 
     def test_passwords_never_reach_keytool_arguments(self) -> None:
+        """keytool reads the password from the environment, not from its arguments."""
         self.assertEqual(0, self.run_script().returncode)
         args = (self.log / "keytool-args").read_text().splitlines()
         password = (self.log / "keytool-env-password").read_text()
@@ -96,6 +104,7 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertIn("-keypass:env", args)
 
     def test_existing_properties_become_owner_only_and_keep_other_lines(self) -> None:
+        """A world-readable local.properties becomes 0600, keeps other lines and drops old signing entries."""
         self.props.write_text(
             "sdk.dir=/opt/android-sdk\n"
             "WHITENOISE_KEYSTORE_PASSWORD=old-secret\n"
@@ -112,6 +121,7 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertEqual(1, props.count("WHITENOISE_KEY_ALIAS="))
 
     def test_existing_keystore_is_never_replaced(self) -> None:
+        """An existing keystore is left untouched and keytool never runs."""
         self.keystore.parent.mkdir()
         self.keystore.write_text("shipped keystore")
         result = self.run_script()
@@ -121,6 +131,7 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertFalse((self.log / "keytool-args").exists())
 
     def test_symlinked_properties_are_refused(self) -> None:
+        """A symlinked local.properties is refused without writing through it."""
         target = self.root / "elsewhere.properties"
         target.write_text("unchanged\n")
         self.props.symlink_to(target)
@@ -128,6 +139,17 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertEqual("unchanged\n", target.read_text())
         self.assertFalse(self.keystore.exists())
+
+    @unittest.skipIf(os.geteuid() == 0, "root ignores the read-only repository directory")
+    def test_failure_after_placing_keystore_removes_it(self) -> None:
+        """A run that cannot write local.properties removes the keystore whose password it never stored."""
+        self.repo.chmod(0o555)
+        self.addCleanup(self.repo.chmod, 0o755)
+        result = self.run_script()
+        self.assertNotEqual(0, result.returncode)
+        self.assertFalse(self.keystore.exists())
+        self.assertEqual([], list(self.keystore.parent.iterdir()))
+        self.assertFalse(self.props.exists())
 
 
 if __name__ == "__main__":

@@ -51,8 +51,15 @@ mkdir -p "$KEYSTORE_DIR"
 # Stage both files beside their destinations so each final step is a
 # same-filesystem link or rename of an owner-only file.
 STAGING_DIR="$(mktemp -d "$KEYSTORE_DIR/.whitenoise-keystore.XXXXXX")"
+STAGED_KEYSTORE="$STAGING_DIR/release.p12"
 PROPS_TMP=""
+COMPLETED=""
 cleanup() {
+  # A keystore whose password never reached local.properties is unusable and
+  # would block every later run, so remove it if it is still this run's file.
+  if [[ -z "$COMPLETED" && "$KEYSTORE_PATH" -ef "$STAGED_KEYSTORE" ]]; then
+    rm -f "$KEYSTORE_PATH"
+  fi
   rm -rf "$STAGING_DIR"
   if [[ -n "$PROPS_TMP" ]]; then rm -f "$PROPS_TMP"; fi
 }
@@ -64,7 +71,6 @@ export KEYSTORE_PASSWORD
 echo "==> Generating PKCS12 keystore at $KEYSTORE_PATH"
 # keytool reads the passwords from the environment so they never appear in the
 # process list.
-STAGED_KEYSTORE="$STAGING_DIR/release.p12"
 keytool -genkeypair \
   -keystore "$STAGED_KEYSTORE" \
   -storetype PKCS12 \
@@ -79,8 +85,8 @@ chmod 600 "$STAGED_KEYSTORE"
 
 # A hard link never replaces an existing path, so a keystore that appeared
 # while keytool ran is kept.
-if ! ln "$STAGED_KEYSTORE" "$KEYSTORE_PATH" 2>/dev/null; then
-  echo "error: could not place keystore at $KEYSTORE_PATH (it may already exist)" >&2
+if ! ln "$STAGED_KEYSTORE" "$KEYSTORE_PATH"; then
+  echo "error: could not place keystore at $KEYSTORE_PATH" >&2
   exit 1
 fi
 
@@ -102,6 +108,7 @@ fi
 chmod 600 "$PROPS_TMP"
 mv -f "$PROPS_TMP" "$LOCAL_PROPS"
 PROPS_TMP=""
+COMPLETED=1
 
 cat <<EOF
 
