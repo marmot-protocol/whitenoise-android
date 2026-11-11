@@ -137,11 +137,11 @@ class GlobalSearchResultsRecheckTest {
             // A deletion or removal is withdrawn directly (see the revocation gate), so it needs no reread.
             val deleted = upsert(listed.copy(deleted = true), TimelineUpdateTriggerFfi.MESSAGE_DELETED)
             assertFalse(controller.isTouchedBy(deleted))
-            assertEquals(setOf("g:listed"), globalSearchRemovedKeys(deleted))
+            assertEquals(setOf("g:listed"), globalSearchKeyChanges(deleted).removed)
             val removal =
                 update("g", TimelineMessageChangeFfi.Remove("listed", TimelineRemoveReasonFfi.entries.first()))
             assertFalse(controller.isTouchedBy(removal))
-            assertEquals(setOf("g:listed"), globalSearchRemovedKeys(removal))
+            assertEquals(setOf("g:listed"), globalSearchKeyChanges(removal).removed)
             val other = record("g", "other", at = 6uL, text = "unrelated words")
             assertFalse(controller.isTouchedBy(upsert(other, TimelineUpdateTriggerFfi.NEW_MESSAGE)))
             val match = record("g2", "match", at = 7uL, text = "hello again")

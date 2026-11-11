@@ -140,10 +140,10 @@ internal fun globalSearchResultsContent(
 
 /**
  * Rechecks loaded rows on the files and media library's triggers, narrowed to what can change them: a projection
- * update that removes, deletes, edits or invalidates a listed row or brings a new match, a block-list change, and
- * the earliest disappearing deadline among the loaded rows. Removed and deleted rows, and rows past their
- * deadline, leave at once without a reread. Wakeups coalesce and wait briefly, so a burst of updates costs one
- * recheck chain.
+ * update that edits, invalidates or restores a listed row or brings a new match, a block-list change, and the
+ * earliest disappearing deadline among the loaded rows. Removed and deleted rows, and rows past their deadline,
+ * leave at once without a reread. Wakeups coalesce and wait briefly, so a burst of updates costs one recheck
+ * chain.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -155,8 +155,9 @@ private fun GlobalSearchResultsRecheckEffects(
     // Composition can run before the runtime is installed; the observer waits for one instead of throwing.
     val runtime = appState.marmotOrNull()
     val wakeups = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
-    // Every in-scope key MDK reports removed is queued on the controller from the event thread, then withdrawn on the
-    // main thread here or by a read that lands first, so a row a page or reread in flight still holds never lists.
+    // Every key MDK reports removed or live again is queued on the controller from the event thread, then applied in
+    // arrival order on the main thread here or by a read that lands first, so a row a page or reread in flight still
+    // holds never lists while it is removed, and a restored one lists again on the recheck.
     val removals = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
     LaunchedEffect(controller) {
         for (ignored in removals) controller.revoke()
@@ -194,15 +195,15 @@ private fun GlobalSearchResultsRecheckEffects(
                     account = account,
                     wakeups = wakeups,
                     touched = { event ->
-                        touchesLoadedRows(event, account, controller) { groupIdHex, keys ->
-                            controller.reportRemoved(groupIdHex, keys)
+                        touchesLoadedRows(event, account, controller) { groupIdHex, changes ->
+                            controller.reportChanged(groupIdHex, changes)
                             removals.trySend(Unit)
                         }
                     },
-                    // Asked after the subscription opened. A fresh query skips the probe: in practice its first read
-                    // starts only after the 275 ms keystroke debounce, so the subscription is usually open by then,
-                    // though nothing orders the two. A session with rows loaded — a return to a held session — wakes,
-                    // so rows changed while the reader was away are rechecked.
+                    // Asked after the subscription opened. A fresh query skips the probe: in practice its first
+                    // read starts only after the 275 ms keystroke debounce, so the subscription is usually open by
+                    // then, though nothing orders the two. A session with rows loaded — a return to a held
+                    // session — wakes, so rows changed while the reader was away are rechecked.
                     wakeOnOpen = { controller.state.batches > 0 },
                 )
             failures = if (opened) 0 else failures + 1
@@ -230,32 +231,62 @@ private const val MILLIS_PER_SECOND = 1_000L
 
 /**
  * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Every key it
- * removes or deletes goes to [withdraw] with its chat first, so a loaded row leaves before the recheck lands and a
- * held one never lists. Removals do not read the scope here, off the main thread: the controller applies it on
- * withdrawal. The recheck decision still reads it, which can only mistime a recheck.
+ * removes, deletes or makes live again goes to [report] with its chat first, so a loaded row leaves before the
+ * recheck lands and a held one never lists. Reports do not read the scope here, off the main thread: the controller
+ * applies it on the main thread. The recheck decision still reads it, which can only mistime a recheck.
  */
 internal fun touchesLoadedRows(
     event: MarmotEventFfi,
     account: String,
     controller: GlobalSearchResultsController,
-    withdraw: (groupIdHex: String, keys: Set<String>) -> Unit,
+    report: (groupIdHex: String, changes: GlobalSearchKeyChanges) -> Unit,
 ): Boolean {
     val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update?.takeIf { it.accountLabel == account }
     update?.update?.let { change ->
-        globalSearchRemovedKeys(change).takeIf { it.isNotEmpty() }?.let { withdraw(change.groupIdHex, it) }
+        globalSearchKeyChanges(change).takeUnless { it.isEmpty() }?.let { report(change.groupIdHex, it) }
     }
     return update != null && controller.isTouchedBy(update.update)
 }
 
 /**
- * Result keys of every message [update] removes or reports deleted by MDK's own deleted flag (a delete for
- * everyone arrives as an upsert), loaded or not. Reads no list state, so it is safe on the event thread; a removed
- * or deleted message never returns, so withdrawing a key no row holds is harmless.
+ * Result keys one projection update takes out of search, [removed], or makes live again, [restored]. The two never
+ * share a key: the last change to a message in the update decides.
  */
-internal fun globalSearchRemovedKeys(update: TimelineProjectionUpdateFfi): Set<String> =
-    update.changes.mapNotNullTo(HashSet()) { change ->
-        when (change) {
-            is TimelineMessageChangeFfi.Remove -> change.messageIdHex
-            is TimelineMessageChangeFfi.Upsert -> change.message.messageIdHex.takeIf { change.message.deleted }
-        }?.let { globalSearchKey(update.groupIdHex, it) }
+internal data class GlobalSearchKeyChanges(
+    val removed: Set<String> = emptySet(),
+    val restored: Set<String> = emptySet(),
+) {
+    fun isEmpty() = removed.isEmpty() && restored.isEmpty()
+}
+
+/**
+ * Keys of every message [update] removes or reports deleted by MDK's own deleted flag (a delete for everyone
+ * arrives as an upsert), and of every live upsert, which MDK sends when it undoes a deletion it invalidated, loaded
+ * or not. Reads no list state, so it is safe on the event thread; withdrawing or restoring a key no row holds is
+ * harmless, because only a reread lists a row.
+ */
+internal fun globalSearchKeyChanges(update: TimelineProjectionUpdateFfi): GlobalSearchKeyChanges {
+    val removedByKey = LinkedHashMap<String, Boolean>()
+    update.changes.forEach { change ->
+        val (id, removed) =
+            when (change) {
+                is TimelineMessageChangeFfi.Remove -> change.messageIdHex to true
+                is TimelineMessageChangeFfi.Upsert -> {
+                    val message = change.message
+                    val removed =
+                        when {
+                            message.deleted -> true
+                            message.invalidationStatus == null -> false
+                            else -> null
+                        }
+                    message.messageIdHex to removed
+                }
+            }
+        val key = globalSearchKey(update.groupIdHex, id)
+        removed?.let { removedByKey[key] = it }
     }
+    return GlobalSearchKeyChanges(
+        removed = removedByKey.filterValues { it }.keys,
+        restored = removedByKey.filterValues { !it }.keys,
+    )
+}

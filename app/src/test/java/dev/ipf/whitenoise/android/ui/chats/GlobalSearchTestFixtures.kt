@@ -52,9 +52,9 @@ internal object GlobalSearchTestFixtures {
     fun keys(controller: GlobalSearchResultsController) = controller.state.results.map { it.key }
 
     /**
-     * Delivers [update] for the session's account the way the session's observer does: removed and deleted keys are
-     * reported first, then the answer says whether a recheck is still needed. [drain] runs the session's main-thread
-     * revoke at once; without it a read that lands first must withdraw the reported keys itself.
+     * Delivers [update] for the session's account the way the session's observer does: removed, deleted and
+     * restored keys are reported first, then the answer says whether a recheck is still needed. [drain] runs the
+     * session's main-thread revoke at once; without it a read that lands first must withdraw the reported keys itself.
      */
     fun GlobalSearchResultsController.deliver(
         update: TimelineProjectionUpdateFfi,
@@ -65,7 +65,7 @@ internal object GlobalSearchTestFixtures {
                 MarmotEventFfi.ProjectionUpdated(RuntimeProjectionUpdateFfi("ff".repeat(32), ACCOUNT, update)),
                 ACCOUNT,
                 this,
-            ) { groupIdHex, keys -> reportRemoved(groupIdHex, keys) }
+            ) { groupIdHex, changes -> reportChanged(groupIdHex, changes) }
         if (drain) revoke()
         return touched
     }

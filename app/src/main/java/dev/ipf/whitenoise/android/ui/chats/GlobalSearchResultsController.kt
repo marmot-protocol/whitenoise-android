@@ -42,7 +42,7 @@ internal class GlobalSearchResultsEnvironment(
  * previous account or runtime ([GlobalSearchResultsEnvironment.isCurrent]), never reaches [state]. Each batch reads
  * at most four MDK pages / 200 rows and returns its last continuation. Nothing outlives the session.
  */
-@Suppress("TooManyFunctions") // One main-thread state owner; reportRemoved is its only cross-thread entry.
+@Suppress("TooManyFunctions") // One main-thread state owner; reportChanged is its only cross-thread entry.
 internal class GlobalSearchResultsController(
     private val reader: GlobalSearchTimelineReader,
     private val scope: CoroutineScope,
@@ -76,9 +76,9 @@ internal class GlobalSearchResultsController(
 
     private var refreshPending = false
 
-    // Keys MDK reported removed, by chat, queued from the event thread; the next [revoke] on the main thread
-    // withdraws those in a chat the query covers.
-    private val reportedRemovals = ConcurrentLinkedQueue<Pair<String, Set<String>>>()
+    // Keys MDK reported removed or live again, by chat, queued from the event thread; the next [revoke] on the main
+    // thread applies those in a chat the query covers, in arrival order.
+    private val reportedChanges = ConcurrentLinkedQueue<Pair<String, GlobalSearchKeyChanges>>()
     private var loadPending = false
 
     // A change arrived while a capped recheck was still covering the older rows; the head is reread once it ends.
@@ -102,6 +102,8 @@ internal class GlobalSearchResultsController(
     ) {
         if (closed || (next == query && state.generation > 0)) return
         job?.cancel()
+        // The new generation's first read sees the store after every change already queued, so none applies to it.
+        reportedChanges.clear()
         refreshPending = false
         loadPending = false
         headOwed = false
@@ -149,28 +151,34 @@ internal class GlobalSearchResultsController(
     }
 
     /**
-     * Queues [keys] MDK reported removed in chat [groupIdHex], from any thread, without reading the query there. A
-     * completed read withdraws them in the same main-thread step that applies it, so a read landing before the next
-     * [revoke] call still never lists them.
+     * Queues [changes] MDK reported in chat [groupIdHex], from any thread, without reading the query there. A
+     * completed read applies them in the same main-thread step that applies it, so a read landing before the next
+     * [revoke] call still never lists a removed key.
      */
-    fun reportRemoved(
+    fun reportChanged(
         groupIdHex: String,
-        keys: Set<String>,
+        changes: GlobalSearchKeyChanges,
     ) {
-        reportedRemovals.add(groupIdHex to keys)
+        reportedChanges.add(groupIdHex to changes)
     }
 
     /**
      * Drops loaded rows whose disappearing deadline has passed, and rows MDK reported removed, passed as [removed]
-     * or queued by [reportRemoved], without waiting for a reread. A removed key never lists in this generation, even
-     * when the read holding it lands later. Queued keys of chats the current query does not cover are discarded.
+     * or queued by [reportChanged], without waiting for a reread. A removed key does not list again in this
+     * generation, even when the read holding it lands later, until MDK reports it live again (an invalidated delete):
+     * queued changes apply in arrival order, so the last one decides and the recheck that change asks for relists a
+     * restored row. Queued keys of chats the current query does not cover are discarded.
      */
     fun revoke(removed: Set<String> = emptySet()) {
         val current = query?.takeUnless { closed } ?: return
-        val queued = generateSequence { reportedRemovals.poll() }.filter { current.coversGroup(it.first) }
-        val keys = removed + queued.flatMap { it.second }
         val nowSeconds = (environment.nowMillis() / MILLIS_PER_SECOND).coerceAtLeast(0L).toULong()
-        state = GlobalSearchResultsReducer.withdraw(GlobalSearchResultsReducer.dropExpired(state, nowSeconds), keys)
+        val reducer = GlobalSearchResultsReducer
+        var next = reducer.withdraw(reducer.dropExpired(state, nowSeconds), removed)
+        val queued = generateSequence { reportedChanges.poll() }.filter { current.coversGroup(it.first) }
+        queued.forEach { (_, changes) ->
+            next = reducer.restore(reducer.withdraw(next, changes.removed), changes.restored)
+        }
+        state = next
     }
 
     /** Starts one bounded recheck pass, from the head or [continuing] where the previous capped pass stopped. */
@@ -201,10 +209,10 @@ internal class GlobalSearchResultsController(
         recheckFailed = false
     }
 
-    /** Cancels the batch in flight, fences every later completion and drops removals no query will apply. */
+    /** Cancels the batch in flight, fences every later completion and drops reported changes no query will apply. */
     fun close() {
         closed = true
-        reportedRemovals.clear()
+        reportedChanges.clear()
         refreshPending = false
         loadPending = false
         headOwed = false

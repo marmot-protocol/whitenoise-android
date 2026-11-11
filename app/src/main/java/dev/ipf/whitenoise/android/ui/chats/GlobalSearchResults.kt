@@ -190,7 +190,7 @@ internal data class GlobalSearchPageRequest(
  * so paging effects relaunch even when a batch completes within one frame. [validateFrom] is where a capped recheck
  * stopped: loaded rows older than it have not been reread since the change that asked for the recheck, so the
  * controller keeps rechecking from there until the whole loaded range is covered. [withdrawn] holds rows MDK reported
- * removed, which no later page or reread of this generation may list again.
+ * removed, which no later page or reread of this generation may list again unless MDK reports them live again.
  */
 internal data class GlobalSearchResultsState(
     val generation: Int = 0,
@@ -347,7 +347,7 @@ internal object GlobalSearchResultsReducer {
 
     /**
      * Drops loaded rows whose disappearing deadline has passed at [nowSeconds], the way the conversation hides them.
-     * Their keys stay seen, so no later page lists them again.
+     * A later page or reread does not list them again because admission rejects a row past its deadline.
      */
     fun dropExpired(
         state: GlobalSearchResultsState,
@@ -368,6 +368,15 @@ internal object GlobalSearchResultsReducer {
     ): GlobalSearchResultsState {
         if (keys.isEmpty()) return state
         return state.copy(results = state.results.filter { it.key !in keys }, withdrawn = state.withdrawn + keys)
+    }
+
+    /** Lets keys MDK reported live again list on a later page or reread; it lists no row by itself. */
+    fun restore(
+        state: GlobalSearchResultsState,
+        keys: Set<String>,
+    ): GlobalSearchResultsState {
+        if (keys.none { it in state.withdrawn }) return state
+        return state.copy(withdrawn = state.withdrawn - keys)
     }
 
     /** Keeps every loaded row and the cursor, and waits for a retry; a stale failure is ignored. */

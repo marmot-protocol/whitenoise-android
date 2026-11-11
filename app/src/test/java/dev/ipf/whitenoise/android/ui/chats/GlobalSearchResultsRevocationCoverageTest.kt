@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.chats
 
-import androidx.compose.runtime.snapshotFlow
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -65,7 +64,7 @@ class GlobalSearchResultsRevocationCoverageTest {
             val removal =
                 update("g", TimelineMessageChangeFfi.Remove("m0000", TimelineRemoveReasonFfi.entries.first()))
 
-            val removed = globalSearchRemovedKeys(removal)
+            val removed = globalSearchKeyChanges(removal).removed
             assertEquals(setOf("g:m0000"), removed)
             controller.revoke(removed)
             assertFalse("withdrawn before any reread", "g:m0000" in keys(controller))
@@ -97,18 +96,11 @@ class GlobalSearchResultsRevocationCoverageTest {
                 update("g", TimelineMessageChangeFfi.Remove("m0299", TimelineRemoveReasonFfi.entries.first()))
             assertFalse("withdrawn directly, with no reread", controller.deliver(removal, drain = false))
 
-            val published = mutableListOf<List<String>>()
-            val watcher =
-                launch {
-                    snapshotFlow { keys(controller) }.collect { published += it }
-                }
-            runCurrent()
             gate.complete(Unit)
             advanceUntilIdle()
-            watcher.cancel()
             assertTrue("the held page landed", controller.state.results.isNotEmpty())
+            // The page is applied and withdrawn in one main-thread step, so no state in between is ever published.
             assertFalse("the held row never lists", "g:m0299" in keys(controller))
-            assertTrue("never published, even briefly", published.none { "g:m0299" in it })
 
             repeat(3) {
                 controller.refresh()
@@ -117,9 +109,12 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertFalse("a lagging reread never restores it", "g:m0299" in keys(controller))
         }
 
-    /** Only Remove changes and upserts MDK marks deleted yield keys, each scoped to its group. */
+    /**
+     * Only Remove changes and upserts MDK marks deleted are removals, and only live upserts are restorations, each
+     * scoped to its group; the last change to a message in one update decides.
+     */
     @Test
-    fun removedKeysCoverEveryRemoveAndDeletionAndNothingElse() {
+    fun keyChangesCoverEveryRemoveDeletionAndLiveUpsertAndNothingElse() {
         val edited = TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED
         val removal =
             update(
@@ -131,9 +126,79 @@ class GlobalSearchResultsRevocationCoverageTest {
                     record("g", "c", at = 1uL, deleted = true),
                 ),
                 TimelineMessageChangeFfi.Upsert(edited, record("g", "d", at = 1uL)),
+                TimelineMessageChangeFfi.Upsert(
+                    edited,
+                    record("g", "e", at = 1uL, invalidation = "local_publish_failed"),
+                ),
+                TimelineMessageChangeFfi.Remove("f", TimelineRemoveReasonFfi.entries.first()),
+                TimelineMessageChangeFfi.Upsert(edited, record("g", "f", at = 1uL)),
+                TimelineMessageChangeFfi.Upsert(edited, record("g", "h", at = 1uL)),
+                TimelineMessageChangeFfi.Remove("h", TimelineRemoveReasonFfi.entries.first()),
             )
-        assertEquals(setOf("g:a", "g:b", "g:c"), globalSearchRemovedKeys(removal))
+        val changes = globalSearchKeyChanges(removal)
+        assertEquals(setOf("g:a", "g:b", "g:c", "g:h"), changes.removed)
+        assertEquals(setOf("g:d", "g:f"), changes.restored)
     }
+
+    /**
+     * MDK undoes a delete for everyone it invalidates (a losing branch, or a failed local publish) by sending the
+     * message live again. The row that left on the deletion lists again after the recheck that change asks for, even
+     * the oldest of a long scrolled list.
+     */
+    @Test
+    fun aDeletionMdkUndoesListsTheRowAgain() =
+        runTest {
+            val store = StoreReader(rows())
+            val controller = controller(store)
+            loadAll(controller)
+            store.replace("m0000") { it.copy(deleted = true) }
+            val deleted = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.MESSAGE_DELETED, store.row("m0000"))
+            controller.deliver(update("g", deleted))
+            assertFalse("withdrawn on the deletion", "g:m0000" in keys(controller))
+
+            store.replace("m0000") { it.copy(deleted = false) }
+            val live =
+                TimelineMessageChangeFfi.Upsert(
+                    TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
+                    store.row("m0000"),
+                )
+            assertTrue("the restoration asks for a recheck", controller.deliver(update("g", live)))
+            repeat(3) {
+                controller.refresh()
+                advanceUntilIdle()
+            }
+            assertTrue("listed again", "g:m0000" in keys(controller))
+            assertEquals(LOADED, controller.state.results.size)
+        }
+
+    /** Changes queued before the main thread drains them apply in arrival order, so the last one decides. */
+    @Test
+    fun queuedChangesApplyInArrivalOrder() =
+        runTest {
+            val store = StoreReader(rows())
+            val controller = controller(store)
+            loadAll(controller)
+
+            fun upsert(
+                id: String,
+                deleted: Boolean,
+            ) = update(
+                "g",
+                TimelineMessageChangeFfi.Upsert(
+                    TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
+                    store.row(id).copy(deleted = deleted),
+                ),
+            )
+            // m0299 is restored after its deletion; m0298 is deleted again after its restoration.
+            controller.deliver(upsert("m0299", deleted = true), drain = false)
+            controller.deliver(upsert("m0298", deleted = false), drain = false)
+            controller.deliver(upsert("m0299", deleted = false), drain = false)
+            controller.deliver(upsert("m0298", deleted = true), drain = false)
+            controller.revoke()
+
+            assertFalse("the last change deleted it", "g:m0298" in controller.state.results.map { it.key })
+            assertEquals(setOf("g:m0298"), controller.state.withdrawn)
+        }
 
     /**
      * A delete for everyone arrives as an upsert MDK marks deleted. Through the session's hand-off it withdraws a
