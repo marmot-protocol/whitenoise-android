@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -39,6 +38,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StorageUsage
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -176,13 +176,19 @@ private fun StorageUsageBar(categories: List<StorageCategory>) {
 /** The empty track, pulsing while the first figures load. */
 @Composable
 private fun StorageUsagePlaceholderBar() {
-    val pulse by
-        rememberInfiniteTransition(label = "storage.calculating").animateFloat(
-            initialValue = StorageUsageDefaults.PulseLowAlpha,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(StorageUsageDefaults.PulseMillis), RepeatMode.Reverse),
-            label = "storage.calculating.alpha",
-        )
+    // With animations off the track stays fully drawn rather than freezing at a dim frame.
+    val pulse =
+        if (rememberSystemAnimationsEnabled()) {
+            rememberInfiniteTransition(label = "storage.calculating")
+                .animateFloat(
+                    initialValue = StorageUsageDefaults.PulseLowAlpha,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(tween(StorageUsageDefaults.PulseMillis), RepeatMode.Reverse),
+                    label = "storage.calculating.alpha",
+                ).value
+        } else {
+            1f
+        }
     Box(
         Modifier
             .fillMaxWidth()

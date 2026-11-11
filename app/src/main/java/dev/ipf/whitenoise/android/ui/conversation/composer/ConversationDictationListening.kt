@@ -18,7 +18,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -64,18 +63,23 @@ internal fun ConversationDictationListeningSlot(visible: Boolean) {
 /** Three animated bars distinguish live capture from circular action processing. */
 @Composable
 private fun ConversationDictationListeningIndicator() {
-    val transition = rememberInfiniteTransition(label = "dictation listening")
-    val phase by
-        transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(durationMillis = 900, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-            label = "dictation listening phase",
-        )
+    // With animations off the bars hold their staggered first frame.
+    val phase =
+        if (rememberSystemAnimationsEnabled()) {
+            rememberInfiniteTransition(label = "dictation listening")
+                .animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec =
+                        infiniteRepeatable(
+                            animation = tween(durationMillis = 900, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart,
+                        ),
+                    label = "dictation listening phase",
+                ).value
+        } else {
+            0f
+        }
     val barColor = MaterialTheme.colorScheme.primary
     Canvas(
         modifier =

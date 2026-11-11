@@ -28,6 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
@@ -345,6 +348,8 @@ internal fun LockHintAbove(
 
 @Composable
 internal fun rememberInfiniteRecordingPulse(): State<Float> {
+    // With animations off the dot rests at its base size instead of freezing mid-pulse.
+    if (!rememberSystemAnimationsEnabled()) return remember { mutableFloatStateOf(1f) }
     val transition = rememberInfiniteTransition(label = "rec-pulse")
     return transition.animateFloat(
         initialValue = 1f,

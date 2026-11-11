@@ -184,6 +184,28 @@ class ShareChatPickerFullScreenBackTest {
     }
 
     @Test
+    fun predictiveBackScaleFollowsGestureWithoutLag() {
+        mountSharePicker(modal = false)
+        val initialWidth = screenTitleWidth()
+        val dispatcher = screenOnBackPressedDispatcher()
+
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle {
+            dispatcher.dispatchOnBackStarted(predictiveBackEvent(progress = 0f))
+            dispatcher.dispatchOnBackProgressed(predictiveBackEvent(progress = 0.5f))
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeByFrame()
+
+        // Halfway through the gesture the screen is already at halfway scale, not easing toward it.
+        assertEquals(initialWidth * 0.95f, screenTitleWidth(), 1f)
+        composeRule.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertEquals(initialWidth, screenTitleWidth(), 1f)
+    }
+
+    @Test
     fun committedPredictiveBackDismissesScreenOnceAndClearsRequest() {
         val tracker = mountSharePicker(modal = false)
 
