@@ -8,15 +8,24 @@
 
 set -euo pipefail
 
+# The keystore and local.properties hold release signing secrets, so every file
+# this script creates is readable by its owner only.
+umask 077
+
 KEYSTORE_PATH_DEFAULT="$HOME/.android/keystores/whitenoise-android-release.p12"
 KEYSTORE_PATH="${1:-$KEYSTORE_PATH_DEFAULT}"
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOCAL_PROPS="$REPO_DIR/local.properties"
 
-if [[ -e "$KEYSTORE_PATH" ]]; then
+if [[ -e "$KEYSTORE_PATH" || -L "$KEYSTORE_PATH" ]]; then
   echo "error: keystore already exists at $KEYSTORE_PATH" >&2
   echo "Refusing to overwrite. Delete it manually if you really mean to regenerate." >&2
+  exit 1
+fi
+
+if [[ -L "$LOCAL_PROPS" ]]; then
+  echo "error: $LOCAL_PROPS is a symlink; refusing to write signing credentials through it." >&2
   exit 1
 fi
 
@@ -36,26 +45,52 @@ if ! command -v keytool >/dev/null 2>&1; then
   exit 1
 fi
 
-mkdir -p "$(dirname "$KEYSTORE_PATH")"
+KEYSTORE_DIR="$(dirname "$KEYSTORE_PATH")"
+mkdir -p "$KEYSTORE_DIR"
+
+# Stage both files beside their destinations so each final step is a
+# same-filesystem link or rename of an owner-only file.
+STAGING_DIR="$(mktemp -d "$KEYSTORE_DIR/.whitenoise-keystore.XXXXXX")"
+PROPS_TMP=""
+cleanup() {
+  rm -rf "$STAGING_DIR"
+  if [[ -n "$PROPS_TMP" ]]; then rm -f "$PROPS_TMP"; fi
+}
+trap cleanup EXIT
 
 KEYSTORE_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+export KEYSTORE_PASSWORD
 
 echo "==> Generating PKCS12 keystore at $KEYSTORE_PATH"
+# keytool reads the passwords from the environment so they never appear in the
+# process list.
+STAGED_KEYSTORE="$STAGING_DIR/release.p12"
 keytool -genkeypair \
-  -keystore "$KEYSTORE_PATH" \
+  -keystore "$STAGED_KEYSTORE" \
   -storetype PKCS12 \
   -alias whitenoise \
   -keyalg RSA \
   -keysize 2048 \
   -validity 9999 \
-  -storepass "$KEYSTORE_PASSWORD" \
-  -keypass "$KEYSTORE_PASSWORD" \
+  -storepass:env KEYSTORE_PASSWORD \
+  -keypass:env KEYSTORE_PASSWORD \
   -dname "CN=White Noise Android Release, OU=Engineering, O=IPF, C=US"
+chmod 600 "$STAGED_KEYSTORE"
 
-# Write/update local.properties
-touch "$LOCAL_PROPS"
-grep -v -E "^WHITENOISE_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$LOCAL_PROPS.tmp" || true
-mv "$LOCAL_PROPS.tmp" "$LOCAL_PROPS"
+# A hard link never replaces an existing path, so a keystore that appeared
+# while keytool ran is kept.
+if ! ln "$STAGED_KEYSTORE" "$KEYSTORE_PATH" 2>/dev/null; then
+  echo "error: could not place keystore at $KEYSTORE_PATH (it may already exist)" >&2
+  exit 1
+fi
+
+# Rewrite local.properties without old signing entries, keeping every other
+# line, and add the new credentials. The replacement is owner-only even when
+# the previous file was not.
+PROPS_TMP="$(mktemp "$REPO_DIR/.local.properties.XXXXXX")"
+if [[ -f "$LOCAL_PROPS" ]]; then
+  grep -v -E "^WHITENOISE_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$PROPS_TMP" || true
+fi
 {
   echo ""
   echo "# Android release signing (DO NOT COMMIT)"
@@ -63,7 +98,10 @@ mv "$LOCAL_PROPS.tmp" "$LOCAL_PROPS"
   echo "WHITENOISE_KEY_ALIAS=whitenoise"
   echo "WHITENOISE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
   echo "WHITENOISE_KEY_PASSWORD=$KEYSTORE_PASSWORD"
-} >> "$LOCAL_PROPS"
+} >> "$PROPS_TMP"
+chmod 600 "$PROPS_TMP"
+mv -f "$PROPS_TMP" "$LOCAL_PROPS"
+PROPS_TMP=""
 
 cat <<EOF
 
