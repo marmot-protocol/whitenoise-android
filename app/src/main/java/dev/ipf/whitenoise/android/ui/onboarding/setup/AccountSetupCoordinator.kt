@@ -275,34 +275,38 @@ internal class AccountSetupCoordinator(
             return token
         }
 
-        /** Activates only a freshly certified account and leaves the route available if activation fails. */
+        /**
+         * Activates only a freshly certified account and leaves the route available if activation fails.
+         * Returns whether the account was activated, so a declined attempt stays retryable (#3697).
+         */
+        @Suppress("ReturnCount") // Each ownership check declines before any activation side effect.
         suspend fun finish(
             token: Long,
             owner: SetupRuntimeOwner,
             client: AccountSetupClient,
             account: String,
             isMountCurrent: () -> Boolean,
-        ) {
+        ): Boolean {
             val selection = app.accountSession.handoff.capture()
-            if (!setupReadyForActivation(client, isMountCurrent)) return
+            if (!setupReadyForActivation(client, isMountCurrent)) return false
             app.refreshAccounts()
-            if (!isMountCurrent()) return
+            if (!isMountCurrent()) return false
             // Resumed setup may have diverted bootstrap before its receiver/privacy barrier.
             awaitActivationReadiness()
-            if (isMountCurrent()) {
-                val activated =
-                    app.setActiveAccount(
-                        account,
-                        shouldActivate = {
-                            generation == token &&
-                                app.runtimeGeneration == owner.epoch &&
-                                app.marmot() === owner.runtime
-                        },
-                        expectedSelection = selection,
-                        onActivated = { onPhaseChange(AppPhase.Ready) },
-                    )
-                if (activated) scope.launch { if (generation == token) close() }
-            }
+            if (!isMountCurrent()) return false
+            val activated =
+                app.setActiveAccount(
+                    account,
+                    shouldActivate = {
+                        generation == token &&
+                            app.runtimeGeneration == owner.epoch &&
+                            app.marmot() === owner.runtime
+                    },
+                    expectedSelection = selection,
+                    onActivated = { onPhaseChange(AppPhase.Ready) },
+                )
+            if (activated) scope.launch { if (generation == token) close() }
+            return activated
         }
     }
 }

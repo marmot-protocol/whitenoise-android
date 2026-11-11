@@ -41,6 +41,26 @@ class VoiceRecordingOwnershipCoverageTest {
         assertTrue(recorder.contains("unregisterAudioRecordingCallback(callback)"))
     }
 
+    /**
+     * A discarded take's native close is tracked, a new take waits for it before opening a recorder, and
+     * its cleanup releases the shared lease only when no newer take holds it (#3707).
+     */
+    @Test
+    fun discardedTakeCloseIsSerializedBeforeAReplacementTake() {
+        val controller = source("audio/VoiceRecordingController.kt")
+        val trackedDiscard = "discardJob =\n                recorderScope.launch {"
+        assertTrue("the discard close is tracked", controller.contains(trackedDiscard))
+        val join = controller.indexOf("discarding?.join()")
+        assertTrue(
+            "a new take waits for the discard before opening a recorder",
+            join >= 0 && join < controller.indexOf("beginRecording(generation)\n            }"),
+        )
+        assertTrue(
+            "the discard releases only an unclaimed lease",
+            controller.contains("if (!isRecording && startJob == null && restartJob?.isActive != true) {"),
+        )
+    }
+
     /** Reads production source from either the module or repository test working directory. */
     private fun source(path: String): String =
         listOf(

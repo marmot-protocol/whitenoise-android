@@ -64,10 +64,8 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.UUID
 
 internal enum class DiagnosticsSection {
@@ -211,13 +209,12 @@ internal fun DiagnosticsScreen(
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
         streaming = true
-        val subscription = appState.marmotIo { subscribeEvents() }
         try {
-            while (true) {
-                val event =
-                    withContext(Dispatchers.IO) {
-                        subscription.next()
-                    } ?: break
+            streamDiagnosticEvents(
+                acquire = { keep -> appState.marmotIo { keep(subscribeEvents()) } },
+                next = { it.next() },
+                release = { it.destroy() },
+            ) { event ->
                 val described = DiagnosticFormatter.describe(event, diagnosticIdentity)
                 entries = (entries + DiagnosticLogEntry(text = described)).takeLast(500)
             }
@@ -234,9 +231,6 @@ internal fun DiagnosticsScreen(
                 ).takeLast(500)
         } finally {
             streaming = false
-            withContext(Dispatchers.IO) {
-                subscription.destroy()
-            }
         }
     }
 

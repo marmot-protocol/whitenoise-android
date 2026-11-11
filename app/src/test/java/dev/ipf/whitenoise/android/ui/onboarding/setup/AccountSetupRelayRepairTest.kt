@@ -101,7 +101,7 @@ class AccountSetupRelayRepairTest {
     @Test fun failedLoadDoesNotOpenEditor() =
         runTest {
             val client = FakeSetupClient(relayDecision()).apply { fail = true }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -125,7 +125,7 @@ class AccountSetupRelayRepairTest {
                     client.current
                 }
             }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -155,7 +155,15 @@ class AccountSetupRelayRepairTest {
                     executeResult = { relayPreviewSnapshot() }
                 }
             var current = true
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { current }, {}, {})
+            val controller =
+                AccountSetupController(
+                    SETUP_TEST_ACCOUNT,
+                    client,
+                    backgroundScope,
+                    { current },
+                    { true },
+                    {},
+                )
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -171,7 +179,7 @@ class AccountSetupRelayRepairTest {
     @Test fun changedCheckpointInvalidatesOpenEditor() =
         runTest {
             val client = FakeSetupClient(relayDecision()).apply { executeResult = { relayPreviewSnapshot() } }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -187,7 +195,7 @@ class AccountSetupRelayRepairTest {
     @Test fun recoveryEpochInvalidatesOpenEditorAtSameRevision() =
         runTest {
             val client = FakeSetupClient(relayDecision()).apply { executeResult = { relayPreviewSnapshot() } }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)

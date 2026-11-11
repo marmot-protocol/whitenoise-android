@@ -24,7 +24,10 @@ class AccountSetupAutomationTest {
                     client,
                     backgroundScope,
                     { true },
-                    { activations++ },
+                    {
+                        activations++
+                        true
+                    },
                     {},
                 )
             controller.reconnect()
@@ -59,7 +62,7 @@ class AccountSetupAutomationTest {
     @Test fun detailsToggleDoesNotMutateTheAccount() =
         runTest {
             val client = FakeSetupClient()
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.toggleDetails()
             assertEquals(true, controller.state.value.detailsExpanded)
             controller.toggleDetails()

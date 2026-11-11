@@ -18,7 +18,7 @@ class AccountSetupRelayDismissTest {
     @Test fun dismissRestoresRepairChoicesAfterNativeCancellation() =
         runTest {
             val client = previewClient()
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -48,7 +48,7 @@ class AccountSetupRelayDismissTest {
     @Test fun failedDiscardKeepsTheEditorForRetry() =
         runTest {
             val client = previewClient()
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -73,7 +73,7 @@ class AccountSetupRelayDismissTest {
     @Test fun dismissDoesNotCancelANewerNativeProposal() =
         runTest {
             val client = previewClient()
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL)
@@ -93,7 +93,7 @@ class AccountSetupRelayDismissTest {
         runTest {
             val initial = setupSnapshot(OnboardingStepFfi.PROFILE, listOf(OnboardingActionFfi.EDIT_PROFILE))
             val client = FakeSetupClient(initial)
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.PROFILE, OnboardingActionFfi.EDIT_PROFILE, 3uL)
