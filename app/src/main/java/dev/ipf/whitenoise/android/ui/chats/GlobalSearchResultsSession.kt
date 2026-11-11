@@ -231,7 +231,8 @@ private const val MILLIS_PER_SECOND = 1_000L
 /**
  * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Every key it
  * removes or deletes goes to [withdraw] with its chat first, so a loaded row leaves before the recheck lands and a
- * held one never lists. The scope is not read here, off the main thread: the controller applies it on withdrawal.
+ * held one never lists. Removals do not read the scope here, off the main thread: the controller applies it on
+ * withdrawal. The recheck decision still reads it, which can only mistime a recheck.
  */
 internal fun touchesLoadedRows(
     event: MarmotEventFfi,

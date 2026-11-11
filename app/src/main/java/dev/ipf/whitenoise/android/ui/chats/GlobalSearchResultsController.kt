@@ -201,9 +201,10 @@ internal class GlobalSearchResultsController(
         recheckFailed = false
     }
 
-    /** Cancels the batch in flight and fences every later completion. */
+    /** Cancels the batch in flight, fences every later completion and drops removals no query will apply. */
     fun close() {
         closed = true
+        reportedRemovals.clear()
         refreshPending = false
         loadPending = false
         headOwed = false
