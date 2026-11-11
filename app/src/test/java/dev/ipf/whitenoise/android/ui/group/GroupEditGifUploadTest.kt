@@ -2,15 +2,22 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,6 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLooper
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
@@ -186,6 +194,42 @@ class GroupEditGifUploadTest {
             confirm()
         }
         assertEquals(0, fixture.uploads.get())
+    }
+
+    /** A save started while an uncroppable photo is prepared delays its upload instead of dropping it. */
+    @Test
+    fun saveDuringFallbackPreparationDoesNotDropTheUpload() {
+        render()
+        // Opens: picker sniff and crop load fail, then the fallback's own sniff is held.
+        pick(fixture.uri("save-during-fallback", still = true, failedOpens = 2, holdAtOpen = 2), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { fixture.entered.count == 0L }
+        val commitHeld = CountDownLatch(1)
+        val commitRelease = CountDownLatch(1)
+        val holder =
+            CoroutineScope(Dispatchers.IO).launch {
+                fixture.state.withGroupCommitLock(fixture.account, fixture.firstGroup) {
+                    commitHeld.countDown()
+                    commitRelease.await()
+                }
+            }
+        assertTrue(commitHeld.await(5, TimeUnit.SECONDS))
+        composeRule.onNode(hasSetTextAction() and hasText("Editor group")).performTextReplacement("Renamed group")
+        composeRule.onNodeWithText(fixture.context.getString(R.string.save_group)).performClick()
+        awaitProgress { fixture.controller.value.mutationInFlight }
+        fixture.release.countDown()
+        // The fallback's sniff, SVG check and decode each close a stream; then let preparation return to the editor.
+        awaitProgress { fixture.closedStreams.get() >= 3 }
+        repeat(50) {
+            Thread.sleep(20)
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+        }
+        composeRule.waitForIdle()
+        assertTrue("The save must still hold the editor", fixture.controller.value.mutationInFlight)
+        assertEquals(0, fixture.uploads.get())
+        commitRelease.countDown()
+        runBlocking { holder.join() }
+        awaitProgress { fixture.uploads.get() == 1 }
     }
 
     private fun replacement(groupId: String) {

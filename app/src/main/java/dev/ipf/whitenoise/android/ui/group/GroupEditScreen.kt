@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,6 +81,7 @@ import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -462,15 +464,18 @@ internal fun GroupEditScreen(
             },
             onUnreadable = { picked ->
                 // The upload is prepared first and its actual media type decides the notice, so a GIF never goes up
-                // whole after the still-photo confirmation. The image slot stays claimed while it is prepared, so
-                // this confirmed pick wins over any later one the same way it would during an upload.
+                // whole after the still-photo confirmation. The image slot stays claimed while the pick is prepared
+                // and while any save started meanwhile finishes, so the upload or its failure is never dropped as
+                // busy. A later pick may still replace an unconfirmed GIF notice, as it would any pending notice.
                 val claimed = imageOwnerIsCurrent() && !imageSaving && !controller.mutationInFlight
                 if (claimed) {
                     imageSaving = true
                     imagePickerScope.launch {
                         val prepared =
                             try {
-                                preparedFallbackDraft(context.contentResolver, picked)
+                                preparedFallbackDraft(context.contentResolver, picked).also {
+                                    snapshotFlow { controller.mutationInFlight }.first { inFlight -> !inFlight }
+                                }
                             } finally {
                                 imageSaving = false
                             }

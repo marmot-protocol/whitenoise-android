@@ -90,13 +90,15 @@ internal class GroupEditGifFixture {
         hold: Boolean = false,
         still: Boolean = false,
         failedOpens: Int = 0,
+        holdAtOpen: Int = if (hold) 0 else -1,
     ): Uri {
         val failuresLeft = AtomicInteger(failedOpens)
+        val opens = AtomicInteger()
         val extension = if (still) "png" else "gif"
         val uri = Uri.parse("content://whitenoise.synthetic/gif-editor/$name.$extension")
         val bytes = if (still) stillPng() else twoFrameGif()
         shadowOf(context.contentResolver).registerInputStreamSupplier(uri) {
-            if (hold) {
+            if (opens.getAndIncrement() >= holdAtOpen && holdAtOpen >= 0) {
                 entered.countDown()
                 check(release.await(5, TimeUnit.SECONDS)) { "Held document was not released" }
             }
