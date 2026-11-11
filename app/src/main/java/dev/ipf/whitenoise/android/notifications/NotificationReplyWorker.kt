@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -15,6 +16,7 @@ import androidx.work.await
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -88,6 +90,19 @@ class NotificationReplyWorker(
                 return Result.failure().also { retryStore.clear(retryKey) }
             }
             null -> Unit
+        }
+        if (exceedsOutgoingMessageLimit(reply)) {
+            // Nothing is sent, and the card comes back repliable with the notice the composer shows.
+            return finalizeReplyFailure(
+                action,
+                containsLegacyPlaintext,
+                completionStore,
+                completionKey,
+                retryStore,
+                retryKey,
+                failureReason = "message too long",
+                failureNotice = R.string.toast_message_too_long,
+            )
         }
         if (!application.appState.notificationActionsAllowed) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
@@ -251,6 +266,7 @@ class NotificationReplyWorker(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
         failureReason: String? = null,
+        @StringRes failureNotice: Int = R.string.toast_send_failed,
     ): Result {
         // Only persist the abandon marker once we're actually giving up (off the
         // worker thread); if it can't be recorded, retry so recovery state isn't lost.
@@ -264,7 +280,7 @@ class NotificationReplyWorker(
             "group=${action.target.groupIdHex.take(8)}"
         }
         retryStore.clear(retryKey)
-        surfaceReplyFailure(action)
+        surfaceReplyFailure(action, failureNotice)
         return Result.failure()
     }
 
@@ -275,9 +291,12 @@ class NotificationReplyWorker(
      * restore the card to a repliable state stamped with the failure notice.
      * Best-effort on both fronts — the abandon marker is already durable.
      */
-    private suspend fun surfaceReplyFailure(action: NotificationAction) {
+    private suspend fun surfaceReplyFailure(
+        action: NotificationAction,
+        @StringRes notice: Int = R.string.toast_send_failed,
+    ) {
         withContext(NonCancellable) {
-            val failureNotice = applicationContext.getString(R.string.toast_send_failed)
+            val failureNotice = applicationContext.getString(notice)
             runCatching {
                 val presenter = LocalNotificationPresenter(applicationContext)
                 // Same bounded retry as the success-path re-post: the system

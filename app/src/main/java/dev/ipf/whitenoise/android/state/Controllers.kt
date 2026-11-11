@@ -85,6 +85,7 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
@@ -7980,6 +7981,11 @@ class ConversationController(
             return
         }
         val trimmed = text.trim()
+        if (exceedsOutgoingMessageLimit(trimmed)) {
+            // Sends and edits both stop here, before any optimistic bubble, so the composer keeps its text.
+            appState.present(R.string.toast_message_too_long)
+            return
+        }
         val accountRef = conversationAccountRef
         if (
             !canAcceptTextSend(

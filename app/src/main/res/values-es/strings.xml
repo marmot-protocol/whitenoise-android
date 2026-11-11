@@ -858,6 +858,7 @@
     <string name="toast_profile_published_detail">Tu perfil ya está en %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">No se pudo publicar el perfil</string>
     <string name="toast_send_failed">Envío fallido</string>
+    <string name="toast_message_too_long">Mensaje demasiado largo. Acórtalo y vuelve a enviarlo.</string>
     <string name="toast_send_storage_full">No hay suficiente espacio para enviar. Libera espacio e inténtalo de nuevo.</string>
     <string name="error_storage_full">No hay suficiente espacio en este dispositivo. Libera espacio e inténtalo de nuevo.</string>
     <string name="toast_send_connection_failed">No se pudo conectar con el relé. Comprueba tu conexión e inténtalo de nuevo.</string>

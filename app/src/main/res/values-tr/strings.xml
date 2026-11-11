@@ -856,6 +856,7 @@
     <string name="toast_profile_published_detail">Profiliniz artık %1$d rölede yayında.</string>
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
+    <string name="toast_message_too_long">Mesaj çok uzun. Mesajınızı kısaltıp yeniden gönderin.</string>
     <string name="toast_send_storage_full">Göndermek için yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="error_storage_full">Bu cihazda yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="toast_send_connection_failed">Aktarıcıya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>

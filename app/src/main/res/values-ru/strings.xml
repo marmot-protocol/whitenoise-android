@@ -894,6 +894,7 @@
     <string name="toast_profile_published_detail">Ваш профиль теперь доступен на %1$d реле.</string>
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
+    <string name="toast_message_too_long">Сообщение слишком длинное. Сократите его и отправьте снова.</string>
     <string name="toast_send_storage_full">Недостаточно места для отправки. Освободите место и попробуйте снова.</string>
     <string name="error_storage_full">Недостаточно места на этом устройстве. Освободите место и попробуйте снова.</string>
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>
