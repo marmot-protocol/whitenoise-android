@@ -187,6 +187,37 @@ class AppReviewDemoTest {
             assertEquals(2, backend.messages.size)
         }
 
+    /**
+     * Creation that resumes an account which existed before the run, such as an unfinished generated setup, must
+     * not receive demo data: no profile, conversation or message, and the original account stays selected (#3702).
+     */
+    @Test
+    fun resumedPreexistingAccountIsRefusedBeforeAnyDemoMutation() =
+        runTest {
+            val unfinished = ReviewDemoAccount("unfinished", "d".repeat(64), localSigning = true, signedOut = false)
+            val backend =
+                FakeBackend().apply {
+                    accountList += unfinished
+                    resumedAccount = unfinished
+                }
+            val store = MemoryStore()
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
+
+            demo.start()
+            advanceUntilIdle()
+
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.AmbiguousAccount),
+                demo.status,
+            )
+            assertEquals(1, backend.accountCreates)
+            assertEquals(0, backend.profilePublishes)
+            assertEquals(0, backend.groupCreates)
+            assertTrue(backend.messages.isEmpty())
+            assertEquals(original.ref, backend.activeAccountRef)
+            assertEquals(null, store.checkpoint?.demoRef)
+        }
+
     @Test
     fun unrelatedSoleNewAccountIsNeverAdoptedByAResumedDemo() =
         runTest {
@@ -474,10 +505,14 @@ class AppReviewDemoTest {
         var loseAccountCreateReply = false
         var hideCreatedAccount = false
 
+        /** An existing unfinished account that creation resumes instead of making a new one. */
+        var resumedAccount: ReviewDemoAccount? = null
+
         override suspend fun accounts() = accountList.filter { !hideCreatedAccount || it.ref == original.ref }
 
         override suspend fun createAccount(): ReviewDemoAccount {
             accountCreates++
+            resumedAccount?.let { return it }
             accountList += johnny
             if (loseAccountCreateReply) {
                 loseAccountCreateReply = false

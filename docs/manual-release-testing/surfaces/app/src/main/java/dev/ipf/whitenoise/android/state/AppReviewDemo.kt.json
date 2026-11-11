@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReviewDemo.kt",
+  "legacy_sha256": "2fa2ad5dd605dbf0b6e7ccbc2e8eb6f193148922624355f2a17f3b2c47a3fe29",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AppReviewDemo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReviewDemo.kt",
+        "anchor": "internal class AppReviewDemo(",
+        "test_ids": [
+          "SET-029"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Demo setup refuses a resumed pre-existing account before any demo mutation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppReviewDemo.kt",
+        "anchor": "if (preexisting) throw ReviewDemoFailure(ReviewDemoProblem.AmbiguousAccount)",
+        "test_ids": [
+          "SET-029"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

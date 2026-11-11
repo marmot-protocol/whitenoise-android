@@ -609,7 +609,14 @@ internal class AppReviewDemo(
         requireOwned()
         save(checkpoint.copy(accountCreationAttempted = true))
         requireOwned()
-        return backend.createAccount()
+        val created = backend.createAccount()
+        // MDK's generated-account creation resumes an unfinished setup, which can be an account that existed before
+        // this run. Only a brand-new identity may receive demo data (#3702).
+        val preexisting =
+            created.ref in checkpoint.initialAccountRefs ||
+                current.any { it.id.equals(created.id, ignoreCase = true) }
+        if (preexisting) throw ReviewDemoFailure(ReviewDemoProblem.AmbiguousAccount)
+        return created
     }
 
     private suspend fun waitForSetup(
