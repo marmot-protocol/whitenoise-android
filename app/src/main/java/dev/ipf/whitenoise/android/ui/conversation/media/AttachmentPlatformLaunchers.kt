@@ -187,6 +187,10 @@ internal fun androidPackageInstallPermissionIntent(context: Context): Intent =
         Uri.parse("package:${context.packageName}"),
     )
 
+/**
+ * Saves [source] to Downloads, or through [fallback]'s chosen destination when Downloads fails. [beforePublish]
+ * throws once the save has lost its owner; it runs before Downloads publishes, before the picker and after it.
+ */
 internal suspend fun saveDocumentWithFallback(
     context: Context,
     source: File,

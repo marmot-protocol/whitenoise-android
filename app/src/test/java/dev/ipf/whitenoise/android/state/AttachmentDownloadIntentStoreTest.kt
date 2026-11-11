@@ -345,6 +345,7 @@ class AttachmentDownloadIntentStoreTest {
         assertFalse(AttachmentDownloadIntentStore(preferences).isAutomaticSuppressed(REQUEST_A))
     }
 
+    /** Resuming one account's backlog leaves every other account's cancellations in place. */
     @Test
     fun restartingOneAccountBacklogKeepsOtherAccountsCancels() {
         val second = REQUEST_A.copy(attachmentIndex = 1)
@@ -364,6 +365,7 @@ class AttachmentDownloadIntentStoreTest {
         assertFalse(AttachmentDownloadIntentStore(preferences).isAutomaticSuppressed(REQUEST_B))
     }
 
+    /** A restored cancellation stays as it is when another account restarts later. */
     @Test
     fun restoredCancelIsNotResurrectedOrClearedByALaterAccountRestart() {
         val store = AttachmentDownloadIntentStore(preferences)
@@ -377,6 +379,7 @@ class AttachmentDownloadIntentStoreTest {
         assertTrue(store.isAutomaticSuppressed(REQUEST_B))
     }
 
+    /** A cancellation stored without an owner, as an older version saved it, survives an account restart. */
     @Test
     fun cancelRecordedWithoutAnOwnerSurvivesAccountRestart() {
         AttachmentDownloadIntentStore(preferences).suppressAutomatic(REQUEST_A)

@@ -138,6 +138,7 @@ class StickersTest {
             assertFalse(library.hasLoadedInstalled)
         }
 
+    /** A failed installed read stays reported until a later read succeeds. */
     @Test
     fun aFailedInstalledReadIsReportedUntilARetrySucceeds() =
         runTest {
@@ -161,6 +162,7 @@ class StickersTest {
             assertTrue(library.isInstalled(coordinate("a")))
         }
 
+    /** Uninstalling drops the pack even when the reread after it fails. */
     @Test
     fun anUninstalledPackIsDroppedEvenWhenTheRereadFails() =
         runTest {
@@ -182,6 +184,7 @@ class StickersTest {
             assertTrue(library.installedReadFailed)
         }
 
+    /** A read that started before an uninstall cannot put the removed pack back. */
     @Test
     fun aReadThatStartedBeforeAnUninstallCannotRestoreThePack() =
         runTest {
@@ -217,6 +220,7 @@ class StickersTest {
             assertFalse(library.isInstalled(coordinate("a")))
         }
 
+    /** A read that started before an uninstall and then failed is not reported as a failure. */
     @Test
     fun aFailureFromAReadThatStartedBeforeAnUninstallIsNotReported() =
         runTest {
@@ -253,6 +257,7 @@ class StickersTest {
             assertFalse(library.isInstalled(coordinate("a")))
         }
 
+    /** A failed uninstall leaves the pack installed. */
     @Test
     fun aFailedUninstallKeepsThePackInstalled() =
         runTest {

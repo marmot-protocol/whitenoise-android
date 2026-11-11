@@ -66,7 +66,7 @@ import java.net.URLEncoder
 private const val SEARCH_DEBOUNCE_MS = 250L
 
 /** The browser's last discovery read: its packs, the query they answer and whether the latest read failed. */
-private class DiscoveryResults {
+internal class DiscoveryResults {
     var packs by mutableStateOf<List<StickerPackFfi>>(emptyList())
         private set
     var failed by mutableStateOf(false)
