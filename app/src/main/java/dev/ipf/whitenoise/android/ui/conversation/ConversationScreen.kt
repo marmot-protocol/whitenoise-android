@@ -4325,13 +4325,12 @@ internal fun ConversationScreen(
                                             },
                                             onRemoveDocument = { index ->
                                                 if (!attachmentSendClaim.isHeld) {
-                                                    val kept = pendingDocumentUris.filterIndexed { i, _ -> i != index }
-                                                    // A second occurrence of the same file keeps its prepared bytes.
-                                                    pendingDocumentUris
-                                                        .getOrNull(index)
-                                                        ?.takeIf { it !in kept }
-                                                        ?.let(mediaDraftState::releasePreparedDocument)
-                                                    pendingDocumentUris = kept
+                                                    pendingDocumentUris =
+                                                        removeStagedDocumentAt(
+                                                            pendingDocumentUris,
+                                                            index,
+                                                            mediaDraftState::releasePreparedDocument,
+                                                        )
                                                 }
                                             },
                                         )

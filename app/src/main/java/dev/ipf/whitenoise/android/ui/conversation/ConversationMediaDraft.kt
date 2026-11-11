@@ -926,9 +926,8 @@ internal fun ConversationMediaDraftContent(
                         onMediaSlotsChange(mediaSlots.filterIndexed { itemIndex, _ -> itemIndex != index })
                     },
                     onRemoveDocumentAt = { index ->
-                        documentUris.getOrNull(index)?.let(state::releasePreparedDocument)
                         onDocumentUrisChange(
-                            documentUris.filterIndexed { itemIndex, _ -> itemIndex != index },
+                            removeStagedDocumentAt(documentUris, index, state::releasePreparedDocument),
                         )
                     },
                     onAddPhotos = onAddPhotos,
@@ -963,6 +962,20 @@ internal fun ConversationMediaDraftContent(
             onSave = { recipe, quality -> state.saveEditor(editor, recipe, quality) },
         )
     }
+}
+
+/**
+ * Removes the staged document at [index] and returns the documents left. Every copy of one file shares its prepared
+ * bytes and native draft attachment, so [release] runs only once no other copy of that file stays staged.
+ */
+internal fun removeStagedDocumentAt(
+    documents: List<Uri>,
+    index: Int,
+    release: (Uri) -> Unit,
+): List<Uri> {
+    val kept = documents.filterIndexed { itemIndex, _ -> itemIndex != index }
+    documents.getOrNull(index)?.takeIf { it !in kept }?.let(release)
+    return kept
 }
 
 private data class DraftPhotoEdit(
