@@ -48,7 +48,11 @@ internal class GlobalSearchCompleteScope(
 ) {
     /** The chats global search is scoped to: filtered complete rows, plus explicit chats no complete row knows. */
     fun scopedChats(state: GlobalSearchState): List<ChatListItem> =
-        globalSearchScopedChats(source, state, folderChatIds)
+        globalSearchScopedChats(
+            source,
+            state,
+            folderChatIds,
+        )
 
     /**
      * Group ids for a message or attachment query. An explicitly chosen chat is an identity, so one that is in no
@@ -84,7 +88,11 @@ private data class ScopeRevisions(
 )
 
 private fun ChatsController.scopeRevisions() =
-    ScopeRevisions(materializedGroupsRevision, forwardTargetsRevision, ambiguousMembershipRemovalsRevision)
+    ScopeRevisions(
+        materializedGroupsRevision,
+        forwardTargetsRevision,
+        ambiguousMembershipRemovalsRevision,
+    )
 
 /**
  * The complete scope while search is [enabled], or null while it is pending: no covering account-wide snapshot yet,
