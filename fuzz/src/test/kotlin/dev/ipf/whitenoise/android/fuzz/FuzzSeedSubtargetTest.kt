@@ -42,6 +42,8 @@ class FuzzSeedSubtargetTest {
             }
             seedName in GROUP_SYSTEM_SEEDS ->
                 assertTrue(provider.consumeParserInput().trimStart().startsWith("{"), "$seedName must replay JSON")
+            seedName in NON_STRICT_GROUP_SYSTEM_SEEDS ->
+                assertTrue(provider.consumeParserInput().contains("\"system_type\""), "$seedName must replay a system event")
             seedName.startsWith("nostr_event_") ->
                 assertTrue(provider.consumeParserInput().trimStart().startsWith("{"), "$seedName must replay JSON")
             seedName.startsWith("relay_envelope_") -> {
@@ -92,6 +94,14 @@ class FuzzSeedSubtargetTest {
                 "truncated_nested.input",
                 "unicode_unknown.input",
             )
+
+        /** Non-strict JSON seeds the bounds check must reject before org.json sees them. */
+        private val NON_STRICT_GROUP_SYSTEM_SEEDS =
+            setOf(
+                "comment_hidden_depth.input",
+                "literal_quote_hidden_depth.input",
+            )
+
         private val IMAGE_CONTAINER_SEEDS =
             mapOf(
                 "minimal_jpeg.input" to ImageContainerKind.Jpeg,
@@ -119,7 +129,7 @@ class FuzzSeedSubtargetTest {
                         ImageContainerSubtarget.AllContainers.ordinal,
                         ImageContainerSubtarget.AllContainers.name,
                     )
-                name in GROUP_SYSTEM_SEEDS ->
+                name in GROUP_SYSTEM_SEEDS || name in NON_STRICT_GROUP_SYSTEM_SEEDS ->
                     seedExpectation(
                         seedPath,
                         GroupSystemSubtarget.COUNT,
