@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData
-import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -988,11 +987,12 @@ internal fun createImageCaptureFile(context: android.content.Context): java.io.F
 
 /**
  * Copy a receive-content image into app-owned cache while the platform's
- * transient URI read grant is still active.
+ * URI read grant is still active.
  *
- * Clipboard/IME providers may revoke the grant as soon as the receive-content
- * callback returns. The composer staging shelf previews and sends later, so it
- * must hold a local FileProvider URI rather than the provider's raw URI.
+ * The provider may revoke access once the drop's grant ends. The composer
+ * staging shelf previews and sends later, so it must hold a local FileProvider
+ * URI rather than the provider's raw URI. This reads from the provider, so call
+ * it off the main thread; [resolvedMime] is the type already resolved for [uri].
  *
  * The keyboard or clipboard app chooses [uri], so it passes the same foreign-source gate as share intents: a
  * `file:` URI or one of our own providers is refused before any read.
@@ -1000,13 +1000,14 @@ internal fun createImageCaptureFile(context: android.content.Context): java.io.F
 internal fun materializeReceiveContentImageUri(
     context: android.content.Context,
     uri: android.net.Uri,
+    resolvedMime: String,
     maxBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
     isAppOwnedProvider: (android.net.Uri) -> Boolean = { ForeignContentSource.isAppOwned(context, it) },
 ): android.net.Uri? =
     runCatching {
         if (!ForeignContentSource.isForeign(uri, isAppOwnedProvider)) return@runCatching null
         val resolver = context.contentResolver
-        val suffix = receiveContentImageCacheSuffix(safeGetType(resolver, uri))
+        val suffix = receiveContentImageCacheSuffix(resolvedMime)
         val dir = java.io.File(context.cacheDir, MediaCacheDirs.COMPOSER_PASTE).apply { mkdirs() }
         val file = java.io.File.createTempFile("paste_", suffix, dir)
         val copied =
@@ -1188,15 +1189,6 @@ internal fun receiveContentMimeIsImage(
 ): Boolean =
     resolvedMime.startsWith("image/", ignoreCase = true) ||
         (resolvedMime.isBlank() && clipDeclaresImage)
-
-internal fun receiveContentImageUriOrNull(
-    item: ClipData.Item,
-    clipDescription: ClipDescription?,
-    resolveMime: (Uri) -> String?,
-): Uri? {
-    val clipDeclaresImage = clipDescription?.hasMimeType("image/*") == true
-    return receiveContentImageValueOrNull(item.uri, clipDeclaresImage, resolveMime)
-}
 
 internal fun <T> receiveContentImageValueOrNull(
     value: T?,

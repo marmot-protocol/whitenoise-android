@@ -197,6 +197,14 @@
         "test_ids": [
           "NCH-008"
         ]
+      },
+      {
+        "surface": "Composer image drop import stays off the main thread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "item.uri?.also { imageUris += it } != null",
+        "test_ids": [
+          "CON-046"
+        ]
       }
     ],
     "settings_controls": [
