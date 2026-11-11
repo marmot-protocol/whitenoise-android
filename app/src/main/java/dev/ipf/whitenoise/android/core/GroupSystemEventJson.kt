@@ -77,8 +77,9 @@ object GroupSystemEventJson {
 
     /**
      * A linear pre-scan prevents excessive strings, nesting, and collections
-     * from reaching org.json. Malformed inputs that stay inside the limits are
-     * still handed to the parser so fuzzing exercises its error paths.
+     * from reaching org.json. Non-strict JSON is rejected here; other malformed
+     * inputs that stay inside the limits still reach the parser so fuzzing
+     * exercises its error paths.
      */
     internal fun withinResourceBounds(plaintext: String): Boolean =
         !utf8LengthExceedsLimit(plaintext) &&
