@@ -17,6 +17,7 @@ FAKE_KEYTOOL = textwrap.dedent(
     # Records its arguments and writes a placeholder keystore where asked.
     printf '%s\\n' "$@" > "$FAKE_LOG/keytool-args"
     printf '%s' "${KEYSTORE_PASSWORD:-}" > "$FAKE_LOG/keytool-env-password"
+    if [[ -n "${FAKE_RACE_DIR:-}" ]]; then mkdir -p "$FAKE_RACE_DIR"; fi
     while [[ $# -gt 0 ]]; do
       if [[ "$1" == "-keystore" ]]; then
         printf 'synthetic keystore' > "$2"
@@ -60,9 +61,10 @@ class KeystoreGenTest(unittest.TestCase):
         self.keystore = self.root / "keystores" / "release.p12"
         self.props = self.repo / "local.properties"
 
-    def run_script(self) -> subprocess.CompletedProcess:
+    def run_script(self, **extra_env: str) -> subprocess.CompletedProcess:
         """Runs the script under umask 022 and returns the finished process."""
         env = dict(os.environ, PATH=f"{self.bin}{os.pathsep}{os.environ['PATH']}", FAKE_LOG=str(self.log))
+        env.update(extra_env)
         env.pop("KEYSTORE_PASSWORD", None)
         # A permissive umask, as on many developer machines, must not leak the secrets.
         return subprocess.run(
@@ -150,6 +152,28 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertFalse(self.keystore.exists())
         self.assertEqual([], list(self.keystore.parent.iterdir()))
         self.assertFalse(self.props.exists())
+
+    def test_directory_created_at_keystore_path_is_refused(self) -> None:
+        """A directory that appears at the keystore path is left empty and no credentials are written."""
+        result = self.run_script(FAKE_RACE_DIR=str(self.keystore))
+        self.assertNotEqual(0, result.returncode)
+        self.assertTrue(self.keystore.is_dir())
+        self.assertEqual([], list(self.keystore.iterdir()))
+        self.assertEqual([self.keystore], list(self.keystore.parent.iterdir()))
+        self.assertFalse(self.props.exists())
+
+    @unittest.skipIf(os.geteuid() == 0, "root can read the unreadable local.properties")
+    def test_unreadable_properties_are_kept(self) -> None:
+        """An unreadable local.properties is not replaced and the unusable keystore is removed."""
+        self.props.write_text("sdk.dir=/opt/android-sdk\n")
+        self.props.chmod(0o000)
+        self.addCleanup(self.props.chmod, 0o600)
+        result = self.run_script()
+        self.assertNotEqual(0, result.returncode)
+        self.props.chmod(0o600)
+        self.assertEqual("sdk.dir=/opt/android-sdk\n", self.props.read_text())
+        self.assertFalse(self.keystore.exists())
+        self.assertEqual(["local.properties", "scripts"], sorted(p.name for p in self.repo.iterdir()))
 
 
 if __name__ == "__main__":

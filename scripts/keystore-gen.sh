@@ -89,13 +89,23 @@ if ! ln "$STAGED_KEYSTORE" "$KEYSTORE_PATH"; then
   echo "error: could not place keystore at $KEYSTORE_PATH" >&2
   exit 1
 fi
+# If a directory appeared at the destination, ln linked the keystore inside it.
+# Take that link back out and stop.
+if [[ ! "$KEYSTORE_PATH" -ef "$STAGED_KEYSTORE" ]]; then
+  STRAY_LINK="$KEYSTORE_PATH/$(basename "$STAGED_KEYSTORE")"
+  if [[ "$STRAY_LINK" -ef "$STAGED_KEYSTORE" ]]; then rm -f "$STRAY_LINK"; fi
+  echo "error: $KEYSTORE_PATH is not a regular file; keystore not placed" >&2
+  exit 1
+fi
 
 # Rewrite local.properties without old signing entries, keeping every other
 # line, and add the new credentials. The replacement is owner-only even when
 # the previous file was not.
 PROPS_TMP="$(mktemp "$REPO_DIR/.local.properties.XXXXXX")"
 if [[ -f "$LOCAL_PROPS" ]]; then
-  grep -v -E "^WHITENOISE_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$PROPS_TMP" || true
+  # grep exits 1 when no other lines remain, which is fine; any other status is
+  # a read error and stops before the existing file is replaced.
+  grep -v -E "^WHITENOISE_(KEYSTORE_|KEY_)" "$LOCAL_PROPS" > "$PROPS_TMP" || [[ $? -eq 1 ]]
 fi
 {
   echo ""
