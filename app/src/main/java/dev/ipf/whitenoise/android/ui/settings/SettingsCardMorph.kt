@@ -19,6 +19,8 @@ import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -72,6 +74,9 @@ internal class SettingsCardMorph {
     private val anchorBounds: Rect? get() = anchor?.let(live::get)?.takeIf(::onScreen)
 
     private val folding: Boolean get() = !fan && anchorBounds != null && cardTokens.isEmpty()
+
+    /** Whether leaving cards are folding over the live route, which must not take input until they are gone. */
+    val coversRoute: Boolean get() = running && folding
 
     fun report(
         token: Any,
@@ -263,11 +268,21 @@ internal fun <T> rememberSettingsCardMorphHost(
     return morphing to Modifier.settingsCardMorphHost(morph, colors)
 }
 
-/** Draws the travelling cards with the route and fades an arriving route's non-card content in as one layer. */
+/**
+ * Draws the travelling cards with the route, fades an arriving route's non-card content in as one layer
+ * and holds back input while leaving cards fold over the live route.
+ */
 internal fun Modifier.settingsCardMorphHost(
     morph: SettingsCardMorph,
     colors: SettingsMorphColors,
 ): Modifier =
     onGloballyPositioned { morph.placeHost(it.boundsInWindow()) }
-        .drawWithContent { with(morph) { drawMorph(colors) } }
+        .pointerInput(morph) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    if (morph.coversRoute) event.changes.forEach { it.consume() }
+                }
+            }
+        }.drawWithContent { with(morph) { drawMorph(colors) } }
         .graphicsLayer { alpha = morph.pageAlpha() }

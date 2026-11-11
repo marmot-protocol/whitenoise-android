@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.awaitConversationCondition
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
+import dev.ipf.whitenoise.android.ui.settings.SETTINGS_CARD_MORPH_MILLIS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -206,6 +207,8 @@ class DetailRouteMotionScreenshotTest {
             rule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
             rule.mainClock.advanceTimeByFrame()
             captureTransition("${name}_entry_back", profile)
+            // The closing cards cover the chat and hold back taps until they have folded away.
+            rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS.toLong())
             rule.onNode(opensDetails()).assertExists()
             rule.onNode(opensDetails()).performClick()
             rule.mainClock.advanceTimeBy(240)

@@ -6158,11 +6158,11 @@
         {
           "case": "presentation-modal-translation-composer",
           "selector": {
-            "text": "Translate"
+            "text": "Offline Translator can write message text.*"
           },
-          "scope": "Audited production owner and distinctive asserted title; controlled presentation proves acceptance precedes any engine request, not the real Android entrypoint.",
+          "scope": "Audited production owner and distinctive asserted consent text; controlled presentation proves acceptance precedes any engine request, not the real Android entrypoint.",
           "entry_assertion": {
-            "text": "Translate"
+            "text": "Offline Translator can write message text.*"
           },
           "visible_on_entry": true
         }
