@@ -66,8 +66,8 @@ class GlobalSearchScopeCoverageTest {
         openSearch(
             GlobalSearchState(isOpen = true, query = "hello", chatTypeFilters = setOf(GlobalSearchChatType.GROUPS)),
         )
-        awaitReads { scopedGroups(model).size >= 3 }
-        assertEquals(setOf(ACTION_TARGET, ACTION_SURVIVOR, GROUP_EXTRA), scopedGroups(model))
+        awaitReads { model.scopedGroups.size >= 3 }
+        assertEquals(setOf(ACTION_TARGET, ACTION_SURVIVOR, GROUP_EXTRA), model.scopedGroups)
     }
 
     /** Direct scopes the message search to the off-window direct chat. */
@@ -76,8 +76,8 @@ class GlobalSearchScopeCoverageTest {
         openSearch(
             GlobalSearchState(isOpen = true, query = "hello", chatTypeFilters = setOf(GlobalSearchChatType.DIRECT)),
         )
-        awaitReads { scopedGroups(model).isNotEmpty() }
-        assertEquals(setOf(DIRECT_EXTRA), scopedGroups(model))
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        assertEquals(setOf(DIRECT_EXTRA), model.scopedGroups)
     }
 
     /** A folder whose native query names an off-window member scopes the message search to it. */
@@ -86,8 +86,8 @@ class GlobalSearchScopeCoverageTest {
         model.chatListQueryIds = { _, _ -> listOf(ACTION_TARGET) }
         val folder = createFolder(model, ChatFolderRule(includeMuted = true))
         openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
-        awaitReads { scopedGroups(model).isNotEmpty() }
-        assertEquals(setOf(ACTION_TARGET), scopedGroups(model))
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        assertEquals(setOf(ACTION_TARGET), model.scopedGroups)
     }
 
     /** Explicitly chosen chats stay in scope, whether in the snapshot or in no row at all. */
@@ -96,8 +96,8 @@ class GlobalSearchScopeCoverageTest {
         val chosen =
             setOf(GlobalSearchChatFilter(ACTION_TARGET, "Target"), GlobalSearchChatFilter(EVICTED_CHAT, "Evicted"))
         openSearch(GlobalSearchState(isOpen = true, query = "hello", chatFilters = chosen))
-        awaitReads { scopedGroups(model).size >= 2 }
-        assertEquals(setOf(ACTION_TARGET, EVICTED_CHAT), scopedGroups(model))
+        awaitReads { model.scopedGroups.size >= 2 }
+        assertEquals(setOf(ACTION_TARGET, EVICTED_CHAT), model.scopedGroups)
     }
 
     /** An unready folder scope shows the results boundary progress, never No Results or a window-only search. */
@@ -122,8 +122,8 @@ class GlobalSearchScopeCoverageTest {
         )
         ready = true
         rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
-        awaitReads { scopedGroups(model).isNotEmpty() }
-        assertEquals(setOf(ACTION_TARGET), scopedGroups(model))
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        assertEquals(setOf(ACTION_TARGET), model.scopedGroups)
     }
 
     /** A refresh that cannot prove the folder again withdraws the published scope instead of searching with it. */
@@ -136,7 +136,7 @@ class GlobalSearchScopeCoverageTest {
         }
         val folder = createFolder(model, ChatFolderRule(includeMuted = true))
         openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
-        awaitReads { scopedGroups(model).isNotEmpty() }
+        awaitReads { model.scopedGroups.isNotEmpty() }
         ready = false
         rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
         settle()
@@ -178,10 +178,6 @@ class GlobalSearchScopeCoverageTest {
         awaitReads { model.timelineQueries.isNotEmpty() }
         assertTrue(model.timelineQueries.all { it.second.groupIdHex == null })
     }
-
-    private fun scopedGroups(model: OffWindowActionFixture): Set<String> = model.timelineQueries
-        .mapNotNull { it.second.groupIdHex }
-        .toSet()
 
     private fun createFolder(
         model: OffWindowActionFixture,
@@ -243,6 +239,10 @@ class GlobalSearchScopeCoverageTest {
         return model
     }
 }
+
+/** The chat ids that scoped message searches were limited to. */
+private val OffWindowActionFixture.scopedGroups: Set<String>
+    get() = timelineQueries.mapNotNullTo(HashSet()) { it.second.groupIdHex }
 
 private val GROUP_EXTRA = "d7".repeat(16)
 private val DIRECT_EXTRA = "e7".repeat(16)
