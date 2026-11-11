@@ -196,7 +196,7 @@ class VoiceRecordingController internal constructor(
         // stop/cancel. A denied grant means the mic is unavailable (e.g. an
         // active call) — surface it rather than capture competing audio.
         if (!requestRecordingFocus()) {
-            releaseMicrophoneLease()
+            releaseMicrophoneLeaseUnlessDiscarding()
             onError(IllegalStateException("Couldn't start recording — audio is in use"))
             return false
         }
@@ -483,7 +483,7 @@ class VoiceRecordingController internal constructor(
             resetRecordingUiState()
             abandonRecordingFocus()
             val pendingStart = startJob
-            if (pendingStart == null) releaseMicrophoneLease() else pendingStart.cancel()
+            if (pendingStart == null) releaseMicrophoneLeaseUnlessDiscarding() else pendingStart.cancel()
             return
         }
         recorder = null
@@ -531,7 +531,7 @@ class VoiceRecordingController internal constructor(
             tailCut?.complete(Unit)
             finalizeJob?.cancel()
         } else {
-            releaseMicrophoneLease()
+            releaseMicrophoneLeaseUnlessDiscarding()
         }
     }
 
@@ -573,6 +573,15 @@ class VoiceRecordingController internal constructor(
             microphoneLeaseHeld = acquired
             acquired
         }
+    }
+
+    /**
+     * Releases the lease now unless a discarded take is still closing its recorder, in which case that
+     * cleanup releases it once the microphone is actually free (#3707).
+     */
+    private fun releaseMicrophoneLeaseUnlessDiscarding() {
+        if (discardJob?.isActive == true) return
+        releaseMicrophoneLease()
     }
 
     private fun releaseMicrophoneLease() {

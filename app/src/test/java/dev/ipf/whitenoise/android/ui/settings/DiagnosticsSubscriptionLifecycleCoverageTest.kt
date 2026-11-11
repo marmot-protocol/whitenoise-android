@@ -20,6 +20,10 @@ class DiagnosticsSubscriptionLifecycleCoverageTest {
             "acquire = { keep -> appState.marmotIo { keep(subscribeEvents()) } }" in screen,
         )
         assertFalse("no subscription is opened outside the helper", "val subscription = appState.marmotIo" in screen)
+        assertTrue(
+            "a cancelled stream cannot clear its replacement's Live indicator",
+            "if (streamingOwner === owner) streaming = false" in screen,
+        )
     }
 
     /** The helper releases outside the effect's cancellation, once, for any acquired subscription. */

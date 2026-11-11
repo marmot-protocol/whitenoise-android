@@ -441,6 +441,8 @@ class ZapstoreIntegrationTests(unittest.TestCase):
         body = 'if mode == "verify": print("error: CDN blob size differs", file=sys.stderr); sys.exit(1)'
         result, root, summary, output = self.run_with_parent_runner_files(readback_body=body, VERIFY_ONLY='true')
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn('CDN blob size differs', result.stderr)
+        self.assertIn('submit=false', (root / 'github-output').read_text())
         self.assert_parent_runner_files_untouched(summary, output)
         fixture_summary = root / 'step-summary.md'
         self.assertFalse(fixture_summary.exists() and 'verified public' in fixture_summary.read_text())

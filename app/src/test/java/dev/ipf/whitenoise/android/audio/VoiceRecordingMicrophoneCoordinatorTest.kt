@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.content.Context
+import android.media.AudioManager
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -13,7 +15,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.File
 import java.nio.file.Files
 import kotlin.coroutines.CoroutineContext
 
@@ -219,6 +223,81 @@ class VoiceRecordingMicrophoneCoordinatorTest {
                 output.deleteRecursively()
             }
         }
+
+    /** Leaving the screen while a discarded take still closes keeps the lease until that close has finished. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun teardownDuringDiscardKeepsTheLeaseUntilTheRecorderCloses() =
+        runTest {
+            val coordinator = MicrophoneCaptureCoordinator()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val output = Files.createTempDirectory("voice-discard-teardown-test").toFile()
+            val discarded = FakeVoiceRecordingSession(onCancel = {})
+            val controller = discardTestController(coordinator, dispatcher, output, discarded)
+
+            try {
+                assertTrue(controller.start())
+                runCurrent()
+                controller.cancel()
+                controller.release()
+
+                assertTrue("the closing recorder still holds the mic", coordinator.isOwnedBy(controller))
+                runCurrent()
+                assertTrue(discarded.cancelled)
+                assertFalse(coordinator.isOwnedBy(controller))
+            } finally {
+                output.deleteRecursively()
+            }
+        }
+
+    /** A replacement start refused audio focus during a discard leaves the lease to the discard's cleanup. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun deniedReplacementDuringDiscardKeepsTheLeaseUntilTheRecorderCloses() =
+        runTest {
+            val coordinator = MicrophoneCaptureCoordinator()
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val output = Files.createTempDirectory("voice-discard-denied-test").toFile()
+            val discarded = FakeVoiceRecordingSession(onCancel = {})
+            val controller = discardTestController(coordinator, dispatcher, output, discarded, onError = {})
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val audio = shadowOf(context.getSystemService(AudioManager::class.java))
+
+            try {
+                assertTrue(controller.start())
+                runCurrent()
+                controller.cancel()
+                audio.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+                assertFalse(controller.start())
+
+                assertTrue("the closing recorder still holds the mic", coordinator.isOwnedBy(controller))
+                runCurrent()
+                assertFalse(coordinator.isOwnedBy(controller))
+            } finally {
+                controller.release()
+                output.deleteRecursively()
+            }
+        }
+
+    /** A controller whose first recorder is [discarded], with Main and recorder work on [dispatcher]. */
+    private fun TestScope.discardTestController(
+        coordinator: MicrophoneCaptureCoordinator,
+        dispatcher: CoroutineDispatcher,
+        output: File,
+        discarded: FakeVoiceRecordingSession,
+        onError: (Throwable) -> Unit = { throw it },
+    ) = VoiceRecordingController(
+        context = ApplicationProvider.getApplicationContext(),
+        outputDirectory = output,
+        scope = this,
+        onPermissionRequest = { true },
+        onRecordingComplete = { _, _ -> error("No take is finished here") },
+        onError = onError,
+        microphoneCaptures = coordinator,
+        recorderFactory = { _, _, _ -> discarded },
+        mainDispatcher = dispatcher,
+        recorderDispatcher = dispatcher,
+    )
 
     /** A Main stand-in that runs queued work only when the test drains it, to pin an interleaving. */
     private class QueueDispatcher : CoroutineDispatcher() {

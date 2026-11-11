@@ -179,6 +179,10 @@ internal fun DiagnosticsScreen(
     var health by remember { mutableStateOf<RelayHealthFfi?>(null) }
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
+
+    // The effect that owns [streaming]. A cancelled stream's release can finish after its replacement
+    // started, so only the current owner may clear the indicator.
+    var streamingOwner by remember { mutableStateOf<Any?>(null) }
     var sendingPing by remember { mutableStateOf(false) }
     var performanceStatus by remember { mutableStateOf(PerformanceDiagnostics.status()) }
     val scope = rememberCoroutineScope()
@@ -208,6 +212,8 @@ internal fun DiagnosticsScreen(
         }
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
+        val owner = Any()
+        streamingOwner = owner
         streaming = true
         try {
             streamDiagnosticEvents(
@@ -230,7 +236,7 @@ internal fun DiagnosticsScreen(
                         )
                 ).takeLast(500)
         } finally {
-            streaming = false
+            if (streamingOwner === owner) streaming = false
         }
     }
 
