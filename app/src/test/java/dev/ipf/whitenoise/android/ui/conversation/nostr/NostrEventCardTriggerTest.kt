@@ -61,4 +61,35 @@ class NostrEventCardTriggerTest {
             "https://example.com/xnote1qqqqqqqq",
         ).forEach { text -> assertFalse("must not match: $text", mayNameNostrEventCard(text)) }
     }
+
+    /**
+     * Repeated schemes in one unbroken run are searched once, not once per scheme: a run of 16,384 `https://` before
+     * an invalid segment rescanned its rest from every scheme, about a billion character steps, and stalled the page.
+     */
+    @Test(timeout = 5_000)
+    fun repeatedSchemesBeforeAnInvalidSegmentStayLinear() {
+        val schemes = "https://".repeat(16_384)
+        assertFalse(mayNameNostrEventCard("${schemes}note1!"))
+        assertFalse(mayNameNostrEventCard("[post](${schemes.replace("://", "\\://")}note1!)"))
+        assertTrue(mayNameNostrEventCard("$schemes$note"))
+        assertTrue(mayNameNostrEventCard("[post](${schemes.replace("://", "\\://")}$note)"))
+    }
+
+    /** Many short words, each its own run, are scanned in one forward pass rather than once per word. */
+    @Test(timeout = 5_000)
+    fun manyShortRunsStayLinear() {
+        assertFalse(mayNameNostrEventCard("x ".repeat(50_000) + "note1!"))
+        assertFalse(mayNameNostrEventCard("https:// ".repeat(50_000) + "note1!"))
+        assertTrue(mayNameNostrEventCard("https:// ".repeat(50_000) + "https://njump.me/$note"))
+        assertTrue(mayNameNostrEventCard("HTTPS://NJUMP.ME/${note.uppercase()}"))
+    }
+
+    /** A segment counts only after a scheme in its own run, however many unrelated schemes come first. */
+    @Test
+    fun segmentMatchesOnlyAfterSchemeInItsOwnRun() {
+        assertTrue(mayNameNostrEventCard("http://a https://b http://njump.me/$note"))
+        assertTrue(mayNameNostrEventCard("https://x\ty https://njump.me/$note"))
+        assertFalse(mayNameNostrEventCard("https://a https://b\n$note"))
+        assertFalse(mayNameNostrEventCard("$note https://njump.me/"))
+    }
 }
