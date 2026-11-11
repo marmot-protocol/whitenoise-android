@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -51,6 +52,8 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.OutputStream
 import java.lang.reflect.Proxy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -184,9 +187,58 @@ class AccountKeysExportDeliveryTest {
         dialogButton(R.string.export).performClick()
         composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
         composeRule.runOnIdle { fixture.picker.deliver(uri) }
-        assertEquals(ENCRYPTED_KEY, bytes.toString(Charsets.UTF_8.name()))
+        composeRule.waitUntil(TIMEOUT_MILLIS) { bytes.toString(Charsets.UTF_8.name()) == ENCRYPTED_KEY }
         assertEquals(1, fixture.native.encryptedCalls.get())
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
+    }
+
+    /**
+     * A slow provider is opened off the main thread; the screen stays responsive and export stays locked until it
+     * ends.
+     */
+    @Test
+    fun slowProviderWritesOffMainAndHoldsExportUntilSaved() {
+        val provider = BlockingProvider(fail = false)
+        val fixture = pickRawDestination(provider)
+        awaitProviderOpened(provider)
+        // The main looper keeps running while the provider is blocked.
+        composeRule.runOnIdle { assertNotSame(Thread.currentThread(), provider.openThread) }
+        composeRule.onNodeWithTag("profile_keys.export_raw").assertIsNotEnabled()
+        provider.release.countDown()
+        composeRule.waitUntil(TIMEOUT_MILLIS) { provider.bytes.toString(Charsets.UTF_8.name()) == RAW_KEY }
+        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().assertIsEnabled()
+        composeRule.onNodeWithText(context.getString(R.string.couldnt_save_file)).assertDoesNotExist()
+        assertEquals(1, fixture.native.rawCalls.get())
+    }
+
+    /** A provider that fails after a slow open still reports the failure to the screen that is waiting for it. */
+    @Test
+    fun slowProviderFailureShowsTheSaveError() {
+        val provider = BlockingProvider(fail = true)
+        pickRawDestination(provider)
+        awaitProviderOpened(provider)
+        provider.release.countDown()
+        composeRule.waitUntil(TIMEOUT_MILLIS) {
+            composeRule
+                .onAllNodes(hasText(context.getString(R.string.couldnt_save_file)))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+    }
+
+    /** Leaving the screen while the provider is blocked drops the late result instead of showing it on return. */
+    @Test
+    fun stopWhileProviderBlocksDropsTheLateResult() {
+        val provider = BlockingProvider(fail = true)
+        val fixture = pickRawDestination(provider)
+        awaitProviderOpened(provider)
+        composeRule.runOnIdle { fixture.owner.stop() }
+        provider.release.countDown()
+        assertTrue(provider.writeAttempted.await(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+        composeRule.runOnIdle { fixture.owner.resume() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(context.getString(R.string.couldnt_save_file)).assertDoesNotExist()
+        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().assertIsEnabled()
     }
 
     /** Foreground departure clears an encrypted preview and resume does not reveal it again. */
@@ -378,14 +430,32 @@ class AccountKeysExportDeliveryTest {
         }
         composeRule.waitForIdle()
         if (blockedBy == null) {
+            val expected = if (encrypted) ENCRYPTED_KEY else RAW_KEY
+            // The provider is written on IO, after the callback returns.
+            composeRule.waitUntil(TIMEOUT_MILLIS) { bytes.toString(Charsets.UTF_8.name()) == expected }
             assertEquals(1, opens.get())
-            assertEquals(if (encrypted) ENCRYPTED_KEY else RAW_KEY, bytes.toString(Charsets.UTF_8.name()))
         } else {
             assertEquals(0, opens.get())
             assertEquals(0, bytes.size())
         }
         assertEquals(if (encrypted) 1 else 0, fixture.native.encryptedCalls.get())
         assertEquals(if (encrypted) 0 else 1, fixture.native.rawCalls.get())
+    }
+
+    /** Idles the main looper while waiting, because the save is launched there before it moves to IO. */
+    private fun awaitProviderOpened(provider: BlockingProvider) {
+        composeRule.waitUntil(TIMEOUT_MILLIS) { provider.opened.count == 0L }
+    }
+
+    /** Starts a raw export and returns the picked URI to the screen, whose provider is [provider]. */
+    private fun pickRawDestination(provider: BlockingProvider): Fixture {
+        val fixture = render()
+        val uri = Uri.parse("content://key-export-test/slow-provider")
+        shadowOf(context.contentResolver).registerOutputStreamSupplier(uri) { provider.open() }
+        beginExport(encrypted = false)
+        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.picker.launchCount == 1 }
+        composeRule.runOnIdle { fixture.picker.deliver(uri) }
+        return fixture
     }
 
     /** Uses the screen's real menu rows and consequence/password dialogs rather than assigning private UI state. */
@@ -504,6 +574,44 @@ class AccountKeysExportDeliveryTest {
         /** Delivers ON_PAUSE and ON_STOP, exercising the actual screen's sensitive-operation observer. */
         fun stop() {
             registry.currentState = Lifecycle.State.CREATED
+        }
+    }
+
+    /** Document provider that blocks in open until released, then accepts or rejects the write. */
+    private class BlockingProvider(
+        private val fail: Boolean,
+    ) {
+        val opened = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val writeAttempted = CountDownLatch(1)
+        val bytes = ByteArrayOutputStream()
+
+        @Volatile
+        var openThread: Thread? = null
+            private set
+
+        /** Records the opening thread, then waits for the test before handing out the stream. */
+        fun open(): OutputStream {
+            openThread = Thread.currentThread()
+            opened.countDown()
+            check(release.await(15, TimeUnit.SECONDS)) { "Test did not release the provider" }
+            return object : OutputStream() {
+                override fun write(b: Int) {
+                    writeAttempted.countDown()
+                    if (fail) throw IOException("Synthetic provider write failure")
+                    bytes.write(b)
+                }
+
+                override fun write(
+                    b: ByteArray,
+                    off: Int,
+                    len: Int,
+                ) {
+                    writeAttempted.countDown()
+                    if (fail) throw IOException("Synthetic provider write failure")
+                    bytes.write(b, off, len)
+                }
+            }
         }
     }
 
