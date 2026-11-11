@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -78,8 +79,11 @@ class OfflineRecoveryLatencyDeviceTest {
                 val backgroundCycle = index % SCENARIO_COUNT == BACKGROUND_SCENARIO
                 if (backgroundCycle) instrumentation.runOnMainSync { composeRule.activity.moveTaskToBack(true) }
                 if (index % SCENARIO_COUNT == REPEATED_FLAP_SCENARIO) repeatRapidFlap()
+                // A row delivered during the flap is seen before the edge and fails the cycle.
+                observations += observe(expectedText)
                 // Only the final validated reconnect owns this cycle, never an earlier flap.
-                val edge = OfflineReconnectEdge(latestGeneration(diagnostics), restoreWifi())
+                val baseline = latestGeneration(diagnostics)
+                val edge = OfflineReconnectEdge(baseline, restoreWifi { observations += observe(expectedText) })
 
                 if (backgroundCycle) {
                     awaitPhaseAfter(diagnostics, edge, PerformancePhase.ACCOUNT_CATCH_UP_READY)
@@ -134,14 +138,20 @@ class OfflineRecoveryLatencyDeviceTest {
     /**
      * Enables Wi-Fi, waits until Android validates the restored transport and returns the last
      * monotonic time it was still seen offline, so measured recovery latency is never understated.
+     * [whileOffline] runs on each poll that still finds the device offline.
      */
-    private fun restoreWifi(): Long {
+    private fun restoreWifi(whileOffline: () -> Unit = {}): Long {
         var lastOfflineAt = SystemClock.elapsedRealtime()
         shell("svc wifi enable")
         val validated =
             waitUntil(NETWORK_TRANSITION_TIMEOUT_MILLIS) {
                 val now = SystemClock.elapsedRealtime()
-                hasValidatedInternet().also { online -> if (!online) lastOfflineAt = now }
+                hasValidatedInternet().also { online ->
+                    if (!online) {
+                        whileOffline()
+                        lastOfflineAt = now
+                    }
+                }
             }
         assertTrue("Wi-Fi did not regain validated internet", validated)
         return lastOfflineAt
@@ -187,10 +197,11 @@ class OfflineRecoveryLatencyDeviceTest {
         observations: MutableList<ControlledMessageObservation>,
     ): Long {
         // A timeout leaves the observations for the oracle, which names the failure.
-        runCatching {
+        try {
             composeRule.waitUntil(timeoutMillis = cycleTimeoutMillis()) {
                 observe(expectedText).also(observations::add).visibleCount != 0
             }
+        } catch (_: ComposeTimeoutException) {
         }
         return when (val outcome = controlledMessageOutcome(edge, observations, MESSAGE_CEILING_MILLIS)) {
             is ControlledMessageOutcome.Completed -> outcome.latencyMillis

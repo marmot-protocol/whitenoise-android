@@ -226,7 +226,7 @@ internal class IsolatedMediaTransport(
                             // Revoke the capability before retirement, reuse or another callback.
                             worker.exchange = null
                             pending.remove(worker)
-                            result?.let(IsolatedMediaDecoder::recordIsolation)
+                            result?.let(IsolatedMediaDecoder::recordStillImageIsolation)
                             exchange.ready.countDown()
                         }
                     }

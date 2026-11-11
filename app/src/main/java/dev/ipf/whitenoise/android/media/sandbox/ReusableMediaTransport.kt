@@ -83,7 +83,7 @@ internal class ReusableMediaTransport(
                         }
                     if (!closed && pending === current && current.completed.compareAndSet(false, true)) {
                         current.result = result
-                        result?.let(IsolatedMediaDecoder::recordIsolation)
+                        result?.let(IsolatedMediaDecoder::recordStillImageIsolation)
                         current.ready.countDown()
                     }
                     return true

@@ -36,7 +36,10 @@ internal object IsolatedMediaDecoder {
     /** Still-image requests sent to an isolated worker so far. */
     internal val dispatchCount: Long get() = workerDispatches.get()
 
-    /** Isolation receipts accepted from still-image workers so far. */
+    /**
+     * Isolation receipts accepted from still-image workers so far. Animation and A/V receipts are not counted.
+     * Concurrent still-image work on another thread would still mix into one operation's deltas.
+     */
     internal val receiptCount: Long get() = workerReceipts.get()
 
     /** Counts one request handed to an isolated worker; never changes routing. */
@@ -52,6 +55,11 @@ internal object IsolatedMediaDecoder {
     /** Stores the latest accepted isolation receipt for diagnostics without granting a new source capability. */
     internal fun recordIsolation(result: android.os.Bundle) {
         lastIsolation = isolationReceipt(result)
+    }
+
+    /** Stores a still-image worker's receipt and counts it for per-operation evidence. */
+    internal fun recordStillImageIsolation(result: android.os.Bundle) {
+        recordIsolation(result)
         workerReceipts.incrementAndGet()
     }
 

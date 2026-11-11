@@ -45,6 +45,12 @@ class OfflineRecoveryMessageDeadlineTest {
         assertFailed(outcome(seen(-200L, 1), seen(1_000L, 1)))
     }
 
+    /** A row delivered during a rapid flap, just before the final reconnect, fails instead of completing fast. */
+    @Test
+    fun rowDeliveredDuringTheFlapFails() {
+        assertFailed(outcome(seen(-3_000L, 0), seen(-50L, 1), seen(20L, 1)))
+    }
+
     /** A background cycle whose foreground return lands after the ceiling still fails. */
     @Test
     fun lateBackgroundReturnFails() {
