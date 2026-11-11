@@ -22,7 +22,7 @@ class DiagnosticsSubscriptionLifecycleCoverageTest {
         assertFalse("no subscription is opened outside the helper", "val subscription = appState.marmotIo" in screen)
         assertTrue(
             "a cancelled stream cannot clear its replacement's Live indicator",
-            "if (streamingOwner === owner) streaming = false" in screen,
+            "if (streamingOwner[0] === owner) streaming = false" in screen,
         )
     }
 

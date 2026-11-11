@@ -1734,7 +1734,7 @@ class ChatsController private constructor(
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
     // Holds a locally committed rename on its row until the subscription agrees (#2696).
-    private val localGroupNames = LocalGroupNameAuthority()
+    private val localGroupNames = LocalGroupFieldAuthority()
 
     // Whole-second activity timestamps need an in-memory tie-break that follows
     // the order local/live activity is accepted. This is bounded to one scalar
@@ -5947,10 +5947,10 @@ class ConversationController(
     private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
 
     // Retains a locally committed rename against a stale group-state snapshot (#2696).
-    private val localGroupNames = LocalGroupNameAuthority()
+    private val localGroupNames = LocalGroupFieldAuthority()
 
     // The same retention for a just-committed description, so a pre-edit snapshot cannot restore it (#3704).
-    private val localGroupDescriptions = LocalGroupNameAuthority()
+    private val localGroupDescriptions = LocalGroupFieldAuthority()
 
     /**
      * Latest chat-list projection for this conversation, kept live even while
@@ -11478,7 +11478,8 @@ class ConversationController(
      * with ([openedName] and [openedDescription]). An unchanged field is sent as null, so MDK carries
      * it forward from canonical group state, even if another admin changed it meanwhile. A changed
      * field is sent as its trimmed text, so an erased one arrives as the explicit empty string MDK
-     * applies as a clear (#3704).
+     * applies as a clear (#3704). Callers other than the editor may omit the opened values; they then
+     * default to the live group, so a field equal to its current value is treated as unchanged.
      */
     suspend fun updateGroupProfile(
         name: String,
@@ -11510,7 +11511,7 @@ class ConversationController(
     /**
      * Installs a just-committed group profile locally and hands it to the chat list (#2696).
      *
-     * [LocalGroupNameAuthority] then retains the new name and description against a pre-edit
+     * [LocalGroupFieldAuthority] then retains the new name and description against a pre-edit
      * snapshot that was already in flight, while a genuinely newer authoritative commit still wins.
      */
     private fun applyLocalGroupProfile(
@@ -11520,8 +11521,8 @@ class ConversationController(
     ) {
         val updated = group.copy(name = name, description = description)
         if (updated == group) return
-        localGroupNames.record(group.groupIdHex, previousName = group.name, committedName = name)
-        localGroupDescriptions.record(group.groupIdHex, previousName = group.description, committedName = description)
+        localGroupNames.record(group.groupIdHex, previous = group.name, committed = name)
+        localGroupDescriptions.record(group.groupIdHex, previous = group.description, committed = description)
         group = updated
         appState.applyLocalGroupUpdate(updated, account)
     }
