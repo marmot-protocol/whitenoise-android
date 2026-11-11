@@ -9,9 +9,12 @@ import java.io.File
 
 /**
  * Received timestamps are untrusted unsigned seconds. Converting one past 9999-12-31 to an instant, or its instant to a
- * zoned date, throws during composition, so every production conversion of a raw stamp is guarded by
- * [IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS] or goes through [IdentityFormatter.localDate] or
- * [IdentityFormatter.clampedLocalDate].
+ * zoned date, throws during composition, and its millisecond product can wrap into an unrelated date. Every production
+ * conversion of a raw stamp is therefore guarded by [IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS] or follows a
+ * null-checked [IdentityFormatter.localDate], or goes through [IdentityFormatter.clampedLocalDate].
+ *
+ * Retention deadlines, local expiries and the local receive stamp come from this device's clock and its own bounded
+ * retention arithmetic rather than a sender's stamp, so their millisecond products are outside this gate.
  */
 class ReceivedTimestampDateCoverageTest {
     @Test
@@ -19,12 +22,18 @@ class ReceivedTimestampDateCoverageTest {
         val conversions =
             mainSources().flatMap { file ->
                 val text = file.readText()
-                conversion.findAll(text).map { match -> Triple(file, text, match.range.first) }.toList()
+                conversions
+                    .flatMap { it.findAll(text) }
+                    .filterNot { match -> match.groupValues[1].substringAfterLast('.') in LOCAL_CLOCK_STAMPS }
+                    .map { match -> Triple(file, text, match.range.first) }
+                    .toList()
             }
-        assertTrue("the scan found the guarded conversions", conversions.size >= MIN_CONVERSIONS)
+        val files = conversions.map { (file, _, _) -> file.name }.toSet()
+        assertTrue("the scan found the search date filter", "ChatListMessageSearch.kt" in files)
+        assertTrue("the scan found instant conversions", "IdentityFormatter.kt" in files)
         val unguarded =
             conversions
-                .filterNot { (_, text, at) -> text.substring(maxOf(0, at - GUARD_WINDOW), at).contains(GUARD) }
+                .filterNot { (_, text, at) -> guarded(text, at) }
                 .map { (file, text, at) -> "${file.name}:${text.substring(0, at).count { it == '\n' } + 1}" }
         assertEquals("raw stamp conversions without the displayable bound", emptyList<String>(), unguarded)
     }
@@ -41,6 +50,14 @@ class ReceivedTimestampDateCoverageTest {
         assertTrue(globalAttachmentDay.containsMatchIn(global))
     }
 
+    private fun guarded(
+        text: String,
+        at: Int,
+    ): Boolean {
+        val window = text.substring(maxOf(0, at - GUARD_WINDOW), at)
+        return GUARDS.any(window::contains)
+    }
+
     private fun mainSources(): List<File> {
         val root =
             listOf(
@@ -51,11 +68,17 @@ class ReceivedTimestampDateCoverageTest {
     }
 
     private companion object {
-        val conversion = Regex("""ofEpochSecond\(\s*[\w.]+\.toLong\(\)""")
+        val conversions =
+            listOf(
+                Regex("""ofEpochSecond\(\s*([\w.]+)\.toLong\(\)"""),
+                Regex("""([\w.]+)\.toLong\(\)\s*\*\s*(?:MILLIS_PER_SECOND\w*|1000L)"""),
+            )
+
+        /** Stamps produced by this device's clock or retention arithmetic, not by a sender. */
+        val LOCAL_CLOCK_STAMPS = setOf("deadline", "expiry", "expirySeconds", "receivedAt")
         val globalAttachmentDay =
             Regex("""fun globalAttachmentDay\([^)]*\): LocalDate = IdentityFormatter\.clampedLocalDate\(""")
-        const val GUARD = "MAX_DISPLAYABLE_EPOCH_SECONDS"
+        val GUARDS = listOf("MAX_DISPLAYABLE_EPOCH_SECONDS", "IdentityFormatter.localDate(")
         const val GUARD_WINDOW = 400
-        const val MIN_CONVERSIONS = 5
     }
 }
