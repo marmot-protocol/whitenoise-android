@@ -36,6 +36,10 @@ import org.junit.runner.RunWith
  * when Wi-Fi is not its only validated transport. The test verifies the exact
  * text once in durable history and Compose, exercises foreground, background,
  * and repeated-flap recovery, and reports numeric phase percentiles.
+ *
+ * Each cycle's five-second ceiling runs from its final validated reconnect to
+ * the moment exactly one controlled row is visible (#3723). Generic
+ * first-frame markers are reported separately and cannot complete a cycle.
  */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
@@ -61,39 +65,33 @@ class OfflineRecoveryLatencyDeviceTest {
             PerformanceDiagnostics.start().active,
         )
         composeRule.waitForIdle()
-        val suiteBaselineGeneration = diagnostics.performanceSamples().maxOfOrNull { it.generation } ?: 0L
+        val suiteBaselineGeneration = latestGeneration(diagnostics)
+        val messageLatencies = mutableListOf<Long>()
 
         try {
             messages.forEachIndexed { index, expectedText ->
-                val baselineGeneration = diagnostics.performanceSamples().maxOfOrNull { it.generation } ?: 0L
                 goOffline()
                 reportCycle(index, "publish_now", expectedText)
                 SystemClock.sleep(argumentLong(ARG_PUBLISH_WAIT_MILLIS, DEFAULT_PUBLISH_WAIT_MILLIS))
+                val observations = mutableListOf(observe(expectedText))
 
                 val backgroundCycle = index % SCENARIO_COUNT == BACKGROUND_SCENARIO
                 if (backgroundCycle) instrumentation.runOnMainSync { composeRule.activity.moveTaskToBack(true) }
-                if (index % SCENARIO_COUNT == REPEATED_FLAP_SCENARIO) {
-                    repeatRapidFlap()
-                } else {
-                    restoreWifi()
-                }
+                if (index % SCENARIO_COUNT == REPEATED_FLAP_SCENARIO) repeatRapidFlap()
+                // Only the final validated reconnect owns this cycle, never an earlier flap.
+                val edge = OfflineReconnectEdge(latestGeneration(diagnostics), restoreWifi())
 
                 if (backgroundCycle) {
-                    awaitPhaseAfter(
-                        diagnostics = diagnostics,
-                        baselineGeneration = baselineGeneration,
-                        phase = PerformancePhase.ACCOUNT_CATCH_UP_READY,
-                    )
+                    awaitPhaseAfter(diagnostics, edge, PerformancePhase.ACCOUNT_CATCH_UP_READY)
                     foregroundApp()
                 }
-                val generation = awaitVisibleGenerationAfter(diagnostics, baselineGeneration)
-                composeRule.waitUntil(timeoutMillis = cycleTimeoutMillis()) {
-                    composeRule.onAllNodesWithText(expectedText).fetchSemanticsNodes().size == 1
-                }
+                val latency = awaitControlledMessage(expectedText, edge, observations)
                 composeRule.onAllNodesWithText(expectedText).assertCountEquals(1)
                 assertDurableMessageExactlyOnce(application, accountRef, groupIdHex, expectedText)
+                val generation = awaitVisibleGenerationAfter(diagnostics, edge)
                 assertGenerationBudgets(diagnostics.performanceSamples(), generation)
-                reportCycle(index, "verified", expectedText, generation)
+                messageLatencies += latency
+                reportCycle(index, "verified", expectedText, generation, latency)
             }
 
             val report =
@@ -101,7 +99,7 @@ class OfflineRecoveryLatencyDeviceTest {
                     diagnostics.performanceSamples().filter { it.generation > suiteBaselineGeneration },
                 )
             assertEquals(REQUIRED_CYCLES, report.completedCycles)
-            reportFinal(report)
+            reportFinal(report, phaseLatency(messageLatencies))
         } finally {
             restoreWifi()
             PerformanceDiagnostics.stop()
@@ -133,13 +131,20 @@ class OfflineRecoveryLatencyDeviceTest {
         )
     }
 
-    /** Enables Wi-Fi and waits until Android validates the restored transport. */
-    private fun restoreWifi() {
+    /**
+     * Enables Wi-Fi, waits until Android validates the restored transport and returns the last
+     * monotonic time it was still seen offline, so measured recovery latency is never understated.
+     */
+    private fun restoreWifi(): Long {
+        var lastOfflineAt = SystemClock.elapsedRealtime()
         shell("svc wifi enable")
-        assertTrue(
-            "Wi-Fi did not regain validated internet",
-            waitUntil(NETWORK_TRANSITION_TIMEOUT_MILLIS, ::hasValidatedInternet),
-        )
+        val validated =
+            waitUntil(NETWORK_TRANSITION_TIMEOUT_MILLIS) {
+                val now = SystemClock.elapsedRealtime()
+                hasValidatedInternet().also { online -> if (!online) lastOfflineAt = now }
+            }
+        assertTrue("Wi-Fi did not regain validated internet", validated)
+        return lastOfflineAt
     }
 
     /** Exercises a short failed restore before the final validated edge owns recovery. */
@@ -151,7 +156,6 @@ class OfflineRecoveryLatencyDeviceTest {
             "The rapid flap did not return offline",
             waitUntil(NETWORK_TRANSITION_TIMEOUT_MILLIS) { !hasValidatedInternet() },
         )
-        restoreWifi()
     }
 
     /** Brings the existing task forward without recreating or clearing app state. */
@@ -163,35 +167,60 @@ class OfflineRecoveryLatencyDeviceTest {
         composeRule.waitForIdle()
     }
 
-    /** Waits for the first completed visible-frame marker newer than the cycle baseline. */
+    /** Returns the newest recovery generation recorded so far. */
+    private fun latestGeneration(diagnostics: NotificationNetworkRecoveryCoordinator): Long =
+        diagnostics.performanceSamples().maxOfOrNull { it.generation } ?: 0L
+
+    /** Records how many visible rows show the controlled message right now. */
+    private fun observe(expectedText: String): ControlledMessageObservation {
+        val count = composeRule.onAllNodesWithText(expectedText).fetchSemanticsNodes().size
+        return ControlledMessageObservation(SystemClock.elapsedRealtime(), count)
+    }
+
+    /**
+     * Polls the controlled message until exactly one row is visible or the cycle timeout passes,
+     * then requires that completion within five seconds of [edge] and returns its latency.
+     */
+    private fun awaitControlledMessage(
+        expectedText: String,
+        edge: OfflineReconnectEdge,
+        observations: MutableList<ControlledMessageObservation>,
+    ): Long {
+        // A timeout leaves the observations for the oracle, which names the failure.
+        runCatching {
+            composeRule.waitUntil(timeoutMillis = cycleTimeoutMillis()) {
+                observe(expectedText).also(observations::add).visibleCount != 0
+            }
+        }
+        return when (val outcome = controlledMessageOutcome(edge, observations, MESSAGE_CEILING_MILLIS)) {
+            is ControlledMessageOutcome.Completed -> outcome.latencyMillis
+            is ControlledMessageOutcome.Failed -> throw AssertionError(outcome.reason)
+        }
+    }
+
+    /** Waits for the visible-frame marker of the generation started by the cycle's final reconnect. */
     private fun awaitVisibleGenerationAfter(
         diagnostics: NotificationNetworkRecoveryCoordinator,
-        baselineGeneration: Long,
+        edge: OfflineReconnectEdge,
     ): Long {
         var generation: Long? = null
         composeRule.waitUntil(timeoutMillis = cycleTimeoutMillis()) {
-            generation =
-                diagnostics
-                    .performanceSamples()
-                    .firstOrNull {
-                        it.generation > baselineGeneration &&
-                            it.phase == PerformancePhase.RECOVERY_FIRST_VISIBLE_FRAME
-                    }?.generation
+            generation = recoveryGenerationAfter(diagnostics.performanceSamples(), edge)
             generation != null
         }
         return requireNotNull(generation)
     }
 
-    /** Waits for a recovery phase before foregrounding a background cycle. */
+    /** Waits for a recovery phase of the final reconnect before foregrounding a background cycle. */
     private fun awaitPhaseAfter(
         diagnostics: NotificationNetworkRecoveryCoordinator,
-        baselineGeneration: Long,
+        edge: OfflineReconnectEdge,
         phase: PerformancePhase,
     ) {
         assertTrue(
             "Recovery never reached ${phase.wireName}",
             waitUntil(cycleTimeoutMillis()) {
-                diagnostics.performanceSamples().any { it.generation > baselineGeneration && it.phase == phase }
+                diagnostics.performanceSamples().any { it.generation > edge.generationBaseline && it.phase == phase }
             },
         )
     }
@@ -223,7 +252,10 @@ class OfflineRecoveryLatencyDeviceTest {
         assertEquals("Expected one durable row for the controlled relay message", 1, exactCount)
     }
 
-    /** Enforces activation, post-replay projection, and end-to-end ceilings for one cycle. */
+    /**
+     * Enforces the activation and post-replay projection ceilings for one cycle. The end-to-end
+     * ceiling belongs to the controlled message, not to a generic visible-frame marker.
+     */
     private fun assertGenerationBudgets(
         samples: List<NotificationNetworkRecoverySample>,
         generation: Long,
@@ -234,10 +266,8 @@ class OfflineRecoveryLatencyDeviceTest {
         val projection =
             cycle.phaseElapsedOrNull(PerformancePhase.TIMELINE_PROJECTION_PUBLISHED)
                 ?: cycle.phaseElapsed(PerformancePhase.CHAT_LIST_PROJECTION_PUBLISHED)
-        val visible = cycle.phaseElapsed(PerformancePhase.RECOVERY_FIRST_VISIBLE_FRAME)
         assertTrue("Subscription activation exceeded 3 seconds: $activation ms", activation <= 3_000L)
         assertTrue("Post-replay projection exceeded 1 second: ${projection - replay} ms", projection - replay <= 1_000L)
-        assertTrue("End-to-end recovery exceeded 5 seconds: $visible ms", visible <= 5_000L)
     }
 
     /** Returns the elapsed marker for a required phase. */
@@ -254,6 +284,7 @@ class OfflineRecoveryLatencyDeviceTest {
         state: String,
         expectedText: String,
         generation: Long? = null,
+        messageLatencyMillis: Long? = null,
     ) {
         instrumentation.sendStatus(
             0,
@@ -262,12 +293,16 @@ class OfflineRecoveryLatencyDeviceTest {
                 putString("offline_recovery_state", state)
                 putInt("offline_recovery_expected_length", expectedText.length)
                 generation?.let { putLong("offline_recovery_generation", it) }
+                messageLatencyMillis?.let { putLong("offline_recovery_message_latency_ms", it) }
             },
         )
     }
 
-    /** Reports device/build context and p50/p95/max for every observed phase. */
-    private fun reportFinal(report: OfflineRecoveryLatencyReport) {
+    /** Reports device/build context, the controlled-message latency and p50/p95/max for every observed phase. */
+    private fun reportFinal(
+        report: OfflineRecoveryLatencyReport,
+        messageLatency: OfflineRecoveryPhaseLatency,
+    ) {
         instrumentation.sendStatus(
             0,
             Bundle().apply {
@@ -275,6 +310,9 @@ class OfflineRecoveryLatencyDeviceTest {
                 putInt("api", Build.VERSION.SDK_INT)
                 putString("build_fingerprint", Build.FINGERPRINT)
                 putInt("completed_cycles", report.completedCycles)
+                putLong("controlled_message_p50_ms", messageLatency.p50Millis)
+                putLong("controlled_message_p95_ms", messageLatency.p95Millis)
+                putLong("controlled_message_max_ms", messageLatency.maximumMillis)
                 report.phaseLatencies.forEach { (phase, latency) ->
                     putLong("${phase.wireName}_p50_ms", latency.p50Millis)
                     putLong("${phase.wireName}_p95_ms", latency.p95Millis)
@@ -337,6 +375,7 @@ class OfflineRecoveryLatencyDeviceTest {
         const val NETWORK_TRANSITION_TIMEOUT_MILLIS = 15_000L
         const val RAPID_FLAP_MILLIS = 150L
         const val POLL_MILLIS = 50L
+        const val MESSAGE_CEILING_MILLIS = 5_000L
         const val DURABLE_QUERY_LIMIT = 500u
     }
 }
