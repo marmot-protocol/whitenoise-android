@@ -32,6 +32,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
@@ -231,6 +232,27 @@ class ComposerExpansionDestructiveLifecycleTest {
                 assertEquals(if (guardRefusal) 0 else 1, pending)
                 assertEquals(if (guardRefusal) 0 else 1, fixture.calls.send.get())
             }
+        }
+
+    /** An over-limit dictation sent with no conversation open is refused and its draft kept. */
+    @Test
+    fun detachedOverLimitDictationIsRefusedBeforeTransport() =
+        runBlocking {
+            val fixture = fixture(attachConversationController = false)
+            val typed = "a".repeat(8_000)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue(typed))
+            var rejections = 0
+            val request =
+                dictationRequest(fixture.appState, typed).copy(
+                    onDispatchRejectedBeforeTransport = { rejections += 1 },
+                )
+
+            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+            assertEquals(0, fixture.calls.send.get())
+            assertEquals(1, rejections)
+            assertEquals(typed, fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+            assertEquals(AppText.Resource(R.string.toast_message_too_long), fixture.appState.toast?.title)
         }
 
     @Test

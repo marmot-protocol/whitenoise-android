@@ -291,10 +291,8 @@ internal suspend fun dismissReactedNotification(
 }
 
 /**
- * A terminal reply failure was previously invisible: the shade clears the
- * RemoteInput field on send, so the reply read as sent while the card sat
- * lifetime-extended on un-sent text. Restore the card to a repliable state
- * stamped with [notice] and show it as a toast too. Best-effort on both fronts.
+ * Restores a replied card to a repliable state stamped with [notice] and shows [notice] as a toast.
+ * The shade clears its reply field on send, so without this an unsent reply looks sent. Best-effort.
  */
 internal suspend fun surfaceNotificationReplyFailure(
     context: Context,

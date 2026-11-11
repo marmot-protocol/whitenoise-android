@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.TimeFormatPreference
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
@@ -3194,10 +3195,14 @@ class WhiteNoiseAppState private constructor(
                 )
         ) {
             ConversationDictationReplyTargetResolution.Detached ->
-                if (request.replyToMessageIdHex == null) {
-                    sendDetachedDictationText(request)
-                } else {
-                    rejectDictationDispatchBeforeTransport(request)
+                when {
+                    request.replyToMessageIdHex != null -> rejectDictationDispatchBeforeTransport(request)
+                    // No composer is mounted to refuse it, and this path sends straight to MDK.
+                    exceedsOutgoingMessageLimit(request.payload.trim()) -> {
+                        present(R.string.toast_message_too_long)
+                        rejectDictationDispatchBeforeTransport(request)
+                    }
+                    else -> sendDetachedDictationText(request)
                 }
             ConversationDictationReplyTargetResolution.Mismatch -> rejectDictationDispatchBeforeTransport(request)
             is ConversationDictationReplyTargetResolution.Mounted ->
