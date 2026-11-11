@@ -283,7 +283,8 @@ internal fun globalSearchKeyChanges(update: TimelineProjectionUpdateFfi): Global
                 }
             }
         val key = globalSearchKey(update.groupIdHex, id)
-        removed?.let { removedByKey[key] = it }
+        // An upsert that is neither deleted nor live clears any earlier change to the key, so it lands in neither set.
+        if (removed == null) removedByKey.remove(key) else removedByKey[key] = removed
     }
     return GlobalSearchKeyChanges(
         removed = removedByKey.filterValues { it }.keys,

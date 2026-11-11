@@ -111,7 +111,8 @@ class GlobalSearchResultsRevocationCoverageTest {
 
     /**
      * Only Remove changes and upserts MDK marks deleted are removals, and only live upserts are restorations, each
-     * scoped to its group; the last change to a message in one update decides.
+     * scoped to its group; the last change to a message in one update decides, and an invalidated upsert that is
+     * not deleted leaves the key in neither set.
      */
     @Test
     fun keyChangesCoverEveryRemoveDeletionAndLiveUpsertAndNothingElse() {
@@ -134,6 +135,16 @@ class GlobalSearchResultsRevocationCoverageTest {
                 TimelineMessageChangeFfi.Upsert(edited, record("g", "f", at = 1uL)),
                 TimelineMessageChangeFfi.Upsert(edited, record("g", "h", at = 1uL)),
                 TimelineMessageChangeFfi.Remove("h", TimelineRemoveReasonFfi.entries.first()),
+                TimelineMessageChangeFfi.Upsert(edited, record("g", "i", at = 1uL)),
+                TimelineMessageChangeFfi.Upsert(
+                    edited,
+                    record("g", "i", at = 1uL, invalidation = "local_publish_failed"),
+                ),
+                TimelineMessageChangeFfi.Remove("j", TimelineRemoveReasonFfi.entries.first()),
+                TimelineMessageChangeFfi.Upsert(
+                    edited,
+                    record("g", "j", at = 1uL, invalidation = "local_publish_failed"),
+                ),
             )
         val changes = globalSearchKeyChanges(removal)
         assertEquals(setOf("g:a", "g:b", "g:c", "g:h"), changes.removed)
@@ -169,6 +180,27 @@ class GlobalSearchResultsRevocationCoverageTest {
             }
             assertTrue("listed again", "g:m0000" in keys(controller))
             assertEquals(LOADED, controller.state.results.size)
+        }
+
+    /**
+     * A removal still queued when a new query starts carries over to it: the new query's first read, from a store that
+     * has not caught up, cannot list the row.
+     */
+    @Test
+    fun aRemovalQueuedBeforeANewQueryStaysOutOfIt() =
+        runTest {
+            val store = StoreReader(rows())
+            val controller = controller(store)
+            loadAll(controller)
+            val removal =
+                update("g", TimelineMessageChangeFfi.Remove("m0299", TimelineRemoveReasonFfi.entries.first()))
+            controller.deliver(removal, drain = false)
+
+            controller.search(GlobalSearchResultsQuery(needle = "hell"))
+            advanceUntilIdle()
+            assertTrue("the new query read its first page", controller.state.results.isNotEmpty())
+            assertFalse("the queued removal applies to the new query", "g:m0299" in keys(controller))
+            assertTrue("and stays withdrawn", "g:m0299" in controller.state.withdrawn)
         }
 
     /** Changes queued before the main thread drains them apply in arrival order, so the last one decides. */

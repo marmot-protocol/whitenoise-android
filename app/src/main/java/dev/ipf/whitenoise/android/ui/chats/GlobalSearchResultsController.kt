@@ -102,8 +102,6 @@ internal class GlobalSearchResultsController(
     ) {
         if (closed || (next == query && state.generation > 0)) return
         job?.cancel()
-        // The new generation's first read sees the store after every change already queued, so none applies to it.
-        reportedChanges.clear()
         refreshPending = false
         loadPending = false
         headOwed = false
@@ -114,7 +112,9 @@ internal class GlobalSearchResultsController(
         query = next
         val restarted = GlobalSearchResultsReducer.restart(state)
         // A scope with no chats cannot match, so it ends at once instead of reading the whole account.
-        state = if (next.matchesNothing) restarted.copy(endReached = true) else restarted
+        val opened = if (next.matchesNothing) restarted.copy(endReached = true) else restarted
+        // Changes still queued carry over, so a removal the store has not caught up with never lists for this query.
+        state = applyQueued(opened, next)
         loadMore(debounceMillis)
     }
 
@@ -173,12 +173,21 @@ internal class GlobalSearchResultsController(
         val current = query?.takeUnless { closed } ?: return
         val nowSeconds = (environment.nowMillis() / MILLIS_PER_SECOND).coerceAtLeast(0L).toULong()
         val reducer = GlobalSearchResultsReducer
-        var next = reducer.withdraw(reducer.dropExpired(state, nowSeconds), removed)
+        state = applyQueued(reducer.withdraw(reducer.dropExpired(state, nowSeconds), removed), current)
+    }
+
+    /** Drains changes queued by [reportChanged] onto [from] in arrival order, discarding chats [current] skips. */
+    private fun applyQueued(
+        from: GlobalSearchResultsState,
+        current: GlobalSearchResultsQuery,
+    ): GlobalSearchResultsState {
+        val reducer = GlobalSearchResultsReducer
+        var next = from
         val queued = generateSequence { reportedChanges.poll() }.filter { current.coversGroup(it.first) }
         queued.forEach { (_, changes) ->
             next = reducer.restore(reducer.withdraw(next, changes.removed), changes.restored)
         }
-        state = next
+        return next
     }
 
     /** Starts one bounded recheck pass, from the head or [continuing] where the previous capped pass stopped. */
