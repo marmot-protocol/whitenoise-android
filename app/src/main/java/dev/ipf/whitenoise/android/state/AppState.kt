@@ -4449,7 +4449,10 @@ class WhiteNoiseAppState private constructor(
     ) {
         val trimmed = text.trim()
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        if (trimmed.isEmpty() || targets.isEmpty()) return
+        // Forward eligibility already blocks these, this keeps any other caller from sending one.
+        val tooLong = exceedsOutgoingMessageLimit(trimmed)
+        if (tooLong) present(R.string.toast_message_too_long)
+        if (trimmed.isEmpty() || targets.isEmpty() || tooLong) return
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var failures = 0
@@ -4500,7 +4503,9 @@ class WhiteNoiseAppState private constructor(
     ) {
         val bodies = MessageProjector.validatedForwardTextBodies(texts)
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        if (bodies.isEmpty() || targets.isEmpty()) return
+        val tooLong = bodies.any { exceedsOutgoingMessageLimit(it.trim()) }
+        if (tooLong) present(R.string.toast_message_too_long)
+        if (bodies.isEmpty() || targets.isEmpty() || tooLong) return
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var completeTargets = 0

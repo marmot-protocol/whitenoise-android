@@ -450,6 +450,7 @@
     <string name="forward_blocked_unavailable">请先下载此附件再转发</string>
     <string name="forward_blocked_restricted">不允许转发此附件</string>
     <string name="forward_blocked_unsupported">无法转发此消息</string>
+    <string name="forward_blocked_too_long">此消息过长，无法转发</string>
     <string name="forward_blocked_selection">无法转发：%1$s</string>
     <string name="forward_progress_title">正在转发</string>
     <string name="forward_preparing_attachments">正在准备附件 %1$d / %2$d</string>

@@ -465,6 +465,7 @@
     <string name="forward_blocked_unavailable">Baixe este anexo antes de encaminhar</string>
     <string name="forward_blocked_restricted">Não é permitido encaminhar este anexo</string>
     <string name="forward_blocked_unsupported">Esta mensagem não pode ser encaminhada</string>
+    <string name="forward_blocked_too_long">Esta mensagem é longa demais para ser encaminhada</string>
     <string name="forward_blocked_selection">Encaminhamento indisponível: %1$s</string>
     <string name="forward_progress_title">Encaminhando</string>
     <string name="forward_preparing_attachments">Preparando anexos: %1$d de %2$d</string>

@@ -465,6 +465,7 @@
     <string name="forward_blocked_unavailable">Téléchargez cette pièce jointe avant de la transférer</string>
     <string name="forward_blocked_restricted">Le transfert de cette pièce jointe n’est pas autorisé</string>
     <string name="forward_blocked_unsupported">Impossible de transférer ce message</string>
+    <string name="forward_blocked_too_long">Ce message est trop long pour être transféré</string>
     <string name="forward_blocked_selection">Transfert indisponible : %1$s</string>
     <string name="forward_progress_title">Transfert en cours</string>
     <string name="forward_preparing_attachments">Préparation des pièces jointes : %1$d sur %2$d</string>

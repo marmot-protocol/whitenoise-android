@@ -520,16 +520,19 @@ object MessageProjector {
         message: AppMessageRecordFfi,
         editedText: String?,
     ): ForwardEligibility {
-        val payload =
-            forwardableText(message, editedText)?.let { body ->
-                ForwardMessagePayload.Text(
-                    sourceGroupIdHex = message.groupIdHex,
-                    sourceMessageIdHex = message.messageIdHex,
-                    text = body,
+        val body = forwardableText(message, editedText)
+        return when {
+            body == null -> ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+            exceedsOutgoingMessageLimit(body.trim()) -> ForwardEligibility.Blocked(ForwardBlockedReason.TooLong)
+            else ->
+                ForwardEligibility.Eligible(
+                    ForwardMessagePayload.Text(
+                        sourceGroupIdHex = message.groupIdHex,
+                        sourceMessageIdHex = message.messageIdHex,
+                        text = body,
+                    ),
                 )
-            }
-        return payload?.let(ForwardEligibility::Eligible)
-            ?: ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+        }
     }
 
     private fun forwardMediaEligibility(
@@ -550,6 +553,8 @@ object MessageProjector {
                         reference.locators.isEmpty() &&
                         index !in cachedAttachmentIndices
                 } -> ForwardBlockedReason.UnavailableAttachment
+                mediaCaption(message, editedText ?: message.plaintext)
+                    ?.let { exceedsOutgoingMessageLimit(it.trim()) } == true -> ForwardBlockedReason.TooLong
                 else -> null
             }
         if (blockedReason != null) return ForwardEligibility.Blocked(blockedReason)

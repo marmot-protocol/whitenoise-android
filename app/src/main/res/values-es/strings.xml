@@ -465,6 +465,7 @@
     <string name="forward_blocked_unavailable">Descarga este archivo adjunto antes de reenviarlo</string>
     <string name="forward_blocked_restricted">No se permite reenviar este archivo adjunto</string>
     <string name="forward_blocked_unsupported">No se puede reenviar este mensaje</string>
+    <string name="forward_blocked_too_long">Este mensaje es demasiado largo para reenviarlo</string>
     <string name="forward_blocked_selection">Reenvío no disponible: %1$s</string>
     <string name="forward_progress_title">Reenviando</string>
     <string name="forward_preparing_attachments">Preparando archivos adjuntos: %1$d de %2$d</string>

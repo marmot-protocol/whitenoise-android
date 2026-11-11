@@ -604,6 +604,7 @@
     <string name="forward_blocked_unavailable">Download this attachment before forwarding</string>
     <string name="forward_blocked_restricted">Forwarding isn’t allowed for this attachment</string>
     <string name="forward_blocked_unsupported">This message can’t be forwarded</string>
+    <string name="forward_blocked_too_long">This message is too long to forward</string>
     <string name="forward_blocked_selection">Forward unavailable: %1$s</string>
     <string name="forward_progress_title">Forwarding</string>
     <string name="forward_preparing_attachments">Preparing attachments %1$d of %2$d</string>

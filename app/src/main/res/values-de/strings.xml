@@ -463,6 +463,7 @@
     <string name="forward_blocked_unavailable">Lade diesen Anhang vor dem Weiterleiten herunter</string>
     <string name="forward_blocked_restricted">Das Weiterleiten dieses Anhangs ist nicht erlaubt</string>
     <string name="forward_blocked_unsupported">Diese Nachricht kann nicht weitergeleitet werden</string>
+    <string name="forward_blocked_too_long">Diese Nachricht ist zu lang zum Weiterleiten</string>
     <string name="forward_blocked_selection">Weiterleiten nicht verfügbar: %1$s</string>
     <string name="forward_progress_title">Weiterleiten läuft</string>
     <string name="forward_preparing_attachments">Anhänge werden vorbereitet: %1$d von %2$d</string>
