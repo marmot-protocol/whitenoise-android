@@ -51,6 +51,14 @@ class OfflineRecoveryMessageDeadlineTest {
         assertFailed(outcome(seen(-3_000L, 0), seen(-50L, 1), seen(20L, 1)))
     }
 
+    /** A row first seen on the last offline poll precedes the edge even though its timestamp is later. */
+    @Test
+    fun rowSeenOnTheLastOfflinePollFails() {
+        val lastOfflinePoll = ControlledMessageObservation(edge.atMillis + 1L, 1, offline = true)
+
+        assertFailed(outcome(seen(-3_000L, 0), lastOfflinePoll, seen(20L, 1)))
+    }
+
     /** A background cycle whose foreground return lands after the ceiling still fails. */
     @Test
     fun lateBackgroundReturnFails() {

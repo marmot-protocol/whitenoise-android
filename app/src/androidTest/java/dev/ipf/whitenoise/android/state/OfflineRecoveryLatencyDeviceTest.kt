@@ -74,16 +74,21 @@ class OfflineRecoveryLatencyDeviceTest {
                 goOffline()
                 reportCycle(index, "publish_now", expectedText)
                 SystemClock.sleep(argumentLong(ARG_PUBLISH_WAIT_MILLIS, DEFAULT_PUBLISH_WAIT_MILLIS))
-                val observations = mutableListOf(observe(expectedText))
+                val observations = mutableListOf(observe(expectedText, offline = true))
 
                 val backgroundCycle = index % SCENARIO_COUNT == BACKGROUND_SCENARIO
                 if (backgroundCycle) instrumentation.runOnMainSync { composeRule.activity.moveTaskToBack(true) }
                 if (index % SCENARIO_COUNT == REPEATED_FLAP_SCENARIO) repeatRapidFlap()
-                // A row delivered during the flap is seen before the edge and fails the cycle.
-                observations += observe(expectedText)
+                // A row delivered during the flap is seen before the edge and fails the cycle. A stopped
+                // background task shows no rows, so it is only observed once it returns.
+                if (!backgroundCycle) observations += observe(expectedText, offline = true)
                 // Only the final validated reconnect owns this cycle, never an earlier flap.
                 val baseline = latestGeneration(diagnostics)
-                val edge = OfflineReconnectEdge(baseline, restoreWifi { observations += observe(expectedText) })
+                val edge =
+                    OfflineReconnectEdge(
+                        baseline,
+                        restoreWifi { if (!backgroundCycle) observations += observe(expectedText, offline = true) },
+                    )
 
                 if (backgroundCycle) {
                     awaitPhaseAfter(diagnostics, edge, PerformancePhase.ACCOUNT_CATCH_UP_READY)
@@ -181,10 +186,13 @@ class OfflineRecoveryLatencyDeviceTest {
     private fun latestGeneration(diagnostics: NotificationNetworkRecoveryCoordinator): Long =
         diagnostics.performanceSamples().maxOfOrNull { it.generation } ?: 0L
 
-    /** Records how many visible rows show the controlled message right now. */
-    private fun observe(expectedText: String): ControlledMessageObservation {
+    /** Records how many visible rows show the controlled message right now, marking observations made offline. */
+    private fun observe(
+        expectedText: String,
+        offline: Boolean = false,
+    ): ControlledMessageObservation {
         val count = composeRule.onAllNodesWithText(expectedText).fetchSemanticsNodes().size
-        return ControlledMessageObservation(SystemClock.elapsedRealtime(), count)
+        return ControlledMessageObservation(SystemClock.elapsedRealtime(), count, offline)
     }
 
     /**

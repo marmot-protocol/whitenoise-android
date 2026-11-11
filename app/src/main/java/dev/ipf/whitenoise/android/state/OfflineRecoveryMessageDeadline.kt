@@ -13,10 +13,14 @@ internal data class OfflineReconnectEdge(
     val atMillis: Long,
 )
 
-/** One monotonic observation of how many visible rows show the cycle's controlled message. */
+/**
+ * One monotonic observation of how many visible rows show the cycle's controlled message. An [offline]
+ * observation was taken while the device was still offline, so it precedes the edge whatever its timestamp.
+ */
 internal data class ControlledMessageObservation(
     val atMillis: Long,
     val visibleCount: Int,
+    val offline: Boolean = false,
 )
 
 /** Whether the controlled message became visible, exactly once, within the cycle's ceiling. */
@@ -42,10 +46,13 @@ internal fun controlledMessageOutcome(
     observations: List<ControlledMessageObservation>,
     ceilingMillis: Long,
 ): ControlledMessageOutcome {
-    val completion = observations.firstOrNull { it.atMillis >= edge.atMillis && it.visibleCount == 1 }
+    val beforeEdge = { observation: ControlledMessageObservation ->
+        observation.offline || observation.atMillis < edge.atMillis
+    }
+    val completion = observations.firstOrNull { !beforeEdge(it) && it.visibleCount == 1 }
     val latency = completion?.let { it.atMillis - edge.atMillis }
     return when {
-        observations.any { it.atMillis < edge.atMillis && it.visibleCount > 0 } ->
+        observations.any { beforeEdge(it) && it.visibleCount > 0 } ->
             ControlledMessageOutcome.Failed("Controlled message was visible before the final reconnect")
         observations.any { it.visibleCount > 1 } ->
             ControlledMessageOutcome.Failed("Controlled message was visible more than once")

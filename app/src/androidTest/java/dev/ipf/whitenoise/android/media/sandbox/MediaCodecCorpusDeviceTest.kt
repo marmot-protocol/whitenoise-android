@@ -83,7 +83,7 @@ class MediaCodecCorpusDeviceTest {
             region.recycle()
         }
         assertNull(
-            contained("invalid region", refusalExpected = true) {
+            contained("invalid region") {
                 IsolatedMediaDecoder.region(source, MediaImageRegion(-1, 0, 1, 1), 1000)
             },
         )
@@ -291,12 +291,11 @@ class MediaCodecCorpusDeviceTest {
 
     /**
      * Runs one decoder operation and checks the evidence that operation itself produced (#3722). Every operation
-     * must reach exactly one isolated worker, and any result must carry that worker's own receipt. Only a call
-     * marked [refusalExpected] may instead be refused before dispatch, and then it must return nothing.
+     * here must reach exactly one isolated worker, and any result must carry that worker's own receipt, so a
+     * `null` from an in-process decode cannot pass as a refusal.
      */
     private fun <T> contained(
         operation: String,
-        refusalExpected: Boolean = false,
         call: () -> T?,
     ): T? {
         val dispatchesBefore = IsolatedMediaDecoder.dispatchCount
@@ -309,7 +308,6 @@ class MediaCodecCorpusDeviceTest {
             receipt = IsolatedMediaDecoder.lastIsolation,
             producedResult = result != null,
             hostUid = Process.myUid(),
-            refusalExpected = refusalExpected,
         )
         return result
     }
@@ -319,7 +317,6 @@ class MediaCodecCorpusDeviceTest {
     fun operationEvidenceRejectsMissingStaleAndNonIsolatedReceipts() {
         val isolated = WorkerIsolation(99_999, true, false, false, true, 13, -1)
         val host = Process.myUid()
-        checkOperationEvidence("refused", 0, 0, null, producedResult = false, hostUid = host, refusalExpected = true)
         checkOperationEvidence("isolated", 1, 1, isolated, producedResult = true, hostUid = host)
         checkOperationEvidence("worker rejected", 1, 1, isolated, producedResult = false, hostUid = host)
         checkOperationEvidence("worker died", 1, 0, null, producedResult = false, hostUid = host)
@@ -343,9 +340,6 @@ class MediaCodecCorpusDeviceTest {
             val error = runCatching { case.check(host) }.exceptionOrNull()
             assertTrue("$case passed", error is AssertionError)
         }
-        // An expected refusal still fails once any result comes back without a worker.
-        val refusedWithResult = EvidenceCase(0L, 0L, null, producedResult = true, refusalExpected = true)
-        assertTrue(runCatching { refusedWithResult.check(host) }.exceptionOrNull() is AssertionError)
     }
 
     /** One forged evidence shape for the negative controls. */
@@ -354,7 +348,6 @@ class MediaCodecCorpusDeviceTest {
         val receipts: Long,
         val receipt: WorkerIsolation?,
         val producedResult: Boolean = true,
-        val refusalExpected: Boolean = false,
     ) {
         /** Applies the containment rule to this forged shape. */
         fun check(hostUid: Int) {
@@ -365,7 +358,6 @@ class MediaCodecCorpusDeviceTest {
                 receipt = receipt,
                 producedResult = producedResult,
                 hostUid = hostUid,
-                refusalExpected = refusalExpected,
             )
         }
     }
@@ -379,13 +371,7 @@ internal fun checkOperationEvidence(
     receipt: WorkerIsolation?,
     producedResult: Boolean,
     hostUid: Int,
-    refusalExpected: Boolean = false,
 ) {
-    if (dispatched == 0L && refusalExpected) {
-        // Refused before any decoder ran: nothing may come back.
-        assertTrue("$operation produced output without an isolated worker", !producedResult && receipts == 0L)
-        return
-    }
     assertEquals("$operation must reach exactly one worker", 1L, dispatched)
     if (receipts == 0L) {
         // The worker died or timed out, so containment holds only if nothing came back.
