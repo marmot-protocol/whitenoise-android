@@ -74,6 +74,21 @@ The fixed source epoch and compiler prefix maps remove host build paths; the
 embedded FFmpeg configuration retains the recipe with normalized paths.
 Independent builds must still establish reproducibility for the shipped APK.
 
+### Reusing the decoder cache on macOS
+
+Build the decoder in a Linux x86_64 environment (for example a Docker
+container running `linux/amd64`) using the same checkout and ABI selection as
+your Mac build. Run `python3 scripts/prepare_media_decoder.py --cache-key` with
+the same `--abi` arguments to get the cache key. Copy `manifest.json` and the
+whole `jniLibs` directory from that build to
+`$GRADLE_USER_HOME/caches/whitenoise/media-decoder/<cache-key>/` on your Mac.
+Gradle uses `~/.gradle` by default and expects all four ABIs unless
+`android.injected.build.abi` selects a subset.
+
+Build the APK with Gradle as usual. The decoder task checks the source key,
+ABI set and library hashes before packaging. If those inputs change, build a
+fresh cache from the updated checkout in the Linux environment.
+
 ## JNI contract
 
 `NativeMediaEngine` in the media sandbox package checks `Process.isIsolated()`

@@ -139,7 +139,7 @@ val mediaDecoderPreparedDir =
 val prepareNativeMediaDecoder =
     tasks.register<Exec>("prepareNativeMediaDecoder") {
         group = "build setup"
-        description = "Build verified software codecs for the permissionless media worker"
+        description = "Prepare verified software codecs for the permissionless media worker"
         inputs.dir(rootProject.file("native/media-decoder"))
         inputs.file(rootProject.file("scripts/prepare_media_decoder.py"))
         inputs.property("abiSelection", mediaDecoderAbis)
@@ -148,19 +148,21 @@ val prepareNativeMediaDecoder =
         outputs.upToDateWhen { false }
         environment("PYTHONDONTWRITEBYTECODE", "1")
         doFirst {
+            val ndkArguments =
+                if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
+                    emptyList()
+                } else {
+                    listOf("--ndk", androidComponents.sdkComponents.ndkDirectory.get().asFile.absolutePath)
+                }
             commandLine(
                 marmotKitPreparationLauncher +
                     listOf(
                         rootProject.file("scripts/prepare_media_decoder.py").absolutePath,
-                        "--ndk",
-                        androidComponents.sdkComponents.ndkDirectory
-                            .get()
-                            .asFile.absolutePath,
                         "--output",
                         mediaDecoderPreparedDir.absolutePath,
                         "--jobs",
                         "2",
-                    ) + mediaDecoderAbiArguments,
+                    ) + ndkArguments + mediaDecoderAbiArguments,
             )
         }
     }

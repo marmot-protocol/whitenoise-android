@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the pinned selected-descriptor decoder on Linux x86_64, or print its plan.
+"""Build the pinned decoder on Linux x86_64 or reuse its verified outputs on macOS.
 
 No platform codec, URL protocol or secondary-source opener is included. Source
 archives and Python build-tool wheels are pinned in native/media-decoder/lock.json.
@@ -346,29 +346,45 @@ def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
 def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command=run):
     """Serialize artifact preparation and reuse only complete matching manifests whose library bytes still verify."""
     lock = load_lock()
-    require(platform.system() == "Linux" and platform.machine() == "x86_64", "Linux x86_64 build host required")
-    import fcntl  # Linux-only locking is unnecessary for portable --cache-key/--plan inspection.
+    system = platform.system()
+    can_build = system == "Linux" and platform.machine() == "x86_64"
+    require(can_build or system == "Darwin", "Linux x86_64 build host required")
+    import fcntl  # Both supported hosts lock the cache while checking its contents.
     require(type(jobs) is int and 1 <= jobs <= 8, "build worker count refused")
     require(abis and len(set(abis)) == len(abis) and all(abi in ABIS for abi in abis), "unique supported ABIs required")
-    for abi in abis:
-        toolchain(ndk, abi, lock)
-    output.mkdir(parents=True, exist_ok=True)
-    require(not output.is_symlink() and not re.search(r"\s", str(output)), "real build directory without whitespace required")
+    if can_build:
+        require(ndk is not None, "--ndk is required for Linux decoder preparation")
+        for abi in abis:
+            toolchain(ndk, abi, lock)
+        require(not re.search(r"\s", str(output)), "build directory must not contain whitespace")
+        output.mkdir(parents=True, exist_ok=True)
+    missing_cache = f"Decoder cache missing at {output}. Build it on Linux x86_64 for the same checkout and ABIs."
+    require(not output.is_symlink(), "real decoder cache directory required")
+    require(output.is_dir(), missing_cache)
     with (output / ".build.lock").open("a") as stream:
         fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         key = cache_key(abis)
         manifest_path = output / "manifest.json"
-        if manifest_path.exists():
-            require(not manifest_path.is_symlink(), "decoder manifest symlink refused")
+        if manifest_path.exists() or manifest_path.is_symlink():
+            require(manifest_path.is_file() and not manifest_path.is_symlink(), "real decoder manifest required")
             manifest = json.loads(manifest_path.read_text())
-            require(manifest.get("cache_key") == key and type(manifest.get("artifacts")) is list and
-                    sorted(item.get("abi", "") for item in manifest["artifacts"]) == sorted(abis),
+            require(isinstance(manifest, dict) and manifest.get("schema") == 1 and manifest.get("cache_key") == key and
+                    isinstance(manifest.get("artifacts"), list) and
+                    all(isinstance(item, dict) and isinstance(item.get("abi"), str) for item in manifest["artifacts"]) and
+                    sorted(item["abi"] for item in manifest["artifacts"]) == sorted(abis),
                     "cached decoder input identity differs")
+            libraries = output / "jniLibs"
+            require(libraries.is_dir() and not libraries.is_symlink() and
+                    {entry.name for entry in libraries.iterdir()} == set(abis), "cached decoder ABI directories differ")
             for item in manifest["artifacts"]:
-                library = output / "jniLibs" / item["abi"] / "libmedia_decoder.so"
-                require(library.is_file() and not library.is_symlink() and sha(library) == item.get("sha256"),
+                directory = libraries / item["abi"]
+                library = directory / "libmedia_decoder.so"
+                require(directory.is_dir() and not directory.is_symlink() and
+                        {entry.name for entry in directory.iterdir()} == {library.name} and
+                        library.is_file() and not library.is_symlink() and sha(library) == item.get("sha256"),
                         "cached decoder output differs")
             return manifest
+        require(can_build, missing_cache)
         downloads = output / "downloads"
         downloads.mkdir(exist_ok=True)
         inputs = {name: fetch(lock[name], downloads, opener) for name in ("ffmpeg", "dav1d", "meson", "ninja")}
@@ -406,9 +422,10 @@ def main():
         print(json.dumps({"lock": load_lock(), "abis": args.abi or list(ABIS),
                           "decoders": DECODERS, "demuxers": DEMUXERS, "parsers": PARSERS}, indent=2, sort_keys=True))
         return
-    if not args.ndk or not args.output:
-        parser.error("--ndk and --output are required for CI compilation")
-    result = prepare(args.ndk.resolve(), args.output.absolute(), args.abi or list(ABIS), jobs=args.jobs)
+    if not args.output:
+        parser.error("--output is required for decoder preparation")
+    ndk = args.ndk.resolve() if args.ndk is not None else None
+    result = prepare(ndk, args.output.absolute(), args.abi or list(ABIS), jobs=args.jobs)
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
