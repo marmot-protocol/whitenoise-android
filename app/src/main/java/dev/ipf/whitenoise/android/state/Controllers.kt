@@ -2275,7 +2275,11 @@ class ChatsController private constructor(
         record: AppGroupRecordFfi,
         invalidateMembers: Boolean = true,
     ) {
-        groupRecordsById = groupRecordsById + (record.groupIdHex to record)
+        // A snapshot still carrying a name this device just renamed away from must not restore it
+        // underneath the row; [chatListDisplayGroup] falls back to this record's name.
+        val retainedName = localGroupNames.retainedFor(record.groupIdHex, record.name)
+        val folded = if (retainedName == null) record else record.copy(name = retainedName)
+        groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
         if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
         scheduleRecompute()
     }
@@ -2880,8 +2884,12 @@ class ChatsController private constructor(
         scheduleRecompute()
     }
 
-    fun applyLocalGroupUpdate(record: AppGroupRecordFfi) {
-        applyLocalGroupProjection(record, members = null)
+    /** [nameCleared] marks a committed clear, so a blank [record] name is not read as "no name yet". */
+    fun applyLocalGroupUpdate(
+        record: AppGroupRecordFfi,
+        nameCleared: Boolean = false,
+    ) {
+        applyLocalGroupProjection(record, members = null, nameCleared = nameCleared)
     }
 
     fun applyLocalGroupDetails(
@@ -2895,6 +2903,7 @@ class ChatsController private constructor(
     private fun applyLocalGroupProjection(
         record: AppGroupRecordFfi,
         members: List<AppGroupMemberRecordFfi>?,
+        nameCleared: Boolean = false,
     ) {
         if (accountRef == null) return
         val rowKey = chatRowKey(record.groupIdHex)
@@ -2932,7 +2941,7 @@ class ChatsController private constructor(
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
         (optimisticChatListPreviewByGroup[rowKey]?.baselineRow ?: chatRowsByGroup[rowKey])?.let { row ->
-            val updated = locallyProjectedChatRow(rowKey, row, record)
+            val updated = locallyProjectedChatRow(rowKey, row, record, nameCleared)
             optimisticChatListPreviewByGroup[rowKey]?.let { state ->
                 state.baselineRow = updated
                 materializeOptimisticChatListPreview(rowKey, state)
@@ -2954,11 +2963,12 @@ class ChatsController private constructor(
         rowKey: String,
         row: ChatListRowFfi,
         record: AppGroupRecordFfi,
+        nameCleared: Boolean,
     ): ChatListRowFfi {
-        // A blank name clears the profile only when the group was named before; otherwise the record
-        // simply carries no name yet and the row keeps what it already shows.
-        val cleared = record.name.isBlank() && !groupRecordsById[record.groupIdHex]?.name.isNullOrBlank()
-        val projectedName = if (cleared) "" else record.name.ifBlank { row.groupName }
+        // Only an explicit clear empties the row; any other blank record simply carries no name yet.
+        // The caller states the intent because the subscription may already have folded the cleared
+        // record, so the prior name cannot be read back from live state.
+        val projectedName = if (nameCleared) "" else record.name.ifBlank { row.groupName }
         val renamed = projectedName != row.groupName
         if (renamed) {
             localGroupNames.record(record.groupIdHex, row.groupName, projectedName)
@@ -11526,8 +11536,9 @@ class ConversationController(
         if (updated == group) return
         localGroupNames.record(group.groupIdHex, previousName = group.name, committedName = name)
         localGroupDescriptions.record(group.groupIdHex, previousName = group.description, committedName = description)
+        val nameCleared = name.isBlank() && group.name.isNotBlank()
         group = updated
-        appState.applyLocalGroupUpdate(updated, account)
+        appState.applyLocalGroupUpdate(updated, account, nameCleared = nameCleared)
     }
 
     /**

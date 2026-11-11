@@ -266,13 +266,39 @@ class GroupRenameChatListProjectionTest {
             chats.applyChatListRow(row(groupName = OLD_NAME))
             flushChatListRecompute()
 
-            val item = chats.items.single()
-            assertTrue(item.group.name.isBlank())
-            assertEquals(null, item.sanitizedNamedTitle)
-            assertTrue(chatListItemDisplayTitle(item, appState, GroupTitleCopy.Default) != OLD_NAME)
-            assertTrue(
-                applyChatListSearchAndFilter(chats.items, OLD_NAME, appState, GroupTitleCopy.Default).isEmpty(),
-            )
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
+    /** The subscription may fold the cleared record before the local projection runs. */
+    @Test
+    fun clearStillLandsWhenTheSubscriptionFoldsFirst() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            chats.foldGroupRecordForTest(group(name = ""))
+            assertTrue(conversation.updateGroupProfile("", ""))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
+    /** A group snapshot still carrying the old name cannot restore it under the cleared row. */
+    @Test
+    fun staleGroupRecordCannotRestoreAClearedName() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
             chats.onCleared()
         }
 
@@ -328,6 +354,18 @@ class GroupRenameChatListProjectionTest {
             )
             restarted.onCleared()
         }
+
+    /** The single chat row no longer shows, titles or matches [OLD_NAME]. */
+    private fun assertClearedEverywhere(
+        chats: ChatsController,
+        appState: WhiteNoiseAppState,
+    ) {
+        val item = chats.items.single()
+        assertTrue(item.group.name.isBlank())
+        assertEquals(null, item.sanitizedNamedTitle)
+        assertTrue(chatListItemDisplayTitle(item, appState, GroupTitleCopy.Default) != OLD_NAME)
+        assertTrue(applyChatListSearchAndFilter(chats.items, OLD_NAME, appState, GroupTitleCopy.Default).isEmpty())
+    }
 
     /** Runs the chat list's one-frame recompute debounce so its projection is current. */
     private fun flushChatListRecompute() {

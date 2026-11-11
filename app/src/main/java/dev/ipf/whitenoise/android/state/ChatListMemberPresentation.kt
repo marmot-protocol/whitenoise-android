@@ -82,10 +82,11 @@ internal fun chatListDisplayGroup(
 internal fun ChatsController?.applyLocalGroupUpdateForAccount(
     record: AppGroupRecordFfi,
     accountRef: String?,
+    nameCleared: Boolean = false,
 ) {
     this
         ?.takeIf { accountRef == null || it.boundAccountRef == accountRef }
-        ?.applyLocalGroupUpdate(record)
+        ?.applyLocalGroupUpdate(record, nameCleared)
 }
 
 /**
