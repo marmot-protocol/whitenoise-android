@@ -34,7 +34,7 @@ class TextAttachmentNativeActionsTest {
                             downloads += 1
                             materialized.await()
                         },
-                        { published += 1 },
+                        { _, _ -> published += 1 },
                     )
                 }
             val save = launch { actions.save() }
@@ -48,6 +48,29 @@ class TextAttachmentNativeActionsTest {
             assertEquals(0, published)
             actions.save()
             assertEquals(1, downloads)
+        }
+
+    /** Owner loss while the platform save is writing reaches the finalize hook, so the file is never published. */
+    @Test
+    fun ownerLossDuringPublishFailsTheFinalizeCheck() =
+        runTest {
+            var current = true
+            var finalized = false
+            val failure =
+                runCatching {
+                    saveOwnedTextAttachment(
+                        isCurrent = { current },
+                        materialize = { "owned-native-cache-file" },
+                        publish = { _, beforePublish ->
+                            current = false
+                            beforePublish()
+                            finalized = true
+                        },
+                    )
+                }.exceptionOrNull()
+
+            assertTrue(failure is CancellationException)
+            assertFalse(finalized)
         }
 
     /**

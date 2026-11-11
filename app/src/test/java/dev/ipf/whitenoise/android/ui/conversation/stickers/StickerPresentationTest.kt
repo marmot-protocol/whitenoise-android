@@ -57,13 +57,20 @@ class StickerPresentationTest {
             count: Int = 0,
             search: String = "",
             failed: Boolean = false,
-        ) = StickerPresentation.discoveryState(loading, count, search, failed)
+            readFailed: Boolean = false,
+        ) = StickerPresentation.discoveryState(loading, count, search, failed, readFailed)
 
         assertEquals(DiscoveryState.Packs, state(count = 2, failed = true))
         assertEquals(DiscoveryState.Loading, state(loading = true))
         assertEquals(DiscoveryState.Unreachable, state(failed = true, search = "cat"))
         assertEquals(DiscoveryState.NoMatches, state(search = "cat"))
         assertEquals(DiscoveryState.NoneOnRelays, state())
+
+        assertEquals(DiscoveryState.LoadFailed, state(readFailed = true))
+        assertEquals(DiscoveryState.LoadFailed, state(readFailed = true, search = "cat"))
+        assertEquals(DiscoveryState.LoadFailed, state(readFailed = true, failed = true))
+        assertEquals(DiscoveryState.Packs, state(count = 1, readFailed = true))
+        assertEquals(DiscoveryState.Loading, state(loading = true, readFailed = true))
     }
 
     @Test

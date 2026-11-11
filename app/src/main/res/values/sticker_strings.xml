@@ -24,6 +24,7 @@
     <string name="sticker_packs_no_matches">No sticker packs match your search.</string>
     <string name="sticker_packs_unreachable">Couldn\'t check your relays for sticker packs.</string>
     <string name="sticker_packs_try_again">Try again</string>
+    <string name="sticker_packs_load_failed">Couldn\'t load sticker packs.</string>
     <string name="sticker_packs_public_footer">Sticker packs are public and aren\'t reviewed by White Noise. Your installed packs are listed publicly on your relays.</string>
     <string name="sticker_pack_add">Add</string>
     <string name="sticker_pack_by">By %1$s</string>

@@ -24,6 +24,7 @@
     <string name="sticker_packs_no_matches">Nenhum pacote de figurinhas corresponde à sua busca.</string>
     <string name="sticker_packs_unreachable">Não foi possível consultar seus relays em busca de pacotes de figurinhas.</string>
     <string name="sticker_packs_try_again">Tentar de novo</string>
+    <string name="sticker_packs_load_failed">Não foi possível carregar os pacotes de figurinhas.</string>
     <string name="sticker_packs_public_footer">Os pacotes de figurinhas são públicos e não são revisados pelo White Noise. Seus pacotes instalados ficam listados publicamente nos seus relays.</string>
     <string name="sticker_pack_add">Adicionar</string>
     <string name="sticker_pack_by">Por %1$s</string>

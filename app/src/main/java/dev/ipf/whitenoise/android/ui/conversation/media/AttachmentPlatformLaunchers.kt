@@ -24,7 +24,9 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-internal typealias DocumentSaveFallback = suspend (source: File, fileName: String, mediaType: String) -> Unit
+/** Saves through a chosen destination; [beforeCopy] rechecks the save's owner once the picker returns. */
+internal typealias DocumentSaveFallback =
+    suspend (source: File, fileName: String, mediaType: String, beforeCopy: () -> Unit) -> Unit
 private typealias ExternalAttachmentOpen = suspend (File, String, String) -> OpenAttachmentResult
 internal typealias AttachmentOpener =
     suspend (File, String, String, InstallerPermissionPersistence?, AttachmentDispatchGuard?) -> OpenAttachmentResult
@@ -185,12 +187,17 @@ internal fun androidPackageInstallPermissionIntent(context: Context): Intent =
         Uri.parse("package:${context.packageName}"),
     )
 
+/**
+ * Saves [source] to Downloads, or through [fallback]'s chosen destination when Downloads fails. [beforePublish]
+ * throws once the save has lost its owner; it runs before Downloads publishes, before the picker and after it.
+ */
 internal suspend fun saveDocumentWithFallback(
     context: Context,
     source: File,
     fileName: String,
     mediaType: String,
     fallback: DocumentSaveFallback?,
+    beforePublish: () -> Unit = {},
 ): Boolean =
     try {
         withContext(Dispatchers.IO) {
@@ -199,11 +206,14 @@ internal suspend fun saveDocumentWithFallback(
                 source = source,
                 fileName = fileName,
                 mediaType = mediaType,
+                beforePublish = beforePublish,
             )
         }
     } catch (failure: AttachmentSaveException) {
         val selectDestination = fallback ?: throw failure
-        selectDestination(source, fileName, mediaType)
+        // A source revoked while Downloads failed must not reopen the save through the picker.
+        beforePublish()
+        selectDestination(source, fileName, mediaType, beforePublish)
         true
     }
 

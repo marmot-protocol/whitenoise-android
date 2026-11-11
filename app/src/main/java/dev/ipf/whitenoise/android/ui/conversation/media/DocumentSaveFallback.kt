@@ -110,22 +110,32 @@ internal fun rememberDocumentSaveFallback(
             }
         }
     }
-    return { source, fileName, mediaType ->
-        saveDocumentToChosenDestination(context, source) { requestDestination(fileName, mediaType) }
+    return { source, fileName, mediaType, beforeCopy ->
+        saveDocumentToChosenDestination(context, source, beforeCopy) { requestDestination(fileName, mediaType) }
     }
 }
 
 /**
  * Copies [source] to the destination the user chooses, keeping it protected from cache cleanup until the copy finishes.
+ * When [beforeCopy] rejects the save after the picker returns, the unused empty destination is removed and nothing is
+ * written.
  */
+@Suppress("TooGenericExceptionCaught")
 private suspend fun saveDocumentToChosenDestination(
     context: Context,
     source: File,
+    beforeCopy: () -> Unit,
     selectDestination: suspend () -> Uri,
 ) {
     AttachmentPlaintextCache.protectPublicationFile(source)
     try {
         val destination = selectDestination()
+        try {
+            beforeCopy()
+        } catch (rejected: Throwable) {
+            discardInterruptedCreatedDocument(context, destination)
+            throw rejected
+        }
         withContext(Dispatchers.IO) { copyDocumentToDestination(context, source, destination) }
     } finally {
         AttachmentPlaintextCache.unprotectPublicationFile(source)

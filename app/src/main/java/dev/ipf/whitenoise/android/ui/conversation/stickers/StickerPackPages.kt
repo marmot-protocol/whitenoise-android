@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.stickers
 
 import android.content.Intent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,60 @@ import java.net.URLEncoder
 
 private const val SEARCH_DEBOUNCE_MS = 250L
 
+/** The browser's last discovery read: its packs, the query they answer and whether the latest read failed. */
+internal class DiscoveryResults {
+    var packs by mutableStateOf<List<StickerPackFfi>>(emptyList())
+        private set
+    var failed by mutableStateOf(false)
+        private set
+    private var search: String? = null
+
+    /**
+     * Reads [query]; a failed read keeps this query's last results, minus packs installed since, but never shows
+     * another query's.
+     */
+    suspend fun read(
+        library: StickerLibrary,
+        query: String,
+    ) {
+        val failure =
+            attemptSticker {
+                packs = library.discover(query)
+                search = query
+            }
+        failed = failure != null
+        if (failure != null) {
+            // A pack installed since the last good read moves to the installed list instead of staying discoverable.
+            packs = if (search != query) emptyList() else packs.filterNot { library.isInstalled(it.coordinate) }
+        }
+    }
+}
+
+/** The browser's top bar with its add-by-link toggle and relay refresh. */
+@Suppress("FunctionNaming")
+@Composable
+private fun StickerBrowserTopBar(
+    linkOpen: Boolean,
+    onLinkOpenChange: (Boolean) -> Unit,
+    refreshEnabled: Boolean,
+    onRefresh: () -> Unit,
+    onBack: () -> Unit,
+    onClose: () -> Unit,
+) {
+    StickerSheetTopBar(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
+        IconToggleButton(
+            checked = linkOpen,
+            onCheckedChange = onLinkOpenChange,
+            modifier = Modifier.testTag("sticker.link.toggle"),
+        ) {
+            Icon(painterResource(R.drawable.ic_link), stringResource(R.string.sticker_packs_add_by_link))
+        }
+        IconButton(onClick = onRefresh, enabled = refreshEnabled) {
+            Icon(painterResource(R.drawable.ic_refresh), stringResource(R.string.refresh))
+        }
+    }
+}
+
 /** Lists packs to discover, with search and an optional add-by-link field. */
 @Suppress("FunctionNaming")
 @Composable
@@ -76,11 +131,11 @@ internal fun StickerBrowserPage(
 ) {
     var linkOpen by rememberSaveable { mutableStateOf(false) }
     var search by rememberSaveable { mutableStateOf("") }
-    var discovered by remember { mutableStateOf<List<StickerPackFfi>>(emptyList()) }
     var syncing by remember { mutableStateOf(true) }
     var syncFailed by remember { mutableStateOf(false) }
     var refreshRequests by remember { mutableIntStateOf(0) }
     var syncGeneration by remember { mutableIntStateOf(0) }
+    val discovery = remember { DiscoveryResults() }
     LaunchedEffect(refreshRequests) {
         syncing = true
         syncFailed = attemptSticker { library.sync(force = refreshRequests > 0) } != null
@@ -89,21 +144,16 @@ internal fun StickerBrowserPage(
     }
     LaunchedEffect(search, library.installed, syncGeneration) {
         if (search.isNotBlank()) delay(SEARCH_DEBOUNCE_MS)
-        // A failed search shows no results rather than the previous query's.
-        if (attemptSticker { discovered = library.discover(search) } != null) discovered = emptyList()
+        discovery.read(library, search)
     }
-    StickerSheetTopBar(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
-        IconToggleButton(
-            checked = linkOpen,
-            onCheckedChange = { linkOpen = it },
-            modifier = Modifier.testTag("sticker.link.toggle"),
-        ) {
-            Icon(painterResource(R.drawable.ic_link), stringResource(R.string.sticker_packs_add_by_link))
-        }
-        IconButton(onClick = { refreshRequests++ }, enabled = !syncing) {
-            Icon(painterResource(R.drawable.ic_refresh), stringResource(R.string.refresh))
-        }
-    }
+    StickerBrowserTopBar(
+        linkOpen = linkOpen,
+        onLinkOpenChange = { linkOpen = it },
+        refreshEnabled = !syncing,
+        onRefresh = { refreshRequests++ },
+        onBack = onBack,
+        onClose = onClose,
+    )
     WhiteNoiseLazyColumn(
         contentPadding =
             PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related),
@@ -125,8 +175,9 @@ internal fun StickerBrowserPage(
         item { StickerSectionTitle(stringResource(R.string.sticker_packs_discover)) }
         item { StickerSearchField(search) { search = it } }
         discoveryResults(
-            state = StickerPresentation.discoveryState(syncing, discovered.size, search, syncFailed),
-            packs = discovered,
+            state =
+                StickerPresentation.discoveryState(syncing, discovery.packs.size, search, syncFailed, discovery.failed),
+            packs = discovery.packs,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },
         )
@@ -211,15 +262,21 @@ private fun LazyListScope.discoveryResults(
         DiscoveryState.Loading -> item { StickerProgress() }
         DiscoveryState.NoneOnRelays -> item { StickerDisclosure(stringResource(R.string.sticker_packs_none_on_relays)) }
         DiscoveryState.NoMatches -> item { StickerDisclosure(stringResource(R.string.sticker_packs_no_matches)) }
-        DiscoveryState.Unreachable ->
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
-                    StickerDisclosure(stringResource(R.string.sticker_packs_unreachable))
-                    WhiteNoiseOutlinedButton(onClick = onRetry) {
-                        Text(stringResource(R.string.sticker_packs_try_again))
-                    }
-                }
-            }
+        DiscoveryState.Unreachable -> item { DiscoveryRetry(R.string.sticker_packs_unreachable, onRetry) }
+        DiscoveryState.LoadFailed -> item { DiscoveryRetry(R.string.sticker_packs_load_failed, onRetry) }
+    }
+}
+
+/** Why Discover is empty, with a retry. */
+@Suppress("FunctionNaming")
+@Composable
+private fun DiscoveryRetry(
+    @StringRes message: Int,
+    onRetry: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+        StickerDisclosure(stringResource(message))
+        WhiteNoiseOutlinedButton(onClick = onRetry) { Text(stringResource(R.string.sticker_packs_try_again)) }
     }
 }
 
