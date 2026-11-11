@@ -99,6 +99,7 @@ import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardTextActionsToMessageRow
+import dev.ipf.whitenoise.android.ui.conversation.messages.MAX_ROW_CUSTOM_ACTIONS
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSearchHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighlight
@@ -442,18 +443,21 @@ private fun MarkdownBodyText(
 
     val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
     LaunchedEffect(sentenceLayoutReporter) { reportIfReady() }
+    // A paragraph with many links must stay below Compose's custom-action limit too.
     val leafActions =
-        speechActions +
-            if (onCopyLink == null) {
-                emptyList()
-            } else {
-                linkDestinations.map { destination ->
-                    CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
-                        onCopyLink(destination)
-                        true
+        (
+            speechActions +
+                if (onCopyLink == null) {
+                    emptyList()
+                } else {
+                    linkDestinations.map { destination ->
+                        CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
+                            onCopyLink(destination)
+                            true
+                        }
                     }
                 }
-            }
+        ).distinctBy(CustomAccessibilityAction::label).take(MAX_ROW_CUSTOM_ACTIONS)
     // Inside a merged message row this leaf is not focusable; the row republishes its actions.
     ForwardTextActionsToMessageRow(leafActions)
     val accessibilityModifier = Modifier.semantics { customActions = leafActions }

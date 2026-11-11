@@ -60,6 +60,26 @@ class ScreenReaderMessageRowStopCoverageTest {
         assertEquals(listOf("info"), performed)
     }
 
+    /**
+     * A long message forwards one read-aloud action per paragraph. The row keeps its own actions first, offers
+     * one entry per distinct label, and stays below Compose's limit of 32 custom actions, which throws while an
+     * accessibility service such as TalkBack reads the row.
+     */
+    @Test
+    fun longMessageRowStaysBelowTheCustomActionLimit() {
+        val own = (1..8).map { MessageRowAction("Action $it", available = true) {} }
+        val sentences = List(40) { CustomAccessibilityAction("Choose sentence to read") { true } }
+        val links = (1..40).map { CustomAccessibilityAction("Copy link: https://example.com/$it") { true } }
+
+        val actions = messageRowCustomActions(own, sentences + links)
+
+        assertTrue("got ${actions.size} actions", actions.size <= MAX_ROW_CUSTOM_ACTIONS)
+        assertTrue(MAX_ROW_CUSTOM_ACTIONS < 32)
+        assertEquals(own.map { it.label }, actions.take(own.size).map { it.label })
+        assertEquals(1, actions.count { it.label == "Choose sentence to read" })
+        assertEquals(actions.size, actions.map { it.label }.distinct().size)
+    }
+
     @Test
     fun textLeavesRegisterByIdentityAndLeaveWhenRemoved() {
         val registry = MessageRowTextActions()
