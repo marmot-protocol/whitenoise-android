@@ -23,9 +23,13 @@ import kotlin.concurrent.thread
  * `tools/attachment-fixture/fixture_relay.py`. It answers EVENT/REQ/CLOSE over WebSocket. Closing it
  * takes every client offline, which is how the cold-start test models a process that relaunches without
  * network.
+ *
+ * With [advertisedMaxLimit] set it also serves a NIP-11 page with that REQ limit, as deployed relays do. Without
+ * one the relay's caps stay unknown, so MDK fences live frames whose window it cannot prove from stored history.
  */
 internal class LoopbackNostrRelay(
     port: Int = 0,
+    private val advertisedMaxLimit: Int? = null,
 ) : Closeable {
     private val server = ServerSocket(port, BACKLOG, InetAddress.getByName(LOOPBACK))
     private val lock = Any()
@@ -190,18 +194,37 @@ internal class LoopbackNostrRelay(
         clients.clear()
     }
 
-    /** Upgrades one accepted connection to the WebSocket relay, or rejects a plain HTTP request. */
+    /**
+     * Upgrades one accepted connection to the WebSocket relay, answers a NIP-11 request when a limit is advertised,
+     * or rejects any other plain HTTP request.
+     */
     private fun serve(socket: Socket) {
         socket.use {
             val input = DataInputStream(socket.getInputStream().buffered())
             val output = socket.getOutputStream()
             input.readHttpLine() ?: return
             val headers = generateSequence { input.readHttpLine()?.takeIf(String::isNotEmpty) }.toList()
-            when (val key = headers.headerValue("sec-websocket-key")) {
-                null -> output.write("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n".toByteArray())
-                else -> Client(socket, input, output).run(key)
+            val key = headers.headerValue("sec-websocket-key")
+            val info = advertisedMaxLimit?.takeIf { headers.headerValue("accept")?.contains(NIP11_TYPE) == true }
+            when {
+                key != null -> Client(socket, input, output).run(key)
+                info != null -> output.write(relayInformation(info))
+                else -> output.write("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n".toByteArray())
             }
         }
+    }
+
+    /** A NIP-11 response that advertises only the REQ result limit, as MDK's own limited test relay does. */
+    private fun relayInformation(maxLimit: Int): ByteArray {
+        val body =
+            JSONObject()
+                .put("supported_nips", JSONArray())
+                .put("limitation", JSONObject().put("max_limit", maxLimit))
+                .toString()
+                .toByteArray()
+        val head =
+            "HTTP/1.1 200 OK\r\nContent-Type: $NIP11_TYPE\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n"
+        return head.toByteArray() + body
     }
 
     /** One upgraded WebSocket connection with its own subscriptions. */
@@ -419,6 +442,7 @@ internal class LoopbackNostrRelay(
         const val LOOPBACK = "127.0.0.1"
         const val BACKLOG = 16
         const val WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+        const val NIP11_TYPE = "application/nostr+json"
         const val MAX_FRAME = 2L * 1024 * 1024
         const val MASK_BYTES = 4
         const val FIN = 0x80
