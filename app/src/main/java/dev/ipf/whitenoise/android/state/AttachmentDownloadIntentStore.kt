@@ -558,7 +558,8 @@ private fun accountToken(accountRef: String): String = attachmentIdentityDigest(
 
 /** Binds one cancel record to its account without storing either raw reference. */
 private fun cancelledOwnerToken(request: AttachmentTransferRequest): String {
-    return accountToken(request.accountRef) + OPEN_TOKEN_SEPARATOR + requestToken(request)
+    val account = accountToken(request.accountRef)
+    return account + OPEN_TOKEN_SEPARATOR + requestToken(request)
 }
 
 /** Produces the opaque token shared by transfer-intent sets. */
