@@ -12,11 +12,11 @@ internal class ProfileKeyOperation {
     private var job: Job? = null
 
     /** Rejects reentry and rechecks authority after suspension, including work that ignores cancellation. */
-    fun start(
+    fun <T> start(
         scope: CoroutineScope,
         canDeliver: () -> Boolean,
-        load: suspend () -> String?,
-        onResult: (String?) -> Unit,
+        load: suspend () -> T,
+        onResult: (T) -> Unit,
         onFinished: () -> Unit = {},
     ): Boolean {
         if (job?.isActive == true || !canDeliver()) return false
