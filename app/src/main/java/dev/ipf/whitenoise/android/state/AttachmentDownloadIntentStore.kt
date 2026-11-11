@@ -557,8 +557,9 @@ private fun PersistedInstallerHandoff.toPersistedValues(): Map<String, String> =
 private fun accountToken(accountRef: String): String = attachmentIdentityDigest(accountRef)
 
 /** Binds one cancel record to its account without storing either raw reference. */
-private fun cancelledOwnerToken(request: AttachmentTransferRequest): String =
-    accountToken(request.accountRef) + OPEN_TOKEN_SEPARATOR + requestToken(request)
+private fun cancelledOwnerToken(request: AttachmentTransferRequest): String {
+    return accountToken(request.accountRef) + OPEN_TOKEN_SEPARATOR + requestToken(request)
+}
 
 /** Produces the opaque token shared by transfer-intent sets. */
 private fun requestToken(request: AttachmentTransferRequest): String = attachmentIdentityTag(request)
