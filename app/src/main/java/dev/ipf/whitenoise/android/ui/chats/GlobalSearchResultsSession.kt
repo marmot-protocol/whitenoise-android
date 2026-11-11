@@ -155,11 +155,11 @@ private fun GlobalSearchResultsRecheckEffects(
     // Composition can run before the runtime is installed; the observer waits for one instead of throwing.
     val runtime = appState.marmotOrNull()
     val wakeups = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
-    // Every key MDK reports removed, collected on the event thread without reading list state, then withdrawn on the
-    // main thread, so a row a page or reread in flight still holds never lists either.
-    val removals = remember(controller) { Channel<Set<String>>(Channel.UNLIMITED) }
+    // Every in-scope key MDK reports removed is queued on the controller from the event thread, then withdrawn on the
+    // main thread here or by a read that lands first, so a row a page or reread in flight still holds never lists.
+    val removals = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
     LaunchedEffect(controller) {
-        for (keys in removals) controller.revoke(keys)
+        for (ignored in removals) controller.revoke()
     }
     // The first launch before any page landed is not a change: that page reads current data. A later launch is a
     // real block change, or a return to a screen whose rows may be stale.
@@ -193,7 +193,12 @@ private fun GlobalSearchResultsRecheckEffects(
                     runtime = runtime,
                     account = account,
                     wakeups = wakeups,
-                    touched = { event -> touchesLoadedRows(event, account, controller) { removals.trySend(it) } },
+                    touched = { event ->
+                        touchesLoadedRows(event, account, controller) { keys ->
+                            controller.reportRemoved(keys)
+                            removals.trySend(Unit)
+                        }
+                    },
                     // Asked after the subscription opened. A fresh query skips the probe: in practice its first read
                     // starts only after the 275 ms keystroke debounce, so the subscription is usually open by then,
                     // though nothing orders the two. A session with rows loaded — a return to a held session — wakes,
@@ -225,8 +230,8 @@ private const val MILLIS_PER_SECOND = 1_000L
 
 /**
  * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Every key it
- * removes or deletes goes to [withdraw] first, so a loaded row leaves before the recheck lands and a held one never
- * lists.
+ * removes or deletes in a chat the query covers goes to [withdraw] first, so a loaded row leaves before the recheck
+ * lands and a held one never lists; keys of chats outside the scope are never retained.
  */
 internal fun touchesLoadedRows(
     event: MarmotEventFfi,
@@ -235,7 +240,8 @@ internal fun touchesLoadedRows(
     withdraw: (Set<String>) -> Unit,
 ): Boolean {
     val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update?.takeIf { it.accountLabel == account }
-    val removed = update?.let { globalSearchRemovedKeys(it.update) }.orEmpty()
+    val inScope = update?.takeIf { controller.query?.coversGroup(it.update.groupIdHex) == true }
+    val removed = inScope?.let { globalSearchRemovedKeys(it.update) }.orEmpty()
     if (removed.isNotEmpty()) withdraw(removed)
     return update != null && controller.isTouchedBy(update.update)
 }

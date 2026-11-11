@@ -20,6 +20,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /** The one MDK read global message results make: a typed timeline page for the bound account. */
 internal fun interface GlobalSearchTimelineReader {
@@ -41,6 +42,7 @@ internal class GlobalSearchResultsEnvironment(
  * previous account or runtime ([GlobalSearchResultsEnvironment.isCurrent]), never reaches [state]. Each batch reads
  * at most four MDK pages / 200 rows and returns its last continuation. Nothing outlives the session.
  */
+@Suppress("TooManyFunctions") // One main-thread state owner; reportRemoved is its only cross-thread entry.
 internal class GlobalSearchResultsController(
     private val reader: GlobalSearchTimelineReader,
     private val scope: CoroutineScope,
@@ -73,6 +75,9 @@ internal class GlobalSearchResultsController(
         private set
 
     private var refreshPending = false
+
+    // Keys MDK reported removed, queued from the event thread; the next [revoke] on the main thread withdraws them.
+    private val reportedRemovals = ConcurrentLinkedQueue<Set<String>>()
     private var loadPending = false
 
     // A change arrived while a capped recheck was still covering the older rows; the head is reread once it ends.
@@ -143,14 +148,23 @@ internal class GlobalSearchResultsController(
     }
 
     /**
-     * Drops loaded rows whose disappearing deadline has passed, and the rows with [removed] keys MDK reported gone,
-     * without waiting for a reread. A removed key never lists in this generation, even when the read holding it
-     * lands later.
+     * Queues [keys] MDK reported removed, from any thread. A completed read withdraws them in the same main-thread
+     * step that applies it, so a read landing before the next [revoke] call still never lists them.
+     */
+    fun reportRemoved(keys: Set<String>) {
+        reportedRemovals.add(keys)
+    }
+
+    /**
+     * Drops loaded rows whose disappearing deadline has passed, and rows MDK reported removed, passed as [removed]
+     * or queued by [reportRemoved], without waiting for a reread. A removed key never lists in this generation, even
+     * when the read holding it lands later.
      */
     fun revoke(removed: Set<String> = emptySet()) {
         if (query == null || closed) return
+        val keys = removed + generateSequence { reportedRemovals.poll() }.flatten()
         val nowSeconds = (environment.nowMillis() / MILLIS_PER_SECOND).coerceAtLeast(0L).toULong()
-        state = GlobalSearchResultsReducer.withdraw(GlobalSearchResultsReducer.dropExpired(state, nowSeconds), removed)
+        state = GlobalSearchResultsReducer.withdraw(GlobalSearchResultsReducer.dropExpired(state, nowSeconds), keys)
     }
 
     /** Starts one bounded recheck pass, from the head or [continuing] where the previous capped pass stopped. */
@@ -222,8 +236,9 @@ internal class GlobalSearchResultsController(
                         }
                     if (accepts(current)) {
                         val applies = state.inFlight == request
+                        // Removals reported while the read ran and rows past their deadline leave before the next
+                        // frame, in the same main-thread step that applies the read.
                         state = next(state)
-                        // A row may have expired between the read and now.
                         revoke()
                         if (applies) settle(request, succeeded = true)
                     }
@@ -282,7 +297,8 @@ internal class GlobalSearchResultsController(
             }
             stale || state.failed -> Unit
             state.validateFrom != null && lastPassApplied -> recheck(continuing = true)
-            headOwed -> {
+            // A failed pass keeps the head owed until the next trigger, so a persistent failure is not retried.
+            headOwed && lastPassApplied -> {
                 headOwed = false
                 recheck(continuing = false)
             }

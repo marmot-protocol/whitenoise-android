@@ -53,14 +53,22 @@ internal object GlobalSearchTestFixtures {
 
     /**
      * Delivers [update] for the session's account the way the session's observer does: removed and deleted keys are
-     * withdrawn first, then the answer says whether a recheck is still needed.
+     * reported first, then the answer says whether a recheck is still needed. [drain] runs the session's main-thread
+     * revoke at once; without it a read that lands first must withdraw the reported keys itself.
      */
-    fun GlobalSearchResultsController.deliver(update: TimelineProjectionUpdateFfi): Boolean =
-        touchesLoadedRows(
-            MarmotEventFfi.ProjectionUpdated(RuntimeProjectionUpdateFfi("ff".repeat(32), ACCOUNT, update)),
-            ACCOUNT,
-            this,
-        ) { revoke(it) }
+    fun GlobalSearchResultsController.deliver(
+        update: TimelineProjectionUpdateFfi,
+        drain: Boolean = true,
+    ): Boolean {
+        val touched =
+            touchesLoadedRows(
+                MarmotEventFfi.ProjectionUpdated(RuntimeProjectionUpdateFfi("ff".repeat(32), ACCOUNT, update)),
+                ACCOUNT,
+                this,
+            ) { reportRemoved(it) }
+        if (drain) revoke()
+        return touched
+    }
 
     private const val ACCOUNT = "personal"
 

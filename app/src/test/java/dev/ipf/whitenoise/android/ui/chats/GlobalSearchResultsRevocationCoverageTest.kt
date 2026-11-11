@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.runtime.snapshotFlow
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -80,7 +81,8 @@ class GlobalSearchResultsRevocationCoverageTest {
 
     /**
      * A Remove that arrives while the first page is still being read withdraws the row that page holds, so it never
-     * lists, and rereads of a store that has not caught up cannot restore it.
+     * lists, and rereads of a store that has not caught up cannot restore it. The session's main-thread revoke has not
+     * run yet when the page lands, so the read itself must withdraw the reported key before it publishes.
      */
     @Test
     fun aRemovalDuringAReadInFlightKeepsTheHeldRowOut() =
@@ -93,12 +95,20 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertTrue("the first page is held", controller.state.inFlight != null)
             val removal =
                 update("g", TimelineMessageChangeFfi.Remove("m0299", TimelineRemoveReasonFfi.entries.first()))
-            assertFalse("withdrawn directly, with no reread", controller.deliver(removal))
+            assertFalse("withdrawn directly, with no reread", controller.deliver(removal, drain = false))
 
+            val published = mutableListOf<List<String>>()
+            val watcher =
+                launch {
+                    snapshotFlow { keys(controller) }.collect { published += it }
+                }
+            runCurrent()
             gate.complete(Unit)
             advanceUntilIdle()
+            watcher.cancel()
             assertTrue("the held page landed", controller.state.results.isNotEmpty())
             assertFalse("the held row never lists", "g:m0299" in keys(controller))
+            assertTrue("never published, even briefly", published.none { "g:m0299" in it })
 
             repeat(3) {
                 controller.refresh()
@@ -262,6 +272,49 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertFalse("g:m0000" in keys(controller))
             assertEquals(null, controller.state.validateFrom)
             assertEquals(LOADED - 1, controller.state.results.size)
+        }
+
+    /** A capped pass that keeps failing is tried once per trigger: the owed head reread does not retry it at once. */
+    @Test
+    fun aPersistentlyFailingPassIsTriedOncePerTrigger() =
+        runTest {
+            val store = StoreReader(rows())
+            val failing = FailingReader(store)
+            val controller = controller(failing)
+            loadAll(controller)
+            failing.failBelow = 100uL
+
+            controller.refresh()
+            advanceUntilIdle()
+            assertEquals(1, failing.failures)
+            controller.refresh()
+            advanceUntilIdle()
+            assertEquals("the second trigger tries the continuation once", 2, failing.failures)
+            assertTrue("the chain still waits", controller.state.validateFrom != null)
+
+            failing.failBelow = null
+            controller.refresh()
+            advanceUntilIdle()
+            assertEquals(null, controller.state.validateFrom)
+            assertEquals(LOADED, controller.state.results.size)
+        }
+
+    /** A removal in a chat outside the query's scope is neither withdrawn nor retained for the generation. */
+    @Test
+    fun aRemovalOutsideTheScopeIsNotRetained() =
+        runTest {
+            val controller = controller(StoreReader(rows()))
+            controller.search(GlobalSearchResultsQuery(needle = "hello", groups = setOf("g")))
+            advanceUntilIdle()
+            val elsewhere =
+                update("other", TimelineMessageChangeFfi.Remove("x", TimelineRemoveReasonFfi.entries.first()))
+            val inside = update("g", TimelineMessageChangeFfi.Remove("m0299", TimelineRemoveReasonFfi.entries.first()))
+
+            controller.deliver(elsewhere)
+            controller.deliver(inside)
+
+            assertEquals(setOf("g:m0299"), controller.state.withdrawn)
+            assertFalse("g:m0299" in keys(controller))
         }
 
     /** Fails every read that continues below [failBelow]. */
