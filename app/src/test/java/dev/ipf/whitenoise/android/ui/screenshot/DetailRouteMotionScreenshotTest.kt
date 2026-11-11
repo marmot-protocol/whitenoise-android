@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.snapshots.SnapshotMutableState
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -55,6 +57,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLog
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Actual caller navigation: no substitute route or screen, no protocol mutations. */
 @RunWith(RobolectricTestRunner::class)
@@ -164,9 +167,14 @@ class DetailRouteMotionScreenshotTest {
         captureSource(name, profile)
         rule.mainClock.autoAdvance = false
         val preparationLogOffset = ShadowLog.getLogsForTag("ConversationSettings").size
-        action.performClick()
-        rule.mainClock.advanceTimeByFrame()
-        if (!profile) awaitNotificationCategories(preparationLogOffset)
+        val rowsPublished = CategoryRowsPublication()
+        try {
+            action.performClick()
+            rule.mainClock.advanceTimeByFrame()
+            if (!profile) awaitNotificationCategories(preparationLogOffset, rowsPublished)
+        } finally {
+            rowsPublished.close()
+        }
         captureTransition(name, profile)
         val destinationTitle =
             app.getString(
@@ -208,7 +216,10 @@ class DetailRouteMotionScreenshotTest {
 
     /** Wait for real platform preparation without advancing the measured animation. */
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    private fun awaitNotificationCategories(logOffset: Int) {
+    private fun awaitNotificationCategories(
+        logOffset: Int,
+        rowsPublished: CategoryRowsPublication,
+    ) {
         val animationOrigin = rule.mainClock.currentTime
 
         /** Returns the log lines since [logOffset] that mark the end of category preparation. */
@@ -242,11 +253,36 @@ class DetailRouteMotionScreenshotTest {
                 item.msg + (item.throwable?.stackTraceToString()?.let { "\n$it" } ?: "")
             }
         assertTrue("category preparation must succeed:\n$diagnostics", records.all { "outcome=ok" in it })
-        // prepare_total precedes the main continuation that assigns the rows.
-        rule.runOnIdle { }
+        // prepare_total is logged on the worker before it posts the main continuation that assigns the rows, so the
+        // post can land after one idle pass. Pump without advancing the clock until the rows are applied; the single
+        // frame below then recomposes them in place of the placeholder.
+        awaitConversationCondition(timeoutMs = 5_000) {
+            rule.runOnUiThread { rule.mainClock.scheduler.runCurrent() }
+            rule.waitForIdle()
+            rowsPublished.isPublished
+        }
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithText(app.getString(R.string.notification_categories_loading)).assertDoesNotExist()
         rule.onNodeWithText(app.getString(R.string.notification_channel_mentions)).assertExists()
+    }
+
+    /** Records when the screen applies its prepared category rows, which it holds in private snapshot state. */
+    private class CategoryRowsPublication : AutoCloseable {
+        private val published = AtomicBoolean(false)
+        private val observer =
+            Snapshot.registerApplyObserver { changed, _ ->
+                val rows = changed.any { state -> (state as? SnapshotMutableState<*>)?.value.isPreparedCategoryList() }
+                if (rows) published.set(true)
+            }
+
+        val isPublished: Boolean get() = published.get()
+
+        override fun close() = observer.dispose()
+
+        private fun Any?.isPreparedCategoryList(): Boolean {
+            val first = (this as? List<*>)?.firstOrNull() ?: return false
+            return first.javaClass.simpleName == "PreparedNotificationCategorySetting"
+        }
     }
 
     /** Diagnostic frame sets are opt-in; only the three registered goldens participate in CI verification. */
