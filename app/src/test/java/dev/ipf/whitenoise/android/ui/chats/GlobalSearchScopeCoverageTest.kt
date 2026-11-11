@@ -150,7 +150,7 @@ class GlobalSearchScopeCoverageTest {
         settle()
         model.timelineQueries.clear()
         openSearch(GlobalSearchState(isOpen = true, query = "hello again", folderFilters = setOf(folder)))
-        settle()
+        afterDebounce()
         assertTrue("a withdrawn scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
         rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
     }
@@ -176,7 +176,7 @@ class GlobalSearchScopeCoverageTest {
         awaitReads { calls >= 2 }
         model.timelineQueries.clear()
         openSearch(GlobalSearchState(isOpen = true, query = "hello again", folderFilters = setOf(folder)))
-        settle()
+        afterDebounce()
         assertTrue("the old scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
         rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
         release.complete(Unit)
@@ -339,6 +339,12 @@ class GlobalSearchScopeCoverageTest {
     private fun openSearch(state: GlobalSearchState) {
         rule.runOnIdle { search.value = state }
         rule.waitForIdle()
+    }
+
+    /** Lets the keystroke debounce elapse, so a search the current scope allows would start, then settles. */
+    private fun afterDebounce() {
+        rule.mainClock.advanceTimeBy(CHAT_LIST_SEARCH_DEBOUNCE_MS * 2)
+        settle()
     }
 
     /** Drives the test scheduler and main looper for a bounded stretch, so pending work finishes or stays blocked. */
