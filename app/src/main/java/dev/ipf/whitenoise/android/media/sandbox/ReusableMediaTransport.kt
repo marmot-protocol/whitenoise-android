@@ -301,6 +301,7 @@ internal class ReusableMediaTransport(
                 },
             )
             requestDispatched = true
+            IsolatedMediaDecoder.recordDispatch()
             if (!reply.ready.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) {
                 retireCurrentWorker()
                 return null

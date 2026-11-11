@@ -550,6 +550,7 @@ internal class IsolatedMediaTransport(
                     data = requestPayload(input, output, request)
                 },
             )
+            IsolatedMediaDecoder.recordDispatch()
             // Warm a spare while this generation serves, a new domain or single-use input takes it.
             pool.refill()
             if (!await(exchange.ready, ticket)) {

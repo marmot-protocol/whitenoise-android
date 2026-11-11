@@ -41,7 +41,12 @@ class MediaCodecCorpusDeviceTest {
                 "<!DOCTYPE svg [<!ENTITY x SYSTEM 'file:///not-authorized'>]><svg>&x;</svg>".toByteArray(),
             )
         for ((index, bytes) in corpus.withIndex()) {
-            val decoded = if (index >= 6) IsolatedMediaDecoder.svg(bytes) else IsolatedMediaDecoder.decode(bytes, 32)
+            val decoded =
+                if (index >= 6) {
+                    contained("svg #$index") { IsolatedMediaDecoder.svg(bytes) }
+                } else {
+                    contained("decode #$index") { IsolatedMediaDecoder.decode(bytes, 32) }
+                }
             // Native codecs may salvage truncated images. Containment, output bounds and recovery
             // are the guarantee, rather than claiming every decoder rejects every mutation.
             val limit = if (index >= 6) MediaDecodePolicy.SVG_EDGE else 32
@@ -49,10 +54,9 @@ class MediaCodecCorpusDeviceTest {
                 assertTrue(it.width in 1..limit && it.height in 1..limit)
                 it.recycle()
             }
-            if (index == 2) IsolatedMediaDecoder.exif(bytes)
-            requireNotNull(IsolatedMediaDecoder.decode(png, 32)).recycle()
-            val worker = requireNotNull(IsolatedMediaDecoder.lastIsolation)
-            assertTrue(worker.isolated && !worker.internetGranted && !worker.runtimeInitialized)
+            if (index == 2) contained("exif #$index") { IsolatedMediaDecoder.exif(bytes) }
+            // Healthy recovery is checked on its own, after the malformed operation's evidence.
+            requireNotNull(contained("healthy png after #$index") { IsolatedMediaDecoder.decode(png, 32) }).recycle()
             assertEquals(Process.myPid(), caller)
         }
     }
@@ -61,13 +65,20 @@ class MediaCodecCorpusDeviceTest {
     fun cameraSized108MegapixelSourceUsesABoundedOffCentreRegion() {
         IsolatedMediaDecoder.install(InstrumentationRegistry.getInstrumentation().targetContext)
         val source = stripedPng(12000, 9000)
-        assertEquals(ImageInspection(12000, 9000, "image/png", 1), IsolatedMediaDecoder.inspect(source))
-        val region = requireNotNull(IsolatedMediaDecoder.region(source, MediaImageRegion(7000, 2000, 8000, 3000), 1000))
+        assertEquals(
+            ImageInspection(12000, 9000, "image/png", 1),
+            contained("camera inspect") { IsolatedMediaDecoder.inspect(source) },
+        )
+        val region =
+            requireNotNull(
+                contained("camera region") {
+                    IsolatedMediaDecoder.region(source, MediaImageRegion(7000, 2000, 8000, 3000), 1000)
+                },
+            )
         try {
             assertEquals(1000, region.width)
             assertEquals(1000, region.height)
             assertEquals(Color.BLUE, region.getPixel(500, 500))
-            assertTrue(requireNotNull(IsolatedMediaDecoder.lastIsolation).isolated)
         } finally {
             region.recycle()
         }
@@ -93,9 +104,11 @@ class MediaCodecCorpusDeviceTest {
                 .digest(source)
                 .joinToString("") { "%02x".format(it) }
         assertEquals("62dfb44160403ca8355a874cecc91cdbce57e98dd597fa36a2af55ef54c017ac", digest)
-        val inspected = IsolatedMediaDecoder.inspect(source)
-        val preview = IsolatedMediaDecoder.decode(source, 32)
-        val region = IsolatedMediaDecoder.region(source, MediaImageRegion(0, 0, 32, 32), 32)
+        // Each HEIF operation carries its own evidence rather than sharing the last receipt.
+        val inspected = contained("heif inspect") { IsolatedMediaDecoder.inspect(source) }
+        val preview = contained("heif preview") { IsolatedMediaDecoder.decode(source, 32) }
+        val region =
+            contained("heif region") { IsolatedMediaDecoder.region(source, MediaImageRegion(0, 0, 32, 32), 32) }
         try {
             if (inspected != null) {
                 assertEquals(1920, inspected.width)
@@ -103,8 +116,6 @@ class MediaCodecCorpusDeviceTest {
             }
             for (bitmap in listOfNotNull(preview, region)) {
                 assertTrue(bitmap.width in 1..32 && bitmap.height in 1..32)
-                val worker = requireNotNull(IsolatedMediaDecoder.lastIsolation)
-                assertTrue(worker.isolated && worker.uid != Process.myUid() && !worker.internetGranted)
             }
             println(
                 "MEDIA_FORMAT_QUALIFICATION format=HEIF api=${android.os.Build.VERSION.SDK_INT} " +
@@ -273,4 +284,80 @@ class MediaCodecCorpusDeviceTest {
             }
         write(ByteBuffer.allocate(4).putInt(crc.value.toInt()).array())
     }
+
+    /**
+     * Runs one decoder operation and checks the evidence that operation itself produced (#3722). An operation
+     * that reached a worker must have produced exactly one isolated receipt; one refused before any worker ran
+     * must return nothing. A result without its own isolated receipt, such as a host decode, fails.
+     */
+    private fun <T> contained(
+        operation: String,
+        call: () -> T?,
+    ): T? {
+        val dispatchesBefore = IsolatedMediaDecoder.dispatchCount
+        val receiptsBefore = IsolatedMediaDecoder.receiptCount
+        val result = call()
+        checkOperationEvidence(
+            operation,
+            dispatched = IsolatedMediaDecoder.dispatchCount - dispatchesBefore,
+            receipts = IsolatedMediaDecoder.receiptCount - receiptsBefore,
+            receipt = IsolatedMediaDecoder.lastIsolation,
+            producedResult = result != null,
+            hostUid = Process.myUid(),
+        )
+        return result
+    }
+
+    /** Missing, stale, duplicated and non-isolated evidence each fail the containment check. */
+    @Test
+    fun operationEvidenceRejectsMissingStaleAndNonIsolatedReceipts() {
+        val isolated = WorkerIsolation(99_999, true, false, false, true, 13, -1)
+        val host = Process.myUid()
+        checkOperationEvidence("refused", 0, 0, null, producedResult = false, hostUid = host)
+        checkOperationEvidence("isolated", 1, 1, isolated, producedResult = true, hostUid = host)
+        val failures =
+            listOf(
+                // A result with no dispatch is a host decode.
+                Triple(0L, 0L, isolated),
+                // A dispatched result without its own receipt relies on a stale one.
+                Triple(1L, 0L, isolated),
+                // Two dispatches cannot be attributed to one operation.
+                Triple(2L, 2L, isolated),
+                // A receipt from a non-isolated, host-uid or networked process is not containment.
+                Triple(1L, 1L, isolated.copy(isolated = false)),
+                Triple(1L, 1L, isolated.copy(uid = host)),
+                Triple(1L, 1L, isolated.copy(internetGranted = true)),
+            ).map { (dispatched, receipts, receipt) ->
+                { checkOperationEvidence("forged", dispatched, receipts, receipt, true, host) }
+            }
+        failures.forEach { failure -> assertTrue(runCatching(failure).exceptionOrNull() is AssertionError) }
+    }
+}
+
+/** The containment rule for one operation's evidence, throwing [AssertionError] when it does not hold. */
+internal fun checkOperationEvidence(
+    operation: String,
+    dispatched: Long,
+    receipts: Long,
+    receipt: WorkerIsolation?,
+    producedResult: Boolean,
+    hostUid: Int,
+) {
+    if (dispatched == 0L) {
+        // Refused before any decoder ran: nothing may come back.
+        assertTrue("$operation produced output without an isolated worker", !producedResult && receipts == 0L)
+        return
+    }
+    assertEquals("$operation must reach exactly one worker", 1L, dispatched)
+    if (receipts == 0L) {
+        // The worker died or timed out; containment holds only if nothing came back.
+        assertTrue("$operation produced output without its own receipt", !producedResult)
+        return
+    }
+    assertEquals("$operation must carry exactly one receipt", 1L, receipts)
+    val worker = requireNotNull(receipt)
+    assertTrue(
+        "$operation ran outside an isolated, offline, uninitialised worker",
+        worker.isolated && worker.uid != hostUid && !worker.internetGranted && !worker.runtimeInitialized,
+    )
 }

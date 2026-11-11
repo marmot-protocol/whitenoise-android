@@ -24,6 +24,26 @@ internal object IsolatedMediaDecoder {
     @Volatile internal var lastAvIsolation: WorkerIsolation? = null
         private set
 
+    // Observation only (#3722): how many still-image requests reached an isolated worker, and how many replies
+    // carried a receipt. A device test reads both around one operation to tie its evidence to that operation.
+    private val workerDispatches =
+        java.util.concurrent.atomic
+            .AtomicLong()
+    private val workerReceipts =
+        java.util.concurrent.atomic
+            .AtomicLong()
+
+    /** Still-image requests sent to an isolated worker so far. */
+    internal val dispatchCount: Long get() = workerDispatches.get()
+
+    /** Isolation receipts accepted from still-image workers so far. */
+    internal val receiptCount: Long get() = workerReceipts.get()
+
+    /** Counts one request handed to an isolated worker; never changes routing. */
+    internal fun recordDispatch() {
+        workerDispatches.incrementAndGet()
+    }
+
     /** Stores the attested automatic A/V isolation receipt without treating it as device qualification. */
     internal fun recordAvIsolation(result: android.os.Bundle) {
         lastAvIsolation = isolationReceipt(result)
@@ -32,6 +52,7 @@ internal object IsolatedMediaDecoder {
     /** Stores the latest accepted isolation receipt for diagnostics without granting a new source capability. */
     internal fun recordIsolation(result: android.os.Bundle) {
         lastIsolation = isolationReceipt(result)
+        workerReceipts.incrementAndGet()
     }
 
     /** Returns the retained diagnostic receipt rather than probing or parsing another source. */
