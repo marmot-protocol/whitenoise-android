@@ -5,6 +5,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -68,6 +69,7 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 
 private val EditorContentInset = 12.dp
 
@@ -152,9 +154,10 @@ internal fun ComposerToolbarEditor(
                     }.fadingVerticalScroll(scroll)
                     .padding(horizontal = EditorContentInset),
             ) {
-                ComposerToolbarPreview(state.draft, state, false)
-                ComposerToolbarLayoutChoices(state, false)
-                ComposerToolbarPalette(state, false)
+                // Each section is a card the composer pill unfolds into and Back folds away.
+                Box(Modifier.settingsCardMorph()) { ComposerToolbarPreview(state.draft, state, false) }
+                Box(Modifier.settingsCardMorph()) { ComposerToolbarLayoutChoices(state, false) }
+                Box(Modifier.settingsCardMorph()) { ComposerToolbarPalette(state, false) }
             }
         }
     }

@@ -6130,11 +6130,11 @@
         {
           "case": "presentation-modal-translation-composer",
           "selector": {
-            "text": "Translate as you type"
+            "text": "Translate"
           },
           "scope": "Audited production owner and distinctive asserted title; controlled presentation proves acceptance precedes any engine request, not the real Android entrypoint.",
           "entry_assertion": {
-            "text": "Translate as you type"
+            "text": "Translate"
           },
           "visible_on_entry": true
         }

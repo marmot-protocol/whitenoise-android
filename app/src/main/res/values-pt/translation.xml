@@ -27,7 +27,7 @@
     <string name="translation_install_release">Instalar a partir do GitHub</string>
     <string name="translation_install_release_reason">O Zapstore ainda não oferece uma versão que o White Noise possa usar, por isso abre-se a versão %1$s do editor no GitHub.</string>
     <string name="translation_install_open_failed">Nenhuma app conseguiu abrir o Offline Translator nem a sua página de transferência. Instala um navegador web e tenta novamente.</string>
-    <string name="translation_composer_toggle">Traduzir enquanto escreve</string>
+    <string name="translation_composer_toggle">Traduzir</string>
     <string name="translation_composer_will_send">Será enviado</string>
     <string name="translation_composer_dictation_off">Traduzir enquanto escreve fica desativado durante o ditado</string>
     <string name="translation_composer_placeholder">A tradução aparece aqui</string>

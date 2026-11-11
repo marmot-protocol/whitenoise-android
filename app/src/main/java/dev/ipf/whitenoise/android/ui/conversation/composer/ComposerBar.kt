@@ -110,6 +110,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
+import dev.ipf.whitenoise.android.ui.conversation.ConversationMorphAnchor
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
@@ -119,6 +120,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.rememberInstalledEmojiPicker
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -2058,6 +2060,8 @@ internal fun ComposerBar(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
+                                // Customize unfolds composer settings from this pill.
+                                .settingsCardMorph(anchor = ConversationMorphAnchor.Composer)
                                 .then(
                                     if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
                                         Modifier

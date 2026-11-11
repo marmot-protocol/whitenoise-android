@@ -66,6 +66,7 @@ class DetailRouteMotionScreenshotTest {
     private val captureFrames = System.getenv("ANIMATION_CAPTURE_FRAMES") == "1"
     private var activeController: ConversationController? = null
     private var routeBackground: Int? = null
+    private var morphBackplate: Int? = null
 
     /** Releases the conversation controller that the test created, if any. */
     @After fun closeController() {
@@ -96,6 +97,12 @@ class DetailRouteMotionScreenshotTest {
     /** Conversation route motion under RTL at double font scale on the AMOLED theme. */
     @Test fun conversationLargeRtl() = capture("conversation_large_rtl", dark = true, amoled = true, rtl = true)
 
+    /** The composer unfolds into composer settings and Back folds them into it, on the AMOLED theme. */
+    @Test fun composerAmoled() = captureComposer("composer_amoled", dark = true, amoled = true)
+
+    /** The composer settings card morph on the light theme. */
+    @Test fun composerLight() = captureComposer("composer_light")
+
     /** The conversation title, which offers Details as its click label. */
     private fun opensDetails() =
         SemanticsMatcher("opens details") {
@@ -113,6 +120,7 @@ class DetailRouteMotionScreenshotTest {
         dark: Boolean = false,
         amoled: Boolean = false,
         rtl: Boolean = false,
+        composer: Boolean = false,
     ) {
         if (!profile) NotificationChannels.ensureChannels(app)
         val state =
@@ -136,7 +144,11 @@ class DetailRouteMotionScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
                     val background = MaterialTheme.colorScheme.background.toArgb()
-                    SideEffect { routeBackground = background }
+                    val backplate = MaterialTheme.colorScheme.surfaceContainerLow.toArgb()
+                    SideEffect {
+                        routeBackground = background
+                        morphBackplate = backplate
+                    }
                     if (profile) {
                         ProfileSheet(state, PEER_NPUB, { _, _ -> }, {}, {})
                     } else {
@@ -146,6 +158,7 @@ class DetailRouteMotionScreenshotTest {
             }
         }
         rule.waitForIdle()
+        if (composer) return captureComposerRoute(name)
         if (!profile) {
             captureSource("${name}_entry", profile)
             rule.mainClock.autoAdvance = false
@@ -204,6 +217,39 @@ class DetailRouteMotionScreenshotTest {
         }
         rule.mainClock.advanceTimeByFrame()
         protectedDestination.assertDoesNotExist()
+    }
+
+    /** Drives the conversation into composer settings through the composer's Customize action, and back. */
+    private fun captureComposer(
+        name: String,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+    ) = capture(name, dark = dark, amoled = amoled, composer = true)
+
+    /** Captures the composer pill unfolding into the composer settings cards and folding back on Back. */
+    private fun captureComposerRoute(name: String) {
+        val customize = app.getString(R.string.composer_customize)
+        val composer =
+            rule.onNode(
+                SemanticsMatcher("customizes the composer") { node ->
+                    node.config.getOrNull(SemanticsActions.CustomActions).orEmpty().any { it.label == customize }
+                },
+                useUnmergedTree = true,
+            )
+        captureSource("${name}_entry", profile = false)
+        rule.mainClock.autoAdvance = false
+        val action =
+            composer.fetchSemanticsNode().config[SemanticsActions.CustomActions].first { it.label == customize }
+        rule.runOnUiThread { action.action() }
+        rule.mainClock.advanceTimeByFrame()
+        captureTransition("${name}_entry", profile = false)
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+        rule.mainClock.autoAdvance = false
+        rule.mainClock.advanceTimeByFrame()
+        captureTransition("${name}_entry_back", profile = false)
+        rule.mainClock.autoAdvance = true
+        composer.assertExists()
     }
 
     /** Wait for real platform preparation without advancing the measured animation. */
@@ -274,8 +320,16 @@ class DetailRouteMotionScreenshotTest {
             if (captureFrames || frame in listOf(0, 6, 20)) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
-                // Closing details shrinks the card over the live conversation, which owns that edge.
-                if (frame == 0 && !name.endsWith("_entry_back")) {
+                // The chat's routes start as card bubbles over the morph backplate, like nested Settings.
+                if (frame == 0 && (name.endsWith("_entry") || name.endsWith("_entry_back"))) {
+                    for (y in listOf(bitmap.height / 4, bitmap.height / 2, bitmap.height * 3 / 4)) {
+                        assertEquals(
+                            "$name must draw the card morph over its backplate",
+                            checkNotNull(morphBackplate),
+                            bitmap.getPixel(1, y),
+                        )
+                    }
+                } else if (frame == 0) {
                     val exposedLeft = name.endsWith("_back") == name.contains("_rtl")
                     val edge = if (exposedLeft) 1 else bitmap.width - 2
                     for (y in listOf(bitmap.height / 4, bitmap.height / 2, bitmap.height * 3 / 4)) {
