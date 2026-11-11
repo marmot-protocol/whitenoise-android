@@ -162,6 +162,14 @@
         "test_ids": [
           "SET-006"
         ]
+      },
+      {
+        "surface": "string:toast_couldnt_delete_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_delete_audit_logs",
+        "test_ids": [
+          "SEC-010"
+        ]
       }
     ],
     "source_coverage": [
