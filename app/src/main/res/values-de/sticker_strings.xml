@@ -24,6 +24,7 @@
     <string name="sticker_packs_no_matches">Keine Stickerpakete passen zu deiner Suche.</string>
     <string name="sticker_packs_unreachable">Deine Relays konnten nicht nach Stickerpaketen abgefragt werden.</string>
     <string name="sticker_packs_try_again">Erneut versuchen</string>
+    <string name="sticker_packs_load_failed">Stickerpakete konnten nicht geladen werden.</string>
     <string name="sticker_packs_public_footer">Stickerpakete sind öffentlich und werden nicht von White Noise geprüft. Deine installierten Pakete sind auf deinen Relays öffentlich gelistet.</string>
     <string name="sticker_pack_add">Hinzufügen</string>
     <string name="sticker_pack_by">Von %1$s</string>

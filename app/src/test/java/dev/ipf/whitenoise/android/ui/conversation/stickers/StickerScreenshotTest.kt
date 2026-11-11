@@ -84,6 +84,26 @@ class StickerScreenshotTest {
         capture("sticker_picker_empty_amoled")
     }
 
+    /** When the installed packs can't be read the picker offers a retry instead of a spinner or the empty state. */
+    @Test fun pickerLoadFailedAmoled() {
+        composeRule.setContent {
+            Frame(darkTheme = true, amoled = true) {
+                StickerPickerPage(unreadableLibrary(), cache(), onBrowse = {}, onSend = {}, onClose = {})
+            }
+        }
+        capture("sticker_picker_load_failed_amoled")
+    }
+
+    /** When cached packs can't be read Discover says so and offers a retry, in RTL at a large font. */
+    @Test fun browserLoadFailedRtlLargeFont() {
+        composeRule.setContent {
+            Frame(darkTheme = true, amoled = true, rtlLarge = true) {
+                StickerBrowserPage(unreadableLibrary(), { _, _, _ -> }, onOpen = {}, onBack = {}, onClose = {})
+            }
+        }
+        capture("sticker_browser_load_failed_rtl_large")
+    }
+
     /** The browser lists installed and discoverable packs; the link field stays behind its top-bar button. */
     @Test fun browserAmoled() = browser(rtlLarge = false, name = "sticker_browser_amoled")
 
@@ -224,6 +244,16 @@ class StickerScreenshotTest {
             installPack = { error("No install in screenshots") },
             uninstallPack = { error("No uninstall in screenshots") },
         )
+
+        /** A library whose pack reads always fail. */
+        fun unreadableLibrary() =
+            StickerLibrary(
+                packs = { _, _ -> error("Pack storage unavailable in screenshots") },
+                syncPacks = {},
+                fetchPack = { error("No lookup in screenshots") },
+                installPack = { error("No install in screenshots") },
+                uninstallPack = { error("No uninstall in screenshots") },
+            )
 
         /** Images load immediately: a colored disc per sticker, or nothing when [failing]. */
         fun cache(failing: Boolean = false) =

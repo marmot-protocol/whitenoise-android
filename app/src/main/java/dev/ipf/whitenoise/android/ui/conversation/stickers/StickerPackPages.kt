@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.stickers
 
 import android.content.Intent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -81,6 +82,8 @@ internal fun StickerBrowserPage(
     var syncFailed by remember { mutableStateOf(false) }
     var refreshRequests by remember { mutableIntStateOf(0) }
     var syncGeneration by remember { mutableIntStateOf(0) }
+    var discoveryFailed by remember { mutableStateOf(false) }
+    var discoveredSearch by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(refreshRequests) {
         syncing = true
         syncFailed = attemptSticker { library.sync(force = refreshRequests > 0) } != null
@@ -89,8 +92,14 @@ internal fun StickerBrowserPage(
     }
     LaunchedEffect(search, library.installed, syncGeneration) {
         if (search.isNotBlank()) delay(SEARCH_DEBOUNCE_MS)
-        // A failed search shows no results rather than the previous query's.
-        if (attemptSticker { discovered = library.discover(search) } != null) discovered = emptyList()
+        // A failed read keeps this query's last results but never shows another query's.
+        val failure =
+            attemptSticker {
+                discovered = library.discover(search)
+                discoveredSearch = search
+            }
+        discoveryFailed = failure != null
+        if (failure != null && discoveredSearch != search) discovered = emptyList()
     }
     StickerSheetTopBar(stringResource(R.string.sticker_packs_title), onBack = onBack, onClose = onClose) {
         IconToggleButton(
@@ -125,7 +134,7 @@ internal fun StickerBrowserPage(
         item { StickerSectionTitle(stringResource(R.string.sticker_packs_discover)) }
         item { StickerSearchField(search) { search = it } }
         discoveryResults(
-            state = StickerPresentation.discoveryState(syncing, discovered.size, search, syncFailed),
+            state = StickerPresentation.discoveryState(syncing, discovered.size, search, syncFailed, discoveryFailed),
             packs = discovered,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },
@@ -211,15 +220,21 @@ private fun LazyListScope.discoveryResults(
         DiscoveryState.Loading -> item { StickerProgress() }
         DiscoveryState.NoneOnRelays -> item { StickerDisclosure(stringResource(R.string.sticker_packs_none_on_relays)) }
         DiscoveryState.NoMatches -> item { StickerDisclosure(stringResource(R.string.sticker_packs_no_matches)) }
-        DiscoveryState.Unreachable ->
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
-                    StickerDisclosure(stringResource(R.string.sticker_packs_unreachable))
-                    WhiteNoiseOutlinedButton(onClick = onRetry) {
-                        Text(stringResource(R.string.sticker_packs_try_again))
-                    }
-                }
-            }
+        DiscoveryState.Unreachable -> item { DiscoveryRetry(R.string.sticker_packs_unreachable, onRetry) }
+        DiscoveryState.LoadFailed -> item { DiscoveryRetry(R.string.sticker_packs_load_failed, onRetry) }
+    }
+}
+
+/** Why Discover is empty, with a retry. */
+@Suppress("FunctionNaming")
+@Composable
+private fun DiscoveryRetry(
+    @StringRes message: Int,
+    onRetry: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
+        StickerDisclosure(stringResource(message))
+        WhiteNoiseOutlinedButton(onClick = onRetry) { Text(stringResource(R.string.sticker_packs_try_again)) }
     }
 }
 

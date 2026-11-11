@@ -226,6 +226,14 @@
         "test_ids": [
           "MSG-046"
         ]
+      },
+      {
+        "surface": "DiscoveryRetry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun DiscoveryRetry(",
+        "test_ids": [
+          "MSG-046"
+        ]
       }
     ]
   },

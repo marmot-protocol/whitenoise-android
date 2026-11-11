@@ -82,21 +82,26 @@ internal object StickerPresentation {
 
         /** Relays couldn't be reached and nothing is cached to show. */
         data object Unreachable : DiscoveryState
+
+        /** The cached packs couldn't be read, so nothing can be shown. */
+        data object LoadFailed : DiscoveryState
     }
 
     /**
      * What Discover shows. Cached packs stay listed when a refresh fails;
-     * a failed refresh never reads as "there are none".
+     * a failed refresh or read never reads as "there are none".
      */
     fun discoveryState(
         isLoading: Boolean,
         packCount: Int,
         search: String,
         syncFailed: Boolean,
+        readFailed: Boolean,
     ): DiscoveryState =
         when {
             packCount > 0 -> DiscoveryState.Packs
             isLoading -> DiscoveryState.Loading
+            readFailed -> DiscoveryState.LoadFailed
             syncFailed -> DiscoveryState.Unreachable
             search.isNotBlank() -> DiscoveryState.NoMatches
             else -> DiscoveryState.NoneOnRelays

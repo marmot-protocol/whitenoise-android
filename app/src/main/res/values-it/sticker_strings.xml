@@ -24,6 +24,7 @@
     <string name="sticker_packs_no_matches">Nessun pacchetto di sticker corrisponde alla ricerca.</string>
     <string name="sticker_packs_unreachable">Impossibile controllare i tuoi relay per i pacchetti di sticker.</string>
     <string name="sticker_packs_try_again">Riprova</string>
+    <string name="sticker_packs_load_failed">Impossibile caricare i pacchetti di sticker.</string>
     <string name="sticker_packs_public_footer">I pacchetti di sticker sono pubblici e non vengono verificati da White Noise. I pacchetti installati sono elencati pubblicamente sui tuoi relay.</string>
     <string name="sticker_pack_add">Aggiungi</string>
     <string name="sticker_pack_by">Di %1$s</string>
