@@ -329,6 +329,20 @@ internal object ConversationCardPostedRegistry {
         }
     }
 
+    /**
+     * Whether the app's accepted write for this card is newer than [cutoffMs]: a replacement registered after a
+     * dismissal began, which an older tray snapshot of the same key must not authorize cancelling (#3711).
+     */
+    fun hasPostedAfter(
+        notificationTag: String,
+        notificationId: Int,
+        cutoffMs: Long,
+    ): Boolean =
+        synchronized(lock) {
+            val record = postedCards[PostedConversationCardKey(notificationTag, notificationId)]
+            record != null && record.posted && record.writtenAtMs > cutoffMs
+        }
+
     /** Consumes a posted write but retains bounded retirement metadata; newer dismissal ages stay untouched. */
     fun clearPosted(
         notificationTag: String,

@@ -6425,11 +6425,20 @@ class WhiteNoiseAppState private constructor(
         unreadCount: ULong,
     ) = accountUnreadStore.updateCount(accountRef, unreadCount)
 
+    /**
+     * Publishes a chat-list row fold only while no complete native total exists for [accountRef]. The fold sees
+     * just the bounded loaded rows, so it must not replace a Ready total that also counts chats outside the
+     * window, such as an older unread chat or a manual reminder (#3729).
+     */
     internal fun updateAccountUnreadProjection(
         accountRef: String?,
         unreadCount: ULong,
         hasManualUnread: Boolean,
-    ) = accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    ) {
+        val accountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+        if (accountIdHex != null && runtimeMirrors.attention.latest?.hasReadyTotal(accountIdHex) == true) return
+        accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    }
 
     /**
      * Accounts with at least one manually-marked-unread chat. A boolean
