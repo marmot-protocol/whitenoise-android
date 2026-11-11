@@ -50,7 +50,10 @@ class AppStateDraftOrderingIntegrationTest {
         chats.onCleared()
     }
 
-    /** Verifies only the newest account-fenced summary request can publish after an A-B-A race. */
+    /**
+     * Verifies only the newest account-fenced summary request can publish after an A-B-A race. The final
+     * assertions wait for every refresh's fenced publication to finish, not just its native read (#3726).
+     */
     @Test
     fun latestAccountFencedSummaryRefreshWinsAcrossDelayedABACompletions() =
         runBlocking {
@@ -63,24 +66,26 @@ class AppStateDraftOrderingIntegrationTest {
                 appState.accountSession.publishCreatedIdentity(
                     ACCOUNT_A,
                 ) { appState.switchMediaSessionForTest(ACCOUNT_A) }
-                appState.refreshDraftSummaries(ACCOUNT_A)
+                val firstA = appState.refreshDraftSummaries(ACCOUNT_A)
                 gateway.awaitStarted(0)
                 appState.accountSession.publishCreatedIdentity(
                     ACCOUNT_B,
                 ) { appState.switchMediaSessionForTest(ACCOUNT_B) }
-                appState.refreshDraftSummaries(ACCOUNT_B)
+                val onlyB = appState.refreshDraftSummaries(ACCOUNT_B)
                 gateway.awaitStarted(1)
                 appState.accountSession.publishCreatedIdentity(
                     ACCOUNT_A,
                 ) { appState.switchMediaSessionForTest(ACCOUNT_A) }
-                appState.refreshDraftSummaries(ACCOUNT_A)
+                val latestA = appState.refreshDraftSummaries(ACCOUNT_A)
                 gateway.awaitStarted(2)
 
                 gateway.release(2)
                 awaitCondition { drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP) == 900uL }
                 gateway.release(0)
                 gateway.release(1)
-                awaitCondition { gateway.completed.get() == 3 }
+                // The stale refreshes publish on Main only after the repository returns; wait (bounded, with
+                // Main pumped) until every refresh job has finished that fenced publication.
+                awaitCondition { listOf(firstA, onlyB, latestA).all { it.isCompleted } }
 
                 assertEquals(900uL, drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP))
                 assertNull(drafts.draftedAtSecondsFor(ACCOUNT_B, OTHER_GROUP))

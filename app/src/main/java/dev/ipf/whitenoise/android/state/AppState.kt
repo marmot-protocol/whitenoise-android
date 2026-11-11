@@ -3333,11 +3333,14 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
 
-    /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
-    internal fun refreshDraftSummaries(accountRef: String) {
+    /**
+     * Refreshes draft summaries behind account, request, and local-fingerprint fences. Returns the
+     * refresh job, so tests can wait for its fenced publication rather than only the native read.
+     */
+    internal fun refreshDraftSummaries(accountRef: String): Job {
         val refresh = draftSummaryRefreshLifetime.advance()
         val expected = draftStore.captureSummaryRefresh(accountRef)
-        mutationsScope.launch {
+        return mutationsScope.launch {
             messageDraftRepository
                 .summaries(accountRef)
                 .onSuccess { summaries ->
