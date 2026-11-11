@@ -152,7 +152,12 @@ val prepareNativeMediaDecoder =
                 if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
                     emptyList()
                 } else {
-                    listOf("--ndk", androidComponents.sdkComponents.ndkDirectory.get().asFile.absolutePath)
+                    listOf(
+                        "--ndk",
+                        androidComponents.sdkComponents.ndkDirectory
+                            .get()
+                            .asFile.absolutePath,
+                    )
                 }
             commandLine(
                 marmotKitPreparationLauncher +
