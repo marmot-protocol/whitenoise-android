@@ -2886,12 +2886,12 @@ class ChatsController private constructor(
         scheduleRecompute()
     }
 
-    /** [nameCleared] marks a committed clear, so a blank [record] name is not read as "no name yet". */
+    /** [clearedName] is the name a committed clear removed, so a blank [record] name is not read as "no name yet". */
     fun applyLocalGroupUpdate(
         record: AppGroupRecordFfi,
-        nameCleared: Boolean = false,
+        clearedName: String? = null,
     ) {
-        applyLocalGroupProjection(record, members = null, nameCleared = nameCleared)
+        applyLocalGroupProjection(record, members = null, clearedName = clearedName)
     }
 
     fun applyLocalGroupDetails(
@@ -2905,7 +2905,7 @@ class ChatsController private constructor(
     private fun applyLocalGroupProjection(
         record: AppGroupRecordFfi,
         members: List<AppGroupMemberRecordFfi>?,
-        nameCleared: Boolean = false,
+        clearedName: String? = null,
     ) {
         if (accountRef == null) return
         val rowKey = chatRowKey(record.groupIdHex)
@@ -2943,7 +2943,7 @@ class ChatsController private constructor(
         // (not just the group record), so patch both the chat row and the group
         // record to keep them consistent.
         (optimisticChatListPreviewByGroup[rowKey]?.baselineRow ?: chatRowsByGroup[rowKey])?.let { row ->
-            val updated = locallyProjectedChatRow(rowKey, row, record, nameCleared)
+            val updated = locallyProjectedChatRow(rowKey, row, record, clearedName)
             optimisticChatListPreviewByGroup[rowKey]?.let { state ->
                 state.baselineRow = updated
                 materializeOptimisticChatListPreview(rowKey, state)
@@ -2965,13 +2965,18 @@ class ChatsController private constructor(
         rowKey: String,
         row: ChatListRowFfi,
         record: AppGroupRecordFfi,
-        nameCleared: Boolean,
+        clearedName: String?,
     ): ChatListRowFfi {
         // Only an explicit clear empties the row; any other blank record simply carries no name yet.
         // The caller states the intent because the subscription may already have folded the cleared
         // record, so the prior name cannot be read back from live state.
-        val projectedName = if (nameCleared) "" else record.name.ifBlank { row.groupName }
+        val projectedName = if (clearedName != null) "" else record.name.ifBlank { row.groupName }
         val renamed = projectedName != row.groupName
+        // A row that already shows the clear still fences the cleared name against the group record,
+        // which arrives on its own stream and is what a blank row falls back to.
+        if (clearedName != null && clearedName != row.groupName) {
+            localGroupNames.record(record.groupIdHex, clearedName, projectedName)
+        }
         if (renamed) {
             localGroupNames.record(record.groupIdHex, row.groupName, projectedName)
             selectedPresentationsByGroup =
@@ -11509,13 +11514,19 @@ class ConversationController(
             val updatedDescription = description.trim().takeIf { it != openedDescription.trim() }
             if (updatedName == null && updatedDescription == null) return@withMutationLockResult true
             runCatchingCancellable {
+                val before = group
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     groupProfileUpdater(account, group.groupIdHex, updatedName, updatedDescription)
                 }
                 // Reflect the committed profile locally so the header and every chat-list
                 // projection agree immediately, rather than after the group-state
                 // subscription converges (#2696).
-                applyLocalGroupProfile(updatedName ?: group.name, updatedDescription ?: group.description, account)
+                applyLocalGroupProfile(
+                    before = before,
+                    name = updatedName ?: group.name,
+                    description = updatedDescription ?: group.description,
+                    account = account,
+                )
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
@@ -11530,17 +11541,19 @@ class ConversationController(
      * snapshot that was already in flight, while a genuinely newer authoritative commit still wins.
      */
     private fun applyLocalGroupProfile(
+        before: AppGroupRecordFfi,
         name: String,
         description: String,
         account: String,
     ) {
-        val updated = group.copy(name = name, description = description)
-        if (updated == group) return
-        localGroupNames.record(group.groupIdHex, previousName = group.name, committedName = name)
-        localGroupDescriptions.record(group.groupIdHex, previousName = group.description, committedName = description)
-        val nameCleared = name.isBlank() && group.name.isNotBlank()
-        group = updated
-        appState.applyLocalGroupUpdate(updated, account, nameCleared = nameCleared)
+        // [before] is the record the edit was made against: the subscription may already have applied
+        // the committed profile, and the fences still need the values it replaced.
+        if (before.name == name && before.description == description) return
+        localGroupNames.record(group.groupIdHex, previousName = before.name, committedName = name)
+        localGroupDescriptions.record(group.groupIdHex, previousName = before.description, committedName = description)
+        val clearedName = before.name.takeIf { name.isBlank() && it.isNotBlank() }
+        group = group.copy(name = name, description = description)
+        appState.applyLocalGroupUpdate(group, account, clearedName = clearedName)
     }
 
     /**

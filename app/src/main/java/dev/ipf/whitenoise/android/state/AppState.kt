@@ -3858,9 +3858,9 @@ class WhiteNoiseAppState private constructor(
     fun applyLocalGroupUpdate(
         record: AppGroupRecordFfi,
         accountRef: String? = null,
-        nameCleared: Boolean = false,
+        clearedName: String? = null,
     ) {
-        chatsController.applyLocalGroupUpdateForAccount(record, accountRef, nameCleared)
+        chatsController.applyLocalGroupUpdateForAccount(record, accountRef, clearedName)
     }
 
     // Same temporary projection backchannel as [applyLocalGroupUpdate], but for

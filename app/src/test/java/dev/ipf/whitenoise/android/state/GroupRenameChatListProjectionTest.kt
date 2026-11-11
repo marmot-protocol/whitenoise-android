@@ -319,6 +319,31 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
+    /**
+     * The conversation and chat-list subscriptions may both deliver the clear while the commit is in
+     * flight; the cleared name is still fenced against a later pre-clear group record.
+     */
+    @Test
+    fun clearDeliveredDuringTheCommitIsStillFenced() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            lateinit var conversation: ConversationController
+            conversation =
+                conversationController(appState) { _, _, _, _ ->
+                    conversation.applyGroupStateForTest(group(name = ""))
+                    chats.applyChatListRow(row(groupName = ""))
+                    chats.foldGroupRecordForTest(group(name = ""))
+                }
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
     /** A rejected clear leaves the existing description in place. */
     @Test
     fun failedClearLeavesTheDescription() =
