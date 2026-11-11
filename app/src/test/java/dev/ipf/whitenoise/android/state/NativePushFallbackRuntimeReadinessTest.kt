@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotInterface
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -81,45 +84,55 @@ class NativePushFallbackRuntimeReadinessTest {
         assertTrue(readiness.isReady(replacementOwner))
     }
 
-    /** A waiter completes only after the exact service generation acknowledges its live owner. */
+    /**
+     * A waiter already suspended on its pending request completes only after the exact service
+     * generation acknowledges its live owner; a wrong generation leaves it waiting (#3727).
+     */
     @Test
     fun waiterRequiresExactLiveAcknowledgement() =
         runTest {
             val readiness = NativePushFallbackRuntimeReadiness()
             val owner = owner(account = "a", switchGeneration = 1L)
             val generation = readiness.request(owner)
-            val waiting = async { readiness.await(owner) }
+            val waiting = async(start = CoroutineStart.UNDISPATCHED) { readiness.await(owner) }
+            assertFalse("the waiter suspends on the pending request", waiting.isCompleted)
+
+            assertNull(readiness.acknowledge(generation + 1) { true })
+            runCurrent()
+            assertFalse("a wrong generation does not release the waiter", waiting.isCompleted)
 
             assertEquals(owner, readiness.acknowledge(generation) { true })
-            assertTrue(waiting.await())
+            assertTrue(withTimeout(WAITER_BOUND_MS) { waiting.await() })
         }
 
-    /** Superseding a pending service generation releases the old waiter as rejected. */
+    /** Superseding a pending service generation releases an already-suspended old waiter as rejected. */
     @Test
     fun supersededWaiterCompletesFalse() =
         runTest {
             val readiness = NativePushFallbackRuntimeReadiness()
             val first = owner(account = "a", switchGeneration = 1L)
             readiness.request(first)
-            val waiting = async { readiness.await(first) }
+            val waiting = async(start = CoroutineStart.UNDISPATCHED) { readiness.await(first) }
+            assertFalse("the waiter suspends on the pending request", waiting.isCompleted)
 
             readiness.request(owner(account = "b", switchGeneration = 2L))
 
-            assertFalse(waiting.await())
+            assertFalse(withTimeout(WAITER_BOUND_MS) { waiting.await() })
         }
 
-    /** Explicit invalidation releases a pending waiter without manufacturing readiness. */
+    /** Explicit invalidation releases an already-suspended waiter without manufacturing readiness. */
     @Test
     fun invalidatedWaiterCompletesFalse() =
         runTest {
             val readiness = NativePushFallbackRuntimeReadiness()
             val owner = owner(account = "a", switchGeneration = 1L)
             val generation = readiness.request(owner)
-            val waiting = async { readiness.await(owner) }
+            val waiting = async(start = CoroutineStart.UNDISPATCHED) { readiness.await(owner) }
+            assertFalse("the waiter suspends on the pending request", waiting.isCompleted)
 
             readiness.invalidate(generation)
 
-            assertFalse(waiting.await())
+            assertFalse(withTimeout(WAITER_BOUND_MS) { waiting.await() })
             assertFalse(readiness.isReady(owner))
         }
 
@@ -149,4 +162,9 @@ class NativePushFallbackRuntimeReadinessTest {
                 else -> throw UnsupportedOperationException("Unexpected Marmot call: ${method.name}")
             }
         } as MarmotInterface
+
+    private companion object {
+        /** Virtual-time bound for a released waiter to complete. */
+        const val WAITER_BOUND_MS = 1_000L
+    }
 }

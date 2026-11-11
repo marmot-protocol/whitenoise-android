@@ -64,10 +64,8 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.UUID
 
 internal enum class DiagnosticsSection {
@@ -181,6 +179,10 @@ internal fun DiagnosticsScreen(
     var health by remember { mutableStateOf<RelayHealthFfi?>(null) }
     var entries by remember { mutableStateOf<List<DiagnosticLogEntry>>(emptyList()) }
     var streaming by remember { mutableStateOf(false) }
+
+    // The effect that owns [streaming]. A cancelled stream's release can finish after its replacement
+    // started, so only the current owner may clear the indicator.
+    var streamingOwner by remember { mutableStateOf<Any?>(null) }
     var sendingPing by remember { mutableStateOf(false) }
     var performanceStatus by remember { mutableStateOf(PerformanceDiagnostics.status()) }
     val scope = rememberCoroutineScope()
@@ -210,14 +212,15 @@ internal fun DiagnosticsScreen(
         }
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
+        val owner = Any()
+        streamingOwner = owner
         streaming = true
-        val subscription = appState.marmotIo { subscribeEvents() }
         try {
-            while (true) {
-                val event =
-                    withContext(Dispatchers.IO) {
-                        subscription.next()
-                    } ?: break
+            streamDiagnosticEvents(
+                acquire = { keep -> appState.marmotIo { keep(subscribeEvents()) } },
+                next = { it.next() },
+                release = { it.destroy() },
+            ) { event ->
                 val described = DiagnosticFormatter.describe(event, diagnosticIdentity)
                 entries = (entries + DiagnosticLogEntry(text = described)).takeLast(500)
             }
@@ -233,10 +236,7 @@ internal fun DiagnosticsScreen(
                         )
                 ).takeLast(500)
         } finally {
-            streaming = false
-            withContext(Dispatchers.IO) {
-                subscription.destroy()
-            }
+            if (streamingOwner === owner) streaming = false
         }
     }
 

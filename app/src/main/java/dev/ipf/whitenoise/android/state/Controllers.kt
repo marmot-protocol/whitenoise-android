@@ -4824,18 +4824,6 @@ class ChatsController private constructor(
             if (BuildConfig.DEBUG) Log.w("DMChatsController", "$label failed", it)
         }.getOrDefault(false)
 
-    /** Atomically replace the pinned block's manual order; ids must cover the pinned set exactly. */
-    suspend fun setPinnedOrder(orderedGroupIds: List<String>): Boolean {
-        val account = accountRef ?: return false
-        return runCatchingCancellable {
-            val state = appState.marmotIo { setPinnedChatOrder(account, orderedGroupIds) }
-            applyPinState(state)
-            true
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinnedOrder failed", it)
-        }.getOrDefault(false)
-    }
-
     /**
      * Fold the engine's normalized pin order into the held rows so the list
      * reorders immediately; the PIN_ORDER_CHANGED trigger (or a snapshot)
@@ -5960,6 +5948,9 @@ class ConversationController(
 
     // Retains a locally committed rename against a stale group-state snapshot (#2696).
     private val localGroupNames = LocalGroupNameAuthority()
+
+    // The same retention for a just-committed description, so a pre-edit snapshot cannot restore it (#3704).
+    private val localGroupDescriptions = LocalGroupNameAuthority()
 
     /**
      * Latest chat-list projection for this conversation, kept live even while
@@ -7271,7 +7262,9 @@ class ConversationController(
 
     /** Applies a canonical group update while retaining only a still-unresolved stale action fence. */
     private fun applyGroupState(incoming: AppGroupRecordFfi) {
-        val update = localGroupNames.reconciled(incoming)
+        val named = localGroupNames.reconciled(incoming)
+        val description = localGroupDescriptions.reconcile(named.groupIdHex, named.description)
+        val update = if (description == named.description) named else named.copy(description = description)
         val previousGroup = group
         if (update.leaveBlocked) observedBlockedLeave = true
         if (update.selfMembership.isGroupEviction()) {
@@ -11480,15 +11473,25 @@ class ConversationController(
             }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
         }
 
+    /**
+     * Commits the fields the user changed in the group editor, compared with the values it opened
+     * with ([openedName] and [openedDescription]). An unchanged field is sent as null, so MDK carries
+     * it forward from canonical group state, even if another admin changed it meanwhile. A changed
+     * field is sent as its trimmed text, so an erased one arrives as the explicit empty string MDK
+     * applies as a clear (#3704).
+     */
     suspend fun updateGroupProfile(
         name: String,
         description: String,
+        openedName: String = group.name,
+        openedDescription: String = group.description,
     ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val updatedName = name.trim().takeIf { it.isNotEmpty() }
-            val updatedDescription = description.trim().takeIf { it.isNotEmpty() }
+            val updatedName = name.trim().takeIf { it != openedName.trim() }
+            val updatedDescription = description.trim().takeIf { it != openedDescription.trim() }
+            if (updatedName == null && updatedDescription == null) return@withMutationLockResult true
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     groupProfileUpdater(account, group.groupIdHex, updatedName, updatedDescription)
@@ -11496,7 +11499,7 @@ class ConversationController(
                 // Reflect the committed profile locally so the header and every chat-list
                 // projection agree immediately, rather than after the group-state
                 // subscription converges (#2696).
-                applyLocalGroupProfile(updatedName.orEmpty(), updatedDescription.orEmpty(), account)
+                applyLocalGroupProfile(updatedName ?: group.name, updatedDescription ?: group.description, account)
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {
@@ -11507,8 +11510,8 @@ class ConversationController(
     /**
      * Installs a just-committed group profile locally and hands it to the chat list (#2696).
      *
-     * [LocalGroupNameAuthority] then retains the new name against a pre-rename snapshot that was
-     * already in flight, while a genuinely newer authoritative commit still wins.
+     * [LocalGroupNameAuthority] then retains the new name and description against a pre-edit
+     * snapshot that was already in flight, while a genuinely newer authoritative commit still wins.
      */
     private fun applyLocalGroupProfile(
         name: String,
@@ -11518,6 +11521,7 @@ class ConversationController(
         val updated = group.copy(name = name, description = description)
         if (updated == group) return
         localGroupNames.record(group.groupIdHex, previousName = group.name, committedName = name)
+        localGroupDescriptions.record(group.groupIdHex, previousName = group.description, committedName = description)
         group = updated
         appState.applyLocalGroupUpdate(updated, account)
     }

@@ -27,7 +27,7 @@ class AccountSetupDirectRemovalTest {
                 .single()
                 .actions = emptyList()
             val client = FakeSetupClient(decision)
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             assertNull(controller.state.value.directRemovalEndpoint())
@@ -41,7 +41,7 @@ class AccountSetupDirectRemovalTest {
     @Test fun freshFindingGrantIsRequiredBeforePreview() =
         runTest {
             val client = FakeSetupClient(retiredDecision())
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             client.snapshotOverride =
@@ -78,7 +78,7 @@ class AccountSetupDirectRemovalTest {
                     proposal = preview.proposal!!.copy(revision = 5uL),
                 )
             val client = removalClient(preview, review)
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
 
@@ -120,7 +120,7 @@ class AccountSetupDirectRemovalTest {
                 )
             val wait = CompletableDeferred<Unit>()
             client.hold = wait
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED)
@@ -162,7 +162,15 @@ class AccountSetupDirectRemovalTest {
                 )
             for ((index, preview) in previews.withIndex()) {
                 val client = removalClient(preview, preview)
-                val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+                val controller =
+                    AccountSetupController(
+                        SETUP_TEST_ACCOUNT,
+                        client,
+                        backgroundScope,
+                        { true },
+                        { true },
+                        {},
+                    )
                 controller.reconnect()
                 runCurrent()
                 controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED)
@@ -186,7 +194,7 @@ class AccountSetupDirectRemovalTest {
             val client = removalClient(preview, preview)
             val wait = CompletableDeferred<Unit>()
             client.hold = wait
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED)
@@ -216,7 +224,7 @@ class AccountSetupDirectRemovalTest {
                 val client = delayedRemovalClient(preview, response, wait)
                 var ownerCurrent = true
                 val controller =
-                    AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { ownerCurrent }, {}, {})
+                    AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { ownerCurrent }, { true }, {})
                 controller.reconnect()
                 runCurrent()
                 controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED, "initial")
@@ -256,7 +264,7 @@ class AccountSetupDirectRemovalTest {
             var ownerCurrent = true
             client.beforeSnapshot = { if (client.snapshotReads == 2) ownerCurrent = false }
             val controller =
-                AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { ownerCurrent }, {}, {})
+                AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { ownerCurrent }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.RELAYS, OnboardingActionFfi.EDIT_RELAYS, 3uL, RETIRED)
@@ -270,7 +278,7 @@ class AccountSetupDirectRemovalTest {
         runTest {
             val client = removalClient(removablePreview(), removablePreview())
             client.current = retiredDecision().copy(recoveryEpoch = "current")
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(

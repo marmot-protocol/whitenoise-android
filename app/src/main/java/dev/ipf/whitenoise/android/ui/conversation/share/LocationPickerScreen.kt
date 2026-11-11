@@ -48,7 +48,6 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.LocationOn
 import dev.ipf.whitenoise.android.ui.icons.filled.MyLocation
-import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
@@ -93,7 +92,8 @@ internal fun LocationPickerScreen(
         val context = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
         val scope = rememberCoroutineScope()
-        var locating by remember { mutableStateOf(true) }
+        // The picker looks up the device location as soon as it opens, so it starts in progress.
+        val lookups = remember(scope) { LocationLookupOwner(scope, initiallyLocating = true) }
         var selectedCenter by remember { mutableStateOf<SharedLocation?>(null) }
         val mapView =
             remember {
@@ -113,6 +113,8 @@ internal fun LocationPickerScreen(
                 object : MapListener {
                     override fun onScroll(event: ScrollEvent?): Boolean {
                         if (userHasInteracted) {
+                            // A manual selection wins over any lookup still in flight.
+                            lookups.retire()
                             val center = mapView.mapCenter
                             selectedCenter = SharedLocation(center.latitude, center.longitude, null)
                         }
@@ -151,15 +153,14 @@ internal fun LocationPickerScreen(
         }
 
         fun centerOnCurrent() {
-            locating = true
-            scope.launch {
-                val current = locationLookup(context, hasFineGrant)
-                if (current != null) {
-                    selectedCenter = current
-                    mapView.controller.animateTo(GeoPoint(current.latitude, current.longitude))
-                    mapView.controller.setZoom(PICKER_ZOOM)
-                }
-                locating = false
+            // Finish any fling or earlier animation first: its scroll frames would otherwise count as a
+            // manual pan and retire this explicit request.
+            mapView.controller.stopPanning()
+            mapView.controller.stopAnimation(false)
+            lookups.start(lookup = { locationLookup(context, hasFineGrant) }) { current ->
+                selectedCenter = current
+                mapView.controller.animateTo(GeoPoint(current.latitude, current.longitude))
+                mapView.controller.setZoom(PICKER_ZOOM)
             }
         }
         LaunchedEffect(Unit) { centerOnCurrent() }
@@ -226,7 +227,7 @@ internal fun LocationPickerScreen(
                     )
                 }
                 FilledIconButton(onClick = { centerOnCurrent() }) {
-                    if (locating) {
+                    if (lookups.locating) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,

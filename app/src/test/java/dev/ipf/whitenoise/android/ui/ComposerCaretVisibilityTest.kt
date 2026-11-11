@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -40,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerSelectionLayo
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerCaretScrollTarget
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -112,67 +115,47 @@ class ComposerCaretVisibilityTest {
         field.assertActiveCaretVisible()
     }
 
-    /** Proves profile hydration cannot reuse caret geometry from an older mention transformation. */
+    /**
+     * Proves profile hydration cannot reuse caret geometry from an older mention transformation. The
+     * mention is followed by a separator so its label is actually displayed (a terminal mention stays
+     * untransformed), and the label change must reflow the layout while the caret stays visible (#3728).
+     */
     @Test
     fun mentionTransformationChangeWithUnchangedDraftKeepsTheTerminalCaretVisible() {
         val npub = "npub1" + "q".repeat(58)
-        val draft = longDraft() + "\n@$npub"
+        val longLabel = "Alice Long Profile Name Reflowing The Mention Across Multiple Visual Lines"
+        val draft = longDraft() + "\n@$npub "
         val focusRequester = FocusRequester()
-        var value by mutableStateOf(TextFieldValue(draft, TextRange(draft.length)))
-        var candidate by
-            mutableStateOf(
-                MentionComposer.Candidate(
-                    accountIdHex = "aa".repeat(32),
-                    npub = npub,
-                    displayName = "A",
-                    nip05 = null,
-                ),
-            )
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                Surface {
-                    Box(Modifier.width(300.dp).height(140.dp)) {
-                        ComposerPill(
-                            actionColors = accountActionColors(appState = null),
-                            textFieldValue = value,
-                            composerFocus = focusRequester,
-                            emojiPickerOpen = false,
-                            onValueChange = { value = it },
-                            onEmojiPickerToggle = {},
-                            onAttachmentsToggle = {},
-                            attachmentSheetOpen = false,
-                            onPickFromGallery = null,
-                            onPickDocument = null,
-                            highlightMentionChips = true,
-                            mentionCandidates = listOf(candidate),
-                            expansionMode = ComposerExpansionMode.Manual,
-                            modifier = Modifier.height(140.dp),
-                        )
-                    }
-                }
-            }
-        }
+        val value = mutableStateOf(TextFieldValue(draft, TextRange(draft.length)))
+        val candidate = mutableStateOf(MentionComposer.Candidate("aa".repeat(32), npub, "A", null))
+        setMentionComposer(value, candidate, focusRequester)
         composeRule.waitForIdle()
         val field = composeRule.onNode(hasSetTextAction())
         composeRule.runOnIdle { focusRequester.requestFocus() }
-        field.assertActiveCaretVisible()
+        val before = field.textLayout()
+        assertTrue("the short label is displayed", "@A " in before.layoutInput.text.text)
+        assertFalse("the mention is transformed, not raw", npub in before.layoutInput.text.text)
+        field.assertTerminalCaretVisible()
 
         composeRule.mainClock.autoAdvance = false
         try {
-            composeRule.runOnIdle {
-                candidate =
-                    candidate.copy(
-                        displayName = "Alice Long Profile Name Reflowing The Mention Across Multiple Visual Lines",
-                    )
-            }
+            composeRule.runOnIdle { candidate.value = candidate.value.copy(displayName = longLabel) }
             composeRule.mainClock.advanceTimeByFrame()
-            composeRule.runOnIdle { }
-
-            composeRule.runOnIdle { assertEquals(TextRange(draft.length), value.selection) }
-            field.assertActiveCaretVisible()
+            composeRule.runOnIdle { assertEquals(TextRange(draft.length), value.value.selection) }
+            // The controlled update frame: whichever layout is current, its caret must be visible.
+            field.assertTerminalCaretVisible()
+            val updated = field.awaitLayoutContaining(longLabel)
+            assertTrue("the long label replaces the short one", longLabel in updated.layoutInput.text.text)
+            assertTrue(
+                "the longer label reflows the layout (${before.lineCount} -> ${updated.lineCount} lines)",
+                updated.lineCount > before.lineCount,
+            )
+            field.assertTerminalCaretVisible()
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
+        composeRule.waitForIdle()
+        field.assertTerminalCaretVisible()
     }
 
     @Test
@@ -444,15 +427,16 @@ class ComposerCaretVisibilityTest {
         return harness
     }
 
-    private fun androidx.compose.ui.test.SemanticsNodeInteraction.verticalScroll() = fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
+    private fun SemanticsNodeInteraction.verticalScroll() = fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
 
-    /** Asserts that the active caret is inside the editor's current scroll viewport. */
-    private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertActiveCaretVisible() {
+    /**
+     * Asserts the caret lies inside the field's scrolled viewport. [terminalCaretOffset] overrides the
+     * canonical selection offset for a terminal caret in a transformed layout, whose text length differs.
+     */
+    private fun SemanticsNodeInteraction.assertActiveCaretVisible(terminalCaretOffset: Int? = null) {
         val node = fetchSemanticsNode()
         val selection = node.config[SemanticsProperties.TextSelectionRange]
-        val layouts = mutableListOf<TextLayoutResult>()
-        performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> action(layouts) }
-        val caret = layouts.single().getCursorRect(selection.end)
+        val caret = textLayout().getCursorRect(terminalCaretOffset ?: selection.end)
         val scrollTop = verticalScroll().value()
         val scrollBottom = scrollTop + node.boundsInRoot.height
         assertTrue(
@@ -463,6 +447,61 @@ class ComposerCaretVisibilityTest {
             "active caret bottom ${caret.bottom} must stay above viewport bottom $scrollBottom",
             caret.bottom <= scrollBottom + 1f,
         )
+    }
+
+    /** Asserts the terminal caret is visible, measured at the end of the transformed layout. */
+    private fun SemanticsNodeInteraction.assertTerminalCaretVisible() {
+        assertActiveCaretVisible(terminalCaretOffset = textLayout().layoutInput.text.length)
+    }
+
+    /** Mounts the composer pill around [value], offering the single mention [candidate]. */
+    private fun setMentionComposer(
+        value: MutableState<TextFieldValue>,
+        candidate: MutableState<MentionComposer.Candidate>,
+        focusRequester: FocusRequester,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    Box(Modifier.width(300.dp).height(140.dp)) {
+                        ComposerPill(
+                            actionColors = accountActionColors(appState = null),
+                            textFieldValue = value.value,
+                            composerFocus = focusRequester,
+                            emojiPickerOpen = false,
+                            onValueChange = { value.value = it },
+                            onEmojiPickerToggle = {},
+                            onAttachmentsToggle = {},
+                            attachmentSheetOpen = false,
+                            onPickFromGallery = null,
+                            onPickDocument = null,
+                            highlightMentionChips = true,
+                            mentionCandidates = listOf(candidate.value),
+                            expansionMode = ComposerExpansionMode.Manual,
+                            modifier = Modifier.height(140.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** Advances frames, bounded, until the transformed layout shows [text]; returns that layout. */
+    private fun SemanticsNodeInteraction.awaitLayoutContaining(text: String): TextLayoutResult {
+        repeat(LABEL_SETTLE_FRAMES) {
+            if (text !in textLayout().layoutInput.text.text) {
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.runOnIdle { }
+            }
+        }
+        return textLayout()
+    }
+
+    /** The field's current transformed text layout. */
+    private fun SemanticsNodeInteraction.textLayout(): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> action(layouts) }
+        return layouts.single()
     }
 
     /** Builds the parent message record that the composer replies to. */
@@ -499,4 +538,9 @@ class ComposerCaretVisibilityTest {
     private fun longDraft(): String = (1..18).joinToString("\n", transform = ::longDraftLine)
 
     private fun longDraftLine(line: Int): String = "Line $line keeps the composer tall enough to scroll"
+
+    private companion object {
+        /** Frames allowed for a profile label change to reach the transformed layout. */
+        const val LABEL_SETTLE_FRAMES = 5
+    }
 }

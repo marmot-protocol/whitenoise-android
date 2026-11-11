@@ -114,7 +114,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "ordering uses complete native universe",
-            "controller.movePinnedSelection(ids, delta, owner)" in controls,
+            "onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) }" in controls &&
+                "controller.movePinnedSelection(ids, delta, owner)" in source,
         )
         assertFalse(
             "bulk never forwards to a selection-clearing helper",
@@ -236,6 +237,11 @@ class ChatsScreenSelectionActionsCoverageTest {
             "showMovePinnedUp" in actionSheet &&
                 "showMovePinnedDown" in actionSheet &&
                 "onMovePinned = { delta -> movePinnedChat(item, delta) }" in actionSheet,
+        )
+        val singleMove = source.requiredSection(start = "fun movePinnedChat(", end = "\n    }\n")
+        assertTrue(
+            "a single-row move submits through the complete native pin order, not the loaded window (#3709)",
+            "movePinnedChats(setOf(" in singleMove && "pinnedOrderedIds" !in singleMove,
         )
     }
 

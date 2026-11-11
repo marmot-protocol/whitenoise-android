@@ -78,7 +78,8 @@ internal class AccountSetupController(
     private val client: AccountSetupClient,
     parentScope: CoroutineScope,
     private val isCurrent: () -> Boolean,
-    private val onReady: suspend () -> Unit,
+    /** Activates this account and reports whether it did; a declined activation stays retryable (#3697). */
+    private val onReady: suspend () -> Boolean,
     private val onCancelled: () -> Unit,
 ) {
     private val lifetime = SupervisorJob(parentScope.coroutineContext[Job])
@@ -114,7 +115,10 @@ internal class AccountSetupController(
             accept(client.run())
         }
 
-    /** Rechecks readiness even when the ready stream already terminated. */
+    /**
+     * Rechecks readiness even when the ready stream already terminated, and activates the account. Only
+     * a successful activation suppresses later attempts.
+     */
     fun openChats() =
         operate {
             val latest = client.snapshot()
@@ -127,8 +131,8 @@ internal class AccountSetupController(
                         it.revision == mutableState.value.snapshot?.revision
                 } == true
             if (readyForThisAccount && isCurrent() && !readinessDelivered) {
-                onReady()
-                readinessDelivered = true
+                // Latch only a real activation: a normally declined one must leave Open Chats retryable.
+                readinessDelivered = onReady()
             }
         }
 

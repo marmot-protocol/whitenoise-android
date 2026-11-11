@@ -133,7 +133,10 @@ class AccountSetupReadOnlyRecoveryTest {
             val scope = rememberCoroutineScope()
             val controller =
                 remember {
-                    AccountSetupController(SETUP_TEST_ACCOUNT, client, scope, { true }, { opens++ }, {})
+                    AccountSetupController(SETUP_TEST_ACCOUNT, client, scope, { true }, {
+                        opens++
+                        true
+                    }, {})
                 }
             LaunchedEffect(controller) { controller.reconnect() }
             WhiteNoiseTheme { AccountSetupScreen(controller, { "Quiet Otter" }) {} }

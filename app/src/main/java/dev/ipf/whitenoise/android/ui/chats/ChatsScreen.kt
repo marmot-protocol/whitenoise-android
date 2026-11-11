@@ -1185,11 +1185,11 @@ internal fun ChatsScreen(
             } ?: loaded
         }
     val bulkArchiveAction = selectionActions.archiveAction
-    // Engine-normalized manual order of the pinned block, for the selection
-    // bar's move actions. Ids keep the projection's casing — they round-trip
-    // straight back into setPinnedChatOrder, which must receive the pinned
-    // set exactly. Active items suffice: the engine only pins unarchived
-    // chats and clears a pin on archive, so no archived row can be pinned.
+    // Engine-normalized order of the loaded pinned rows, which decides where a
+    // row sits for its Move up/down menu. It covers only the loaded window, so
+    // moves themselves read MDK's complete pin order (#3709). Active items
+    // suffice: the engine only pins unarchived chats and clears a pin on
+    // archive, so no archived row can be pinned.
     val pinnedOrderedIds =
         remember(controller.items) {
             controller.items
@@ -1336,20 +1336,44 @@ internal fun ChatsScreen(
         }
     }
 
+    /**
+     * Moves [ids] by [delta] within MDK's complete pin order, never the loaded window, and tells the
+     * user when the order did not change. Selection and single-row moves share this path (#3709).
+     */
+    fun movePinnedChats(
+        ids: Set<String>,
+        delta: Int,
+        fromSelection: Boolean = true,
+    ) {
+        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
+        appState.launchMutation {
+            val result =
+                runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
+                    .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
+            // The unchanged notice describes a selection; a single row already at the end just stays put.
+            val quiet =
+                result == ChatListPinMoveResult.MOVED ||
+                    (!fromSelection && result == ChatListPinMoveResult.UNCHANGED)
+            if (controller.chatListActionIsCurrent(owner) && !quiet) {
+                val message =
+                    when (result) {
+                        ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
+                        ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
+                        else -> R.string.chat_batch_order_failed
+                    }
+                appState.presentTransient(resources.getString(message))
+            }
+        }
+    }
+
+    /** Moves one pinned row from its long-press menu through the complete-order path. */
     fun movePinnedChat(
         item: ChatListItem,
         delta: Int,
     ) {
-        val index = pinnedIndex(item) ?: return
-        val target = index + delta
-        if (target !in pinnedOrderedIds.indices) return
-        val reordered =
-            pinnedOrderedIds.toMutableList().also { ids ->
-                val id = ids.removeAt(index)
-                ids.add(target, id)
-            }
+        if (pinnedIndex(item) == null) return
         clearSelection()
-        appState.launchMutation { controller.setPinnedOrder(reordered) }
+        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta, fromSelection = false)
     }
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
@@ -2086,7 +2110,8 @@ internal fun ChatsScreen(
                             pinned = item.pinned(),
                             showPinToggle = !item.group.archived,
                             showMovePinnedUp = (pinnedIndex ?: 0) > 0,
-                            showMovePinnedDown = pinnedIndex != null && pinnedIndex < pinnedOrderedIds.lastIndex,
+                            // Pins below the loaded window still count; a move at the true end leaves the row in place.
+                            showMovePinnedDown = pinnedIndex != null,
                             onMarkRead = { markChatRead(item, unread = false) },
                             onMarkUnread = { markChatRead(item, unread = true) },
                             onAddToFolder = { openFolderPicker(listOf(item)) },
@@ -2398,30 +2423,7 @@ internal fun ChatsScreen(
                         },
                         onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
                         onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
-                        onMovePinned = { delta ->
-                            val owner = controller.captureChatListActionOwner { batchScope.get() }
-                            val ids = selectedChatIds.toSet()
-                            if (owner != null) {
-                                appState.launchMutation {
-                                    val result =
-                                        runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
-                                            .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-                                    if (
-                                        controller.chatListActionIsCurrent(owner) &&
-                                        result != ChatListPinMoveResult.MOVED
-                                    ) {
-                                        val message =
-                                            when (result) {
-                                                ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
-                                                ChatListPinMoveResult.UNCONFIRMED ->
-                                                    R.string.chat_batch_order_unconfirmed
-                                                else -> R.string.chat_batch_order_failed
-                                            }
-                                        appState.presentTransient(resources.getString(message))
-                                    }
-                                }
-                            }
-                        },
+                        onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) },
                         onSelectAll = {
                             selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
                             // #2925: extend past the loaded window to MDK's complete view where it owns membership.

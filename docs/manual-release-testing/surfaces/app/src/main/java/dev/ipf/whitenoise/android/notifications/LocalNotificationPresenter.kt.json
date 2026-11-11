@@ -124,6 +124,14 @@
         "test_ids": [
           "NTF-033"
         ]
+      },
+      {
+        "surface": "Failed silent rewrite restores a clean card",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "val cleanNotification = buildSettled(true)",
+        "test_ids": [
+          "NTF-010"
+        ]
       }
     ]
   },

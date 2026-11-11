@@ -153,7 +153,10 @@ class AccountSetupNavigationPortTest {
                         client,
                         scope,
                         { ownerCurrent },
-                        { opens++ },
+                        {
+                            opens++
+                            true
+                        },
                         { exits++ },
                     )
                 }

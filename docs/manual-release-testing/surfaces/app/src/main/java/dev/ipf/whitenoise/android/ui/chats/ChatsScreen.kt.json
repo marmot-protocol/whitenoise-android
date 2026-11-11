@@ -259,6 +259,15 @@
         "test_ids": [
           "CHL-012"
         ]
+      },
+      {
+        "surface": "Pinned move through the complete native order",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "controller.movePinnedSelection(ids, delta, owner)",
+        "test_ids": [
+          "CHL-010",
+          "CHL-012"
+        ]
       }
     ],
     "source_coverage": [

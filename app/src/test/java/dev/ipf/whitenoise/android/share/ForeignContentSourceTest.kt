@@ -47,11 +47,12 @@ class ForeignContentSourceTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val secret = File(context.filesDir, "private.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
         try {
-            assertNull(materializeReceiveContentImageUri(context, Uri.fromFile(secret)))
+            assertNull(materializeReceiveContentImageUri(context, Uri.fromFile(secret), "image/jpeg"))
             assertNull(
                 materializeReceiveContentImageUri(
                     context,
                     Uri.parse("content://$ownAuthority/shared/a.jpg"),
+                    resolvedMime = "image/jpeg",
                     isAppOwnedProvider = { true },
                 ),
             )

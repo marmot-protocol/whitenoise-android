@@ -16,6 +16,7 @@ import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -246,18 +247,30 @@ class ChatListWindowSetTest {
                 }
             val windows = ChatListWindowSet.open("acct") { _, view -> handles.getValue(view) }
             val replaced = mutableListOf<ULong>()
-            val receiver = launch { windows.receive { _, update -> replaced += update.sequence } }
+            val streamFirst = CompletableDeferred<Unit>()
+            chats.echoObserved = streamFirst
+            val receiver =
+                launch {
+                    windows.receive { _, update ->
+                        replaced += update.sequence
+                        if (update.sequence == 2uL) streamFirst.complete(Unit)
+                    }
+                }
+            try {
+                windows.pageForward(ChatListViewFfi.CHATS)
+                assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
 
-            windows.pageForward(ChatListViewFfi.CHATS)
-            assertTrue(windows.isForwardStalled(ChatListViewFfi.CHATS))
-
-            chats.forwardPageAppends = true
-            val completed = windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a")
-            assertEquals(listOf("CHATS-a", "CHATS-page"), completed?.rows?.map { it.row.groupIdHex })
-            assertEquals(listOf(2uL), replaced)
-            assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
-            handles.values.forEach(FakeWindow::close)
-            receiver.join()
+                chats.forwardPageAppends = true
+                val completed = windows.setVisibleAnchor(ChatListViewFfi.CHATS, "CHATS-a")
+                assertTrue("the stream delivered the frame before the command replied", streamFirst.isCompleted)
+                assertEquals(listOf("CHATS-a", "CHATS-page"), completed?.rows?.map { it.row.groupIdHex })
+                assertEquals(listOf(2uL), replaced)
+                assertFalse(windows.isForwardStalled(ChatListViewFfi.CHATS))
+            } finally {
+                streamFirst.complete(Unit)
+                handles.values.forEach(FakeWindow::close)
+                withTimeout(ECHO_OBSERVED_BOUND_MS) { receiver.join() }
+            }
         }
 
     /** Each anchor report completes at most one page; one that again makes no progress parks demand anew. */
@@ -311,6 +324,9 @@ class ChatListWindowSetTest {
 
 /** How long an echoing fake lets the stream copy of an answer lead the reply. */
 private const val ECHO_LEAD_MS = 50L
+
+// Real-time bound for a gated echo or receiver to finish.
+private const val ECHO_OBSERVED_BOUND_MS = 5_000L
 
 /** Polls a condition driven by the IO-dispatched receive loops, failing after five seconds. */
 private suspend fun awaitUntil(condition: () -> Boolean) {
@@ -378,6 +394,12 @@ private class FakeWindow(
     /** True publishes each command's answer to the stream before replying, the way the MDK actor does. */
     var echoAnswersToStream = false
 
+    /**
+     * When set, an echoed command holds its reply until the stream receiver has observed the echo, so a
+     * stream-first test runs exactly that order instead of relying on a fixed delay (#3726).
+     */
+    var echoObserved: CompletableDeferred<Unit>? = null
+
     /** Anchors without changing the rows; with [echoAnswersToStream] the frame reaches the stream first. */
     override suspend fun setVisibleAnchor(
         sequence: ULong,
@@ -387,7 +409,8 @@ private class FakeWindow(
         current = snapshot(sequence + 1uL, current.rows.map { it.row.groupIdHex })
         if (echoAnswersToStream) {
             check(updates.trySend(current).isSuccess)
-            delay(ECHO_LEAD_MS)
+            val observed = echoObserved
+            if (observed == null) delay(ECHO_LEAD_MS) else withTimeout(ECHO_OBSERVED_BOUND_MS) { observed.await() }
         }
         return current
     }
