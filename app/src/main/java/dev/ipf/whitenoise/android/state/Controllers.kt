@@ -2060,7 +2060,7 @@ class ChatsController private constructor(
                             chatStream.snapshot()
                         }.associateBy { it.groupIdHex }
                     if (!isActiveBindEpoch(epoch)) break
-                    groupRecordsById = initialGroups
+                    groupRecordsById = initialGroups.mapValues { (_, group) -> withRetainedName(group) }
                     groupRecordsById.values.forEach(::requestGroupProfiles)
                     seedInitialMemberIdProjection(accountRef, epoch)
                     if (!isActiveBindEpoch(epoch)) break
@@ -2277,12 +2277,14 @@ class ChatsController private constructor(
     ) {
         // A snapshot still carrying a name this device just renamed away from must not restore it
         // underneath the row; [chatListDisplayGroup] falls back to this record's name.
-        val retainedName = localGroupNames.retainedFor(record.groupIdHex, record.name)
-        val folded = if (retainedName == null) record else record.copy(name = retainedName)
-        groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
+        groupRecordsById = groupRecordsById + (record.groupIdHex to withRetainedName(record))
         if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
         scheduleRecompute()
     }
+
+    /** [record] carrying the retained local name in place of one this device just renamed away from. */
+    private fun withRetainedName(record: AppGroupRecordFfi): AppGroupRecordFfi =
+        localGroupNames.retainedFor(record.groupIdHex, record.name)?.let { record.copy(name = it) } ?: record
 
     /** Invalidates authoritative roster state while retaining display-only continuity. */
     private fun invalidateMemberCacheForGroup(groupIdHex: String) {

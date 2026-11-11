@@ -119,6 +119,18 @@ class LocalGroupNameAuthorityTest {
         assertNull(authority.retainedFor(GROUP, "New"))
     }
 
+    /** A clear stays fenced after a blank snapshot agrees; only a different name ends it. */
+    @Test
+    fun clearOutlivesAnAgreeingBlankSnapshot() {
+        val authority = LocalGroupNameAuthority()
+        authority.record(GROUP, previousName = "Old", committedName = "")
+
+        assertEquals("", authority.reconcile(GROUP, ""))
+        assertEquals("", authority.reconcile(GROUP, "Old"))
+        assertEquals("Remote", authority.reconcile(GROUP, "Remote"))
+        assertEquals("Old", authority.reconcile(GROUP, "Old"))
+    }
+
     private companion object {
         const val GROUP = "ab" + "cd"
     }

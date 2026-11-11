@@ -61,7 +61,12 @@ internal class LocalGroupNameAuthority {
         incomingName: String,
     ): String {
         retainedFor(groupIdHex, incomingName)?.let { return it }
-        forget(groupIdHex)
+        // A cleared name stays fenced after the row agrees: the chat list falls back to the group
+        // record's name for a blank row, and that record arrives on a separate stream that can
+        // still deliver the pre-clear name. A different name, or the row leaving, ends it.
+        val committed = key(groupIdHex)?.let(commitsByGroup::get)?.committed
+        val clearAgreed = incomingName.isBlank() && committed?.isBlank() == true
+        if (!clearAgreed) forget(groupIdHex)
         return incomingName
     }
 

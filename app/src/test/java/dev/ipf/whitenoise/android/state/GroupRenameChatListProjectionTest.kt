@@ -302,6 +302,23 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
+    /** The chat-list row agreeing with the clear does not let a later pre-clear group record back in. */
+    @Test
+    fun staleGroupRecordAfterAnAgreeingRowCannotRestoreAClearedName() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
     /** A rejected clear leaves the existing description in place. */
     @Test
     fun failedClearLeavesTheDescription() =
