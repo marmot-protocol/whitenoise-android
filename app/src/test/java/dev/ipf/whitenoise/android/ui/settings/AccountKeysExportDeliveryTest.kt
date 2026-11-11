@@ -200,7 +200,7 @@ class AccountKeysExportDeliveryTest {
     fun slowProviderWritesOffMainAndHoldsExportUntilSaved() {
         val provider = BlockingProvider(fail = false)
         val fixture = pickRawDestination(provider)
-        assertTrue(provider.opened.await(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+        awaitProviderOpened(provider)
         // The main looper keeps running while the provider is blocked.
         composeRule.runOnIdle { assertNotSame(Thread.currentThread(), provider.openThread) }
         composeRule.onNodeWithTag("profile_keys.export_raw").assertIsNotEnabled()
@@ -216,7 +216,7 @@ class AccountKeysExportDeliveryTest {
     fun slowProviderFailureShowsTheSaveError() {
         val provider = BlockingProvider(fail = true)
         pickRawDestination(provider)
-        assertTrue(provider.opened.await(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+        awaitProviderOpened(provider)
         provider.release.countDown()
         composeRule.waitUntil(TIMEOUT_MILLIS) {
             composeRule
@@ -231,7 +231,7 @@ class AccountKeysExportDeliveryTest {
     fun stopWhileProviderBlocksDropsTheLateResult() {
         val provider = BlockingProvider(fail = true)
         val fixture = pickRawDestination(provider)
-        assertTrue(provider.opened.await(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
+        awaitProviderOpened(provider)
         composeRule.runOnIdle { fixture.owner.stop() }
         provider.release.countDown()
         assertTrue(provider.writeAttempted.await(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS))
@@ -440,6 +440,11 @@ class AccountKeysExportDeliveryTest {
         }
         assertEquals(if (encrypted) 1 else 0, fixture.native.encryptedCalls.get())
         assertEquals(if (encrypted) 0 else 1, fixture.native.rawCalls.get())
+    }
+
+    /** Idles the main looper while waiting, because the save is launched there before it moves to IO. */
+    private fun awaitProviderOpened(provider: BlockingProvider) {
+        composeRule.waitUntil(TIMEOUT_MILLIS) { provider.opened.count == 0L }
     }
 
     /** Starts a raw export and returns the picked URI to the screen, whose provider is [provider]. */
