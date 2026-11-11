@@ -77,9 +77,9 @@ object GroupSystemEventJson {
 
     /**
      * A linear pre-scan prevents excessive strings, nesting, and collections
-     * from reaching org.json. Non-strict JSON is rejected here; other malformed
-     * inputs that stay inside the limits still reach the parser so fuzzing
-     * exercises its error paths.
+     * from reaching org.json. Lenient syntax that could hide brackets from the
+     * count is rejected here; other malformed inputs that stay inside the
+     * limits still reach the parser so fuzzing exercises its error paths.
      */
     internal fun withinResourceBounds(plaintext: String): Boolean =
         !utf8LengthExceedsLimit(plaintext) &&
@@ -109,14 +109,15 @@ object GroupSystemEventJson {
     }
 
     /**
-     * Accepts only the strict JSON lexical subset outside strings, so the
-     * counted structure is the structure every org.json implementation sees.
+     * Rejects the lenient syntax that could make the counted structure differ
+     * from the structure org.json parses.
      *
      * Android's JSONTokener also accepts comments, single-quoted strings,
      * `;` and `=` separators and unquoted literals that may contain quotes.
      * Each of those can hide brackets from a counting scanner, so they are
      * rejected rather than modelled: kind-1210 content is produced by a
-     * strict JSON serializer.
+     * strict JSON serializer. Unquoted literals without quotes still pass,
+     * because they end at the first structural character and cannot hide one.
      */
     private class JsonStructureBoundsScanner {
         private val membersByDepth = IntArray(MAX_JSON_DEPTH + 1)
