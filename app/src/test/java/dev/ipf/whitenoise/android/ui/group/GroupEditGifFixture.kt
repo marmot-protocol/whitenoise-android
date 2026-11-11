@@ -36,6 +36,8 @@ import org.junit.Assert.assertEquals
 import org.robolectric.Shadows.shadowOf
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -87,7 +89,9 @@ internal class GroupEditGifFixture {
         name: String,
         hold: Boolean = false,
         still: Boolean = false,
+        failedOpens: Int = 0,
     ): Uri {
+        val failuresLeft = AtomicInteger(failedOpens)
         val extension = if (still) "png" else "gif"
         val uri = Uri.parse("content://whitenoise.synthetic/gif-editor/$name.$extension")
         val bytes = if (still) stillPng() else twoFrameGif()
@@ -95,6 +99,11 @@ internal class GroupEditGifFixture {
             if (hold) {
                 entered.countDown()
                 check(release.await(5, TimeUnit.SECONDS)) { "Held document was not released" }
+            }
+            if (failuresLeft.getAndDecrement() > 0) {
+                return@registerInputStreamSupplier object : InputStream() {
+                    override fun read(): Int = throw IOException("Provider is not ready")
+                }
             }
             object : ByteArrayInputStream(bytes) {
                 override fun close() {

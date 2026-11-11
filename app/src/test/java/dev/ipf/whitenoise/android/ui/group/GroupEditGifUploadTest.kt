@@ -101,6 +101,27 @@ class GroupEditGifUploadTest {
         assertTrue(fixture.uploadMimeTypes.single() != "image/gif")
     }
 
+    /** A GIF the provider could only read after the still-photo notice is never uploaded as an animation. */
+    @Test
+    fun gifReadableOnlyAfterStillNoticeIsNotUploadedAnimated() {
+        render()
+        pick(fixture.uri("late-gif", failedOpens = 3), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { fixture.uploads.get() == 1 }
+        awaitSettledUploads(1)
+        assertTrue(fixture.uploadMimeTypes.none { it.equals("image/gif", ignoreCase = true) })
+    }
+
+    /** Once the provider recovers in time, the uncroppable GIF gets the animation notice instead of uploading. */
+    @Test
+    fun gifReadableBeforeFallbackAsksBeforeUploading() {
+        render()
+        pick(fixture.uri("recovered-gif", failedOpens = 2), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { composeRule.onAllNodesWithText(title()).fetchSemanticsNodes().isNotEmpty() }
+        awaitSettledUploads(0)
+    }
+
     @Test
     fun groupReplacementRetiresDialogAndCallbacksWithoutRemountingParent() = replacement(fixture.secondGroup)
 

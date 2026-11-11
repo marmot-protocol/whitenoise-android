@@ -461,26 +461,24 @@ internal fun GroupEditScreen(
                 pendingCropUri = null
             },
             onUnreadable = { picked ->
-                // A GIF that escaped the first check would otherwise go up whole after the still-photo notice.
-                // The image slot stays claimed during the re-check, so this confirmed pick wins over any later one
-                // the same way it would during an upload.
+                // The upload is prepared first and its actual media type decides the notice, so a GIF never goes up
+                // whole after the still-photo confirmation. The image slot stays claimed while it is prepared, so
+                // this confirmed pick wins over any later one the same way it would during an upload.
                 val claimed = imageOwnerIsCurrent() && !imageSaving && !controller.mutationInFlight
                 if (claimed) {
                     imageSaving = true
                     imagePickerScope.launch {
-                        val gif =
+                        val prepared =
                             try {
-                                ProfilePictureDraftProcessor.isGifSource(context.contentResolver, picked)
+                                preparedFallbackDraft(context.contentResolver, picked)
                             } finally {
                                 imageSaving = false
                             }
                         when {
                             !imageOwnerIsCurrent() -> Unit
-                            gif -> pendingPublicPhoto = PendingPublicGroupPhoto(picked, gif = true)
-                            else ->
-                                uploadPublicAvatar {
-                                    GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked)
-                                }
+                            prepared.getOrNull()?.mediaType.equals(GIF_MEDIA_TYPE, ignoreCase = true) ->
+                                pendingPublicPhoto = PendingPublicGroupPhoto(picked, gif = true)
+                            else -> uploadPublicAvatar { prepared.getOrThrow() }
                         }
                     }
                 }
@@ -775,6 +773,22 @@ internal fun GroupEditScaffold(
 }
 
 /** A device photo awaiting the public-upload confirmation; a still image is cropped after it. */
+private const val GIF_MEDIA_TYPE = "image/gif"
+
+/** Prepares an uncroppable pick, keeping a preparation failure for the upload's own error handling. */
+@Suppress("TooGenericExceptionCaught") // Decoding and provider reads fail with unrelated exception types.
+private suspend fun preparedFallbackDraft(
+    contentResolver: android.content.ContentResolver,
+    uri: Uri,
+): Result<ImageUploadDraft> =
+    try {
+        Result.success(GroupImageDraftProcessor.fromGroupContentUri(contentResolver, uri))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
+    }
+
 private data class PendingPublicGroupPhoto(
     val uri: Uri,
     val gif: Boolean,
