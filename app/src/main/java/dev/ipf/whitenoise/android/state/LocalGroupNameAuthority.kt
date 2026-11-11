@@ -31,8 +31,13 @@ private data class LocalGroupNameCommit(
  * already correct.
  *
  * Instances belong to one account's controller, so a rename never reaches another account's rows.
+ *
+ * [holdClearAfterAgreement] keeps a cleared value fenced after the reconciled stream agrees. Only a
+ * value that a second, independently settling stream can still restore needs it.
  */
-internal class LocalGroupNameAuthority {
+internal class LocalGroupNameAuthority(
+    private val holdClearAfterAgreement: Boolean = false,
+) {
     private val commitsByGroup = HashMap<String, LocalGroupNameCommit>()
 
     /**
@@ -61,11 +66,12 @@ internal class LocalGroupNameAuthority {
         incomingName: String,
     ): String {
         retainedFor(groupIdHex, incomingName)?.let { return it }
-        // A cleared name stays fenced after the row agrees: the chat list falls back to the group
-        // record's name for a blank row, and that record arrives on a separate stream that can
-        // still deliver the pre-clear name. A different name, or the row leaving, ends it.
+        // With [holdClearAfterAgreement] a cleared name stays fenced after the row agrees: the chat
+        // list falls back to the group record's name for a blank row, and that record arrives on a
+        // separate stream that can still deliver the pre-clear name. A different name, or the row
+        // leaving, ends it.
         val committed = key(groupIdHex)?.let(commitsByGroup::get)?.committed
-        val clearAgreed = incomingName.isBlank() && committed?.isBlank() == true
+        val clearAgreed = holdClearAfterAgreement && incomingName.isBlank() && committed?.isBlank() == true
         if (!clearAgreed) forget(groupIdHex)
         return incomingName
     }

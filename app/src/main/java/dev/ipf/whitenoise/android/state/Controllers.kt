@@ -1733,8 +1733,9 @@ class ChatsController private constructor(
         get() = chatRowsByGroup.values
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
-    // Holds a locally committed rename on its row until the subscription agrees (#2696).
-    private val localGroupNames = LocalGroupNameAuthority()
+    // Holds a locally committed rename on its row until the subscription agrees (#2696). A clear
+    // stays held after the row agrees because the group record can still restore the old name.
+    private val localGroupNames = LocalGroupNameAuthority(holdClearAfterAgreement = true)
 
     // Whole-second activity timestamps need an in-memory tie-break that follows
     // the order local/live activity is accepted. This is bounded to one scalar
