@@ -180,7 +180,9 @@ class ScreenReaderMessageRowStopCoverageTest {
         val host = appModuleSource("$CONVERSATION/TimelineRowTtsHighlight.kt")
         assertTrue(host.contains("LocalMessageRowTextActions provides rowTextActions"))
         val markdown = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt")
-        assertTrue(markdown.contains("ForwardTextActionsToMessageRow(leafActions)"))
+        // Markdown paragraphs forward their links and one chooser over the whole message's sentences.
+        assertTrue(markdown.contains("ttsSentenceRowAccessibilityActions(leafId, text.text, sentenceOwner)"))
+        assertTrue(markdown.contains("ForwardTextActionsToMessageRow(rowSpeechActions + linkActions)"))
         val plain = appModuleSource("$MESSAGES/BubbleContentBlocks.kt")
         assertTrue(plain.contains("ForwardTextActionsToMessageRow(sentenceActions)"))
     }

@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceChoice
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
+import dev.ipf.whitenoise.android.ui.ttsSentenceRowAccessibilityActions
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -31,6 +32,47 @@ import org.robolectric.annotation.GraphicsMode
 class TtsSentenceAccessibilityTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /**
+     * A merged message row keeps one action per label, so its single chooser must reach the second
+     * paragraph's sentences too, not only those of the paragraph that happened to win the label (#3761).
+     */
+    @Test
+    fun mergedRowChooserOffersEveryParagraphsSentences() {
+        val selected = mutableListOf<TtsSentenceChoice>()
+        val paragraphs =
+            mapOf(
+                "first" to listOf(TtsSentenceChoice("r", "s0", 0, "One."), TtsSentenceChoice("r", "s1", 1, "Two.")),
+                "second" to listOf(TtsSentenceChoice("r", "s2", 2, "Three."), TtsSentenceChoice("r", "s3", 3, "Four.")),
+            )
+        val owner =
+            TtsSentenceActions({ leafId, _ -> paragraphs.getValue(leafId) }, {
+                selected += it
+                true
+            })
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                // The second paragraph composes first, so the row's host follows reading order, not composition.
+                listOf("second", "first").forEach { leafId ->
+                    val actions = ttsSentenceRowAccessibilityActions(leafId, leafId, owner)
+                    Text(leafId, Modifier.semantics { customActions = actions })
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val first = composeRule.onNodeWithText("first").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        val second =
+            composeRule
+                .onNodeWithText("second")
+                .fetchSemanticsNode()
+                .config
+                .getOrElseNullable(SemanticsActions.CustomActions) { null }
+        assertEquals(listOf("Choose sentence to read"), first.map { it.label })
+        assertEquals(emptyList<Any>(), second.orEmpty())
+        composeRule.runOnIdle { first.single().action() }
+        composeRule.onNodeWithText("4. Four.").performClick()
+        assertEquals(listOf(paragraphs.getValue("second")[1]), selected)
+    }
 
     @Test
     fun duplicateOriginalTextChoosesTheSecondRevisionScopedSentence() {

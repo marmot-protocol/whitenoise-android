@@ -441,25 +441,29 @@ private fun MarkdownBodyText(
         sentenceLayoutReporter?.invoke(leafId, text.text, measuredLayout, coordinates)
     }
 
-    val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
+    val sentenceOwner = LocalTtsSentenceActions.current
+    val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, sentenceOwner)
+    val rowSpeechActions = ttsSentenceRowAccessibilityActions(leafId, text.text, sentenceOwner)
     LaunchedEffect(sentenceLayoutReporter) { reportIfReady() }
+    val linkActions =
+        if (onCopyLink == null) {
+            emptyList()
+        } else {
+            linkDestinations.map { destination ->
+                CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
+                    onCopyLink(destination)
+                    true
+                }
+            }
+        }
     // A paragraph with many links must stay below Compose's custom-action limit too.
     val leafActions =
-        (
-            speechActions +
-                if (onCopyLink == null) {
-                    emptyList()
-                } else {
-                    linkDestinations.map { destination ->
-                        CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
-                            onCopyLink(destination)
-                            true
-                        }
-                    }
-                }
-        ).distinctBy(CustomAccessibilityAction::label).take(MAX_ROW_CUSTOM_ACTIONS)
-    // Inside a merged message row this leaf is not focusable; the row republishes its actions.
-    ForwardTextActionsToMessageRow(leafActions)
+        (speechActions + linkActions)
+            .distinctBy(CustomAccessibilityAction::label)
+            .take(MAX_ROW_CUSTOM_ACTIONS)
+    // Inside a merged message row this leaf is not focusable, so the row republishes its links and one
+    // chooser over the whole message's sentences.
+    ForwardTextActionsToMessageRow(rowSpeechActions + linkActions)
     val accessibilityModifier = Modifier.semantics { customActions = leafActions }
 
     MarkdownTimestampText(

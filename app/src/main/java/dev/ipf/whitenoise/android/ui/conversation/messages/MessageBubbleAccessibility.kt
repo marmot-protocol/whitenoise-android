@@ -37,9 +37,9 @@ internal class MessageRowAction(
 /**
  * Row actions in menu order, followed by the actions forwarded from the message text. Compose refuses a node
  * with 32 or more custom actions by throwing while an accessibility service reads it, and a long message
- * forwards one read-aloud action per paragraph. So forwarded actions with the same label collapse into the
- * first, as a screen reader could not tell them apart, and the list stops at [MAX_ROW_CUSTOM_ACTIONS] with
- * the row's own actions kept first.
+ * can forward many link actions. So forwarded actions with the same label collapse into the first, as a
+ * screen reader could not tell them apart, and the list stops at [MAX_ROW_CUSTOM_ACTIONS] with the row's
+ * own actions kept first. Read-aloud forwards one chooser for the whole message, so no sentence is lost.
  */
 internal fun messageRowCustomActions(
     actions: List<MessageRowAction>,
