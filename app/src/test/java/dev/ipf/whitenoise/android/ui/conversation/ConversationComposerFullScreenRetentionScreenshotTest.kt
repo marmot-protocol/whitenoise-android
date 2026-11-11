@@ -190,8 +190,9 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
     fun speakerOffStopsPausedManualSpeechInThisConversation() = assertManualSpeakerStop(paused = true, sameGroup = true)
 
     @Test
-    fun speakerOffPreservesManualSpeechInAnotherConversation() =
+    fun speakerOffPreservesManualSpeechInAnotherConversation() {
         assertManualSpeakerStop(paused = false, sameGroup = false)
+    }
 
     private fun assertManualSpeakerStop(
         paused: Boolean,
