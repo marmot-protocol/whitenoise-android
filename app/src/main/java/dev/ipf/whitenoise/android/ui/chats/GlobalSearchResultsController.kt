@@ -76,8 +76,9 @@ internal class GlobalSearchResultsController(
 
     private var refreshPending = false
 
-    // Keys MDK reported removed, queued from the event thread; the next [revoke] on the main thread withdraws them.
-    private val reportedRemovals = ConcurrentLinkedQueue<Set<String>>()
+    // Keys MDK reported removed, by chat, queued from the event thread; the next [revoke] on the main thread
+    // withdraws those in a chat the query covers.
+    private val reportedRemovals = ConcurrentLinkedQueue<Pair<String, Set<String>>>()
     private var loadPending = false
 
     // A change arrived while a capped recheck was still covering the older rows; the head is reread once it ends.
@@ -148,21 +149,26 @@ internal class GlobalSearchResultsController(
     }
 
     /**
-     * Queues [keys] MDK reported removed, from any thread. A completed read withdraws them in the same main-thread
-     * step that applies it, so a read landing before the next [revoke] call still never lists them.
+     * Queues [keys] MDK reported removed in chat [groupIdHex], from any thread, without reading the query there. A
+     * completed read withdraws them in the same main-thread step that applies it, so a read landing before the next
+     * [revoke] call still never lists them.
      */
-    fun reportRemoved(keys: Set<String>) {
-        reportedRemovals.add(keys)
+    fun reportRemoved(
+        groupIdHex: String,
+        keys: Set<String>,
+    ) {
+        reportedRemovals.add(groupIdHex to keys)
     }
 
     /**
      * Drops loaded rows whose disappearing deadline has passed, and rows MDK reported removed, passed as [removed]
      * or queued by [reportRemoved], without waiting for a reread. A removed key never lists in this generation, even
-     * when the read holding it lands later.
+     * when the read holding it lands later. Queued keys of chats the current query does not cover are discarded.
      */
     fun revoke(removed: Set<String> = emptySet()) {
-        if (query == null || closed) return
-        val keys = removed + generateSequence { reportedRemovals.poll() }.flatten()
+        val current = query?.takeUnless { closed } ?: return
+        val queued = generateSequence { reportedRemovals.poll() }.filter { current.coversGroup(it.first) }
+        val keys = removed + queued.flatMap { it.second }
         val nowSeconds = (environment.nowMillis() / MILLIS_PER_SECOND).coerceAtLeast(0L).toULong()
         state = GlobalSearchResultsReducer.withdraw(GlobalSearchResultsReducer.dropExpired(state, nowSeconds), keys)
     }

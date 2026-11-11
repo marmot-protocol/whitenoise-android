@@ -194,8 +194,8 @@ private fun GlobalSearchResultsRecheckEffects(
                     account = account,
                     wakeups = wakeups,
                     touched = { event ->
-                        touchesLoadedRows(event, account, controller) { keys ->
-                            controller.reportRemoved(keys)
+                        touchesLoadedRows(event, account, controller) { groupIdHex, keys ->
+                            controller.reportRemoved(groupIdHex, keys)
                             removals.trySend(Unit)
                         }
                     },
@@ -230,19 +230,19 @@ private const val MILLIS_PER_SECOND = 1_000L
 
 /**
  * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Every key it
- * removes or deletes in a chat the query covers goes to [withdraw] first, so a loaded row leaves before the recheck
- * lands and a held one never lists; keys of chats outside the scope are never retained.
+ * removes or deletes goes to [withdraw] with its chat first, so a loaded row leaves before the recheck lands and a
+ * held one never lists. The scope is not read here, off the main thread: the controller applies it on withdrawal.
  */
 internal fun touchesLoadedRows(
     event: MarmotEventFfi,
     account: String,
     controller: GlobalSearchResultsController,
-    withdraw: (Set<String>) -> Unit,
+    withdraw: (groupIdHex: String, keys: Set<String>) -> Unit,
 ): Boolean {
     val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update?.takeIf { it.accountLabel == account }
-    val inScope = update?.takeIf { controller.query?.coversGroup(it.update.groupIdHex) == true }
-    val removed = inScope?.let { globalSearchRemovedKeys(it.update) }.orEmpty()
-    if (removed.isNotEmpty()) withdraw(removed)
+    update?.update?.let { change ->
+        globalSearchRemovedKeys(change).takeIf { it.isNotEmpty() }?.let { withdraw(change.groupIdHex, it) }
+    }
     return update != null && controller.isTouchedBy(update.update)
 }
 
