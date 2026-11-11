@@ -87,7 +87,13 @@ class OfflineRecoveryLatencyDeviceTest {
                 val edge =
                     OfflineReconnectEdge(
                         baseline,
-                        restoreWifi { if (!backgroundCycle) observations += observe(expectedText, offline = true) },
+                        restoreWifi {
+                            // An observation that outlived the offline state is left to the post-edge polls.
+                            if (!backgroundCycle) {
+                                val offlinePoll = observe(expectedText, offline = true)
+                                if (!hasValidatedInternet()) observations += offlinePoll
+                            }
+                        },
                     )
 
                 if (backgroundCycle) {
