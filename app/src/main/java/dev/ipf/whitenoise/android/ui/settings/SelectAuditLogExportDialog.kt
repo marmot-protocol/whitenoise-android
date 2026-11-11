@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Checkbox
@@ -40,6 +39,7 @@ import dev.ipf.whitenoise.android.state.listAuditLogExportCandidates
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.stageSelectedAuditLogs
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
 import java.io.File
@@ -110,7 +110,7 @@ internal fun AuditLogPickerDialog(
                 result.isFailure -> Text(stringResource(R.string.toast_couldnt_export_audit_logs))
                 files.isEmpty() -> Text(stringResource(R.string.toast_no_audit_logs_to_export))
                 else ->
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = AuditLogPickerMaxHeight)) {
+                    WhiteNoiseLazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = AuditLogPickerMaxHeight)) {
                         items(files, key = { it.path }) { file ->
                             AuditLogPickerRow(file, file.path in selected, enabled = !exporting) { checked ->
                                 selected = if (checked) selected + file.path else selected - file.path
