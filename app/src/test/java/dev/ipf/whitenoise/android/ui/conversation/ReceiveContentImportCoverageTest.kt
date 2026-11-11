@@ -22,6 +22,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -42,13 +43,15 @@ import java.util.concurrent.TimeUnit
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ReceiveContentImportCoverageTest {
-    private val context = ApplicationProvider.getApplicationContext<Context>()
+    // Robolectric builds the test instance before it sets up this test's application, so anything bound to the
+    // application is resolved lazily from inside the test.
+    private val context by lazy { ApplicationProvider.getApplicationContext<Context>() }
     private val provider = BlockingImageProvider()
     private val scope = CoroutineScope(Dispatchers.Main.immediate + Job())
-    private val pasteDir = File(context.cacheDir, "composer_paste")
+    private val pasteDir by lazy { File(context.cacheDir, "composer_paste") }
     private val discarded = Collections.synchronizedList(mutableListOf<Uri>())
     private val delivered = mutableListOf<ComposerImageDropResult>()
-    private val dropImport =
+    private val dropImport by lazy {
         ComposerImageDropImport(
             scope = scope,
             resolveMime = { uri -> safeGetType(context.contentResolver, uri) },
@@ -60,8 +63,10 @@ class ReceiveContentImportCoverageTest {
                 pasteDir.listFiles { file -> file.name == copy.lastPathSegment }?.forEach(File::delete)
             },
         )
+    }
 
-    init {
+    @Before
+    fun registerDropSource() {
         ShadowContentResolver.registerProviderInternal(AUTHORITY, provider)
         // Robolectric serves openInputStream from registered suppliers, never from a provider's openFile.
         (1..MAX_DROP_INDEX).forEach { index ->
