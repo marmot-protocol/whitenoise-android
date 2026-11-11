@@ -947,7 +947,11 @@ internal class ConversationMediaSender(
                     pickKey,
                 )
             }
-        val pickHasVideo = imageSlots.any { isVideoMediaType(safeGetType(context.contentResolver, it.uri)) }
+        // getType is provider IPC that may stall arbitrarily, and the send calls this from Main.
+        val pickHasVideo =
+            withContext(Dispatchers.IO) {
+                imageSlots.any { isVideoMediaType(safeGetType(context.contentResolver, it.uri)) }
+            }
         return PreparedStagedAttachments(
             images = images.attachments,
             documents = documents,
