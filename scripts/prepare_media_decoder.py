@@ -343,12 +343,18 @@ def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
                 "elf_needed": sorted(set(re.findall(r"Shared library: \[([^\]]+)\]", dynamic)))}
 
 
+def require_entries(directory, expected, reason):
+    """Refuse a cached directory unless it holds exactly the expected entries, naming every difference."""
+    actual = {entry.name for entry in directory.iterdir()}
+    require(actual == expected, f"{reason}: unexpected {sorted(actual - expected)}, missing {sorted(expected - actual)}")
+
+
 def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command=run):
     """Serialize artifact preparation and reuse only complete matching manifests whose library bytes still verify."""
     lock = load_lock()
     system = platform.system()
     can_build = system == "Linux" and platform.machine() == "x86_64"
-    require(can_build or system == "Darwin", "Linux x86_64 build host required")
+    require(can_build or system == "Darwin", "Linux x86_64 build host or macOS cache reuse required")
     import fcntl  # Both supported hosts lock the cache while checking its contents.
     require(type(jobs) is int and 1 <= jobs <= 8, "build worker count refused")
     require(abis and len(set(abis)) == len(abis) and all(abi in ABIS for abi in abis), "unique supported ABIs required")
@@ -374,14 +380,14 @@ def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command
                     sorted(item["abi"] for item in manifest["artifacts"]) == sorted(abis),
                     "cached decoder input identity differs")
             libraries = output / "jniLibs"
-            require(libraries.is_dir() and not libraries.is_symlink() and
-                    {entry.name for entry in libraries.iterdir()} == set(abis), "cached decoder ABI directories differ")
+            require(libraries.is_dir() and not libraries.is_symlink(), "cached decoder ABI directories differ")
+            require_entries(libraries, set(abis), "cached decoder ABI directories differ")
             for item in manifest["artifacts"]:
                 directory = libraries / item["abi"]
                 library = directory / "libmedia_decoder.so"
-                require(directory.is_dir() and not directory.is_symlink() and
-                        {entry.name for entry in directory.iterdir()} == {library.name} and
-                        library.is_file() and not library.is_symlink() and sha(library) == item.get("sha256"),
+                require(directory.is_dir() and not directory.is_symlink(), "cached decoder output differs")
+                require_entries(directory, {library.name}, "cached decoder files differ in " + item["abi"])
+                require(library.is_file() and not library.is_symlink() and sha(library) == item.get("sha256"),
                         "cached decoder output differs")
             return manifest
         require(can_build, missing_cache)

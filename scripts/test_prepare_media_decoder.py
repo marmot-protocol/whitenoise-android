@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import struct
 import sys
 import subprocess
@@ -336,9 +337,16 @@ class NativeBuildTests(unittest.TestCase):
                     reuse(["x86_64"])
                 extra = library.with_name("extra.so")
                 extra.write_bytes(expected)
-                with self.assertRaisesRegex(ValueError, "cached decoder output differs"):
+                with self.assertRaisesRegex(ValueError, re.escape(
+                        "cached decoder files differ in arm64-v8a: unexpected ['extra.so'], missing []")):
                     reuse(["arm64-v8a"])
                 extra.unlink()
+                stray = output / "jniLibs/x86"
+                stray.mkdir()
+                with self.assertRaisesRegex(ValueError, re.escape(
+                        "cached decoder ABI directories differ: unexpected ['x86'], missing []")):
+                    reuse(["arm64-v8a"])
+                stray.rmdir()
                 library.write_bytes(b"changed output")
                 with self.assertRaisesRegex(ValueError, "cached decoder output differs"):
                     reuse(["arm64-v8a"])
