@@ -378,15 +378,19 @@ internal class LoopbackNostrRelay(
             if (matches) hold.awaitRelease()
         }
 
-        /** Stored events matching any filter, newest first and within each filter's limit. */
+        /**
+         * Stored events matching any filter, newest first and within each filter's limit, the advertised NIP-11
+         * maximum and any stricter test clamp.
+         */
         private fun stored(filters: List<JSONObject>): Collection<JSONObject> {
             val newestFirst = events.values.sortedByDescending { it.optLong("created_at") }
             val selected = LinkedHashMap<String, JSONObject>()
             filters.forEach { filter ->
-                val requested = filter.optInt("limit", Int.MAX_VALUE)
+                val limit =
+                    listOfNotNull(filter.optInt("limit", Int.MAX_VALUE), advertisedMaxLimit, requestLimitClamp).min()
                 newestFirst
                     .filter { visible(it) && matches(it, filter) }
-                    .take(requestLimitClamp?.let { minOf(it, requested) } ?: requested)
+                    .take(limit)
                     .forEach { selected[it.getString("id")] = it }
             }
             return selected.values
