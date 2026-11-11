@@ -208,7 +208,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSave
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachmentSaveSummaries
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
-import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.newPendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
@@ -1983,6 +1982,8 @@ internal fun ConversationScreen(
     val attachmentOwnerCurrent = {
         appState.activeAccountRef == conversationAccountRef && appState.runtimeGeneration == attachmentRuntime
     }
+    val imageDropImport = rememberComposerImageDropImport(scope, conversationAccountRef, chat.id)
+    val imageDropImporting = imageDropImport.isImporting
 
     // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
@@ -3756,10 +3757,10 @@ internal fun ConversationScreen(
         val sender =
             StagedAttachmentSender(
                 hasStaged = {
-                    controller.editingMessageId == null &&
-                        (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty())
+                    val staged = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()
+                    controller.editingMessageId == null && (staged || imageDropImport.isImporting)
                 },
-                isBusy = { attachmentSendClaim.isHeld || mediaDraftState.isPreparing },
+                isBusy = { attachmentSendClaim.isHeld || mediaDraftState.isPreparing || imageDropImport.isImporting },
                 dispatch = { caption, onResult -> stagedAttachmentDispatch(caption, onResult) },
             )
         controller.stagedAttachmentSender = sender
@@ -4297,8 +4298,9 @@ internal fun ConversationScreen(
                         ),
                     composerTextState = composerTextState,
                     composerAttachmentSheet = composerAttachmentSheet,
-                    hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),
-                    attachmentsPreparing = mediaDraftState.isPreparing,
+                    hasPendingAttachments =
+                        pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty() || imageDropImporting,
+                    attachmentsPreparing = mediaDraftState.isPreparing || imageDropImporting,
                     attachmentContent =
                         if (pendingMediaSlots.size + pendingDocumentUris.size > 0 || collectionPanels != null) {
                             {
@@ -4400,29 +4402,26 @@ internal fun ConversationScreen(
                             null
                         },
                     onPasteImageUris = { uris ->
-                        val admission =
-                            admitComposerAttachments(
-                                uris,
-                                pendingMediaSlots.size,
-                                pendingDocumentUris.size,
-                                MEDIA_PICKER_MAX_ITEMS,
-                            )
-                        val pasteCandidates = admission.accepted
-                        val localUris =
-                            pasteCandidates.mapNotNull { uri ->
-                                materializeReceiveContentImageUri(context, uri)
+                        imageDropImport.import(
+                            uris = uris,
+                            maxItems = MEDIA_PICKER_MAX_ITEMS,
+                            stagedCount = { pendingMediaSlots.size + pendingDocumentUris.size },
+                            isCurrent = {
+                                attachmentOwnerCurrent() && !appState.signOutInProgress && !appState.wipeInProgress
+                            },
+                        ) { (admission, localUris, unreadableCount) ->
+                            val unreadable = unreadableCount > 0
+                            // One notice carries both outcomes, since a second notice would replace the first.
+                            if (admission.droppedCount > 0) {
+                                val detail =
+                                    AppText.Resource(R.string.toast_couldnt_decode_image).takeIf { unreadable }
+                                appState.presentAdmission(context, admission, detail, unreadableCount)
+                            } else if (unreadable) {
+                                appState.present(R.string.toast_couldnt_decode_image, copyable = true)
                             }
-                        val unreadableCount = pasteCandidates.size - localUris.size
-                        val unreadable = unreadableCount > 0
-                        // One notice carries both outcomes, since a second notice would replace the first.
-                        if (admission.droppedCount > 0) {
-                            val detail = AppText.Resource(R.string.toast_couldnt_decode_image).takeIf { unreadable }
-                            appState.presentAdmission(context, admission, detail, unreadableCount)
-                        } else if (unreadable) {
-                            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
-                        }
-                        if (localUris.isNotEmpty()) {
-                            pendingMediaSlots = pendingMediaSlots + localUris.map(::newPendingMediaSlot)
+                            if (localUris.isNotEmpty()) {
+                                pendingMediaSlots = pendingMediaSlots + localUris.map(::newPendingMediaSlot)
+                            }
                         }
                     },
                     voiceRecordingController = voiceRecordingController,

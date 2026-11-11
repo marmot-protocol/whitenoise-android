@@ -149,8 +149,6 @@ import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
-import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
-import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
@@ -511,17 +509,13 @@ internal fun ComposerPill(
                     val onPaste = latestOnPasteImageUris ?: return transferableContent
                     if (!transferableContent.hasMediaType(MediaType.Image)) return transferableContent
 
+                    // #3715: this runs on the main thread and must answer now, so it claims every URI of an
+                    // image-declaring clip without asking the provider anything. The conversation then resolves
+                    // each type and copies the bytes off the main thread, skipping a URI that is not an image.
                     val imageUris = mutableListOf<Uri>()
                     val remaining =
                         transferableContent.consume { item ->
-                            val imageUri =
-                                receiveContentImageUriOrNull(
-                                    item = item,
-                                    clipDescription = transferableContent.clipMetadata.clipDescription,
-                                    resolveMime = { uri -> safeGetType(context.contentResolver, uri) },
-                                )
-                            if (imageUri != null) imageUris += imageUri
-                            imageUri != null
+                            item.uri?.also { imageUris += it } != null
                         }
                     if (imageUris.isNotEmpty()) onPaste(imageUris.distinct())
                     return remaining
