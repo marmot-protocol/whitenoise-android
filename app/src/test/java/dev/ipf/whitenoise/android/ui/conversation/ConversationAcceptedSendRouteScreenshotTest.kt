@@ -17,6 +17,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -156,31 +157,6 @@ class ConversationAcceptedSendRouteScreenshotTest {
     @Test
     fun retiredTargetSnapsAnAlreadyPaintedSendAndKeepsTheNextDraft() =
         assertLiveTailFlight("First line\nSecond line\nThird line", 240, retireDuringFlight = true)
-
-    /** Captures the editor viewport bounds inside the composer pill and the colours painted in its top corners. */
-    private fun retiredPillInternalGeometry(): Pair<Rect, List<Color>> {
-        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
-        val surfaceBounds = surface.fetchSemanticsNode().boundsInRoot
-        val editorBounds =
-            composeRule
-                .onNodeWithTag(
-                    dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_EDITOR_VIEWPORT_TAG,
-                    useUnmergedTree = true,
-                ).fetchSemanticsNode()
-                .boundsInRoot
-                .translate(-surfaceBounds.topLeft)
-        val pixels = surface.captureToImage().toPixelMap()
-        val corners =
-            buildList {
-                for (y in 0 until minOf(16, pixels.height)) {
-                    for (x in 0 until minOf(24, pixels.width)) {
-                        add(pixels[x, y])
-                        add(pixels[pixels.width - 1 - x, y])
-                    }
-                }
-            }
-        return editorBounds to corners
-    }
 
     /** Releases the deferred markdown parse at frame 4, once moving ink has painted, and awaits the publish. */
     private fun hydrateDuringFlight(
@@ -338,7 +314,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 composeRule.onRoot().captureRoboImage("src/test/snapshots/send_invalid_restore_$index.png")
             }
             if (retireDuringFlight && index == 8) {
-                frames.earlyRetiredInternalGeometry = retiredPillInternalGeometry()
+                frames.earlyRetiredInternalGeometry = retiredPillInternalGeometry(composeRule)
                 frames.earlyRetiredHeight =
                     composeRule
                         .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
@@ -386,7 +362,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
             )
             assertEquals(
                 "inner editor insets and painted pill corners must already be settled",
-                retiredPillInternalGeometry(),
+                retiredPillInternalGeometry(composeRule),
                 checkNotNull(frames.earlyRetiredInternalGeometry),
             )
         }
@@ -639,7 +615,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 startOnConstruction = true,
                 markdownParser = { text ->
                     if (deferMarkdownHydration && text == draftText) markdownHydrationGate.await()
-                    plainParagraphDocument(text)
+                    plainParagraphDocument(text, formattedHydration)
                 },
                 clockMillis = { 1_672_531_260_000L },
                 textPublisher = { _, _, _, _ ->
@@ -657,35 +633,6 @@ class ConversationAcceptedSendRouteScreenshotTest {
         awaitConversationCondition { conversation.timeline.size == records.size }
         return conversation
     }
-
-    /**
-     * Parses text into a one-paragraph markdown document with soft breaks, or a bold run for the styled send when
-     * formatted hydration is on.
-     */
-    private fun plainParagraphDocument(text: String): MarkdownDocumentFfi =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blocks =
-                if (formattedHydration && text == "**Styled send**") {
-                    listOf(
-                        MarkdownBlockFfi.Paragraph(
-                            listOf(MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Styled send")))),
-                        ),
-                    )
-                } else {
-                    listOf(
-                        MarkdownBlockFfi.Paragraph(
-                            text.split('\n').flatMapIndexed { index, line ->
-                                buildList {
-                                    if (index > 0) add(MarkdownInlineFfi.SoftBreak)
-                                    add(MarkdownInlineFfi.Text(line))
-                                }
-                            },
-                        ),
-                    )
-                },
-            blankLinesBefore = ByteArray(0),
-        )
 
     /** Mounts the real route with a logical far-history bookmark and the actual production scroll writer. */
     private fun mountHistoryConversation(
@@ -744,6 +691,60 @@ class ConversationAcceptedSendRouteScreenshotTest {
 }
 
 private const val INCOMING_TEXT = "A received row while sending"
+
+/** Captures the editor viewport and the painted top corners without owning route-test state. */
+private fun retiredPillInternalGeometry(rule: ComposeContentTestRule): Pair<Rect, List<Color>> {
+    val surface = rule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+    val surfaceBounds = surface.fetchSemanticsNode().boundsInRoot
+    val editorBounds =
+        rule
+            .onNodeWithTag(
+                dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_EDITOR_VIEWPORT_TAG,
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
+            .boundsInRoot
+            .translate(-surfaceBounds.topLeft)
+    val pixels = surface.captureToImage().toPixelMap()
+    val corners =
+        buildList {
+            for (y in 0 until minOf(16, pixels.height)) {
+                for (x in 0 until minOf(24, pixels.width)) {
+                    add(pixels[x, y])
+                    add(pixels[pixels.width - 1 - x, y])
+                }
+            }
+        }
+    return editorBounds to corners
+}
+
+/** Builds the same synthetic paragraph from explicit hydration state. */
+private fun plainParagraphDocument(
+    text: String,
+    formattedHydration: Boolean,
+): MarkdownDocumentFfi =
+    MarkdownDocumentFfi(
+        truncated = false,
+        blocks =
+            if (formattedHydration && text == "**Styled send**") {
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Styled send")))),
+                    ),
+                )
+            } else {
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        text.split('\n').flatMapIndexed { index, line ->
+                            buildList {
+                                if (index > 0) add(MarkdownInlineFfi.SoftBreak)
+                                add(MarkdownInlineFfi.Text(line))
+                            }
+                        },
+                    ),
+                )
+            },
+        blankLinesBefore = ByteArray(0),
+    )
 
 /**
  * Returns an action that republishes the timeline window with the accepted row plus a newly received row, then waits
