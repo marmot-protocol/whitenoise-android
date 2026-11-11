@@ -11469,20 +11469,23 @@ class ConversationController(
         }
 
     /**
-     * Commits the fields the user changed in the group editor. An unchanged field is sent as null, so
-     * MDK carries it forward from canonical group state rather than from this possibly lagging
-     * projection. A changed field is sent as its trimmed text, so an erased one arrives as the
-     * explicit empty string MDK applies as a clear (#3704).
+     * Commits the fields the user changed in the group editor, compared with the values it opened
+     * with ([openedName] and [openedDescription]). An unchanged field is sent as null, so MDK carries
+     * it forward from canonical group state, even if another admin changed it meanwhile. A changed
+     * field is sent as its trimmed text, so an erased one arrives as the explicit empty string MDK
+     * applies as a clear (#3704).
      */
     suspend fun updateGroupProfile(
         name: String,
         description: String,
+        openedName: String = group.name,
+        openedDescription: String = group.description,
     ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val updatedName = name.trim().takeIf { it != group.name }
-            val updatedDescription = description.trim().takeIf { it != group.description }
+            val updatedName = name.trim().takeIf { it != openedName.trim() }
+            val updatedDescription = description.trim().takeIf { it != openedDescription.trim() }
             if (updatedName == null && updatedDescription == null) return@withMutationLockResult true
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {

@@ -1341,13 +1341,18 @@ internal fun ChatsScreen(
     fun movePinnedChats(
         ids: Set<String>,
         delta: Int,
+        fromSelection: Boolean = true,
     ) {
         val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
         appState.launchMutation {
             val result =
                 runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
                     .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-            if (controller.chatListActionIsCurrent(owner) && result != ChatListPinMoveResult.MOVED) {
+            // The unchanged notice describes a selection; a single row already at the end just stays put.
+            val quiet =
+                result == ChatListPinMoveResult.MOVED ||
+                    (!fromSelection && result == ChatListPinMoveResult.UNCHANGED)
+            if (controller.chatListActionIsCurrent(owner) && !quiet) {
                 val message =
                     when (result) {
                         ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
@@ -1366,7 +1371,7 @@ internal fun ChatsScreen(
     ) {
         if (pinnedIndex(item) == null) return
         clearSelection()
-        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta)
+        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta, fromSelection = false)
     }
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
@@ -2103,7 +2108,7 @@ internal fun ChatsScreen(
                             pinned = item.pinned(),
                             showPinToggle = !item.group.archived,
                             showMovePinnedUp = (pinnedIndex ?: 0) > 0,
-                            // Pins below the loaded window still count; a move at the true end reports unchanged.
+                            // Pins below the loaded window still count; a move at the true end leaves the row in place.
                             showMovePinnedDown = pinnedIndex != null,
                             onMarkRead = { markChatRead(item, unread = false) },
                             onMarkUnread = { markChatRead(item, unread = true) },

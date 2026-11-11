@@ -111,6 +111,28 @@ class GroupRenameChatListProjectionTest {
             assertEquals("", conversation.group.description)
         }
 
+    /**
+     * A description another admin set while the editor was open is left alone by a rename, because
+     * the change check uses the values the editor opened with.
+     */
+    @Test
+    fun renameKeepsADescriptionChangedWhileTheEditorWasOpen() =
+        runBlocking {
+            val appState = testAppState()
+            val sent = mutableListOf<Pair<String?, String?>>()
+            val conversation =
+                conversationController(appState, description = "set by another admin") { _, _, name, description ->
+                    sent += name to description
+                }
+
+            assertTrue(
+                conversation.updateGroupProfile(NEW_NAME, "", openedName = OLD_NAME, openedDescription = ""),
+            )
+
+            assertEquals(listOf<Pair<String?, String?>>(NEW_NAME to null), sent)
+            assertEquals("set by another admin", conversation.group.description)
+        }
+
     /** Saving without a change makes no native call. */
     @Test
     fun unchangedProfileMakesNoNativeCall() =
