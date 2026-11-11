@@ -11,13 +11,14 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceChoice
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
-import dev.ipf.whitenoise.android.ui.ttsSentenceRowAccessibilityActions
+import dev.ipf.whitenoise.android.ui.ttsSentenceLeafAndRowActions
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -54,7 +55,7 @@ class TtsSentenceAccessibilityTest {
             WhiteNoiseTheme {
                 // The second paragraph composes first, so the row's host follows reading order, not composition.
                 listOf("second", "first").forEach { leafId ->
-                    val actions = ttsSentenceRowAccessibilityActions(leafId, leafId, owner)
+                    val actions = ttsSentenceLeafAndRowActions(leafId, leafId, owner).row
                     Text(leafId, Modifier.semantics { customActions = actions })
                 }
             }
@@ -101,6 +102,35 @@ class TtsSentenceAccessibilityTest {
             .captureRoboImage("src/test/snapshots/tts_sentence_chooser_dark_large_font.png")
         composeRule.onNodeWithText("2. Pay $12.50.").performClick()
         assertEquals(listOf(choices[1]), selected)
+    }
+
+    /** A chooser over more than one page of sentences pages on instead of dropping the later ones. */
+    @Test
+    fun chooserPagesOnToSentencesBeyondTheFirstPage() {
+        val selected = mutableListOf<TtsSentenceChoice>()
+        val choices = (0 until 250).map { TtsSentenceChoice("revision", "sentence-$it", it, "Line $it.") }
+        val owner =
+            TtsSentenceActions({ _, _ -> choices }, {
+                selected += it
+                true
+            })
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val actions = ttsSentenceAccessibilityActions("leaf", "long", owner)
+                Text("source", Modifier.semantics { customActions = actions })
+            }
+        }
+        val actions = composeRule.onNodeWithText("source").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        composeRule.runOnIdle { actions.single().action() }
+        composeRule.onNodeWithText("250. Line 249.").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag("tts_sentence_chooser")
+            .captureRoboImage("src/test/snapshots/tts_sentence_chooser_first_of_two_pages.png")
+        composeRule.onNodeWithText("Next").performClick()
+        composeRule.onNodeWithText("1. Line 0.").assertDoesNotExist()
+        composeRule.onNodeWithText("Next").assertDoesNotExist()
+        composeRule.onNodeWithText("250. Line 249.").performScrollTo().performClick()
+        assertEquals(listOf(choices.last()), selected)
     }
 
     @Test

@@ -33,14 +33,13 @@ internal class TtsSentenceActions(
 ) {
     private val leafChoices = mutableStateMapOf<String, List<TtsSentenceChoice>>()
 
-    /** Every published leaf's sentences in reading order, for one chooser on a merged message row. */
+    /** Every published leaf's sentences in reading order, for one paged chooser on a merged message row. */
     val messageChoices: List<TtsSentenceChoice>
         get() =
             leafChoices.values
                 .flatten()
-                .distinctBy(TtsSentenceChoice::sentenceId)
                 .sortedBy(TtsSentenceChoice::ordinal)
-                .take(MAX_SENTENCE_CHOICES)
+                .distinctBy(TtsSentenceChoice::sentenceId)
 
     /** Records the sentences one rendered leaf currently offers. */
     fun publish(
@@ -59,7 +58,8 @@ internal class TtsSentenceActions(
     }
 }
 
-private const val MAX_SENTENCE_CHOICES = 200
+/** Sentences shown on one page of the chooser, which pages on instead of dropping later sentences. */
+private const val SENTENCE_CHOICES_PER_PAGE = 200
 
 /** Only the focused leaf creates actions; its bounded chooser is discarded on revision changes. */
 @Composable
@@ -69,18 +69,34 @@ internal fun ttsSentenceAccessibilityActions(
     owner: TtsSentenceActions?,
 ): List<CustomAccessibilityAction> = sentenceChooserActions(rememberLeafChoices(owner, leafId, originalText), owner)
 
+/** A leaf's own read-aloud actions and those it forwards to a merged message row. */
+internal class TtsSentenceLeafActions(
+    val own: List<CustomAccessibilityAction>,
+    val row: List<CustomAccessibilityAction>,
+)
+
+/** Resolves the leaf's sentences once for both its own node and the merged row it belongs to. */
+@Composable
+internal fun ttsSentenceLeafAndRowActions(
+    leafId: String,
+    originalText: String,
+    owner: TtsSentenceActions?,
+): TtsSentenceLeafActions {
+    val choices = rememberLeafChoices(owner, leafId, originalText)
+    return TtsSentenceLeafActions(sentenceChooserActions(choices, owner), rowChooserActions(leafId, choices, owner))
+}
+
 /**
  * The read-aloud actions a merged message row republishes for this leaf. A row is one focus stop and keeps
  * one action per label, so instead of each paragraph offering only its own sentences, the leaf holding the
  * message's first sentence offers a chooser over every paragraph's sentences and the other leaves offer none.
  */
 @Composable
-internal fun ttsSentenceRowAccessibilityActions(
+private fun rowChooserActions(
     leafId: String,
-    originalText: String,
+    choices: List<TtsSentenceChoice>,
     owner: TtsSentenceActions?,
 ): List<CustomAccessibilityAction> {
-    val choices = rememberLeafChoices(owner, leafId, originalText)
     DisposableEffect(owner, leafId, choices) {
         owner?.publish(leafId, choices)
         onDispose { owner?.retract(leafId, choices) }
@@ -103,16 +119,17 @@ private fun rememberLeafChoices(
             ?.choices
             ?.invoke(leafId, originalText)
             .orEmpty()
-            .take(MAX_SENTENCE_CHOICES)
     }
 
-/** Offers [choices] as one read action, or as a chooser dialog when there are several. */
+/** Offers [choices] as one read action, or as a paged chooser dialog when there are several. */
 @Composable
 private fun sentenceChooserActions(
     choices: List<TtsSentenceChoice>,
     owner: TtsSentenceActions?,
 ): List<CustomAccessibilityAction> {
     var choosing by remember(owner, choices) { mutableStateOf(false) }
+    var page by remember(owner, choices) { mutableStateOf(0) }
+    val pages = remember(choices) { choices.chunked(SENTENCE_CHOICES_PER_PAGE) }
     val readLabel = stringResource(R.string.tts_read_from_sentence)
     val chooseLabel = stringResource(R.string.tts_choose_sentence)
     if (choosing && choices.isNotEmpty()) {
@@ -122,7 +139,7 @@ private fun sentenceChooserActions(
             title = { Text(chooseLabel) },
             text = {
                 Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
-                    choices.forEach { choice ->
+                    pages.getOrNull(page).orEmpty().forEach { choice ->
                         TextButton(onClick = {
                             owner?.select?.invoke(choice)
                             choosing = false
@@ -132,7 +149,11 @@ private fun sentenceChooserActions(
                     }
                 }
             },
-            confirmButton = {},
+            confirmButton = {
+                if (page < pages.lastIndex) {
+                    TextButton(onClick = { page += 1 }) { Text(stringResource(R.string.next)) }
+                }
+            },
             dismissButton = {
                 TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.cancel)) }
             },
@@ -144,6 +165,7 @@ private fun sentenceChooserActions(
         else ->
             listOf(
                 CustomAccessibilityAction(chooseLabel) {
+                    page = 0
                     choosing = true
                     true
                 },

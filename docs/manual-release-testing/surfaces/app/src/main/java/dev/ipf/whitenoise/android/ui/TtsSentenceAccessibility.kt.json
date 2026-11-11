@@ -55,6 +55,14 @@
         "test_ids": [
           "TTS-004"
         ]
+      },
+      {
+        "surface": "R.string.next",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+        "anchor": "R.string.next",
+        "test_ids": [
+          "AXY-002"
+        ]
       }
     ]
   },
