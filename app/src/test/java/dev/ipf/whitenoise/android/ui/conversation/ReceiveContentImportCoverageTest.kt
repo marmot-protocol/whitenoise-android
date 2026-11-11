@@ -7,7 +7,6 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
@@ -29,7 +28,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowContentResolver
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.io.InputStream
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -62,6 +63,10 @@ class ReceiveContentImportCoverageTest {
 
     init {
         ShadowContentResolver.registerProviderInternal(AUTHORITY, provider)
+        // Robolectric serves openInputStream from registered suppliers, never from a provider's openFile.
+        (1..MAX_DROP_INDEX).forEach { index ->
+            shadowOf(context.contentResolver).registerInputStreamSupplier(dropUri(index), provider::openSource)
+        }
     }
 
     /** Every barrier opens and every import is cancelled, so a failed assertion cannot strand an IO thread. */
@@ -235,16 +240,12 @@ class ReceiveContentImportCoverageTest {
             return "image/png"
         }
 
-        override fun openFile(
-            uri: Uri,
-            mode: String,
-        ): ParcelFileDescriptor {
+        /** The source stream; it is opened on the calling thread, like a real provider's file descriptor. */
+        fun openSource(): InputStream {
             openThread = Thread.currentThread()
             openEntered.countDown()
             openGate.await(WAIT_SECONDS, TimeUnit.SECONDS)
-            val filesDir = checkNotNull(context).filesDir
-            val source = File.createTempFile("drop_source", ".png", filesDir).apply { writeBytes(IMAGE_BYTES) }
-            return ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).also { source.delete() }
+            return ByteArrayInputStream(IMAGE_BYTES)
         }
 
         override fun query(
@@ -277,6 +278,7 @@ class ReceiveContentImportCoverageTest {
     private companion object {
         const val AUTHORITY = "dev.test.dropsource"
         const val WAIT_SECONDS = 5L
+        const val MAX_DROP_INDEX = 3
         val IMAGE_BYTES = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 1, 2, 3)
     }
 }
