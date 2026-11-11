@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import struct
 import sys
 import subprocess
@@ -223,6 +224,10 @@ class NativeBuildTests(unittest.TestCase):
         readelf.chmod(0o755)
         self.downloads = []
         self.commands = []
+        for name, value in (("system", "Linux"), ("machine", "x86_64")):
+            host = patch.object(build.platform, name, return_value=value)
+            host.start()
+            self.addCleanup(host.stop)
 
     def save_lock(self):
         """Persist the fixture lock under the same path consumed by the real build-policy loader."""
@@ -302,13 +307,61 @@ class NativeBuildTests(unittest.TestCase):
 
     def test_invalid_platform_is_refused_before_any_transport_or_compiler(self):
         """Invalid platform is refused before any transport or compiler."""
-        for system, machine in (("Darwin", "x86_64"), ("Linux", "aarch64")):
+        for system, machine in (("Windows", "AMD64"), ("Linux", "aarch64")):
             with self.subTest(system=system, machine=machine), \
                     patch.object(build.platform, "system", return_value=system), \
                     patch.object(build.platform, "machine", return_value=machine):
                 with self.assertRaisesRegex(ValueError, "Linux x86_64 build host"):
                     build.prepare(self.ndk, self.root / "out", ["arm64-v8a"], opener=self.opener,
                                   command=self.fake_command)
+        self.assertEqual([], self.downloads)
+        self.assertEqual([], self.commands)
+
+    def test_macos_verifies_linux_cache_without_ndk_or_build_tools(self):
+        """Reuse a Linux-built cache with no NDK and reject every unverified packaging input."""
+        manifest = self.prepare()
+        output = self.root / "output"
+        library = output / "jniLibs/arm64-v8a/libmedia_decoder.so"
+        expected = library.read_bytes()
+        for machine in ("arm64", "x86_64"):
+            with self.subTest(machine=machine), \
+                    patch.object(build.platform, "system", return_value="Darwin"), \
+                    patch.object(build.platform, "machine", return_value=machine), \
+                    patch.object(build, "toolchain", side_effect=AssertionError("macOS resolved an NDK")):
+                def reuse(abis):
+                    """Exercise cache verification with the selected macOS host and no NDK."""
+                    return build.prepare(None, output, abis, opener=self.opener, command=self.fake_command)
+
+                self.assertEqual(manifest, reuse(["arm64-v8a"]))
+                with self.assertRaisesRegex(ValueError, "cached decoder input identity differs"):
+                    reuse(["x86_64"])
+                extra = library.with_name("extra.so")
+                extra.write_bytes(expected)
+                with self.assertRaisesRegex(ValueError, re.escape(
+                        "cached decoder files differ in arm64-v8a: unexpected ['extra.so'], missing []")):
+                    reuse(["arm64-v8a"])
+                extra.unlink()
+                stray = output / "jniLibs/x86"
+                stray.mkdir()
+                with self.assertRaisesRegex(ValueError, re.escape(
+                        "cached decoder ABI directories differ: unexpected ['x86'], missing []")):
+                    reuse(["arm64-v8a"])
+                stray.rmdir()
+                library.write_bytes(b"changed output")
+                with self.assertRaisesRegex(ValueError, "cached decoder output differs"):
+                    reuse(["arm64-v8a"])
+                library.write_bytes(expected)
+        self.assertEqual(4, len(self.downloads))
+        self.assertEqual(1, len([command for command in self.commands if "-shared" in command]))
+
+    def test_macos_cache_miss_reports_how_to_build_without_creating_cache(self):
+        """A cold macOS build points to the required cache and leaves preparation to Linux."""
+        output = self.root / "missing"
+        with patch.object(build.platform, "system", return_value="Darwin"):
+            with self.assertRaisesRegex(ValueError, "Decoder cache missing.*Linux x86_64") as error:
+                build.prepare(None, output, ["arm64-v8a"], opener=self.opener, command=self.fake_command)
+        self.assertIn(str(output), str(error.exception))
+        self.assertFalse(output.exists())
         self.assertEqual([], self.downloads)
         self.assertEqual([], self.commands)
 
