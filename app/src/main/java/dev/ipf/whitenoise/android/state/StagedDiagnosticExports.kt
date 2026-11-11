@@ -83,8 +83,8 @@ internal object StagedDiagnosticExports {
         val file = confinedRegularAuditFile(entry.archive, lexicalRoot, realRoot) ?: return null
         if (file.toPath() != entry.realPath || file.length() != entry.size) return null
         return TrustedShareSource(
-            name = AUDIT_LOG_ARCHIVE_NAME,
-            mime = AUDIT_LOG_ARCHIVE_MIME_TYPE,
+            name = file.name,
+            mime = auditLogExportMimeType(file),
             size = entry.size,
             sha256 = entry.sha256.copyOf(),
             open = { Files.newInputStream(entry.realPath, LinkOption.NOFOLLOW_LINKS) },

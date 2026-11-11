@@ -2370,6 +2370,8 @@
     <string name="diagnostics_clear_confirm_action">Günlükleri Temizle</string>
     <string name="donate_open_failed">Bağış sayfası açılamadı. Tekrar deneyin.</string>
     <string name="export_audit_logs_confirm_body">Günlükler teknik tanımlayıcılar ve etkinlik ayrıntıları içerir. Yalnızca güvendiğiniz kişiyle paylaşın.</string>
+    <string name="choose_audit_files">Denetim dosyalarını seç</string>
+    <string name="choose_audit_files_subtitle">Seçili Marmot denetim dosyalarını kaydet veya paylaş</string>
     <string name="export_audit_logs">Tanılama Günlüklerini Dışa Aktar</string>
     <string name="export_audit_logs_subtitle">Bu cihazın tanılama günlüklerini tek arşiv olarak kaydedin veya paylaşın</string>
     <string name="export_audit_logs_confirm_title">Tanılama günlükleri dışa aktarılsın mı?</string>

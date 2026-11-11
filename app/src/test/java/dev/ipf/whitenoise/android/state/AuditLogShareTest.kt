@@ -4,6 +4,7 @@ import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AuditLogFileFfi
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
@@ -13,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -20,6 +22,7 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.zip.ZipFile
@@ -31,6 +34,47 @@ class AuditLogShareTest {
 
     @get:Rule
     val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
+
+    /** A single export keeps its raw bytes, and a multi-file export contains exactly the selection. */
+    @Test
+    fun selectedAuditExportPreservesRawBytesAndIncludesOnlySelectedFiles() {
+        val cache = temporaryFolder.newFolder()
+        val source = temporaryFolder.newFolder()
+        val first = File(source, "audit-first-v5.jsonl").apply { writeText("{\"seq\":1}\n") }
+        val second = File(source, "audit-second-v5.jsonl").apply { writeText("{\"seq\":2}\n") }
+        File(source, "audit-unselected-v5.jsonl").writeText("{\"seq\":3}\n")
+        val raw = prepareSelectedAuditLogExport(cache, source, listOf(first.path))
+        assertEquals(first.name, raw.name)
+        assertEquals(AUDIT_LOG_JSONL_MIME_TYPE, auditLogExportMimeType(raw))
+        assertArrayEquals(first.readBytes(), raw.readBytes())
+
+        val zip = prepareSelectedAuditLogExport(cache, source, listOf(first.path, second.path))
+        assertEquals(AUDIT_LOG_ARCHIVE_MIME_TYPE, auditLogExportMimeType(zip))
+        assertEquals(mapOf(first.name to first.readText(), second.name to second.readText()), zip.entries())
+    }
+
+    /** An incomplete record invalidates the whole selection and leaves no shareable partial ZIP. */
+    @Test
+    fun selectedAuditExportRejectsAnIncompleteFileWithoutStagingAPartialZip() {
+        val cache = temporaryFolder.newFolder()
+        val source = temporaryFolder.newFolder()
+        val complete = File(source, "audit-complete-v5.jsonl").apply { writeText("{\"seq\":1}\n") }
+        val partial = File(source, "audit-partial-v5.jsonl").apply { writeText("{\"seq\":") }
+        assertThrows(IOException::class.java) {
+            prepareSelectedAuditLogExport(cache, source, listOf(complete.path, partial.path))
+        }
+        assertTrue(File(cache, AUDIT_LOG_SHARE_DIRECTORY).listFiles().orEmpty().isEmpty())
+    }
+
+    /** The picker hides empty files and key-reveal records while sorting the remaining files by recency. */
+    @Test
+    fun auditPickerOrdersNonemptyForensicsFilesAndExcludesKeyRevealRecords() {
+        val older = AuditLogFileFfi("profile", "/older", "audit-older-v5.jsonl", 1uL, 10uL)
+        val newer = older.copy(path = "/newer", fileName = "audit-newer-v5.jsonl", modifiedAtMs = 20uL)
+        val empty = older.copy(path = "/empty", sizeBytes = 0uL)
+        val keyReveal = older.copy(path = "/keys", fileName = "audit-key-reveal.jsonl")
+        assertEquals(listOf(newer, older), auditLogExportCandidates(listOf(older, empty, keyReveal, newer)))
+    }
 
     /** Retained dictation and performance data export without native audit files and clear locally. */
     @Test

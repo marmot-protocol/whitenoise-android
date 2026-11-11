@@ -2334,6 +2334,8 @@
     <string name="diagnostics_clear_confirm_action">清除日志</string>
     <string name="donate_open_failed">无法打开捐赠页面。请重试。</string>
     <string name="export_audit_logs_confirm_body">日志包含技术标识符和活动详情。仅分享给你信任的人。</string>
+    <string name="choose_audit_files">选择审计文件</string>
+    <string name="choose_audit_files_subtitle">保存或分享所选的 Marmot 审计文件</string>
     <string name="export_audit_logs">导出诊断日志</string>
     <string name="export_audit_logs_subtitle">将此设备的诊断日志保存或分享为一个压缩包</string>
     <string name="export_audit_logs_confirm_title">导出诊断日志？</string>

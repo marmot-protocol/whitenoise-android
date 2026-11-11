@@ -2335,6 +2335,8 @@
     <string name="diagnostics_clear_confirm_action">清除日誌</string>
     <string name="donate_open_failed">無法開啟捐款頁面。請重試。</string>
     <string name="export_audit_logs_confirm_body">日誌包含技術識別碼和活動詳情。僅分享給你信任的人。</string>
+    <string name="choose_audit_files">選擇稽核檔案</string>
+    <string name="choose_audit_files_subtitle">儲存或分享選取的 Marmot 稽核檔案</string>
     <string name="export_audit_logs">匯出診斷日誌</string>
     <string name="export_audit_logs_subtitle">將此裝置的診斷日誌儲存或分享為一個壓縮檔</string>
     <string name="export_audit_logs_confirm_title">匯出診斷日誌？</string>

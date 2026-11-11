@@ -2389,6 +2389,8 @@
     <string name="diagnostics_clear_confirm_action">Protokolle löschen</string>
     <string name="donate_open_failed">Die Spendenseite ließ sich nicht öffnen. Versuche es erneut.</string>
     <string name="export_audit_logs_confirm_body">Protokolle enthalten technische Kennungen und Aktivitätsdetails. Teile sie nur mit Vertrauenspersonen.</string>
+    <string name="choose_audit_files">Auditdateien auswählen</string>
+    <string name="choose_audit_files_subtitle">Ausgewählte Marmot-Auditdateien speichern oder teilen</string>
     <string name="export_audit_logs">Diagnoseprotokolle exportieren</string>
     <string name="export_audit_logs_subtitle">Diagnoseprotokolle dieses Geräts als ein Archiv speichern oder teilen</string>
     <string name="export_audit_logs_confirm_title">Diagnoseprotokolle exportieren?</string>
