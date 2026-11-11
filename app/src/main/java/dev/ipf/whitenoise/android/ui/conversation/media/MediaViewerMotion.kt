@@ -3,7 +3,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -40,14 +39,17 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.toSize
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
+import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 private const val MAX_REGISTERED_MEDIA_THUMBNAILS = 128
-private const val MEDIA_OPEN_MILLIS = 220
-internal const val MEDIA_CLOSE_MILLIS = 180
+private const val MEDIA_OPEN_MILLIS = APP_MOTION_OPEN_MILLIS
+internal const val MEDIA_CLOSE_MILLIS = APP_MOTION_CLOSE_MILLIS
 private const val MEDIA_CONTENT_BLEND_START = 0.85f
 private const val MEDIA_CONTENT_BLEND_INTERVAL = 0.15f
 
@@ -344,9 +346,10 @@ internal suspend fun animateMediaViewerMotion(
             launch {
                 if (!closing) awaitEntryFrame()
                 if (sourceAvailable()) {
+                    // The return lands in its thumbnail, so it settles like an opening instead of arriving at speed.
                     progress.animateTo(
                         if (closing) 0f else 1f,
-                        tween(if (closing) MEDIA_CLOSE_MILLIS else MEDIA_OPEN_MILLIS, easing = FastOutSlowInEasing),
+                        tween(if (closing) MEDIA_CLOSE_MILLIS else MEDIA_OPEN_MILLIS, easing = AppMotionOpenEasing),
                     )
                 } else {
                     sourceLost = true

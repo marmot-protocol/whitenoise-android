@@ -1917,6 +1917,8 @@ internal fun ComposerBar(
                                     )
                                 }
                             },
+                        dictationControlsWidth =
+                            dictationState.compactActionsWidth(activeDictationController?.captureInProgress == true),
                         highlightMentionChips = mentionPickerEnabled,
                         mentionCandidates = mentionCandidates,
                         enterKeyBehavior = enterKeyBehavior,

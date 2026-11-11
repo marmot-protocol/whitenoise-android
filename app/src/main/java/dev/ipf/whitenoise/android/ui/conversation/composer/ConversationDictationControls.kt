@@ -252,9 +252,10 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
 
 /**
  * Active recognition keeps room for the 24dp listening pulse only while capture runs. Paste or Send
- * stops capture, and the capsule narrows with the pulse instead of keeping its blank slot.
+ * stops capture, and the capsule narrows with the pulse instead of keeping its blank slot. The
+ * composer reserves this same width so its bubble narrows in step with the commands.
  */
-private fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
+internal fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
     when {
         !hasActiveRecognitionActions -> 96.dp
         captureInProgress -> DICTATION_ACTIVE_ACTIONS_WIDTH

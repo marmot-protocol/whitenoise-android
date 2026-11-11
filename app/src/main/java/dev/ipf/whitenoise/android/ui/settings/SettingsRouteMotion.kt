@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -110,7 +108,7 @@ internal fun <T> rememberRouteMotionModifier(
         history.depth = depth
     }
     LaunchedEffect(progress) {
-        runRouteMotion(progress, motion, bubble, opening = logicalDirection > 0)
+        runRouteMotion(progress, motion, opening = logicalDirection > 0)
         // A kept Settings frame is only valid while top-level Settings stays shown.
         if (depth != 1) snapshot.picture = null
     }
@@ -139,12 +137,12 @@ internal fun <T> rememberRouteMotionModifier(
 private suspend fun runRouteMotion(
     progress: Animatable<Float, *>,
     motion: Boolean,
-    bubble: Boolean,
     opening: Boolean,
 ) {
     if (motion) {
-        val millis = settingsRouteMotionMillis(bubble, opening)
-        progress.animateTo(1f, tween(millis, easing = settingsRouteMotionEasing(bubble, opening)))
+        val millis = if (opening) SETTINGS_BUBBLE_OPEN_MILLIS else SETTINGS_BUBBLE_CLOSE_MILLIS
+        val easing = if (opening) SettingsBubbleOpenEasing else SettingsBubbleCloseEasing
+        progress.animateTo(1f, tween(millis, easing = easing))
     } else {
         progress.snapTo(1f)
     }
@@ -162,25 +160,4 @@ private fun Modifier.settingsSlide(
     }.graphicsLayer {
         val remaining = if (motion) 1f - progress() else 0f
         translationX = travel * remaining
-    }
-
-private fun settingsRouteMotionEasing(
-    bubble: Boolean,
-    opening: Boolean,
-): Easing =
-    when {
-        !bubble -> FastOutSlowInEasing
-        opening -> SettingsBubbleOpenEasing
-        else -> SettingsBubbleCloseEasing
-    }
-
-/** Top-level Settings uses the bubble timing; nested routes keep the shared slide duration. */
-private fun settingsRouteMotionMillis(
-    bubble: Boolean,
-    opening: Boolean,
-): Int =
-    when {
-        !bubble -> SETTINGS_ROUTE_MOTION_MILLIS
-        opening -> SETTINGS_BUBBLE_OPEN_MILLIS
-        else -> SETTINGS_BUBBLE_CLOSE_MILLIS
     }
