@@ -462,16 +462,26 @@ internal fun GroupEditScreen(
             },
             onUnreadable = { picked ->
                 // A GIF that escaped the first check would otherwise go up whole after the still-photo notice.
+                // The image slot stays claimed during the re-check so no other pick or upload starts in the gap.
                 val generation = imagePickGeneration.capture()
-                imagePickerScope.launch {
-                    val gif = ProfilePictureDraftProcessor.isGifSource(context.contentResolver, picked)
-                    when {
-                        !imagePickGeneration.isCurrent(generation) || !imageOwnerIsCurrent() -> Unit
-                        gif -> pendingPublicPhoto = PendingPublicGroupPhoto(picked, gif = true)
-                        else ->
-                            uploadPublicAvatar {
-                                GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked)
+                val claimed = imageOwnerIsCurrent() && !imageSaving && !controller.mutationInFlight
+                if (claimed) {
+                    imageSaving = true
+                    imagePickerScope.launch {
+                        val gif =
+                            try {
+                                ProfilePictureDraftProcessor.isGifSource(context.contentResolver, picked)
+                            } finally {
+                                imageSaving = false
                             }
+                        when {
+                            !imagePickGeneration.isCurrent(generation) || !imageOwnerIsCurrent() -> Unit
+                            gif -> pendingPublicPhoto = PendingPublicGroupPhoto(picked, gif = true)
+                            else ->
+                                uploadPublicAvatar {
+                                    GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked)
+                                }
+                        }
                     }
                 }
             },
