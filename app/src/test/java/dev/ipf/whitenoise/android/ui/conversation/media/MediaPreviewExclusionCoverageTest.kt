@@ -116,7 +116,14 @@ class MediaPreviewExclusionCoverageTest {
     private fun applyExclusions(draft: Draft) {
         composeRule.onNodeWithText(app.getString(R.string.done)).performClick()
         // Removals apply one per recomposition; Done closes the screen once the last one lands.
-        composeRule.waitUntil(timeoutMillis = 5_000L) { draft.closed == 1 }
+        runCatching { composeRule.waitUntil(timeoutMillis = 5_000L) { draft.closed >= 1 } }.onFailure { cause ->
+            throw AssertionError(
+                "Done never closed the preview: closed=${draft.closed}, " +
+                    "media=${draft.media.map { it.id }}, documents=${draft.documents.map { it.tag }}",
+                cause,
+            )
+        }
+        assertEquals("Done closes the preview exactly once", 1, draft.closed)
     }
 
     @Test
