@@ -37,6 +37,7 @@ import java.io.InputStream
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * #3715: a composer image drop never blocks the main thread on the source app's provider, keeps the combined
@@ -159,6 +160,17 @@ class ReceiveContentImportCoverageTest {
     }
 
     @Test
+    fun fullShelfReportsTheDropWithoutAskingTheProvider() {
+        importDrop((1..3).map(::dropUri), maxItems = 2, stagedCount = { 2 })
+        pumpMainUntil { !dropImport.isImporting }
+
+        val result = delivered.single()
+        assertTrue(result.admission.accepted.isEmpty())
+        assertEquals(3, result.admission.droppedCount)
+        assertEquals(0, provider.typeCalls.get())
+    }
+
+    @Test
     fun concurrentDropsShareTheLimitThroughReservations() {
         provider.openGate = CountDownLatch(1)
 
@@ -246,7 +258,10 @@ class ReceiveContentImportCoverageTest {
 
         override fun onCreate() = true
 
+        val typeCalls = AtomicInteger()
+
         override fun getType(uri: Uri): String {
+            typeCalls.incrementAndGet()
             typeThread = Thread.currentThread()
             typeEntered.countDown()
             typeGate.await(WAIT_SECONDS, TimeUnit.SECONDS)

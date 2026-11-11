@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,6 +61,23 @@ internal class ComposerImageDropImport(
     /** True while any dropped batch is resolving or copying; staged sends wait so a caption cannot leave without it. */
     val isImporting: Boolean get() = activeImports > 0
 
+    /** Resolves MIME types until [capacity] images are found; returns them and how many URIs were never examined. */
+    private suspend fun classifyImages(
+        uris: List<Uri>,
+        capacity: Int,
+    ): Pair<List<Pair<Uri, String>>, Int> {
+        val found = mutableListOf<Pair<Uri, String>>()
+        var examined = 0
+        while (examined < uris.size && found.size < capacity) {
+            currentCoroutineContext().ensureActive()
+            val uri = uris[examined++]
+            val mime = resolveMime(uri)
+            // The drop's clip declared an image type, so a silent resolver still counts as an image.
+            if (receiveContentMimeIsImage(mime, clipDeclaresImage = true)) found += uri to mime
+        }
+        return found to uris.size - examined
+    }
+
     /**
      * Imports [uris] that the drop callback already claimed. Call on the main thread. [stagedCount] is the shelf's
      * current media and document count, [isCurrent] whether this conversation still owns the composer and [deliver]
@@ -80,17 +98,12 @@ internal class ComposerImageDropImport(
             val copies = mutableListOf<Uri>()
             var staged = emptySet<Uri>()
             try {
-                val images =
-                    withContext(io) {
-                        uris.mapNotNull { uri ->
-                            ensureActive()
-                            val mime = resolveMime(uri)
-                            // The drop's clip declared an image type, so a silent resolver still counts as an image.
-                            (uri to mime).takeIf { receiveContentMimeIsImage(mime, clipDeclaresImage = true) }
-                        }
-                    }
-                if (images.isEmpty() || !isCurrent()) return@launch
-                val admission = admitComposerAttachments(images, stagedCount() + reservedSlots, 0, maxItems)
+                // Only ask the provider about as many items as could still fit; the rest are reported over the limit.
+                val capacity = (maxItems - stagedCount() - reservedSlots).coerceAtLeast(0)
+                val (images, unexamined) = withContext(io) { classifyImages(uris, capacity) }
+                if ((images.isEmpty() && unexamined == 0) || !isCurrent()) return@launch
+                val admitted = admitComposerAttachments(images, stagedCount() + reservedSlots, 0, maxItems)
+                val admission = admitted.copy(droppedCount = admitted.droppedCount + unexamined)
                 reservation = admission.accepted.size
                 reservedSlots += reservation
                 withContext(io) {
