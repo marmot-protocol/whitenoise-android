@@ -4824,18 +4824,6 @@ class ChatsController private constructor(
             if (BuildConfig.DEBUG) Log.w("DMChatsController", "$label failed", it)
         }.getOrDefault(false)
 
-    /** Atomically replace the pinned block's manual order; ids must cover the pinned set exactly. */
-    suspend fun setPinnedOrder(orderedGroupIds: List<String>): Boolean {
-        val account = accountRef ?: return false
-        return runCatchingCancellable {
-            val state = appState.marmotIo { setPinnedChatOrder(account, orderedGroupIds) }
-            applyPinState(state)
-            true
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinnedOrder failed", it)
-        }.getOrDefault(false)
-    }
-
     /**
      * Fold the engine's normalized pin order into the held rows so the list
      * reorders immediately; the PIN_ORDER_CHANGED trigger (or a snapshot)
@@ -11480,6 +11468,11 @@ class ConversationController(
             }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
         }
 
+    /**
+     * Commits both fields of the group editor. A field the user erased is sent as an explicit empty
+     * string, which MDK applies as a clear, because a null field means "keep" and would leave the
+     * old value on every member's device (#3704). Clearing both is left to native validation.
+     */
     suspend fun updateGroupProfile(
         name: String,
         description: String,
@@ -11487,8 +11480,8 @@ class ConversationController(
         withMutationLockResult(false) {
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
-            val updatedName = name.trim().takeIf { it.isNotEmpty() }
-            val updatedDescription = description.trim().takeIf { it.isNotEmpty() }
+            val updatedName = name.trim()
+            val updatedDescription = description.trim()
             runCatchingCancellable {
                 appState.withGroupCommitLock(account, group.groupIdHex) {
                     groupProfileUpdater(account, group.groupIdHex, updatedName, updatedDescription)
@@ -11496,7 +11489,7 @@ class ConversationController(
                 // Reflect the committed profile locally so the header and every chat-list
                 // projection agree immediately, rather than after the group-state
                 // subscription converges (#2696).
-                applyLocalGroupProfile(updatedName.orEmpty(), updatedDescription.orEmpty(), account)
+                applyLocalGroupProfile(updatedName, updatedDescription, account)
                 presentConversationTransient(R.string.toast_group_updated)
                 true
             }.onFailure {

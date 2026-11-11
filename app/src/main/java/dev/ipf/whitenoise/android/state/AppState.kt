@@ -8415,7 +8415,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
+    /**
+     * Clears audit, dictation, and performance files while surfacing native deletion failures. Every
+     * listed file is attempted, but any failed native deletion makes the result a failure, so a
+     * deleted sibling never reports logs that are still on disk as cleared (#3705).
+     */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
@@ -8443,7 +8447,6 @@ class WhiteNoiseAppState private constructor(
             presentTransient(R.string.toast_no_audit_logs_to_delete)
             return false
         }
-        var anyDeleted = false
         for (file in files) {
             val outcome =
                 runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
@@ -8451,14 +8454,14 @@ class WhiteNoiseAppState private constructor(
                         if (engineFailure == null) engineFailure = it
                         appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
                     }.getOrNull() ?: continue
-            anyDeleted = true
             appStateDebug { "audit log deleted still_recording=${outcome.stillRecording}" }
         }
         cacheFailure?.let {
             presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             return false
         }
-        val deleted = anyDeleted || (preparedDeleted && engineFailure == null)
+        // Files were listed, so every one was deleted exactly when no native deletion failed.
+        val deleted = engineFailure == null
         if (deleted) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {

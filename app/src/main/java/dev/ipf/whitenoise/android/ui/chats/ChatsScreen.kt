@@ -1334,20 +1334,39 @@ internal fun ChatsScreen(
         }
     }
 
+    /**
+     * Moves [ids] by [delta] within MDK's complete pin order, never the loaded window, and tells the
+     * user when the order did not change. Selection and single-row moves share this path (#3709).
+     */
+    fun movePinnedChats(
+        ids: Set<String>,
+        delta: Int,
+    ) {
+        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
+        appState.launchMutation {
+            val result =
+                runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
+                    .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
+            if (controller.chatListActionIsCurrent(owner) && result != ChatListPinMoveResult.MOVED) {
+                val message =
+                    when (result) {
+                        ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
+                        ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
+                        else -> R.string.chat_batch_order_failed
+                    }
+                appState.presentTransient(resources.getString(message))
+            }
+        }
+    }
+
+    /** Moves one pinned row from its long-press menu through the complete-order path. */
     fun movePinnedChat(
         item: ChatListItem,
         delta: Int,
     ) {
-        val index = pinnedIndex(item) ?: return
-        val target = index + delta
-        if (target !in pinnedOrderedIds.indices) return
-        val reordered =
-            pinnedOrderedIds.toMutableList().also { ids ->
-                val id = ids.removeAt(index)
-                ids.add(target, id)
-            }
+        if (pinnedIndex(item) == null) return
         clearSelection()
-        appState.launchMutation { controller.setPinnedOrder(reordered) }
+        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta)
     }
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
@@ -2396,30 +2415,7 @@ internal fun ChatsScreen(
                         },
                         onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
                         onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
-                        onMovePinned = { delta ->
-                            val owner = controller.captureChatListActionOwner { batchScope.get() }
-                            val ids = selectedChatIds.toSet()
-                            if (owner != null) {
-                                appState.launchMutation {
-                                    val result =
-                                        runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
-                                            .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-                                    if (
-                                        controller.chatListActionIsCurrent(owner) &&
-                                        result != ChatListPinMoveResult.MOVED
-                                    ) {
-                                        val message =
-                                            when (result) {
-                                                ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
-                                                ChatListPinMoveResult.UNCONFIRMED ->
-                                                    R.string.chat_batch_order_unconfirmed
-                                                else -> R.string.chat_batch_order_failed
-                                            }
-                                        appState.presentTransient(resources.getString(message))
-                                    }
-                                }
-                            }
-                        },
+                        onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) },
                         onSelectAll = {
                             selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
                             // #2925: extend past the loaded window to MDK's complete view where it owns membership.

@@ -61,6 +61,43 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
+    /** Erasing only the description sends an explicit empty description, the native clear, not "keep". */
+    @Test
+    fun clearingTheDescriptionSendsAnExplicitEmptyValue() =
+        runBlocking {
+            val appState = testAppState()
+            val sent = mutableListOf<Pair<String?, String?>>()
+            val conversation =
+                conversationController(appState, description = "old details") { _, _, name, description ->
+                    sent += name to description
+                }
+
+            assertTrue(conversation.updateGroupProfile(" $OLD_NAME ", "   "))
+
+            assertEquals(listOf<Pair<String?, String?>>(OLD_NAME to ""), sent)
+            assertEquals("", conversation.group.description)
+            assertEquals(OLD_NAME, conversation.group.name)
+        }
+
+    /** Erasing the name is sent as an explicit empty name, so native validation decides instead of keeping it. */
+    @Test
+    fun clearingTheNameSendsAnExplicitEmptyValue() =
+        runBlocking {
+            val appState = testAppState()
+            val sent = mutableListOf<Pair<String?, String?>>()
+            val conversation =
+                conversationController(appState, description = "old details") { _, _, name, description ->
+                    sent += name to description
+                    error("group name is required")
+                }
+
+            assertFalse(conversation.updateGroupProfile("", "old details"))
+
+            assertEquals(listOf<Pair<String?, String?>>("" to "old details"), sent)
+            assertEquals(OLD_NAME, conversation.group.name)
+            assertEquals("old details", conversation.group.description)
+        }
+
     /** A folder scoped to this chat, and the archived list, both carry the new name. */
     @Test
     fun renameReachesFolderAndArchivedProjections() =
@@ -215,10 +252,11 @@ class GroupRenameChatListProjectionTest {
     /** A conversation on this group whose profile commit is answered by [updater]. */
     private fun conversationController(
         appState: WhiteNoiseAppState,
+        description: String = "",
         updater: suspend (String, String, String?, String?) -> Unit = { _, _, _, _ -> },
     ) = ConversationController(
         appState = appState,
-        initialGroup = group(name = OLD_NAME),
+        initialGroup = group(name = OLD_NAME).copy(description = description),
         groupProfileUpdater = updater,
     )
 
