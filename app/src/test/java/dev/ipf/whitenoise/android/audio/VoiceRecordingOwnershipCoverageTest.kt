@@ -57,7 +57,9 @@ class VoiceRecordingOwnershipCoverageTest {
         )
         assertTrue(
             "the discard releases only an unclaimed lease",
-            controller.contains("if (!isRecording && startJob == null && restartJob?.isActive != true) {"),
+            controller.contains(
+                "if (recorder == null && startJob?.isActive != true && restartJob?.isActive != true) {",
+            ),
         )
     }
 

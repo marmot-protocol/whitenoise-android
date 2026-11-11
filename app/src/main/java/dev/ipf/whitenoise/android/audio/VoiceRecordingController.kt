@@ -515,8 +515,10 @@ class VoiceRecordingController internal constructor(
                     } finally {
                         withContext(NonCancellable + mainDispatcher) {
                             finalizingTakes--
-                            // A newer take started meanwhile owns the shared lease and releases it itself.
-                            if (!isRecording && startJob == null && restartJob?.isActive != true) {
+                            // A newer take that holds a recorder or is still opening one owns the shared lease
+                            // and releases it itself. A start that is only cancelling leaves the lease here,
+                            // since it defers to this still-active job, and so does a stale isRecording flag.
+                            if (recorder == null && startJob?.isActive != true && restartJob?.isActive != true) {
                                 releaseMicrophoneLease()
                             }
                         }

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -14,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.nio.file.Files
+import kotlin.coroutines.CoroutineContext
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -160,6 +162,80 @@ class VoiceRecordingMicrophoneCoordinatorTest {
             }
             assertFalse(coordinator.isOwnedBy(controller))
         }
+
+    /**
+     * Tearing down while a replacement start waits for a discarded take, with the discard's cleanup and
+     * the cancelled start resuming on Main in that order, still frees the shared microphone (#3707).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun teardownDuringPendingReplacementStartReleasesTheLease() =
+        runTest {
+            val coordinator = MicrophoneCaptureCoordinator()
+            val main = QueueDispatcher()
+            val recorderDispatcher = StandardTestDispatcher(testScheduler)
+            val output = Files.createTempDirectory("voice-teardown-coordinator-test").toFile()
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val discarded = FakeVoiceRecordingSession(onCancel = {})
+            val replacement = FakeVoiceRecordingSession(onCancel = {})
+            val recorders = ArrayDeque(listOf(discarded, replacement))
+            val controller =
+                VoiceRecordingController(
+                    context = context,
+                    outputDirectory = output,
+                    scope = this,
+                    onPermissionRequest = { true },
+                    onRecordingComplete = { _, _ -> error("No take is finished here") },
+                    onError = { throw it },
+                    microphoneCaptures = coordinator,
+                    recorderFactory = { _, _, _ -> recorders.removeFirst() },
+                    mainDispatcher = main,
+                    recorderDispatcher = recorderDispatcher,
+                )
+
+            try {
+                assertTrue(controller.start())
+                // The first take prepares on the recorder dispatcher, then publishes itself on Main.
+                main.drain()
+                runCurrent()
+                main.drain()
+                assertTrue(discarded.started)
+                controller.cancel()
+                assertTrue(controller.start())
+                // The replacement start suspends waiting for the discard.
+                main.drain()
+                // The discard's native close runs and queues its Main cleanup.
+                runCurrent()
+                // Teardown cancels the waiting start; its resumption queues behind the discard cleanup.
+                controller.release()
+                main.drain()
+                runCurrent()
+                main.drain()
+
+                assertTrue(discarded.cancelled)
+                assertFalse("the cancelled start never opened a recorder", replacement.started)
+                assertTrue("dictation can take the mic after teardown", coordinator.tryAcquire(Any()))
+            } finally {
+                output.deleteRecursively()
+            }
+        }
+
+    /** A Main stand-in that runs queued work only when the test drains it, to pin an interleaving. */
+    private class QueueDispatcher : CoroutineDispatcher() {
+        private val queue = ArrayDeque<Runnable>()
+
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) {
+            queue.addLast(block)
+        }
+
+        /** Runs queued work, including work it queues, until nothing is left. */
+        fun drain() {
+            while (queue.isNotEmpty()) queue.removeFirst().run()
+        }
+    }
 
     private class FakeVoiceRecordingSession(
         private val onCancel: () -> Unit,
