@@ -320,6 +320,9 @@ class MediaCodecCorpusDeviceTest {
         checkOperationEvidence("isolated", 1, 1, isolated, producedResult = true, hostUid = host)
         checkOperationEvidence("worker rejected", 1, 1, isolated, producedResult = false, hostUid = host)
         checkOperationEvidence("worker died", 1, 0, null, producedResult = false, hostUid = host)
+        // A worker that threw sends an empty reply, so only the Binder uid attests where it ran.
+        val threw = WorkerIsolation(99_875, false, false, false, false, 0, -1)
+        checkOperationEvidence("worker threw", 1, 1, threw, producedResult = false, hostUid = host)
         val failures =
             listOf(
                 // A null result with no dispatch may be a host decode that failed, not a refusal.
@@ -330,6 +333,9 @@ class MediaCodecCorpusDeviceTest {
                 EvidenceCase(1L, 0L, isolated),
                 // Two dispatches cannot be attributed to one operation.
                 EvidenceCase(2L, 2L, isolated),
+                // Even an empty failure reply must come from an isolated uid, never the app or another app.
+                EvidenceCase(1L, 1L, isolated.copy(uid = host), producedResult = false),
+                EvidenceCase(1L, 1L, isolated.copy(uid = 10_500), producedResult = false),
                 // A receipt from a non-isolated, host-uid, networked or initialised process is not containment.
                 EvidenceCase(1L, 1L, isolated.copy(isolated = false)),
                 EvidenceCase(1L, 1L, isolated.copy(uid = host)),
@@ -380,8 +386,20 @@ internal fun checkOperationEvidence(
     }
     assertEquals("$operation must carry exactly one receipt", 1L, receipts)
     val worker = requireNotNull(receipt)
+    // The uid comes from Binder, so the worker cannot forge it.
     assertTrue(
-        "$operation ran outside an isolated, offline, uninitialised worker",
-        worker.isolated && worker.uid != hostUid && !worker.internetGranted && !worker.runtimeInitialized,
+        "$operation was answered outside an isolated uid: $worker (host uid $hostUid)",
+        worker.uid != hostUid && (worker.uid % PER_USER_UID_RANGE) in ISOLATED_APP_IDS,
     )
+    // A worker that threw replies without its attestation, which is acceptable only when nothing came back.
+    if (producedResult) {
+        assertTrue(
+            "$operation returned output from a worker that did not attest isolation: $worker",
+            worker.isolated && !worker.internetGranted && !worker.runtimeInitialized,
+        )
+    }
 }
+
+/** Android's per-user uid stride and its isolated and app-zygote isolated app ids. */
+private const val PER_USER_UID_RANGE = 100_000
+private val ISOLATED_APP_IDS = 90_000..99_999
