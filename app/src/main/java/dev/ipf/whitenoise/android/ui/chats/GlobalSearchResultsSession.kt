@@ -13,6 +13,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
@@ -21,6 +23,7 @@ import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -152,6 +155,11 @@ private fun GlobalSearchResultsRecheckEffects(
     // Composition can run before the runtime is installed; the observer waits for one instead of throwing.
     val runtime = appState.marmotOrNull()
     val wakeups = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
+    // Loaded rows MDK removed, read on the event thread and dropped from the list on the main thread.
+    val removals = remember(controller) { Channel<Set<String>>(Channel.UNLIMITED) }
+    LaunchedEffect(controller) {
+        for (keys in removals) controller.revoke(keys)
+    }
     // The first launch before any page landed is not a change: that page reads current data. A later launch is a
     // real block change, or a return to a screen whose rows may be stale.
     val firstLaunch = remember(controller) { booleanArrayOf(true) }
@@ -184,10 +192,7 @@ private fun GlobalSearchResultsRecheckEffects(
                     runtime = runtime,
                     account = account,
                     wakeups = wakeups,
-                    touched = { event ->
-                        val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update
-                        update?.accountLabel == account && controller.isTouchedBy(update.update)
-                    },
+                    touched = { event -> touchesLoadedRows(event, account, controller, removals) },
                     // Asked after the subscription opened. A fresh query skips the probe: in practice its first read
                     // starts only after the 275 ms keystroke debounce, so the subscription is usually open by then,
                     // though nothing orders the two. A session with rows loaded — a return to a held session — wakes,
@@ -201,7 +206,9 @@ private fun GlobalSearchResultsRecheckEffects(
     val expiry = controller.state.nextExpiry
     LaunchedEffect(controller, expiry) {
         val deadline = expiry ?: return@LaunchedEffect
-        delay((deadline.toLong() * MILLIS_PER_SECOND - System.currentTimeMillis()).coerceAtLeast(0L))
+        delay((deadline.toLong() * MILLIS_PER_SECOND - controller.environment.nowMillis()).coerceAtLeast(0L))
+        // The expired row leaves at once; the coalesced recheck that follows rereads the rest.
+        controller.revoke()
         wakeups.send(Unit)
     }
 }
@@ -210,3 +217,28 @@ private const val GLOBAL_SEARCH_RECHECK_COALESCE_MS = 750L
 private const val GLOBAL_SEARCH_OBSERVER_RETRY_MS = 5_000L
 private const val GLOBAL_SEARCH_OBSERVER_ATTEMPTS = 3
 private const val MILLIS_PER_SECOND = 1_000L
+
+/**
+ * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Loaded rows it
+ * removes go to [removals] first, so they leave the list before the recheck lands.
+ */
+private fun touchesLoadedRows(
+    event: MarmotEventFfi,
+    account: String,
+    controller: GlobalSearchResultsController,
+    removals: SendChannel<Set<String>>,
+): Boolean {
+    val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update?.takeIf { it.accountLabel == account }
+    val removed = update?.let { controller.removedLoadedKeys(it.update) }.orEmpty()
+    if (removed.isNotEmpty()) removals.trySend(removed)
+    return update != null && controller.isTouchedBy(update.update)
+}
+
+/** The loaded rows [update] removes, which leave the list before the recheck it triggers lands. */
+internal fun GlobalSearchResultsController.removedLoadedKeys(update: TimelineProjectionUpdateFfi): Set<String> {
+    val loaded = state.seenKeys
+    return update.changes
+        .filterIsInstance<TimelineMessageChangeFfi.Remove>()
+        .map { globalSearchKey(update.groupIdHex, it.messageIdHex) }
+        .filterTo(HashSet()) { it in loaded }
+}

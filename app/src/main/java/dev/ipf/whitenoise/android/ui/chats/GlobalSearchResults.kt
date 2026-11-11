@@ -169,7 +169,8 @@ internal suspend fun <R> fillGlobalSearchBatch(
  * [refresh] rereads the loaded range from the head; its [cursor] is then the old continuation it reads through.
  * [launch] is unique per request within a generation, so a completion that outlived its cancellation can never
  * match a newer request that happens to read the same range. A [verifying] refresh rechecks rows the reader has not
- * seen confirmed since returning (#1945); it never keeps rows below where it stopped.
+ * seen confirmed since returning (#1945); it never keeps rows below where it stopped. A refresh with a [from] cursor
+ * continues a capped recheck: it rereads only the rows older than [from], which the previous pass already covered.
  */
 internal data class GlobalSearchPageRequest(
     val generation: Int,
@@ -179,13 +180,17 @@ internal data class GlobalSearchPageRequest(
     val refresh: Boolean = false,
     val launch: Long = 0L,
     val verifying: Boolean = false,
+    val from: GlobalSearchCursor? = null,
 )
 
 /**
  * Transient results of one search generation. Only admitted rows are kept, never raw pages. [emptyBatches] counts
  * consecutive batches that showed nothing, [launches] numbers every request started, and [batches] increases with
  * every finished one,
- * so paging effects relaunch even when a batch completes within one frame.
+ * so paging effects relaunch even when a batch completes within one frame. [validateFrom] is where a capped recheck
+ * stopped: loaded rows older than it have not been reread since the change that asked for the recheck, so the
+ * controller keeps rechecking from there until the whole loaded range is covered. [withdrawn] holds rows MDK reported
+ * removed, which no later page or reread of this generation may list again.
  */
 internal data class GlobalSearchResultsState(
     val generation: Int = 0,
@@ -198,6 +203,8 @@ internal data class GlobalSearchResultsState(
     val emptyBatches: Int = 0,
     val batches: Int = 0,
     val launches: Long = 0L,
+    val validateFrom: GlobalSearchCursor? = null,
+    val withdrawn: Set<String> = emptySet(),
 ) {
     /** The earliest deadline of a loaded disappearing match, when the rows must be checked again. */
     val nextExpiry: ULong? = results.mapNotNull { it.expiresAt }.minOrNull()
@@ -242,7 +249,10 @@ internal object GlobalSearchResultsReducer {
         batch: GlobalSearchBatch,
     ): GlobalSearchResultsState {
         if (request != state.inFlight) return state
-        val fresh = batch.results.filter { it.key !in state.seenKeys }.distinctBy { it.key }
+        val fresh =
+            batch.results
+                .filter { it.key !in state.seenKeys && it.key !in state.withdrawn }
+                .distinctBy { it.key }
         val results = state.results + fresh
         val ended = batch.nextCursor == null
         val emptyBatches = if (fresh.isEmpty()) state.emptyBatches + 1 else 0
@@ -259,13 +269,16 @@ internal object GlobalSearchResultsReducer {
 
     /**
      * Starts rereading the loaded range from the head, after a change that may delete, expire or hide a loaded
-     * row or add a newer match. Null while a batch is in flight or before anything loaded.
+     * row or add a newer match, or from [GlobalSearchResultsState.validateFrom] when [continuing] a capped recheck.
+     * A verifying refresh always starts at the head. Null while a batch is in flight or before anything loaded.
      */
     fun beginRefresh(
         state: GlobalSearchResultsState,
         verifying: Boolean = false,
+        continuing: Boolean = false,
     ): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
         if (state.inFlight != null || state.batches == 0) return null
+        val from = if (continuing && !verifying) state.validateFrom else null
         val launch = state.launches + 1
         val request =
             GlobalSearchPageRequest(
@@ -276,16 +289,19 @@ internal object GlobalSearchResultsReducer {
                 refresh = true,
                 launch = launch,
                 verifying = verifying,
+                from = from,
             )
         return state.copy(inFlight = request, launches = launch) to request
     }
 
     /**
-     * Replaces the loaded range with a reread. [refreshed] covers the head down to [rereadThrough]; loaded rows
-     * older than that keep their place, so a reread capped before the old continuation loses nothing. Rows
-     * keep their stable keys, so a list viewport stays where it was while gone rows drop out. A verifying reread
-     * that stopped short instead drops those older, unconfirmed rows and continues from [rereadThrough], so they
-     * return only as fresh pages.
+     * Replaces the loaded range with a reread. [refreshed] covers the request's start (the head, or the rows older
+     * than [GlobalSearchPageRequest.from]) down to [rereadThrough]; loaded rows newer than the start were covered by
+     * the previous pass and keep their place. Loaded rows older than [rereadThrough] keep their place too, so a
+     * reread capped before the old continuation loses nothing, and [GlobalSearchResultsState.validateFrom] records
+     * where the next pass must continue. Rows keep their stable keys, so a list viewport stays where it was while
+     * gone rows drop out. A verifying reread that stopped short instead drops those older, unconfirmed rows and
+     * continues from [rereadThrough], so they return only as fresh pages.
      */
     fun applyRefresh(
         state: GlobalSearchResultsState,
@@ -295,22 +311,60 @@ internal object GlobalSearchResultsReducer {
     ): GlobalSearchResultsState {
         if (request != state.inFlight || !request.refresh) return state
         val through = request.cursor
-        // The old continuation is the oldest row the range consumed, so it belongs to the range.
-        val head = refreshed.filter { through == null || it.cursor >= through }
         val stoppedShort = rereadThrough != null && (through == null || rereadThrough > through)
         val dropTail = request.verifying && stoppedShort
-        val tail =
-            if (dropTail) emptyList() else state.results.filter { rereadThrough != null && it.cursor < rereadThrough }
-        val results = (head + tail).distinctBy { it.key }
+        val results = keptAfterReread(state, request, refreshed, rereadThrough.takeUnless { dropTail })
         return state.copy(
             results = results,
             seenKeys = results.mapTo(HashSet()) { it.key },
+            validateFrom = if (stoppedShort && !dropTail) rereadThrough else null,
             nextCursor = if (dropTail) rereadThrough else state.nextCursor,
             endReached = state.endReached && !dropTail,
             emptyBatches = if (dropTail) 0 else state.emptyBatches,
             inFlight = null,
             batches = state.batches + 1,
         )
+    }
+
+    /**
+     * The rows a reread leaves listed: rows newer than the request's start, which the pass that set it rechecked,
+     * then the reread rows, then loaded rows older than [keepOlderThan] (none when null). Withdrawn rows never stay.
+     */
+    private fun keptAfterReread(
+        state: GlobalSearchResultsState,
+        request: GlobalSearchPageRequest,
+        refreshed: List<GlobalSearchResult>,
+        keepOlderThan: GlobalSearchCursor?,
+    ): List<GlobalSearchResult> {
+        val from = request.from
+        val through = request.cursor
+        val covered = if (from == null) emptyList() else state.results.filter { it.cursor >= from }
+        // The old continuation is the oldest row the range consumed, so it belongs to the range.
+        val reread = refreshed.filter { through == null || it.cursor >= through }
+        val tail = if (keepOlderThan == null) emptyList() else state.results.filter { it.cursor < keepOlderThan }
+        return (covered + reread + tail).filter { it.key !in state.withdrawn }.distinctBy { it.key }
+    }
+
+    /**
+     * Drops loaded rows whose disappearing deadline has passed at [nowSeconds], the way the conversation hides them.
+     * Their keys stay seen, so no later page lists them again.
+     */
+    fun dropExpired(
+        state: GlobalSearchResultsState,
+        nowSeconds: ULong,
+    ): GlobalSearchResultsState {
+        val expired = state.results.filter { result -> result.expiresAt?.let { it <= nowSeconds } == true }
+        if (expired.isEmpty()) return state
+        return state.copy(results = state.results - expired.toSet())
+    }
+
+    /** Drops loaded rows MDK reported removed, and keeps them out of every later page of this generation. */
+    fun withdraw(
+        state: GlobalSearchResultsState,
+        keys: Set<String>,
+    ): GlobalSearchResultsState {
+        if (keys.isEmpty()) return state
+        return state.copy(results = state.results.filter { it.key !in keys }, withdrawn = state.withdrawn + keys)
     }
 
     /** Keeps every loaded row and the cursor, and waits for a retry; a stale failure is ignored. */

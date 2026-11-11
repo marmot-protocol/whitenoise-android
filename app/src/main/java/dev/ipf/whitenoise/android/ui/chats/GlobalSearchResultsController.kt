@@ -57,6 +57,10 @@ internal class GlobalSearchResultsController(
     private var job: Job? = null
     private var closed = false
 
+    // Only the live query on an open, current session may change [state].
+    private val accepts: (GlobalSearchResultsQuery) -> Boolean =
+        { owner -> !closed && owner == query && environment.isCurrent() }
+
     /**
      * The loaded rows were last read before this session was detached from the screen, so a message deleted,
      * hidden or expired meanwhile may still be among them. The screen shows none of them until the first recheck
@@ -70,6 +74,12 @@ internal class GlobalSearchResultsController(
 
     private var refreshPending = false
     private var loadPending = false
+
+    // A change arrived while a capped recheck was still covering the older rows; the head is reread once it ends.
+    private var headOwed = false
+
+    // Whether the last recheck pass landed; a failed one waits for the next trigger instead of retrying at once.
+    private var lastPassApplied = true
 
     // Whether a stale session is paging on after a capped recheck to re-read the rest of its old range, and the old
     // continuation that paging must reach, or null when the old range had reached MDK's end (#1945).
@@ -88,6 +98,7 @@ internal class GlobalSearchResultsController(
         job?.cancel()
         refreshPending = false
         loadPending = false
+        headOwed = false
         stale = false
         recheckFailed = false
         pagingToVerify = false
@@ -96,11 +107,8 @@ internal class GlobalSearchResultsController(
         val restarted = GlobalSearchResultsReducer.restart(state)
         // A scope with no chats cannot match, so it ends at once instead of reading the whole account.
         state = if (next.matchesNothing) restarted.copy(endReached = true) else restarted
-        read(debounceMillis)
+        loadMore(debounceMillis)
     }
-
-    /** Reads the next bounded batch unless one is in flight or MDK reported the end. */
-    fun loadMore() = read(debounceMillis = 0L)
 
     /**
      * Rechecks a [stale] session again, or reads the failed batch again from its cursor; loaded rows stay. A failed
@@ -113,23 +121,47 @@ internal class GlobalSearchResultsController(
 
     /**
      * Rechecks the loaded rows after a change that can delete, expire, hide or add a match: a projection update,
-     * a block change or a disappearing deadline. It rereads the loaded range from the head within a bounded
-     * budget and replaces rows in place. A request while anything is in flight, the first page included, runs
-     * once that read ends, since the read may already hold a row the change affects.
+     * a block change or a disappearing deadline. Rows past their disappearing deadline drop at once. It then
+     * rereads the loaded range from the head within a bounded budget and replaces rows in place; a capped reread
+     * continues in further bounded passes until every loaded row was rechecked. A request while anything is in
+     * flight, the first page included, runs once that read ends, since the read may already hold a row the change
+     * affects.
      */
     fun refresh() {
-        val current = query?.takeUnless { closed } ?: return
-        val started = GlobalSearchResultsReducer.beginRefresh(state, verifying = stale)
+        if (query == null || closed) return
+        revoke()
         // Anything in flight, the first page included, may already hold a row a later change affects.
         if (state.inFlight != null) {
             refreshPending = true
-        } else if (started != null) {
-            val budget = refreshBatchBudget(state.results.size)
-            // A stale recheck must cover the whole range the reader had; a retry keeps the original target.
-            if (stale && !pagingToVerify) verifyTarget = state.nextCursor
-            state = started.first
-            launch(current, started.second, debounceMillis = 0L, refreshBudget = budget)
+        } else if (state.validateFrom != null && !stale) {
+            // Finish covering the older rows first, so a busy account cannot keep the recheck at the head.
+            headOwed = true
+            recheck(continuing = true)
+        } else {
+            recheck(continuing = false)
         }
+    }
+
+    /**
+     * Drops loaded rows whose disappearing deadline has passed, and the rows with [removed] keys MDK reported gone,
+     * without waiting for a reread. A removed key never returns in this generation.
+     */
+    fun revoke(removed: Set<String> = emptySet()) {
+        if (query == null || closed) return
+        val nowSeconds = (environment.nowMillis() / MILLIS_PER_SECOND).coerceAtLeast(0L).toULong()
+        state = GlobalSearchResultsReducer.withdraw(GlobalSearchResultsReducer.dropExpired(state, nowSeconds), removed)
+    }
+
+    /** Starts one bounded recheck pass, from the head or [continuing] where the previous capped pass stopped. */
+    private fun recheck(continuing: Boolean) {
+        val current = query?.takeUnless { closed } ?: return
+        val (next, request) =
+            GlobalSearchResultsReducer.beginRefresh(state, verifying = stale, continuing = continuing) ?: return
+        val budget = refreshBatchBudget(state.results.size)
+        // A stale recheck must cover the whole range the reader had; a retry keeps the original target.
+        if (stale && !pagingToVerify) verifyTarget = state.nextCursor
+        state = next
+        launch(current, request, debounceMillis = 0L, refreshBudget = budget)
     }
 
     /**
@@ -142,6 +174,7 @@ internal class GlobalSearchResultsController(
         job?.cancel()
         refreshPending = false
         loadPending = false
+        headOwed = false
         state.inFlight?.let { state = GlobalSearchResultsReducer.cancel(state, it) }
         stale = true
         recheckFailed = false
@@ -152,12 +185,16 @@ internal class GlobalSearchResultsController(
         closed = true
         refreshPending = false
         loadPending = false
+        headOwed = false
         job?.cancel()
         query = null
     }
 
-    /** Starts one batch for the current generation, unless one is in flight or MDK reported the end. */
-    private fun read(debounceMillis: Long) {
+    /**
+     * Reads the next bounded batch unless one is in flight or MDK reported the end. [debounceMillis] delays only
+     * this read.
+     */
+    fun loadMore(debounceMillis: Long = 0L) {
         val current = query?.takeUnless { closed } ?: return
         // A page or Retry asked for during a background refresh runs once the refresh lands, never dropped.
         if (state.inFlight?.refresh == true) loadPending = true
@@ -185,6 +222,8 @@ internal class GlobalSearchResultsController(
                     if (accepts(current)) {
                         val applies = state.inFlight == request
                         state = next(state)
+                        // A row may have expired between the read and now.
+                        revoke()
                         if (applies) settle(request, succeeded = true)
                     }
                 } catch (cancel: CancellationException) {
@@ -210,6 +249,7 @@ internal class GlobalSearchResultsController(
         request: GlobalSearchPageRequest,
         succeeded: Boolean,
     ) {
+        if (request.refresh) lastPassApplied = succeeded
         val confirming = request.verifying || pagingToVerify
         when {
             !succeeded -> if (stale && (request.refresh || pagingToVerify)) recheckFailed = true
@@ -221,22 +261,32 @@ internal class GlobalSearchResultsController(
         }
     }
 
-    /** Runs a refresh that arrived during the batch, else a page asked for during a refresh. */
+    /**
+     * Runs a refresh that arrived during the batch, else a page asked for during a refresh, else the next pass of a
+     * capped recheck, else the head reread a change during that recheck asked for. A failed pass keeps where it
+     * stopped and continues on the next trigger rather than retrying at once.
+     */
     private fun continueAfter() {
+        if (state.inFlight != null) return
         val verificationOwed = pagingToVerify && stale && !recheckFailed
-        if (verificationOwed && state.inFlight == null) {
-            read(0L)
-        } else if (refreshPending) {
-            refreshPending = false
-            refresh()
-        } else if (loadPending) {
-            loadPending = false
-            read(0L)
+        when {
+            verificationOwed -> loadMore()
+            refreshPending -> {
+                refreshPending = false
+                refresh()
+            }
+            loadPending -> {
+                loadPending = false
+                loadMore()
+            }
+            stale || state.failed -> Unit
+            state.validateFrom != null && lastPassApplied -> recheck(continuing = true)
+            headOwed -> {
+                headOwed = false
+                recheck(continuing = false)
+            }
         }
     }
-
-    /** Only the live query on an open, current session may change [state]. */
-    private fun accepts(owner: GlobalSearchResultsQuery): Boolean = !closed && owner == query && environment.isCurrent()
 }
 
 /** Reads what [request] asks for and returns the transition that applies it to the then-current state. */
@@ -249,7 +299,7 @@ private suspend fun completeGlobalSearchRequest(
 ): (GlobalSearchResultsState) -> GlobalSearchResultsState =
     if (request.refresh) {
         val source = batchSource(reader, environment, current)
-        val (rows, through) = rereadGlobalSearchRange(source, request.cursor, refreshBudget)
+        val (rows, through) = rereadGlobalSearchRange(source, request.cursor, refreshBudget, from = request.from)
         val apply: (GlobalSearchResultsState) -> GlobalSearchResultsState = {
             GlobalSearchResultsReducer.applyRefresh(it, request, rows, through)
         }
@@ -319,16 +369,17 @@ internal class GlobalSearchResultsHolder {
 }
 
 /**
- * Rereads from the head until the old continuation [through] (or MDK's end) is reached, or [budget] batches
- * were read. Returns the rows found and the continuation the reread stopped at.
+ * Rereads from the head, or from the rows older than [from], until the old continuation [through] (or MDK's end) is
+ * reached, or [budget] batches were read. Returns the rows found and the continuation the reread stopped at.
  */
 internal suspend fun <R> rereadGlobalSearchRange(
     source: GlobalSearchBatchSource<R>,
     through: GlobalSearchCursor?,
     budget: Int,
+    from: GlobalSearchCursor? = null,
 ): Pair<List<GlobalSearchResult>, GlobalSearchCursor?> {
     val rows = LinkedHashMap<String, GlobalSearchResult>()
-    var cursor: GlobalSearchCursor? = null
+    var cursor: GlobalSearchCursor? = from
     var batches = 0
     do {
         val batch = fillGlobalSearchBatch(cursor, rows.keys.toSet(), source)
@@ -491,6 +542,8 @@ internal fun shouldProbeAfterFirstPage(state: GlobalSearchResultsState): Boolean
 
 /** The most batches one refresh rereads, about a thousand raw rows. */
 internal const val GLOBAL_SEARCH_REFRESH_MAX_BATCHES = 5
+
+private const val MILLIS_PER_SECOND = 1_000L
 
 /**
  * What the screen may show of this session for the [asked] query: nothing until the session adopted the query, nothing

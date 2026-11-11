@@ -49,11 +49,12 @@ internal object GlobalSearchTestFixtures {
     /** The keys of the loaded results in display order. */
     fun keys(controller: GlobalSearchResultsController) = controller.state.results.map { it.key }
 
-    /** A controller whose batches run as children of the test, with the given local hides and owner check. */
+    /** A controller whose batches run as children of the test, with the given local hides, owner check and clock. */
     fun TestScope.controller(
         reader: GlobalSearchTimelineReader,
         hidden: (String) -> Set<String> = { emptySet() },
         isCurrent: () -> Boolean = { true },
+        nowMillis: () -> Long = { NOW_MILLIS },
     ) = GlobalSearchResultsController(
         reader = reader,
         scope = this,
@@ -61,7 +62,7 @@ internal object GlobalSearchTestFixtures {
             GlobalSearchResultsEnvironment(
                 hiddenMessageIds = hidden,
                 isCurrent = isCurrent,
-                nowMillis = { NOW_MILLIS },
+                nowMillis = nowMillis,
                 ioDispatcher = StandardTestDispatcher(testScheduler),
             ),
     )

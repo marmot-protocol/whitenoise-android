@@ -24,7 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.lang.reflect.Proxy
 
-/** Loaded message results are rechecked after relevant changes, without chaining rereads (#1944). */
+/** Loaded message results are rechecked after relevant changes in bounded passes (#1944). */
 class GlobalSearchResultsRecheckTest {
     /** A refresh drops a row deleted while listed, adds a newer match, and keeps the other rows in place. */
     @Test
@@ -328,11 +328,11 @@ class GlobalSearchResultsRecheckTest {
         }
 
     /**
-     * A refresh of a long scrolled session rereads a bounded number of batches from the head; rows below where it
-     * stopped keep their previous state until a later refresh reaches them.
+     * A refresh of a long scrolled session rereads a bounded number of batches per pass and chains passes until it
+     * has rechecked every loaded row, so a deletion far below the head is dropped too.
      */
     @Test
-    fun refreshOfALongSessionIsCappedAndKeepsRowsBelowTheCap() =
+    fun refreshOfALongSessionChainsBoundedPassesDownToTheOldestRow() =
         runTest {
             val store = StoreReader((0 until 1_600).map { record("g", "m%04d".format(it), at = it.toULong() + 1uL) })
             val controller = controller(store)
@@ -346,14 +346,19 @@ class GlobalSearchResultsRecheckTest {
             store.replace("m1599") { it.copy(deleted = true) }
             store.replace("m0000") { it.copy(deleted = true) }
             val readsBefore = store.queries.size
+            val launchesBefore = controller.state.launches
 
             controller.refresh()
             advanceUntilIdle()
 
+            val passes = (controller.state.launches - launchesBefore).toInt()
             val reads = store.queries.size - readsBefore
-            assertTrue("$reads reads", reads <= GLOBAL_SEARCH_REFRESH_MAX_BATCHES * GLOBAL_SEARCH_BATCH_PAGES)
+            val perPass = GLOBAL_SEARCH_REFRESH_MAX_BATCHES * GLOBAL_SEARCH_BATCH_PAGES
+            assertTrue("$passes passes", passes > 1)
+            assertTrue("$reads reads in $passes passes", reads <= passes * perPass)
             assertFalse("the newest deletion is rechecked", "g:m1599" in keys(controller))
-            assertTrue("a row below the cap keeps its state for a later refresh", "g:m0000" in keys(controller))
+            assertFalse("the chain reaches the oldest row", "g:m0000" in keys(controller))
+            assertEquals(1_598, controller.state.results.size)
         }
 
     /** The refresh budget follows the loaded rows but never exceeds its cap. */
