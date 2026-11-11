@@ -203,6 +203,29 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertTrue("and stays withdrawn", "g:m0299" in controller.state.withdrawn)
         }
 
+    /**
+     * A queued removal survives any number of query changes before the store catches up: each new query starts with
+     * the key withdrawn, so its first read still cannot list the row.
+     */
+    @Test
+    fun aQueuedRemovalStaysOutAcrossSeveralQueryChanges() =
+        runTest {
+            val store = StoreReader(rows())
+            val controller = controller(store)
+            loadAll(controller)
+            val removal =
+                update("g", TimelineMessageChangeFfi.Remove("m0299", TimelineRemoveReasonFfi.entries.first()))
+            controller.deliver(removal, drain = false)
+
+            controller.search(GlobalSearchResultsQuery(needle = "hell"))
+            advanceUntilIdle()
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertTrue("the third query read its first page", controller.state.results.isNotEmpty())
+            assertFalse("the removal still applies", "g:m0299" in keys(controller))
+            assertTrue("and stays withdrawn", "g:m0299" in controller.state.withdrawn)
+        }
+
     /** Changes queued before the main thread drains them apply in arrival order, so the last one decides. */
     @Test
     fun queuedChangesApplyInArrivalOrder() =
@@ -396,9 +419,9 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertEquals(LOADED, controller.state.results.size)
         }
 
-    /** A removal in a chat outside the query's scope is neither withdrawn nor retained for the generation. */
+    /** A removal outside the query's scope is still withdrawn, so a later query covering it never lists it. */
     @Test
-    fun aRemovalOutsideTheScopeIsNotRetained() =
+    fun aRemovalOutsideTheScopeIsRetainedForLaterQueries() =
         runTest {
             val controller = controller(StoreReader(rows()))
             controller.search(GlobalSearchResultsQuery(needle = "hello", groups = setOf("g")))
@@ -410,8 +433,12 @@ class GlobalSearchResultsRevocationCoverageTest {
             controller.deliver(elsewhere)
             controller.deliver(inside)
 
-            assertEquals(setOf("g:m0299"), controller.state.withdrawn)
+            assertEquals(setOf("other:x", "g:m0299"), controller.state.withdrawn)
             assertFalse("g:m0299" in keys(controller))
+
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertEquals(setOf("other:x", "g:m0299"), controller.state.withdrawn)
         }
 
     /** Fails every read that continues below [failBelow]. */

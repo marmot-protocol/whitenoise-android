@@ -190,7 +190,8 @@ internal data class GlobalSearchPageRequest(
  * so paging effects relaunch even when a batch completes within one frame. [validateFrom] is where a capped recheck
  * stopped: loaded rows older than it have not been reread since the change that asked for the recheck, so the
  * controller keeps rechecking from there until the whole loaded range is covered. [withdrawn] holds rows MDK reported
- * removed, which no later page or reread of this generation may list again unless MDK reports them live again.
+ * removed, which no later page or reread of this session, in any generation, may list again unless MDK reports them
+ * live again.
  */
 internal data class GlobalSearchResultsState(
     val generation: Int = 0,
@@ -227,11 +228,12 @@ internal data class GlobalSearchResultsState(
 
 /** Pure transitions of the global message results; the controller owns I/O and cancellation. */
 internal object GlobalSearchResultsReducer {
-    /** A new query, filter set or account: drops every row, cursor and request, and opens the next generation. */
-    fun restart(state: GlobalSearchResultsState): GlobalSearchResultsState {
-        val generation = state.generation + 1
-        return GlobalSearchResultsState(generation = generation)
-    }
+    /**
+     * A new query or filter set: drops every row, cursor and request, and opens the next generation. Withdrawn keys
+     * carry over, so a removal the store has not caught up with stays out however often the query changes.
+     */
+    fun restart(state: GlobalSearchResultsState): GlobalSearchResultsState =
+        GlobalSearchResultsState(generation = state.generation + 1, withdrawn = state.withdrawn)
 
     /** Starts the next batch, or returns null while one is in flight or after MDK's end. */
     fun begin(state: GlobalSearchResultsState): Pair<GlobalSearchResultsState, GlobalSearchPageRequest>? {
@@ -360,7 +362,7 @@ internal object GlobalSearchResultsReducer {
 
     /**
      * Drops loaded rows MDK reported removed, and keeps every reported key, loaded or still held by a read in flight,
-     * out of every later page and reread of this generation.
+     * out of every later page and reread of this session.
      */
     fun withdraw(
         state: GlobalSearchResultsState,

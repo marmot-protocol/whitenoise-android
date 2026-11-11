@@ -78,7 +78,7 @@ internal class GlobalSearchResultsController(
 
     // Keys MDK reported removed or live again, by chat, queued from the event thread; the next [revoke] on the main
     // thread applies those in a chat the query covers, in arrival order.
-    private val reportedChanges = ConcurrentLinkedQueue<Pair<String, GlobalSearchKeyChanges>>()
+    private val reportedChanges = ConcurrentLinkedQueue<GlobalSearchKeyChanges>()
     private var loadPending = false
 
     // A change arrived while a capped recheck was still covering the older rows; the head is reread once it ends.
@@ -113,8 +113,9 @@ internal class GlobalSearchResultsController(
         val restarted = GlobalSearchResultsReducer.restart(state)
         // A scope with no chats cannot match, so it ends at once instead of reading the whole account.
         val opened = if (next.matchesNothing) restarted.copy(endReached = true) else restarted
-        // Changes still queued carry over, so a removal the store has not caught up with never lists for this query.
-        state = applyQueued(opened, next)
+        // Withdrawn keys and changes still queued carry over, so a removal the store has not caught up with never
+        // lists for this query.
+        state = applyQueued(opened)
         loadMore(debounceMillis)
     }
 
@@ -151,40 +152,34 @@ internal class GlobalSearchResultsController(
     }
 
     /**
-     * Queues [changes] MDK reported in chat [groupIdHex], from any thread, without reading the query there. A
-     * completed read applies them in the same main-thread step that applies it, so a read landing before the next
-     * [revoke] call still never lists a removed key.
+     * Queues [changes] MDK reported, from any thread, without reading the query there. A completed read applies
+     * them in the same main-thread step that applies it, so a read landing before the next [revoke] call still never
+     * lists a removed key.
      */
-    fun reportChanged(
-        groupIdHex: String,
-        changes: GlobalSearchKeyChanges,
-    ) {
-        reportedChanges.add(groupIdHex to changes)
+    fun reportChanged(changes: GlobalSearchKeyChanges) {
+        reportedChanges.add(changes)
     }
 
     /**
      * Drops loaded rows whose disappearing deadline has passed, and rows MDK reported removed, passed as [removed]
      * or queued by [reportChanged], without waiting for a reread. A removed key does not list again in this
-     * generation, even when the read holding it lands later, until MDK reports it live again (an invalidated delete):
-     * queued changes apply in arrival order, so the last one decides and the recheck that change asks for relists a
-     * restored row. Queued keys of chats the current query does not cover are discarded.
+     * session, even when the read holding it lands later or the query changes, until MDK reports it live again (an
+     * invalidated delete): queued changes apply in arrival order, so the last one decides and the recheck that change
+     * asks for relists a restored row. Keys of chats the current query does not cover are kept too, so a later query
+     * that covers them does not list them either.
      */
     fun revoke(removed: Set<String> = emptySet()) {
-        val current = query?.takeUnless { closed } ?: return
+        if (query == null || closed) return
         val nowSeconds = (environment.nowMillis() / MILLIS_PER_SECOND).coerceAtLeast(0L).toULong()
         val reducer = GlobalSearchResultsReducer
-        state = applyQueued(reducer.withdraw(reducer.dropExpired(state, nowSeconds), removed), current)
+        state = applyQueued(reducer.withdraw(reducer.dropExpired(state, nowSeconds), removed))
     }
 
-    /** Drains changes queued by [reportChanged] onto [from] in arrival order, discarding chats [current] skips. */
-    private fun applyQueued(
-        from: GlobalSearchResultsState,
-        current: GlobalSearchResultsQuery,
-    ): GlobalSearchResultsState {
+    /** Drains changes queued by [reportChanged] onto [from] in arrival order. */
+    private fun applyQueued(from: GlobalSearchResultsState): GlobalSearchResultsState {
         val reducer = GlobalSearchResultsReducer
         var next = from
-        val queued = generateSequence { reportedChanges.poll() }.filter { current.coversGroup(it.first) }
-        queued.forEach { (_, changes) ->
+        generateSequence { reportedChanges.poll() }.forEach { changes ->
             next = reducer.restore(reducer.withdraw(next, changes.removed), changes.restored)
         }
         return next

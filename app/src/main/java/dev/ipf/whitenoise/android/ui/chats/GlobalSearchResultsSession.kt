@@ -195,8 +195,8 @@ private fun GlobalSearchResultsRecheckEffects(
                     account = account,
                     wakeups = wakeups,
                     touched = { event ->
-                        touchesLoadedRows(event, account, controller) { groupIdHex, changes ->
-                            controller.reportChanged(groupIdHex, changes)
+                        touchesLoadedRows(event, account, controller) { changes ->
+                            controller.reportChanged(changes)
                             removals.trySend(Unit)
                         }
                     },
@@ -231,19 +231,19 @@ private const val MILLIS_PER_SECOND = 1_000L
 
 /**
  * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Every key it
- * removes, deletes or makes live again goes to [report] with its chat first, so a loaded row leaves before the
- * recheck lands and a held one never lists. Reports do not read the scope here, off the main thread: the controller
- * applies it on the main thread. The recheck decision still reads it, which can only mistime a recheck.
+ * removes, deletes or makes live again goes to [report] first, so a loaded row leaves before the recheck lands and a
+ * held one never lists. Reports cover every chat of the account, whatever the query's scope, so a later query keeps a
+ * removed key out too. The recheck decision reads the scope off the main thread, which can only mistime a recheck.
  */
 internal fun touchesLoadedRows(
     event: MarmotEventFfi,
     account: String,
     controller: GlobalSearchResultsController,
-    report: (groupIdHex: String, changes: GlobalSearchKeyChanges) -> Unit,
+    report: (changes: GlobalSearchKeyChanges) -> Unit,
 ): Boolean {
     val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update?.takeIf { it.accountLabel == account }
     update?.update?.let { change ->
-        globalSearchKeyChanges(change).takeUnless { it.isEmpty() }?.let { report(change.groupIdHex, it) }
+        globalSearchKeyChanges(change).takeUnless { it.isEmpty() }?.let(report)
     }
     return update != null && controller.isTouchedBy(update.update)
 }

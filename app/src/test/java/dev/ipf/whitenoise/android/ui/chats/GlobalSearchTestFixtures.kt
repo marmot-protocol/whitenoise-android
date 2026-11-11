@@ -65,7 +65,8 @@ internal object GlobalSearchTestFixtures {
                 MarmotEventFfi.ProjectionUpdated(RuntimeProjectionUpdateFfi("ff".repeat(32), ACCOUNT, update)),
                 ACCOUNT,
                 this,
-            ) { groupIdHex, changes -> reportChanged(groupIdHex, changes) }
+                this::reportChanged,
+            )
         if (drain) revoke()
         return touched
     }
