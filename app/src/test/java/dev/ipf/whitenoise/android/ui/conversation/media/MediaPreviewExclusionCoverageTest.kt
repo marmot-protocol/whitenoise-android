@@ -7,12 +7,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -114,7 +118,11 @@ class MediaPreviewExclusionCoverageTest {
     }
 
     private fun applyExclusions(draft: Draft) {
-        composeRule.onNodeWithText(app.getString(R.string.done)).performClick()
+        // Invoke the button's click action directly: a touch at its bounds can land on the filmstrip overlay.
+        composeRule
+            .onNode(hasText(app.getString(R.string.done)) and hasClickAction())
+            .assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.OnClick)
         // Removals apply one per recomposition; Done closes the screen once the last one lands.
         runCatching { composeRule.waitUntil(timeoutMillis = 5_000L) { draft.closed >= 1 } }.onFailure { cause ->
             throw AssertionError(
