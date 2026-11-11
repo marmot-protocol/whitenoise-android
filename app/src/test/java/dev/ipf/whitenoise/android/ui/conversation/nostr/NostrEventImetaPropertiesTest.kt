@@ -9,7 +9,14 @@ class NostrEventImetaPropertiesTest {
     fun repeatedNamesKeepAuthorOrder() {
         val properties =
             imetaProperties(
-                listOf("imeta", "url https://a.example/1.mp4", "M video/mp4", "url https://a.example/2.mp4", "dim", " x"),
+                listOf(
+                    "imeta",
+                    "url https://a.example/1.mp4",
+                    "M video/mp4",
+                    "url https://a.example/2.mp4",
+                    "dim",
+                    " x",
+                ),
             )
 
         assertEquals(listOf("https://a.example/1.mp4", "https://a.example/2.mp4"), properties["url"])
