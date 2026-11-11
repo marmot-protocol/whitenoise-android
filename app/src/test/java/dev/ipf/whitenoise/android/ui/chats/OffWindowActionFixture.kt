@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import android.content.Context
 import androidx.compose.runtime.MutableIntState
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AccountAttachmentQueryFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -69,6 +70,9 @@ internal class OffWindowActionFixture(
 
     /** Every native message-search page query, with the account it was issued for. */
     val timelineQueries = ConcurrentLinkedQueue<Pair<String, TimelineMessageQueryFfi>>()
+
+    /** Every native attachment-library page query; the page itself always fails, so only the query is observed. */
+    val attachmentQueries = ConcurrentLinkedQueue<AccountAttachmentQueryFfi>()
     val state: WhiteNoiseAppState
     val controller: ChatsController
 
@@ -238,6 +242,10 @@ internal class OffWindowActionFixture(
                     check(nativeFolderReads) { "Unexpected unread action native call" }
                     timelineQueries += (args!![0] as String) to (args[1] as TimelineMessageQueryFfi)
                     TimelinePageFfi(emptyList(), hasMoreBefore = false, hasMoreAfter = false)
+                }
+                "accountAttachmentHistoryPage" -> {
+                    attachmentQueries += args!![1] as AccountAttachmentQueryFfi
+                    error("attachment page unavailable")
                 }
                 "catchUpAccounts" -> Unit
                 "toString" -> "OffWindowActionNative"

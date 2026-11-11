@@ -800,7 +800,7 @@ internal fun ChatsScreen(
             globalSearchState.chatTypeFilters.isNotEmpty() ||
             globalSearchState.chatFilters.isNotEmpty()
     // Search covers every chat of the account, not just the retained Home window (#3720).
-    val completeScope =
+    val completeScopeState =
         rememberGlobalSearchCompleteScope(
             appState = appState,
             controller = controller,
@@ -811,12 +811,16 @@ internal fun ChatsScreen(
             folderFilters = globalSearchState.folderFilters,
             folderStore = folderStoreState,
         )
+    val completeScope = completeScopeState.scope
     val scopedChatIds =
         remember(completeScope, libraryChatScoped, globalSearchState) {
             completeScope?.takeIf { libraryChatScoped }?.scopedChatIds(globalSearchState)
         }
     // A chat-scoped search never runs on a window-only or empty scope while the complete one resolves.
-    val scopePending = searchOpen && searchActive && libraryChatScoped && completeScope == null
+    val scopeUnresolved = searchOpen && searchActive && libraryChatScoped && completeScope == null
+    // A scope that failed to resolve shows the existing error state with Retry rather than loading forever.
+    val scopeFailed = scopeUnresolved && completeScopeState.failed
+    val scopePending = scopeUnresolved && !scopeFailed
     val libraryQuery =
         remember(libraryChatScoped, scopedChatIds, messageSearchConstraints, libraryKinds, trimmedQuery) {
             globalAttachmentLibraryQuery(
@@ -848,9 +852,14 @@ internal fun ChatsScreen(
             messageResultsQuery,
             messageResultsMode,
             searchViewport?.messageResults,
-            paused = scopePending,
+            paused = scopeUnresolved,
         )
-    val messageResultsState = messageResults?.shownState(messageResultsQuery)
+    val messageResultsState =
+        if (scopeFailed) {
+            GlobalSearchResultsState(generation = 0, batches = 1, failed = true)
+        } else {
+            messageResults?.shownState(messageResultsQuery)
+        }
     // Pending until the session adopts this query, and on a return to a held session (#1945) until its first
     // recheck lands, so a restored deep viewport never measures a shorter list and no row unverified since the
     // reader came back is shown. Rows of an older query are never shown.
@@ -871,7 +880,7 @@ internal fun ChatsScreen(
             appState,
             libraryAccount,
             libraryQuery,
-            browsingAttachments && !scopePending,
+            browsingAttachments && !scopeUnresolved,
             searchViewport?.libraryExtent,
         )
     // A returning session holds its rows back until it has reread as far as before, so the grid keeps its place.
@@ -896,8 +905,17 @@ internal fun ChatsScreen(
         }
     val libraryLoading =
         browsingAttachments &&
+            !scopeFailed &&
             (scopePending || (!libraryQuery.matchesNothing && libraryPager?.state?.loading != false))
-    val libraryContent = GlobalAttachmentLibraryContent(libraryItems, libraryKinds, libraryLoading, libraryPager)
+    val libraryContent =
+        GlobalAttachmentLibraryContent(
+            libraryItems,
+            libraryKinds,
+            libraryLoading,
+            libraryPager,
+            scopeFailed = browsingAttachments && scopeFailed,
+            onRetryScope = completeScopeState.retry,
+        )
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
     // address shows a loading state, then a `/.well-known/nostr.json` lookup
@@ -1892,11 +1910,11 @@ internal fun ChatsScreen(
         openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
     }
     val messageResultsActions =
-        remember(messageResults) {
+        remember(messageResults, scopeFailed, completeScopeState) {
             GlobalSearchResultsActions(
                 onOpen = { openMessageResult(it) },
                 onLoadMore = { messageResults?.loadMore() },
-                onRetry = { messageResults?.retry() },
+                onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() },
             )
         }
     val messageResultSelected =

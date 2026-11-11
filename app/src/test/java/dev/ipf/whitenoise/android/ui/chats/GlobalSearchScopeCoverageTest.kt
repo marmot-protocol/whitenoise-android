@@ -6,9 +6,16 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
+import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.chatRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -44,6 +51,7 @@ class GlobalSearchScopeCoverageTest {
     private val search = mutableStateOf(GlobalSearchState())
     private var fixture: OffWindowActionFixture? = null
 
+    /** Unmounts the screen, releases the controller and cancels the fixture scope after each test. */
     @After fun close() {
         rule.mainClock.autoAdvance = true
         rule.runOnIdle { mounted.value = false }
@@ -179,6 +187,115 @@ class GlobalSearchScopeCoverageTest {
         assertTrue(model.timelineQueries.all { it.second.groupIdHex == null })
     }
 
+    /** A scope read that fails for any reason but "not ready" shows the failed state with Retry, never a crash. */
+    @Test fun unexpectedScopeFailureShowsRetryAndRecovers() {
+        val model = prepared()
+        var broken = true
+        model.chatListQueryIds = { _, _ ->
+            if (broken) throw IllegalStateException("native read failed")
+            listOf(ACTION_TARGET)
+        }
+        val folder = createFolder(model, ChatFolderRule(includeMuted = true))
+        openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
+        awaitFailedWithRetry()
+        assertTrue("a failed scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
+        broken = false
+        rule.onNodeWithText(rule.activity.getString(R.string.retry)).performClick()
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        assertEquals(setOf(ACTION_TARGET), model.scopedGroups)
+    }
+
+    /**
+     * A removal of unknown cause ends the prepared snapshot's proof, so the scope makes its own account-wide read;
+     * if that read fails the search reaches the failed state with Retry instead of loading forever, and Retry
+     * recovers.
+     */
+    @Test fun failedAccountWideReadShowsRetryAndRecovers() {
+        val model = prepared()
+        rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
+        settle()
+        model.beforeSnapshotRead = { throw IllegalStateException("snapshot unavailable") }
+        rule.runOnIdle {
+            model.controller.applyChatListSubscriptionUpdate(
+                ACTION_ACCOUNT,
+                ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, ARRIVED_CHAT),
+            )
+        }
+        openSearch(
+            GlobalSearchState(isOpen = true, query = "hello", chatTypeFilters = setOf(GlobalSearchChatType.GROUPS)),
+        )
+        awaitFailedWithRetry()
+        assertTrue("a failed scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
+        model.beforeSnapshotRead = null
+        rule.onNodeWithText(rule.activity.getString(R.string.retry)).performClick()
+        awaitReads { model.scopedGroups.size >= 3 }
+        assertEquals(setOf(ACTION_TARGET, ACTION_SURVIVOR, GROUP_EXTRA), model.scopedGroups)
+    }
+
+    /** A participant folder waits for unresolved rosters, then scopes to the chats whose roster names the member. */
+    @Test fun participantFolderWaitsForRostersThenScopes() {
+        val release = CompletableDeferred<Unit>()
+        val model = prepared(memberLoader = rosterLoader(release))
+        val folder = createFolder(model, ChatFolderRule(includeMemberPubkeys = setOf(MEMBER)))
+        openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
+        settle()
+        assertTrue("no query may run before rosters resolve: ${model.timelineQueries}", model.timelineQueries.isEmpty())
+        rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
+        release.complete(Unit)
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        assertEquals(setOf(GROUP_EXTRA), model.scopedGroups)
+    }
+
+    /** A roster that cannot be resolved fails the scope, so no chat is silently dropped from a participant folder. */
+    @Test fun participantFolderWithUnresolvedRosterFailsWithRetry() {
+        val model = prepared(memberLoader = { _, _ -> throw IllegalStateException("roster unavailable") })
+        val folder = createFolder(model, ChatFolderRule(includeMemberPubkeys = setOf(MEMBER)))
+        openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
+        awaitFailedWithRetry()
+        assertTrue("a failed scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
+    }
+
+    /** Files and media browsing queries the library with the complete scope and stays loading until it is ready. */
+    @Test fun attachmentLibraryGetsCompleteScopeAndWaitsWhilePending() {
+        val model = prepared()
+        var ready = false
+        model.chatListQueryIds = { _, _ ->
+            if (!ready) throw MarmotKitException.ChatPresentationNotReady()
+            listOf(ACTION_TARGET, GROUP_EXTRA)
+        }
+        val folder = createFolder(model, ChatFolderRule(includeMuted = true))
+        openSearch(
+            GlobalSearchState(
+                isOpen = true,
+                folderFilters = setOf(folder),
+                contentFilterSelection =
+                    GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.FILES_DOCUMENTS)),
+            ),
+        )
+        settle()
+        assertTrue("no library query may run on a pending scope", model.attachmentQueries.isEmpty())
+        ready = true
+        rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
+        awaitReads { model.attachmentQueries.isNotEmpty() }
+        val groups = model.attachmentQueries.first().groups
+        assertEquals(setOf(ACTION_TARGET, GROUP_EXTRA), groups?.toSet())
+    }
+
+    /** Waits for the shared results failed state and its Retry action. */
+    private fun awaitFailedWithRetry() {
+        val retry = rule.activity.getString(R.string.retry)
+        awaitReads { rule.onAllNodesWithText(retry).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithText(retry).assertExists()
+    }
+
+    /** A roster loader that holds every load until [release], then names [MEMBER] only in [GROUP_EXTRA]. */
+    private fun rosterLoader(release: CompletableDeferred<Unit>): RosterLoader =
+        { _, groupId ->
+            release.await()
+            if (groupId == GROUP_EXTRA) listOf(memberRecord(MEMBER)) else listOf(memberRecord(OTHER_MEMBER))
+        }
+
+    /** Creates a folder named "Scoped" with [folderRule] and returns its id. */
     private fun createFolder(
         model: OffWindowActionFixture,
         folderRule: ChatFolderRule,
@@ -189,11 +306,13 @@ class GlobalSearchScopeCoverageTest {
         }
     }
 
+    /** Publishes [state] as the global search state and waits for composition to settle. */
     private fun openSearch(state: GlobalSearchState) {
         rule.runOnIdle { search.value = state }
         rule.waitForIdle()
     }
 
+    /** Drives the test scheduler and main looper for a bounded stretch, so pending work finishes or stays blocked. */
     private fun settle() {
         repeat(40) {
             scope.testScheduler.runCurrent()
@@ -202,6 +321,7 @@ class GlobalSearchScopeCoverageTest {
         }
     }
 
+    /** Pumps the test scheduler and main looper until [ready] holds, failing after ten seconds. */
     private fun awaitReads(ready: () -> Boolean) {
         rule.waitUntil(timeoutMillis = 10_000) {
             scope.testScheduler.runCurrent()
@@ -213,8 +333,10 @@ class GlobalSearchScopeCoverageTest {
     }
 
     /** Mounts production ChatsScreen with one window chat and off-window group, direct and unknown chats. */
-    private fun prepared(): OffWindowActionFixture {
-        val model = OffWindowActionFixture(scope, nativeFolderReads = true).also { fixture = it }
+    private fun prepared(memberLoader: RosterLoader = { _, _ -> emptyList() }): OffWindowActionFixture {
+        val model =
+            OffWindowActionFixture(scope, memberLoader = memberLoader, nativeFolderReads = true)
+                .also { fixture = it }
         model.snapshotExtras =
             listOf(
                 chatRow(GROUP_EXTRA),
@@ -244,7 +366,13 @@ class GlobalSearchScopeCoverageTest {
 private val OffWindowActionFixture.scopedGroups: Set<String>
     get() = timelineQueries.mapNotNullTo(HashSet()) { it.second.groupIdHex }
 
+private fun memberRecord(pubkey: String) = AppGroupMemberRecordFfi(pubkey, null, false)
+
+private val MEMBER = "ab".repeat(32)
+private val OTHER_MEMBER = "cd".repeat(32)
 private val GROUP_EXTRA = "d7".repeat(16)
 private val DIRECT_EXTRA = "e7".repeat(16)
 private val ARRIVED_CHAT = "f7".repeat(16)
 private val EVICTED_CHAT = "9a".repeat(16)
+
+private typealias RosterLoader = suspend (String, String) -> List<AppGroupMemberRecordFfi>

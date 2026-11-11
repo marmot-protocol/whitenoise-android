@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -17,10 +17,13 @@ import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.memberCandidateIds
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
+import dev.ipf.whitenoise.android.core.unreadNeedsMembers
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatFolderQuery
+import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatListSelectAllScope
@@ -30,6 +33,7 @@ import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.departedFolderMatches
 import dev.ipf.whitenoise.android.state.folderQuery
 import dev.ipf.whitenoise.android.state.readAccountWideForwardTargets
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
@@ -81,24 +85,52 @@ internal data class GlobalSearchScopeFence(
     val folderStore: Any?,
 )
 
-private data class ScopeRevisions(
+/** What a global search knows about its complete scope: still resolving, unable to resolve, or proven. */
+internal sealed interface GlobalSearchScopeStatus {
+    /** No covering snapshot, native membership or roster is ready yet; no scoped query may run. */
+    data object Pending : GlobalSearchScopeStatus
+
+    /** The read, a native folder query or a roster resolution failed; the surface offers Retry. */
+    data object Failed : GlobalSearchScopeStatus
+
+    /** Every chat the search is scoped to is known. */
+    data class Ready(
+        val scope: GlobalSearchCompleteScope,
+    ) : GlobalSearchScopeStatus
+}
+
+/** The scope [status] plus [retry], which reruns the account-wide read and every resolution behind it. */
+internal class GlobalSearchScopeState(
+    val status: GlobalSearchScopeStatus,
+    val retry: () -> Unit,
+) {
+    /** The proven scope, or null while it is pending or failed. */
+    val scope: GlobalSearchCompleteScope? get() = (status as? GlobalSearchScopeStatus.Ready)?.scope
+
+    /** Whether resolving the scope failed, so a chat-scoped search shows its error state instead of loading. */
+    val failed: Boolean get() = status is GlobalSearchScopeStatus.Failed
+}
+
+/** Membership revisions a scope is reread on; row-level revisions reach the scope through the retained rows. */
+private data class Revisions(
     val groups: Long,
-    val forwardTargets: Long,
     val ambiguousRemovals: Long,
 )
 
-private fun ChatsController.scopeRevisions() =
-    ScopeRevisions(
-        materializedGroupsRevision,
-        forwardTargetsRevision,
-        ambiguousMembershipRemovalsRevision,
-    )
+/**
+ * The revisions that can change which chats exist: window membership and removals of unknown cause. Row-level
+ * changes (such as [ChatsController.forwardTargetsRevision], bumped on every recompute) are not among them,
+ * because retained rows override the snapshot and a stale membership is withheld by `coversCurrentMembership`.
+ */
+private fun ChatsController.revisions() = Revisions(materializedGroupsRevision, ambiguousMembershipRemovalsRevision)
 
 /**
- * The complete scope while search is [enabled], or null while it is pending: no covering account-wide snapshot yet,
- * a folder's native membership not ready, or a result for an account or folder state that has since changed.
- * The snapshot is [seed] when that still covers membership, and is reread on the same revision signals the chat
- * list's unread snapshot uses. Projection and folder resolution run off the main thread.
+ * The complete scope state while search is [enabled]: pending until a covering account-wide snapshot, every
+ * folder's native membership and every needed participant roster are known, [GlobalSearchScopeStatus.Failed]
+ * when the read, a native query or a roster resolution fails, and otherwise the scope. A result for an account
+ * or folder state that has since changed is dropped. The snapshot is [seed] when that still covers membership,
+ * and is reread on membership revisions. Row projection runs on the main thread that owns the controller's caches;
+ * only matching and native queries run off it.
  */
 @Composable
 internal fun rememberGlobalSearchCompleteScope(
@@ -110,7 +142,7 @@ internal fun rememberGlobalSearchCompleteScope(
     homeFolderId: String?,
     folderFilters: Set<String>,
     folderStore: Any?,
-): GlobalSearchCompleteScope? {
+): GlobalSearchScopeState {
     val fence =
         GlobalSearchScopeFence(
             controller,
@@ -120,43 +152,80 @@ internal fun rememberGlobalSearchCompleteScope(
             folderFilters,
             folderStore,
         )
-    val own = rememberScopeSnapshot(appState, controller, enabled, seed)
-    val snapshot = listOfNotNull(own, seed).firstOrNull { it.isCurrent && it.coversCurrentMembership }
-    val produced = rememberResolvedScope(appState, controller, titleCopy, enabled, snapshot, fence)
-    return produced?.takeIf { enabled && it.first == fence }?.second
+    var retryRevision by remember(controller, fence.activeAccountRef, fence.runtimeGeneration) { mutableIntStateOf(0) }
+    val read = rememberScopeSnapshot(appState, controller, enabled, seed, retryRevision)
+    val snapshot = listOfNotNull(read.own, seed).firstOrNull { it.isCurrent && it.coversCurrentMembership }
+    val produced = rememberResolvedScope(appState, controller, titleCopy, enabled, snapshot, fence, retryRevision)
+    val status =
+        when {
+            !enabled -> GlobalSearchScopeStatus.Pending
+            snapshot == null -> if (read.failed) GlobalSearchScopeStatus.Failed else GlobalSearchScopeStatus.Pending
+            else -> produced?.takeIf { it.first == fence }?.second ?: GlobalSearchScopeStatus.Pending
+        }
+    return GlobalSearchScopeState(status) { retryRevision += 1 }
 }
 
-/** This screen's own account-wide snapshot, reread on each scope revision unless a covering [seed] opens search. */
+/** The account-wide read this screen holds for the scope: its snapshot, and whether the latest read failed. */
+private class ScopeRead {
+    var own by mutableStateOf<AccountWideForwardTargets?>(null)
+    var failed by mutableStateOf(false)
+
+    /** Records [read] for the binding it started under; a read for another binding or an unavailable one is ignored. */
+    fun apply(
+        read: AccountWideRead,
+        sameRuntime: Boolean,
+    ) {
+        if (!sameRuntime) return
+        when (read) {
+            is AccountWideRead.Loaded ->
+                if (read.snapshot.isCurrent) {
+                    own = read.snapshot
+                    failed = false
+                }
+            AccountWideRead.Failed -> failed = true
+            AccountWideRead.Unavailable -> Unit
+        }
+    }
+}
+
+/**
+ * This screen's own account-wide read, redone on each scope revision and each [retryRevision] unless a covering
+ * [seed] opens search. A failed read is kept apart from a pending one so the surface can offer Retry.
+ */
 @Composable
 private fun rememberScopeSnapshot(
     appState: WhiteNoiseAppState,
     controller: ChatsController,
     enabled: Boolean,
     seed: AccountWideForwardTargets?,
-): AccountWideForwardTargets? {
+    retryRevision: Int,
+): ScopeRead {
     val account = appState.activeAccountRef
     val generation = appState.runtimeGeneration
-    var own by remember(controller, account, generation) { mutableStateOf<AccountWideForwardTargets?>(null) }
+    val state = remember(controller, account, generation) { ScopeRead() }
     val currentSeed by rememberUpdatedState(seed)
-    LaunchedEffect(controller, account, generation, enabled) {
+    LaunchedEffect(controller, account, generation, enabled, retryRevision) {
         if (!enabled || account == null) return@LaunchedEffect
-        var first = true
-        snapshotFlow { controller.scopeRevisions() }
+        var first = retryRevision == 0
+        snapshotFlow { controller.revisions() }
             .conflate()
             .collect {
                 // A prepared unread snapshot that still covers membership opens search with no read.
                 val seeded = first && currentSeed?.let { it.isCurrent && it.coversCurrentMembership } == true
                 first = false
                 if (seeded) return@collect
+                state.failed = false
                 val read = controller.readAccountWideForwardTargets()
-                val sameRuntime = appState.activeAccountRef == account && appState.runtimeGeneration == generation
-                if (read is AccountWideRead.Loaded && read.snapshot.isCurrent && sameRuntime) own = read.snapshot
+                state.apply(read, appState.activeAccountRef == account && appState.runtimeGeneration == generation)
             }
     }
-    return own
+    return state
 }
 
-/** The scope resolved off the main thread for [fence]; a late result for a fence that has moved on is dropped. */
+/**
+ * The scope status resolved for [fence]; a late result for a fence that has moved on is dropped. Participant
+ * folders re-resolve when a roster arrives, so the revision that publishes it is a key only for such folders.
+ */
 @Composable
 private fun rememberResolvedScope(
     appState: WhiteNoiseAppState,
@@ -165,38 +234,62 @@ private fun rememberResolvedScope(
     enabled: Boolean,
     snapshot: AccountWideForwardTargets?,
     fence: GlobalSearchScopeFence,
-): Pair<GlobalSearchScopeFence, GlobalSearchCompleteScope>? {
+    retryRevision: Int,
+): Pair<GlobalSearchScopeFence, GlobalSearchScopeStatus>? {
     val currentFence by rememberUpdatedState(fence)
-    val revisions = controller.scopeRevisions()
     val items = controller.items
     val archived = controller.archivedItems
     val profileRevision = appState.profileRevisionForCompose
-    val produced: State<Pair<GlobalSearchScopeFence, GlobalSearchCompleteScope>?> =
-        produceState<Pair<GlobalSearchScopeFence, GlobalSearchCompleteScope>?>(
+    val preferences = appState.chatFolderPreferences
+    val needsRosters =
+        fence.activeAccountRef?.let { account ->
+            (listOfNotNull(fence.homeFolderId) + fence.folderFilters).any {
+                preferences.folderRule(account, it).unreadNeedsMembers()
+            }
+        } == true
+    val rosterRevision = if (needsRosters) controller.memberSnapshotsRevision else 0L
+    // Chats whose roster resolution already completed for this snapshot, so a roster that stays missing fails
+    // once instead of being requested again on every revision.
+    val attempted = remember(snapshot, fence, retryRevision) { HashSet<String>() }
+    val produced =
+        produceState<Pair<GlobalSearchScopeFence, GlobalSearchScopeStatus>?>(
             null,
             snapshot,
             items,
             archived,
             fence,
-            revisions,
             titleCopy,
             profileRevision,
             enabled,
+            rosterRevision,
+            retryRevision,
         ) {
-            val scope =
-                snapshot?.takeIf { enabled }?.let { covering ->
-                    controller.captureChatListActionOwner()?.let { owner ->
-                        withContext(Dispatchers.Default) {
-                            val rows = CompleteScopeRows(appState, controller, owner, covering, items + archived)
-                            rows.resolve(titleCopy, fence)
-                        }?.takeIf { controller.chatListActionIsCurrent(owner) }
-                    }
-                }
-            // A late result for a fence that has moved on is dropped; a failed refresh withdraws the previous scope.
-            if (fence == currentFence) value = scope?.let { fence to it }
+            val publish = { status: GlobalSearchScopeStatus ->
+                // A late result for a fence that has moved on is dropped; a failed refresh withdraws the old scope.
+                if (fence == currentFence) value = fence to status
+            }
+            val owner = snapshot?.takeIf { enabled }?.let { controller.captureChatListActionOwner() }
+            if (snapshot == null || owner == null) {
+                publish(GlobalSearchScopeStatus.Pending)
+                return@produceState
+            }
+            val status =
+                runCatchingCancellable {
+                    CompleteScopeRows(appState, controller, owner, snapshot, items + archived, attempted)
+                        .resolve(titleCopy, fence) { publish(GlobalSearchScopeStatus.Pending) }
+                }.getOrDefault(GlobalSearchScopeStatus.Failed)
+            publish(if (controller.chatListActionIsCurrent(owner)) status else GlobalSearchScopeStatus.Pending)
         }
     return produced.value
 }
+
+/** One folder's inputs, read on the main thread so matching can run elsewhere without touching shared state. */
+private class FolderInput(
+    val rule: ChatFolderRule?,
+    val manual: Set<String>,
+    val excluded: Set<String>,
+    val query: ChatFolderQuery?,
+)
 
 /** The complete rows of [snapshot] for [owner]'s account, from which folder scopes are resolved. */
 private class CompleteScopeRows(
@@ -204,38 +297,78 @@ private class CompleteScopeRows(
     private val controller: ChatsController,
     private val owner: ChatListActionOwner,
     private val snapshot: AccountWideForwardTargets,
-    windowItems: List<ChatListItem>,
+    private val windowItems: List<ChatListItem>,
+    private val attempted: MutableSet<String>,
 ) {
-    val rows =
-        snapshot.chatListItems(windowItems) { item ->
-            controller.boundAccountRef?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
-        }
-    private val active = rows.filterNot { it.group.archived }
-    private val archived = rows.filter { it.group.archived }
     private val preferences = appState.chatFolderPreferences
     private val account = owner.accountRef
 
+    /** Projects the rows and captures the folder inputs; both read the controller's main-thread caches. */
+    private fun capture(fence: GlobalSearchScopeFence): ScopeInputs {
+        val rows =
+            snapshot.chatListItems(windowItems) { item ->
+                controller.boundAccountRef?.let { appState.draftStore.draftedAtSecondsFor(it, item.group.groupIdHex) }
+            }
+        val folder = { id: String ->
+            FolderInput(
+                preferences.folderRule(account, id),
+                preferences.membershipFor(account, id),
+                preferences.excludedChats(account, id),
+                preferences.folderQuery(account, id),
+            )
+        }
+        return ScopeInputs(
+            rows = rows,
+            accountIdHex = controller.boundAccountIdHex(),
+            home = fence.homeFolderId?.let(folder),
+            filters = fence.folderFilters.map(folder),
+        )
+    }
+
     /**
-     * The complete scope for [fence], or null when a folder's native membership is not ready or the snapshot or
-     * binding is no longer current.
+     * The scope for [fence]. Chats whose participant rule needs a roster they lack are requested once; if any
+     * still lack it afterwards the scope fails rather than silently dropping them. [onResolving] reports the
+     * pending state while rosters resolve.
      */
     suspend fun resolve(
         titleCopy: GroupTitleCopy,
         fence: GlobalSearchScopeFence,
-    ): GlobalSearchCompleteScope? {
+        onResolving: () -> Unit,
+    ): GlobalSearchScopeStatus {
         val displayTitle: (ChatListItem) -> String = { chatListItemDisplayTitle(it, appState, titleCopy) }
-        val home = fence.homeFolderId?.let { folderChatIds(it, displayTitle) }
-        val filters = fence.folderFilters.map { folderChatIds(it, displayTitle) }
-        val ready = (fence.homeFolderId == null || home != null) && filters.none { it == null }
+        var inputs = capture(fence)
+        val missing = inputs.missingRosters(displayTitle)
+        if (missing.isNotEmpty()) {
+            onResolving()
+            val requested = missing - attempted
+            if (requested.isNotEmpty()) {
+                snapshot.resolveChatListMembers(requested)
+                attempted += requested
+            }
+            inputs = capture(fence)
+            if (inputs.missingRosters(displayTitle).isNotEmpty()) return GlobalSearchScopeStatus.Failed
+        }
         val current = snapshot.coversCurrentMembership && controller.chatListActionIsCurrent(owner)
-        val filtered = filters.takeIf { it.isNotEmpty() }?.flatMapTo(HashSet()) { it.orEmpty() }
-        val homeRule = fence.homeFolderId?.let { preferences.folderRule(account, it) }
-        return if (ready && current) {
+        val scope =
+            if (current) withContext(Dispatchers.Default) { inputs.scope(fence, displayTitle) } else null
+        return scope?.let(GlobalSearchScopeStatus::Ready) ?: GlobalSearchScopeStatus.Pending
+    }
+
+    /** Folder ids need their complete native membership; the scope exists only when all of it is ready. */
+    private suspend fun ScopeInputs.scope(
+        fence: GlobalSearchScopeFence,
+        displayTitle: (ChatListItem) -> String,
+    ): GlobalSearchCompleteScope? {
+        val homeIds = home?.let { folderChatIds(it, displayTitle) }
+        val filterIds = filters.map { folderChatIds(it, displayTitle) }
+        val ready = (home == null || homeIds != null) && filterIds.none { it == null }
+        val filtered = filterIds.takeIf { it.isNotEmpty() }?.flatMapTo(HashSet()) { it.orEmpty() }
+        return if (ready) {
             GlobalSearchCompleteScope(
                 fence = fence,
-                source = chatFolderSource(homeRule, active, archived),
+                source = chatFolderSource(home?.rule, active, archived),
                 allRows = rows,
-                folderChatIds = intersectChatScopes(home, filtered),
+                folderChatIds = intersectChatScopes(homeIds, filtered),
             )
         } else {
             null
@@ -243,35 +376,41 @@ private class CompleteScopeRows(
     }
 
     /** A folder's complete membership, or null while its native membership is not ready. */
-    private suspend fun folderChatIds(
-        folderId: String,
+    private suspend fun ScopeInputs.folderChatIds(
+        input: FolderInput,
         displayTitle: (ChatListItem) -> String,
-    ): Set<String>? {
-        val rule = preferences.folderRule(account, folderId)
-        val manual = preferences.membershipFor(account, folderId)
-        val excluded = preferences.excludedChats(account, folderId)
-        val query = preferences.folderQuery(account, folderId)
-        val accountIdHex = controller.boundAccountIdHex()
-        return if (query != null) {
-            nativeChatIds(query)?.let { native ->
+    ): Set<String>? =
+        if (input.query != null) {
+            nativeChatIds(input.query)?.let { native ->
                 native.toSet() +
-                    departedFolderMatches(rule, manual, excluded, active, archived, accountIdHex, displayTitle)
+                    departedFolderMatches(
+                        input.rule,
+                        input.manual,
+                        input.excluded,
+                        active,
+                        archived,
+                        accountIdHex,
+                        displayTitle,
+                    )
             }
         } else {
-            val source = chatFolderSource(rule, active, archived)
+            val source = chatFolderSource(input.rule, active, archived)
             val muted = source.filter { it.engineMuted() }.mapTo(HashSet()) { it.group.groupIdHex }
             chatFolderChatIds(
                 items = source,
-                manualChatIds = manual,
-                rule = rule,
+                manualChatIds = input.manual,
+                rule = input.rule,
                 activeAccountIdHex = accountIdHex,
                 isMuted = { it in muted },
                 displayTitle = displayTitle,
-                excludedChatIds = excluded,
+                excludedChatIds = input.excluded,
             )
         }
-    }
 
+    /**
+     * A native folder's complete membership, or null while MDK reports the presentation not ready. Any other
+     * failure propagates, so the scope fails with Retry instead of crashing or staying pending forever.
+     */
     private suspend fun nativeChatIds(query: ChatFolderQuery): List<String>? =
         try {
             resolveCompleteChatListIds {
@@ -280,6 +419,32 @@ private class CompleteScopeRows(
         } catch (_: MarmotKitException.ChatPresentationNotReady) {
             null
         }
+}
+
+/** Projected complete rows with the folder inputs they are evaluated against. */
+private class ScopeInputs(
+    val rows: List<ChatListItem>,
+    val accountIdHex: String?,
+    val home: FolderInput?,
+    val filters: List<FolderInput>,
+) {
+    val active = rows.filterNot { it.group.archived }
+    val archived = rows.filter { it.group.archived }
+
+    /** Chats a participant folder cannot decide without a roster they do not have yet. */
+    fun missingRosters(displayTitle: (ChatListItem) -> String): Set<String> {
+        val lacking = rows.filter { it.memberSnapshot == null }.mapTo(HashSet()) { it.group.groupIdHex }
+        return (listOfNotNull(home) + filters)
+            .flatMapTo(HashSet()) { input ->
+                input.rule.memberCandidateIds(
+                    chatFolderSource(input.rule, active, archived),
+                    input.manual,
+                    input.excluded,
+                    accountIdHex,
+                    displayTitle,
+                )
+            }.filterTo(HashSet()) { it in lacking }
+    }
 }
 
 /**
