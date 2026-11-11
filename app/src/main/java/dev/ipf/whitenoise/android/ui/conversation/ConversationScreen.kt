@@ -605,6 +605,7 @@ internal fun ConversationScreen(
     // misattributes "is me" nor resets scroll/selection state when the
     // active ref catches up.
     val conversationAccountRef = controller.boundAccountRef
+    val readerComposer = remember(conversationAccountRef, controller.group.groupIdHex) { ConversationReaderComposer() }
     val translationPreferences =
         dev.ipf.whitenoise.android.translation
             .rememberTranslationPreferences()
@@ -1777,6 +1778,17 @@ internal fun ConversationScreen(
 
     val context = LocalContext.current
     val documentSaveFallback = rememberDocumentSaveFallback(appState, controller.group.groupIdHex)
+    /** Defers media reveal until its submitting reader has returned the shared composer. */
+    fun readerAwareSendReveal(): () -> Unit {
+        val readerAccepted = readerComposer.captureSendAccepted()
+        return {
+            if (!readerAccepted()) {
+                acceptedSendRevealedTranscript = true
+                revealSentMessage()
+            }
+        }
+    }
+
     val mediaSender =
         rememberConversationMediaSender(
             appState = appState,
@@ -2146,7 +2158,14 @@ internal fun ConversationScreen(
                         controller.boundAccountRef == conversationAccountRef
                 },
                 send = { file, duration, canSend, onQueued ->
-                    mediaSender.sendVoiceAttachment(file, duration, canSend, onQueued)
+                    val onAfterSend = readerAwareSendReveal()
+                    mediaSender.sendVoiceAttachment(
+                        file,
+                        duration,
+                        canSend,
+                        onAfterSend = onAfterSend,
+                        onQueued = onQueued,
+                    )
                 },
                 onSendFailure = { appState.present(R.string.send_failed) },
                 onPlaybackFailure = { appState.present(R.string.voice_message_failed) },
@@ -3740,10 +3759,7 @@ internal fun ConversationScreen(
                 },
                 onAccepted = onAccepted,
                 onRejected = onRejected,
-                onAfterSend = {
-                    acceptedSendRevealedTranscript = true
-                    revealSentMessage()
-                },
+                onAfterSend = readerAwareSendReveal(),
             )
         }
     }
@@ -3946,8 +3962,10 @@ internal fun ConversationScreen(
                 return@LaunchedEffect
             }
             observedDictatedPendingSendRevision = dictatedPendingSendRevision
-            acceptedSendRevealedTranscript = true
-            revealSentMessage()
+            if (!readerComposer.onDictationSendAccepted()) {
+                acceptedSendRevealedTranscript = true
+                revealSentMessage()
+            }
         }
     }
     dictatedSendRevealEffect()
@@ -4167,6 +4185,7 @@ internal fun ConversationScreen(
             bottomBar = {
                 ConversationBottomBar(
                     onCustomizeComposer = { showComposerSettings = true },
+                    readerComposer = readerComposer,
                     compactHeight = compactHeightConversation,
                     dictationControlsVisible = dictationControlsVisible,
                     dictationOriginVisible = dictationOriginVisible,
@@ -4314,7 +4333,12 @@ internal fun ConversationScreen(
                                             enabled = !attachmentSendClaim.isHeld,
                                             prepared = mediaDraftState.preparedPreviews(),
                                             preparing = mediaDraftState.isPreparing,
-                                            onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
+                                            onPreview = {
+                                                if (!attachmentSendClaim.isHeld) {
+                                                    readerComposer.session?.onDismiss()
+                                                    mediaPreviewIndex = it
+                                                }
+                                            },
                                             onRemoveMedia = { slot ->
                                                 if (!attachmentSendClaim.isHeld) {
                                                     mediaDraftState.releasePreparedPhoto(slot.id)
@@ -4474,6 +4498,7 @@ internal fun ConversationScreen(
             },
         ) { padding ->
             CompositionLocalProvider(
+                LocalConversationReaderComposer provides readerComposer,
                 dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
                 LocalPollVotesHost provides pollVotesHost,

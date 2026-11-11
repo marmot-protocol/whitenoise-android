@@ -5,6 +5,12 @@
     "source_coverage": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+        "surface": "Reader composer transfer before accepted-send closure",
+        "anchor": "onBeforeDismiss",
+        "test_ids": ["MSG-039"]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
         "surface": "Per-message sheet, dialog and in-flight state reset with the message id",
         "anchor": "internal class MessageBubbleSurfaceState",
         "test_ids": [

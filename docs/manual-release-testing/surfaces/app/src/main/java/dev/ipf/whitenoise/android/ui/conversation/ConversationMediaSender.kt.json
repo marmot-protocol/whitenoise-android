@@ -2,6 +2,14 @@
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
   "legacy_sha256": "2c88f5d8624da9c3a6988821ab6a54037d132de9a7fc3b9041dbf76caf6ce714",
   "categories": {
+    "source_coverage": [
+      {
+        "surface": "Voice acceptance returns a reader-owned composer before revealing its conversation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "onAfterSend: () -> Unit = onRevealSent",
+        "test_ids": ["MSG-039", "MED-012"]
+      }
+    ],
     "composable_surfaces": [
       {
         "surface": "Private share send lease storage failure feedback",

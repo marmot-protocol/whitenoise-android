@@ -680,6 +680,7 @@ internal class ConversationMediaSender(
         file: java.io.File,
         durationMs: Long,
         canSend: () -> Boolean,
+        onAfterSend: () -> Unit = onRevealSent,
         onQueued: (Boolean) -> Unit,
     ) {
         val replyTarget = controller.replyingTo?.messageIdHex
@@ -716,7 +717,7 @@ internal class ConversationMediaSender(
                     accepted = true
                     onQueued(true)
                 }
-                onRevealSent()
+                onAfterSend()
                 controller.uploadQueued(seeded) {
                     if (replyTarget != null) {
                         accepted = true

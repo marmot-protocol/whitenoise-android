@@ -109,11 +109,14 @@ internal class MessageBubbleSurfaceState {
 internal fun ReaderSendDismissal(
     surfaces: MessageBubbleSurfaceState,
     onReaderSendAccepted: () -> Unit,
+    onBeforeDismiss: () -> Unit = {},
 ) {
     val session = surfaces.readerSendAcceptedSession ?: return
     val currentOnReaderSendAccepted by rememberUpdatedState(onReaderSendAccepted)
+    val currentOnBeforeDismiss by rememberUpdatedState(onBeforeDismiss)
     LaunchedEffect(surfaces, session) {
         repeat(READER_SEND_DISMISSAL_FRAMES) { withFrameNanos { } }
+        if (surfaces.expandedFullView && session == surfaces.expandedFullViewSession) currentOnBeforeDismiss()
         if (surfaces.closeReaderAfterAcceptedSend(session)) currentOnReaderSendAccepted()
     }
 }

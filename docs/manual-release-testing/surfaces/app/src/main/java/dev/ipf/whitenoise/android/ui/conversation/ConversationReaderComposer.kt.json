@@ -1,0 +1,29 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReaderComposer.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Dictation accepted-send reader ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReaderComposer.kt",
+        "anchor": "onDictationSendAccepted",
+        "test_ids": ["MSG-039", "DIC-002"]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Reader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReaderComposer.kt",
+        "anchor": "fun Reader(",
+        "test_ids": ["MSG-039", "DIC-002"]
+      },
+      {
+        "surface": "Host",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationReaderComposer.kt",
+        "anchor": "fun Host(",
+        "test_ids": ["MSG-039", "DIC-002"]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationReaderComposer
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
@@ -33,12 +34,17 @@ internal fun ConversationDictationFailureAction(
             controller.canRetryRetainedAudio ||
             controller.canRetryRecoveredSend
     val settingsRecoveryAvailable = state.recognitionIncomplete && recovery != ConversationDictationRecovery.Retry
+    val readerComposer = LocalConversationReaderComposer.current
+    val recover = dictationFailureAction(state, controller, recovery, context)
     IconButton(
         enabled =
             !retrySend ||
                 recoveredSendAvailable ||
                 settingsRecoveryAvailable,
-        onClick = dictationFailureAction(state, controller, recovery, context),
+        onClick = {
+            if (retrySend && !state.recognitionIncomplete) readerComposer?.onDictationSendRequested()
+            recover()
+        },
         modifier = Modifier.size(48.dp),
     ) {
         Icon(

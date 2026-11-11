@@ -37,6 +37,13 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
+import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
@@ -54,6 +61,10 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_T
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -78,6 +89,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
     val composeRule = createComposeRule()
 
     private var controller: ConversationController? = null
+    private var dictationScope: CoroutineScope? = null
     private var publishCount = 0
     private var deferMarkdownHydration = false
     private var formattedHydration = false
@@ -90,7 +102,9 @@ class ConversationAcceptedSendRouteScreenshotTest {
     /** Releases every conversation-owned job and restores process-wide timestamp formatting. */
     @After
     fun releaseFixture() {
+        controller?.let { it.appState.detachConversationController(it) }
         controller?.onCleared()
+        dictationScope?.cancel()
         TimeZone.setDefault(originalTimeZone)
     }
 
@@ -573,6 +587,117 @@ class ConversationAcceptedSendRouteScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_send_read_more_tail.png")
     }
 
+    /** Dictation must close the real reader through its actual acceptance revision, not a fixture-owned counter. */
+    @Test
+    fun dictatedSendFromReadMoreClosesTheReaderOnActualPendingAcceptance() {
+        val conversation = createConversation(longHistoryMessage = true, draftText = "")
+        val platform = ReaderDictationPlatform()
+        val dictation = installReaderDictation(conversation, platform)
+        val evidence = SendRouteEvidence()
+        mountHistoryConversation(conversation, evidence)
+        openReaderAndStartDictation()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.runOnIdle { assertTrue(dictation.state is ConversationDictationState.Starting) }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+        composeRule.runOnIdle { platform.listener.onResult("Dictation from Read More") }
+        awaitConversationCondition { publishCount == 1 }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(
+                "the real transport must publish the dictation acceptance revision",
+                1,
+                dictation.pendingSendRevision(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    ConversationTimelineTestIds.GROUP_ID,
+                ),
+            )
+        }
+        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText("Dictation from Read More").assertIsDisplayed()
+        assertEquals(1, publishCount)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_dictation_read_more_accepted_tail.png")
+    }
+
+    /** Paste-only is not Send: keep the reader and its editable transcript without publishing a message. */
+    @Test
+    fun dictatedPasteFromReadMoreKeepsTheReaderAndDoesNotSend() {
+        val conversation = createConversation(longHistoryMessage = true, draftText = "")
+        val platform = ReaderDictationPlatform()
+        val dictation = installReaderDictation(conversation, platform)
+        mountHistoryConversation(conversation, SendRouteEvidence())
+        openReaderAndStartDictation()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.paste_dictation_transcript)).performClick()
+        composeRule.runOnIdle { platform.listener.onResult("Paste-only reader draft") }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Paste-only reader draft").assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(0, publishCount)
+            assertEquals(
+                0,
+                dictation.pendingSendRevision(
+                    ConversationTimelineTestIds.ACCOUNT_REF,
+                    ConversationTimelineTestIds.GROUP_ID,
+                ),
+            )
+        }
+        composeRule
+            .onNodeWithTag(MESSAGE_FULL_SCREEN_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_dictation_read_more_paste_only.png")
+    }
+
+    private fun openReaderAndStartDictation() {
+        composeRule.waitForIdle()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val readMoreId =
+            composeRule
+                .onAllNodesWithText(context.getString(R.string.message_read_more))
+                .fetchSemanticsNodes()
+                .first { it.boundsInRoot.width > 0f }
+                .id
+        composeRule.onNode(SemanticsMatcher("visible Read More") { it.id == readMoreId }).performClick()
+        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.attach_options)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.dictate_text)).performClick()
+    }
+
+    /** Uses the production draft store and mounted-controller send; only recognition and target validation are fake. */
+    private fun installReaderDictation(
+        conversation: ConversationController,
+        platform: ReaderDictationPlatform,
+    ): ConversationDictationController {
+        val appState = conversation.appState
+        appState.attachConversationController(conversation)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        dictationScope = scope
+        val dictation =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { account, group ->
+                    ConversationDictationDraftSnapshot(
+                        appState.draftStore.getDraft(account, group)?.textFieldValue ?: TextFieldValue(""),
+                        appState.composerDraftGeneration(account, group),
+                    )
+                },
+                writeDraft = { account, group, expected, value ->
+                    if (appState.composerDraftGeneration(account, group) == expected) {
+                        appState.setDraft(account, group, value)
+                        appState.composerDraftGeneration(account, group)
+                    } else {
+                        null
+                    }
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+                targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                targetValidationScope = scope,
+                sendTranscriptIfOriginUnchanged = appState::sendDictationTranscriptIfOriginUnchanged,
+            )
+        ReflectionHelpers.setField(appState, "conversationDictationOwner", lazyOf(dictation))
+        return dictation
+    }
+
     /**
      * Builds one synthetic authoritative window with typed durable acceptance and no relay publication. With
      * [longHistoryMessage], the restored history anchor is long enough to collapse behind Read more.
@@ -714,6 +839,29 @@ class ConversationAcceptedSendRouteScreenshotTest {
         const val SENT_TEXT = "Accepted send from older history"
         const val HISTORY_ANCHOR_INDEX = 10
         const val LONG_MESSAGE_LINES = 70
+    }
+}
+
+private class ReaderDictationPlatform : ConversationDictationPlatform {
+    lateinit var listener: ConversationDictationRecognitionListener
+
+    override fun hasRecordAudioPermission() = true
+
+    override fun recognitionAvailable() = true
+
+    override fun createSession(
+        listener: ConversationDictationRecognitionListener,
+    ): ConversationDictationRecognitionSession {
+        this.listener = listener
+        return object : ConversationDictationRecognitionSession {
+            override fun start() = Unit
+
+            override fun stop() = Unit
+
+            override fun cancel() = Unit
+
+            override fun destroy() = Unit
+        }
     }
 }
 

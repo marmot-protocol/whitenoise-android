@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.net.Uri
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.onSizeChanged
@@ -56,6 +56,7 @@ internal fun ConversationBottomBar(
     onCustomizeComposer: (() -> Unit)? = null,
     dictationControlsVisible: Boolean = true,
     dictationOriginVisible: Boolean = dictationControlsVisible,
+    readerComposer: ConversationReaderComposer = remember { ConversationReaderComposer() },
     selectionMode: Boolean,
     selectionActionAvailability: BatchSelectionActionAvailability,
     selectionForwardBlockedReason: ForwardBlockedReason?,
@@ -124,9 +125,15 @@ internal fun ConversationBottomBar(
     onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
 ) {
     val normalComposer = !selectionMode && !searchOpen && !hasError && composerGate == ComposerGate.COMPOSER
+    val readerSession = readerComposer.session
+
+    fun handoff(action: () -> Unit) {
+        readerSession?.onDismiss()
+        action()
+    }
     val renderedInviteGroupIdHex = controller.group.groupIdHex
     val renderedInviteWelcomeMessageIdHex = controller.group.viaWelcomeMessageIdHex
-    Box(
+    readerComposer.Host(
         Modifier
             .fillMaxWidth()
             .testTag(CONVERSATION_BOTTOM_BAR_TAG)
@@ -134,7 +141,7 @@ internal fun ConversationBottomBar(
             .onSizeChanged { size -> onBottomChromeMeasured(size.height) },
     ) {
         when {
-            selectionMode ->
+            selectionMode && readerSession == null ->
                 Column(modifier = Modifier.fillMaxWidth()) {
                     batchDeleteRetryState?.let { retryState ->
                         BatchDeleteFailureNotice(
@@ -156,7 +163,7 @@ internal fun ConversationBottomBar(
                         onDelete = onDeleteSelection,
                     )
                 }
-            searchOpen ->
+            searchOpen && readerSession == null ->
                 ConversationSearchNavBar(
                     matchCount = searchMatchCount,
                     activeIndex = searchActiveIndex,
@@ -273,15 +280,15 @@ internal fun ConversationBottomBar(
                             editingMessageId = controller.editingMessageId,
                             editingInitialText = editingRecord?.let { controller.displayedText(it) },
                             onCancelEdit = controller::cancelMessageEdit,
-                            onAfterSend = onAfterSend,
-                            onPickFromGallery = onPickFromGallery,
-                            onCaptureFromCamera = onCaptureFromCamera,
-                            onPickDocument = onPickDocument,
-                            onShareLocation = onShareLocation,
-                            onShareUser = onShareUser,
-                            onShareContact = onShareContact,
-                            onCreatePoll = onCreatePoll,
-                            onOpenStickers = onOpenStickers,
+                            onAfterSend = readerSession?.onAfterSend ?: onAfterSend,
+                            onPickFromGallery = { handoff(onPickFromGallery) },
+                            onCaptureFromCamera = { handoff(onCaptureFromCamera) },
+                            onPickDocument = { handoff(onPickDocument) },
+                            onShareLocation = { handoff(onShareLocation) },
+                            onShareUser = { handoff(onShareUser) },
+                            onShareContact = { handoff(onShareContact) },
+                            onCreatePoll = onCreatePoll?.let { action -> { handoff(action) } },
+                            onOpenStickers = onOpenStickers?.let { action -> { handoff(action) } },
                             onPasteImageUris = onPasteImageUris,
                             voiceRecordingController = voiceRecordingController,
                             voiceReview = voiceReview,
@@ -291,19 +298,21 @@ internal fun ConversationBottomBar(
                             dictationControlsVisible = dictationControlsVisible,
                             dictationOriginVisible = dictationOriginVisible,
                             appState = appState,
-                            onCustomizeToolbar = onCustomizeComposer,
+                            onCustomizeToolbar = onCustomizeComposer?.let { action -> { handoff(action) } },
                             mentionCandidates = mentionCandidates,
                             mentionPickerEnabled = mentionPickerEnabled,
-                            autoFocusOnEnter = autoFocusOnEnter,
-                            autoFocusOnDraftRestore = autoFocusOnDraftRestore,
+                            autoFocusOnEnter = autoFocusOnEnter && readerSession == null,
+                            autoFocusOnDraftRestore = autoFocusOnDraftRestore && readerSession == null,
                             autoFocusConsumedState = autoFocusConsumedState,
                             enterKeyBehavior = appState.enterKeyBehavior,
                             composerFocus = composerFocus,
                             onComposerFocusChanged = onComposerFocusChanged,
-                            onComposerPreImeBack = onComposerPreImeBack,
+                            onComposerPreImeBack = onComposerPreImeBack.takeIf { readerSession == null },
                             composerDismissInProgress = composerDismissInProgress,
                             onBottomInputChanged = onBottomInputChanged,
-                            onTimelineComposerMeasured = onTimelineComposerMeasured,
+                            onTimelineComposerMeasured = { foreground, compact ->
+                                if (readerSession == null) onTimelineComposerMeasured(foreground, compact)
+                            },
                             onKeyboardRestoreFromCustomInput = onKeyboardRestoreFromCustomInput,
                             onKeyboardRestoreFromCustomInputFailed = onKeyboardRestoreFromCustomInputFailed,
                             recentEmojis = recentEmojis,

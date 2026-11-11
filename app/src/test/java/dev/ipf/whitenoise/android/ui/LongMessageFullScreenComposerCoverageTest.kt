@@ -9,6 +9,88 @@ import java.io.File
 
 class LongMessageFullScreenComposerCoverageTest {
     @Test
+    fun attachmentAndVoiceSendsUseTheSubmittingReaderBeforeTimelineReveal() {
+        val screen = conversationSource("ConversationScreen.kt").readText()
+        val attachments = screen.functionBody("sendStagedAttachmentsWithCaption")
+        assertTrue(
+            "Attachment acceptance must use a captured reader handoff",
+            "onAfterSend = readerAwareSendReveal()" in attachments,
+        )
+        val voiceDispatch =
+            screen.substringAfter("send = { file, duration, canSend, onQueued ->").substringBefore("onSendFailure")
+        assertTrue(
+            "Voice review must capture a handoff for each Send, not for the lifetime of the recorder",
+            "val onAfterSend = readerAwareSendReveal()" in voiceDispatch &&
+                "onAfterSend = onAfterSend" in voiceDispatch &&
+                "onQueued = onQueued" in voiceDispatch,
+        )
+        val reveal = screen.functionBody("readerAwareSendReveal")
+        assertTrue(
+            "Capture the submitting reader before asynchronous acceptance",
+            "readerComposer.captureSendAccepted()" in reveal,
+        )
+        assertTrue("Only the normal conversation may reveal immediately", "if (!readerAccepted())" in reveal)
+        val voice = conversationSource("ConversationMediaSender.kt").readText().functionBody("sendVoiceAttachment")
+        assertTrue("Voice acceptance must invoke its reader-aware reveal", "onAfterSend()" in voice)
+        assertFalse("Voice acceptance cannot bypass its handoff", "onRevealSent()" in voice)
+    }
+
+    @Test
+    fun dictatedSendReturnsTheReaderComposerBeforeRevealingTheTimeline() {
+        val screen = conversationSource("ConversationScreen.kt").readText()
+        val reveal = screen.functionBody("dictatedSendRevealEffect")
+        assertTrue(
+            "Dictation must use the reader's accepted-send handoff before scrolling its owning row away",
+            "if (!readerComposer.onDictationSendAccepted())" in reveal,
+        )
+        val controls = conversationSource("composer/ConversationDictationControls.kt").readText()
+        val actions = controls.functionBody("ConversationDictationActiveActions")
+        assertTrue(
+            "Send must capture the reader session before dispatch, not after a late result",
+            actions.indexOf("onDictationSendRequested()") in 0 until actions.indexOf("controller.send()"),
+        )
+        val recovery =
+            conversationSource("composer/ConversationDictationRecoveryActions.kt")
+                .readText()
+                .functionBody("ConversationDictationFailureAction")
+        assertTrue(
+            "Retry Send must capture its reader, but paste-only recovery must not",
+            "if (retrySend && !state.recognitionIncomplete) readerComposer?.onDictationSendRequested()" in recovery &&
+                recovery.indexOf("onDictationSendRequested()") < recovery.indexOf("recover()"),
+        )
+    }
+
+    @Test
+    fun readerMovesTheFullyWiredComposerInsteadOfCreatingAPartialCopy() {
+        val bubble = messageBubbleSource().readText().functionBody("MessageBubble")
+        val reader = bubble.substringAfter("MessageFullScreenView(").substringBefore("if (surfaces.emojiPickerOpen")
+        assertFalse("The reader must not construct a second partially wired ComposerBar", "ComposerBar(" in reader)
+        assertTrue("The reader must use the screen-owned composer host", "readerComposer.Reader(" in reader)
+        val bottomBar = conversationSource("ConversationBottomBar.kt").readText()
+        assertTrue("The normal composer must move into the reader", "readerComposer.Host(" in bottomBar)
+        assertTrue(
+            "Opening Read More from search or selection must still expose its composer and Reply",
+            "searchOpen && readerSession == null" in bottomBar && "selectionMode && readerSession == null" in bottomBar,
+        )
+        listOf(
+            "onSendAttachments",
+            "onPickFromGallery",
+            "onCaptureFromCamera",
+            "onPickDocument",
+            "onShareLocation",
+            "onShareUser",
+            "onShareContact",
+            "onCreatePoll",
+            "onPasteImageUris",
+            "voiceRecordingController",
+            "voiceReview",
+            "dictationController",
+        ).forEach { capability ->
+            assertTrue("Shared composer must retain $capability", "$capability =" in bottomBar)
+        }
+    }
+
+    @Test
     fun fullScreenLongMessageReaderReservesComposerSlot() {
         val body = messageFullScreenSource().readText().functionBody("MessageFullScreenView")
 
@@ -44,26 +126,29 @@ class LongMessageFullScreenComposerCoverageTest {
             "timeText = rememberedMessageBubbleTime(record.recordedAt)" in fullScreenCall,
         )
         assertTrue(
-            "expanded long-message view must render the standard ComposerBar, not a separate ad-hoc input",
-            "ComposerBar(" in fullScreenCall,
+            "expanded long-message view must move the fully wired conversation composer",
+            "readerComposer.Reader(" in fullScreenCall,
         )
         assertTrue(
             "expanded long-message view must render through the same ComposerGate states as the normal conversation bottom bar",
-            "when (composerGate)" in fullScreenCall &&
-                "ComposerGate.PENDING" in fullScreenCall &&
-                "ComposerGate.NOTICE" in fullScreenCall &&
-                "ComposerGate.INVITE" in fullScreenCall &&
-                "ComposerGate.COMPOSER" in fullScreenCall &&
-                "RemovedMemberComposerNotice(" in fullScreenCall &&
-                "deviceRemoved = controller.group.isDeviceRemovedCopy()" in fullScreenCall &&
-                "InvitationActions(" in fullScreenCall,
+            conversationSource("ConversationBottomBar.kt").readText().let { shared ->
+                "readerComposer.Host(" in shared &&
+                    "when (composerGate)" in shared &&
+                    "ComposerGate.PENDING" in shared &&
+                    "ComposerGate.NOTICE" in shared &&
+                    "ComposerGate.INVITE" in shared &&
+                    "ComposerGate.COMPOSER" in shared &&
+                    "RemovedMemberComposerNotice(" in shared &&
+                    "deviceRemoved = controller.group.isDeviceRemovedCopy()" in shared &&
+                    "InvitationActions(" in shared
+            },
         )
         val expandedComposerGate =
             "val canUseExpandedComposer = !deleted && !actionsReadOnly && " +
                 "composerGate == ComposerGate.COMPOSER"
         assertTrue(
             "expanded reader reply/react actions must require a live message and an active shared composer",
-            "if (surfaces.expandedFullView && !deleted)" in body &&
+            "if (surfaces.expandedFullView)" in body &&
                 expandedComposerGate in body &&
                 "canReply = canUseExpandedComposer" in fullScreenCall &&
                 "canReact = canUseExpandedComposer" in fullScreenCall,
@@ -90,6 +175,7 @@ class LongMessageFullScreenComposerCoverageTest {
         assertTrue(
             "the reader composer must mark its own session when a send is accepted",
             "val readerSession = surfaces.expandedFullViewSession" in body &&
+                "key(readerSession)" in fullScreenCall &&
                 "onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) }" in fullScreenCall,
         )
         assertTrue(
@@ -160,7 +246,7 @@ class LongMessageFullScreenComposerCoverageTest {
         assertTrue("Reader must provide a null motion owner", "LocalComposerSendMotion provides null" in parameters)
         val isolated =
             reader.kotlinBlockFrom(parametersStart + parameters.length, "isolated reader body", searchForOpening = true)
-        assertTrue("Reader composer must be inside its isolated local", "ComposerBar(" in isolated)
+        assertTrue("Reader composer must be inside its isolated local", "readerComposer.Reader(" in isolated)
         assertFalse("Reader disposal must not clear the conversation flight", "composerSendMotion.clear()" in reader)
         assertFalse("Reader disposal must not retire the conversation owner", "composerSendMotion.dispose()" in reader)
     }

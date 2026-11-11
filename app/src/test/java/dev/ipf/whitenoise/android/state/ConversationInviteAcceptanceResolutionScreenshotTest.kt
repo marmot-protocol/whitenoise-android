@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -27,7 +29,10 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.ui.conversation.ConversationReaderComposer
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
+import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationReaderComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
@@ -230,8 +235,9 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
         val item =
             TimelineMessage("reader-message", TimelineProjector.toAppMessageRecord(record), MessageStatus.Received)
         val textState = ComposerTextState(TextFieldValue(""))
+        val readerComposer = ConversationReaderComposer()
         composeRule.setContent {
-            WhiteNoiseTheme {
+            ReaderFixtureHost(readerComposer, appState, controller) {
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     MessageBubble(
                         item = item,
@@ -269,6 +275,31 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    /** Standalone bubbles receive the same screen-owned reader slot as the real route. */
+    @Composable
+    private fun ReaderFixtureHost(
+        host: ConversationReaderComposer,
+        appState: WhiteNoiseAppState,
+        controller: ConversationController,
+        content: @Composable () -> Unit,
+    ) {
+        WhiteNoiseTheme {
+            CompositionLocalProvider(LocalConversationReaderComposer provides host) {
+                Column {
+                    host.Host {
+                        if (controller.inviteAcceptanceResolutionPending) {
+                            InviteAcceptanceResolutionStatus(
+                                state = controller.inviteAcceptanceResolutionState,
+                                onRetry = { appState.launchMutation { controller.retryInviteAcceptanceAuthority() } },
+                            )
+                        }
+                    }
+                    content()
+                }
+            }
+        }
     }
 
     /** Mounts the real conversation route so the bottom-bar gate owns the recovery state. */

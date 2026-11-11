@@ -15,9 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -70,7 +67,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
@@ -114,8 +110,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.canReportMessage
 import dev.ipf.whitenoise.android.state.dismissReports
-import dev.ipf.whitenoise.android.state.isDeviceRemovedCopy
-import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportMessage
 import dev.ipf.whitenoise.android.state.reportsFor
@@ -136,23 +130,16 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsFollowTarget
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutReport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
-import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
-import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
 import dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationReaderComposer
 import dev.ipf.whitenoise.android.ui.conversation.LocalPollVotesHost
 import dev.ipf.whitenoise.android.ui.conversation.PollCard
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageContent
-import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
-import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
-import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
@@ -183,7 +170,6 @@ import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerMessageContent
 import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerPresentation
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
-import dev.ipf.whitenoise.android.ui.group.BlockedLeaveComposerNotice
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
@@ -350,8 +336,8 @@ internal fun MessageBubble(
     onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit = {},
     eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
-    // #1206: shared composer text state so the full-screen reader's composer
-    // stays in sync with the main composer instead of holding a divergent field.
+    // Keep named row/fixture inputs compatible; the reader host now owns composer configuration.
+    @Suppress("UnusedParameter")
     composerTextState: ComposerTextState,
     highlighted: Boolean,
     selectionMode: Boolean,
@@ -374,13 +360,21 @@ internal fun MessageBubble(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
+    @Suppress("UnusedParameter")
     blockedDmUnblockInFlight: Boolean = false,
+    @Suppress("UnusedParameter")
     onUnblockBlockedDm: () -> Unit = {},
+    @Suppress("UnusedParameter")
     groupDisbanded: Boolean = false,
+    @Suppress("UnusedParameter")
     inviteMutationInFlight: Boolean,
+    @Suppress("UnusedParameter")
     onJoinInvite: () -> Unit,
+    @Suppress("UnusedParameter")
     onDeclineInvite: () -> Unit,
+    @Suppress("UnusedParameter")
     mentionCandidates: List<MentionComposer.Candidate>,
+    @Suppress("UnusedParameter")
     mentionPickerEnabled: Boolean,
     // The conversation's accepted-send reveal, run after a send from the Read more reader closes it (#3268).
     onReaderSendAccepted: () -> Unit = {},
@@ -522,6 +516,7 @@ internal fun MessageBubble(
     // Per-key state lives in three holders so the bubble stays within ART's compile limit (MessageBubbleState.kt).
     val pressState = remember(item.presentationId) { MessageBubblePressState() }
     val surfaces = remember(controller, item.presentationId) { MessageBubbleSurfaceState() }
+    val readerComposer = LocalConversationReaderComposer.current
     var explicitlyCollapsed by androidx.compose.runtime.saveable.rememberSaveable(
         controller.boundAccountRef,
         controller.group.groupIdHex,
@@ -979,6 +974,7 @@ internal fun MessageBubble(
             onActionMenuOpenChange(false)
             onTextSelectionModeChange(false)
             surfaces.emojiPickerOpen = false
+            readerComposer?.let { host -> host.session?.takeIf { it.owner === surfaces }?.let(host::detach) }
             surfaces.expandedFullView = false
             surfaces.infoSheetOpen = false
             surfaces.forwardSheetOpen = false
@@ -3188,14 +3184,19 @@ internal fun MessageBubble(
                         }
                     },
                 )
-                if (surfaces.expandedFullView && !deleted) {
+                if (surfaces.expandedFullView) {
                     val readerSession = surfaces.expandedFullViewSession
-                    ReaderSendDismissal(surfaces, onReaderSendAccepted)
-                    val groupIdHex = controller.group.groupIdHex
-                    val editingRecord =
-                        controller.editingMessageId?.let { id ->
-                            controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
+                    val dismissReader: () -> Unit = {
+                        if (surfaces.expandedFullViewSession == readerSession) {
+                            val owned = readerComposer?.session?.takeIf { it.owner === surfaces }
+                            if (owned != null) owned.onDismiss() else surfaces.expandedFullView = false
                         }
+                    }
+                    ReaderSendDismissal(surfaces, onReaderSendAccepted) {
+                        readerComposer?.let { host ->
+                            host.session?.takeIf { it.owner === surfaces }?.let(host::detach)
+                        }
+                    }
                     val canUseExpandedComposer = !deleted && !actionsReadOnly && composerGate == ComposerGate.COMPOSER
                     val expandedBody = bodyTextToRender ?: displayedBody
                     MessageFullScreenView(
@@ -3226,7 +3227,7 @@ internal fun MessageBubble(
                         },
                         onReact = {
                             if (canUseExpandedComposer) {
-                                surfaces.expandedFullView = false
+                                dismissReader()
                                 surfaces.emojiPickerOpen = true
                             }
                         },
@@ -3241,7 +3242,7 @@ internal fun MessageBubble(
                                 {
                                     onBeforeBodyCollapse()
                                     explicitlyCollapsed = true
-                                    surfaces.expandedFullView = false
+                                    dismissReader()
                                 }
                             },
                         onCopy = ::copyMessageText,
@@ -3250,114 +3251,21 @@ internal fun MessageBubble(
                             // delete surface (same handoff the reaction picker
                             // uses) so the sheet never renders behind the
                             // full-screen dialog window.
-                            surfaces.expandedFullView = false
+                            dismissReader()
                             requestDelete()
                         },
-                        onDismiss = { surfaces.expandedFullView = false },
+                        onDismiss = dismissReader,
                         bottomBar = {
-                            when (composerGate) {
-                                ComposerGate.PENDING ->
-                                    if (controller.inviteAcceptanceResolutionPending) {
-                                        InviteAcceptanceResolutionStatus(
-                                            state = controller.inviteAcceptanceResolutionState,
-                                            onRetry = {
-                                                appState.launchMutation {
-                                                    controller.retryInviteAcceptanceAuthority()
-                                                }
-                                            },
-                                        )
-                                    } else if (controller.showsBlockedLeave) {
-                                        BlockedLeaveComposerNotice(controller, appState)
-                                    } else {
-                                        Spacer(
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .navigationBarsPadding()
-                                                .imePadding()
-                                                .height(64.dp),
+                            if (!actionsReadOnly && readerComposer != null) {
+                                CompositionLocalProvider(LocalComposerSendMotion provides null) {
+                                    key(readerSession) {
+                                        readerComposer.Reader(
+                                            owner = surfaces,
+                                            onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
+                                            onDismiss = { surfaces.expandedFullView = false },
                                         )
                                     }
-                                ComposerGate.NOTICE ->
-                                    RemovedMemberComposerNotice(
-                                        deviceRemoved = controller.group.isDeviceRemovedCopy(),
-                                    )
-                                ComposerGate.BLOCKED ->
-                                    BlockedDmComposerNotice(
-                                        unblockInFlight = blockedDmUnblockInFlight,
-                                        onUnblock = onUnblockBlockedDm,
-                                    )
-                                ComposerGate.FROZEN -> FrozenGroupComposerNotice()
-                                ComposerGate.DISBANDED -> DisbandedGroupComposerNotice(disbanded = groupDisbanded)
-                                ComposerGate.INVITE ->
-                                    InvitationActions(
-                                        inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
-                                        mutationInFlight = inviteMutationInFlight,
-                                        onAccept = onJoinInvite,
-                                        onDecline = onDeclineInvite,
-                                    )
-                                ComposerGate.COMPOSER ->
-                                    if (!actionsReadOnly) {
-                                        CompositionLocalProvider(
-                                            LocalComposerSendMotion provides null,
-                                        ) {
-                                            ComposerBar(
-                                                replyingToEmoji =
-                                                    rememberReplyReceivedEmoji(
-                                                        controller.replyingTo?.messageIdHex,
-                                                        controller,
-                                                        appState,
-                                                    ),
-                                                replyingTo = controller.replyingTo,
-                                                replyingToMedia =
-                                                    controller.replyingTo
-                                                        ?.let(controller::mediaReferencesFor)
-                                                        .orEmpty(),
-                                                replyingToDisplay =
-                                                    controller.replyingTo
-                                                        ?.let { controller.replyTargetPreview(it, messageTextCopy) },
-                                                messageTextCopy = messageTextCopy,
-                                                onCancelReply = { controller.replyingTo = null },
-                                                onSend = { text, onAccepted ->
-                                                    appState.launchMutation {
-                                                        appState.sendConversationText(
-                                                            controller,
-                                                            text,
-                                                            onAccepted = onAccepted,
-                                                        )
-                                                    }
-                                                },
-                                                initialDraft =
-                                                    appState
-                                                        .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
-                                                        ?.textFieldValue
-                                                        ?: TextFieldValue(""),
-                                                onDraftChange = { value, textChanged ->
-                                                    appState.setDraft(
-                                                        controller.boundAccountRef,
-                                                        groupIdHex,
-                                                        value,
-                                                        textChanged,
-                                                    )
-                                                },
-                                                draftKey =
-                                                    composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),
-                                                draftAccountRef = controller.boundAccountRef,
-                                                draftGroupIdHex = groupIdHex,
-                                                textState = composerTextState,
-                                                editingMessageId = controller.editingMessageId,
-                                                editingInitialText =
-                                                    editingRecord?.let { controller.displayedText(it) },
-                                                onCancelEdit = controller::cancelMessageEdit,
-                                                appState = appState,
-                                                mentionCandidates = mentionCandidates,
-                                                mentionPickerEnabled = mentionPickerEnabled,
-                                                enterKeyBehavior = appState.enterKeyBehavior,
-                                                recentEmojis = recentEmojis,
-                                                onEmojiUsed = onEmojiUsed,
-                                                onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
-                                            )
-                                        }
-                                    }
+                                }
                             }
                         },
                     )
