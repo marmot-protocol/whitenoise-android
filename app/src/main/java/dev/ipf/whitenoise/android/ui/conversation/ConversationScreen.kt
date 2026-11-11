@@ -1778,6 +1778,7 @@ internal fun ConversationScreen(
 
     val context = LocalContext.current
     val documentSaveFallback = rememberDocumentSaveFallback(appState, controller.group.groupIdHex)
+
     /** Defers media reveal until its submitting reader has returned the shared composer. */
     fun readerAwareSendReveal(): () -> Unit {
         val readerAccepted = readerComposer.captureSendAccepted()
