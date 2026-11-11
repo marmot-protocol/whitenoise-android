@@ -200,6 +200,67 @@ class MediaAttachmentSaveTest {
         assertEquals(1, provider.deleteCount)
     }
 
+    /** A source revoked once its Downloads bytes are written never clears the pending flag and removes the entry. */
+    @Test
+    fun ownerChangedBeforeDownloadsFinalizeDeletesPendingEntryWithoutFallback() =
+        runTest {
+            val source = File.createTempFile("materialized-attachment", ".txt")
+            var fallbackCalls = 0
+            try {
+                source.writeBytes(PAYLOAD)
+
+                val failure =
+                    runCatching {
+                        saveDocumentWithFallback(
+                            context = context(),
+                            source = source,
+                            fileName = "notes.txt",
+                            mediaType = "text/plain",
+                            fallback = { _, _, _ -> fallbackCalls += 1 },
+                            beforePublish = { throw CancellationException("owner changed") },
+                        )
+                    }.exceptionOrNull()
+
+                assertTrue(failure is CancellationException)
+                assertEquals(MediaStore.Downloads.EXTERNAL_CONTENT_URI, provider.insertedCollection)
+                assertArrayEquals(PAYLOAD, outputFile.readBytes())
+                assertEquals(null, provider.updatedValues)
+                assertEquals(1, provider.deleteCount)
+                assertEquals(0, fallbackCalls)
+            } finally {
+                source.delete()
+            }
+        }
+
+    /** A Downloads failure does not reopen a revoked source's save through the destination picker. */
+    @Test
+    fun revokedOwnerSkipsDestinationFallbackAfterMediaStoreFailure() =
+        runTest {
+            val source = File.createTempFile("materialized-attachment", ".txt")
+            provider.outputFailure = java.io.IOException("provider unavailable")
+            var fallbackCalls = 0
+            try {
+                source.writeBytes(PAYLOAD)
+
+                val failure =
+                    runCatching {
+                        saveDocumentWithFallback(
+                            context = context(),
+                            source = source,
+                            fileName = "notes.txt",
+                            mediaType = "text/plain",
+                            fallback = { _, _, _ -> fallbackCalls += 1 },
+                            beforePublish = { throw CancellationException("owner changed") },
+                        )
+                    }.exceptionOrNull()
+
+                assertTrue(failure is CancellationException)
+                assertEquals(0, fallbackCalls)
+            } finally {
+                source.delete()
+            }
+        }
+
     @Test
     fun unknownDocumentMetadataUsesSafeGenericFallbackOnSaveAndPicker() {
         assertTrue(saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), "../..", "*/*"))

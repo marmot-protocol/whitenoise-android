@@ -191,6 +191,7 @@ internal suspend fun saveDocumentWithFallback(
     fileName: String,
     mediaType: String,
     fallback: DocumentSaveFallback?,
+    beforePublish: () -> Unit = {},
 ): Boolean =
     try {
         withContext(Dispatchers.IO) {
@@ -199,10 +200,13 @@ internal suspend fun saveDocumentWithFallback(
                 source = source,
                 fileName = fileName,
                 mediaType = mediaType,
+                beforePublish = beforePublish,
             )
         }
     } catch (failure: AttachmentSaveException) {
         val selectDestination = fallback ?: throw failure
+        // A source revoked while Downloads failed must not reopen the save through the picker.
+        beforePublish()
         selectDestination(source, fileName, mediaType)
         true
     }
