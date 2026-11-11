@@ -40,7 +40,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
         "anchor": "fun StorageUsagePlaceholderBar(",
         "test_ids": [
-          "SET-047"
+          "SET-047",
+          "NAV-013"
         ]
       }
     ],
