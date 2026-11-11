@@ -1693,6 +1693,63 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(listOf("safe new line"), messages)
     }
 
+    /**
+     * A same-message silent rewrite whose rich post fails restores a clean card even though its own
+     * recovery cancellation already removed the card it was rewriting (#3712).
+     */
+    @Test
+    fun failedSilentRewriteRestoresACleanCardAfterItsOwnCancellation() {
+        presenter.ensureChannels()
+        val conversation = LocalNotificationFormatter.conversationDismissalKey("account-a", "group-a")
+        manager.notify(
+            conversation.tag,
+            conversation.id,
+            carriedMessagingNotification("older line" to 2_000_000L),
+        )
+        var failNextPost = false
+        var postAttempts = 0
+        val recoveringPresenter =
+            LocalNotificationPresenter(
+                context = context,
+                groupReconciliation = {},
+                notificationPoster = { notificationManager, tag, id, notification ->
+                    postAttempts += 1
+                    if (failNextPost) {
+                        failNextPost = false
+                        throw RuntimeException("simulated Binder rejection")
+                    }
+                    notificationManager.notify(tag, id, notification)
+                },
+            )
+        val message = update(isMention = false)
+        assertTrue(
+            runBlocking {
+                recoveringPresenter.show(message, previewTextOverride = "first line", shortNpub = { "npub1test" })
+            },
+        )
+
+        failNextPost = true
+        postAttempts = 0
+        val rewritten =
+            runBlocking {
+                recoveringPresenter.show(
+                    message,
+                    previewTextOverride = "edited line",
+                    shortNpub = { "npub1test" },
+                    silentUpdate = true,
+                )
+            }
+
+        assertTrue(rewritten)
+        assertEquals("the clean retry ran after the failed rich rewrite", 2, postAttempts)
+        val messages =
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(manager.activeNotifications.single().notification)
+                ?.messages
+                ?.map { it.text.toString() }
+        assertEquals(listOf("edited line"), messages)
+    }
+
     @Test
     fun failedPlainPostIsContainedAndReportedAsNotPosted() {
         presenter.ensureChannels()
