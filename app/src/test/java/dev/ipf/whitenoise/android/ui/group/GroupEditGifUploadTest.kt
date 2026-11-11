@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
+import kotlinx.coroutines.Job
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -56,9 +57,9 @@ class GroupEditGifUploadTest {
         assertEquals(0, fixture.uploads.get())
         val currentConfirm = composeRule.onNodeWithTag("confirmation.confirm").captureClickCallbackForReplay()
         composeRule.onNodeWithTag("confirmation.confirm").performClick()
-        awaitProgress { fixture.uploads.get() == 1 }
+        awaitSettledUploads(1)
         composeRule.runOnIdle { currentConfirm() }
-        assertEquals(1, fixture.uploads.get())
+        awaitSettledUploads(1)
         assertEquals(listOf("image/gif"), fixture.uploadMimeTypes)
     }
 
@@ -94,9 +95,9 @@ class GroupEditGifUploadTest {
         awaitProgress { composeRule.onAllNodesWithTag("identity_crop.dialog").fetchSemanticsNodes().isNotEmpty() }
         val cropConfirm = composeRule.onNodeWithTag("identity_crop.confirm").captureClickCallbackForReplay()
         composeRule.onNodeWithTag("identity_crop.confirm").performClick()
-        awaitProgress { fixture.uploads.get() == 1 }
+        awaitSettledUploads(1)
         composeRule.runOnIdle { cropConfirm() }
-        assertEquals(1, fixture.uploads.get())
+        awaitSettledUploads(1)
         assertTrue(fixture.uploadMimeTypes.single() != "image/gif")
     }
 
@@ -201,6 +202,13 @@ class GroupEditGifUploadTest {
         launchDocument()
         composeRule.runOnIdle { assertTrue(fixture.registry.deliver(uri)) }
         awaitProgress { composeRule.onAllNodesWithText(expectedTitle).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /** Waits until every launched upload attempt has finished, then checks how many reached the server. */
+    private fun awaitSettledUploads(expected: Int) {
+        val mutations = fixture.state.mutationsScope.coroutineContext[Job]!!
+        awaitProgress { mutations.children.none { it.isActive } }
+        assertEquals(expected, fixture.uploads.get())
     }
 
     /** Drive the real Main→IO→Main boundary without blocking the paused Android looper. */

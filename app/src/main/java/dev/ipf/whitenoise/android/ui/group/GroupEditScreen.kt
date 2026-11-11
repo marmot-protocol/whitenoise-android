@@ -461,11 +461,28 @@ internal fun GroupEditScreen(
                 pendingCropUri = null
             },
             onUnreadable = { picked ->
-                uploadPublicAvatar { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked) }
+                // A GIF that escaped the first check would otherwise go up whole after the still-photo notice.
+                val generation = imagePickGeneration.capture()
+                imagePickerScope.launch {
+                    val gif = ProfilePictureDraftProcessor.isGifSource(context.contentResolver, picked)
+                    when {
+                        !imagePickGeneration.isCurrent(generation) || !imageOwnerIsCurrent() -> Unit
+                        gif -> pendingPublicPhoto = PendingPublicGroupPhoto(picked, gif = true)
+                        else ->
+                            uploadPublicAvatar {
+                                GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked)
+                            }
+                    }
+                }
             },
             onCropped = { bytes, crop ->
-                pendingCropUri = null
-                uploadPublicAvatar(acceptedCrop = true) { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+                // A replayed confirm after the crop has closed must not upload the same picture again.
+                if (pendingCropUri != null) {
+                    pendingCropUri = null
+                    uploadPublicAvatar(acceptedCrop = true) {
+                        renderIdentityImageDraft(bytes, crop, MediaQuality.Standard)
+                    }
+                }
             },
         )
 
