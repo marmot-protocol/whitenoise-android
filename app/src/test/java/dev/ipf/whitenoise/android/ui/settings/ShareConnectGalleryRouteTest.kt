@@ -172,6 +172,9 @@ class ShareConnectGalleryRouteTest {
             it()
             it()
         }
+        // waitForCompletion can read the share button before it is redrawn as disabled, so once the insert lands
+        // it could return before the save finished and presented its notice.
+        composeRule.waitUntil(10_000) { appState.transientNotice != null }
         waitForCompletion()
         composeRule.runOnIdle {
             assertEquals(1, provider.insertCount)
