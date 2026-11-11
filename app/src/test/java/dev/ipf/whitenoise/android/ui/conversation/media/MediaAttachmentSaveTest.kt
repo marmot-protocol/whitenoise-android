@@ -261,6 +261,40 @@ class MediaAttachmentSaveTest {
             }
         }
 
+    /** The destination picker's copy rechecks the owner, so a save revoked while the picker was open rethrows. */
+    @Test
+    fun ownerRevokedWhileThePickerIsOpenFailsTheFallbackCopy() =
+        runTest {
+            val source = File.createTempFile("materialized-attachment", ".txt")
+            provider.outputFailure = java.io.IOException("provider unavailable")
+            var ownerRevoked = false
+            var copied = false
+            try {
+                source.writeBytes(PAYLOAD)
+
+                val failure =
+                    runCatching {
+                        saveDocumentWithFallback(
+                            context = context(),
+                            source = source,
+                            fileName = "notes.txt",
+                            mediaType = "text/plain",
+                            fallback = { _, _, _, beforeCopy ->
+                                ownerRevoked = true
+                                beforeCopy()
+                                copied = true
+                            },
+                            beforePublish = { if (ownerRevoked) throw CancellationException("owner changed") },
+                        )
+                    }.exceptionOrNull()
+
+                assertTrue(failure is CancellationException)
+                assertFalse(copied)
+            } finally {
+                source.delete()
+            }
+        }
+
     @Test
     fun unknownDocumentMetadataUsesSafeGenericFallbackOnSaveAndPicker() {
         assertTrue(saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), "../..", "*/*"))
