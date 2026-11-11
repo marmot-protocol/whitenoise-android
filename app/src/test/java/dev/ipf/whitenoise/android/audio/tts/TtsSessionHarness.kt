@@ -290,16 +290,30 @@ internal class FakeSessionFocus : TtsAudioFocus {
         private set
     var releases = 0
         private set
+    private var onFocusLoss: (() -> Unit)? = null
+    private var onOwnerSurrender: (() -> Unit)? = null
 
     override fun acquire(
         onFocusLoss: () -> Unit,
         onOwnerSurrender: () -> Unit,
     ): Boolean {
         acquires += 1
+        this.onFocusLoss = onFocusLoss
+        this.onOwnerSurrender = onOwnerSurrender
         return true
     }
 
     override fun release() {
         releases += 1
+    }
+
+    /** Delivers a transient focus loss to the latest holder. */
+    fun loseFocus() {
+        onFocusLoss?.invoke()
+    }
+
+    /** Delivers a permanent loss or in-app surrender to the latest holder. */
+    fun surrender() {
+        onOwnerSurrender?.invoke()
     }
 }

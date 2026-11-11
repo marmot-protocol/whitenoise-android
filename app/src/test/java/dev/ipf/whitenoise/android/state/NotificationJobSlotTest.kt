@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -166,6 +167,10 @@ class NotificationJobSlotTest {
         assertEquals(1, started.get())
     }
 
+    /**
+     * The slot stays reserved while its cancelled job is still stopping. The teardown gate is released
+     * in `finally`, so a failed reservation assertion ends the test instead of parking it (#3727).
+     */
     @Test
     fun cancellationReservesTheSlotUntilTheOwnedJobHasStopped() =
         runBlocking {
@@ -186,19 +191,22 @@ class NotificationJobSlotTest {
             slot.startIfInactive { listener }
 
             val cancellation = launch { slot.cancelAndJoin() }
-            cancellationEntered.await()
-
             var replacementStarts = 0
-            val duringCancellation =
-                slot.currentOrStart {
-                    replacementStarts += 1
-                    Job()
-                }
-            assertNull("a concurrent startup must not escape account teardown", duringCancellation)
-            assertEquals(0, replacementStarts)
+            try {
+                withTimeout(SLOT_BOUND_MS) { cancellationEntered.await() }
 
-            releaseCancellation.complete(Unit)
-            cancellation.join()
+                val duringCancellation =
+                    slot.currentOrStart {
+                        replacementStarts += 1
+                        Job()
+                    }
+                assertNull("a concurrent startup must not escape account teardown", duringCancellation)
+                assertEquals(0, replacementStarts)
+            } finally {
+                // Release the NonCancellable teardown even when an assertion failed, so the scope can finish.
+                releaseCancellation.complete(Unit)
+                withTimeout(SLOT_BOUND_MS) { cancellation.join() }
+            }
 
             val afterCancellation =
                 slot.currentOrStart {
@@ -209,4 +217,9 @@ class NotificationJobSlotTest {
             assertEquals(1, replacementStarts)
             slot.cancelAndJoin()
         }
+
+    private companion object {
+        /** Real-time bound for the parked teardown to be reached and released. */
+        const val SLOT_BOUND_MS = 5_000L
+    }
 }
