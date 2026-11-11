@@ -242,7 +242,8 @@ class ReceiveContentImportCoverageTest {
             openThread = Thread.currentThread()
             openEntered.countDown()
             openGate.await(WAIT_SECONDS, TimeUnit.SECONDS)
-            val source = File.createTempFile("drop_source", ".png", context.filesDir).apply { writeBytes(IMAGE_BYTES) }
+            val filesDir = checkNotNull(context).filesDir
+            val source = File.createTempFile("drop_source", ".png", filesDir).apply { writeBytes(IMAGE_BYTES) }
             return ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).also { source.delete() }
         }
 
