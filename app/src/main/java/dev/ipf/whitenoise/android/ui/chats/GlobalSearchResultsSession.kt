@@ -155,7 +155,8 @@ private fun GlobalSearchResultsRecheckEffects(
     // Composition can run before the runtime is installed; the observer waits for one instead of throwing.
     val runtime = appState.marmotOrNull()
     val wakeups = remember(controller) { Channel<Unit>(Channel.CONFLATED) }
-    // Loaded rows MDK removed, read on the event thread and dropped from the list on the main thread.
+    // Every key MDK reports removed, collected on the event thread without reading list state, then withdrawn on the
+    // main thread, so a row a page or reread in flight still holds never lists either.
     val removals = remember(controller) { Channel<Set<String>>(Channel.UNLIMITED) }
     LaunchedEffect(controller) {
         for (keys in removals) controller.revoke(keys)
@@ -219,8 +220,8 @@ private const val GLOBAL_SEARCH_OBSERVER_ATTEMPTS = 3
 private const val MILLIS_PER_SECOND = 1_000L
 
 /**
- * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Loaded rows it
- * removes go to [removals] first, so they leave the list before the recheck lands.
+ * Whether [event] is a projection update of [account] that can change [controller]'s loaded rows. Every key it
+ * removes goes to [removals] first, so a loaded row leaves before the recheck lands and a held one never lists.
  */
 private fun touchesLoadedRows(
     event: MarmotEventFfi,
@@ -229,16 +230,16 @@ private fun touchesLoadedRows(
     removals: SendChannel<Set<String>>,
 ): Boolean {
     val update = (event as? MarmotEventFfi.ProjectionUpdated)?.update?.takeIf { it.accountLabel == account }
-    val removed = update?.let { controller.removedLoadedKeys(it.update) }.orEmpty()
+    val removed = update?.let { globalSearchRemovedKeys(it.update) }.orEmpty()
     if (removed.isNotEmpty()) removals.trySend(removed)
     return update != null && controller.isTouchedBy(update.update)
 }
 
-/** The loaded rows [update] removes, which leave the list before the recheck it triggers lands. */
-internal fun GlobalSearchResultsController.removedLoadedKeys(update: TimelineProjectionUpdateFfi): Set<String> {
-    val loaded = state.seenKeys
-    return update.changes
+/**
+ * Result keys of every message [update] removes, loaded or not. Reads no list state, so it is safe on the event
+ * thread; a removed message never returns, so withdrawing a key no row holds is harmless.
+ */
+internal fun globalSearchRemovedKeys(update: TimelineProjectionUpdateFfi): Set<String> =
+    update.changes
         .filterIsInstance<TimelineMessageChangeFfi.Remove>()
-        .map { globalSearchKey(update.groupIdHex, it.messageIdHex) }
-        .filterTo(HashSet()) { it in loaded }
-}
+        .mapTo(HashSet()) { globalSearchKey(update.groupIdHex, it.messageIdHex) }

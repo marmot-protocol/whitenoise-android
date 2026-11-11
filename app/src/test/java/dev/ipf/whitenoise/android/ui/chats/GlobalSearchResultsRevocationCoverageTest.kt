@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.TimelineRemoveReasonFfi
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.NOW_MILLIS
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.StoreReader
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.controller
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.holdingFirstRead
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.keys
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.record
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTestFixtures.update
@@ -58,7 +59,7 @@ class GlobalSearchResultsRevocationCoverageTest {
             val removal =
                 update("g", TimelineMessageChangeFfi.Remove("m0000", TimelineRemoveReasonFfi.entries.first()))
 
-            val removed = controller.removedLoadedKeys(removal)
+            val removed = globalSearchRemovedKeys(removal)
             assertEquals(setOf("g:m0000"), removed)
             controller.revoke(removed)
             assertFalse("withdrawn before any reread", "g:m0000" in keys(controller))
@@ -71,6 +72,48 @@ class GlobalSearchResultsRevocationCoverageTest {
             assertFalse("a stale reread never restores it", "g:m0000" in keys(controller))
             assertEquals(LOADED - 1, controller.state.results.size)
         }
+
+    /**
+     * A Remove that arrives while the first page is still being read withdraws the row that page holds, so it never
+     * lists, and rereads of a store that has not caught up cannot restore it.
+     */
+    @Test
+    fun aRemovalDuringAReadInFlightKeepsTheHeldRowOut() =
+        runTest {
+            val store = StoreReader(rows())
+            val (reader, gate) = holdingFirstRead(store)
+            val controller = controller(reader)
+            controller.search(GlobalSearchResultsQuery(needle = "hello"))
+            advanceUntilIdle()
+            assertTrue("the first page is held", controller.state.inFlight != null)
+            val removal =
+                update("g", TimelineMessageChangeFfi.Remove("m0299", TimelineRemoveReasonFfi.entries.first()))
+            assertTrue("a removal while a read is held counts", controller.isTouchedBy(removal))
+
+            controller.revoke(globalSearchRemovedKeys(removal))
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertTrue("the held page landed", controller.state.results.isNotEmpty())
+            assertFalse("the held row never lists", "g:m0299" in keys(controller))
+
+            repeat(3) {
+                controller.refresh()
+                advanceUntilIdle()
+            }
+            assertFalse("a lagging reread never restores it", "g:m0299" in keys(controller))
+        }
+
+    /** Only Remove changes yield keys, each scoped to its group. */
+    @Test
+    fun removedKeysCoverEveryRemoveAndNothingElse() {
+        val removal =
+            update(
+                "g",
+                TimelineMessageChangeFfi.Remove("a", TimelineRemoveReasonFfi.entries.first()),
+                TimelineMessageChangeFfi.Remove("b", TimelineRemoveReasonFfi.entries.last()),
+            )
+        assertEquals(setOf("g:a", "g:b"), globalSearchRemovedKeys(removal))
+    }
 
     /** A deletion and a local hide far below the cap are reached by chained bounded passes and dropped. */
     @Test

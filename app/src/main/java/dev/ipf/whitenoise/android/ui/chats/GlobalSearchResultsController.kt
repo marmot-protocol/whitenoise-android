@@ -144,7 +144,8 @@ internal class GlobalSearchResultsController(
 
     /**
      * Drops loaded rows whose disappearing deadline has passed, and the rows with [removed] keys MDK reported gone,
-     * without waiting for a reread. A removed key never returns in this generation.
+     * without waiting for a reread. A removed key never lists in this generation, even when the read holding it
+     * lands later.
      */
     fun revoke(removed: Set<String> = emptySet()) {
         if (query == null || closed) return

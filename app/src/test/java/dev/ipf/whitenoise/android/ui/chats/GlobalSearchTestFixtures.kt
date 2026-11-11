@@ -15,14 +15,14 @@ import kotlinx.coroutines.test.TestScope
 
 /** Shared fakes and records for the global message-search controller tests (#1944). */
 internal object GlobalSearchTestFixtures {
-    /** One projection update of [group] carrying [change]. */
+    /** One projection update of [group] carrying [changes]. */
     fun update(
         group: String,
-        change: TimelineMessageChangeFfi,
+        vararg changes: TimelineMessageChangeFfi,
     ) = TimelineProjectionUpdateFfi(
         groupIdHex = group,
         messages = emptyList(),
-        changes = listOf(change),
+        changes = changes.toList(),
         chatListRow = null,
         chatListTrigger = ChatListUpdateTriggerFfi.entries.first(),
     )

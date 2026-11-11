@@ -358,7 +358,10 @@ internal object GlobalSearchResultsReducer {
         return state.copy(results = state.results - expired.toSet())
     }
 
-    /** Drops loaded rows MDK reported removed, and keeps them out of every later page of this generation. */
+    /**
+     * Drops loaded rows MDK reported removed, and keeps every reported key, loaded or still held by a read in flight,
+     * out of every later page and reread of this generation.
+     */
     fun withdraw(
         state: GlobalSearchResultsState,
         keys: Set<String>,
