@@ -30,7 +30,26 @@ internal fun nostrEventReferences(document: MarkdownDocumentFfi): List<NostrEven
  */
 internal fun mayNameNostrEventCardReference(text: String): Boolean =
     EVENT_ENTITY_PREFIX.containsMatchIn(text) &&
-        (NOSTR_EVENT_URI.containsMatchIn(text) || HTTP_EVENT_LINK.containsMatchIn(text.withoutMarkdownEscapes()))
+        (NOSTR_EVENT_URI.containsMatchIn(text) || text.withoutMarkdownEscapes().containsHttpEventLink())
+
+/**
+ * Whether an unbroken run of non-whitespace carries an HTTP(S) scheme and, after it, the NIP-19 event segment
+ * [NostrEventReferenceCollector] reads a card from. Each run is searched once, from its first scheme to its end, so the
+ * work stays linear in the text: a repeated scheme never rescans the rest of its run.
+ */
+private fun String.containsHttpEventLink(): Boolean {
+    val runs = NON_WHITESPACE_RUN.toPattern().matcher(this)
+    val scheme = HTTP_SCHEME.toPattern().matcher(this)
+    val segment = NIP19_EVENT_SEGMENT.toPattern().matcher(this).useTransparentBounds(true)
+    while (runs.find()) {
+        if (scheme.region(runs.start(), runs.end()).find() &&
+            segment.region(scheme.end(), runs.end()).find()
+        ) {
+            return true
+        }
+    }
+    return false
+}
 
 /**
  * [this] with every backslash that escapes an ASCII punctuation character removed, as CommonMark, and MDK's
@@ -204,12 +223,8 @@ private val EVENT_ENTITY_PREFIX = Regex("(?i)$NIP19_EVENT_HRP")
 private val NOSTR_EVENT_URI =
     Regex("(?<![A-Za-z0-9_/])nostr:$NIP19_EVENT_HRP[$NIP19_BODY_CHARS]{6,}(?![A-Za-z0-9_/])")
 
-/** An HTTP(S) URL whose unbroken text carries the segment [NostrEventReferenceCollector] reads a card from. */
-private val HTTP_EVENT_LINK =
-    Regex(
-        "(?i)https?://\\S*?(?<![$NIP19_BODY_CHARS])$NIP19_EVENT_HRP" +
-            "[$NIP19_BODY_CHARS]+(?![$NIP19_BODY_CHARS])",
-    )
+private val NON_WHITESPACE_RUN = Regex("\\S+")
+private val HTTP_SCHEME = Regex("(?i)https?://")
 private val NIP19_EVENT_SEGMENT =
     Regex(
         "(?i)(?<![$NIP19_BODY_CHARS])(?:note|nevent|naddr)1" +
