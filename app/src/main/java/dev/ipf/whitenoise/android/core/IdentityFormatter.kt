@@ -131,7 +131,7 @@ object IdentityFormatter {
     // and the localized formatter throws on extreme years too. Clamping to a sane
     // window (plus the guards below) keeps a crafted timestamp from crashing the
     // row that renders it (#468).
-    private const val MAX_DISPLAYABLE_EPOCH_SECONDS = 253_402_300_799L
+    internal const val MAX_DISPLAYABLE_EPOCH_SECONDS = 253_402_300_799L
 
     fun relativeTime(
         epochSeconds: ULong,
@@ -304,6 +304,30 @@ object IdentityFormatter {
             runCatching {
                 Instant.ofEpochSecond(epochSeconds.toLong()).atZone(zone).year == now.atZone(zone).year
             }.getOrDefault(false)
+
+    /**
+     * The calendar day an untrusted epoch-second stamp falls on in [zone], or null past
+     * 9999-12-31T23:59:59Z. Inside that window neither the instant nor its zoned date can overflow.
+     */
+    fun localDate(
+        epochSeconds: ULong,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): LocalDate? =
+        if (epochSeconds > MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) {
+            null
+        } else {
+            Instant.ofEpochSecond(epochSeconds.toLong()).atZone(zone).toLocalDate()
+        }
+
+    /** [localDate], with stamps past that bound placed on its day in [zone] so grouping stays total and ordered. */
+    fun clampedLocalDate(
+        epochSeconds: ULong,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): LocalDate =
+        Instant
+            .ofEpochSecond(epochSeconds.coerceAtMost(MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()).toLong())
+            .atZone(zone)
+            .toLocalDate()
 
     private fun numericDateFormatter(pattern: String): DateTimeFormatter =
         numericDateFormatters.computeIfAbsent(pattern) { DateTimeFormatter.ofPattern(it, Locale.ROOT) }

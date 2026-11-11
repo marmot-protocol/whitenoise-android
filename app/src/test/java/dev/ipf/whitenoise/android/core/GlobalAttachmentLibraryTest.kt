@@ -134,4 +134,13 @@ class GlobalAttachmentLibraryTest {
         const val SECONDS_PER_DAY = 86_400
         const val SECONDS_PER_HOUR = 3_600
     }
+
+    @Test
+    fun unrepresentableTimelineStampsFallOnTheLastDisplayableDay() {
+        val calendar = GlobalAttachmentSections(LocalDate.of(1970, 2, 13), ZoneOffset.UTC, DayOfWeek.MONDAY)
+        for (stamp in listOf(40_000_000_000_000_000uL, Long.MAX_VALUE.toULong(), ULong.MAX_VALUE)) {
+            assertEquals(LocalDate.of(9999, 12, 31), globalAttachmentDay(stamp, ZoneOffset.UTC))
+            assertEquals(GlobalAttachmentSectionKey.Today, globalAttachmentSectionKey(stamp, calendar))
+        }
+    }
 }
