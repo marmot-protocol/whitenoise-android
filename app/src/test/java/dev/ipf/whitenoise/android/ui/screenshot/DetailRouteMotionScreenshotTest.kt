@@ -244,7 +244,10 @@ class DetailRouteMotionScreenshotTest {
             rule
                 .onAllNodes(
                     SemanticsMatcher("customizes the composer") { node ->
-                        node.config.getOrNull(SemanticsActions.CustomActions).orEmpty().any { it.label == customize }
+                        node.config
+                            .getOrNull(SemanticsActions.CustomActions)
+                            .orEmpty()
+                            .any { it.label == customize }
                     },
                     useUnmergedTree = true,
                 ).onFirst()
