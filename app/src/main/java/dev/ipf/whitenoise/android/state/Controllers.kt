@@ -5949,6 +5949,9 @@ class ConversationController(
     // Retains a locally committed rename against a stale group-state snapshot (#2696).
     private val localGroupNames = LocalGroupNameAuthority()
 
+    // The same retention for a just-committed description, so a pre-edit snapshot cannot restore it (#3704).
+    private val localGroupDescriptions = LocalGroupNameAuthority()
+
     /**
      * Latest chat-list projection for this conversation, kept live even while
      * the chat list itself is hidden (its controller freezes item recomputes
@@ -7259,7 +7262,9 @@ class ConversationController(
 
     /** Applies a canonical group update while retaining only a still-unresolved stale action fence. */
     private fun applyGroupState(incoming: AppGroupRecordFfi) {
-        val update = localGroupNames.reconciled(incoming)
+        val named = localGroupNames.reconciled(incoming)
+        val description = localGroupDescriptions.reconcile(named.groupIdHex, named.description)
+        val update = if (description == named.description) named else named.copy(description = description)
         val previousGroup = group
         if (update.leaveBlocked) observedBlockedLeave = true
         if (update.selfMembership.isGroupEviction()) {
@@ -11505,8 +11510,8 @@ class ConversationController(
     /**
      * Installs a just-committed group profile locally and hands it to the chat list (#2696).
      *
-     * [LocalGroupNameAuthority] then retains the new name against a pre-rename snapshot that was
-     * already in flight, while a genuinely newer authoritative commit still wins.
+     * [LocalGroupNameAuthority] then retains the new name and description against a pre-edit
+     * snapshot that was already in flight, while a genuinely newer authoritative commit still wins.
      */
     private fun applyLocalGroupProfile(
         name: String,
@@ -11516,6 +11521,7 @@ class ConversationController(
         val updated = group.copy(name = name, description = description)
         if (updated == group) return
         localGroupNames.record(group.groupIdHex, previousName = group.name, committedName = name)
+        localGroupDescriptions.record(group.groupIdHex, previousName = group.description, committedName = description)
         group = updated
         appState.applyLocalGroupUpdate(updated, account)
     }

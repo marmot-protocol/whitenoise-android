@@ -79,6 +79,24 @@ class GroupRenameChatListProjectionTest {
             assertEquals(OLD_NAME, conversation.group.name)
         }
 
+    /**
+     * A snapshot from before the clear, still in flight when it succeeds, cannot restore the old
+     * description, while a genuinely newer description still wins.
+     */
+    @Test
+    fun staleSnapshotCannotRestoreAClearedDescription() =
+        runBlocking {
+            val appState = testAppState()
+            val conversation = conversationController(appState, description = "old details")
+
+            assertTrue(conversation.updateGroupProfile(OLD_NAME, ""))
+            conversation.applyGroupStateForTest(group(name = OLD_NAME).copy(description = "old details"))
+            assertEquals("", conversation.group.description)
+
+            conversation.applyGroupStateForTest(group(name = OLD_NAME).copy(description = "newer details"))
+            assertEquals("newer details", conversation.group.description)
+        }
+
     /** A rename leaves the untouched description null, so MDK keeps the canonical one instead of this projection's. */
     @Test
     fun renameLeavesTheUntouchedDescriptionToNativeState() =
