@@ -462,8 +462,8 @@ internal fun GroupEditScreen(
             },
             onUnreadable = { picked ->
                 // A GIF that escaped the first check would otherwise go up whole after the still-photo notice.
-                // The image slot stays claimed during the re-check so no other pick or upload starts in the gap.
-                val generation = imagePickGeneration.capture()
+                // The image slot stays claimed during the re-check, so this confirmed pick wins over any later one
+                // the same way it would during an upload.
                 val claimed = imageOwnerIsCurrent() && !imageSaving && !controller.mutationInFlight
                 if (claimed) {
                     imageSaving = true
@@ -475,7 +475,7 @@ internal fun GroupEditScreen(
                                 imageSaving = false
                             }
                         when {
-                            !imagePickGeneration.isCurrent(generation) || !imageOwnerIsCurrent() -> Unit
+                            !imageOwnerIsCurrent() -> Unit
                             gif -> pendingPublicPhoto = PendingPublicGroupPhoto(picked, gif = true)
                             else ->
                                 uploadPublicAvatar {
