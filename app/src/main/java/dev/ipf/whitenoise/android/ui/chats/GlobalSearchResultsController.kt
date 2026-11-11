@@ -76,8 +76,9 @@ internal class GlobalSearchResultsController(
 
     private var refreshPending = false
 
-    // Keys MDK reported removed or live again, by chat, queued from the event thread; the next [revoke] on the main
-    // thread applies those in a chat the query covers, in arrival order.
+    // Keys MDK reported removed or live again in any chat of the account, queued from the event thread. The main
+    // thread applies them in arrival order whatever the query's scope, so a later query covering that chat still
+    // keeps a removal the store has not caught up with out.
     private val reportedChanges = ConcurrentLinkedQueue<GlobalSearchKeyChanges>()
     private var loadPending = false
 

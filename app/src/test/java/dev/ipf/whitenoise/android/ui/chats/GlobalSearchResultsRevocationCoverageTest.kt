@@ -423,7 +423,8 @@ class GlobalSearchResultsRevocationCoverageTest {
     @Test
     fun aRemovalOutsideTheScopeIsRetainedForLaterQueries() =
         runTest {
-            val controller = controller(StoreReader(rows()))
+            // The store has not caught up: the removed row in the other chat still matches.
+            val controller = controller(StoreReader(rows() + record("other", "x", at = 1000uL)))
             controller.search(GlobalSearchResultsQuery(needle = "hello", groups = setOf("g")))
             advanceUntilIdle()
             val elsewhere =
@@ -438,6 +439,8 @@ class GlobalSearchResultsRevocationCoverageTest {
 
             controller.search(GlobalSearchResultsQuery(needle = "hello"))
             advanceUntilIdle()
+            assertTrue("the wider query read its first page", controller.state.results.isNotEmpty())
+            assertFalse("the out-of-scope removal is not listed", "other:x" in keys(controller))
             assertEquals(setOf("other:x", "g:m0299"), controller.state.withdrawn)
         }
 
