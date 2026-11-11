@@ -256,17 +256,6 @@ internal fun AccountKeysScreen(
             !appState.signOutInProgress &&
             !appState.wipeInProgress
 
-    val exportLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-            val request = ui.pendingExport
-            ui.pendingExport = null
-            when {
-                uri == null || !canDeliverSecret() -> Unit
-                request == null || request.isExpired() -> ui.expiredExportDialog = true
-                else -> saveExport(uri, request.content)
-            }
-        }
-
     /** Writes the picked document on IO; only the still-owning, started screen hears whether it failed. */
     fun saveExport(
         uri: Uri,
@@ -283,6 +272,17 @@ internal fun AccountKeysScreen(
             )
         if (!started) ui.savingExport = false
     }
+
+    val exportLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+            val request = ui.pendingExport
+            ui.pendingExport = null
+            when {
+                uri == null || !canDeliverSecret() -> Unit
+                request == null || request.isExpired() -> ui.expiredExportDialog = true
+                else -> saveExport(uri, request.content)
+            }
+        }
 
     /** Launches the export share with the prepared content. */
     fun launchExport(
