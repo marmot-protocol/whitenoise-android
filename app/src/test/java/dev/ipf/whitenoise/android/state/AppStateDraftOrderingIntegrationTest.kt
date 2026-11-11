@@ -17,6 +17,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -85,7 +86,11 @@ class AppStateDraftOrderingIntegrationTest {
                 gateway.release(1)
                 // The stale refreshes publish on Main only after the repository returns; wait (bounded, with
                 // Main pumped) until every refresh job has finished that fenced publication.
-                awaitCondition { listOf(firstA, onlyB, latestA).all { it.isCompleted } }
+                val refreshes = listOf(firstA, onlyB, latestA)
+                awaitCondition { refreshes.all { it.isCompleted } }
+                // Completion alone also covers a cancelled job; every stale read must actually have returned.
+                assertEquals(3, gateway.completed.get())
+                assertTrue("no refresh was cancelled", refreshes.none { it.isCancelled })
 
                 assertEquals(900uL, drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP))
                 assertNull(drafts.draftedAtSecondsFor(ACCOUNT_B, OTHER_GROUP))
