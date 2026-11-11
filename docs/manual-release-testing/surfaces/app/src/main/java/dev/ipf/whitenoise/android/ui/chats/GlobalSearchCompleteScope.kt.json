@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchCompleteScope.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Account-wide global-search chat scope for folder, chat-type and chat filters",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchCompleteScope.kt",
+        "anchor": "fun rememberGlobalSearchCompleteScope(",
+        "test_ids": [
+          "FIND-003",
+          "FIND-016"
+        ]
+      },
+      {
+        "surface": "Account-wide chat-name matches in global search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchCompleteScope.kt",
+        "anchor": "fun rememberCompleteChatSearchSections(",
+        "test_ids": [
+          "FIND-003",
+          "FIND-015"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

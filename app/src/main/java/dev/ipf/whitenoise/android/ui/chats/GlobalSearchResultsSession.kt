@@ -38,9 +38,11 @@ internal fun rememberGlobalSearchResults(
     query: GlobalSearchResultsQuery,
     enabled: Boolean,
     holder: GlobalSearchResultsHolder? = null,
+    paused: Boolean = false,
 ): GlobalSearchResultsController? {
     SideEffect { if (!enabled) holder?.close() }
-    val active = account?.takeIf { enabled && it == appState.activeAccountRef } ?: return null
+    // A paused session (its chat scope still resolving, #3720) shows nothing but keeps the held pages.
+    val active = account?.takeIf { enabled && !paused && it == appState.activeAccountRef } ?: return null
     val generation = appState.runtimeGeneration
     val create: (CoroutineScope) -> GlobalSearchResultsController = { scope ->
         GlobalSearchResultsController(

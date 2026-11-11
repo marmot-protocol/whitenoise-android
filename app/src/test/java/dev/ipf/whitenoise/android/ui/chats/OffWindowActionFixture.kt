@@ -6,9 +6,12 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -38,6 +41,7 @@ internal class OffWindowActionFixture(
     scope: TestScope,
     ioDispatcher: CoroutineDispatcher = StandardTestDispatcher(scope.testScheduler),
     memberLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi> = { _, _ -> emptyList() },
+    nativeFolderReads: Boolean = false,
 ) {
     val calls = ConcurrentLinkedQueue<String>()
     val row = AtomicReference(chatRow(ACTION_TARGET).copy(manuallyMarkedUnread = true))
@@ -56,6 +60,12 @@ internal class OffWindowActionFixture(
     var loseMuteReadback = false
     var targetReadUnavailable = false
     var targetMuteEligible = true
+
+    /** Native folder query reader when [nativeFolderReads]; may throw `ChatPresentationNotReady`. */
+    var chatListQueryIds: (suspend (String, ChatListViewQueryFfi) -> List<String>)? = null
+
+    /** Every native message-search page query, with the account it was issued for. */
+    val timelineQueries = ConcurrentLinkedQueue<Pair<String, TimelineMessageQueryFfi>>()
     val state: WhiteNoiseAppState
     val controller: ChatsController
 
@@ -92,6 +102,14 @@ internal class OffWindowActionFixture(
                     beforeSnapshotRead?.invoke()
                     listOf(presented(row.get()), presented(retainedRow.get())) + snapshotExtras.map(::presented)
                 },
+                chatListQueryIds =
+                    if (nativeFolderReads) {
+                        { account, query ->
+                            checkNotNull(chatListQueryIds) { "Unexpected chatListQueryIds read" }(account, query)
+                        }
+                    } else {
+                        null
+                    },
                 presentedRowByGroup = { account, id ->
                     check(account == ACTION_ACCOUNT && id in listOf(ACTION_TARGET, ACTION_SURVIVOR))
                     keyedReads++
@@ -213,6 +231,10 @@ internal class OffWindowActionFixture(
                 "setChatMuted", "clearChatMuted", "chatNotificationSettings" -> muteCommand(name, args)
                 "chatListRow" -> row.get()
                 "listMedia" -> emptyList<Any>()
+                "timelineMessages" -> {
+                    timelineQueries += (args!![0] as String) to (args[1] as TimelineMessageQueryFfi)
+                    TimelinePageFfi(emptyList(), hasMoreBefore = false, hasMoreAfter = false)
+                }
                 "catchUpAccounts" -> Unit
                 "toString" -> "OffWindowActionNative"
                 "hashCode" -> System.identityHashCode(proxy)
