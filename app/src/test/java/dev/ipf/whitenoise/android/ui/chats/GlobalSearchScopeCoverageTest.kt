@@ -108,8 +108,23 @@ class GlobalSearchScopeCoverageTest {
         assertEquals(setOf(ACTION_TARGET, EVICTED_CHAT), model.scopedGroups)
     }
 
-    /** An unready folder scope shows the results boundary progress, never No Results or a window-only search. */
-    @Test fun notReadyScopeShowsLoadingThenResolvesOnTheNextRevision() {
+    /** A chosen chat in no row stays in a folder search when the folder names it, and only then. */
+    @Test fun explicitChatOutsideTheRowsStaysInAFolderThatNamesIt() {
+        val model = prepared()
+        model.chatListQueryIds = { _, _ -> listOf(ACTION_TARGET, EVICTED_CHAT) }
+        val folder = createFolder(model, ChatFolderRule(includeMuted = true))
+        val chosen =
+            setOf(GlobalSearchChatFilter(EVICTED_CHAT, "Evicted"), GlobalSearchChatFilter(OUTSIDE_CHAT, "Outside"))
+        openSearch(
+            GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder), chatFilters = chosen),
+        )
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        settle()
+        assertEquals(setOf(EVICTED_CHAT), model.scopedGroups)
+    }
+
+    /** A folder that stays not ready shows Retry, never No Results or a window-only search, then resolves. */
+    @Test fun notReadyScopeShowsRetryThenResolvesOnTheNextRevision() {
         val model = prepared()
         var ready = false
         model.chatListQueryIds = { _, _ ->
@@ -118,13 +133,8 @@ class GlobalSearchScopeCoverageTest {
         }
         val folder = createFolder(model, ChatFolderRule(includeMuted = true))
         openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
-        repeat(40) {
-            scope.testScheduler.runCurrent()
-            ShadowLooper.idleMainLooper(50, TimeUnit.MILLISECONDS)
-            rule.waitForIdle()
-        }
+        awaitFailedWithRetry()
         assertTrue("no query may run on an unproven scope", model.timelineQueries.isEmpty())
-        rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
         assertTrue(
             rule.onAllNodesWithText(rule.activity.getString(R.string.no_results)).fetchSemanticsNodes().isEmpty(),
         )
@@ -147,15 +157,15 @@ class GlobalSearchScopeCoverageTest {
         awaitReads { model.scopedGroups.isNotEmpty() }
         ready = false
         rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
-        settle()
+        awaitFailedWithRetry()
         model.timelineQueries.clear()
         openSearch(GlobalSearchState(isOpen = true, query = "hello again", folderFilters = setOf(folder)))
         afterDebounce()
         assertTrue("a withdrawn scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
-        rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertExists()
+        awaitFailedWithRetry()
     }
 
-    /** After a membership change, the scope proved for the previous snapshot is not searched while the new resolves. */
+    /** After a membership change, a changed query waits for the new scope instead of searching the previous one. */
     @Test fun previousScopeIsNotAppliedToANewerSnapshot() {
         val model = prepared()
         var calls = 0
@@ -182,6 +192,35 @@ class GlobalSearchScopeCoverageTest {
         release.complete(Unit)
         awaitReads { model.scopedGroups.size >= 2 }
         assertEquals(setOf(ACTION_TARGET, GROUP_EXTRA), model.scopedGroups)
+    }
+
+    /** While a newer snapshot resolves, the same query keeps its proven scope, so results neither pause nor blink. */
+    @Test fun sameQueryKeepsItsScopeWhileANewerSnapshotResolves() {
+        val model = prepared()
+        var calls = 0
+        val release = CompletableDeferred<Unit>()
+        model.chatListQueryIds = { _, _ ->
+            calls += 1
+            if (calls == 1) {
+                listOf(ACTION_TARGET)
+            } else {
+                release.await()
+                listOf(ACTION_TARGET, GROUP_EXTRA)
+            }
+        }
+        val folder = createFolder(model, ChatFolderRule(includeMuted = true))
+        openSearch(GlobalSearchState(isOpen = true, query = "hello", folderFilters = setOf(folder)))
+        awaitReads { model.scopedGroups.isNotEmpty() }
+        settle()
+        model.timelineQueries.clear()
+        rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
+        awaitReads { calls >= 2 }
+        settle()
+        assertTrue("the held scope is not searched again: ${model.timelineQueries}", model.timelineQueries.isEmpty())
+        rule.onNodeWithTag(GLOBAL_SEARCH_RESULTS_LOADING_TAG).assertDoesNotExist()
+        release.complete(Unit)
+        awaitReads { GROUP_EXTRA in model.scopedGroups }
+        assertTrue("never a window-only search", model.timelineQueries.all { it.second.groupIdHex != null })
     }
 
     /** A scope answered after the account changed is dropped, so no query runs for the old account's chats. */
@@ -284,7 +323,7 @@ class GlobalSearchScopeCoverageTest {
         assertTrue("a failed scope must not search: ${model.timelineQueries}", model.timelineQueries.isEmpty())
     }
 
-    /** Files and media browsing queries the library with the complete scope and stays loading until it is ready. */
+    /** Files and media browsing queries the library with the complete scope, and only once it is proven. */
     @Test fun attachmentLibraryGetsCompleteScopeAndWaitsWhilePending() {
         val model = prepared()
         var ready = false
@@ -301,8 +340,8 @@ class GlobalSearchScopeCoverageTest {
                     GlobalSearchContentFilterSelection(setOf(GlobalSearchContentKind.FILES_DOCUMENTS)),
             ),
         )
-        settle()
-        assertTrue("no library query may run on a pending scope", model.attachmentQueries.isEmpty())
+        awaitFailedWithRetry()
+        assertTrue("no library query may run on an unproven scope", model.attachmentQueries.isEmpty())
         ready = true
         rule.runOnIdle { model.controller.applyChatListRow(chatRow(ARRIVED_CHAT)) }
         awaitReads { model.attachmentQueries.isNotEmpty() }
@@ -409,5 +448,6 @@ private val GROUP_EXTRA = "d7".repeat(16)
 private val DIRECT_EXTRA = "e7".repeat(16)
 private val ARRIVED_CHAT = "f7".repeat(16)
 private val EVICTED_CHAT = "9a".repeat(16)
+private val OUTSIDE_CHAT = "6c".repeat(16)
 
 private typealias RosterLoader = suspend (String, String) -> List<AppGroupMemberRecordFfi>

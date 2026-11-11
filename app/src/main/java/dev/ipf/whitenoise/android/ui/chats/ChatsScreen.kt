@@ -810,6 +810,8 @@ internal fun ChatsScreen(
             homeFolderId = selectedFolder?.id,
             folderFilters = globalSearchState.folderFilters,
             folderStore = folderStoreState,
+            // A changed query or filter waits for a proven scope; the same one keeps its last scope meanwhile.
+            queryKey = globalSearchState.copy(query = trimmedQuery, openFilterCategory = null),
         )
     val completeScope = completeScopeState.scope
     val scopedChatIds =

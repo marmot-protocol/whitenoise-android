@@ -11,7 +11,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.core.ChatListSearchSections
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
@@ -60,17 +59,17 @@ internal class GlobalSearchCompleteScope(
 
     /**
      * Group ids for a message or attachment query. An explicitly chosen chat is an identity, so one that is in no
-     * complete row yet stays in scope unless a folder narrows it away.
+     * complete row yet stays in scope unless the folder scope leaves it out.
      */
     fun scopedChatIds(state: GlobalSearchState): List<String> {
         val ids = scopedChats(state).mapTo(ArrayList()) { it.group.groupIdHex }
-        if (folderChatIds == null) {
-            val known = allRows.mapTo(HashSet()) { canonicalChatListGroupId(it.group.groupIdHex) }
-            state.chatFilters
-                .map { it.stableId }
-                .filter { canonicalChatListGroupId(it) !in known }
-                .forEach(ids::add)
-        }
+        val known = allRows.mapTo(HashSet()) { canonicalChatListGroupId(it.group.groupIdHex) }
+        val inFolder = folderChatIds?.mapTo(HashSet(), ::canonicalChatListGroupId)
+        state.chatFilters
+            .map { it.stableId }
+            .filter { canonicalChatListGroupId(it) !in known }
+            .filter { inFolder == null || canonicalChatListGroupId(it) in inFolder }
+            .forEach(ids::add)
         return ids
     }
 }
@@ -142,6 +141,7 @@ internal fun rememberGlobalSearchCompleteScope(
     homeFolderId: String?,
     folderFilters: Set<String>,
     folderStore: Any?,
+    queryKey: Any?,
 ): GlobalSearchScopeState {
     val fence =
         GlobalSearchScopeFence(
@@ -165,8 +165,38 @@ internal fun rememberGlobalSearchCompleteScope(
                     ?: GlobalSearchScopeStatus.Pending
             }
         }
-    return GlobalSearchScopeState(status) { retryRevision += 1 }
+    val held = remember(fence, queryKey, enabled) { HeldScope() }
+    return GlobalSearchScopeState(held.settle(status)) { retryRevision += 1 }
 }
+
+/**
+ * The last Ready scope for one fence and query. While a newer snapshot of the same query resolves, the search keeps
+ * running on it instead of pausing; a failure withdraws it, and a new query or fence starts without one, so a
+ * changed query always waits for a proven scope. An unchanged Ready scope keeps its identity, so the sections
+ * projected from it are not recomputed.
+ */
+private class HeldScope {
+    private var scope: GlobalSearchCompleteScope? = null
+
+    fun settle(status: GlobalSearchScopeStatus): GlobalSearchScopeStatus =
+        when (status) {
+            is GlobalSearchScopeStatus.Ready -> {
+                val previous = scope
+                val kept = previous?.takeIf { it.sameAs(status.scope) }
+                scope = kept ?: status.scope
+                if (kept != null) GlobalSearchScopeStatus.Ready(kept) else status
+            }
+            GlobalSearchScopeStatus.Failed -> {
+                scope = null
+                status
+            }
+            GlobalSearchScopeStatus.Pending -> scope?.let(GlobalSearchScopeStatus::Ready) ?: status
+        }
+}
+
+/** Whether [other] scopes exactly the same chats with the same rows. */
+private fun GlobalSearchCompleteScope.sameAs(other: GlobalSearchCompleteScope): Boolean =
+    fence == other.fence && folderChatIds == other.folderChatIds && source == other.source && allRows == other.allRows
 
 /** A scope [status] and the [fence] and [snapshot] it was resolved from; it applies only while both are current. */
 private class ResolvedScope(
@@ -365,45 +395,37 @@ private class CompleteScopeRows(
         return scope?.let(GlobalSearchScopeStatus::Ready) ?: GlobalSearchScopeStatus.Pending
     }
 
-    /** Folder ids need their complete native membership; the scope exists only when all of it is ready. */
+    /** The scope over the complete rows; folder ids come from their complete native membership. */
     private suspend fun ScopeInputs.scope(
         fence: GlobalSearchScopeFence,
         displayTitle: (ChatListItem) -> String,
-    ): GlobalSearchCompleteScope? {
+    ): GlobalSearchCompleteScope {
         val homeIds = home?.let { folderChatIds(it, displayTitle) }
-        val filterIds = filters.map { folderChatIds(it, displayTitle) }
-        val ready = (home == null || homeIds != null) && filterIds.none { it == null }
-        val filtered = filterIds.takeIf { it.isNotEmpty() }?.flatMapTo(HashSet()) { it.orEmpty() }
-        return if (ready) {
-            GlobalSearchCompleteScope(
-                fence = fence,
-                source = chatFolderSource(home?.rule, active, archived),
-                allRows = rows,
-                folderChatIds = intersectChatScopes(homeIds, filtered),
-            )
-        } else {
-            null
-        }
+        val filtered = filters.takeIf { it.isNotEmpty() }?.flatMapTo(HashSet()) { folderChatIds(it, displayTitle) }
+        return GlobalSearchCompleteScope(
+            fence = fence,
+            source = chatFolderSource(home?.rule, active, archived),
+            allRows = rows,
+            folderChatIds = intersectChatScopes(homeIds, filtered),
+        )
     }
 
-    /** A folder's complete membership, or null while its native membership is not ready. */
+    /** A folder's complete membership; a native membership that cannot be read throws. */
     private suspend fun ScopeInputs.folderChatIds(
         input: FolderInput,
         displayTitle: (ChatListItem) -> String,
-    ): Set<String>? =
+    ): Set<String> =
         if (input.query != null) {
-            nativeChatIds(input.query)?.let { native ->
-                native.toSet() +
-                    departedFolderMatches(
-                        input.rule,
-                        input.manual,
-                        input.excluded,
-                        active,
-                        archived,
-                        accountIdHex,
-                        displayTitle,
-                    )
-            }
+            nativeChatIds(input.query).toSet() +
+                departedFolderMatches(
+                    input.rule,
+                    input.manual,
+                    input.excluded,
+                    active,
+                    archived,
+                    accountIdHex,
+                    displayTitle,
+                )
         } else {
             val source = chatFolderSource(input.rule, active, archived)
             val muted = source.filter { it.engineMuted() }.mapTo(HashSet()) { it.group.groupIdHex }
@@ -419,17 +441,14 @@ private class CompleteScopeRows(
         }
 
     /**
-     * A native folder's complete membership, or null while MDK reports the presentation not ready. Any other
-     * failure propagates, so the scope fails with Retry instead of crashing or staying pending forever.
+     * A native folder's complete membership. A presentation that stays not ready through the bounded retries, an
+     * unavailable reader or any other failure propagates, so the scope fails with Retry instead of staying pending
+     * forever; a read for an owner that is no longer current is reported pending by the caller.
      */
-    private suspend fun nativeChatIds(query: ChatFolderQuery): List<String>? =
-        try {
-            resolveCompleteChatListIds {
-                controller.completeChatListIds(ChatListSelectAllScope.of(query), owner)
-            }
-        } catch (_: MarmotKitException.ChatPresentationNotReady) {
-            null
-        }
+    private suspend fun nativeChatIds(query: ChatFolderQuery): List<String> =
+        resolveCompleteChatListIds {
+            controller.completeChatListIds(ChatListSelectAllScope.of(query), owner)
+        } ?: error("complete chat list unavailable")
 }
 
 /** Projected complete rows with the folder inputs they are evaluated against. */
@@ -459,8 +478,9 @@ private class ScopeInputs(
 }
 
 /**
- * The chat-row sections over the complete scope, or null until they are projected for exactly these inputs, so the
- * caller keeps showing its window sections meanwhile. Projection runs off the main thread.
+ * The chat-row sections over the complete scope, or null until they are first projected for this query, so the
+ * caller keeps showing its window sections meanwhile. A newer scope for the same query keeps the previous sections
+ * until it is projected. Projection runs off the main thread.
  */
 @Composable
 internal fun rememberCompleteChatSearchSections(
@@ -484,8 +504,10 @@ internal fun rememberCompleteChatSearchSections(
             state.chatTypeFilters,
             state.chatFilters,
         ) { Any() }
+    // The query the sections answer; while a new scope for the same query re-projects, the previous sections stay.
+    val query = listOf(scope?.fence, normalizedQuery, messageOnly, state.chatTypeFilters, state.chatFilters)
     val produced =
-        produceState<Pair<Any, ChatListSearchSections<ChatListItem>>?>(null, token) {
+        produceState<ProjectedSections?>(null, token) {
             val complete = scope ?: return@produceState
             val sections =
                 withContext(Dispatchers.Default) {
@@ -512,7 +534,14 @@ internal fun rememberCompleteChatSearchSections(
                         if (!succeeded) attempt?.failure()
                     }
                 }
-            value = token to sections
+            value = ProjectedSections(token, query, sections)
         }
-    return produced.value?.takeIf { scope != null && it.first === token }?.second
+    return produced.value?.takeIf { scope != null && (it.token === token || it.query == query) }?.sections
 }
+
+/** Sections projected for [token], and the [query] they answer. */
+private class ProjectedSections(
+    val token: Any,
+    val query: List<Any?>,
+    val sections: ChatListSearchSections<ChatListItem>,
+)
