@@ -657,20 +657,20 @@ class ConversationDictationControllerTest {
         assertFalse(f.controller.requestStart(ACCOUNT, "other", TextFieldValue("")))
     }
 
-    /** A concurrent editor change prevents sending and stays a visible Send failure, never a Paste success. */
+    /** A composer edit made while speaking is part of the Send, never a reason to block it. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun explicitSendWithAChangedDraftReportsFailureAndKeepsNormalComposer() =
+    fun explicitSendWithAChangedDraftSendsTheEditedComposer() =
         runTest {
-            var sends = 0
+            val sent = mutableListOf<String>()
             var notices = 0
             val f =
                 fixture(
                     draft = TextFieldValue("Draft"),
                     targetValidationScope = this,
                     onSendBlocked = { notices++ },
-                    sendTranscriptIfOriginUnchanged = {
-                        sends++
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
                         true
                     },
                 )
@@ -679,10 +679,10 @@ class ConversationDictationControllerTest {
             f.edit(key(), TextFieldValue("New draft"))
             f.platform.listener.onResult("recognized words")
             advanceUntilIdle()
-            assertEquals(1, notices)
+            assertEquals(0, notices)
             assertTrue(f.controller.state is ConversationDictationState.Idle)
-            assertEquals(0, sends)
-            assertEquals("New draft recognized words", f.drafts.getValue(key()).text)
+            assertEquals(listOf("New draft recognized words"), sent)
+            assertEquals("", f.drafts.getValue(key()).text)
         }
 
     /** Explicit choices replace each other while the same recognition tail is pending. */
@@ -6676,6 +6676,103 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
+    /** Text pasted, typed, or removed while speaking is sent once together with the transcript. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendOnFinishSendsComposerEditsMadeWhileSpeaking() =
+        runTest {
+            val cases =
+                listOf(
+                    Triple(TextFieldValue(""), TextFieldValue("Pasted text"), "Pasted text dictated"),
+                    Triple(
+                        TextFieldValue("Hi there", TextRange(2)),
+                        TextFieldValue("Hi there, friend"),
+                        "Hi dictated there, friend",
+                    ),
+                    Triple(TextFieldValue("Draft", TextRange(5)), TextFieldValue(""), "dictated"),
+                )
+            for ((captured, edited, expected) in cases) {
+                val sent = mutableListOf<String>()
+                val f =
+                    fixture(
+                        draft = captured,
+                        targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = { request ->
+                            assertEquals(1L, request.expectedDraftRevision)
+                            assertEquals(edited.text, request.expectedDraftText)
+                            request.beginDispatch().also { if (it) sent += request.payload }
+                        },
+                    )
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                f.controller.send()
+                f.edit(key(), edited)
+                f.platform.listener.onResult("dictated")
+                advanceUntilIdle()
+
+                assertEquals(listOf(expected), sent)
+                assertEquals("", f.drafts.getValue(key()).text)
+                assertTrue(f.controller.state is ConversationDictationState.Idle)
+            }
+        }
+
+    /** An edit landing after Send read the composer is never cleared or sent; both texts stay in the draft. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendOnFinishKeepsAnEditThatRacesTheDispatch() =
+        runTest {
+            lateinit var f: Fixture
+            var sendCalls = 0
+            f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sendCalls++
+                        f.edit(key(), TextFieldValue("Pasted text later"))
+                        assertFalse(request.beginDispatch())
+                        false
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.edit(key(), TextFieldValue("Pasted text"))
+            f.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+
+            assertEquals(1, sendCalls)
+            val draft = f.drafts.getValue(key()).text
+            assertTrue(draft, draft.contains("Pasted text later"))
+            assertTrue(draft, draft.contains("dictated"))
+        }
+
+    /** Uncertain delivery puts the edited composer and transcript back exactly as they were sent. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun sendOnFinishRestoresEditedComposerWhenDeliveryStaysUnknown() =
+        runTest {
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertTrue(request.beginDispatch())
+                        false
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.edit(key(), TextFieldValue("New draft"))
+            f.platform.listener.onResult("dictated")
+            advanceUntilIdle()
+
+            assertEquals("New draft dictated", f.drafts.getValue(key()).text)
+            val failed = f.controller.state as ConversationDictationState.Failed
+            assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)
+        }
+
     /** The composer empties in the frame the dispatch is claimed, never beside its own pending row. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -7253,7 +7350,7 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
-    /** A rejected Send restores text immediately; newer editor changes remain ineligible for retry. */
+    /** A rejected Send restores text immediately; an edited composer is sent once and never resent. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun sendRejectionAndConcurrentDraftEditRecoverTextWithoutResending() =
@@ -7283,7 +7380,8 @@ class ConversationDictationControllerTest {
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
                     targetValidationScope = this,
-                    sendTranscriptIfOriginUnchanged = {
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertEquals("Draft dictated changed", request.payload)
                         sendCalls += 1
                         true
                     },
@@ -7294,9 +7392,13 @@ class ConversationDictationControllerTest {
             edited.platform.listener.onResult("dictated")
             advanceUntilIdle()
 
-            assertEquals(1, sendCalls)
-            assertEquals("Draft dictated changed", edited.drafts.getValue(key()).text)
+            // The edit is sent with the transcript at the remapped cursor, exactly once.
+            assertEquals(2, sendCalls)
+            assertEquals("", edited.drafts.getValue(key()).text)
             assertTrue(edited.controller.state is ConversationDictationState.Idle)
+            edited.controller.retry()
+            advanceUntilIdle()
+            assertEquals(2, sendCalls)
         }
 
     /** A saved result needs a new ordinary composer Send; old dictation Retry cannot dispatch it. */
@@ -7449,18 +7551,18 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
-    /** New editor changes keep their text and recovered transcript without authorizing a Send. */
+    /** An editor change while Send drains is sent once with the transcript; Retry and Paste never resend. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun draftChangedWhileExplicitSendDrainsRetainsFailureWithoutDispatch() =
+    fun draftChangedWhileExplicitSendDrainsIsSentOnce() =
         runTest {
-            var sends = 0
+            val sent = mutableListOf<String>()
             val fixture =
                 fixture(
                     draft = TextFieldValue("Draft"),
                     targetValidationScope = this,
-                    sendTranscriptIfOriginUnchanged = {
-                        sends++
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        sent += request.payload
                         true
                     },
                 )
@@ -7469,31 +7571,33 @@ class ConversationDictationControllerTest {
             fixture.edit(key(), TextFieldValue("New draft"))
             fixture.platform.listener.onResult("dictated")
             advanceUntilIdle()
-            assertEquals(0, sends)
-            assertEquals("New draft dictated", fixture.drafts.getValue(key()).text)
+            assertEquals(listOf("New draft dictated"), sent)
+            assertEquals("", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
             fixture.controller.retry()
             advanceUntilIdle()
-            assertEquals(0, sends)
-            assertEquals("New draft dictated", fixture.drafts.getValue(key()).text)
             fixture.controller.paste()
-            assertEquals("New draft dictated", fixture.drafts.getValue(key()).text)
-            assertEquals(0, sends)
+            advanceUntilIdle()
+            assertEquals(listOf("New draft dictated"), sent)
+            assertEquals("", fixture.drafts.getValue(key()).text)
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
-    /** Media mutations advance the semantic revision even when the visible draft text is unchanged. */
+    /**
+     * Media mutations advance the semantic revision even when the visible text is unchanged; the Send
+     * is fenced on that newer revision, so the staged change goes out with it exactly once.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun sameTextSemanticGenerationChangeCannotBeAbsorbedBySendRetry() =
+    fun sameTextSemanticGenerationChangeIsSentOnceAtItsNewRevision() =
         runTest {
-            var sends = 0
+            val fenced = mutableListOf<Pair<Long, String>>()
             val fixture =
                 fixture(
                     draft = TextFieldValue("Draft", TextRange(5)),
                     targetValidationScope = this,
-                    sendTranscriptIfOriginUnchanged = {
-                        sends++
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        fenced += request.expectedDraftRevision to request.payload
                         true
                     },
                 )
@@ -7504,12 +7608,11 @@ class ConversationDictationControllerTest {
             advanceUntilIdle()
             fixture.controller.retry()
             advanceUntilIdle()
-            assertEquals(0, sends)
-            assertEquals("Draft dictated", fixture.drafts.getValue(key()).text)
-            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
             fixture.controller.paste()
-            assertEquals("Draft dictated", fixture.drafts.getValue(key()).text)
-            assertEquals(0, sends)
+            advanceUntilIdle()
+            assertEquals(listOf(1L to "Draft dictated"), fenced)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
     /** Verifies cancellation invalidates queued validation and prevents a later automatic send. */

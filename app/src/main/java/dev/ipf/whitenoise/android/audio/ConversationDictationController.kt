@@ -1361,7 +1361,8 @@ internal class ConversationDictationController internal constructor(
         completion.intent.reset()
         val retryMode =
             if (retrySend) {
-                // Retry cannot absorb another writer's text/attachment generation.
+                // A saved recovery that was edited stops above in retainSupersededSendDraft; an
+                // unsaved transcript is sent with the composer as it is now, like the first Send.
                 ConversationDictationDeliveryMode.SendOnFinish
             } else {
                 ConversationDictationDeliveryMode.PasteIntoDraft
@@ -3399,31 +3400,40 @@ internal class ConversationDictationController internal constructor(
         }
     }
 
-    /** Sends only the immutable origin payload, preserving a rejected Send in the draft. */
+    /**
+     * Sends the composer as it stands at finish: edits, pastes and staged attachments made while the user
+     * was speaking go out with the transcript, which lands exactly where Paste would have put it. The
+     * dispatch stays conditional on that snapshot, so a later edit still retains everything in the draft.
+     */
     private fun sendTranscriptOnFinish(
         sessionId: Long,
         target: ConversationDictationTarget,
         transcript: String,
     ) {
-        if (completion.draftRecovery.owns(sessionId, target)) {
-            recoverRecognizedDraft(sessionId, target, transcript)
-        }
-        val admissionTarget = completion.draftRecovery.sendTarget(sessionId, target)
+        // A saved recovery already holds the transcript in the draft, so the composer is the whole payload.
+        val recovered = completion.draftRecovery.owns(sessionId, target)
+        val recoveryHeld =
+            !recovered ||
+                recoverRecognizedDraftResult(sessionId, target, transcript) !=
+                ConversationDictationDraftRecovery.Result.Unavailable
+        val admission = completion.draftRecovery.sendTarget(sessionId, target, honorEdits = true)
         val current = runCatching { readDraft(target.accountRef, target.groupIdHex) }.getOrNull()
-        val draftConflict =
-            current == null ||
-                current.revision != admissionTarget?.capturedDraftRevision ||
-                current.value.text != admissionTarget?.capturedDraft?.text
-        if (admissionTarget == null || draftConflict) {
-            conversationDictationDiagnostic("event=send_outcome outcome=retained reason=draft_conflict")
+        val sendTarget =
+            when {
+                current == null || admission == null || !recoveryHeld -> null
+                recovered -> admission.takeIf { it.capturedDraftRevision == current.revision }
+                else -> target.rebasedOnto(current)
+            }
+        if (sendTarget == null) {
+            val reason = if (current == null) "draft_unreadable" else "recovery_superseded"
+            conversationDictationDiagnostic("event=send_outcome outcome=retained reason=$reason")
             fail(sessionId, target, ConversationDictationFailure.SendBlocked, retainedTranscript = transcript)
             return
         }
-        val sendRequest =
-            conversationDictationSendRequest(target, transcript)?.copy(
-                expectedDraftRevision = admissionTarget.capturedDraftRevision,
-                expectedDraftText = admissionTarget.capturedDraft.text,
-            )
+        if (!recovered && sendTarget != target) {
+            conversationDictationDiagnostic("event=send_admission source=edited_draft")
+        }
+        val sendRequest = conversationDictationSendRequest(sendTarget, if (recovered) "" else transcript)
         val scope = targetValidationScope
         if (sendRequest == null || scope == null) {
             conversationDictationDiagnostic("event=send_outcome outcome=retained reason=dispatch_unavailable")
@@ -3432,7 +3442,7 @@ internal class ConversationDictationController internal constructor(
         }
         clearRecognitionSession(cancel = false, releaseDurableSession = false)
         state = ConversationDictationState.Processing(sessionId, target)
-        launchGuardedDispatch(sessionId, target, transcript, sendRequest, admissionTarget)
+        launchGuardedDispatch(sessionId, target, transcript, sendRequest, sendTarget)
     }
 
     /** The completion owner claims and dispatches one immutable send for this origin. */
@@ -3501,7 +3511,8 @@ internal class ConversationDictationController internal constructor(
             restoreDraftAfterFailedDispatch(admissionTarget, claim.emptiedRevision) ?: claim.restoredRevision
         val hadRecovery = completion.draftRecovery.owns(sessionId, target)
         completion.draftRecovery.updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
-        val failedTarget = if (hadRecovery) target else claim.recoveredTarget(target)
+        // Without a saved receipt the admitted snapshot is the origin, so recovery keeps edits made while speaking.
+        val failedTarget = if (hadRecovery) target else claim.recoveredTarget(admissionTarget)
         if (!draftTargetRemoved &&
             completedTargetValidation(target, includeReply = false) !=
             ConversationDictationTargetValidation.DefinitelyRemoved
@@ -3923,6 +3934,23 @@ internal fun mergeConversationDictationTranscript(
     return ConversationDictationMerge.Applied(
         insertConversationDictationTranscript(current, remappedSelection, recognized),
     )
+}
+
+/**
+ * Re-anchors a dictation on the draft as it stands now, with the transcript's insertion point remapped
+ * exactly as [mergeConversationDictationTranscript] would place it, or at the end when that is ambiguous.
+ */
+internal fun ConversationDictationTarget.rebasedOnto(
+    current: ConversationDictationDraftSnapshot,
+): ConversationDictationTarget {
+    if (current.revision == capturedDraftRevision && current.value.text == capturedDraft.text) return this
+    val selection =
+        if (current.value.text == capturedDraft.text) {
+            capturedDraft.selection
+        } else {
+            remapConversationDictationSelection(capturedDraft, current.value) ?: TextRange(current.value.text.length)
+        }
+    return copy(capturedDraft = TextFieldValue(current.value.text, selection), capturedDraftRevision = current.revision)
 }
 
 /** Appends a recognized segment to the draft and places the cursor after the inserted text. */

@@ -262,6 +262,14 @@
         "test_ids": [
           "DIC-012"
         ]
+      },
+      {
+        "surface": "Dictation Send on finish sends composer edits made while speaking",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun sendTranscriptOnFinish(",
+        "test_ids": [
+          "DIC-013"
+        ]
       }
     ]
   },
