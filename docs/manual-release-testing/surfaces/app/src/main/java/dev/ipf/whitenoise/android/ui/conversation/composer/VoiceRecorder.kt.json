@@ -33,7 +33,8 @@
         "anchor": "fun RecordingStripLeading(",
         "test_ids": [
           "CON-001",
-          "MED-048"
+          "MED-048",
+          "NAV-013"
         ]
       },
       {

@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerBack.kt",
+  "legacy_sha256": "d1b7da97c8075ad684f96e59152110cd6101154afe2927487924dcb4b1715588",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ShareChatPickerBackAwareScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerBack.kt",
+        "anchor": "fun ShareChatPickerBackAwareScreen(",
+        "test_ids": [
+          "SYS-001",
+          "NAV-013"
+        ]
+      },
+      {
+        "surface": "ShareChatPickerOverlayBackHandler",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerBack.kt",
+        "anchor": "fun ShareChatPickerOverlayBackHandler(",
+        "test_ids": [
+          "SYS-001"
+        ]
+      },
+      {
+        "surface": "ShareChatPickerPredictiveBackHandler",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerBack.kt",
+        "anchor": "fun ShareChatPickerPredictiveBackHandler(",
+        "test_ids": [
+          "SYS-001",
+          "NAV-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
