@@ -14,6 +14,14 @@ Gradle CI jobs upload their own reports; there is no additional build/test matri
 The report represents resolutions observed by that job, not every configuration
 or the R8-retained APK. Native MarmotKit requires its own target/feature inventory.
 
+Some modules publish one release under several edition suffixes. Guava's
+`33.7.2-android` and `33.7.2-jre` are both the stable 33.7.2 release, not
+prereleases. `edition_suffixes` lists those suffixes for a module that has a
+minimum version. The Gradle hook and the CI validator strip a listed suffix
+before comparing, so `33.7.2-rc1-android` is still below the floor. Raising a
+request keeps its edition; a request without one gets the first listed suffix.
+`DependencySecurityPolicyCoverageTest` keeps the Guava floor and both checks aligned.
+
 ## Distribution and native inventories
 
 Inventory collection is enabled by `CI=true` on GitHub. Local builds keep the

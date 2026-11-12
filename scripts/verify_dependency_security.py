@@ -13,8 +13,16 @@ class InvalidEvidence(ValueError):
     """Missing, malformed or unsafe selected-version evidence."""
 
 
-def below(version: str, minimum: str) -> bool:
-    match = re.fullmatch(r"(\d+(?:\.\d+)*)(.*)", version)
+def release(version: str, editions: list[str] | None = None) -> str:
+    """Drop a known edition suffix, such as Guava's -android or -jre build of a release."""
+    for suffix in editions or []:
+        if version.endswith(suffix) and len(version) > len(suffix):
+            return version[:-len(suffix)]
+    return version
+
+
+def below(version: str, minimum: str, editions: list[str] | None = None) -> bool:
+    match = re.fullmatch(r"(\d+(?:\.\d+)*)(.*)", release(version, editions))
     if match is None:
         raise InvalidEvidence("non-numeric selected security dependency version")
     actual = [int(x) for x in match[1].split(".")]
@@ -40,7 +48,8 @@ def unsafe_prerelease(version: str, fixed: str | None) -> bool:
 
 
 def verify(report: dict, minimums: dict[str, str], expected_source: str | None = None,
-           prereleases: dict[str, str] | None = None) -> int:
+           prereleases: dict[str, str] | None = None,
+           editions: dict[str, list[str]] | None = None) -> int:
     if (report.get("schema") != 1 or not isinstance(report.get("project"), str)
             or report.get("scope") not in {"project", "plugin"}
             or not isinstance(report.get("configuration"), str)
@@ -60,7 +69,7 @@ def verify(report: dict, minimums: dict[str, str], expected_source: str | None =
         key = f"{component['group']}:{component['name']}"
         if key in minimums:
             count += 1
-            if below(component["version"], minimums[key]) or unsafe_prerelease(
+            if below(component["version"], minimums[key], (editions or {}).get(key)) or unsafe_prerelease(
                     component["version"], (prereleases or {}).get(key)):
                 raise InvalidEvidence(f"security floor not met: {key}@{component['version']}")
     return count
@@ -78,11 +87,19 @@ def main() -> int:
         minimums = policy["minimum_versions"]
         if policy.get("schema") != 1 or not isinstance(minimums, dict):
             raise InvalidEvidence("invalid security policy")
+        editions = policy.get("edition_suffixes", {})
+        if not isinstance(editions, dict) or any(
+                key not in minimums or not isinstance(suffixes, list) or not suffixes
+                or any(not isinstance(item, str) or not re.fullmatch(r"-[A-Za-z][A-Za-z0-9]*", item)
+                       for item in suffixes)
+                for key, suffixes in editions.items()):
+            raise InvalidEvidence("invalid security edition policy")
         paths = sorted(args.directory.glob("*.json"))
         if not paths:
             raise InvalidEvidence("selected dependency evidence missing")
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, timeout=10).strip()
-        checked = sum(verify(json.loads(path.read_text()), minimums, source, policy.get("fixed_prerelease_versions", {})) for path in paths)
+        checked = sum(verify(json.loads(path.read_text()), minimums, source, policy.get("fixed_prerelease_versions", {}),
+                             editions) for path in paths)
         if args.inventory:
             if __package__:
                 from .dependency_inventory import export_selected

@@ -76,6 +76,7 @@ jobs:
           ./scripts/release_test.sh
           .github/scripts/test-staging-apk-transport.sh
           python3 .github/scripts/test-generate-audit-attestation.py
+          python3 .github/scripts/test-apk-size-report.py
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -242,6 +243,29 @@ jobs:
               raise SystemExit("bundled audit attestation differs from the trusted generated source")
           json.loads(bundled)
           PY
+
+      # Observational: shows which components the transport limit is paying for (#3695).
+      - name: Report staging APK size by component
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=$(find app/build/outputs/apk/stagingZapstore/release -maxdepth 1 -type f \
+            -name 'whitenoise-staging-v8a-release-*.apk' -print -quit)
+          mkdir -p build/reports/apk-size
+          python3 .github/scripts/apk-size-report.py "$apk" --flavor staging --commit "$GITHUB_SHA" \
+            --marmot-version app/src/main/marmotkit/MARMOT_VERSION \
+            --json build/reports/apk-size/staging.json --markdown build/reports/apk-size/staging.md
+          cat build/reports/apk-size/staging.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain staging APK size report
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk-size-staging-${{ github.run_number }}-${{ github.sha }}
+          path: build/reports/apk-size/
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Compute short SHA
         id: sha

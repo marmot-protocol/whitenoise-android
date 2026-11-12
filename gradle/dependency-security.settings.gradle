@@ -86,9 +86,27 @@ class SecurityVersions {
         return alpha < boundaryAlpha || (alpha == boundaryAlpha && actual[0][3] != null)
     }
 
-    static boolean below(String version, String minimum) {
+    // Guava publishes each release as parallel -android and -jre editions. An edition
+    // names the build of a release, not a prerelease, so it is set aside before comparing.
+    static String edition(String version, List<String> editions) {
+        if (version == null || editions == null) return null
+        return editions.find { version.endsWith(it) && version.length() > it.length() }
+    }
+
+    static String release(String version, List<String> editions) {
+        def suffix = edition(version, editions)
+        return suffix == null ? version : version.substring(0, version.length() - suffix.length())
+    }
+
+    // Raising keeps the requested edition, or the policy's first edition for an empty request.
+    static String fixedVersion(String requested, String minimum, List<String> editions) {
+        if (!editions) return minimum
+        return minimum + (edition(requested, editions) ?: editions[0])
+    }
+
+    static boolean below(String version, String minimum, List<String> editions = []) {
         if (version == null || version.isEmpty()) return true
-        def match = version =~ /^(\d+(?:\.\d+)*)(.*)$/
+        def match = release(version, editions) =~ /^(\d+(?:\.\d+)*)(.*)$/
         if (!match.matches()) {
             throw new GradleException("Unsupported version selector for security floor: ${version}")
         }
@@ -111,6 +129,12 @@ if (policy.schema != 1 || !(policy.minimum_versions instanceof Map)) {
 }
 def minimums = policy.minimum_versions
 def prereleases = policy.fixed_prerelease_versions ?: [:]
+def editions = policy.edition_suffixes ?: [:]
+if (!(editions instanceof Map) || editions.any { coordinate, suffixes ->
+        !minimums.containsKey(coordinate) || !(suffixes instanceof List) || suffixes.isEmpty() ||
+            suffixes.any { !(it instanceof String) || !(it ==~ /-[A-Za-z][A-Za-z0-9]*/) } }) {
+    throw new GradleException('Invalid dependency security edition policy')
+}
 // Source identity is evidence metadata, not a prerequisite for security enforcement.
 def sourceSha = providers.gradleProperty('dependencySecurity.sourceSha')
     .orElse(providers.environmentVariable('GITHUB_SHA')).orNull ?: 'unknown'
@@ -138,8 +162,8 @@ gradle.beforeProject { project ->
                 if (SecurityVersions.unsafePrerelease(details.requested.version, prereleases[coordinate])) {
                     details.useVersion(prereleases[coordinate])
                     details.because('first patched release on the requested prerelease line')
-                } else if (SecurityVersions.below(details.requested.version, minimum)) {
-                    details.useVersion(minimum)
+                } else if (SecurityVersions.below(details.requested.version, minimum, editions[coordinate])) {
+                    details.useVersion(SecurityVersions.fixedVersion(details.requested.version, minimum, editions[coordinate]))
                     details.because('minimum release containing the dependency security fixes')
                 }
             }
@@ -149,7 +173,7 @@ gradle.beforeProject { project ->
             all { selection ->
                 def coordinate = "${selection.candidate.group}:${selection.candidate.module}".toString()
                 def minimum = minimums[coordinate]
-                if (minimum != null && (SecurityVersions.below(selection.candidate.version, minimum) ||
+                if (minimum != null && (SecurityVersions.below(selection.candidate.version, minimum, editions[coordinate]) ||
                         SecurityVersions.unsafePrerelease(selection.candidate.version, prereleases[coordinate]))) {
                     selection.reject('affected dependency version rejected by security policy')
                 }
@@ -210,7 +234,7 @@ gradle.beforeProject { project ->
             def violations = components.findAll { component ->
                 def minimum = minimums["${component.group}:${component.name}".toString()]
                 def coordinate = "${component.group}:${component.name}".toString()
-                minimum != null && (SecurityVersions.below(component.version, minimum) ||
+                minimum != null && (SecurityVersions.below(component.version, minimum, editions[coordinate]) ||
                     SecurityVersions.unsafePrerelease(component.version, prereleases[coordinate]))
             }
             def reportDir = new File(project.rootDir, 'build/reports/dependency-security')
