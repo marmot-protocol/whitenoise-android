@@ -6742,9 +6742,8 @@ class ConversationDictationControllerTest {
             advanceUntilIdle()
 
             assertEquals(1, sendCalls)
-            val draft = f.drafts.getValue(key()).text
-            assertTrue(draft, draft.contains("Pasted text later"))
-            assertTrue(draft, draft.contains("dictated"))
+            // The racing edit stays whole; the transcript goes back where it was going to be sent.
+            assertEquals("Pasted text dictated later", f.drafts.getValue(key()).text)
         }
 
     /** Uncertain delivery puts the edited composer and transcript back exactly as they were sent. */

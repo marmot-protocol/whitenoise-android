@@ -3940,9 +3940,7 @@ internal fun mergeConversationDictationTranscript(
  * Re-anchors a dictation on the draft as it stands now, with the transcript's insertion point remapped
  * exactly as [mergeConversationDictationTranscript] would place it, or at the end when that is ambiguous.
  */
-internal fun ConversationDictationTarget.rebasedOnto(
-    current: ConversationDictationDraftSnapshot,
-): ConversationDictationTarget {
+internal fun ConversationDictationTarget.rebasedOnto(current: ConversationDictationDraftSnapshot): ConversationDictationTarget {
     if (current.revision == capturedDraftRevision && current.value.text == capturedDraft.text) return this
     val selection =
         if (current.value.text == capturedDraft.text) {
