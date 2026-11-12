@@ -2370,6 +2370,7 @@
     <string name="error_invalid_key_package_for">无法验证%1$s发布的聊天密钥。请对方更新 White Noise 并发布新的聊天密钥，然后重试。</string>
     <string name="error_missing_member_inbox">此用户没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
     <string name="error_missing_member_inbox_for">%1$s没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
+    <string name="error_invite_welcome_too_large">此邀请过大，收件人的收件箱中继无法接收。请尝试更小的群组。</string>
     <string name="notification_show_previews">显示通知预览</string>
     <string name="notification_show_previews_detail">关闭后会隐藏姓名和消息内容。适用于所有账户。</string>
     <string name="notification_preview_update_failed">重新启动后更改可能会丢失。</string>

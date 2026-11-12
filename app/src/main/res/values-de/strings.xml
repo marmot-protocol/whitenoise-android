@@ -2425,6 +2425,7 @@
     <string name="error_invalid_key_package_for">Der veröffentlichte Chat-Schlüssel für %1$s konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox">Für diese Person gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox_for">Für %1$s gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
+    <string name="error_invite_welcome_too_large">Diese Einladung ist zu groß für die Posteingangs-Relays einer eingeladenen Person. Versuchen Sie es mit einer kleineren Gruppe.</string>
     <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
     <string name="notification_show_previews_detail">Wenn aus, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
     <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>

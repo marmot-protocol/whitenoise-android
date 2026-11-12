@@ -98,6 +98,7 @@ internal fun quarantinedGroupsSummary(state: QuarantinedGroupsUiState): String =
         else -> stringResource(R.string.quarantine_loading)
     }
 
+/** The guidance shown under a quarantined group for its coarse [reason]. */
 internal fun quarantineGuidance(reason: AppGroupHydrationQuarantineReasonFfi): Int =
     when (reason) {
         AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED -> R.string.quarantine_stored_state
@@ -105,6 +106,17 @@ internal fun quarantineGuidance(reason: AppGroupHydrationQuarantineReasonFfi): I
         AppGroupHydrationQuarantineReasonFfi.MEMBER_VALIDATION_FAILED -> R.string.quarantine_member_validation
         AppGroupHydrationQuarantineReasonFfi.GROUP_RECORD_LOAD_FAILED -> R.string.quarantine_group_record
         AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED -> R.string.quarantine_pending_commit
+        AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED -> R.string.quarantine_rewind_restore
+    }
+
+/**
+ * Whether Retry can help a group quarantined for [reason]. MDK retries a failed rewind restore only when the
+ * account reopens, so a retry there always reports the group still quarantined.
+ */
+internal fun quarantineRetryable(reason: AppGroupHydrationQuarantineReasonFfi): Boolean =
+    when (reason) {
+        AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED -> false
+        else -> true
     }
 
 internal fun quarantineOutcome(outcome: QuarantineRecoveryOutcome): Int =
@@ -178,30 +190,37 @@ private fun LazyListScope.quarantineCallouts(state: QuarantinedGroupsUiState) {
     }
 }
 
+/** One card per quarantined group: Retry where it can help, otherwise the group and its restart guidance. */
 private fun LazyListScope.quarantineRows(
     state: QuarantinedGroupsUiState,
     onRecover: (String) -> Unit,
 ) {
     state.rows.forEach { entry ->
         item(key = entry.groupId) {
+            val group = stringResource(R.string.quarantine_group, IdentityFormatter.short(entry.groupId))
+            val guidance = stringResource(quarantineGuidance(entry.reason))
             SettingsGroup {
-                row("recovery") { context ->
-                    SettingsAction(
-                        context = context,
-                        title = stringResource(R.string.quarantine_retry),
-                        subtitle =
-                            stringResource(R.string.quarantine_group, IdentityFormatter.short(entry.groupId)) +
-                                "\n" + stringResource(quarantineGuidance(entry.reason)),
-                        onClick = { onRecover(entry.groupId) },
-                        enabled = state.available && state.loaded && !state.busy,
-                        leading =
-                            if (state.recoveringGroup == entry.groupId) {
-                                { CircularProgressIndicator() }
-                            } else {
-                                null
-                            },
-                        modifier = Modifier.testTag("quarantine.recover"),
-                    )
+                if (!quarantineRetryable(entry.reason)) {
+                    row("reopen") { context ->
+                        SettingsValue(context, group, guidance, Modifier.testTag("quarantine.reopen"))
+                    }
+                } else {
+                    row("recovery") { context ->
+                        SettingsAction(
+                            context = context,
+                            title = stringResource(R.string.quarantine_retry),
+                            subtitle = group + "\n" + guidance,
+                            onClick = { onRecover(entry.groupId) },
+                            enabled = state.available && state.loaded && !state.busy,
+                            leading =
+                                if (state.recoveringGroup == entry.groupId) {
+                                    { CircularProgressIndicator() }
+                                } else {
+                                    null
+                                },
+                            modifier = Modifier.testTag("quarantine.recover"),
+                        )
+                    }
                 }
             }
         }

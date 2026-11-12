@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotKitException.MissingKeyPackage
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
+import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
 
 private fun recipientFailureDetail(
@@ -69,7 +70,22 @@ internal fun inviteFailureDetail(
         is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
         // A full disk refuses the change before anything is written; freeing space makes Retry worthwhile.
         is MarmotKitException.StorageFull -> AppText.Resource(R.string.error_storage_full)
+        is MarmotKitException.EventTooLarge -> oversizedInviteDetail(throwable, fallbackResource)
         else -> AppText.Resource(fallbackResource)
+    }
+
+/**
+ * MDK refuses a create or invite up front when an invitee's Welcome fits none of their inbox relays, so Retry cannot
+ * help. Any other oversized artifact keeps [fallbackResource].
+ */
+private fun oversizedInviteDetail(
+    tooLarge: MarmotKitException.EventTooLarge,
+    @StringRes fallbackResource: Int,
+): AppText =
+    if (tooLarge.artifact == OversizedArtifactFfi.WELCOME) {
+        AppText.Resource(R.string.error_invite_welcome_too_large)
+    } else {
+        AppText.Resource(fallbackResource)
     }
 
 internal fun groupCreateFailureDetail(

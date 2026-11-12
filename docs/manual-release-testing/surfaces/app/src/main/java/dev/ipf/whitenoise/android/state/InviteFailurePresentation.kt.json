@@ -119,6 +119,16 @@
           "CON-038",
           "GRP-005"
         ]
+      },
+      {
+        "surface": "setting:error_invite_welcome_too_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_invite_welcome_too_large",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
       }
     ],
     "source_coverage": [

@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.marmotkit.EventSizeClassFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
+import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
@@ -49,6 +51,26 @@ class InviteFailurePresentationTest {
 
         assertEquals(AppText.Resource(R.string.error_storage_full), groupCreateFailureDetail(full) { "Alice" })
         assertEquals(AppText.Resource(R.string.error_storage_full), startProfileChatFailureDetail(full) { "Alice" })
+    }
+
+    /** A Welcome too large for every inbox relay says so instead of offering a retry that cannot succeed. */
+    @Test
+    fun anOversizedWelcomeSaysTheInvitationIsTooLarge() {
+        val welcome = MarmotKitException.EventTooLarge(OversizedArtifactFfi.WELCOME, EventSizeClassFfi.FROM64_TO128_KIB)
+        val commit = MarmotKitException.EventTooLarge(OversizedArtifactFfi.COMMIT, EventSizeClassFfi.FROM64_TO128_KIB)
+
+        assertEquals(
+            AppText.Resource(R.string.error_invite_welcome_too_large),
+            groupCreateFailureDetail(welcome) { "Alice" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_invite_welcome_too_large),
+            startProfileChatFailureDetail(welcome) { "Alice" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_group_create_failed_retry),
+            groupCreateFailureDetail(commit) { "Alice" },
+        )
     }
 
     /** Obsolete-only KeyPackages ask the recipient to update, never to set up, and offer no install link. */

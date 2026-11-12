@@ -98,6 +98,36 @@ class QuarantinedGroupsScreenTest {
         assertEquals(listOf(id), actions)
     }
 
+    /** A failed rewind restore names the group and asks for a restart, but offers no Retry that cannot help. */
+    @Test fun rewindRestoreFailureOffersRestartGuidanceInsteadOfRetry() {
+        val id = "c".repeat(64)
+        val actions = mutableListOf<String>()
+        content(
+            QuarantinedGroupsUiState(
+                loaded = true,
+                rows = listOf(QuarantinedGroupRow(id, AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED)),
+            ),
+            recover = actions::add,
+        )
+        compose.onNodeWithTag("quarantine.reopen").assertIsDisplayed()
+        compose.onNodeWithText("Group ${IdentityFormatter.short(id)}").assertIsDisplayed()
+        compose.onNodeWithText("Restart White Noise", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag("quarantine.recover").assertDoesNotExist()
+        compose.onNodeWithText("Retry recovery").assertDoesNotExist()
+        assertEquals(emptyList<String>(), actions)
+    }
+
+    /** Only a failed rewind restore withholds Retry, every earlier reason keeps it. */
+    @Test fun onlyRewindRestoreFailureWithholdsRetry() {
+        AppGroupHydrationQuarantineReasonFfi.entries.forEach { reason ->
+            assertEquals(
+                reason.name,
+                reason != AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED,
+                quarantineRetryable(reason),
+            )
+        }
+    }
+
     @Test fun activeRecoveryDisablesBothRefreshAndAnotherRetry() {
         val row = QuarantinedGroupRow("a".repeat(64), AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED)
         content(QuarantinedGroupsUiState(loaded = true, rows = listOf(row), recoveringGroup = row.groupId))

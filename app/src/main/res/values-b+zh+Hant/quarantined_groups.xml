@@ -15,6 +15,7 @@
     <string name="quarantine_member_validation">成員或加密狀態驗證未通過。</string>
     <string name="quarantine_group_record">無法載入群組紀錄。</string>
     <string name="quarantine_pending_commit">無法復原中斷的群組更新。</string>
+    <string name="quarantine_rewind_restore">讀取群組的早期狀態後無法還原該群組。請重新啟動 White Noise 後再試一次。</string>
     <string name="quarantine_recovered">復原成功。群組可以重新出現在聊天清單中。</string>
     <string name="quarantine_still_quarantined">群組仍處於隔離狀態。其歷史紀錄未被刪除。</string>
     <string name="quarantine_retry_failed">無法完成復原。請稍後重試。</string>
