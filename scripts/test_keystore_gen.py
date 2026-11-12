@@ -162,7 +162,6 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertEqual([self.keystore], list(self.keystore.parent.iterdir()))
         self.assertFalse(self.props.exists())
 
-    @unittest.skipIf(os.geteuid() == 0, "root can read the unreadable local.properties")
     def test_directory_at_properties_path_is_refused_before_a_key_exists(self) -> None:
         """An existing local.properties directory fails before keytool runs and receives no credentials."""
         self.props.mkdir()
@@ -184,6 +183,7 @@ class KeystoreGenTest(unittest.TestCase):
         self.assertEqual([], list(self.keystore.parent.iterdir()))
         self.assertEqual(["local.properties", "scripts"], sorted(p.name for p in self.repo.iterdir()))
 
+    @unittest.skipIf(os.geteuid() == 0, "root can read the unreadable local.properties")
     def test_unreadable_properties_are_kept(self) -> None:
         """An unreadable local.properties is not replaced and the unusable keystore is removed."""
         self.props.write_text("sdk.dir=/opt/android-sdk\n")
