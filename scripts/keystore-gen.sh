@@ -29,6 +29,13 @@ if [[ -L "$LOCAL_PROPS" ]]; then
   exit 1
 fi
 
+# mv would move the credentials inside a directory instead of replacing it, so
+# anything but a regular file is refused before a key is generated.
+if [[ -e "$LOCAL_PROPS" && ! -f "$LOCAL_PROPS" ]]; then
+  echo "error: $LOCAL_PROPS is not a regular file; refusing to write signing credentials." >&2
+  exit 1
+fi
+
 if ! command -v keytool >/dev/null 2>&1; then
   for candidate in \
     "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
@@ -53,6 +60,7 @@ mkdir -p "$KEYSTORE_DIR"
 STAGING_DIR="$(mktemp -d "$KEYSTORE_DIR/.whitenoise-keystore.XXXXXX")"
 STAGED_KEYSTORE="$STAGING_DIR/release.p12"
 PROPS_TMP=""
+PROPS_REF=""
 COMPLETED=""
 cleanup() {
   # A keystore whose password never reached local.properties is unusable and
@@ -62,6 +70,7 @@ cleanup() {
   fi
   rm -rf "$STAGING_DIR"
   if [[ -n "$PROPS_TMP" ]]; then rm -f "$PROPS_TMP"; fi
+  if [[ -n "$PROPS_REF" ]]; then rm -f "$PROPS_REF"; fi
 }
 trap cleanup EXIT
 
@@ -116,8 +125,18 @@ fi
   echo "WHITENOISE_KEY_PASSWORD=$KEYSTORE_PASSWORD"
 } >> "$PROPS_TMP"
 chmod 600 "$PROPS_TMP"
+# A second link to the staged file proves where mv put it: a directory that
+# appeared at the destination since the check above would receive it inside.
+PROPS_REF="$PROPS_TMP.ref"
+ln "$PROPS_TMP" "$PROPS_REF"
+STRAY_PROPS="$LOCAL_PROPS/$(basename "$PROPS_TMP")"
 mv -f "$PROPS_TMP" "$LOCAL_PROPS"
 PROPS_TMP=""
+if [[ -L "$LOCAL_PROPS" || ! "$LOCAL_PROPS" -ef "$PROPS_REF" ]]; then
+  if [[ "$STRAY_PROPS" -ef "$PROPS_REF" ]]; then rm -f "$STRAY_PROPS"; fi
+  echo "error: $LOCAL_PROPS is not a regular file; signing credentials not written" >&2
+  exit 1
+fi
 COMPLETED=1
 
 cat <<EOF
