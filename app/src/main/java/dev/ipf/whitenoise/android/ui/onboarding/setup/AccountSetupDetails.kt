@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
 import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
-import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
@@ -71,6 +70,7 @@ private fun setupPendingHeadingTitle(
         else -> null
     }
 
+/** The heading for [step] when no pending operation or review overrides it; the device step names what it covers. */
 private fun setupDefaultHeadingTitle(
     step: OnboardingStepStateFfi,
     proposal: OnboardingRepairProposalFfi?,
@@ -80,7 +80,7 @@ private fun setupDefaultHeadingTitle(
             proposal == null &&
             OnboardingActionFfi.CONTINUE_WITHOUT in step.actions -> R.string.setup_profile_optional_title
         step.findings.any { it.issue == OnboardingIssueFfi.RETIRED_RELAY } -> R.string.setup_relay_retired_title
-        step.step == OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_one_phone_per_account
+        step.step == OnboardingStepFfi.SINGLE_DEVICE -> R.string.setup_chats_on_this_device
         else -> setupStepTitle(step.step)
     }
 
@@ -195,7 +195,10 @@ internal fun SetupStepIcon(step: OnboardingStepFfi) {
     )
 }
 
-/** Diagnostic history is available on demand rather than repeated above every decision. */
+/**
+ * Diagnostic history is available on demand rather than repeated above every decision. The device step's discovery
+ * note stays with the step, so Details does not repeat it.
+ */
 @Composable
 internal fun SetupDetails(state: AccountSetupState) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
@@ -207,18 +210,6 @@ internal fun SetupDetails(state: AccountSetupState) {
             Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
                 SetupFindingContent(finding)
-            }
-            if (state.currentStep?.step == OnboardingStepFfi.SINGLE_DEVICE) {
-                Text(
-                    stringResource(
-                        when (snapshot.singleDeviceNotice?.discovery ?: OnboardingDeviceDiscoveryFfi.UNKNOWN) {
-                            OnboardingDeviceDiscoveryFfi.NONE_FOUND -> R.string.setup_device_discovery_none
-                            OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE ->
-                                R.string.setup_other_device_possible
-                            OnboardingDeviceDiscoveryFfi.UNKNOWN -> R.string.setup_device_discovery_unknown
-                        },
-                    ),
-                )
             }
             SetupChecklist(snapshot)
         }

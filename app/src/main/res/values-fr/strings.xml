@@ -2020,12 +2020,11 @@
     <string name="setup_acknowledge_single_device">J’ai compris — continuer</string>
     <string name="setup_continue_without_profile">Continuer sans profil</string>
     <string name="setup_review_suggested_changes">Examiner les modifications suggérées</string>
-    <string name="setup_one_phone_per_account">Un téléphone par compte</string>
-    <string name="setup_one_phone_per_account_help">Les discussions ne se synchronisent pas entre les téléphones. Utilisez ce compte sur un téléphone à la fois.</string>
+    <string name="setup_chats_on_this_device">Discussions sur cet appareil</string>
+    <string name="setup_chats_on_this_device_help">Se connecter ne suffit pas à restaurer vos discussions ni vos messages existants. Si vous utilisez un autre appareil, conservez son app et ses données jusqu’à ce que vous ayez vérifié vos discussions ici.</string>
     <string name="setup_device_stage">Utilisation de l\'appareil</string>
-    <string name="setup_device_discovery_none">Aucune autre installation n\'a été trouvée sur les relais vérifiés.</string>
-    <string name="setup_other_device_possible">Un autre appareil utilise peut-être ce compte.</string>
-    <string name="setup_device_discovery_unknown">Impossible de rechercher d\'autres appareils.</string>
+    <string name="setup_other_sign_ins_found">D’autres traces de connexion ont été trouvées. Elles peuvent provenir d’une autre installation ou d’une installation antérieure.</string>
+    <string name="setup_other_sign_ins_unchecked">Les autres connexions n’ont pas pu être vérifiées.</string>
     <string name="setup_approval_saved_pending">Votre approbation est enregistrée. Le changement est toujours en attente.</string>
     <string name="setup_profile_scope_help">Cela met à jour votre profil dans d\'autres applications Nostr.</string>
     <string name="setup_optional_profile_help">Facultatif. Vous pourrez ajouter un profil plus tard.</string>
@@ -2125,7 +2124,6 @@
     <string name="setup_finding_interrupted">La configuration a été interrompue. Vous pouvez reprendre l’étape enregistrée.</string>
     <string name="setup_finding_too_many_relays">La liste contient trop de relais.</string>
     <string name="setup_finding_multi_device_unsupported">Les conversations ne sont pas synchronisées entre les appareils.</string>
-    <string name="setup_finding_other_installation_possible">Une autre installation utilise peut-être cette identité.</string>
     <string name="setup_finding_discovery_incomplete">La découverte n’a pas pu se terminer. Aucun remplacement ne sera déduit de ce résultat.</string>
     <string name="setup_profile_help">Ajoutez un nom pour que les autres vous reconnaissent. Vous pourrez le faire plus tard.</string>
     <string name="setup_details">Détails</string>
