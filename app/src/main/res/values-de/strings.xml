@@ -318,8 +318,6 @@
     <string name="dismiss">Schließen</string>
     <string name="edit">Bearbeiten</string>
     <string name="edit_group_info_title">Gruppe bearbeiten</string>
-    <string name="group_private_image">Privates Gruppenfoto</string>
-    <string name="group_private_image_detail">Für Gruppenmitglieder sichtbar.</string>
     <string name="group_description">Beschreibung (optional)</string>
     <string name="save_group">Gruppe speichern</string>
     <string name="saving_group">Gruppe wird gespeichert...</string>

@@ -59,6 +59,26 @@ class ChatListRowProjectorTest {
         assertEquals(members(), first.memberSnapshot?.members)
     }
 
+    /** An off-window row drops a superseded name, so it searches and sorts by the title it shows. */
+    @Test
+    fun offWindowRowCarriesTheRetainedLocalName() {
+        val names = LocalGroupFieldAuthority().apply { record(GROUP_ID, "Conversation", "Renamed") }
+        val item =
+            projector(null, null, localGroupNames = names).presented(
+                PresentedChatRowFfi(
+                    draftVersion = null,
+                    preview = emptyChatRowPreview(),
+                    actions = noChatRowActions(),
+                    row = row(preview()),
+                    presentation = presentation("Conversation"),
+                    avatarAsset = null,
+                ),
+            )
+        assertEquals("Renamed", item.group.name)
+        assertEquals("Renamed", item.sanitizedNamedTitle)
+        assertEquals("Renamed", names.retainedFor(GROUP_ID, "Conversation"))
+    }
+
     /** Applying the archive overlay preserves the pure projection and leaves the authoritative row unchanged. */
     @Test
     fun projectorPreservesTheExistingPureProjectionAndArchiveOverlay() {
@@ -130,6 +150,7 @@ class ChatListRowProjectorTest {
         presentation: ConversationPresentationFfi?,
         optimistic: OptimisticChatListPreviewState?,
         archives: ChatListArchiveActions = archiveActions(row(preview())),
+        localGroupNames: LocalGroupFieldAuthority = LocalGroupFieldAuthority(),
     ) = ChatListRowProjector(
         activeAccountIdHex = ACTIVE_ACCOUNT,
         groups = mapOf(GROUP_ID to group()),
@@ -141,7 +162,7 @@ class ChatListRowProjectorTest {
         activitySequences = mapOf(GROUP_ID to 7uL),
         optimisticPreviews = optimistic?.let { mapOf(GROUP_ID to it) }.orEmpty(),
         archiveActions = archives,
-        localGroupNames = LocalGroupFieldAuthority(),
+        localGroupNames = localGroupNames,
         presentations = presentation?.let { mapOf(GROUP_ID to it) }.orEmpty(),
         avatars = emptyMap(),
         previews = emptyMap(),

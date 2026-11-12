@@ -392,8 +392,6 @@
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
     <string name="edit_group_info_title">Edit Group</string>
-    <string name="group_private_image">Private group photo</string>
-    <string name="group_private_image_detail">Visible to group members.</string>
     <string name="group_description">Description (optional)</string>
     <string name="save_group">Save Group</string>
     <string name="saving_group">Saving group...</string>

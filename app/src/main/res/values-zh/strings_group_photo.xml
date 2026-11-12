@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">将此 GIF 用于群组？</string>
+    <string name="group_gif_upload_notice">动画 GIF 将上传至公开的图片服务器。任何拥有链接的人都可以查看。将使用完整 GIF，不进行裁剪。</string>
+    <string name="group_gif_upload_confirm">上传 GIF</string>
+    <string name="group_photo_title">群组照片</string>
+    <string name="group_photo_encrypted_detail">已加密。仅群组成员可见。</string>
+    <string name="group_photo_public_detail">位于公开的图片服务器上。任何拥有链接的人都可以查看。</string>
+    <string name="group_photo_upload_title">将此照片用于群组？</string>
+    <string name="group_photo_upload_notice">照片将上传至公开的图片服务器。任何拥有链接的人都可以查看。</string>
+    <string name="group_photo_upload_confirm">继续</string>
+</resources>

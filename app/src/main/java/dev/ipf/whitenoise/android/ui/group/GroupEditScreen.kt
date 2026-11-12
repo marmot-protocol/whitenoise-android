@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,7 +40,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.GroupImageDraftProcessor
@@ -188,8 +191,10 @@ internal fun GroupEditScreen(
         val hasGroupImage =
             ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null ||
                 controller.group.imageHashHex != null
+        // A photo being prepared or uploaded holds Save too, so a save cannot close the editor under it.
         val saveEnabled =
             !saving &&
+                !imageSaving &&
                 !controller.mutationInFlight &&
                 (name.text != controller.group.name || description != controller.group.description)
 
@@ -377,14 +382,15 @@ internal fun GroupEditScreen(
 
         var photoMenuOpen by remember(imageOwner) { mutableStateOf(false) }
         var pendingCropUri by rememberSaveable(imageOwner) { mutableStateOf<Uri?>(null) }
-        var pendingGifUri by remember(imageOwner) { mutableStateOf<Uri?>(null) }
+        // Every device photo is uploaded publicly, so each pick is confirmed before cropping or upload.
+        var pendingPublicPhoto by remember(imageOwner) { mutableStateOf<PendingPublicGroupPhoto?>(null) }
         val imagePickerScope = rememberCoroutineScope()
         val imagePickGeneration = remember(imageOwner) { StalenessGuard() }
 
         /** Only the latest pick can open a review in the editor that requested it. */
         fun pickGroupImage(uri: Uri) {
             if (!imageOwnerIsCurrent()) return
-            pendingGifUri = null
+            pendingPublicPhoto = null
             pendingCropUri = null
             val generation = imagePickGeneration.advance()
             imagePickerScope.launch {
@@ -393,30 +399,29 @@ internal fun GroupEditScreen(
                 val current = imagePickGeneration.isCurrent(generation) && imageOwnerIsCurrent()
                 val busy = imageSaving || controller.mutationInFlight
                 if (!current || !editable || busy) return@launch
-                if (gif) {
-                    pendingGifUri = uri
-                } else {
-                    pendingCropUri = uri
-                }
+                pendingPublicPhoto = PendingPublicGroupPhoto(uri, gif)
             }
         }
 
-        pendingGifUri?.let { selected ->
+        pendingPublicPhoto?.let { selected ->
             val generation = imagePickGeneration.capture()
 
             fun selectionIsCurrent(): Boolean =
                 imageOwnerIsCurrent() &&
                     imagePickGeneration.isCurrent(generation) &&
-                    pendingGifUri == selected
+                    pendingPublicPhoto == selected
+            val gif = selected.gif
             dev.ipf.whitenoise.android.ui.common.ConfirmDialog(
-                title = stringResource(R.string.group_gif_upload_title),
-                message = stringResource(R.string.group_gif_upload_notice),
-                confirmLabel = stringResource(R.string.group_gif_upload_confirm),
+                title = stringResource(if (gif) R.string.group_gif_upload_title else R.string.group_photo_upload_title),
+                message =
+                    stringResource(if (gif) R.string.group_gif_upload_notice else R.string.group_photo_upload_notice),
+                confirmLabel =
+                    stringResource(if (gif) R.string.group_gif_upload_confirm else R.string.group_photo_upload_confirm),
                 confirmEnabled = canEdit && !imageSaving && !controller.mutationInFlight,
                 onDismiss = {
                     if (selectionIsCurrent()) {
                         imagePickGeneration.advance()
-                        pendingGifUri = null
+                        pendingPublicPhoto = null
                     }
                 },
                 onConfirm = {
@@ -424,9 +429,13 @@ internal fun GroupEditScreen(
                     val currentEditableSelection = selectionIsCurrent() && editable
                     if (currentEditableSelection && !imageSaving && !controller.mutationInFlight) {
                         imagePickGeneration.advance()
-                        pendingGifUri = null
-                        uploadPublicAvatar {
-                            GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, selected)
+                        pendingPublicPhoto = null
+                        if (selected.gif) {
+                            uploadPublicAvatar {
+                                GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, selected.uri)
+                            }
+                        } else {
+                            pendingCropUri = selected.uri
                         }
                     }
                 },
@@ -454,11 +463,37 @@ internal fun GroupEditScreen(
                 pendingCropUri = null
             },
             onUnreadable = { picked ->
-                uploadPublicAvatar { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked) }
+                // The upload is prepared first and its actual media type decides the notice, so a GIF never goes up
+                // whole after the still-photo confirmation. The image slot, and with it Save, stays claimed while
+                // the pick is prepared. A later pick may still replace an unconfirmed GIF notice, as it would any
+                // pending notice.
+                val claimed = imageOwnerIsCurrent() && !imageSaving && !controller.mutationInFlight
+                if (claimed) {
+                    imageSaving = true
+                    imagePickerScope.launch {
+                        val prepared =
+                            try {
+                                preparedFallbackDraft(context.contentResolver, picked)
+                            } finally {
+                                imageSaving = false
+                            }
+                        when {
+                            !imageOwnerIsCurrent() -> Unit
+                            prepared.getOrNull()?.mediaType.equals(GIF_MEDIA_TYPE, ignoreCase = true) ->
+                                pendingPublicPhoto = PendingPublicGroupPhoto(picked, gif = true)
+                            else -> uploadPublicAvatar { prepared.getOrThrow() }
+                        }
+                    }
+                }
             },
             onCropped = { bytes, crop ->
-                pendingCropUri = null
-                uploadPublicAvatar(acceptedCrop = true) { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+                // A replayed confirm after the crop has closed must not upload the same picture again.
+                if (pendingCropUri != null) {
+                    pendingCropUri = null
+                    uploadPublicAvatar(acceptedCrop = true) {
+                        renderIdentityImageDraft(bytes, crop, MediaQuality.Standard)
+                    }
+                }
             },
         )
 
@@ -497,11 +532,15 @@ internal fun GroupEditScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                 ) {
-                    Text(stringResource(R.string.group_private_image), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.group_private_image_detail),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    Text(stringResource(R.string.group_photo_title), style = MaterialTheme.typography.titleMedium)
+                    groupPhotoVisibilityDetail(controller.group)?.let { detail ->
+                        Text(
+                            stringResource(detail),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.testTag("group_edit.photoVisibility"),
+                        )
+                    }
                     Box(
                         modifier =
                             Modifier
@@ -735,3 +774,38 @@ internal fun GroupEditScaffold(
         content = content,
     )
 }
+
+/** A device photo awaiting the public-upload confirmation; a still image is cropped after it. */
+private const val GIF_MEDIA_TYPE = "image/gif"
+
+/** Prepares an uncroppable pick, keeping a preparation failure for the upload's own error handling. */
+@Suppress("TooGenericExceptionCaught") // Decoding and provider reads fail with unrelated exception types.
+private suspend fun preparedFallbackDraft(
+    contentResolver: android.content.ContentResolver,
+    uri: Uri,
+): Result<ImageUploadDraft> =
+    try {
+        Result.success(GroupImageDraftProcessor.fromGroupContentUri(contentResolver, uri))
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        Result.failure(error)
+    }
+
+private data class PendingPublicGroupPhoto(
+    val uri: Uri,
+    val gif: Boolean,
+)
+
+/**
+ * Who can see the group's current photo: an encrypted image reaches members only, while a URL
+ * photo sits on a public server. The avatar shows a public URL ahead of an encrypted image, so a
+ * group carrying both is described as public. No photo needs no note.
+ */
+@StringRes
+internal fun groupPhotoVisibilityDetail(group: AppGroupRecordFfi): Int? =
+    when {
+        ProfileSanitizer.protocolImageUrl(group.avatarUrl) != null -> R.string.group_photo_public_detail
+        group.imageHashHex != null -> R.string.group_photo_encrypted_detail
+        else -> null
+    }

@@ -46,6 +46,31 @@ class LocalGroupFieldAuthorityTest {
         assertEquals("Three", authority.reconcile(GROUP, "Two"))
     }
 
+    /** Renaming back to an earlier name lets the agreeing snapshot retire the record (#3703). */
+    @Test
+    fun renamingBackToAnEarlierNameRetiresOnAgreement() {
+        val authority = LocalGroupFieldAuthority()
+        authority.record(GROUP, previous = "A", committed = "B")
+        authority.record(GROUP, previous = "B", committed = "A")
+
+        assertNull(authority.retainedFor(GROUP, "A"))
+        assertEquals("A", authority.reconcile(GROUP, "B"))
+        assertEquals("A", authority.reconcile(GROUP, "A"))
+        assertEquals("B", authority.reconcile(GROUP, "B"))
+    }
+
+    /** A rename made elsewhere after the cycle settles is not overwritten by a stale local commit. */
+    @Test
+    fun laterRemoteRenameWinsAfterACycleSettles() {
+        val authority = LocalGroupFieldAuthority()
+        authority.record(GROUP, previous = "A", committed = "B")
+        authority.record(GROUP, previous = "B", committed = "A")
+
+        assertEquals("A", authority.reconcile(GROUP, "A"))
+        assertNull(authority.retainedFor(GROUP, "B"))
+        assertEquals("B", authority.reconcile(GROUP, "B"))
+    }
+
     /** A commit that does not change the name installs nothing. */
     @Test
     fun unchangedNameIsNotRecorded() {
@@ -92,6 +117,42 @@ class LocalGroupFieldAuthorityTest {
         assertEquals("New", authority.retainedFor(GROUP, "Old"))
         assertEquals("New", authority.retainedFor(GROUP, "Old"))
         assertNull(authority.retainedFor(GROUP, "New"))
+    }
+
+    /** A held clear stays fenced after only the row agrees; the group record can still restore it. */
+    @Test
+    fun clearOutlivesAnAgreeingBlankRow() {
+        val authority = LocalGroupFieldAuthority(holdClearAfterAgreement = true)
+        authority.record(GROUP, previous = "Old", committed = "")
+
+        assertEquals("", authority.reconcile(GROUP, ""))
+        assertEquals("", authority.reconcile(GROUP, "Old"))
+        assertEquals("", authority.reconcileRecord(GROUP, "Old"))
+        assertEquals("Remote", authority.reconcile(GROUP, "Remote"))
+        assertEquals("Old", authority.reconcile(GROUP, "Old"))
+    }
+
+    /** Once both the row and the group record agree with a held clear, a remote restore is shown. */
+    @Test
+    fun clearRetiresOnceBothStreamsAgree() {
+        val authority = LocalGroupFieldAuthority(holdClearAfterAgreement = true)
+        authority.record(GROUP, previous = "Old", committed = "")
+
+        assertEquals("", authority.reconcileRecord(GROUP, ""))
+        assertEquals("", authority.reconcile(GROUP, "Old"))
+        assertEquals("", authority.reconcile(GROUP, ""))
+        assertEquals("Old", authority.reconcileRecord(GROUP, "Old"))
+        assertEquals("Old", authority.reconcile(GROUP, "Old"))
+    }
+
+    /** By default an agreeing blank snapshot retires a clear, so restoring the old value wins. */
+    @Test
+    fun agreeingBlankSnapshotRetiresAnUnheldClear() {
+        val authority = LocalGroupFieldAuthority()
+        authority.record(GROUP, previous = "Old", committed = "")
+
+        assertEquals("", authority.reconcile(GROUP, ""))
+        assertEquals("Old", authority.reconcile(GROUP, "Old"))
     }
 
     private companion object {

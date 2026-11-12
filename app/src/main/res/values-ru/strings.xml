@@ -344,8 +344,6 @@
     <string name="dismiss">Закрыть</string>
     <string name="edit">Изменить</string>
     <string name="edit_group_info_title">Изменить группу</string>
-    <string name="group_private_image">Приватное фото группы</string>
-    <string name="group_private_image_detail">Видно участникам группы.</string>
     <string name="group_description">Описание (необязательно)</string>
     <string name="save_group">Сохранить группу</string>
     <string name="saving_group">Сохранение группы...</string>

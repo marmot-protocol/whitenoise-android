@@ -305,8 +305,6 @@
     <string name="dismiss">關閉</string>
     <string name="edit">編輯</string>
     <string name="edit_group_info_title">編輯群組</string>
-    <string name="group_private_image">群組私密照片</string>
-    <string name="group_private_image_detail">僅群組成員可見。</string>
     <string name="group_description">描述（選填）</string>
     <string name="save_group">保存群組</string>
     <string name="saving_group">正在儲存群組...</string>

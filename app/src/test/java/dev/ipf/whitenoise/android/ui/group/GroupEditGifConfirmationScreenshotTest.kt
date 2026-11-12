@@ -46,24 +46,40 @@ class GroupEditGifConfirmationScreenshotTest {
     @Test
     fun confirmationLargeRtl() = capture("large_rtl", rtl = true)
 
+    @Test
+    fun stillPhotoConfirmationLight() = capture("light", still = true)
+
+    @Test
+    fun stillPhotoConfirmationAmoled() = capture("amoled", dark = true, amoled = true, still = true)
+
+    @Test
+    fun stillPhotoConfirmationDark() = capture("dark", dark = true, still = true)
+
+    @Test
+    fun stillPhotoConfirmationLargeRtl() = capture("large_rtl", rtl = true, still = true)
+
     private fun capture(
         name: String,
         dark: Boolean = false,
         amoled: Boolean = false,
         rtl: Boolean = false,
+        still: Boolean = false,
     ) {
         composeRule.setContent { GifEditorTestContent(fixture, dark, amoled, rtl) }
         composeRule.onNodeWithTag("group_edit.photoAction").performClick()
         composeRule.onNodeWithText(fixture.context.getString(R.string.choose_files)).performClick()
-        composeRule.runOnIdle { assertTrue(fixture.registry.deliver(fixture.uri(name))) }
-        val title = fixture.context.getString(R.string.group_gif_upload_title)
+        composeRule.runOnIdle { assertTrue(fixture.registry.deliver(fixture.uri(name, still = still))) }
+        val titleRes = if (still) R.string.group_photo_upload_title else R.string.group_gif_upload_title
+        val title = fixture.context.getString(titleRes)
+        val notice = if (still) R.string.group_photo_upload_notice else R.string.group_gif_upload_notice
         composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText(title).fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithText(title).assertIsDisplayed()
-        composeRule.onNodeWithText(fixture.context.getString(R.string.group_gif_upload_notice)).assertIsDisplayed()
+        composeRule.onNodeWithText(fixture.context.getString(notice)).assertIsDisplayed()
         composeRule.onNodeWithTag("confirmation.confirm").assertIsDisplayed()
         composeRule.onNodeWithTag("confirmation.cancel").assertIsDisplayed()
         assertEquals(0, fixture.uploads.get())
         // Android Dialog has a separate window; capture the real composed screen including that window.
-        captureScreenRoboImage("src/test/snapshots/group_gif_confirmation_$name.png")
+        val kind = if (still) "photo" else "gif"
+        captureScreenRoboImage("src/test/snapshots/group_${kind}_confirmation_$name.png")
     }
 }

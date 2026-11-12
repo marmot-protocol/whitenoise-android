@@ -49,7 +49,7 @@ internal class ChatListRowProjector(
     /** Uses the keyed MDK result without inserting it into the bounded window or borrowing its overlay. */
     fun presented(presented: PresentedChatRowFfi): ChatListItem =
         project(
-            presented.row,
+            localGroupNames.retainedRow(presented.row),
             localGroupNames.reconciledPresentation(presented.row, presented.presentation),
             presented.avatarAsset,
             presented.preview,

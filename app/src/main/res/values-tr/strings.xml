@@ -318,8 +318,6 @@
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
     <string name="edit_group_info_title">Grubu düzenle</string>
-    <string name="group_private_image">Özel grup fotoğrafı</string>
-    <string name="group_private_image_detail">Grup üyelerine görünür.</string>
     <string name="group_description">Açıklama (isteğe bağlı)</string>
     <string name="save_group">Grubu Kaydet</string>
     <string name="saving_group">Grup kaydediliyor...</string>

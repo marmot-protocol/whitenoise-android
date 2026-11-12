@@ -254,6 +254,174 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
+    /** Clearing the name drops the old title from the row, search and sort, even against a stale snapshot. */
+    @Test
+    fun clearedNameLeavesEveryChatListProjection() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = OLD_NAME))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
+    /** The subscription may fold the cleared record before the local projection runs. */
+    @Test
+    fun clearStillLandsWhenTheSubscriptionFoldsFirst() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            chats.foldGroupRecordForTest(group(name = ""))
+            assertTrue(conversation.updateGroupProfile("", ""))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
+    /** A group snapshot still carrying the old name cannot restore it under the cleared row. */
+    @Test
+    fun staleGroupRecordCannotRestoreAClearedName() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
+    /** The chat-list row agreeing with the clear does not let a later pre-clear group record back in. */
+    @Test
+    fun staleGroupRecordAfterAnAgreeingRowCannotRestoreAClearedName() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
+    /**
+     * The conversation and chat-list subscriptions may both deliver the clear while the commit is in
+     * flight; the cleared name is still fenced against a later pre-clear group record.
+     */
+    @Test
+    fun clearDeliveredDuringTheCommitIsStillFenced() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            lateinit var conversation: ConversationController
+            conversation =
+                conversationController(appState) { _, _, _, _ ->
+                    conversation.applyGroupStateForTest(group(name = ""))
+                    chats.applyChatListRow(row(groupName = ""))
+                    chats.foldGroupRecordForTest(group(name = ""))
+                }
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            assertClearedEverywhere(chats, appState)
+            chats.onCleared()
+        }
+
+    /** After both streams deliver the clear, a later restore of the old name is shown. */
+    @Test
+    fun remoteRestoreAfterBothStreamsAgreeIsShown() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.foldGroupRecordForTest(group(name = ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            chats.applyChatListRow(row(groupName = OLD_NAME))
+            flushChatListRecompute()
+
+            val item = chats.items.single()
+            assertEquals(OLD_NAME, item.group.name)
+            chats.onCleared()
+        }
+
+    /** A newer name on the group-record stream ends a clear's fence, so a later rename back is shown. */
+    @Test
+    fun newerGroupRecordEndsTheClearFence() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.foldGroupRecordForTest(group(name = NEW_NAME))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            flushChatListRecompute()
+
+            val item = chats.items.single()
+            assertEquals(OLD_NAME, item.group.name)
+            chats.onCleared()
+        }
+
+    /** A description-only save does not fence a name the subscription changed during the commit. */
+    @Test
+    fun descriptionSaveLeavesANameChangedDuringTheCommitUnfenced() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            lateinit var conversation: ConversationController
+            conversation =
+                conversationController(appState) { _, _, _, _ ->
+                    conversation.applyGroupStateForTest(group(name = ""))
+                }
+
+            assertTrue(conversation.updateGroupProfile(OLD_NAME, "described"))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.applyChatListRow(row(groupName = OLD_NAME))
+            flushChatListRecompute()
+
+            val item = chats.items.single()
+            assertEquals(OLD_NAME, item.group.name)
+            chats.onCleared()
+        }
+
+    /** A rejected clear leaves the existing description in place. */
+    @Test
+    fun failedClearLeavesTheDescription() =
+        runBlocking {
+            val appState = testAppState()
+            val conversation =
+                conversationController(
+                    appState,
+                    description = "Weekly plans",
+                    updater = { _, _, _, _ -> error("rejected") },
+                )
+
+            assertFalse(conversation.updateGroupProfile(OLD_NAME, ""))
+
+            assertEquals("Weekly plans", conversation.group.description)
+        }
+
     /** The immediate patch is scoped to the account that renamed the group. */
     @Test
     fun renameDoesNotReachAnotherAccountsChatList() =
@@ -289,6 +457,18 @@ class GroupRenameChatListProjectionTest {
             )
             restarted.onCleared()
         }
+
+    /** The single chat row no longer shows, titles or matches [OLD_NAME]. */
+    private fun assertClearedEverywhere(
+        chats: ChatsController,
+        appState: WhiteNoiseAppState,
+    ) {
+        val item = chats.items.single()
+        assertTrue(item.group.name.isBlank())
+        assertEquals(null, item.sanitizedNamedTitle)
+        assertTrue(chatListItemDisplayTitle(item, appState, GroupTitleCopy.Default) != OLD_NAME)
+        assertTrue(applyChatListSearchAndFilter(chats.items, OLD_NAME, appState, GroupTitleCopy.Default).isEmpty())
+    }
 
     /** Runs the chat list's one-frame recompute debounce so its projection is current. */
     private fun flushChatListRecompute() {

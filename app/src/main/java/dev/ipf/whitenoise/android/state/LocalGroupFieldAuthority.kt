@@ -10,11 +10,15 @@ import java.util.Locale
  * The values one locally committed edit of a group field installed and replaced.
  *
  * [superseded] accumulates every value the field has been changed away from since the engine last
- * agreed, so a burst of edits still recognises a snapshot carrying any of the older values.
+ * agreed, so a burst of edits still recognises a snapshot carrying any of the older values. It
+ * never contains [committed] itself. [rowAgreed] and [recordAgreed] track which streams have
+ * delivered a held clear.
  */
 private data class LocalGroupFieldCommit(
     val committed: String,
     val superseded: Set<String>,
+    val rowAgreed: Boolean = false,
+    val recordAgreed: Boolean = false,
 )
 
 /**
@@ -31,8 +35,14 @@ private data class LocalGroupFieldCommit(
  * already correct.
  *
  * Instances belong to one account's controller, so a rename never reaches another account's rows.
+ *
+ * [holdClearAfterAgreement] keeps a cleared value fenced until both the reconciled row stream and
+ * the group-record stream have delivered it. Only a value that a second, independently settling
+ * stream can still restore needs it.
  */
-internal class LocalGroupFieldAuthority {
+internal class LocalGroupFieldAuthority(
+    private val holdClearAfterAgreement: Boolean = false,
+) {
     private val commitsByGroup = HashMap<String, LocalGroupFieldCommit>()
 
     /**
@@ -50,7 +60,9 @@ internal class LocalGroupFieldAuthority {
         if (previous == committed) return
         val existing = commitsByGroup[key]
         val carried = existing?.superseded.orEmpty() + setOfNotNull(existing?.committed)
-        commitsByGroup[key] = LocalGroupFieldCommit(committed, carried + previous)
+        // Changing back to an earlier value must not leave that value marked superseded, or the
+        // snapshot that agrees with the new commit would be read as stale and never retire it (#3703).
+        commitsByGroup[key] = LocalGroupFieldCommit(committed, carried + previous - committed)
     }
 
     /** The value [groupIdHex] should display given an authoritative [incoming] value. */
@@ -58,9 +70,47 @@ internal class LocalGroupFieldAuthority {
         groupIdHex: String,
         incoming: String,
     ): String {
-        retainedFor(groupIdHex, incoming)?.let { return it }
-        forget(groupIdHex)
-        return incoming
+        val retained = retainedFor(groupIdHex, incoming)
+        if (retained == null) agree(groupIdHex, incoming, fromRecord = false, retireOtherwise = true)
+        return retained ?: incoming
+    }
+
+    /**
+     * The value a group record should carry given its authoritative [incoming] value.
+     *
+     * The record stream answers a superseded value like [reconcile], but only a value other than
+     * the committed one ends the fence there; plain agreement is left to the chat-list row.
+     */
+    fun reconcileRecord(
+        groupIdHex: String,
+        incoming: String,
+    ): String {
+        val retained = retainedFor(groupIdHex, incoming)
+        if (retained == null) agree(groupIdHex, incoming, fromRecord = true, retireOtherwise = false)
+        return retained ?: incoming
+    }
+
+    /**
+     * Settles the commit for a non-superseded [incoming] value. A held clear retires once both
+     * streams delivered it; any other value retires on a row, or on a record that disagrees.
+     */
+    private fun agree(
+        groupIdHex: String,
+        incoming: String,
+        fromRecord: Boolean,
+        retireOtherwise: Boolean,
+    ) {
+        val key = key(groupIdHex) ?: return
+        val commit = commitsByGroup[key] ?: return
+        val agrees = incoming == commit.committed
+        when {
+            agrees && holdClearAfterAgreement && commit.committed.isBlank() -> {
+                val next =
+                    if (fromRecord) commit.copy(recordAgreed = true) else commit.copy(rowAgreed = true)
+                if (next.rowAgreed && next.recordAgreed) commitsByGroup.remove(key) else commitsByGroup[key] = next
+            }
+            !agrees || retireOtherwise -> commitsByGroup.remove(key)
+        }
     }
 
     /**
@@ -101,6 +151,15 @@ internal fun LocalGroupFieldAuthority.reconciled(row: ChatListRowFfi): ChatListR
     return if (name == row.groupName) row else row.copy(groupName = name, title = name)
 }
 
+/**
+ * [row] carrying a retained local rename or clear in place of a superseded name, without settling
+ * the commit. Off-window lookups use it so search and sort match the title they show.
+ */
+internal fun LocalGroupFieldAuthority.retainedRow(row: ChatListRowFfi): ChatListRowFfi {
+    val name = retainedFor(row.groupIdHex, row.groupName) ?: return row
+    return row.copy(groupName = name, title = name)
+}
+
 /** [presentation] retitled to a retained local rename, decided from its own [row]'s name. */
 internal fun LocalGroupFieldAuthority.reconciledPresentation(
     row: ChatListRowFfi,
@@ -110,10 +169,15 @@ internal fun LocalGroupFieldAuthority.reconciledPresentation(
     return presentation.withLocalGroupTitle(retained)
 }
 
-/** [presentation] carrying [name] as its literal title. */
+/** [presentation] carrying [name] as its literal title, or the unnamed-group title once cleared. */
 internal fun ConversationPresentationFfi.withLocalGroupTitle(name: String): ConversationPresentationFfi {
-    val literal = PresentationTextFfi.Literal(name)
-    return copy(title = literal)
+    val title =
+        if (name.isBlank()) {
+            PresentationTextFfi.UnnamedGroup(memberCount = null)
+        } else {
+            PresentationTextFfi.Literal(name)
+        }
+    return copy(title = title)
 }
 
 /** [record] with the newest locally committed name applied; the same instance when nothing changed. */

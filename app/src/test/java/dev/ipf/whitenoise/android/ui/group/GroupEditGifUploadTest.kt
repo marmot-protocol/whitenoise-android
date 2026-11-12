@@ -2,13 +2,20 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
+import kotlinx.coroutines.Job
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -55,9 +62,69 @@ class GroupEditGifUploadTest {
         assertEquals(0, fixture.uploads.get())
         val currentConfirm = composeRule.onNodeWithTag("confirmation.confirm").captureClickCallbackForReplay()
         composeRule.onNodeWithTag("confirmation.confirm").performClick()
-        awaitProgress { fixture.uploads.get() == 1 }
+        awaitSettledUploads(1)
         composeRule.runOnIdle { currentConfirm() }
-        assertEquals(1, fixture.uploads.get())
+        awaitSettledUploads(1)
+        assertEquals(listOf("image/gif"), fixture.uploadMimeTypes)
+    }
+
+    /** A still photo also goes to a public server, so it needs the same consent before the crop editor opens. */
+    @Test
+    fun stillPhotoAsksBeforeCropAndCancelLeavesNothing() {
+        render()
+        pick(fixture.uri("still-cancel", still = true), photoTitle())
+        composeRule.onNodeWithText(fixture.context.getString(R.string.group_photo_upload_notice)).assertIsDisplayed()
+        composeRule.onNodeWithTag("identity_crop.dialog").assertDoesNotExist()
+        composeRule.onNodeWithTag("confirmation.cancel").performClick()
+        composeRule.onNodeWithText(photoTitle()).assertDoesNotExist()
+        composeRule.onNodeWithTag("identity_crop.dialog").assertDoesNotExist()
+        assertEquals(0, fixture.uploads.get())
+    }
+
+    @Test
+    fun confirmedStillPhotoOpensCropWithoutUploading() {
+        render()
+        pick(fixture.uri("still-confirm", still = true), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { composeRule.onAllNodesWithTag("identity_crop.dialog").fetchSemanticsNodes().isNotEmpty() }
+        composeRule.onNodeWithText(photoTitle()).assertDoesNotExist()
+        assertEquals(0, fixture.uploads.get())
+    }
+
+    /** Accepting the crop after consent uploads the cropped still exactly once, not the original file. */
+    @Test
+    fun acceptedCropUploadsTheStillPhotoOnce() {
+        render()
+        pick(fixture.uri("still-crop", still = true), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { composeRule.onAllNodesWithTag("identity_crop.dialog").fetchSemanticsNodes().isNotEmpty() }
+        val cropConfirm = composeRule.onNodeWithTag("identity_crop.confirm").captureClickCallbackForReplay()
+        composeRule.onNodeWithTag("identity_crop.confirm").performClick()
+        awaitSettledUploads(1)
+        composeRule.runOnIdle { cropConfirm() }
+        awaitSettledUploads(1)
+        assertTrue(fixture.uploadMimeTypes.single() != "image/gif")
+    }
+
+    /** A GIF the provider could only read after the still-photo notice is never uploaded as an animation. */
+    @Test
+    fun gifReadableOnlyAfterStillNoticeIsNotUploadedAnimated() {
+        render()
+        pick(fixture.uri("late-gif", failedOpens = 3), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { fixture.uploads.get() == 1 }
+        awaitSettledUploads(1)
+        assertTrue(fixture.uploadMimeTypes.none { it.equals("image/gif", ignoreCase = true) })
+    }
+
+    /** Once the provider recovers in time, the uncroppable GIF gets the animation notice instead of uploading. */
+    @Test
+    fun gifReadableBeforeFallbackAsksBeforeUploading() {
+        render()
+        pick(fixture.uri("recovered-gif", failedOpens = 2), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { composeRule.onAllNodesWithText(title()).fetchSemanticsNodes().isNotEmpty() }
+        awaitSettledUploads(0)
     }
 
     @Test
@@ -126,6 +193,23 @@ class GroupEditGifUploadTest {
         assertEquals(0, fixture.uploads.get())
     }
 
+    /** Save waits while an uncroppable photo is prepared, so it cannot close the editor under the upload. */
+    @Test
+    fun saveIsHeldWhileFallbackPhotoIsPrepared() {
+        render()
+        // Opens: picker sniff and crop load fail, then the fallback's own sniff is held.
+        pick(fixture.uri("save-during-fallback", still = true, failedOpens = 2, holdAtOpen = 2), photoTitle())
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        awaitProgress { fixture.entered.count == 0L }
+        composeRule.onNode(hasSetTextAction() and hasText("Editor group")).performTextReplacement("Renamed group")
+        val save = composeRule.onNodeWithText(fixture.context.getString(R.string.save_group))
+        save.assertIsNotEnabled()
+        fixture.release.countDown()
+        awaitProgress { fixture.uploads.get() == 1 }
+        awaitSettledUploads(1)
+        save.assertIsEnabled()
+    }
+
     private fun replacement(groupId: String) {
         render()
         pick(fixture.uri("before-replacement"))
@@ -154,10 +238,20 @@ class GroupEditGifUploadTest {
         composeRule.onNodeWithText(fixture.context.getString(R.string.choose_files)).performClick()
     }
 
-    private fun pick(uri: Uri) {
+    private fun pick(
+        uri: Uri,
+        expectedTitle: String = title(),
+    ) {
         launchDocument()
         composeRule.runOnIdle { assertTrue(fixture.registry.deliver(uri)) }
-        awaitProgress { composeRule.onAllNodesWithText(title()).fetchSemanticsNodes().isNotEmpty() }
+        awaitProgress { composeRule.onAllNodesWithText(expectedTitle).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    /** Waits until every launched upload attempt has finished, then checks how many reached the server. */
+    private fun awaitSettledUploads(expected: Int) {
+        val mutations = fixture.state.mutationsScope.coroutineContext[Job]!!
+        awaitProgress { mutations.children.none { it.isActive } }
+        assertEquals(expected, fixture.uploads.get())
     }
 
     /** Drive the real Main→IO→Main boundary without blocking the paused Android looper. */
@@ -170,4 +264,6 @@ class GroupEditGifUploadTest {
     }
 
     private fun title() = fixture.context.getString(R.string.group_gif_upload_title)
+
+    private fun photoTitle() = fixture.context.getString(R.string.group_photo_upload_title)
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">¿Usar este GIF para el grupo?</string>
+    <string name="group_gif_upload_notice">El GIF animado se subirá a un servidor público de imágenes. Cualquier persona que tenga el enlace podrá verlo. Se usará el GIF completo, sin recortar.</string>
+    <string name="group_gif_upload_confirm">Subir GIF</string>
+    <string name="group_photo_title">Foto del grupo</string>
+    <string name="group_photo_encrypted_detail">Cifrada. Solo los miembros del grupo pueden verla.</string>
+    <string name="group_photo_public_detail">En un servidor de imágenes público. Cualquiera con el enlace puede verla.</string>
+    <string name="group_photo_upload_title">¿Usar esta foto para el grupo?</string>
+    <string name="group_photo_upload_notice">La foto se subirá a un servidor de imágenes público. Cualquiera con el enlace puede verla.</string>
+    <string name="group_photo_upload_confirm">Continuar</string>
+</resources>
