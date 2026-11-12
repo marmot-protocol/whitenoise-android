@@ -5,8 +5,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -29,6 +31,8 @@ class VoicePlaybackControllerCancellationTest {
     /** Restores the shared controller so later fixtures start from an idle player and default factory. */
     @After
     fun tearDown() {
+        // A cancelled request must leave the process-wide serializer free for the next play.
+        assertFalse("playback serializer still locked", serializerLocked())
         VoicePlaybackController.stop()
         VoicePlaybackController.noisyRoutes = NoisyAudioRouteRegistrar.None
         setControllerField("playerFactory", RawVoicePlaybackPlayer.Factory)
@@ -49,6 +53,7 @@ class VoicePlaybackControllerCancellationTest {
         job.cancel()
         caller.drain()
 
+        assertTrue(job.isCompleted)
         assertTrue(job.isCancelled)
         assertTrue(mediaPlayer.released)
         assertEquals(0, mediaPlayer.startCount)
@@ -82,6 +87,7 @@ class VoicePlaybackControllerCancellationTest {
         caller.awaitQueued()
         caller.drain()
 
+        assertTrue(job.isCompleted)
         assertTrue(job.isCancelled)
         assertTrue(mediaPlayer.released)
         assertEquals(0, mediaPlayer.startCount)
@@ -110,6 +116,7 @@ class VoicePlaybackControllerCancellationTest {
         job.cancel()
         caller.drain()
 
+        assertTrue(job.isCompleted)
         assertTrue(mediaPlayer.released)
         assertSame(replacement, VoicePlaybackController.state.value)
     }
@@ -190,6 +197,13 @@ private fun setControllerField(
     field.set(VoicePlaybackController, value)
 }
 
+/** Reports whether the controller's play serializer is still held. */
+private fun serializerLocked(): Boolean {
+    val serializer = controllerField("playSerializer")!!
+    val mutex = serializer.javaClass.getDeclaredField("mutex").apply { isAccessible = true }.get(serializer)
+    return (mutex as Mutex).isLocked
+}
+
 /** Publishes a replacement session through the controller state flow. */
 @Suppress("UNCHECKED_CAST")
 private fun setPlaybackState(state: VoicePlaybackController.PlaybackState) {
@@ -209,8 +223,12 @@ private class QueuedDispatcher : CoroutineDispatcher() {
         queue.put(block)
     }
 
+    /** Waits for the IO handoff; generous because loaded CI shards can stall the IO pool for seconds. */
     fun awaitQueued() {
-        val next = checkNotNull(queue.poll(5, TimeUnit.SECONDS)) { "caller resume was never dispatched" }
+        val next =
+            checkNotNull(queue.poll(30, TimeUnit.SECONDS)) {
+                "caller resume was never dispatched (serializer locked: ${serializerLocked()})"
+            }
         queue.putFirst(next)
     }
 
