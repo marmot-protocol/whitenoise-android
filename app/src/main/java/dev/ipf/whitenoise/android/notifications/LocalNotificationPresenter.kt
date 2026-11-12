@@ -988,7 +988,10 @@ class LocalNotificationPresenter(
                                                         notificationContent.notificationId,
                                                         cleanNotification,
                                                         writeObserver,
-                                                        mustBeLive = rewriteGeneration != null,
+                                                        // This attempt owns the cancellation above, so a rewrite
+                                                        // need not find its card live; generation and dismissal
+                                                        // gates still apply (#3712).
+                                                        mustBeLive = false,
                                                         hiddenShortcut = hiddenShortcut,
                                                         finalPostAllowed = {
                                                             categoryAllowsPost() &&

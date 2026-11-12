@@ -49,12 +49,12 @@ internal fun GlobalAttachmentLibraryHost(
         paging =
             GlobalAttachmentPaging(
                 hasMore = pager?.state?.hasMore == true,
-                failed = failure != null,
+                failed = failure != null || library.scopeFailed,
                 filtersUnsupported = failure == AccountAttachmentFailure.QUERY,
                 emptyBatches = pager?.state?.emptyBatches ?: 0,
                 batch = pager?.state?.batches ?: 0,
                 onLoadMore = loadMore,
-                onRetry = loadMore,
+                onRetry = if (library.scopeFailed) library.onRetryScope else loadMore,
             ),
         selectionOwner = viewport?.selection,
         gridState = viewport?.attachmentGrid ?: rememberLazyGridState(),

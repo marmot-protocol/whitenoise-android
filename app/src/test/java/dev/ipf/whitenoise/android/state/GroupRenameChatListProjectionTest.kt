@@ -344,6 +344,26 @@ class GroupRenameChatListProjectionTest {
             chats.onCleared()
         }
 
+    /** After both streams deliver the clear, a later restore of the old name is shown. */
+    @Test
+    fun remoteRestoreAfterBothStreamsAgreeIsShown() =
+        runBlocking {
+            val appState = testAppState()
+            val chats = seededChats(appState)
+            val conversation = conversationController(appState)
+
+            assertTrue(conversation.updateGroupProfile("", ""))
+            chats.applyChatListRow(row(groupName = ""))
+            chats.foldGroupRecordForTest(group(name = ""))
+            chats.foldGroupRecordForTest(group(name = OLD_NAME))
+            chats.applyChatListRow(row(groupName = OLD_NAME))
+            flushChatListRecompute()
+
+            val item = chats.items.single()
+            assertEquals(OLD_NAME, item.group.name)
+            chats.onCleared()
+        }
+
     /** A newer name on the group-record stream ends a clear's fence, so a later rename back is shown. */
     @Test
     fun newerGroupRecordEndsTheClearFence() =

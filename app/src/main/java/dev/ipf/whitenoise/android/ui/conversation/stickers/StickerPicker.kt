@@ -25,6 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +53,7 @@ import dev.ipf.whitenoise.android.state.StickerLibrary
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.launch
 
 private val PackTabShape = RoundedCornerShape(10.dp)
 
@@ -76,7 +79,17 @@ internal fun StickerPickerPage(
             Icon(painterResource(R.drawable.ic_add), stringResource(R.string.sticker_packs_title))
         }
     }
+    val scope = rememberCoroutineScope()
+    var retrying by remember(library) { mutableStateOf(false) }
     when {
+        packs.isEmpty() && library.installedReadFailed && !retrying ->
+            StickerLoadFailed {
+                retrying = true
+                scope.launch {
+                    library.reloadInstalled()
+                    retrying = false
+                }
+            }
         !library.hasLoadedInstalled && packs.isEmpty() -> StickerProgress()
         selected == null -> EmptyStickerPicker(onBrowse)
         else -> {

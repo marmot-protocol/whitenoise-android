@@ -2,10 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 
 private const val MEDIA_FALLBACK_CLOSE_SCALE = 0.92f
 
@@ -20,7 +20,7 @@ internal suspend fun closeWithoutTravel(
     onClosed: () -> Unit,
 ) {
     if (motionEnabled && fallbackAllowed) {
-        fallbackProgress.animateTo(0f, tween(MEDIA_CLOSE_MILLIS, easing = FastOutSlowInEasing))
+        fallbackProgress.animateTo(0f, tween(MEDIA_CLOSE_MILLIS, easing = AppMotionCloseEasing))
     }
     onClosed()
 }

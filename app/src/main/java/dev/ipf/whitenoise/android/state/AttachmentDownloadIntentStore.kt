@@ -64,10 +64,16 @@ internal class AttachmentDownloadIntentStore(
      * composable, and a fresh cold cache probe resolves to a plain remote
      * attachment that the auto-download policy immediately re-enqueues.
      */
-    fun suppressAutomatic(request: AttachmentTransferRequest) = updateSet(CANCELLED) { it + requestToken(request) }
+    fun suppressAutomatic(request: AttachmentTransferRequest) =
+        updateCancelled { cancelled, owners ->
+            (cancelled + requestToken(request)) to (owners + cancelledOwnerToken(request))
+        }
 
     /** Explicit user intent outranks an earlier cancel and reopens the automatic path. */
-    fun restoreAutomatic(request: AttachmentTransferRequest) = updateSet(CANCELLED) { it - requestToken(request) }
+    fun restoreAutomatic(request: AttachmentTransferRequest) =
+        updateCancelled { cancelled, owners ->
+            (cancelled - requestToken(request)) to (owners - cancelledOwnerToken(request))
+        }
 
     fun isAutomaticSuppressed(request: AttachmentTransferRequest): Boolean = requestToken(request) in readSet(CANCELLED)
 
@@ -93,9 +99,16 @@ internal class AttachmentDownloadIntentStore(
         updateSet(TRANSIENT_RETRY_SPENT) { it - token }
     }
 
-    /** Restarting the whole automatic backlog is a resume-everything signal. */
-    fun clearSuppressedAutomatic() {
-        updateSet(CANCELLED) { emptySet() }
+    /**
+     * Restarting one account's automatic backlog resumes only that account's cancels. Another account's cancels,
+     * and digest-only records written before cancels carried an owner, stay suppressed.
+     */
+    fun clearSuppressedAutomatic(accountRef: String) {
+        val ownerPrefix = accountToken(accountRef) + OPEN_TOKEN_SEPARATOR
+        updateCancelled { cancelled, owners ->
+            val resumed = owners.filter { it.startsWith(ownerPrefix) }.toSet()
+            (cancelled - resumed.map { it.removePrefix(ownerPrefix) }.toSet()) to (owners - resumed)
+        }
     }
 
     /**
@@ -499,12 +512,27 @@ internal class AttachmentDownloadIntentStore(
         }
     }
 
+    /** Updates the cancel set and its account ownership index in one preferences commit. */
+    private fun updateCancelled(transform: (Set<String>, Set<String>) -> Pair<Set<String>, Set<String>>) {
+        synchronized(LOCK) {
+            val (cancelled, owners) = transform(readSet(CANCELLED), readSet(CANCELLED_OWNERS))
+            preferences
+                .edit()
+                .putStringSet(CANCELLED, cancelled)
+                .putStringSet(CANCELLED_OWNERS, owners)
+                .apply()
+        }
+    }
+
     private companion object {
         const val TAG = "AttachmentIntentStore"
         val LOCK = Any()
         const val PAUSED_ACCOUNTS = "attachment_download_paused_accounts"
         const val INTERACTIVE_IDENTITIES = "attachment_download_interactive_identities"
         const val CANCELLED = "attachment_download_cancelled_identities"
+
+        /** `accountToken:requestToken` entries; request tokens are digests and cannot be filtered by account. */
+        const val CANCELLED_OWNERS = "attachment_download_cancelled_owners"
         const val TRANSIENT_RETRY_SPENT = "attachment_download_transient_retry_spent_identities"
         const val OPEN_IDENTITIES = "attachment_download_open_identities"
         const val DOWNLOAD_IDENTITIES = "attachment_download_in_place_identities"
@@ -527,6 +555,12 @@ private fun PersistedInstallerHandoff.toPersistedValues(): Map<String, String> =
 
 /** Hides a raw account reference before it enters ordinary preferences. */
 private fun accountToken(accountRef: String): String = attachmentIdentityDigest(accountRef)
+
+/** Binds one cancel record to its account without storing either raw reference. */
+private fun cancelledOwnerToken(request: AttachmentTransferRequest): String {
+    val account = accountToken(request.accountRef)
+    return account + OPEN_TOKEN_SEPARATOR + requestToken(request)
+}
 
 /** Produces the opaque token shared by transfer-intent sets. */
 private fun requestToken(request: AttachmentTransferRequest): String = attachmentIdentityTag(request)

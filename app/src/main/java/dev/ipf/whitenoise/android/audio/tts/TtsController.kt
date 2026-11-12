@@ -112,13 +112,13 @@ class TtsController internal constructor(
     // headphone-disconnect listener lives exactly as long as the focus hold.
     private val audioFocus = TtsNoisyRouteFocus(audioFocus, noisyRoutes, ::pauseForNoisyRoute)
 
-    /** Advanced by each headphone disconnect; a seek loading across one cannot resume speech. */
-    private val routeSilences =
+    /** Advanced by each headphone disconnect or audio focus loss; a seek loading across one cannot resume speech. */
+    private val playbackSilences =
         dev.ipf.whitenoise.android.state
             .StalenessGuard()
 
-    /** Route generation when the pending target seek was deferred. */
-    private var targetSeekRoute = routeSilences.capture()
+    /** Silence generation when the pending target seek was deferred. */
+    private var targetSeekRoute = playbackSilences.capture()
 
     /** True while the headphone-disconnect listener is registered. */
     internal val listensForNoisyRoute: Boolean get() = audioFocus.listening
@@ -572,8 +572,22 @@ class TtsController internal constructor(
      * a session parked for a seek pauses too, and a first start still preparing is cancelled.
      */
     @Synchronized
-    private fun pauseForNoisyRoute() {
-        routeSilences.advance()
+    private fun pauseForNoisyRoute() = silencePlayback()
+
+    /**
+     * Audio focus was lost or surrendered: speech pauses, and a start still preparing must not speak
+     * once it finishes. A first start is cancelled and a session parked for a seek pauses, so only an
+     * explicit resume or start speaks again (#3708).
+     */
+    @Synchronized
+    private fun pauseForFocusLoss() = silencePlayback()
+
+    /**
+     * Stops every state that could still produce speech without discarding a resumable session, and
+     * keeps a seek that is still loading from resuming afterwards.
+     */
+    private fun silencePlayback() {
+        playbackSilences.advance()
         when (val current = state.value) {
             is TtsState.Speaking -> pause()
             is TtsState.Preparing ->
@@ -688,12 +702,12 @@ class TtsController internal constructor(
 
     @Synchronized
     internal fun deferForTargetSeek(): Boolean {
-        targetSeekRoute = routeSilences.capture()
+        targetSeekRoute = playbackSilences.capture()
         return queue.deferForTargetSeek()
     }
 
-    /** A tap-to-jump resumes a paused session unless headphones disconnected while its target loaded. */
-    private fun targetSeekMayResume(): Boolean = routeSilences.isCurrent(targetSeekRoute)
+    /** A tap-to-jump resumes a paused session unless playback was silenced while its target loaded. */
+    private fun targetSeekMayResume(): Boolean = playbackSilences.isCurrent(targetSeekRoute)
 
     /** Prepares off-lock and resolves the rendered sentence against that exact speech without replacing the session. */
     internal suspend fun installRenderedSeekTarget(
@@ -857,13 +871,13 @@ class TtsController internal constructor(
     private fun acquireAudioFocus(mode: TtsAudioFocusMode = activeFocusMode): Boolean =
         audioFocus.acquire(
             mode = mode,
-            onFocusLoss = ::pause,
+            onFocusLoss = ::pauseForFocusLoss,
             // Permanent focus loss (another app took over playback, a voice
             // note started) pauses too: interruptions must not silently
             // discard the session's position (#1484). The retained session
             // stays resumable until explicit dismissal, natural completion, or
             // a security boundary ends it.
-            onOwnerSurrender = ::pause,
+            onOwnerSurrender = ::pauseForFocusLoss,
         )
 
     /** Returns focus and clears the session-specific focus policy. */

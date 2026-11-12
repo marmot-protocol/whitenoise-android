@@ -1,9 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Easing
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +20,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
-import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 internal const val SETTINGS_ROUTE_MOTION_MILLIS = 200
 
@@ -68,26 +64,7 @@ internal fun <T> SettingsRouteMotion(
     if (!contentVisible) return
     val morph = if (cardMorph) remember(ownerKey) { SettingsCardMorph() } else null
     val motion = animationsEnabled && !suppressMotion
-    // Runs while the new route composes, before the old route's cards have reported their removal.
-    val morphing = morph != null && remember(ownerKey, target) { morph.begin(motion) }
-    val morphProgress = remember(ownerKey, target) { Animatable(if (morphing) 0f else 1f) }
-    morph?.time = { morphProgress.value }
-    LaunchedEffect(morphProgress) {
-        // Linear time: the bubbles ease their geometry and the page fades on its own schedule.
-        morphProgress.animateTo(1f, tween(SETTINGS_CARD_MORPH_MILLIS, easing = LinearEasing))
-        morph?.finish()
-    }
-    val morphHost =
-        if (morph != null) {
-            Modifier.settingsCardMorphHost(
-                morph,
-                backplate = MaterialTheme.colorScheme.surfaceContainerLow,
-                fill = MaterialTheme.colorScheme.surfaceContainerLowest,
-                outline = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outline else Color.Unspecified,
-            )
-        } else {
-            Modifier
-        }
+    val (morphing, morphHost) = rememberSettingsCardMorphHost(morph, target, ownerKey, motion)
     Box(
         Modifier.fillMaxSize().then(morphHost).then(
             // Matched cards carry the transition; the page slide would fight their movement.
@@ -131,7 +108,7 @@ internal fun <T> rememberRouteMotionModifier(
         history.depth = depth
     }
     LaunchedEffect(progress) {
-        runRouteMotion(progress, motion, bubble, opening = logicalDirection > 0)
+        runRouteMotion(progress, motion, opening = logicalDirection > 0)
         // A kept Settings frame is only valid while top-level Settings stays shown.
         if (depth != 1) snapshot.picture = null
     }
@@ -160,12 +137,12 @@ internal fun <T> rememberRouteMotionModifier(
 private suspend fun runRouteMotion(
     progress: Animatable<Float, *>,
     motion: Boolean,
-    bubble: Boolean,
     opening: Boolean,
 ) {
     if (motion) {
-        val millis = settingsRouteMotionMillis(bubble, opening)
-        progress.animateTo(1f, tween(millis, easing = settingsRouteMotionEasing(bubble, opening)))
+        val millis = if (opening) SETTINGS_BUBBLE_OPEN_MILLIS else SETTINGS_BUBBLE_CLOSE_MILLIS
+        val easing = if (opening) SettingsBubbleOpenEasing else SettingsBubbleCloseEasing
+        progress.animateTo(1f, tween(millis, easing = easing))
     } else {
         progress.snapTo(1f)
     }
@@ -183,25 +160,4 @@ private fun Modifier.settingsSlide(
     }.graphicsLayer {
         val remaining = if (motion) 1f - progress() else 0f
         translationX = travel * remaining
-    }
-
-private fun settingsRouteMotionEasing(
-    bubble: Boolean,
-    opening: Boolean,
-): Easing =
-    when {
-        !bubble -> FastOutSlowInEasing
-        opening -> SettingsBubbleOpenEasing
-        else -> SettingsBubbleCloseEasing
-    }
-
-/** Top-level Settings uses the bubble timing; nested routes keep the shared slide duration. */
-private fun settingsRouteMotionMillis(
-    bubble: Boolean,
-    opening: Boolean,
-): Int =
-    when {
-        !bubble -> SETTINGS_ROUTE_MOTION_MILLIS
-        opening -> SETTINGS_BUBBLE_OPEN_MILLIS
-        else -> SETTINGS_BUBBLE_CLOSE_MILLIS
     }

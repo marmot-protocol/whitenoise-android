@@ -17,6 +17,7 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -50,7 +51,10 @@ class AppStateDraftOrderingIntegrationTest {
         chats.onCleared()
     }
 
-    /** Verifies only the newest account-fenced summary request can publish after an A-B-A race. */
+    /**
+     * Verifies only the newest account-fenced summary request can publish after an A-B-A race. The final
+     * assertions wait for every refresh's fenced publication to finish, not just its native read (#3726).
+     */
     @Test
     fun latestAccountFencedSummaryRefreshWinsAcrossDelayedABACompletions() =
         runBlocking {
@@ -63,24 +67,30 @@ class AppStateDraftOrderingIntegrationTest {
                 appState.accountSession.publishCreatedIdentity(
                     ACCOUNT_A,
                 ) { appState.switchMediaSessionForTest(ACCOUNT_A) }
-                appState.refreshDraftSummaries(ACCOUNT_A)
+                val firstA = appState.refreshDraftSummaries(ACCOUNT_A)
                 gateway.awaitStarted(0)
                 appState.accountSession.publishCreatedIdentity(
                     ACCOUNT_B,
                 ) { appState.switchMediaSessionForTest(ACCOUNT_B) }
-                appState.refreshDraftSummaries(ACCOUNT_B)
+                val onlyB = appState.refreshDraftSummaries(ACCOUNT_B)
                 gateway.awaitStarted(1)
                 appState.accountSession.publishCreatedIdentity(
                     ACCOUNT_A,
                 ) { appState.switchMediaSessionForTest(ACCOUNT_A) }
-                appState.refreshDraftSummaries(ACCOUNT_A)
+                val latestA = appState.refreshDraftSummaries(ACCOUNT_A)
                 gateway.awaitStarted(2)
 
                 gateway.release(2)
                 awaitCondition { drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP) == 900uL }
                 gateway.release(0)
                 gateway.release(1)
-                awaitCondition { gateway.completed.get() == 3 }
+                // The stale refreshes publish on Main only after the repository returns; wait (bounded, with
+                // Main pumped) until every refresh job has finished that fenced publication.
+                val refreshes = listOf(firstA, onlyB, latestA)
+                awaitCondition { refreshes.all { it.isCompleted } }
+                // Completion alone also covers a cancelled job; every stale read must actually have returned.
+                assertEquals(3, gateway.completed.get())
+                assertTrue("no refresh was cancelled", refreshes.none { it.isCancelled })
 
                 assertEquals(900uL, drafts.draftedAtSecondsFor(ACCOUNT_A, GROUP))
                 assertNull(drafts.draftedAtSecondsFor(ACCOUNT_B, OTHER_GROUP))

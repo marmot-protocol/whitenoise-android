@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.common
 
 import android.graphics.Picture
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -37,14 +36,14 @@ import androidx.compose.ui.unit.toSize
 import kotlin.math.ceil
 import kotlin.math.min
 
-internal const val SEARCH_EXPAND_REVEAL_MILLIS = 220
-internal const val SEARCH_COLLAPSE_MILLIS = 180
+internal const val SEARCH_EXPAND_REVEAL_MILLIS = APP_MOTION_OPEN_MILLIS
+internal const val SEARCH_COLLAPSE_MILLIS = APP_MOTION_CLOSE_MILLIS
 
-/** Emphasized decelerate: the bubble leaves the icon quickly and settles at full width. */
-private val SearchExpandEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+/** The bubble leaves the icon quickly and settles at full width. */
+private val SearchExpandEasing: Easing = AppMotionOpenEasing
 
-/** Emphasized accelerate: the closing bubble starts gently and lands in the icon. */
-private val SearchCollapseEasing: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+/** The closing bubble starts gently and lands in the icon. */
+private val SearchCollapseEasing: Easing = AppMotionCloseEasing
 
 /** Share of the collapse, at its end, over which the icon-sized bubble fades out. */
 private const val SEARCH_COLLAPSE_FADE = 0.3f

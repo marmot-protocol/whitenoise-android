@@ -198,10 +198,28 @@ internal fun ChatFolderRule?.unreadMemberCandidateIds(
     excludedChatIds: Set<String>,
     activeAccountIdHex: String?,
     displayTitle: (ChatListItem) -> String,
+): Set<String> =
+    memberCandidateIds(
+        items.filter { it.effectiveHasUnread(activeAccountIdHex) },
+        manualChatIds,
+        excludedChatIds,
+        activeAccountIdHex,
+        displayTitle,
+    )
+
+/**
+ * Chats of [unread] (any row set the folder is evaluated over) whose participant rule cannot be decided without
+ * a roster: those the folder's other constraints can still match, minus chats it already decides.
+ */
+internal fun ChatFolderRule?.memberCandidateIds(
+    unread: List<ChatListItem>,
+    manualChatIds: Set<String>,
+    excludedChatIds: Set<String>,
+    activeAccountIdHex: String?,
+    displayTitle: (ChatListItem) -> String,
 ): Set<String> {
     val advanced = this?.smartFilter?.let(SmartFolderCodec::decode)
     val rule = this?.takeIf { it.unreadNeedsMembers() } ?: return emptySet()
-    val unread = items.filter { it.effectiveHasUnread(activeAccountIdHex) }
     val muted = unread.filter { it.engineMuted() }.mapTo(hashSetOf()) { it.group.groupIdHex }
     val known =
         chatFolderChatIds(

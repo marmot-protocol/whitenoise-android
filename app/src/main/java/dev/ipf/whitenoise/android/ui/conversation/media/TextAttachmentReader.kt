@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
@@ -69,6 +70,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
 import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRenderedHit
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Info
+import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -326,8 +328,12 @@ internal fun TextAttachmentReaderScreen(
                 )
                 if (textAttachmentPlaybackPassage(playback) != null) Spacer(Modifier.height(trailingHeight))
             }
-            if (speech.showResumeFollow) {
-                TtsResumeFollowButton(speech.resumeFollow, Modifier.align(Alignment.BottomEnd).padding(16.dp))
+            FloatingControlVisibility(
+                visible = speech.showResumeFollow,
+                motionEnabled = rememberSystemAnimationsEnabled(),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            ) {
+                TtsResumeFollowButton(speech.resumeFollow)
             }
         }
     }

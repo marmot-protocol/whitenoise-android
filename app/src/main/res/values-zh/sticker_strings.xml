@@ -24,6 +24,7 @@
     <string name="sticker_packs_no_matches">没有符合搜索条件的贴纸包。</string>
     <string name="sticker_packs_unreachable">无法在你的中继上查找贴纸包。</string>
     <string name="sticker_packs_try_again">重试</string>
+    <string name="sticker_packs_load_failed">无法加载贴纸包。</string>
     <string name="sticker_packs_public_footer">贴纸包是公开的，未经 White Noise 审核。你安装的贴纸包会公开列在你的中继上。</string>
     <string name="sticker_pack_add">添加</string>
     <string name="sticker_pack_by">作者：%1$s</string>

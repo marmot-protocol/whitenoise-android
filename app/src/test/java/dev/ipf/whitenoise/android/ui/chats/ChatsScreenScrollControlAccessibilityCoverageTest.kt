@@ -16,7 +16,7 @@ class ChatsScreenScrollControlAccessibilityCoverageTest {
 
         assertTrue(
             "scroll-to-top control must retain button semantics from the replaced FAB",
-            ".clickable(role = Role.Button)" in scrollControl,
+            ".clickable(role = Role.Button" in scrollControl,
         )
     }
 

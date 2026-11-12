@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.navigation.FLOATING_CONTROL_MOTION_MILLIS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -74,7 +75,7 @@ class ConversationNavigationControlMotionScreenshotTest {
     @Test fun controlsGrowFromTheBottomEndCornerLight() {
         render(dark = false, rtl = false, motion = true)
         show(true)
-        advanceFrames(CONVERSATION_NAVIGATION_CONTROL_MOTION_MILLIS / 2L)
+        advanceFrames(FLOATING_CONTROL_MOTION_MILLIS / 2L)
         capture("conversation_navigation_controls_enter_mid_light")
         advanceFrames(SETTLE_MILLIS)
         capture("conversation_navigation_controls_shown_light")
@@ -84,7 +85,7 @@ class ConversationNavigationControlMotionScreenshotTest {
         visible.value = true
         render(dark = true, rtl = true, motion = true)
         show(false)
-        advanceFrames(CONVERSATION_NAVIGATION_CONTROL_MOTION_MILLIS / 2L)
+        advanceFrames(FLOATING_CONTROL_MOTION_MILLIS / 2L)
         capture("conversation_navigation_controls_exit_mid_rtl_dark")
         advanceFrames(SETTLE_MILLIS)
         capture("conversation_navigation_controls_hidden_rtl_dark")
@@ -96,7 +97,7 @@ class ConversationNavigationControlMotionScreenshotTest {
         tapJumpToNewest()
         assertEquals(1, jumpClicks)
         show(false)
-        advanceFrames(CONVERSATION_NAVIGATION_CONTROL_MOTION_MILLIS / 2L)
+        advanceFrames(FLOATING_CONTROL_MOTION_MILLIS / 2L)
         tapJumpToNewest()
         assertEquals(1, jumpClicks)
         composeRule.onAllNodesWithText("@ 3").assertCountEquals(0)

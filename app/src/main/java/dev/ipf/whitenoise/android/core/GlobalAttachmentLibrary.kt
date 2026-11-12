@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.core
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -143,12 +142,8 @@ fun globalAttachmentSectionKey(
     }
 }
 
-/** The local calendar day a timeline second falls on. */
+/** The local calendar day a timeline second falls on; stamps past the displayable bound fall on its day. */
 fun globalAttachmentDay(
     timelineAt: ULong,
     zoneId: ZoneId,
-): LocalDate =
-    Instant
-        .ofEpochSecond(timelineAt.toLong())
-        .atZone(zoneId)
-        .toLocalDate()
+): LocalDate = IdentityFormatter.clampedLocalDate(timelineAt, zoneId)

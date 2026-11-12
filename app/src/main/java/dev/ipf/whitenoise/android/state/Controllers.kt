@@ -1734,8 +1734,8 @@ class ChatsController private constructor(
     private var groupRecordsById = mapOf<String, AppGroupRecordFfi>()
 
     // Holds a locally committed rename on its row until the subscription agrees (#2696). A clear
-    // stays held after the row agrees because the group record can still restore the old name.
-    private val localGroupNames = LocalGroupNameAuthority(holdClearAfterAgreement = true)
+    // stays held until the group record agrees too, because a blank row falls back to its name.
+    private val localGroupNames = LocalGroupFieldAuthority(holdClearAfterAgreement = true)
 
     // Whole-second activity timestamps need an in-memory tie-break that follows
     // the order local/live activity is accepted. This is bounded to one scalar
@@ -2275,10 +2275,14 @@ class ChatsController private constructor(
     private fun foldGroup(
         record: AppGroupRecordFfi,
         invalidateMembers: Boolean = true,
+        fromSubscription: Boolean = true,
     ) {
         // A snapshot still carrying a name this device just renamed away from must not restore it
-        // underneath the row; [chatListDisplayGroup] falls back to this record's name.
-        groupRecordsById = groupRecordsById + (record.groupIdHex to withRetainedName(record))
+        // underneath the row; [chatListDisplayGroup] falls back to this record's name. A locally
+        // committed record is the edit itself, so it neither needs the fence nor counts as the
+        // record stream agreeing with it.
+        val folded = if (fromSubscription) withRetainedName(record) else record
+        groupRecordsById = groupRecordsById + (record.groupIdHex to folded)
         if (invalidateMembers) invalidateMemberCacheForGroup(record.groupIdHex)
         scheduleRecompute()
     }
@@ -2957,7 +2961,7 @@ class ChatsController private constructor(
                 chatRowsByGroup[rowKey] = updated
             }
         }
-        foldGroup(record, invalidateMembers = members == null)
+        foldGroup(record, invalidateMembers = members == null, fromSubscription = false)
     }
 
     /**
@@ -5974,10 +5978,10 @@ class ConversationController(
     private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
 
     // Retains a locally committed rename against a stale group-state snapshot (#2696).
-    private val localGroupNames = LocalGroupNameAuthority()
+    private val localGroupNames = LocalGroupFieldAuthority()
 
     // The same retention for a just-committed description, so a pre-edit snapshot cannot restore it (#3704).
-    private val localGroupDescriptions = LocalGroupNameAuthority()
+    private val localGroupDescriptions = LocalGroupFieldAuthority()
 
     /**
      * Latest chat-list projection for this conversation, kept live even while
@@ -11505,7 +11509,8 @@ class ConversationController(
      * with ([openedName] and [openedDescription]). An unchanged field is sent as null, so MDK carries
      * it forward from canonical group state, even if another admin changed it meanwhile. A changed
      * field is sent as its trimmed text, so an erased one arrives as the explicit empty string MDK
-     * applies as a clear (#3704).
+     * applies as a clear (#3704). Callers other than the editor may omit the opened values; they then
+     * default to the live group, so a field equal to its current value is treated as unchanged.
      */
     suspend fun updateGroupProfile(
         name: String,
@@ -11543,7 +11548,7 @@ class ConversationController(
     /**
      * Installs a just-committed group profile locally and hands it to the chat list (#2696).
      *
-     * [LocalGroupNameAuthority] then retains the new name and description against a pre-edit
+     * [LocalGroupFieldAuthority] then retains the new name and description against a pre-edit
      * snapshot that was already in flight, while a genuinely newer authoritative commit still wins.
      */
     private fun applyLocalGroupProfile(

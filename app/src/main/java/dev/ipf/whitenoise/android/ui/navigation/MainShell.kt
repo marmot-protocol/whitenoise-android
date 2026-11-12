@@ -940,7 +940,8 @@ internal fun MainShell(
                 )
             pendingStagedShareOpen = pending
             appState.launchMutation {
-                appState.setActiveAccount(accountRef)
+                // A newer share retires this open; its delayed switch must then not change the account (#3698).
+                appState.setActiveAccount(accountRef, shouldActivate = { pendingStagedShareOpen === pending })
                 if (
                     appState.activeAccountRef != accountRef &&
                     pendingStagedShareOpen === pending

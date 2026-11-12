@@ -109,7 +109,11 @@ class MainShellShareRoutingCoverageTest {
             "appState.stageInboundShareForFirstFrame(accountRef, groupIds, request.payload)" in shareStageSection,
         )
         val pendingIndex = nonActiveAccountBranch.indexOf("pendingStagedShareOpen = pending")
-        val switchIndex = nonActiveAccountBranch.indexOf("appState.setActiveAccount(accountRef)")
+        val switchIndex = nonActiveAccountBranch.indexOf("appState.setActiveAccount(accountRef,")
+        assertTrue(
+            "a superseded share's delayed switch must not activate its account (#3698)",
+            "shouldActivate = { pendingStagedShareOpen === pending }" in nonActiveAccountBranch,
+        )
         val failedSwitchGuardIndex = nonActiveAccountBranch.indexOf("appState.activeAccountRef != accountRef")
         assertTrue(
             "non-active staging must retain its open before switching accounts",

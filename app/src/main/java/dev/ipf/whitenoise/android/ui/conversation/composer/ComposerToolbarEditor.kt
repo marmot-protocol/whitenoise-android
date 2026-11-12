@@ -68,6 +68,7 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 
 private val EditorContentInset = 12.dp
 
@@ -152,9 +153,10 @@ internal fun ComposerToolbarEditor(
                     }.fadingVerticalScroll(scroll)
                     .padding(horizontal = EditorContentInset),
             ) {
-                ComposerToolbarPreview(state.draft, state, false)
-                ComposerToolbarLayoutChoices(state, false)
-                ComposerToolbarPalette(state, false)
+                // Each section is a card the composer pill unfolds into and Back folds away.
+                Column(Modifier.settingsCardMorph()) { ComposerToolbarPreview(state.draft, state, false) }
+                Column(Modifier.settingsCardMorph()) { ComposerToolbarLayoutChoices(state, false) }
+                Column(Modifier.settingsCardMorph()) { ComposerToolbarPalette(state, false) }
             }
         }
     }

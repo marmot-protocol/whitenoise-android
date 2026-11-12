@@ -125,7 +125,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.FormatStyle
@@ -395,9 +394,9 @@ private fun TimelineMessage.toSharedMediaTile(
 // Month bucketing keyed off the local-time calendar so the separators match
 // what the user sees on each message. `recordedAt` is epoch SECONDS.
 internal fun monthKeyForMedia(recordedAtSeconds: ULong): Int {
-    val zdt = Instant.ofEpochSecond(recordedAtSeconds.toLong()).atZone(mediaMonthGroupingZone)
+    val date = IdentityFormatter.clampedLocalDate(recordedAtSeconds, mediaMonthGroupingZone)
     // monthLabel() decodes the month with Calendar.MONTH (0-based).
-    return zdt.year * 100 + (zdt.monthValue - 1)
+    return date.year * 100 + (date.monthValue - 1)
 }
 
 // Group already-newest-first items by calendar month, preserving order so
@@ -1471,10 +1470,7 @@ private fun relativeTimestamp(
     display: DateTimeDisplay,
 ): String {
     val zone = ZoneId.systemDefault()
-    val sameDay =
-        runCatching {
-            Instant.ofEpochSecond(recordedAtSeconds.toLong()).atZone(zone).toLocalDate() == LocalDate.now(zone)
-        }.getOrDefault(false)
+    val sameDay = IdentityFormatter.localDate(recordedAtSeconds, zone) == LocalDate.now(zone)
     return IdentityFormatter.dateTime(
         recordedAtSeconds,
         locale,
