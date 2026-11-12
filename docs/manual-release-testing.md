@@ -17,7 +17,7 @@ Use disposable profiles you control and harmless content. Test with a second ins
 - [ ] Install fresh, create a profile and set its name/photo. Reopen: profile and settings remain.
 - [ ] Upgrade a populated test install: chats, profiles and drafts survive, and sending still works. Keep a device-level copy of app data first; an exported key does not back up chat history. Avoid downgrades.
 - [ ] Sign in with a test key; try Amber if available. Cancel and retry: sign-in recovers.
-- [ ] Switch between two profiles, then restart. Each shows its own chats and settings.
+- [ ] Switch between two profiles, then restart. Each shows its own chats and settings. Open a chat before switching and return afterward: the chat list and conversation belong to the selected profile.
 
 ### Chat and send
 

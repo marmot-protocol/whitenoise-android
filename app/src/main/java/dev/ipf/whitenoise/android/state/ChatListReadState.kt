@@ -1,18 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.ChatListRowFfi
-
-/** Restores a previous preview only while the optimistic message still owns it. */
-internal fun rollbackOptimisticChatListPreview(
-    current: ChatListRowFfi,
-    previous: ChatListRowFfi,
-    optimisticMessageIdHex: String,
-): ChatListRowFfi =
-    if (current.lastMessage?.messageIdHex == optimisticMessageIdHex) {
-        previous
-    } else {
-        current
-    }
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 
 /** Orders engine timeline cursors by timestamp and then stable message id. */
 internal fun compareTimelineAtMessageIdHex(
@@ -152,3 +141,97 @@ internal fun reconcileReadDerivedUnread(incoming: ChatListRowFfi): ChatListRowFf
     } else {
         incoming
     }
+
+/**
+ * Field-wise reducer for live chat-list subscription rows. Subscription rows
+ * are ordered full projections, so all non-read fields are authoritative — in
+ * particular, a deletion may move [ChatListRowFfi.lastMessage] backwards or to
+ * null. Only the read-dependent fields can be stale when a synchronous
+ * [markTimelineMessageRead] return races a previously queued subscription row.
+ */
+internal fun reduceSubscriptionChatListRow(
+    current: ChatListRowFfi,
+    incoming: ChatListRowFfi,
+    trigger: ChatListUpdateTriggerFfi,
+): ChatListRowFfi {
+    val incomingReadComplete = incoming.lastReadTimelineAt != null && incoming.lastReadMessageIdHex != null
+    val currentReadComplete = current.lastReadTimelineAt != null && current.lastReadMessageIdHex != null
+    val incomingReadCompare =
+        compareOptionalTimelineAtMessageIdHex(
+            incoming.lastReadTimelineAt,
+            incoming.lastReadMessageIdHex,
+            current.lastReadTimelineAt,
+            current.lastReadMessageIdHex,
+        )
+    val incomingReadTrusted = incomingReadComplete && (!currentReadComplete || incomingReadCompare!! >= 0)
+    if (incomingReadTrusted) return reconcileReadDerivedUnread(incoming)
+
+    val newLastMessage = incoming.lastMessage
+    val currentLastMessage = current.lastMessage
+    val distinctNewLastMessage = observesDistinctNewLastMessage(current, incoming, trigger)
+    val advancesLastMessage =
+        newLastMessage != null &&
+            (
+                currentLastMessage == null ||
+                    newLastMessage.timelineAt > currentLastMessage.timelineAt ||
+                    (distinctNewLastMessage && newLastMessage.timelineAt == currentLastMessage.timelineAt)
+            )
+    val advancesPastRead =
+        newLastMessage != null &&
+            (
+                !currentReadComplete ||
+                    newLastMessage.timelineAt > current.lastReadTimelineAt!! ||
+                    (distinctNewLastMessage && newLastMessage.timelineAt == current.lastReadTimelineAt)
+            )
+    val addsUnread =
+        trigger == ChatListUpdateTriggerFfi.NEW_LAST_MESSAGE &&
+            advancesLastMessage &&
+            advancesPastRead &&
+            incoming.unreadCount > current.unreadCount
+
+    val unreadCount =
+        if (addsUnread && current.unreadCount != ULong.MAX_VALUE) {
+            current.unreadCount + 1uL
+        } else {
+            current.unreadCount
+        }
+    val unreadMentionCount =
+        if (
+            addsUnread &&
+            incoming.unreadMentionCount > current.unreadMentionCount &&
+            current.unreadMentionCount != ULong.MAX_VALUE
+        ) {
+            current.unreadMentionCount + 1uL
+        } else {
+            current.unreadMentionCount
+        }
+    return incoming.copy(
+        lastReadTimelineAt = current.lastReadTimelineAt,
+        lastReadMessageIdHex = current.lastReadMessageIdHex,
+        unreadCount = unreadCount,
+        hasUnread = unreadCount > 0uL,
+        firstUnreadMessageIdHex =
+            if (addsUnread && current.unreadCount == 0uL) {
+                newLastMessage.messageIdHex
+            } else {
+                current.firstUnreadMessageIdHex
+            },
+        unreadMentionCount = unreadMentionCount,
+        unreadMention = unreadMentionCount > 0uL,
+    )
+}
+
+/**
+ * Fold a successful [markTimelineMessageRead] row into the active chat list.
+ * Does not gate on [ConversationController.lastReadMessageId]: concurrent
+ * mark-read calls can complete out of order, and monotonic tuple merge rejects
+ * rows that are already superseded.
+ */
+internal fun foldMarkReadReturnedRow(
+    row: ChatListRowFfi,
+    persistedLastReadTimelineAt: ULong?,
+    applyChatListRow: (ChatListRowFfi) -> Unit,
+): ULong? {
+    applyChatListRow(row)
+    return monotonicMaxTimelineAt(persistedLastReadTimelineAt, row.lastReadTimelineAt)
+}
