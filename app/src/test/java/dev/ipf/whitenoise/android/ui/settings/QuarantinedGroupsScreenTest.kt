@@ -98,7 +98,7 @@ class QuarantinedGroupsScreenTest {
         assertEquals(listOf(id), actions)
     }
 
-    /** A failed rewind restore names the group and asks for a restart, but offers no Retry that cannot help. */
+    /** A failed rewind restore names the group and asks for a force stop or reboot, with no Retry that cannot help. */
     @Test fun rewindRestoreFailureOffersRestartGuidanceInsteadOfRetry() {
         val id = "c".repeat(64)
         val actions = mutableListOf<String>()
@@ -111,7 +111,9 @@ class QuarantinedGroupsScreenTest {
         )
         compose.onNodeWithTag("quarantine.reopen").assertIsDisplayed()
         compose.onNodeWithText("Group ${IdentityFormatter.short(id)}").assertIsDisplayed()
-        compose.onNodeWithText("Restart White Noise", substring = true).assertIsDisplayed()
+        compose
+            .onNodeWithText("force stop White Noise in Android settings or restart your phone", substring = true)
+            .assertIsDisplayed()
         compose.onNodeWithTag("quarantine.recover").assertDoesNotExist()
         compose.onNodeWithText("Retry recovery").assertDoesNotExist()
         assertEquals(emptyList<String>(), actions)

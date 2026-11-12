@@ -15,7 +15,7 @@
     <string name="quarantine_member_validation">Üye veya şifreleme durumu doğrulaması başarısız oldu.</string>
     <string name="quarantine_group_record">Grup kaydı yüklenemedi.</string>
     <string name="quarantine_pending_commit">Kesintiye uğrayan grup güncellemesi kurtarılamadı.</string>
-    <string name="quarantine_rewind_restore">Grup, önceki durumu okunduktan sonra geri yüklenemedi. Yeniden denemek için White Noise’u yeniden başlatın.</string>
+    <string name="quarantine_rewind_restore">Grup, önceki durumu okunduktan sonra geri yüklenemedi. Yeniden denemek için Android ayarlarından White Noise’u zorla durdurun veya telefonunuzu yeniden başlatın, ardından White Noise’u açın.</string>
     <string name="quarantine_recovered">Kurtarma başarılı. Grup sohbet listesine geri dönebilir.</string>
     <string name="quarantine_still_quarantined">Grup hâlâ karantinada. Geçmişi silinmedi.</string>
     <string name="quarantine_retry_failed">Kurtarma tamamlanamadı. Daha sonra tekrar deneyin.</string>

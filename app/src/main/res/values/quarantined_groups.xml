@@ -15,7 +15,7 @@
     <string name="quarantine_member_validation">Member or encryption-state validation did not pass.</string>
     <string name="quarantine_group_record">The group record could not be loaded.</string>
     <string name="quarantine_pending_commit">An interrupted group update could not be recovered.</string>
-    <string name="quarantine_rewind_restore">The group could not be restored after reading its earlier state. Restart White Noise to try again.</string>
+    <string name="quarantine_rewind_restore">The group could not be restored after reading its earlier state. To try again, force stop White Noise in Android settings or restart your phone, then open White Noise.</string>
     <string name="quarantine_recovered">Recovery succeeded. The group can return to the chat list.</string>
     <string name="quarantine_still_quarantined">The group is still quarantined. Its history has not been deleted.</string>
     <string name="quarantine_retry_failed">Recovery could not be completed. Try again later.</string>

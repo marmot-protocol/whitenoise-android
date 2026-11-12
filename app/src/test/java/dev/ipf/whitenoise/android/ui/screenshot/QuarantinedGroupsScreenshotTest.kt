@@ -55,10 +55,10 @@ class QuarantinedGroupsScreenshotTest {
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun largeRtl() = capture("quarantine_rtl_large", inventory(), rtl = true)
 
-    /** A failed rewind restore shows restart guidance in place of Retry. */
+    /** A failed rewind restore shows force-stop guidance in place of Retry. */
     @Test fun rewindRestoreLight() = capture("quarantine_rewind_restore_light", rewindRestore())
 
-    /** The restart guidance wraps in dark theme, RTL and large text. */
+    /** The force-stop guidance wraps in dark theme, RTL and large text. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun rewindRestoreDarkLargeRtl() =

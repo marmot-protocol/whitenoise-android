@@ -38,8 +38,11 @@ Four existing public types change:
 
 - `AppGroupHydrationQuarantineReasonFfi` gains `REWIND_RESTORE_FAILED`. MDK only
   retries that restore when the account reopens, so Retry always reports the group
-  still quarantined. Quarantined groups shows the shortened group ID with restart
-  guidance in every shipped locale and offers no Retry for that reason.
+  still quarantined. Quarantined groups shows the shortened group ID and offers no Retry
+  for that reason. Its guidance, in every shipped locale, is to force stop White Noise in
+  Android settings or restart the phone: with the background connection on (the default),
+  swiping the app away keeps the process and the open account alive, so it does not reopen
+  the account.
 - `MarmotKitException` gains `Nip46`. Android has no exhaustive `when` over the
   exception and uses no NIP-46 session, so it stays on existing fallbacks.
 - `GroupEventKindFfi.QueuedIntentRefused` adds `artifact` and `sizeClass`. Android
@@ -86,6 +89,17 @@ upgrade and full stop/cold restart, unchanged retained bytes with acquisition
 blocked, the original pending upload sending unchanged, and all seven recovery cases
 in both relay modes, with no skips. Record the exact-head run in the PR; historical,
 skipped or cancelled runs do not satisfy it.
+
+### Accepted exception
+
+[Run 43208824959](https://github.com/marmot-protocol/whitenoise-android/actions/runs/43208824959)
+passed every retained-data phase. Recovery passed 6 of 7 cases in both relay modes;
+both failed `healthyAccountReceivesAfterLocalDeletionAndRestart` with
+`expected:<[healthy-incoming-0]> but was:<[]>`. This is the intermittent failure tracked as
+[mdk#3264](https://github.com/marmot-protocol/mdk/issues/3264), still open in 0.16.0 and
+accepted for the 0.15.0 adoption. A maintainer accepted it again for this adoption on
+12 November 2026. Without that acceptance this pin would not qualify; the exception covers
+only this case.
 
 ## Retention
 

@@ -195,7 +195,7 @@ private fun LazyListScope.quarantineCallouts(state: QuarantinedGroupsUiState) {
     }
 }
 
-/** One card per quarantined group: Retry where it can help, otherwise the group and its restart guidance. */
+/** One card per quarantined group: Retry where it can help, otherwise the group and how to reopen its account. */
 private fun LazyListScope.quarantineRows(
     state: QuarantinedGroupsUiState,
     onRecover: (String) -> Unit,
