@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.marmotkit.RelayLivenessFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.RelayListKind
@@ -136,6 +137,12 @@ internal enum class RelayPublicationOperation(
 internal data class RelayPublicationState(
     val running: RelayPublicationOperation? = null,
     val failed: RelayPublicationOperation? = null,
+)
+
+/** One configured row's native state and whether MDK admits the endpoint for dialing. */
+internal data class RelayConnection(
+    val liveness: RelayLivenessFfi?,
+    val allowed: Boolean,
 )
 
 /** Everything the list screen renders from. */

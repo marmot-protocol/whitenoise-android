@@ -114,12 +114,13 @@ class RelaysScreenScreenshotTest {
         name: String,
         lists: AccountRelayListsFfi = DEFAULT_LISTS,
     ) {
+        val urls = accountRelays(lists).map { it.url }
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 RelaysContent(
                     state = RelaysUiState(
                         lists = lists,
-                        connections = projectRelayConnections(accountRelays(lists).map { it.url }, emptyMap(), CONNECTIONS),
+                        connections = projectRelayConnections(urls, emptyMap(), CONNECTIONS),
                     ),
                     onBack = {},
                     onOpenRelay = {},

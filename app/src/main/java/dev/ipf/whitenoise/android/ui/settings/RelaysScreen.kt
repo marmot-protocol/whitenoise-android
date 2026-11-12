@@ -631,6 +631,7 @@ private fun AccountRelay.displayAttention(connection: RelayConnection?): RelayAd
     if (restrictedForEditing(connection)) RelayAddressAttention.None else attention
 
 /** An imported address allowed by MDK may still be dropped by the existing list editor. */
-private fun AccountRelay.restrictedForEditing(connection: RelayConnection?): Boolean = needsAttention && connection?.allowed == true
+private fun AccountRelay.restrictedForEditing(connection: RelayConnection?): Boolean =
+    needsAttention && connection?.allowed == true
 
 private val RelayProgressSize = 20.dp

@@ -20,12 +20,6 @@ import dev.ipf.whitenoise.android.state.relayLiveness
 import java.text.DateFormat
 import java.util.Date
 
-/** One configured row's native state and whether MDK admits the endpoint for dialing. */
-internal data class RelayConnection(
-    val liveness: RelayLivenessFfi?,
-    val allowed: Boolean,
-)
-
 /** Collect live rows while this destination is started and resolve identities only when the relay list changes. */
 @Composable
 internal fun rememberRelayConnections(
@@ -91,19 +85,26 @@ internal fun RelayConnectionDetails(
     val canReconnect = connection?.status == RelayStatusFfi.OFFLINE || connection?.status == RelayStatusFfi.UNKNOWN
     SettingsGroup {
         row("connection_status") { context ->
-            SettingsValue(context, stringResource(R.string.relay_connection_status), stringResource(connection.statusLabel))
+            SettingsValue(
+                context,
+                stringResource(R.string.relay_connection_status),
+                stringResource(connection.statusLabel),
+            )
         }
         connection?.lastAttemptUnix?.let { seconds ->
             row("connection_attempt") { context ->
-                val attempt = remember(seconds) { DateFormat.getDateTimeInstance().format(Date(seconds.toLong() * 1_000L)) }
+                val attempt = remember(seconds) {
+                    DateFormat.getDateTimeInstance().format(Date(seconds.toLong() * 1_000L))
+                }
                 SettingsValue(context, stringResource(R.string.relay_connection_attempt), attempt)
             }
         }
         if (retrying || (onReconnect != null && canReconnect)) {
             row("reconnect") { context ->
+                val title = if (retrying) R.string.relay_connection_retrying else R.string.relay_connection_retry
                 SettingsAction(
                     context = context,
-                    title = stringResource(if (retrying) R.string.relay_connection_retrying else R.string.relay_connection_retry),
+                    title = stringResource(title),
                     subtitle = if (reconnectState == RelayReconnectState.Failed) {
                         stringResource(R.string.relay_connection_retry_failed)
                     } else {

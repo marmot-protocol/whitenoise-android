@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -79,11 +80,12 @@ class RelaysContentTest {
         val c = RelayLivenessFfi(C, RelayStatusFfi.UNKNOWN, null, null)
         val endpoints =
             mapOf(
-                configured to RelayEndpointClassificationFfi(configured, "$A/", RelayEndpointPolicyFfi.ALLOWED),
-                nonDefaultPort to RelayEndpointClassificationFfi(nonDefaultPort, nonDefaultPort, RelayEndpointPolicyFfi.ALLOWED),
+                configured to allowedEndpoint(configured, "$A/"),
+                nonDefaultPort to allowedEndpoint(nonDefaultPort, nonDefaultPort),
             )
         val urls = listOf(configured, nonDefaultPort, C)
-        val state = mutableStateOf(RelaysUiState(lists, connections = projectRelayConnections(urls, endpoints, listOf(a, b, c))))
+        val initialConnections = projectRelayConnections(urls, endpoints, listOf(a, b, c))
+        val state = mutableStateOf(RelaysUiState(lists, connections = initialConnections))
         renderState { state.value }
 
         assertConnection(configured, R.string.relay_connection_connecting)
@@ -93,7 +95,8 @@ class RelaysContentTest {
         assertConnection(C, R.string.relay_connection_unknown)
 
         composeRule.runOnIdle {
-            val connections = projectRelayConnections(urls, endpoints, listOf(a.copy(status = RelayStatusFfi.CONNECTED)))
+            val connected = a.copy(status = RelayStatusFfi.CONNECTED)
+            val connections = projectRelayConnections(urls, endpoints, listOf(connected))
             state.value = state.value.copy(connections = connections)
         }
         assertConnection(configured, R.string.relay_connection_connected)
@@ -109,8 +112,8 @@ class RelaysContentTest {
         val connected = RelayLivenessFfi(trailingSlash, RelayStatusFfi.CONNECTED, null, null)
         val endpoints =
             mapOf(
-                dotPath to RelayEndpointClassificationFfi(dotPath, offline.url, RelayEndpointPolicyFfi.ALLOWED),
-                trailingSlash to RelayEndpointClassificationFfi(trailingSlash, connected.url, RelayEndpointPolicyFfi.ALLOWED),
+                dotPath to allowedEndpoint(dotPath, offline.url),
+                trailingSlash to allowedEndpoint(trailingSlash, connected.url),
             )
         val connections = projectRelayConnections(listOf(dotPath, trailingSlash), endpoints, listOf(offline, connected))
         assertEquals(offline, connections[dotPath]?.liveness)
@@ -122,42 +125,12 @@ class RelaysContentTest {
     fun reconnectShowsProgressAndFailureUntilAnotherRequest() {
         var response = CompletableDeferred<Boolean>()
         val operations = RelayOperationState()
-        val lists = relayLists(nip65 = listOf(A), inbox = emptyList())
         val showDetails = mutableStateOf(true)
         var requests = 0
         val connection = mutableStateOf(RelayLivenessFfi(A, RelayStatusFfi.OFFLINE, null, null))
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = false) {
-                val scope = rememberCoroutineScope()
-                if (showDetails.value) {
-                    RelayDetailsScreen(
-                        relay = AccountRelay(A, setOf(AccountRelayRole.Profile)),
-                        lists = null,
-                        busy = operations.busy,
-                        onBack = {},
-                        onSetRole = { _, _ -> },
-                        onRemove = {},
-                        connection = connection.value,
-                        reconnectState = operations.reconnectState(0, A),
-                        onReconnect = {
-                            operations.reconnect({ block -> scope.launch { block() } }, 0, A) {
-                                requests++
-                                response.await()
-                            }
-                        },
-                    )
-                } else {
-                    RelaysContent(
-                        state = RelaysUiState(lists = lists, busy = operations.busy, reconnecting = operations.reconnecting),
-                        onBack = {},
-                        onOpenRelay = { showDetails.value = true },
-                        onAdd = {},
-                        onRefresh = {},
-                        onPublishMissing = {},
-                        onRestore = {},
-                    )
-                }
-            }
+        renderReconnectVisit(operations, showDetails, connection) {
+            requests++
+            response.await()
         }
 
         val retry = composeRule.onNodeWithText(app.getString(R.string.relay_connection_retry))
@@ -187,12 +160,63 @@ class RelaysContentTest {
         composeRule.onNodeWithText(app.getString(R.string.relay_connection_offline)).assertIsDisplayed()
         retry.assertIsEnabled()
         composeRule.runOnIdle {
-            connection.value = connection.value.copy(status = RelayStatusFfi.CONNECTED, lastAttemptUnix = 1_700_000_000uL)
+            connection.value = connection.value.copy(
+                status = RelayStatusFfi.CONNECTED,
+                lastAttemptUnix = 1_700_000_000uL,
+            )
         }
         composeRule.onNodeWithText(app.getString(R.string.relay_connection_connected)).assertIsDisplayed()
         attempt.assertIsDisplayed()
         retry.assertDoesNotExist()
     }
+
+    /** Allows real list-to-detail navigation while retaining the shared request owner. */
+    private fun renderReconnectVisit(
+        operations: RelayOperationState,
+        showDetails: MutableState<Boolean>,
+        connection: MutableState<RelayLivenessFfi>,
+        request: suspend () -> Boolean,
+    ) {
+        val lists = relayLists(nip65 = listOf(A), inbox = emptyList())
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                val scope = rememberCoroutineScope()
+                if (showDetails.value) {
+                    RelayDetailsScreen(
+                        relay = AccountRelay(A, setOf(AccountRelayRole.Profile)),
+                        lists = null,
+                        busy = operations.busy,
+                        onBack = {},
+                        onSetRole = { _, _ -> },
+                        onRemove = {},
+                        connection = connection.value,
+                        reconnectState = operations.reconnectState(0, A),
+                        onReconnect = {
+                            operations.reconnect({ block -> scope.launch { block() } }, 0, A, request)
+                        },
+                    )
+                } else {
+                    RelaysContent(
+                        state = RelaysUiState(
+                            lists = lists,
+                            busy = operations.busy,
+                            reconnecting = operations.reconnecting,
+                        ),
+                        onBack = {},
+                        onOpenRelay = { showDetails.value = true },
+                        onAdd = {},
+                        onRefresh = {},
+                        onPublishMissing = {},
+                        onRestore = {},
+                    )
+                }
+            }
+        }
+    }
+
+    /** Native fixture classification for an admitted address and its canonical spelling. */
+    private fun allowedEndpoint(endpoint: String, normalized: String): RelayEndpointClassificationFfi =
+        RelayEndpointClassificationFfi(endpoint, normalized, RelayEndpointPolicyFfi.ALLOWED)
 
     /** Check the status in the accessible row that owns the configured URL. */
     private fun assertConnection(url: String, statusRes: Int) {
@@ -273,7 +297,8 @@ class RelaysContentTest {
         render(relayLists(nip65 = listOf(POST, LEGACY), inbox = emptyList()))
         composeRule.onNodeWithTag("relays.imported.issue").assertExists()
         composeRule.onNodeWithText("legacy.example.com").performScrollTo().assertExists()
-        composeRule.onNodeWithText("$LEGACY · " + app.getString(R.string.relay_needs_attention), substring = true).assertExists()
+        val note = app.getString(R.string.relay_needs_attention)
+        composeRule.onNodeWithText("$LEGACY · $note", substring = true).assertExists()
     }
 
     /** A valid onion relay gets the Tor explanation, not the insecure-connection callout or note. */
