@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.LifecycleOwner
+import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 
 internal tailrec fun Context.lifecycleOwner(): LifecycleOwner? =
     when (this) {
@@ -67,12 +68,16 @@ internal fun android.view.Window.releaseSecureFlag() {
 @Composable
 internal fun WindowSecureFlag(enabled: Boolean = true) {
     val context = LocalContext.current
-    DisposableEffect(context, enabled) {
+    // A route morph never keeps a picture of protected cards past the flag's release.
+    val morph = LocalSettingsCardMorph.current
+    DisposableEffect(context, enabled, morph) {
         val window = context.activity()?.window
+        val releaseMorph = if (enabled) morph?.holdSecure() else null
         if (enabled) {
             window?.retainSecureFlag()
         }
         onDispose {
+            releaseMorph?.invoke()
             // No symmetric restore for enabled=false: this is the shared
             // activity window, so each secure surface must assert the flag for
             // itself instead of resurrecting stale state when a permissive

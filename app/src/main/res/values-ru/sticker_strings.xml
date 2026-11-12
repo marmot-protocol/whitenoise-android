@@ -24,6 +24,7 @@
     <string name="sticker_packs_no_matches">Нет наборов стикеров по вашему запросу.</string>
     <string name="sticker_packs_unreachable">Не удалось проверить ваши релеи на наличие наборов стикеров.</string>
     <string name="sticker_packs_try_again">Повторить</string>
+    <string name="sticker_packs_load_failed">Не удалось загрузить наборы стикеров.</string>
     <string name="sticker_packs_public_footer">Наборы стикеров публичны и не проверяются White Noise. Ваши установленные наборы публично видны на ваших релеях.</string>
     <string name="sticker_pack_add">Добавить</string>
     <string name="sticker_pack_by">Автор: %1$s</string>

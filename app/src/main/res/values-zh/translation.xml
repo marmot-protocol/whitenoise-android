@@ -27,9 +27,9 @@
     <string name="translation_install_release">从 GitHub 安装</string>
     <string name="translation_install_release_reason">Zapstore 尚未提供 White Noise 可用的版本，因此将打开发布者在 GitHub 上的 %1$s 版本。</string>
     <string name="translation_install_open_failed">没有应用能打开 Offline Translator 或其下载页面。请安装网页浏览器后重试。</string>
-    <string name="translation_composer_toggle">边输入边翻译</string>
+    <string name="translation_composer_toggle">翻译</string>
     <string name="translation_composer_will_send">将发送</string>
-    <string name="translation_composer_dictation_off">听写时已关闭边输入边翻译</string>
+    <string name="translation_composer_dictation_off">听写时翻译已关闭</string>
     <string name="translation_composer_placeholder">译文显示在这里</string>
     <string name="translation_composer_detection_failed">无法识别语言，请再多输入一些。</string>
 </resources>

@@ -648,17 +648,21 @@ internal fun saveAttachmentToMediaStore(
                 normalizedMime,
                 write = source::copyTo,
             )
-        else -> publishFileToDownloads(context, fileName, normalizedMime, source::copyTo)
+        else -> publishFileToDownloads(context, fileName, normalizedMime, write = source::copyTo)
     }
 }
 
-/** Stream a reusable general-file artifact into public Downloads. */
+/**
+ * Stream a reusable general-file artifact into public Downloads. [beforePublish] runs at the finalize boundary and
+ * may throw to keep the entry pending and delete it, as the gallery saves do.
+ */
 internal fun saveDocumentToDownloads(
     context: Context,
     source: java.io.File,
     fileName: String,
     mediaType: String,
-): Boolean = source.inputStream().use { saveFileToDownloads(context, it, fileName, mediaType) }
+    beforePublish: () -> Unit = {},
+): Boolean = source.inputStream().use { saveFileToDownloads(context, it, fileName, mediaType, beforePublish) }
 
 /** Streams [source] into Download/White Noise without reading it whole. */
 private fun saveFileToDownloads(
@@ -666,8 +670,9 @@ private fun saveFileToDownloads(
     source: java.io.InputStream,
     fileName: String,
     mediaType: String,
+    beforePublish: () -> Unit = {},
 ): Boolean =
-    publishFileToDownloads(context, fileName, mediaType) { output ->
+    publishFileToDownloads(context, fileName, mediaType, beforePublish) { output ->
         source.copyTo(output, DEFAULT_BUFFER_SIZE)
     }
 
@@ -676,6 +681,7 @@ private fun publishFileToDownloads(
     context: Context,
     fileName: String,
     mediaType: String,
+    beforePublish: () -> Unit = {},
     write: (java.io.OutputStream) -> Unit,
 ): Boolean {
     val resolver = context.contentResolver
@@ -690,6 +696,7 @@ private fun publishFileToDownloads(
         resolver = resolver,
         collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,
         values = values,
+        beforePublish = beforePublish,
         write = write,
     )
 }

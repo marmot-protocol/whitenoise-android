@@ -29,6 +29,13 @@ class GlobalSearchResultsReducerTest {
         assertNull(restarted.inFlight)
     }
 
+    /** Withdrawn keys outlive a restart, so a new query cannot list a removal the store has not caught up with. */
+    @Test
+    fun restartKeepsWithdrawnKeys() {
+        val withdrawn = GlobalSearchResultsReducer.withdraw(GlobalSearchResultsState(), setOf("g1:m1"))
+        assertEquals(setOf("g1:m1"), GlobalSearchResultsReducer.restart(withdrawn).withdrawn)
+    }
+
     /** A page that completes after the query or filters changed cannot reach the new generation. */
     @Test
     fun staleBatchFromAnOlderQueryIsIgnored() {

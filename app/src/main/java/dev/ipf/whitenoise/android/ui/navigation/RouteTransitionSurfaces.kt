@@ -7,7 +7,6 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
@@ -40,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 
@@ -121,11 +121,17 @@ internal fun <T> ConversationRouteAnimatedContent(
     }
 }
 
+/**
+ * Routes leave their origin quickly and settle softly in both directions. One curve keeps the
+ * shared visibility value reversible: a Back mid-entry continues from the rendered position.
+ */
+internal val ConversationRouteEasing = AppMotionOpenEasing
+
 /** Visibility and slot retention must finish on the same immutable timing specification. */
 private val conversationRouteAnimationSpec =
     tween<Float>(
         durationMillis = CONVERSATION_ROUTE_TRANSITION_MILLIS,
-        easing = FastOutSlowInEasing,
+        easing = ConversationRouteEasing,
     )
 
 /** Retains both full-screen slots while draw-layer progress owns visible motion. */

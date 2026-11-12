@@ -22,6 +22,22 @@
         ]
       },
       {
+        "surface": "ChatListJumpToTopButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListJumpToTopButton(",
+        "test_ids": [
+          "CHL-036"
+        ]
+      },
+      {
+        "surface": "ChatListJumpToTopControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListJumpToTopControl(",
+        "test_ids": [
+          "CHL-036"
+        ]
+      },
+      {
         "surface": "ChatListSearchSectionHeader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatListSearchSectionHeader(",
@@ -55,7 +71,8 @@
           "CHL-031",
           "CHL-006",
           "CHL-034",
-          "FLD-008"
+          "FLD-008",
+          "CHL-036"
         ]
       },
       {
@@ -89,7 +106,7 @@
       {
         "surface": "Global message results Retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "onRetry = { messageResults?.retry() }",
+        "anchor": "onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() }",
         "test_ids": [
           "FIND-015",
           "FIND-018"

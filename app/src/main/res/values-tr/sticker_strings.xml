@@ -24,6 +24,7 @@
     <string name="sticker_packs_no_matches">Aramanla eşleşen çıkartma paketi yok.</string>
     <string name="sticker_packs_unreachable">Rölelerin çıkartma paketleri için kontrol edilemedi.</string>
     <string name="sticker_packs_try_again">Tekrar dene</string>
+    <string name="sticker_packs_load_failed">Çıkartma paketleri yüklenemedi.</string>
     <string name="sticker_packs_public_footer">Çıkartma paketleri herkese açıktır ve White Noise tarafından incelenmez. Yüklü paketlerin rölelerinde herkese açık olarak listelenir.</string>
     <string name="sticker_pack_add">Ekle</string>
     <string name="sticker_pack_by">%1$s tarafından</string>
