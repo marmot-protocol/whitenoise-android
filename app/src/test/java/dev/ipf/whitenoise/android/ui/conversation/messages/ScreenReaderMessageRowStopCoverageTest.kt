@@ -191,6 +191,7 @@ class ScreenReaderMessageRowStopCoverageTest {
         assertTrue(giphy.contains("editedLabelTarget(label, footer.onEditedClick)"))
     }
 
+    /** Markdown and plain-text bodies forward their read-aloud and link actions to the merged message row. */
     @Test
     fun everyTextRendererForwardsItsActionsToTheRow() {
         val host = appModuleSource("$CONVERSATION/TimelineRowTtsHighlight.kt")
