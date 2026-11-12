@@ -532,12 +532,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         composeRule.waitForIdle()
         composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.ReadingHistory }
         val context = ApplicationProvider.getApplicationContext<Context>()
-        // Ignore the zero-size measurement copy of the footer action.
-        val readMore =
-            composeRule.onNode(
-                hasText(context.getString(R.string.message_read_more)) and
-                    SemanticsMatcher("visible footer action") { it.boundsInRoot.width > 0f },
-            )
+        val readMore = visibleReadMoreButton(context)
         readMore.performClick()
         // Allow the expanded row to remeasure and the scroll coordinator to place it.
         repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
@@ -570,6 +565,38 @@ class ConversationAcceptedSendRouteScreenshotTest {
         assertTrue(checkNotNull(evidence.viewport).mode is ConversationScrollMode.FollowingTail)
     }
 
+    /** Expanding the newest bubble keeps following the chat if its new end remains at the natural tail. */
+    @Test
+    fun smallExpansionAtNaturalTailKeepsFollowingNewest() {
+        val conversation = createConversation(longMessageAtTail = true)
+        val evidence = SendRouteEvidence()
+        mountHistoryConversation(conversation, evidence, liveTail = true)
+        composeRule.waitForIdle()
+        composeRule.waitUntil(5_000) {
+            val viewport = evidence.viewport
+            viewport?.mode is ConversationScrollMode.FollowingTail && !viewport.canScrollBackward
+        }
+
+        val readMore = visibleReadMoreButton(ApplicationProvider.getApplicationContext())
+        readMore.performClick()
+        repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
+        readMore.assertDoesNotExist()
+        val viewport = checkNotNull(evidence.viewport)
+        assertFalse("the newest edge remains physically reached", viewport.canScrollBackward)
+        assertTrue(
+            "incoming messages can still follow the tail",
+            viewport.mode is ConversationScrollMode.FollowingTail,
+        )
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_read_more_at_tail.png")
+    }
+
+    /** Finds the interactive Read More footer, excluding the zero-size measurement copy. */
+    private fun visibleReadMoreButton(context: Context) =
+        composeRule.onNode(
+            hasText(context.getString(R.string.message_read_more)) and
+                SemanticsMatcher("visible footer action") { it.boundsInRoot.width > 0f },
+        )
+
     /** Checks actual line geometry because an oversized text node can be visible while its continuation is clipped. */
     private fun assertFirstNewLineIsVisible(evidence: SendRouteEvidence) {
         val body = composeRule.onNodeWithText("Long history line 0", substring = true, useUnmergedTree = true)
@@ -592,20 +619,24 @@ class ConversationAcceptedSendRouteScreenshotTest {
 
     /**
      * Builds one synthetic authoritative window with typed durable acceptance and no relay publication. With
-     * [longHistoryMessage], the restored history anchor is long enough to collapse behind Read more.
+     * [longHistoryMessage], the restored anchor spans several screens. [longMessageAtTail] uses a newest row
+     * that only just crosses the collapse threshold.
      */
     private fun createConversation(
         longHistoryMessage: Boolean = false,
         draftText: String = SENT_TEXT,
+        longMessageAtTail: Boolean = false,
     ): ConversationController {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val records =
             List(60) { index ->
                 val text =
-                    if (longHistoryMessage && index == HISTORY_ANCHOR_INDEX) {
-                        List(LONG_MESSAGE_LINES) { line -> "Long history line $line" }.joinToString("\n")
-                    } else {
-                        "History $index"
+                    when {
+                        longHistoryMessage && index == HISTORY_ANCHOR_INDEX ->
+                            List(LONG_MESSAGE_LINES) { line -> "Long history line $line" }.joinToString("\n")
+                        longMessageAtTail && index == 59 ->
+                            List(55) { line -> "Long tail line $line" }.joinToString("\n")
+                        else -> "History $index"
                     }
                 timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), text)
             }

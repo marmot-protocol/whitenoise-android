@@ -2394,6 +2394,7 @@ internal fun ConversationScreen(
         val maxLayoutFrames = 3
         val continuationPx = beforeLayout.viewportSize.height / 5
         scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        val wasFollowingTail = scrollCoordinator.isFollowingTail
         scrollCoordinator.settleReadingAt(currentScrollAnchor())
         val expansionRevision = scrollCoordinator.intentToken.revision
 
@@ -2421,7 +2422,17 @@ internal fun ConversationScreen(
                         }
                     }
                 }
-            if (completed) scrollCoordinator.settleReadingAt(currentScrollAnchor())
+            if (completed) {
+                scrollCoordinator.settleLandingAt(
+                    currentScrollAnchor(),
+                    atNewestEdge =
+                        wasFollowingTail &&
+                            conversationLandingAtNewestEdge(
+                                atNaturalTail = timelineViewport.isAtNaturalTail,
+                                hasMoreAfter = controller.hasMoreAfterTimeline,
+                            ),
+                )
+            }
         }
     }
 
