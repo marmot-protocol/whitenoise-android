@@ -1,24 +1,31 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.os.Build
+import android.widget.Toast
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,13 +37,20 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.AppRevision
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
@@ -212,20 +226,49 @@ internal fun SettingsExplainer(text: String) {
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsVersionFooter(versionName: String) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    val copyLabel = stringResource(R.string.copy)
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(WhiteNoiseSpacing.CompactScreenMargin)
+                .heightIn(min = 48.dp)
+                .clickable(role = Role.Button, onClickLabel = copyLabel) {
+                    clipboard.setText(
+                        AnnotatedString(
+                            buildIdentity(
+                                versionName,
+                                BuildConfig.VERSION_CODE,
+                                AppRevision.FULL_SHA,
+                                AppRevision.SOURCE_PR,
+                            ),
+                        ),
+                    )
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
+                    }
+                }.padding(WhiteNoiseSpacing.CompactScreenMargin)
                 .testTag("settings.version_footer"),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = stringResource(R.string.settings_version_label, versionName),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_content_copy),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.settings_version_label, versionName),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

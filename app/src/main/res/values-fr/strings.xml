@@ -962,6 +962,7 @@
     <string name="private_key">Clé privée</string>
     <string name="profile_public_key_help">Partagez-la pour que les autres vous trouvent et se connectent à vous.</string>
     <string name="profile_private_key_help">Gardez-la secrète. Qui la détient contrôle votre profil, et elle est irrécupérable.</string>
+    <string name="profile_private_key_use_help">Utilisez-la pour vous connecter à d’autres applications Nostr avec la même identité et la même clé publique. Confiez-la uniquement à des applications fiables, ou conservez-la dans une application de signature comme Amber, qui signe pour les autres applications sans leur transmettre la clé.</string>
     <string name="public_key_copied">Clé publique copiée</string>
     <string name="private_key_revealed">Clé privée affichée. Utilisez Copier pour la récupérer.</string>
     <string name="private_key_hidden">Clé privée masquée</string>

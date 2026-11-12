@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
@@ -8,6 +9,28 @@ import java.util.Locale
 
 /** Revision metadata cannot crash the reader or replace malformed timestamps with an invented time. */
 class EditHistoryTimestampTest {
+    @Test
+    fun actualRevisionConsumerPreservesEpochAndDisplayBoundaryInExtremeZones() {
+        val maximum = 253_402_300_799uL
+        for (zone in listOf(ZoneId.of("Etc/GMT+12"), ZoneId.of("Pacific/Kiritimati"))) {
+            for (seconds in listOf(0uL, maximum, maximum + 1uL, 40_000_000_000_000_000uL, ULong.MAX_VALUE)) {
+                val expected =
+                    if (seconds <= maximum) {
+                        IdentityFormatter.dateTime(
+                            Instant.ofEpochSecond(seconds.toLong()),
+                            Locale.US,
+                            zone,
+                            dateStyle = java.time.format.FormatStyle.MEDIUM,
+                            timeStyle = java.time.format.FormatStyle.MEDIUM,
+                        ) + " (${zone.id})"
+                    } else {
+                        ""
+                    }
+                assertEquals(expected, editHistoryRevisionTime(seconds, Locale.US, zone))
+            }
+        }
+    }
+
     /** Native unsigned overflow has no representable date. */
     @Test fun unsignedMaximumDoesNotFormat() {
         assertEquals("", editHistoryRevisionTime(ULong.MAX_VALUE, Locale.GERMANY, ZoneId.of("UTC")))

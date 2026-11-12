@@ -112,12 +112,16 @@ internal fun messageDayLabel(
     val days = ChronoUnit.DAYS.between(date, LocalDate.now(zone))
     return when {
         days <= 0L || days == 1L ->
-            DateUtils
-                .getRelativeTimeSpanString(
-                    epochSeconds.toLong() * 1000L,
-                    System.currentTimeMillis(),
-                    DateUtils.DAY_IN_MILLIS,
-                ).toString()
+            IdentityFormatter
+                .epochMillis(epochSeconds)
+                ?.let { millis ->
+                    DateUtils
+                        .getRelativeTimeSpanString(
+                            millis,
+                            System.currentTimeMillis(),
+                            DateUtils.DAY_IN_MILLIS,
+                        ).toString()
+                }.orEmpty()
         days in 2L..6L -> date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, locale)
         else -> IdentityFormatter.date(date, locale, dateFormat, FormatStyle.MEDIUM)
     }

@@ -9,6 +9,26 @@ import java.time.ZoneId
 import java.util.Locale
 
 class MessageInfoFormatTest {
+    @Test
+    fun exactTimestampRetainsItsSentinelAndBoundariesInExtremeZones() {
+        val maximum = 253_402_300_799uL
+        for (zone in listOf(ZoneId.of("Etc/GMT+12"), ZoneId.of("Pacific/Kiritimati"))) {
+            for (seconds in listOf(0uL, maximum, maximum + 1uL, 18_446_744_073_709_552uL, ULong.MAX_VALUE)) {
+                val expected =
+                    if (seconds != 0uL && seconds <= maximum) {
+                        java.time.format.DateTimeFormatter
+                            .ofLocalizedDateTime(java.time.format.FormatStyle.LONG, java.time.format.FormatStyle.LONG)
+                            .withLocale(Locale.US)
+                            .withZone(zone)
+                            .format(Instant.ofEpochSecond(seconds.toLong()))
+                    } else {
+                        ""
+                    }
+                assertEquals(expected, formatExactTimestamp(seconds, zone, Locale.US))
+            }
+        }
+    }
+
     // ---- formatExactTimestamp ----------------------------------------------
 
     @Test

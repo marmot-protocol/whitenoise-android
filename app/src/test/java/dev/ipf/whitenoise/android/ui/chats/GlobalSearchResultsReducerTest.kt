@@ -15,6 +15,89 @@ import org.junit.Test
 
 /** Generations, cursor pages, bounded local-hide refill and stale-page rejection of global message results. */
 class GlobalSearchResultsReducerTest {
+    @Test
+    fun batchedKeyChangesEqualSequentialSemanticsForEveryThreeEventOrder() {
+        val keys = listOf("g:1", "g:2", "off:query")
+        val choices = listOf(emptySet<String>()) + keys.map { setOf(it) } + listOf(keys.toSet())
+        val events =
+            choices.flatMap { removed ->
+                choices.map { restored -> GlobalSearchKeyChanges(removed, restored) }
+            }
+        val initial =
+            GlobalSearchResultsState(
+                results = listOf(result("g", "1"), result("g", "2"), result("g", "3")),
+                withdrawn = setOf("earlier:key"),
+            )
+        for (first in events) {
+            for (second in events) {
+                for (third in events) {
+                    val changes = listOf(first, second, third)
+                    val sequential =
+                        changes.fold(initial) { state, change ->
+                            state.copy(
+                                results = state.results.filter { it.key !in change.removed },
+                                withdrawn = (state.withdrawn + change.removed) - change.restored,
+                            )
+                        }
+                    assertEquals(sequential, GlobalSearchResultsReducer.applyKeyChanges(initial, changes.asSequence()))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun largeBatchScansLoadedRowsAndCopiesPriorWithdrawnKeysOnce() {
+        var rowReads = 0
+        var withdrawnIterations = 0
+        val rows = List(1000) { result("g", "$it") }
+        val countedRows =
+            object : AbstractList<GlobalSearchResult>() {
+                override val size: Int get() = rows.size
+
+                override fun get(index: Int): GlobalSearchResult {
+                    rowReads++
+                    return rows[index]
+                }
+            }
+        val prior = setOf("old:1", "old:2")
+        val countedWithdrawn =
+            object : AbstractSet<String>() {
+                override val size: Int get() = prior.size
+
+                override fun iterator(): Iterator<String> {
+                    withdrawnIterations++
+                    return prior.iterator()
+                }
+            }
+        val initial = GlobalSearchResultsState(results = countedRows, withdrawn = countedWithdrawn)
+        rowReads = 0
+        val changes = (0 until 1000).asSequence().map { GlobalSearchKeyChanges(removed = setOf("g:$it")) }
+        val after = GlobalSearchResultsReducer.applyKeyChanges(initial, changes)
+        assertEquals(1000, rowReads)
+        assertEquals(1, withdrawnIterations)
+        assertTrue(after.results.isEmpty())
+        assertEquals(1002, after.withdrawn.size)
+    }
+
+    @Test
+    fun drainIncludesEventsQueuedWhileItIsBeingConsumedInArrivalOrder() {
+        val queue = java.util.concurrent.ConcurrentLinkedQueue<GlobalSearchKeyChanges>()
+        queue.add(GlobalSearchKeyChanges(removed = setOf("g:1")))
+        val drained =
+            generateSequence { queue.poll() }.onEach { change ->
+                if (change.removed.isNotEmpty()) queue.add(GlobalSearchKeyChanges(restored = setOf("g:1")))
+            }
+        val initial = GlobalSearchResultsState(results = listOf(result("g", "1")))
+        val after = GlobalSearchResultsReducer.applyKeyChanges(initial, drained)
+        assertTrue(after.results.isEmpty())
+        assertTrue(after.withdrawn.isEmpty())
+        val (loading, request) = begin(after)
+        assertEquals(
+            listOf("g:1"),
+            GlobalSearchResultsReducer.applyBatch(loading, request, batch(initial.results)).results.map { it.key },
+        )
+    }
+
     /** A restart opens the next generation and drops rows, cursor, request and failure. */
     @Test
     fun restartOpensNextGenerationAndDropsEverything() {

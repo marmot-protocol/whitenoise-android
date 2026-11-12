@@ -960,6 +960,7 @@
     <string name="private_key">Özel anahtar</string>
     <string name="profile_public_key_help">İnsanların sizi bulup bağlantı kurabilmesi için bunu paylaşın.</string>
     <string name="profile_private_key_help">Gizli tutun. Ona sahip olan profilinizi yönetir ve geri alınamaz.</string>
+    <string name="profile_private_key_use_help">Diğer Nostr uygulamalarında aynı kimlik ve açık anahtarla oturum açmak için kullanın. Yalnızca saklaması için güvendiğiniz uygulamalara verin veya Amber gibi, anahtarı paylaşmadan diğer uygulamalar için imza atan bir imzalayıcı uygulamada tutun.</string>
     <string name="public_key_copied">Ortak anahtar kopyalandı</string>
     <string name="private_key_revealed">Özel anahtar gösterildi. Almak için Kopyala’yı kullanın.</string>
     <string name="private_key_hidden">Özel anahtar gizlendi</string>

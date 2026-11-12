@@ -241,3 +241,6 @@
 *.DictationLauncherEntranceScreenshotTest.reducedMotionStartUsesFinalCapsulePlacement
 *.ComposerToolbarEditorInteractionTest.liftedShortcutPreservesContactAndSettlesIntoTheCommittedSlot
 *.ComposerToolbarEditorInteractionTest.liftedShortcutTracksPhysicalPointerInRtl
+
+# Quarantined native SDK 36 dialog probes; no committed golden. See ACC-009.
+diagnostic: ProfileKeyWipeConfirmationTest

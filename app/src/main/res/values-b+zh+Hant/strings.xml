@@ -945,6 +945,7 @@
     <string name="private_key">私鑰</string>
     <string name="profile_public_key_help">分享此金鑰，讓他人能找到並聯繫你。</string>
     <string name="profile_private_key_help">請保密。擁有它的人可控制你的個人檔案，且無法找回。</string>
+    <string name="profile_private_key_use_help">用它以相同身分和公鑰登入其他 Nostr 應用程式。只將它交給你信任能保管它的應用程式，或將它保存在 Amber 等簽署器應用程式中，由簽署器為其他應用程式簽署，而不向它們提供私鑰。</string>
     <string name="public_key_copied">公鑰已複製</string>
     <string name="private_key_revealed">私鑰已顯示。使用「複製」取得。</string>
     <string name="private_key_hidden">私鑰已隱藏</string>

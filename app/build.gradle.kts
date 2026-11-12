@@ -349,6 +349,13 @@ val previewProviderMatrixBuild =
 val prPreviewVersionCode = 2_000_000_000
 val startupDiagnosticsRequested = providers.gradleProperty("startupDiagnostics").orNull == "true"
 
+val buildFullSha =
+    (System.getenv("PREVIEW_HEAD_SHA") ?: System.getenv("GITHUB_SHA") ?: System.getenv("GIT_COMMIT"))
+        ?.takeIf { it.matches(Regex("[0-9a-fA-F]{40}")) }
+        .orEmpty()
+val appSourcePr =
+    (System.getenv("APP_SOURCE_PR") ?: prNumber)?.takeIf { it.matches(Regex("[1-9][0-9]*")) }.orEmpty()
+
 val buildShortSha =
     System.getenv("PREVIEW_HEAD_SHA")?.take(7)
         ?: System.getenv("GITHUB_SHA")?.take(7)
@@ -831,6 +838,8 @@ androidComponents {
                 "generate${variant.name.replaceFirstChar(Char::uppercase)}AppRevision",
             ) {
                 shortSha.set(buildShortSha)
+                fullSha.set(buildFullSha)
+                sourcePr.set(appSourcePr)
             }
         variant.sources.kotlin?.addGeneratedSourceDirectory(generateAppRevision, GenerateAppRevision::outputDirectory)
     }
@@ -1426,6 +1435,12 @@ abstract class GenerateAppRevision : DefaultTask() {
     @get:Input
     abstract val shortSha: Property<String>
 
+    @get:Input
+    abstract val fullSha: Property<String>
+
+    @get:Input
+    abstract val sourcePr: Property<String>
+
     @get:OutputDirectory
     abstract val outputDirectory: DirectoryProperty
 
@@ -1439,6 +1454,8 @@ abstract class GenerateAppRevision : DefaultTask() {
             |
             |object AppRevision {
             |    const val SHORT_SHA: String = "${shortSha.get()}"
+            |    const val FULL_SHA: String = "${fullSha.get()}"
+            |    const val SOURCE_PR: String = "${sourcePr.get()}"
             |}
             |
             """.trimMargin(),

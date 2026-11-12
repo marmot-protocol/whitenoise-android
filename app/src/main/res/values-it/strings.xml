@@ -962,6 +962,7 @@
     <string name="private_key">Chiave privata</string>
     <string name="profile_public_key_help">Condividila così le persone possono trovarti e contattarti.</string>
     <string name="profile_private_key_help">Tienila privata. Chi la possiede controlla il tuo profilo e non può essere recuperata.</string>
+    <string name="profile_private_key_use_help">Usala per accedere ad altre app Nostr con la stessa identità e chiave pubblica. Affidala solo ad app di cui ti fidi, oppure conservala in un’app di firma come Amber, che firma per altre app senza consegnare loro la chiave.</string>
     <string name="public_key_copied">Chiave pubblica copiata</string>
     <string name="private_key_revealed">Chiave privata mostrata. Usa Copia per ottenerla.</string>
     <string name="private_key_hidden">Chiave privata nascosta</string>

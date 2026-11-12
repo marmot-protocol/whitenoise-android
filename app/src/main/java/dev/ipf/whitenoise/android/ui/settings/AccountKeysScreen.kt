@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
@@ -99,7 +100,6 @@ import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
-import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -588,6 +588,7 @@ private fun ProfileKeysList(
             }
             item(key = "search.AccountKeys.9") {
                 ProfileKeySupportingText(stringResource(R.string.profile_private_key_help))
+                ProfileKeySupportingText(stringResource(R.string.profile_private_key_use_help))
             }
             item(key = "search.AccountKeys.10") { SettingsSection(stringResource(R.string.export)) }
             item(key = "search.AccountKeys.11") {
@@ -623,6 +624,7 @@ private fun ProfileKeysList(
                         title = stringResource(R.string.sign_out),
                         onClick = onSignOut,
                         modifier = Modifier.testTag("profile_keys.sign_out"),
+                        leading = { Icon(painterResource(R.drawable.ic_logout), contentDescription = null) },
                     )
                 }
             }
@@ -773,15 +775,25 @@ private fun ProfileKeysDialogs(
             confirmButton = {
                 FlowRow(horizontalArrangement = Arrangement.End) {
                     TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.Share) }) {
-                        Text(stringResource(R.string.share), color = MaterialTheme.colorScheme.error)
+                        ProfileKeyActionLabel(
+                            stringResource(R.string.share),
+                            R.drawable.ic_share,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                     TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.File) }) {
-                        Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
+                        ProfileKeyActionLabel(
+                            stringResource(R.string.export_nsec),
+                            R.drawable.ic_download,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
             },
             dismissButton = {
-                TextButton(onClick = ui::cancelExport) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = ui::cancelExport) {
+                    ProfileKeyActionLabel(stringResource(R.string.cancel), R.drawable.ic_close)
+                }
             },
         )
     }
@@ -816,6 +828,23 @@ private fun ProfileKeysDialogs(
     )
 }
 
+/** Decorative action glyphs share button content colour and leave the label as the accessible name. */
+@Suppress("FunctionNaming")
+@Composable
+private fun ProfileKeyActionLabel(
+    text: String,
+    @DrawableRes icon: Int,
+    color: Color = LocalContentColor.current,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp), tint = color)
+        Text(text, color = color)
+    }
+}
+
 /** Actual export feedback; callers keep operation ownership and clearing each error flag. */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
@@ -834,7 +863,9 @@ internal fun ProfileKeyFeedbackDialogs(
             onDismissRequest = onNativeErrorDismiss,
             title = { Text(stringResource(title)) },
             confirmButton = {
-                TextButton(onClick = onNativeErrorDismiss) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = onNativeErrorDismiss) {
+                    ProfileKeyActionLabel(stringResource(R.string.ok), R.drawable.ic_check)
+                }
             },
         )
     }
@@ -843,7 +874,9 @@ internal fun ProfileKeyFeedbackDialogs(
             onDismissRequest = onShareErrorDismiss,
             title = { Text(stringResource(R.string.outbound_share_failed)) },
             confirmButton = {
-                TextButton(onClick = onShareErrorDismiss) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = onShareErrorDismiss) {
+                    ProfileKeyActionLabel(stringResource(R.string.ok), R.drawable.ic_check)
+                }
             },
         )
     }
@@ -853,7 +886,9 @@ internal fun ProfileKeyFeedbackDialogs(
             title = { Text(stringResource(R.string.couldnt_save_file)) },
             text = { Text(stringResource(R.string.choose_another_location_and_try_again)) },
             confirmButton = {
-                TextButton(onClick = onSaveErrorDismiss) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = onSaveErrorDismiss) {
+                    ProfileKeyActionLabel(stringResource(R.string.ok), R.drawable.ic_check)
+                }
             },
         )
     }
@@ -863,7 +898,9 @@ internal fun ProfileKeyFeedbackDialogs(
             title = { Text(stringResource(R.string.key_export_expired_title)) },
             text = { Text(stringResource(R.string.key_export_expired_body)) },
             confirmButton = {
-                TextButton(onClick = onExpiryDismiss) { Text(stringResource(R.string.close)) }
+                TextButton(onClick = onExpiryDismiss) {
+                    ProfileKeyActionLabel(stringResource(R.string.close), R.drawable.ic_close)
+                }
             },
         )
     }
@@ -926,15 +963,19 @@ private fun ExportPasswordDialog(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onViewBackup,
                     modifier = Modifier.testTag("profile_keys.view_backup"),
-                ) { Text(stringResource(R.string.key_export_view_backup)) }
+                ) { ProfileKeyActionLabel(stringResource(R.string.key_export_view_backup), R.drawable.ic_visibility) }
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onConfirm,
                     modifier = Modifier.testTag("profile_keys.export_file"),
-                ) { Text(stringResource(R.string.export)) }
+                ) { ProfileKeyActionLabel(stringResource(R.string.export), R.drawable.ic_download) }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                ProfileKeyActionLabel(stringResource(R.string.cancel), R.drawable.ic_close)
+            }
+        },
     )
 }
 
@@ -967,11 +1008,22 @@ internal fun EncryptedBackupResultDialog(
         },
         confirmButton = {
             FlowRow(horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onCopy) { Text(stringResource(if (copied) R.string.copied else R.string.copy)) }
-                TextButton(onClick = onExport) { Text(stringResource(R.string.export)) }
+                TextButton(onClick = onCopy) {
+                    ProfileKeyActionLabel(
+                        stringResource(if (copied) R.string.copied else R.string.copy),
+                        copyGlyph(copied),
+                    )
+                }
+                TextButton(onClick = onExport) {
+                    ProfileKeyActionLabel(stringResource(R.string.export), R.drawable.ic_download)
+                }
             }
         },
-        dismissButton = { TextButton(onClick = onHide) { Text(stringResource(R.string.hide)) } },
+        dismissButton = {
+            TextButton(onClick = onHide) {
+                ProfileKeyActionLabel(stringResource(R.string.hide), R.drawable.ic_visibility_off)
+            }
+        },
     )
 }
 
@@ -1078,104 +1130,119 @@ private fun AccountWipeFlow(
         // case-insensitive and ignores surrounding whitespace. This is the last
         // stop before the engine destroys the local DB, MLS state, keychain
         // entry, and relay key packages, so a single tap must not be enough.
-        val confirmKeyword = stringResource(R.string.sign_out_and_wipe_confirm_keyword)
-        val wipeConfirmed = ui.wipeConfirmInput.trim().equals(confirmKeyword, ignoreCase = true)
-        WhiteNoiseAlertDialog(
-            onDismissRequest = {
+        ProfileKeyWipeConfirmationDialog(
+            input = ui.wipeConfirmInput,
+            onInputChange = { ui.wipeConfirmInput = it },
+            onDismiss = {
                 ui.wipeConfirm = false
                 ui.wipeConfirmInput = ""
             },
-            title = { Text(stringResource(R.string.sign_out_and_wipe_confirm_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(stringResource(R.string.sign_out_and_wipe_confirm_body))
-                    Text(
-                        stringResource(R.string.sign_out_and_wipe_confirm_instruction, confirmKeyword),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedTextField(
-                        value = ui.wipeConfirmInput,
-                        onValueChange = { ui.wipeConfirmInput = it },
-                        label = { Text(stringResource(R.string.sign_out_and_wipe_confirm_field_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions =
-                            KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Characters,
-                                autoCorrectEnabled = false,
-                            ),
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        ui.wipeConfirm = false
-                        ui.wipeConfirmInput = ""
-                        // Run on the process-lifetime mutation scope, not this
-                        // screen's rememberCoroutineScope. signOutAndWipeActiveAccount
-                        // flips activeAccountRef partway through and keeps suspending
-                        // (push teardown, notification refresh); the account-change nav
-                        // reset in MainShell then pops AccountKeysScreen out of composition,
-                        // which would cancel a screen-scoped coroutine before the wipe
-                        // finishes and before the outcome is presented (#547).
-                        //
-                        // wipeInProgress (not signOutInProgress) drives the
-                        // app-root staged progress sheet (#350), which survives
-                        // that nav reset.
-                        appState.wipeInProgress = true
-                        appState.launchMutation {
-                            try {
-                                val outcome = appState.signOutAndWipeActiveAccount()
-                                if (outcome == null) {
-                                    // Total FFI failure: nothing was wiped and the
-                                    // runtime state was restored — this one is
-                                    // worth a bug report, so keep it copyable.
-                                    appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
-                                } else {
-                                    val report = wipeReport(outcome)
-                                    if (report.clean) {
-                                        appState.presentTransient(R.string.toast_signed_out_and_wiped)
-                                    } else {
-                                        // The app-root sheet lists every
-                                        // incomplete stage. If local cleanup
-                                        // failed, AppState restored the active
-                                        // session instead of tearing it down.
-                                        appState.pendingWipeReport = report
-                                    }
-                                }
-                            } finally {
-                                appState.wipeInProgress = false
+            onConfirm = {
+                ui.wipeConfirm = false
+                ui.wipeConfirmInput = ""
+                // Run on the process-lifetime mutation scope, not this
+                // screen's rememberCoroutineScope. signOutAndWipeActiveAccount
+                // flips activeAccountRef partway through and keeps suspending
+                // (push teardown, notification refresh); the account-change nav
+                // reset in MainShell then pops AccountKeysScreen out of composition,
+                // which would cancel a screen-scoped coroutine before the wipe
+                // finishes and before the outcome is presented (#547).
+                //
+                // wipeInProgress (not signOutInProgress) drives the
+                // app-root staged progress sheet (#350), which survives
+                // that nav reset.
+                appState.wipeInProgress = true
+                appState.launchMutation {
+                    try {
+                        val outcome = appState.signOutAndWipeActiveAccount()
+                        if (outcome == null) {
+                            // Total FFI failure: nothing was wiped and the
+                            // runtime state was restored — this one is
+                            // worth a bug report, so keep it copyable.
+                            appState.present(R.string.toast_couldnt_wipe_account, copyable = true)
+                        } else {
+                            val report = wipeReport(outcome)
+                            if (report.clean) {
+                                appState.presentTransient(R.string.toast_signed_out_and_wiped)
+                            } else {
+                                // The app-root sheet lists every
+                                // incomplete stage. If local cleanup
+                                // failed, AppState restored the active
+                                // session instead of tearing it down.
+                                appState.pendingWipeReport = report
                             }
                         }
-                    },
-                    enabled = wipeConfirmed,
-                    modifier = Modifier.testTag("profile_keys.wipe_confirm"),
-                ) {
-                    Text(
-                        stringResource(R.string.wipe),
-                        color =
-                            if (wipeConfirmed) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            },
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        ui.wipeConfirm = false
-                        ui.wipeConfirmInput = ""
-                    },
-                ) {
-                    Text(stringResource(R.string.cancel))
+                    } finally {
+                        appState.wipeInProgress = false
+                    }
                 }
             },
         )
     }
+}
+
+/** Stateless typed confirmation; the account screen retains input and the destructive mutation scope. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ProfileKeyWipeConfirmationDialog(
+    input: String,
+    onInputChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val confirmKeyword = stringResource(R.string.sign_out_and_wipe_confirm_keyword)
+    val wipeConfirmed = input.trim().equals(confirmKeyword, ignoreCase = true)
+    WhiteNoiseAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.sign_out_and_wipe_confirm_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(stringResource(R.string.sign_out_and_wipe_confirm_body))
+                Text(
+                    stringResource(R.string.sign_out_and_wipe_confirm_instruction, confirmKeyword),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = onInputChange,
+                    label = { Text(stringResource(R.string.sign_out_and_wipe_confirm_field_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Characters,
+                            autoCorrectEnabled = false,
+                        ),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = wipeConfirmed,
+                modifier = Modifier.testTag("profile_keys.wipe_confirm"),
+            ) {
+                ProfileKeyActionLabel(
+                    stringResource(R.string.wipe),
+                    R.drawable.ic_delete,
+                    color =
+                        if (wipeConfirmed) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        },
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+            ) {
+                ProfileKeyActionLabel(stringResource(R.string.cancel), R.drawable.ic_close)
+            }
+        },
+    )
 }
 
 @StringRes
@@ -1337,7 +1404,7 @@ internal fun SignOutSheet(
                 Switch(checked = deleteKeyPackages, onCheckedChange = null)
             }
             Button(onClick = { onConfirm(deleteKeyPackages) }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Close, contentDescription = null)
+                Icon(painterResource(R.drawable.ic_logout), contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out))
             }
@@ -1364,7 +1431,7 @@ private fun SignOutAndWipeSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
+            Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
@@ -1496,7 +1563,7 @@ internal fun WipeOutcomeSheet(
             )
             report.stages.forEach { stage -> WipeOutcomeStageRow(stage) }
             Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.close))
+                ProfileKeyActionLabel(stringResource(R.string.close), R.drawable.ic_close)
             }
         }
     }
