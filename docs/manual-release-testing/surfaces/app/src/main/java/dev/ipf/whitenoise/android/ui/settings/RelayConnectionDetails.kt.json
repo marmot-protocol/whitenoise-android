@@ -1,0 +1,98 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:relay_connection_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_status",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_attempt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_attempt",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_connected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_connected",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_connecting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_connecting",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_offline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_offline",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_unknown",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_retry",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_retrying",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_retrying",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_connection_retry_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_connection_retry_failed",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_list_status_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "R.string.relay_list_status_unavailable",
+        "test_ids": [
+          "SYS-016"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "RelayConnectionDetails",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt",
+        "anchor": "fun RelayConnectionDetails(",
+        "test_ids": [
+          "SYS-016"
+        ]
+      }
+    ]
+  }
+}

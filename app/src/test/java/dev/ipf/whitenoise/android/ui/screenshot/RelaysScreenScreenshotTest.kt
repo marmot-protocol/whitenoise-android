@@ -1,18 +1,26 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.marmotkit.RelayLivenessFfi
+import dev.ipf.marmotkit.RelayStatusFfi
 import dev.ipf.whitenoise.android.ui.settings.AddRelaySheet
+import dev.ipf.whitenoise.android.ui.settings.RelayDetailsScreen
 import dev.ipf.whitenoise.android.ui.settings.RelaysContent
 import dev.ipf.whitenoise.android.ui.settings.RelaysUiState
+import dev.ipf.whitenoise.android.ui.settings.accountRelays
+import dev.ipf.whitenoise.android.ui.settings.projectRelayConnections
 import dev.ipf.whitenoise.android.ui.settings.relayLists
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -54,6 +62,30 @@ class RelaysScreenScreenshotTest {
         capture(darkTheme = true, amoled = false, name = "relay_settings_imported_concerns_dark.png", IMPORTED)
     }
 
+    /** The offline detail and reconnect action wrap with large text in RTL. */
+    @Test
+    fun offlineDetailRtlLargeText() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                WhiteNoiseTheme(darkTheme = false, amoled = false, fontScale = 2f) {
+                    val relay = accountRelays(DEFAULT_LISTS).first()
+                    RelayDetailsScreen(
+                        relay = relay,
+                        lists = DEFAULT_LISTS,
+                        busy = false,
+                        onBack = {},
+                        onSetRole = { _, _ -> },
+                        onRemove = {},
+                        connection = RelayLivenessFfi(relay.url, RelayStatusFfi.OFFLINE, null, null),
+                        onReconnect = {},
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithText("Reconnect").assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/relay_settings_offline_detail_rtl_large.png")
+    }
+
     /** Add Relay keeps its sheet visible and replaces the submit label while publication is in flight. */
     @Test
     fun addRelayLoading() {
@@ -85,7 +117,10 @@ class RelaysScreenScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 RelaysContent(
-                    state = RelaysUiState(lists = lists),
+                    state = RelaysUiState(
+                        lists = lists,
+                        connections = projectRelayConnections(accountRelays(lists).map { it.url }, emptyMap(), CONNECTIONS),
+                    ),
                     onBack = {},
                     onOpenRelay = {},
                     onAdd = {},
@@ -99,6 +134,12 @@ class RelaysScreenScreenshotTest {
     }
 
     private companion object {
+        val CONNECTIONS =
+            listOf(
+                RelayLivenessFfi("wss://relay.example.com", RelayStatusFfi.CONNECTED, null, null),
+                RelayLivenessFfi("wss://relay.us.whitenoise.chat", RelayStatusFfi.CONNECTING, null, null),
+                RelayLivenessFfi("wss://inbox.example.com", RelayStatusFfi.OFFLINE, null, null),
+            )
         val DEFAULT_LISTS =
             relayLists(
                 nip65 = listOf("wss://relay.example.com", "wss://relay.us.whitenoise.chat"),
