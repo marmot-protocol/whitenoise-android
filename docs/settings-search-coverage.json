@@ -607,6 +607,10 @@
         {
           "declaration": "\"refresh\"",
           "represented_by": "Developer.quarantined_groups"
+        },
+        {
+          "declaration": "\"reopen\"",
+          "represented_by": "Developer.quarantined_groups"
         }
       ]
     },
