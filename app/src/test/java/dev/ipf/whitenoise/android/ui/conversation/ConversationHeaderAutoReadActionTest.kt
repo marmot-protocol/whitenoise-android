@@ -180,7 +180,10 @@ class ConversationHeaderAutoReadActionTest {
     @Test
     fun offPreservesAnotherConversationsSpeech() = assertManualStop(paused = false, sameGroup = false)
 
-    private fun assertManualStop(paused: Boolean, sameGroup: Boolean) {
+    private fun assertManualStop(
+        paused: Boolean,
+        sameGroup: Boolean,
+    ) {
         rule.runOnIdle {
             app.ttsController.attachEngine(FakeSessionEngine())
             app.setConversationAutoReadOverride(group, TtsAutoReadOverride.ON)
@@ -203,6 +206,9 @@ class ConversationHeaderAutoReadActionTest {
     private object NoOpDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
 
-        override fun write(key: String, value: String?) = Unit
+        override fun write(
+            key: String,
+            value: String?,
+        ) = Unit
     }
 }

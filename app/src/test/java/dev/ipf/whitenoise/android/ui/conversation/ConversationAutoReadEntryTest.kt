@@ -116,6 +116,7 @@ class ConversationAutoReadEntryTest {
     private fun publish(id: String) {
         val field =
             ConversationController::class.java.getDeclaredField("timeline\$delegate").apply { isAccessible = true }
+
         @Suppress("UNCHECKED_CAST")
         val timeline = field.get(controller) as MutableState<List<TimelineMessage>>
         timeline.value =
@@ -132,6 +133,9 @@ class ConversationAutoReadEntryTest {
     private object NoOpDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
 
-        override fun write(key: String, value: String?) = Unit
+        override fun write(
+            key: String,
+            value: String?,
+        ) = Unit
     }
 }
