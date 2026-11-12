@@ -407,19 +407,10 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      # Build the measurement APK pair once, before the emulator competes for CPU;
-      # every scenario below reinstalls this same pair instead of re-running Gradle.
-      - name: Build fixture APKs once
-        env:
-          DISTRIBUTION: ${{ matrix.distribution }}
-        run: |
-          ./gradlew --init-script scripts/media-latency.init.gradle \
-            ":app:assembleDev${DISTRIBUTION}Debug" ":app:assembleDev${DISTRIBUTION}DebugAndroidTest" --no-daemon
       - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           # A PR whose fixture inputs are only the video-metadata scenario's runs that scenario alone.
           FIXTURE_SCOPE: ${{ needs.changes.outputs.attachment_fixture_scope }}
-          WN_FIXTURE_APKS_PREBUILT: '1'
         with:
           api-level: 34
           target: google_apis

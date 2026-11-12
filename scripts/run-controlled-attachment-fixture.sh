@@ -22,11 +22,8 @@ case "$serial" in emulator-*) ;; *) echo 'Disposable emulator required' >&2; exi
 case "$distribution" in Play|Zapstore) ;; *) echo 'Invalid distribution' >&2; exit 2 ;; esac
 [[ "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r\n')" == 1 ]] || exit 2
 
-# CI builds the pair once before booting the emulator; each scenario still installs it.
-if [[ "${WN_FIXTURE_APKS_PREBUILT:-0}" != 1 ]]; then
-  ./gradlew --init-script scripts/media-latency.init.gradle \
-    ":app:assembleDev${distribution}Debug" ":app:assembleDev${distribution}DebugAndroidTest" --no-daemon
-fi
+./gradlew --init-script scripts/media-latency.init.gradle \
+  ":app:assembleDev${distribution}Debug" ":app:assembleDev${distribution}DebugAndroidTest" --no-daemon
 app_apks=(app/build/outputs/apk/dev"$distribution"/debug/*-universal-debug.apk)
 test_apks=(app/build/outputs/apk/androidTest/dev"$distribution"/debug/*.apk)
 [[ ${#app_apks[@]} == 1 && ${#test_apks[@]} == 1 ]] || exit 2
