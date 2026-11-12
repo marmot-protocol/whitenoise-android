@@ -111,7 +111,7 @@ class RawAvTimingTest {
     fun pausedSeekAcknowledgesOnlyTheCompletedCurrentAttempt() {
         val completion =
             com.google.common.util.concurrent.SettableFuture
-                .create<Void>()
+                .create<Void?>()
         val request = RawAvPausedSeekRequest(RawAvPosterTarget(RawAvGeneration(4, 2), 1250), completion)
         assertFalse(completion.isDone)
         request.finish(true) // Current refusal is also an ended attempt, without a fabricated poster.
@@ -119,7 +119,7 @@ class RawAvTimingTest {
         assertFalse(completion.isCancelled)
         val stale =
             com.google.common.util.concurrent.SettableFuture
-                .create<Void>()
+                .create<Void?>()
         RawAvPausedSeekRequest(request.target, stale).finish(false)
         assertTrue(stale.isCancelled)
     }

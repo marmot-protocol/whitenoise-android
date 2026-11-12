@@ -88,7 +88,7 @@ internal class RawAvPlaybackEngine(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val signal = Channel<Unit>(Channel.CONFLATED)
     private val epoch = owners.epoch()
-    private var prepared = SettableFuture.create<Void>()
+    private var prepared = SettableFuture.create<Void?>()
     private var preparationRequested = false
     private var prepareGeneration = 0L
     private var prepareJobGeneration = -1L
@@ -105,7 +105,7 @@ internal class RawAvPlaybackEngine(
     private var activation = 0L
     private var revision = 0L
     private var seekRevision = 0L
-    private var pendingSeek: SettableFuture<Void>? = null
+    private var pendingSeek: SettableFuture<Void?>? = null
     private var targetUs = 0L
     private var pausedUs = 0L
     private var durationUs = 0L
@@ -215,7 +215,7 @@ internal class RawAvPlaybackEngine(
     }
 
     /** Paused preparation displays a poster without reserving a live playback worker. */
-    fun prepare(): ListenableFuture<Void> =
+    fun prepare(): ListenableFuture<Void?> =
         synchronized(lock) {
             if (!current()) {
                 prepared.setException(IOException("Media source owner retired"))
@@ -267,7 +267,7 @@ internal class RawAvPlaybackEngine(
      */
     private fun preparationCurrent(
         generation: Long,
-        completion: SettableFuture<Void>,
+        completion: SettableFuture<Void?>,
     ): Boolean = current() && preparationRequested && prepareGeneration == generation && prepared === completion
 
     /**
@@ -275,7 +275,7 @@ internal class RawAvPlaybackEngine(
      * Stale generations cannot update presentation; optional probe refusal still allows explicit playback.
      */
     @Suppress("TooGenericExceptionCaught") // A refused optional poster does not disable explicit playback.
-    private fun probe(generation: Long, completion: SettableFuture<Void>) {
+    private fun probe(generation: Long, completion: SettableFuture<Void?>) {
         var poster: Bitmap? = null
         try {
             val requested =
@@ -335,7 +335,7 @@ internal class RawAvPlaybackEngine(
      */
     private fun finishRefusedProbe(
         generation: Long,
-        completion: SettableFuture<Void>,
+        completion: SettableFuture<Void?>,
     ) {
         synchronized(lock) {
             if (preparationCurrent(generation, completion)) finishPreparation(completion) else completion.cancel(false)
@@ -347,7 +347,7 @@ internal class RawAvPlaybackEngine(
      * Explicit video can admit its raw stream before optional metadata; opened() supplies authoritative layout.
      * Caller holds the engine lock and has checked the exact preparation promise.
      */
-    private fun finishPreparation(completion: SettableFuture<Void>) {
+    private fun finishPreparation(completion: SettableFuture<Void?>) {
         headerReady = true
         status = if (playIntent) Status.Buffering else Status.Ready
         completion.set(null)
@@ -363,7 +363,7 @@ internal class RawAvPlaybackEngine(
         val matching = synchronized(frameLock) { lastBitmap != null && lastBitmapSeek == seekRevision }
         if (wantVideo && !matching) {
             pendingSeek?.cancel(false)
-            val completion = SettableFuture.create<Void>()
+            val completion = SettableFuture.create<Void?>()
             pendingSeek = completion
             dispatchPausedSeek(completion)
         }
@@ -478,8 +478,8 @@ internal class RawAvPlaybackEngine(
      * Supersedes the pending seek and advances its generation before dispatching playback or paused work.
      * Returns the exact request promise; retired ownership fails that promise without admitting work.
      */
-    fun seekToAsync(positionMs: Long): ListenableFuture<Void> {
-        val completion = SettableFuture.create<Void>()
+    fun seekToAsync(positionMs: Long): ListenableFuture<Void?> {
+        val completion = SettableFuture.create<Void?>()
         synchronized(lock) {
             if (!current()) {
                 completion.setException(IOException("Media source owner retired"))
@@ -503,7 +503,7 @@ internal class RawAvPlaybackEngine(
     /**
      * Queues a generation-bound video poster attempt, or immediately acknowledges an audio-only paused seek.
      */
-    private fun dispatchPausedSeek(completion: SettableFuture<Void>) {
+    private fun dispatchPausedSeek(completion: SettableFuture<Void?>) {
         if (wantVideo) {
             val target = RawAvPosterTarget(RawAvGeneration(activation, seekRevision), targetUs / 1000)
             pausedPoster.submit(RawAvPausedSeekRequest(target, completion))

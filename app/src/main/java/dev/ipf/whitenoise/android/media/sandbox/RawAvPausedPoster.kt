@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 /** A paused seek acknowledges its bounded attempt; a refused attempt never invents a new frame. */
 internal class RawAvPausedSeekRequest(
     val target: RawAvPosterTarget,
-    val completion: SettableFuture<Void>,
+    val completion: SettableFuture<Void?>,
 ) {
     /**
      * Completes the exact seek future on acceptance or cancels it on refusal without interruption.

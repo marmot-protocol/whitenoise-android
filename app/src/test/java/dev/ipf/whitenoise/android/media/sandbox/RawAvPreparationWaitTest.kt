@@ -284,7 +284,7 @@ class RawAvPreparationWaitTest {
         seek: Long,
         positionMs: Long,
     ): RawAvPausedSeekRequest {
-        val completion = SettableFuture.create<Void>()
+        val completion = SettableFuture.create<Void?>()
         setField(engine, "seekRevision", seek)
         setField(engine, "targetUs", positionMs * 1000)
         setField(engine, "pausedUs", positionMs * 1000)
