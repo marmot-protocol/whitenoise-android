@@ -27,10 +27,11 @@ internal fun WhiteNoiseAppState.relayLiveness(
                     subscription = marmotOrNull()?.subscribeRelayLiveness(account)
                 }
             }
-            val active = subscription ?: run {
-                emit(null)
-                return@flow
-            }
+            val active =
+                subscription ?: run {
+                    emit(null)
+                    return@flow
+                }
             currentCoroutineContext().ensureActive()
             if (ownsRelayConnection(account, generation)) emit(active.snapshot())
             while (ownsRelayConnection(account, generation)) {
@@ -52,8 +53,7 @@ internal fun WhiteNoiseAppState.relayLiveness(
     }.catch { failure ->
         if (failure !is Exception) throw failure
         emit(null)
-    }
-        .flowOn(Dispatchers.IO)
+    }.flowOn(Dispatchers.IO)
 
 /** Resolve configured spellings and dial policy with the same parser that supplies the live stream. */
 internal suspend fun WhiteNoiseAppState.classifyRelayConnections(

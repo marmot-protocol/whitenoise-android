@@ -131,9 +131,10 @@ internal fun RelaysScreen(
 
     val relays = remember(lists) { lists?.let(::accountRelays).orEmpty() }
     val urls = remember(relays) { relays.map(AccountRelay::url) }
-    val connections = key(appState, account, feedbackRuntime) {
-        if (account == null) emptyMap() else rememberRelayConnections(appState, account, feedbackRuntime, urls)
-    }
+    val connections =
+        key(appState, account, feedbackRuntime) {
+            if (account == null) emptyMap() else rememberRelayConnections(appState, account, feedbackRuntime, urls)
+        }
     selectedUrl?.let { url ->
         val relay = relays.firstOrNull { it.url == url }
         if (relay == null) {
@@ -148,15 +149,16 @@ internal fun RelaysScreen(
                 busy = busy,
                 connection = liveness,
                 reconnectState = operations.reconnectState(feedbackRuntime, url),
-                onReconnect = if (account != null && connection?.allowed == true && liveness != null) {
-                    {
-                        operations.reconnect(appState::launchMutation, feedbackRuntime, url) {
-                            appState.retryRelayConnection(account, feedbackRuntime, liveness.url)
+                onReconnect =
+                    if (account != null && connection?.allowed == true && liveness != null) {
+                        {
+                            operations.reconnect(appState::launchMutation, feedbackRuntime, url) {
+                                appState.retryRelayConnection(account, feedbackRuntime, liveness.url)
+                            }
                         }
-                    }
-                } else {
-                    null
-                },
+                    } else {
+                        null
+                    },
                 onBack = { selectedUrl = null },
                 onSetRole = { role, enabled ->
                     runEdit {
@@ -631,7 +633,9 @@ private fun AccountRelay.displayAttention(connection: RelayConnection?): RelayAd
     if (restrictedForEditing(connection)) RelayAddressAttention.None else attention
 
 /** An imported address allowed by MDK may still be dropped by the existing list editor. */
-private fun AccountRelay.restrictedForEditing(connection: RelayConnection?): Boolean =
-    needsAttention && connection?.allowed == true
+private fun AccountRelay.restrictedForEditing(connection: RelayConnection?): Boolean {
+    val nativeAllowsConnection = connection?.allowed == true
+    return needsAttention && nativeAllowsConnection
+}
 
 private val RelayProgressSize = 20.dp

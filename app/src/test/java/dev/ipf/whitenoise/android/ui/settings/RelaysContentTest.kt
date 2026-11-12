@@ -143,7 +143,11 @@ class RelaysContentTest {
 
         composeRule.runOnIdle { showDetails.value = false }
         retry.assertDoesNotExist()
-        composeRule.onNodeWithTag("relays.row.$A").performScrollTo().assertIsEnabled().performClick()
+        composeRule
+            .onNodeWithTag("relays.row.$A")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
         composeRule
             .onNodeWithText(app.getString(R.string.relay_connection_retrying))
             .assertIsNotEnabled()
@@ -160,10 +164,11 @@ class RelaysContentTest {
         composeRule.onNodeWithText(app.getString(R.string.relay_connection_offline)).assertIsDisplayed()
         retry.assertIsEnabled()
         composeRule.runOnIdle {
-            connection.value = connection.value.copy(
-                status = RelayStatusFfi.CONNECTED,
-                lastAttemptUnix = 1_700_000_000uL,
-            )
+            connection.value =
+                connection.value.copy(
+                    status = RelayStatusFfi.CONNECTED,
+                    lastAttemptUnix = 1_700_000_000uL,
+                )
         }
         composeRule.onNodeWithText(app.getString(R.string.relay_connection_connected)).assertIsDisplayed()
         attempt.assertIsDisplayed()
@@ -197,11 +202,12 @@ class RelaysContentTest {
                     )
                 } else {
                     RelaysContent(
-                        state = RelaysUiState(
-                            lists = lists,
-                            busy = operations.busy,
-                            reconnecting = operations.reconnecting,
-                        ),
+                        state =
+                            RelaysUiState(
+                                lists = lists,
+                                busy = operations.busy,
+                                reconnecting = operations.reconnecting,
+                            ),
                         onBack = {},
                         onOpenRelay = { showDetails.value = true },
                         onAdd = {},
@@ -215,11 +221,19 @@ class RelaysContentTest {
     }
 
     /** Native fixture classification for an admitted address and its canonical spelling. */
-    private fun allowedEndpoint(endpoint: String, normalized: String): RelayEndpointClassificationFfi =
-        RelayEndpointClassificationFfi(endpoint, normalized, RelayEndpointPolicyFfi.ALLOWED)
+    private fun allowedEndpoint(
+        endpoint: String,
+        normalized: String,
+    ): RelayEndpointClassificationFfi {
+        val policy = RelayEndpointPolicyFfi.ALLOWED
+        return RelayEndpointClassificationFfi(endpoint, normalized, policy)
+    }
 
     /** Check the status in the accessible row that owns the configured URL. */
-    private fun assertConnection(url: String, statusRes: Int) {
+    private fun assertConnection(
+        url: String,
+        statusRes: Int,
+    ) {
         composeRule
             .onNodeWithTag("relays.row.$url")
             .performScrollTo()

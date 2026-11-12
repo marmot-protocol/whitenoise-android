@@ -93,9 +93,10 @@ internal fun RelayConnectionDetails(
         }
         connection?.lastAttemptUnix?.let { seconds ->
             row("connection_attempt") { context ->
-                val attempt = remember(seconds) {
-                    DateFormat.getDateTimeInstance().format(Date(seconds.toLong() * 1_000L))
-                }
+                val attempt =
+                    remember(seconds) {
+                        DateFormat.getDateTimeInstance().format(Date(seconds.toLong() * 1_000L))
+                    }
                 SettingsValue(context, stringResource(R.string.relay_connection_attempt), attempt)
             }
         }
@@ -105,11 +106,12 @@ internal fun RelayConnectionDetails(
                 SettingsAction(
                     context = context,
                     title = stringResource(title),
-                    subtitle = if (reconnectState == RelayReconnectState.Failed) {
-                        stringResource(R.string.relay_connection_retry_failed)
-                    } else {
-                        null
-                    },
+                    subtitle =
+                        if (reconnectState == RelayReconnectState.Failed) {
+                            stringResource(R.string.relay_connection_retry_failed)
+                        } else {
+                            null
+                        },
                     enabled = !busy && !retrying && onReconnect != null,
                     onClick = { onReconnect?.invoke() },
                 )

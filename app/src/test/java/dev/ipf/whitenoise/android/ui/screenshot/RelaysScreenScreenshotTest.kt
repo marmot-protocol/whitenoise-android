@@ -118,10 +118,11 @@ class RelaysScreenScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 RelaysContent(
-                    state = RelaysUiState(
-                        lists = lists,
-                        connections = projectRelayConnections(urls, emptyMap(), CONNECTIONS),
-                    ),
+                    state =
+                        RelaysUiState(
+                            lists = lists,
+                            connections = projectRelayConnections(urls, emptyMap(), CONNECTIONS),
+                        ),
                     onBack = {},
                     onOpenRelay = {},
                     onAdd = {},

@@ -196,8 +196,10 @@ internal class RelayOperationState {
     fun reconnectState(
         generation: Int,
         url: String,
-    ): RelayReconnectState =
-        reconnect?.takeIf { it.generation == generation && it.url == url }?.state ?: RelayReconnectState.Idle
+    ): RelayReconnectState {
+        val current = reconnect?.takeIf { it.generation == generation && it.url == url }
+        return current?.state ?: RelayReconnectState.Idle
+    }
 
     /** Claim one reconnect across settings visits so a still-queued MDK command cannot be issued again. */
     fun reconnect(
