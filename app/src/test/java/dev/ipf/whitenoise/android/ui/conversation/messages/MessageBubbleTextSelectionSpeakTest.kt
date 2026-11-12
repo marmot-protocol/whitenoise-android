@@ -461,12 +461,12 @@ class MessageBubbleTextSelectionSpeakTest {
         assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
     }
 
-    /** Double tap seeks inside active truncated message projection. */
+    /** Double tap seeks past the stored Markdown prefix in the full body during active read-aloud. */
     @Test
     fun doubleTapSeeksInsideActiveTruncatedMessageProjection() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
-        val item = timelineMessage("First sentence. Second sentence.", contentTokensTruncated = true)
+        val item = timelineMessage("First sentence. Second sentence.", tokenizedPrefix = "First sentence.")
         val controller = conversationController(appState)
         var actionMenuOpen by mutableStateOf(false)
 
@@ -1387,7 +1387,7 @@ class MessageBubbleTextSelectionSpeakTest {
     /** Builds a received timeline message with the given body and optionally truncated content tokens. */
     private fun timelineMessage(
         body: String,
-        contentTokensTruncated: Boolean = false,
+        tokenizedPrefix: String? = null,
     ): TimelineMessage {
         val messageId = "05" + "00".repeat(31)
         return TimelineMessage(
@@ -1401,11 +1401,11 @@ class MessageBubbleTextSelectionSpeakTest {
                     plaintext = body,
                     contentTokens =
                         MarkdownDocumentFfi(
-                            truncated = contentTokensTruncated,
+                            truncated = tokenizedPrefix != null,
                             blocks =
                                 listOf(
                                     MarkdownBlockFfi.Paragraph(
-                                        inlines = listOf(MarkdownInlineFfi.Text(body)),
+                                        inlines = listOf(MarkdownInlineFfi.Text(tokenizedPrefix ?: body)),
                                     ),
                                 ),
                             blankLinesBefore = byteArrayOf(),

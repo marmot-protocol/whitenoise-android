@@ -77,7 +77,7 @@ class MessageShowLessBehaviorTest {
             surface = surface.copy(item = item.copy(record = item.record.copy(plaintext = "Short edit")))
             menuOpen = true
         }
-        composeRule.onNodeWithText("Copy text").assertExists()
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
     }
 
@@ -106,7 +106,7 @@ class MessageShowLessBehaviorTest {
                 isActionMenuOpen = true,
             )
         }
-        composeRule.onNodeWithText("Copy text").assertExists()
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
     }
 
@@ -149,7 +149,7 @@ class MessageShowLessBehaviorTest {
         composeRule.setContent {
             SwipeTestBubbleHost(surface = surface, collapseLongMessages = false, isActionMenuOpen = true)
         }
-        composeRule.onNodeWithText("Copy text").assertExists()
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
     }
 }

@@ -18,7 +18,7 @@ name: reader-actions-cancel
 - assertVisible: "Maestro reader heading"
 - longPressOn:
     text: "Maestro reader heading"
-- assertVisible: "Copy text"
+- assertVisible: "Copy"
 - back
 - assertVisible: "Maestro reader heading"
 - assertVisible:
