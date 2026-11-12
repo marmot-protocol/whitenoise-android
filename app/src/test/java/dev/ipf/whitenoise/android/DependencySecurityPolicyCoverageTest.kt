@@ -39,8 +39,8 @@ class DependencySecurityPolicyCoverageTest {
     fun gradleRaiseRejectAndReportAllApplyTheEdition() {
         assertTrue(
             "raising must keep the requested edition",
-            "details.useVersion(SecurityVersions.fixedVersion(details.requested.version, minimum, editions[coordinate]))" in
-                settings,
+            "details.useVersion(" +
+                "SecurityVersions.fixedVersion(details.requested.version, minimum, editions[coordinate]))" in settings,
         )
         assertTrue(
             "candidate rejection must compare the release without its edition",
@@ -54,7 +54,10 @@ class DependencySecurityPolicyCoverageTest {
             "a raise must never drop the edition and request a version Guava does not publish",
             "details.useVersion(minimum)" in settings,
         )
-        assertTrue("a malformed edition policy must fail the build", "Invalid dependency security edition policy" in settings)
+        assertTrue(
+            "a malformed edition policy must fail the build",
+            "Invalid dependency security edition policy" in settings,
+        )
     }
 
     @Test
