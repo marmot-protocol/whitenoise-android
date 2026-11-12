@@ -160,7 +160,10 @@ class TtsAutoReadWiringCoverageTest {
     fun headerShortcutRetainsOpenTimePolicyAndGuardsPrivatePlayback() {
         val effects = source("ui/conversation/ConversationTtsEffects.kt")
         assertFalse("Live-arrival behavior is a separate change", "val timelineFlow =" in effects)
-        assertTrue("Backlog commit must match its controller account", "appState.activeAccountRef == account" in effects)
+        assertTrue(
+            "Backlog commit must match its controller account",
+            "appState.activeAccountRef == account" in effects,
+        )
         assertTrue("Backlog must recheck eligibility at commit", "canCommit = ::canReadBacklog" in effects)
         val app = source("state/AppState.kt")
         assertTrue("Automatic admission must protect the microphone", "microphoneCaptureCoordinator.isHeld" in app)

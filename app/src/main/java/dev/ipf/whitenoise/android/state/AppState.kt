@@ -1905,8 +1905,8 @@ class WhiteNoiseAppState private constructor(
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
-        if (!canStartTtsAutoRead()) return false
-        val owner = ttsAutoReadKey(activeAccountRef, groupIdHex) ?: return false
+        val owner =
+            ttsAutoReadKey(activeAccountRef, groupIdHex)?.takeIf { canStartTtsAutoRead() } ?: return false
         val started = speakAloud(entries, locale, startSentenceIndex)
         if (started) {
             ttsAutoReadSessionKey = owner
@@ -2009,8 +2009,9 @@ class WhiteNoiseAppState private constructor(
 
     /** Uses runtime trust for the actual engine, not only the saved engine-selection preference. */
     internal fun ttsEngineRequiringConsent(): String? {
-        val resolution = ttsResolution ?: return null
-        val enginePackage = ttsPlaybackEnginePackage ?: return null
+        val resolution = ttsResolution
+        val enginePackage = ttsPlaybackEnginePackage
+        if (resolution == null || enginePackage == null) return null
         val trust =
             resolution.handle?.trust
                 ?: resolution.engines.firstOrNull { it.packageName == enginePackage }?.trust
