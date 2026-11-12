@@ -12,8 +12,10 @@ import java.nio.file.LinkOption
 import java.nio.file.StandardOpenOption
 
 /** A single selected audit file retains its original JSONL format. */
-internal fun auditLogExportMimeType(file: File): String =
-    if (file.extension == "jsonl") AUDIT_LOG_JSONL_MIME_TYPE else AUDIT_LOG_ARCHIVE_MIME_TYPE
+internal fun auditLogExportMimeType(file: File): String {
+    val singleFile = file.extension == "jsonl"
+    return if (singleFile) AUDIT_LOG_JSONL_MIME_TYPE else AUDIT_LOG_ARCHIVE_MIME_TYPE
+}
 
 /** Lists nonempty Marmot forensics files newest first. Key-reveal records have a separate purpose. */
 internal fun auditLogExportCandidates(files: List<AuditLogFileFfi>): List<AuditLogFileFfi> =
@@ -22,8 +24,12 @@ internal fun auditLogExportCandidates(files: List<AuditLogFileFfi>): List<AuditL
         .sortedWith(compareByDescending<AuditLogFileFfi> { it.modifiedAtMs }.thenBy { it.path })
 
 /** Fetches the current on-device file inventory from MarmotKit. */
-internal suspend fun WhiteNoiseAppState.listAuditLogExportCandidates(): List<AuditLogFileFfi> =
-    marmotIo { auditLogExportCandidates(auditLogFiles()) }
+internal suspend fun WhiteNoiseAppState.listAuditLogExportCandidates(): List<AuditLogFileFfi> {
+    return marmotIo {
+        val files = auditLogFiles()
+        auditLogExportCandidates(files)
+    }
+}
 
 /** Revalidates the selected paths so a stale or partial selection can never be silently exported. */
 internal suspend fun WhiteNoiseAppState.stageSelectedAuditLogs(selectedPaths: Set<String>): File {

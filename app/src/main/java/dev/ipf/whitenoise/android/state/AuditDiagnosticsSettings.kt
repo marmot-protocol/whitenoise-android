@@ -38,7 +38,12 @@ internal fun summarizeAuditDelivery(statuses: List<AuditDeliveryStatusV5Ffi>): A
     return AuditDeliverySummary(
         state = state,
         httpStatus = paused.mapNotNull { it.lastFailure?.httpStatus?.toInt() }.distinct().singleOrNull(),
-        lastSuccessAtMs = configured.mapNotNull { it.lastSuccessAtMs }.maxOrNull()?.coerceAtMost(Long.MAX_VALUE.toULong())?.toLong(),
+        lastSuccessAtMs =
+            configured
+                .mapNotNull { it.lastSuccessAtMs }
+                .maxOrNull()
+                ?.coerceAtMost(Long.MAX_VALUE.toULong())
+                ?.toLong(),
         waitingBytes =
             configured.fold(0L) { total, status ->
                 val bytes = status.backlog?.undeliveredBytes ?: 0uL

@@ -150,6 +150,7 @@ internal fun AuditRetentionRow(
     SettingsLink(
         context = context,
         title = label,
+        modifier = Modifier.testTag("audit.retention"),
         onClick = { if (current == null) onRefresh() else pickerOpen = true },
         value = current?.let { auditRetentionDays(it) },
         subtitle =
@@ -213,5 +214,7 @@ private fun ShorterAuditRetentionDialog(
 
 /** Formats the age using the app's resource locale. */
 @Composable
-private fun auditRetentionDays(days: UInt): String =
-    pluralStringResource(R.plurals.audit_retention_days, days.toInt(), days.toInt())
+private fun auditRetentionDays(days: UInt): String {
+    val quantity = days.toInt()
+    return pluralStringResource(R.plurals.audit_retention_days, quantity, quantity)
+}

@@ -170,6 +170,7 @@ internal fun DiagnosticsImprovementsScreen(
                         SettingsAction(
                             context = rowContext,
                             title = stringResource(R.string.choose_audit_files),
+                            modifier = Modifier.testTag("audit.files.open"),
                             subtitle = stringResource(R.string.choose_audit_files_subtitle),
                             onClick = { auditPickerOpen = true },
                             enabled = !auditLogsBusy && !exportInFlight,
@@ -374,12 +375,16 @@ private fun AuditLogExportFlow(
 /** Uses the staged file's type and basename for the system document picker. */
 private class CreateAuditExportDocument : ActivityResultContract<File, Uri?>() {
     /** Suggests the actual file name and MIME type to the document provider. */
-    override fun createIntent(context: Context, input: File): Intent =
-        ActivityResultContracts.CreateDocument(auditLogExportMimeType(input)).createIntent(context, input.name)
+    override fun createIntent(
+        context: Context,
+        input: File,
+    ): Intent = ActivityResultContracts.CreateDocument(auditLogExportMimeType(input)).createIntent(context, input.name)
 
     /** Returns the destination only when the user completed the system picker. */
-    override fun parseResult(resultCode: Int, intent: Intent?): Uri? =
-        intent?.data?.takeIf { resultCode == Activity.RESULT_OK }
+    override fun parseResult(
+        resultCode: Int,
+        intent: Intent?,
+    ): Uri? = intent?.data?.takeIf { resultCode == Activity.RESULT_OK }
 }
 
 /**

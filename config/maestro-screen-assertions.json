@@ -6484,26 +6484,78 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
       "symbol": "AuditRetentionRow",
-      "bindings": [],
-      "remaining": "Open Diagnostics on a fixture with local audit retention and assert the displayed age and chooser entry."
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "7 days"
+          },
+          "scope": "Open the production audit retention chooser and directly assert its seven-day option.",
+          "entry_assertion": {
+            "text": "7 days"
+          },
+          "opened_by": {
+            "id": "audit.retention"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
       "symbol": "ShorterAuditRetentionDialog",
-      "bindings": [],
-      "remaining": "Select a shorter age and directly assert the destructive confirmation and cancellation behavior."
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "Delete older audit logs\\?"
+          },
+          "scope": "Selecting seven days from the fresh fixture's thirty-day default opens the destructive confirmation. Cancel without writing.",
+          "entry_assertion": {
+            "text": "Delete older audit logs\\?"
+          },
+          "opened_by": {
+            "text": "7 days"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SelectAuditLogExportDialog.kt",
       "symbol": "AuditLogPickerDialog",
-      "bindings": [],
-      "remaining": "Provide synthetic local audit files and assert selection, empty and expired-file retry states."
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "Export"
+          },
+          "scope": "Assert the raw audit picker export control and cancel without exporting a file.",
+          "entry_assertion": {
+            "text": "Choose Audit Files"
+          },
+          "opened_by": {
+            "id": "audit.files.open"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SelectAuditLogExportDialog.kt",
       "symbol": "SelectAuditLogExportDialog",
-      "bindings": [],
-      "remaining": "Open Choose Audit Files through Diagnostics and assert that it loads the fixture's local files."
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "Choose Audit Files"
+          },
+          "scope": "Open the production raw audit picker through Diagnostics and assert the dialog entry.",
+          "entry_assertion": {
+            "text": "Choose Audit Files"
+          },
+          "opened_by": {
+            "id": "audit.files.open"
+          }
+        }
+      ]
     }
   ]
 }

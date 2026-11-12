@@ -156,7 +156,9 @@ private fun AuditLogPickerRow(
             val dateTime =
                 file.modifiedAtMs?.let {
                     val date = Date(it.toLong())
-                    "${DateFormat.getMediumDateFormat(context).format(date)} ${DateFormat.getTimeFormat(context).format(date)}"
+                    val day = DateFormat.getMediumDateFormat(context).format(date)
+                    val time = DateFormat.getTimeFormat(context).format(date)
+                    "$day $time"
                 }
             val size = Formatter.formatShortFileSize(context, file.sizeBytes.toLong()).replace(' ', '\u00a0')
             listOfNotNull(dateTime, size).joinToString(" · ")
@@ -173,7 +175,12 @@ private fun AuditLogPickerRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text(file.fileName, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.MiddleEllipsis)
+            Text(
+                file.fileName,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.MiddleEllipsis,
+            )
         }
         Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
     }
