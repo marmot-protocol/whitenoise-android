@@ -24,6 +24,33 @@ internal object IsolatedMediaDecoder {
     @Volatile internal var lastAvIsolation: WorkerIsolation? = null
         private set
 
+    /** The latest still-image receipt alone, which animation and A/V receipts never overwrite. */
+    @Volatile internal var lastStillImageIsolation: WorkerIsolation? = null
+        private set
+
+    // Observation only (#3722): how many still-image requests reached an isolated worker, and how many replies
+    // carried a receipt. A device test reads both around one operation to tie its evidence to that operation.
+    private val workerDispatches =
+        java.util.concurrent.atomic
+            .AtomicLong()
+    private val workerReceipts =
+        java.util.concurrent.atomic
+            .AtomicLong()
+
+    /** Still-image requests sent to an isolated worker so far. */
+    internal val dispatchCount: Long get() = workerDispatches.get()
+
+    /**
+     * Isolation receipts accepted from still-image workers so far. Animation and A/V receipts are not counted.
+     * Concurrent still-image work on another thread would still mix into one operation's deltas.
+     */
+    internal val receiptCount: Long get() = workerReceipts.get()
+
+    /** Counts one request handed to an isolated worker; never changes routing. */
+    internal fun recordDispatch() {
+        workerDispatches.incrementAndGet()
+    }
+
     /** Stores the attested automatic A/V isolation receipt without treating it as device qualification. */
     internal fun recordAvIsolation(result: android.os.Bundle) {
         lastAvIsolation = isolationReceipt(result)
@@ -32,6 +59,15 @@ internal object IsolatedMediaDecoder {
     /** Stores the latest accepted isolation receipt for diagnostics without granting a new source capability. */
     internal fun recordIsolation(result: android.os.Bundle) {
         lastIsolation = isolationReceipt(result)
+    }
+
+    /** Stores a still-image worker's receipt and counts it for per-operation evidence. */
+    internal fun recordStillImageIsolation(result: android.os.Bundle) {
+        // One parsed value for both fields, so an animation or A/V receipt cannot land in between.
+        val receipt = isolationReceipt(result)
+        lastIsolation = receipt
+        lastStillImageIsolation = receipt
+        workerReceipts.incrementAndGet()
     }
 
     /** Returns the retained diagnostic receipt rather than probing or parsing another source. */

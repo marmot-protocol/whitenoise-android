@@ -83,7 +83,7 @@ internal class ReusableMediaTransport(
                         }
                     if (!closed && pending === current && current.completed.compareAndSet(false, true)) {
                         current.result = result
-                        result?.let(IsolatedMediaDecoder::recordIsolation)
+                        result?.let(IsolatedMediaDecoder::recordStillImageIsolation)
                         current.ready.countDown()
                     }
                     return true
@@ -301,6 +301,7 @@ internal class ReusableMediaTransport(
                 },
             )
             requestDispatched = true
+            IsolatedMediaDecoder.recordDispatch()
             if (!reply.ready.await(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) {
                 retireCurrentWorker()
                 return null

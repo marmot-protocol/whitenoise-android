@@ -40,8 +40,8 @@ internal fun offlineRecoveryLatencyReport(samples: List<NotificationNetworkRecov
     return OfflineRecoveryLatencyReport(completedGenerations.size, phaseLatencies)
 }
 
-/** Calculates nearest-rank percentiles for a non-empty phase sample. */
-private fun phaseLatency(samples: List<Long>): OfflineRecoveryPhaseLatency {
+/** Calculates nearest-rank percentiles for a non-empty latency sample, such as one phase or the controlled message. */
+internal fun phaseLatency(samples: List<Long>): OfflineRecoveryPhaseLatency {
     require(samples.isNotEmpty())
     val ordered = samples.sorted()
     return OfflineRecoveryPhaseLatency(
