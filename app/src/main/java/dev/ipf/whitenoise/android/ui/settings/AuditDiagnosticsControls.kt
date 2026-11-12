@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AuditDeliveryState
+import dev.ipf.whitenoise.android.state.AuditDeliverySummary
 import dev.ipf.whitenoise.android.state.AuditDiagnosticsSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.auditRetentionChoices
@@ -55,7 +56,6 @@ internal fun AuditDeliverySection(
     onRefresh: () -> Unit,
     onResume: () -> Unit,
 ) {
-    val context = LocalContext.current
     val delivery = settings.delivery?.getOrNull()
     val status = stringResource(auditDeliveryLabel(delivery?.state, settings.delivery?.isFailure == true))
     val enabled = !consentBusy && !settings.resumingDelivery
@@ -67,24 +67,7 @@ internal fun AuditDeliverySection(
                 value = listOfNotNull(status, delivery?.httpStatus?.let { "HTTP $it" }).joinToString(" · "),
             )
         }
-        if (delivery != null && delivery.state != AuditDeliveryState.OFF && delivery.state != AuditDeliveryState.UNCONFIGURED) {
-            row("audit_last_success") { rowContext ->
-                val lastCheck =
-                    delivery.lastSuccessAtMs?.let {
-                        DateUtils.formatDateTime(context, it, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME)
-                    } ?: stringResource(R.string.download_never)
-                SettingsValue(rowContext, stringResource(R.string.audit_delivery_last_success), lastCheck)
-            }
-        }
-        if (delivery != null && delivery.waitingBytes > 0L) {
-            row("audit_delivery_backlog") { rowContext ->
-                SettingsValue(
-                    rowContext,
-                    stringResource(R.string.audit_delivery_waiting),
-                    Formatter.formatShortFileSize(context, delivery.waitingBytes),
-                )
-            }
-        }
+        auditDeliveryMetadata(delivery)
         if (delivery?.state == AuditDeliveryState.PAUSED) {
             row("audit_resume_delivery") { rowContext ->
                 SettingsAction(
@@ -105,6 +88,33 @@ internal fun AuditDeliverySection(
             row("audit_refresh_delivery") { rowContext ->
                 SettingsAction(rowContext, stringResource(R.string.refresh), onRefresh, enabled = enabled)
             }
+        }
+    }
+}
+
+/** Adds the measured delivery time and backlog when MDK reports them. */
+private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySummary?) {
+    if (delivery == null) return
+    if (delivery.state != AuditDeliveryState.OFF && delivery.state != AuditDeliveryState.UNCONFIGURED) {
+        row("audit_last_success") { rowContext ->
+            val lastCheck =
+                delivery.lastSuccessAtMs?.let {
+                    DateUtils.formatDateTime(
+                        LocalContext.current,
+                        it,
+                        DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME,
+                    )
+                } ?: stringResource(R.string.download_never)
+            SettingsValue(rowContext, stringResource(R.string.audit_delivery_last_success), lastCheck)
+        }
+    }
+    if (delivery.waitingBytes > 0L) {
+        row("audit_delivery_backlog") { rowContext ->
+            SettingsValue(
+                rowContext,
+                stringResource(R.string.audit_delivery_waiting),
+                Formatter.formatShortFileSize(LocalContext.current, delivery.waitingBytes),
+            )
         }
     }
 }

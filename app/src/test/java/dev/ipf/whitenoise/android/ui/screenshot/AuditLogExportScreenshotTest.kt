@@ -109,7 +109,13 @@ class AuditLogExportScreenshotTest {
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = darkTheme, fontScale = fontScale) {
                 Surface {
                     Column(modifier = Modifier.width(360.dp)) {
-                        AuditLogPickerDialog(Result.success(files), false, onDismiss = {}, onExport = onExport, onRetry = {})
+                        AuditLogPickerDialog(
+                            Result.success(files),
+                            false,
+                            onDismiss = {},
+                            onExport = onExport,
+                            onRetry = {},
+                        )
                     }
                 }
             }

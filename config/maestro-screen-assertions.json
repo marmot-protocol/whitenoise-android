@@ -6480,6 +6480,30 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+      "symbol": "AuditRetentionRow",
+      "bindings": [],
+      "remaining": "Open Diagnostics on a fixture with local audit retention and assert the displayed age and chooser entry."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+      "symbol": "ShorterAuditRetentionDialog",
+      "bindings": [],
+      "remaining": "Select a shorter age and directly assert the destructive confirmation and cancellation behavior."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SelectAuditLogExportDialog.kt",
+      "symbol": "AuditLogPickerDialog",
+      "bindings": [],
+      "remaining": "Provide synthetic local audit files and assert selection, empty and expired-file retry states."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SelectAuditLogExportDialog.kt",
+      "symbol": "SelectAuditLogExportDialog",
+      "bindings": [],
+      "remaining": "Open Choose Audit Files through Diagnostics and assert that it loads the fixture's local files."
     }
   ]
 }

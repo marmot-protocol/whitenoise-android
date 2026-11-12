@@ -161,7 +161,9 @@ internal fun DiagnosticsImprovementsScreen(
                             context = rowContext,
                             settings = auditDiagnostics,
                             onRefresh = { scope.launch { auditDiagnostics.refreshRetention() } },
-                            onChoose = { days, confirmed -> scope.launch { auditDiagnostics.chooseRetention(days, confirmed) } },
+                            onChoose = { days, confirmed ->
+                                scope.launch { auditDiagnostics.chooseRetention(days, confirmed) }
+                            },
                         )
                     }
                     row("select_audit_files") { rowContext ->
@@ -431,11 +433,17 @@ internal fun AuditLogExportDestinationDialog(
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (singleFile) R.string.export else R.string.export_audit_logs_destination_title)) },
+        title = {
+            Text(stringResource(if (singleFile) R.string.export else R.string.export_audit_logs_destination_title))
+        },
         text = {
             Text(
                 stringResource(
-                    if (singleFile) R.string.export_audit_logs_confirm_body else R.string.export_audit_logs_destination_body,
+                    if (singleFile) {
+                        R.string.export_audit_logs_confirm_body
+                    } else {
+                        R.string.export_audit_logs_destination_body
+                    },
                 ),
             )
         },

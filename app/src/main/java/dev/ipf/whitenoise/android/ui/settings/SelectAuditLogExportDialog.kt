@@ -125,7 +125,10 @@ internal fun AuditLogPickerDialog(
             } else {
                 TextButton(onClick = { onExport(selected) }, enabled = selected.isNotEmpty() && !exporting) {
                     if (exporting) {
-                        CircularProgressIndicator(modifier = Modifier.size(AuditLogPickerProgressSize), strokeWidth = 2.dp)
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(AuditLogPickerProgressSize),
+                            strokeWidth = 2.dp,
+                        )
                         Spacer(Modifier.width(WhiteNoiseSpacing.Related))
                     }
                     Text(stringResource(R.string.export))

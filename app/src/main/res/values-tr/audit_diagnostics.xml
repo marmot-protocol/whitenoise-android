@@ -16,6 +16,7 @@
     <string name="audit_retention_confirm_body">Günlükleri %1$s saklamak, henüz gönderilmemiş olanlar da dahil olmak üzere bu cihazdaki daha eski denetim günlüklerini siler.</string>
     <string name="audit_retention_confirm_action">Eski günlükleri sil</string>
     <plurals name="audit_retention_days">
+        <item quantity="one">%d gün</item>
         <item quantity="other">%d gün</item>
     </plurals>
 </resources>

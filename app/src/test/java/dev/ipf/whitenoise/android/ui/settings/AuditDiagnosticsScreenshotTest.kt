@@ -135,7 +135,8 @@ class AuditDiagnosticsScreenshotTest {
             )
         runBlocking { state.refreshSecurityPrivacySettings() }
         composeRule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides if (darkLarge) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            val layoutDirection = if (darkLarge) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
                 WhiteNoiseTheme(darkTheme = darkLarge, fontScale = if (darkLarge) 1.6f else 1f) {
                     DiagnosticsImprovementsScreen(state, onBack = {})
                 }

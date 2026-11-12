@@ -8361,7 +8361,9 @@ class WhiteNoiseAppState private constructor(
             saveRetention = { days, confirmedShortening ->
                 auditDiagnosticsIo(generation) {
                     val current = auditLogRetention()
-                    check(days >= current.maxAgeDays || confirmedShortening) { "Audit retention shortening requires confirmation" }
+                    check(days >= current.maxAgeDays || confirmedShortening) {
+                        "Audit retention shortening requires confirmation"
+                    }
                     if (days == current.maxAgeDays) current else setAuditLogRetention(current.copy(maxAgeDays = days))
                 }
             },
@@ -8376,11 +8378,8 @@ class WhiteNoiseAppState private constructor(
             },
             retryDelivery = {
                 auditDiagnosticsIo(generation) {
-                    if (
-                        auditUploadConsent.granted &&
-                        auditLogSettings().enabled &&
-                        auditDeliveryStatusV5().any { it.destinationConfigured && it.paused }
-                    ) {
+                    val sharingEnabled = auditUploadConsent.granted && auditLogSettings().enabled
+                    if (sharingEnabled && auditDeliveryStatusV5().any { it.destinationConfigured && it.paused }) {
                         postAuditLogTrackerUpdateV5()
                     }
                 }

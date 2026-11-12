@@ -51,7 +51,8 @@ private val auditRetentionAgePresets = setOf(1u, 3u, 7u, 14u, 30u)
 
 /** The Apple clients' age presets, including a valid custom value already stored by MDK. */
 internal fun auditRetentionChoices(current: UInt): List<UInt> =
-    (auditRetentionAgePresets + current.coerceIn(auditRetentionAgePresets.first(), auditRetentionAgePresets.last())).sorted()
+    (auditRetentionAgePresets + current.coerceIn(auditRetentionAgePresets.first(), auditRetentionAgePresets.last()))
+        .sorted()
 
 /** Screen state for one runtime generation. Reads serialize with writes for each independent setting. */
 internal class AuditDiagnosticsSettings(

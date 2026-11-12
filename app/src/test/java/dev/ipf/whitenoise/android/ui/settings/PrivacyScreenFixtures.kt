@@ -67,7 +67,6 @@ internal fun privacyMarmot(
     audit: PrivacyAuditFixture = PrivacyAuditFixture(),
 ): MarmotInterface {
     var decision = initialDecision
-    var auditSettings = AuditLogSettingsFfi(enabled = audit.enabled)
     return Proxy.newProxyInstance(
         MarmotInterface::class.java.classLoader,
         arrayOf(MarmotInterface::class.java),
@@ -111,34 +110,10 @@ internal fun privacyMarmot(
                     exportEnabled = false,
                     exportIntervalSeconds = 60uL,
                 )
-            "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments!!.first()
-            "auditLogSettings" -> auditSettings
-            "auditLogRetention" -> audit.retention
-            "setAuditLogRetention" -> {
-                audit.retention = arguments!!.first() as AuditLogRetentionFfi
-                audit.retentionWrites++
-                audit.retention
-            }
-            "auditDeliveryStatusV5" -> {
-                audit.deliveryReads++
-                audit.statuses
-            }
-            "postAuditLogTrackerUpdateV5" -> {
-                audit.resumeCalls++
-                if (audit.clearPauseOnResume) {
-                    audit.statuses = audit.statuses.map { it.copy(paused = false, consecutiveFailures = 0uL, lastFailure = null) }
-                }
-                AuditLogTrackerUpdateResultV5Ffi(true, emptyList(), null, null)
-            }
-            "setAuditLogSettings" -> {
-                beforeSave()
-                auditSettings = arguments!!.first() as AuditLogSettingsFfi
-                auditSettings
-            }
             "toString" -> "DevicePrivacyScreenshotMarmotFake"
             "hashCode" -> System.identityHashCode(proxy)
             "equals" -> proxy === arguments?.firstOrNull()
-            else -> error("Unexpected Marmot call: ${method.name}")
+            else -> audit.invoke(method.name, arguments, beforeSave)
         }
     } as MarmotInterface
 }
@@ -153,6 +128,43 @@ internal class PrivacyAuditFixture(
     @Volatile var retentionWrites = 0
     @Volatile var deliveryReads = 0
     @Volatile var resumeCalls = 0
+    private var auditSettings = AuditLogSettingsFfi(enabled = enabled)
+
+    /** Handles the audit subset of the fixture's Marmot interface. */
+    fun invoke(
+        method: String,
+        arguments: Array<out Any?>?,
+        beforeSave: () -> Unit,
+    ): Any? =
+        when (method) {
+            "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments!!.first()
+            "auditLogSettings" -> auditSettings
+            "auditLogRetention" -> retention
+            "setAuditLogRetention" -> {
+                retention = arguments!!.first() as AuditLogRetentionFfi
+                retentionWrites++
+                retention
+            }
+            "auditDeliveryStatusV5" -> {
+                deliveryReads++
+                statuses
+            }
+            "postAuditLogTrackerUpdateV5" -> {
+                resumeCalls++
+                if (clearPauseOnResume) {
+                    statuses = statuses.map {
+                        it.copy(paused = false, consecutiveFailures = 0uL, lastFailure = null)
+                    }
+                }
+                AuditLogTrackerUpdateResultV5Ffi(true, emptyList(), null, null)
+            }
+            "setAuditLogSettings" -> {
+                beforeSave()
+                auditSettings = arguments!!.first() as AuditLogSettingsFfi
+                auditSettings
+            }
+            else -> error("Unexpected Marmot call: $method")
+        }
 }
 
 /** Draft storage that never persists, so fixtures start clean. */

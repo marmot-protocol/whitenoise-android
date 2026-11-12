@@ -45,12 +45,8 @@ internal fun copyAuditSnapshot(
 ) {
     FileChannel.open(source.toPath(), StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS).use { input ->
         val length = input.size()
-        if (length == 0L) throw IOException("An audit log is empty")
+        validateAuditSnapshotTail(input, length)
         val buffer = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE)
-        buffer.limit(1)
-        if (input.read(buffer, length - 1) != 1 || buffer.get(0) != '\n'.code.toByte()) {
-            throw IOException("An audit log changed during export")
-        }
         var remaining = length
         while (remaining > 0) {
             buffer.clear()
@@ -60,5 +56,17 @@ internal fun copyAuditSnapshot(
             output.write(buffer.array(), 0, count)
             remaining -= count
         }
+    }
+}
+
+/** Rejects empty files and snapshots whose final JSONL record has not finished writing. */
+private fun validateAuditSnapshotTail(
+    input: FileChannel,
+    length: Long,
+) {
+    if (length == 0L) throw IOException("An audit log is empty")
+    val tail = ByteBuffer.allocate(1)
+    if (input.read(tail, length - 1) != 1 || tail.get(0) != '\n'.code.toByte()) {
+        throw IOException("An audit log changed during export")
     }
 }
