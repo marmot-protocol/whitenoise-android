@@ -5,9 +5,9 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 /**
  * The final validated reconnect that owns one offline-recovery cycle (#3723).
  * [generationBaseline] is the newest recovery generation before that reconnect, so earlier
- * flaps cannot supply the cycle's markers. [atMillis] is the monotonic time the platform delivered
- * validation of the restored network, the same signal production recovery starts from. Without that
- * signal it falls back to the last poll that found the device offline, which can only overstate latency.
+ * flaps cannot supply the cycle's markers. [atMillis] is the monotonic time the test process received
+ * its default network's VALIDATED callback. Without that callback it falls back to the last poll that
+ * found the device offline, which can only overstate latency.
  */
 internal data class OfflineReconnectEdge(
     val generationBaseline: Long,

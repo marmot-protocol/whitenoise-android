@@ -6,6 +6,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.HandlerThread
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.ComposeTimeoutException
@@ -148,8 +150,10 @@ class OfflineRecoveryLatencyDeviceTest {
      * Enables Wi-Fi, waits until Android validates the restored transport and returns the reconnect edge.
      * The edge is the monotonic time the platform delivered validation to this process, recorded by a
      * network callback independently of polling, so neither the poll interval nor a slow [whileOffline]
-     * observation is counted. The last poll that found the device offline is the fallback, which can only
-     * overstate latency. [whileOffline] runs on each poll that finds the device offline.
+     * observation is counted. The callback runs on its own thread, so the stamp does not wait behind the
+     * app's connectivity callbacks on the shared ConnectivityThread. The last poll that found the device
+     * offline is the fallback, used only if no callback arrives, and can only overstate latency.
+     * [whileOffline] runs on each poll that finds the device offline.
      */
     private fun restoreWifi(whileOffline: () -> Unit = {}): Long {
         val validatedAt = AtomicLong(0L)
@@ -165,7 +169,8 @@ class OfflineRecoveryLatencyDeviceTest {
                 }
             }
         var lastOfflineAt = SystemClock.elapsedRealtime()
-        connectivity.registerDefaultNetworkCallback(callback)
+        val callbackThread = HandlerThread("offline-recovery-edge").apply { start() }
+        connectivity.registerDefaultNetworkCallback(callback, Handler(callbackThread.looper))
         try {
             shell("svc wifi enable")
             val validated =
@@ -179,8 +184,11 @@ class OfflineRecoveryLatencyDeviceTest {
                     }
                 }
             assertTrue("Wi-Fi did not regain validated internet", validated)
+            // A poll can see validation just before the callback is delivered; give the callback a moment.
+            waitUntil(EDGE_CALLBACK_GRACE_MILLIS) { validatedAt.get() > 0L }
         } finally {
             connectivity.unregisterNetworkCallback(callback)
+            callbackThread.quitSafely()
         }
         return validatedAt.get().takeIf { it > 0L } ?: lastOfflineAt
     }
@@ -418,6 +426,7 @@ class OfflineRecoveryLatencyDeviceTest {
         const val RAPID_FLAP_MILLIS = 150L
         const val POLL_MILLIS = 50L
         const val MESSAGE_CEILING_MILLIS = 5_000L
+        const val EDGE_CALLBACK_GRACE_MILLIS = 1_000L
         const val DURABLE_QUERY_LIMIT = 500u
     }
 }
