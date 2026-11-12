@@ -127,11 +127,12 @@ internal fun ConversationTtsAutoReadEffects(
 ) {
     val lifecycleOwner = LocalContext.current.lifecycleOwner()
     // The shortcut changes future auto-read policy, not the backlog captured at chat entry.
-    val autoReadOnEntry = remember(controller, chatId) {
-        controller.boundAccountRef?.let {
-            appState.conversationAutoReadFor(it, controller.group.groupIdHex)
-        } == true
-    }
+    val autoReadOnEntry =
+        remember(controller, chatId) {
+            controller.boundAccountRef?.let {
+                appState.conversationAutoReadFor(it, controller.group.groupIdHex)
+            } == true
+        }
     var entryBacklogConsumed by remember(controller, chatId) { mutableStateOf(false) }
 
     suspend fun projectEntry(record: AppMessageRecordFfi) = projectConversationTtsEntry(appState, controller, record)
@@ -170,6 +171,7 @@ internal fun ConversationTtsAutoReadEffects(
         if (!autoReadOnEntry) return@LaunchedEffect
         val account = controller.boundAccountRef ?: return@LaunchedEffect
         val lifecycle = lifecycleOwner?.lifecycle ?: return@LaunchedEffect
+
         fun canReadBacklog(): Boolean =
             lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
                 appState.activeAccountRef == account &&
@@ -257,10 +259,12 @@ internal fun ConversationTtsAutoReadEffects(
         if (!appState.ttsHasUsableEngine) return@LaunchedEffect
         if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
         val account = controller.boundAccountRef ?: return@LaunchedEffect
+
         fun canReadResume(): Boolean =
             lifecycleOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true &&
                 appState.activeAccountRef == account &&
                 appState.isConversationAutoRead(controller.group.groupIdHex)
+
         if (!canReadResume()) return@LaunchedEffect
         val cursor = autoReadResumeCursor
         val entries =

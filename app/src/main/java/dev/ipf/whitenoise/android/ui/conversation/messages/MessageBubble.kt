@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.rememberTtsTrustAction
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardEligibility
@@ -1138,7 +1139,7 @@ internal fun MessageBubble(
                 }
             }
 
-    val requestTtsTrust = dev.ipf.whitenoise.android.audio.tts.rememberTtsTrustAction(appState)
+    val requestTtsTrust = rememberTtsTrustAction(appState)
 
     /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(

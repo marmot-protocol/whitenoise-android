@@ -2020,8 +2020,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Recheck the effective engine's consent and microphone lease before preparation and commit. */
-    private fun canStartTtsAutoRead(): Boolean =
-        !microphoneCaptureCoordinator.isHeld && ttsEngineRequiringConsent() == null
+    private fun canStartTtsAutoRead(): Boolean {
+        return !microphoneCaptureCoordinator.isHeld && ttsEngineRequiringConsent() == null
+    }
 
     /**
      * History paging for the read-aloud transport. The backing conversation
