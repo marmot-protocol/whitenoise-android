@@ -72,8 +72,10 @@ for the account's relays and nothing was changed
 block publish first, so nothing changes. The publishes get the same detail through
 `presentFailure`, which replaces its generic retry detail for this error only. Android caps
 profiles, relay lists and KeyPackages far below MDK's 64 KiB check, so that copy is
-unit-tested but cannot be produced from the UI; whether MDK keeps a relay-list edit locally
-after such a refusal is unverified. Sticker sync runs in the background and its failure
+unit-tested but cannot be produced from the UI. For those publishes the copy's "Nothing was
+changed" is only true of what was published: a KeyPackage refused for size stays prepared
+locally (`marmot-session/src/key_package.rs`), and whether MDK keeps a relay-list edit
+locally after such a refusal is unverified. Sticker sync runs in the background and its failure
 only marks the pack browser unreachable, so it gets no new copy; a sticker list over 64 KiB
 would need hundreds of packs. No generated
 binding is edited. Device-group and multi-device APIs stay unused and untouched.

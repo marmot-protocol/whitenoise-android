@@ -73,8 +73,9 @@ private fun startupReportFields(detail: String?): String {
 private const val MAX_STARTUP_COPY_FIELDS = 7
 
 /**
- * The detail shown for [throwable]. An account update every relay refused for size (a profile, relay list or
- * KeyPackage) replaces the generic retry copy, because retrying cannot help; a caller's specific detail is kept.
+ * The detail shown for [throwable]. An account update MDK withheld as too large for every relay's known limit (a
+ * profile, relay list or KeyPackage) replaces the generic retry copy, because retrying cannot help; a caller's
+ * specific detail is kept. Nothing was published, though a refused KeyPackage stays prepared locally.
  */
 internal fun failureDetail(
     throwable: Throwable,
