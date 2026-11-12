@@ -965,7 +965,6 @@
     <ID>ReturnCount:ContactShare.kt:internal fun parseSharedContactFromText: SharedContact?</ID>
     <ID>ReturnCount:ConversationController.kt:ConversationController$fun hasCachedAttachment: Boolean</ID>
     <ID>ReturnCount:ConversationController.kt:ConversationController$fun replyPreview: TimelineReplyDisplay?</ID>
-    <ID>ReturnCount:ConversationController.kt:ConversationController$private fun TimelineMessage.withOptimisticEditStatus: TimelineMessage</ID>
     <ID>ReturnCount:ConversationController.kt:ConversationController$private fun upsertProjectedRecord: AppMessageRecordFfi</ID>
     <ID>ReturnCount:ConversationController.kt:ConversationController$private suspend fun lookupMessageRecord: AppMessageRecordFfi?</ID>
     <ID>ReturnCount:ConversationController.kt:ConversationController$private suspend fun performMediaUpload</ID>

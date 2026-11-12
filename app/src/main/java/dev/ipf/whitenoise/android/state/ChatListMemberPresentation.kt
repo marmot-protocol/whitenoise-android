@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
@@ -183,3 +184,17 @@ internal fun memberRecordsFromIds(
                 local = memberIdHex.equals(activeAccountIdHex, ignoreCase = true),
             )
         }.toList()
+
+/** Shares roster-readiness classification across retained rows and off-window forward targets. */
+internal fun isDirectConversationRosterCandidate(
+    conversationKind: ChatConversationKindFfi?,
+    members: List<AppGroupMemberRecordFfi>,
+    name: String,
+): Boolean {
+    val memberCount = GroupProjector.uniqueMemberCount(members)
+    val unresolvedDirect =
+        conversationKind == ChatConversationKindFfi.UNKNOWN &&
+            memberCount <= 1 &&
+            GroupProjector.isUnnamed(name)
+    return unresolvedDirect || GroupProjector.isDm(conversationKind, memberCount, name)
+}

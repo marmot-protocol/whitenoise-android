@@ -13,7 +13,6 @@ import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
-import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowActionsFfi
@@ -1931,31 +1930,17 @@ class ChatsController private constructor(
             chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership?.isNonMember() == true ||
             groupRecordsById[groupIdHex]?.selfMembership?.isNonMember() == true
 
-    /**
-     * Whether the group should be treated as a direct conversation for roster
-     * readiness, including the unresolved case where the projection has not
-     * classified an unnamed low-headcount conversation yet. Shared by the
-     * initial-page and streaming gates so the two cannot drift — an earlier
-     * copy of this heuristic living in only one of them is what let a
-     * self-only DM roster be cached and pin an Unknown title.
-     */
+    /** Supplies retained-row identity to the shared roster-readiness classification. */
     private fun directConversationCandidateFor(
         groupIdHex: String,
         members: List<AppGroupMemberRecordFfi>,
     ): Boolean {
         val row = chatRowsByGroup[chatRowKey(groupIdHex)]
-        val memberCount = GroupProjector.uniqueMemberCount(members)
-        val groupName = row?.groupName ?: groupRecordsById[groupIdHex]?.name.orEmpty()
-        val unresolvedDirectConversation =
-            row?.conversationKind == ChatConversationKindFfi.UNKNOWN &&
-                memberCount <= 1 &&
-                GroupProjector.isUnnamed(groupName)
-        return unresolvedDirectConversation ||
-            GroupProjector.isDm(
-                conversationKind = row?.conversationKind,
-                memberCount = memberCount,
-                name = groupName,
-            )
+        return isDirectConversationRosterCandidate(
+            conversationKind = row?.conversationKind,
+            members = members,
+            name = row?.groupName ?: groupRecordsById[groupIdHex]?.name.orEmpty(),
+        )
     }
 
     private fun recordMemberDerivedLocalReadyIfComplete() {
@@ -4488,23 +4473,13 @@ class ChatsController private constructor(
         epoch: Long,
         cacheEpoch: Long,
     ) {
-        val count = GroupProjector.uniqueMemberCount(members)
-        val unresolvedDirect =
-            row.conversationKind == ChatConversationKindFfi.UNKNOWN &&
-                count <= 1 &&
-                GroupProjector.isUnnamed(row.groupName)
         applyFetchedMemberSnapshot(
             groupIdHex = row.groupIdHex,
             members = members,
             epoch = epoch,
             cacheEpoch = cacheEpoch,
             directConversationOverride =
-                unresolvedDirect ||
-                    GroupProjector.isDm(
-                        row.conversationKind,
-                        count,
-                        row.groupName,
-                    ),
+                isDirectConversationRosterCandidate(row.conversationKind, members, row.groupName),
             requestProfileRefresh = false,
         )
     }

@@ -9110,12 +9110,14 @@ class ConversationController(
         // own native publication and exact revision agree.
         optimisticEdits.entries
             .filter { (target, edit) ->
-                isConfirmedOptimisticEdit(target, edit, aggregated)
+                isConfirmedOptimisticEdit(edit, aggregated[target], timelineRecords[target])
             }.map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
             orderTimelineMessagesForDisplay(
-                (visible + streamDebugTimelineItems.values).map { it.withOptimisticEditStatus() },
+                (visible + streamDebugTimelineItems.values).map { message ->
+                    message.withOptimisticEditStatus(optimisticEdits[message.record.messageIdHex])
+                },
             )
         timelinePresentationIds.keys.retainAll(timeline.mapTo(HashSet()) { it.record.messageIdHex })
         // The optimistic→confirmed handoff snapshot is intentionally preserved;
@@ -9128,65 +9130,8 @@ class ConversationController(
         if (releaseOrphanedOptimisticSendPreserves()) {
             scheduleTimelinePositionSettlement()
         }
-        editsByTarget = applyOptimisticEdits(aggregated)
+        editsByTarget = applyOptimisticEdits(aggregated, optimisticEdits)
         signalForegroundSweepScheduleChanged()
-    }
-
-    private fun isConfirmedOptimisticEdit(
-        target: String,
-        edit: OptimisticEdit,
-        aggregated: Map<String, EditState>,
-    ): Boolean {
-        val confirmedWireEdit = aggregated[target]?.latestText == edit.text
-        val record = timelineRecords[target]
-        val confirmedNativeEdit =
-            edit.nativeEditMessageId != null &&
-                record?.edit?.latestEditMessageIdHex == edit.nativeEditMessageId &&
-                record.plaintext == edit.text
-        return edit.status == MessageStatus.Sent && (confirmedWireEdit || confirmedNativeEdit)
-    }
-
-    /**
-     * Overlay the optimistic edit text onto [aggregated] so the bubble renders
-     * the edited body immediately. A Pending/Sent overlay shows its text; a
-     * Failed overlay shows [OptimisticEdit.preEditText] (the revert target).
-     */
-    private fun applyOptimisticEdits(aggregated: Map<String, EditState>): Map<String, EditState> {
-        if (optimisticEdits.isEmpty()) return aggregated
-        val merged = LinkedHashMap(aggregated)
-        for ((target, edit) in optimisticEdits) {
-            val failed = edit.status == MessageStatus.Failed
-            val displayText = if (failed) edit.preEditText else edit.text
-            val base = merged[target]
-            when {
-                base != null -> merged[target] = base.copy(latestText = displayText)
-                // No real kind-1009 was accepted yet (null base). Synthesize an edit
-                // aggregate only for an applied overlay (Pending/Sent) so the bubble
-                // shows the optimistic body with an edited indicator. A Failed edit
-                // reverts to the original text and never accepted a kind-1009, so
-                // leave the target absent — no spurious "edited" badge.
-                !failed -> merged[target] = EditState(latestText = displayText, count = 1, versions = emptyList())
-            }
-        }
-        return merged
-    }
-
-    /**
-     * Surface an in-flight optimistic edit as the target bubble's status so the
-     * existing Sending indicator / Failed retry+discard row light up without a
-     * new affordance. Durable revisions can also override a pending original;
-     * a failed original keeps its own retry status until that send resolves.
-     */
-    private fun TimelineMessage.withOptimisticEditStatus(): TimelineMessage {
-        val edit = optimisticEdits[record.messageIdHex] ?: return this
-        val durablePending = edit.durableIntent != null && status == MessageStatus.Pending
-        if (status != MessageStatus.Sent && !durablePending) return this
-        val fromEdit = status == MessageStatus.Sent
-        return when (edit.status) {
-            MessageStatus.Pending -> copy(status = MessageStatus.Pending, statusFromEdit = fromEdit)
-            MessageStatus.Failed -> copy(status = MessageStatus.Failed, statusFromEdit = fromEdit)
-            else -> this
-        }
     }
 
     private fun nextOptimisticTimelineOrder(): ULong =
@@ -9852,7 +9797,7 @@ class ConversationController(
             // The new row sorts to the tail (highest recordedAt + timelineOrder),
             // so append it in place rather than re-sorting the whole timeline on
             // every stream update — the slot trick updateStreamPreview uses.
-            timeline = timeline + item.withOptimisticEditStatus()
+            timeline = timeline + item.withOptimisticEditStatus(optimisticEdits[item.record.messageIdHex])
         }
     }
 
