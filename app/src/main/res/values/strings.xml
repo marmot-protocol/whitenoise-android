@@ -706,6 +706,8 @@
     <string name="allow_chat_screenshots_subtitle">Blocks screenshots and Recents previews</string>
     <string name="audit_logs">Audit logs</string>
     <string name="audit_logs_settings_subtitle">Record and export diagnostic logs for your groups on this device</string>
+    <string name="choose_audit_files">Choose Audit Files</string>
+    <string name="choose_audit_files_subtitle">Save or share selected Marmot audit files</string>
     <string name="export_audit_logs">Export Diagnostic Logs</string>
     <string name="export_audit_logs_subtitle">Save or share this device’s diagnostic logs as one archive</string>
     <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>

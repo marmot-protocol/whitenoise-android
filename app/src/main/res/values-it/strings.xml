@@ -2375,6 +2375,8 @@
     <string name="diagnostics_clear_confirm_action">Cancella i log</string>
     <string name="donate_open_failed">Impossibile aprire la pagina delle donazioni. Riprova.</string>
     <string name="export_audit_logs_confirm_body">I log contengono identificatori tecnici e dettagli delle attività. Condividili solo con persone fidate.</string>
+    <string name="choose_audit_files">Scegli i file di audit</string>
+    <string name="choose_audit_files_subtitle">Salva o condividi i file di audit Marmot selezionati</string>
     <string name="export_audit_logs">Esporta log diagnostici</string>
     <string name="export_audit_logs_subtitle">Salva o condividi i log diagnostici di questo dispositivo in un unico archivio</string>
     <string name="export_audit_logs_confirm_title">Esportare i log diagnostici?</string>

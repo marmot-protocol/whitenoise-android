@@ -8353,6 +8353,50 @@ class WhiteNoiseAppState private constructor(
     /** Retries the failed user choice, rather than discarding it with a passive settings read. */
     internal suspend fun retryUsageDiagnostics() = diagnostics.retry(marmot())
 
+    /** Gives the diagnostics screen a fresh controller bound to the runtime it opened with. */
+    internal fun auditDiagnosticsSettings(): AuditDiagnosticsSettings {
+        val generation = runtimeGeneration
+        return AuditDiagnosticsSettings(
+            loadRetention = { auditDiagnosticsIo(generation) { auditLogRetention() } },
+            saveRetention = { days, confirmedShortening ->
+                auditDiagnosticsIo(generation) {
+                    val current = auditLogRetention()
+                    check(days >= current.maxAgeDays || confirmedShortening) {
+                        "Audit retention shortening requires confirmation"
+                    }
+                    if (days == current.maxAgeDays) current else setAuditLogRetention(current.copy(maxAgeDays = days))
+                }
+            },
+            loadDelivery = {
+                auditDiagnosticsIo(generation) {
+                    if (auditUploadConsent.granted && auditLogSettings().enabled) {
+                        summarizeAuditDelivery(auditDeliveryStatusV5())
+                    } else {
+                        AuditDeliverySummary(AuditDeliveryState.OFF)
+                    }
+                }
+            },
+            retryDelivery = {
+                auditDiagnosticsIo(generation) {
+                    val sharingEnabled = auditUploadConsent.granted && auditLogSettings().enabled
+                    if (sharingEnabled && auditDeliveryStatusV5().any { it.destinationConfigured && it.paused }) {
+                        postAuditLogTrackerUpdateV5()
+                    }
+                }
+            },
+        )
+    }
+
+    /** Runs against the captured runtime generation so a replaced screen cannot act on its successor. */
+    private suspend fun <T> auditDiagnosticsIo(
+        generation: Int,
+        block: suspend MarmotInterface.() -> T,
+    ): T =
+        marmotIo {
+            if (generation != runtimeGeneration) throw CancellationException("Audit settings runtime changed")
+            block()
+        }
+
     /** Whether the current MDK policy has a confirmed explicit grant. */
     fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
 

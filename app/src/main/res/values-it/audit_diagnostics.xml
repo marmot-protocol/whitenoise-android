@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Invio dei log di audit</string>
+    <string name="audit_delivery_last_success">Ultimo controllo riuscito</string>
+    <string name="audit_delivery_waiting">In attesa di invio</string>
+    <string name="audit_delivery_resume">Riprendi invio</string>
+    <string name="audit_delivery_resuming">Tentativo di invio dei log di audit…</string>
+    <string name="audit_delivery_resume_failed">Impossibile riprendere l’invio</string>
+    <string name="audit_delivery_active">Attivo</string>
+    <string name="audit_delivery_retrying">Nuovo tentativo automatico</string>
+    <string name="audit_delivery_paused">In pausa</string>
+    <string name="audit_settings_loading">Caricamento…</string>
+    <string name="audit_retention_title">Conserva i log di audit per</string>
+    <string name="audit_retention_save_failed">Impossibile modificare la durata di conservazione</string>
+    <string name="audit_retention_confirm_title">Eliminare i log di audit meno recenti?</string>
+    <string name="audit_retention_confirm_body">Conservare i log per %1$s elimina quelli meno recenti da questo dispositivo, compresi quelli ancora in attesa di invio.</string>
+    <string name="audit_retention_confirm_action">Elimina i log meno recenti</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d giorno</item>
+        <item quantity="other">%d giorni</item>
+    </plurals>
+</resources>

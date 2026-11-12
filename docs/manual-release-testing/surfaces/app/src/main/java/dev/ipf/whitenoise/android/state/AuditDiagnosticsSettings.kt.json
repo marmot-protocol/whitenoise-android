@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditDiagnosticsSettings.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Summarize MDK delivery across configured profiles without exposing their identities",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditDiagnosticsSettings.kt",
+        "anchor": "internal fun summarizeAuditDelivery(",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "Show standard retention ages and the stored custom age",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditDiagnosticsSettings.kt",
+        "anchor": "internal fun auditRetentionChoices(",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "Refresh local status after the explicit MDK upload attempt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditDiagnosticsSettings.kt",
+        "anchor": "suspend fun resumeDelivery()",
+        "test_ids": [
+          "SEC-018"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

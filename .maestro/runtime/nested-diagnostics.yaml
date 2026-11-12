@@ -17,6 +17,30 @@ name: nested-diagnostics
 - tapOn: "Diagnostics & Improvements"
 - assertVisible:
     id: "diagnostics.choices.group"
+- scrollUntilVisible:
+    element:
+      id: "audit.retention"
+    direction: DOWN
+- extendedWaitUntil:
+    visible:
+      id: "audit.retention"
+      enabled: true
+    timeout: 5000
+- tapOn:
+    id: "audit.retention"
+- assertVisible: "7 days"
+- tapOn: "7 days"
+- assertVisible: 'Delete older audit logs\?'
+- tapOn: Cancel
+- scrollUntilVisible:
+    element:
+      id: "audit.files.open"
+    direction: DOWN
+- tapOn:
+    id: "audit.files.open"
+- assertVisible: "Choose Audit Files"
+- assertVisible: Export
+- tapOn: Cancel
 - back
 - assertVisible:
     id: "privacy.device_protection.group"

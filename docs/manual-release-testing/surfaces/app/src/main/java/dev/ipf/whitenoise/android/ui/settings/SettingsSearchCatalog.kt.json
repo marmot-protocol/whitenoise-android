@@ -1040,6 +1040,38 @@
         "test_ids": [
           "SET-051"
         ]
+      },
+      {
+        "surface": "string:audit_delivery_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.audit_delivery_title",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_retention_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.audit_retention_title",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:choose_audit_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.choose_audit_files",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:choose_audit_files_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.choose_audit_files_subtitle",
+        "test_ids": [
+          "SEC-018"
+        ]
       }
     ]
   }

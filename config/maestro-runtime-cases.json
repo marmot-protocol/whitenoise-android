@@ -663,9 +663,11 @@
       "suite": "nested",
       "manual_ids": [
         "SEC-007",
-        "SEC-008"
+        "SEC-008",
+        "SEC-009",
+        "SEC-018"
       ],
-      "assertions": "Sharing choices open and dismiss without granting usage or diagnostic sharing.",
+      "assertions": "Sharing choices appear. Open the audit age chooser and cancel shortening. Open Choose Audit Files and cancel without exporting.",
       "postcondition": "none"
     },
     "nested-diagnostics-log-confirm-cancel": {

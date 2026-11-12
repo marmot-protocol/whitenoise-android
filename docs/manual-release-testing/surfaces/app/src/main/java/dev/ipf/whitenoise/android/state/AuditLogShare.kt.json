@@ -18,6 +18,14 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "Selected Marmot audit files stage as raw JSONL or an audit-only archive",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AuditLogShare.kt",
+        "anchor": "internal fun prepareSelectedAuditLogExport(",
+        "test_ids": [
+          "SEC-009"
+        ]
       }
     ]
   },

@@ -2450,6 +2450,8 @@
     <string name="diagnostics_clear_confirm_action">Очистить журналы</string>
     <string name="donate_open_failed">Не удалось открыть страницу пожертвований. Повторите попытку.</string>
     <string name="export_audit_logs_confirm_body">Журналы содержат технические идентификаторы и сведения об активности. Делитесь только с тем, кому доверяете.</string>
+    <string name="choose_audit_files">Выбрать файлы аудита</string>
+    <string name="choose_audit_files_subtitle">Сохраните выбранные файлы аудита Marmot или поделитесь ими</string>
     <string name="export_audit_logs">Экспортировать диагностические журналы</string>
     <string name="export_audit_logs_subtitle">Сохраните или отправьте диагностические журналы этого устройства одним архивом</string>
     <string name="export_audit_logs_confirm_title">Экспортировать диагностические журналы?</string>

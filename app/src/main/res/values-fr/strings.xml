@@ -2375,6 +2375,8 @@
     <string name="diagnostics_clear_confirm_action">Effacer les journaux</string>
     <string name="donate_open_failed">Impossible d’ouvrir la page de dons. Réessayez.</string>
     <string name="export_audit_logs_confirm_body">Les journaux contiennent des identifiants techniques et des détails d’activité. Ne les partagez qu’avec des personnes de confiance.</string>
+    <string name="choose_audit_files">Choisir les fichiers d’audit</string>
+    <string name="choose_audit_files_subtitle">Enregistrer ou partager les fichiers d’audit Marmot sélectionnés</string>
     <string name="export_audit_logs">Exporter les journaux de diagnostic</string>
     <string name="export_audit_logs_subtitle">Enregistrez ou partagez les journaux de diagnostic de cet appareil dans une seule archive</string>
     <string name="export_audit_logs_confirm_title">Exporter les journaux de diagnostic ?</string>

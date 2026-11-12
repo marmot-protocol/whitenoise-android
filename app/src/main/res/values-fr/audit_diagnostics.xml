@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Envoi des journaux d’audit</string>
+    <string name="audit_delivery_last_success">Dernière vérification réussie</string>
+    <string name="audit_delivery_waiting">En attente d’envoi</string>
+    <string name="audit_delivery_resume">Reprendre l’envoi</string>
+    <string name="audit_delivery_resuming">Tentative d’envoi des journaux d’audit…</string>
+    <string name="audit_delivery_resume_failed">Impossible de reprendre l’envoi</string>
+    <string name="audit_delivery_active">Actif</string>
+    <string name="audit_delivery_retrying">Nouvelle tentative automatique</string>
+    <string name="audit_delivery_paused">En pause</string>
+    <string name="audit_settings_loading">Chargement…</string>
+    <string name="audit_retention_title">Conserver les journaux d’audit pendant</string>
+    <string name="audit_retention_save_failed">Impossible de modifier la durée de conservation</string>
+    <string name="audit_retention_confirm_title">Supprimer les anciens journaux d’audit ?</string>
+    <string name="audit_retention_confirm_body">Une durée de conservation de %1$s supprime les journaux d’audit plus anciens de cet appareil, y compris ceux en attente d’envoi.</string>
+    <string name="audit_retention_confirm_action">Supprimer les anciens journaux</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d jour</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+</resources>

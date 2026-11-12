@@ -258,11 +258,43 @@
         }
       ]
     },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt": {
+      "controls": [
+        {
+          "declaration": "\"audit_delivery_status\"",
+          "represented_by": "DiagnosticsImprovements.delivery"
+        },
+        {
+          "declaration": "\"audit_last_success\"",
+          "excluded": "Conditional detail shown under audit delivery status."
+        },
+        {
+          "declaration": "\"audit_delivery_backlog\"",
+          "excluded": "Conditional detail shown under audit delivery status."
+        },
+        {
+          "declaration": "\"audit_resume_delivery\"",
+          "represented_by": "DiagnosticsImprovements.delivery"
+        },
+        {
+          "declaration": "\"audit_refresh_delivery\"",
+          "represented_by": "DiagnosticsImprovements.delivery"
+        }
+      ]
+    },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt": {
       "controls": [
         {
           "declaration": "\"audit_logs\"",
           "represented_by": "DiagnosticsImprovements.audit_logs"
+        },
+        {
+          "declaration": "\"audit_retention\"",
+          "represented_by": "DiagnosticsImprovements.retention"
+        },
+        {
+          "declaration": "\"select_audit_files\"",
+          "represented_by": "DiagnosticsImprovements.choose_audit_files"
         },
         {
           "declaration": "\"delete\"",
