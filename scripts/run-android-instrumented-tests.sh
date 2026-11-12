@@ -141,13 +141,34 @@ if [[ "$event_name" == "pull_request" ]]; then
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 else
+  # Master pushes split the full suite across emulator jobs (AndroidJUnitRunner
+  # numShards/shardIndex); every other run keeps the single-job suite.
+  shard_count="${INSTRUMENTED_SHARD_COUNT:-1}"
+  shard_index="${INSTRUMENTED_SHARD_INDEX:-0}"
+  if [[ ! "$shard_count" =~ ^[1-9]$ || ! "$shard_index" =~ ^[0-9]$ ]] || (( shard_index >= shard_count )); then
+    echo "Invalid instrumented shard $shard_index of $shard_count" >&2
+    exit 2
+  fi
+  shard_args=()
+  if (( shard_count > 1 )); then
+    shard_args=(
+      -Pandroid.testInstrumentationRunnerArguments.numShards="$shard_count"
+      -Pandroid.testInstrumentationRunnerArguments.shardIndex="$shard_index"
+    )
+  fi
   ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.notAnnotation="$manual_fixture_annotation" \
+    "${shard_args[@]}" \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
   # A green full suite can still hide a required regression that @SdkSuppress or a
   # rename filtered out. Require each declared case to have executed and passed.
-  python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected
+  # Sharded runs check the merged shard reports in a separate job instead.
+  if (( shard_count == 1 )); then
+    python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected
+  fi
+  # The native verifier needs only one shard.
+  (( shard_index == 0 )) || exit 0
 fi
 
 # PRs and master run native correctness only. Timing is a manual physical-device

@@ -687,10 +687,16 @@ ET.ElementTree(suite).write(out/'results.xml')
             for draft in [False,True]:
                 for target in ['healthy','']:
                     for values in cases:
-                        for job in current:
+                        for job in before:
                             with self.subTest(event=event,draft=draft,target=target,values=values,job=job):
                                 self.assertEqual(evaluate(current[job]['if'],event,draft,media_trace_target=target,**values),
                                                  evaluate(before[job]['if'],event,draft,media_trace_target=target,**values))
+                        # The merged shard check follows the connected job on master pushes only.
+                        with self.subTest(event=event,draft=draft,target=target,values=values,job='instrumented-required-cases'):
+                            self.assertEqual(evaluate(current['instrumented-required-cases']['if'],event,draft,media_trace_target=target,**values),
+                                             event=='push' and evaluate(current['instrumented']['if'],event,draft,media_trace_target=target,**values))
+        self.assertEqual(set(current)-set(before),{'instrumented-required-cases'})
+        self.assertFalse(evaluate(current['instrumented-required-cases']['if'],'push',cancelled=True))
         valid=dict(media_trace_target='av',media_startup_trace=True,media_sandbox_only=True)
         for api in ['30','36']:
             values={**valid,'media_sandbox_api':api}

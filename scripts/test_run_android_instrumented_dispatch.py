@@ -1,4 +1,5 @@
 """Behavioral tests for explicitly dispatched Android instrumented suites."""
+import os
 import pathlib
 import importlib.util
 import subprocess
@@ -13,7 +14,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class InstrumentedDispatchTest(unittest.TestCase):
     """The dispatcher keeps bounded PR smoke, full post-merge and opt-in suites distinct."""
 
-    def run_dispatch(self, *args, fail_app=False, fail_required=False):
+    def run_dispatch(self, *args, fail_app=False, fail_required=False, env=None):
         """Run the dispatcher against stub Gradle, opt-in suites and required-case checker."""
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
@@ -46,6 +47,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             result = subprocess.run(
                 ["bash", str(ROOT / "scripts/run-android-instrumented-tests.sh"), *args],
                 cwd=root, text=True, capture_output=True, check=True,
+                env={**os.environ, **(env or {})},
             )
             return result.stdout
 
@@ -375,6 +377,29 @@ class InstrumentedDispatchTest(unittest.TestCase):
                 self.assertLess(app, lines.index(check))
                 self.assertLess(lines.index(check), native)
                 self.assertNotIn("PullRequestDeviceSmoke", lines[app])
+
+    def test_sharded_master_push_splits_suite_and_runs_native_once(self):
+        """Each shard runs its slice; the merged-shard job owns the required-case check."""
+        outputs = [self.run_dispatch("push", env={"INSTRUMENTED_SHARD_COUNT": "2", "INSTRUMENTED_SHARD_INDEX": str(index)})
+                   for index in (0, 1)]
+        for index, output in enumerate(outputs):
+            self.assertIn("numShards=2", output)
+            self.assertIn(f"shardIndex={index}", output)
+            self.assertNotIn("required-cases", output)
+        self.assertIn(":cryptoBenchmark:connectedReleaseAndroidTest", outputs[0])
+        self.assertNotIn(":cryptoBenchmark:", outputs[1])
+
+    def test_invalid_shard_is_rejected(self):
+        """A shard index outside the declared count cannot silently run nothing."""
+        for env in ({"INSTRUMENTED_SHARD_COUNT": "2", "INSTRUMENTED_SHARD_INDEX": "2"},
+                    {"INSTRUMENTED_SHARD_COUNT": "x", "INSTRUMENTED_SHARD_INDEX": "0"}):
+            with self.subTest(env=env), self.assertRaises(subprocess.CalledProcessError) as caught:
+                self.run_dispatch("push", env=env)
+            self.assertEqual(caught.exception.returncode, 2)
+
+    def test_unsharded_full_suite_passes_no_shard_arguments(self):
+        """Single-job full suites keep the exact unsharded Gradle invocation."""
+        self.assertNotIn("numShards", self.run_dispatch("push"))
 
     def test_pull_request_smoke_does_not_require_full_suite_cases(self):
         """Bounded PR smoke runs stay annotation-selected and skip the full-suite case list."""

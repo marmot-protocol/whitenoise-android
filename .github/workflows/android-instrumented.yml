@@ -386,10 +386,19 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      # Build the measurement APK pair once, before the emulator competes for CPU;
+      # every scenario below reinstalls this same pair instead of re-running Gradle.
+      - name: Build fixture APKs once
+        env:
+          DISTRIBUTION: ${{ matrix.distribution }}
+        run: |
+          ./gradlew --init-script scripts/media-latency.init.gradle \
+            ":app:assembleDev${DISTRIBUTION}Debug" ":app:assembleDev${DISTRIBUTION}DebugAndroidTest" --no-daemon
       - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         env:
           # A PR whose fixture inputs are only the video-metadata scenario's runs that scenario alone.
           FIXTURE_SCOPE: ${{ needs.changes.outputs.attachment_fixture_scope }}
+          WN_FIXTURE_APKS_PREBUILT: '1'
         with:
           api-level: 34
           target: google_apis
@@ -425,10 +434,19 @@ jobs:
   instrumented:
     needs: changes
     if: ${{ needs.changes.outputs.media_trace_allowed == 'true' && (needs.changes.outputs.connected == 'true' && (inputs.media_startup_trace || github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.range_selection_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
-    name: Connected Android tests (emulator)
+    name: Connected Android tests (emulator${{ github.event_name == 'push' && format(', shard {0}', matrix.shard) || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # Master pushes split the full suite across two emulators; the merged
+        # required-case check runs in instrumented-required-cases. PR smoke and
+        # dispatched suites stay single-job.
+        shard: ${{ fromJSON(github.event_name == 'push' && '[0, 1]' || '[0]') }}
     env:
+      INSTRUMENTED_SHARD_COUNT: ${{ github.event_name == 'push' && '2' || '1' }}
+      INSTRUMENTED_SHARD_INDEX: ${{ matrix.shard }}
       OUTBOUND_SHARE_ANDROID_API: ${{ inputs.outbound_share_api || '34' }}
       RELEASE_VERIFY_REPORT_DIR: app/build/reports/outbound-share-contract
 
@@ -560,7 +578,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: android-instrumented-reports
+          name: android-instrumented-reports${{ matrix.shard != 0 && format('-shard-{0}', matrix.shard) || '' }}
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
@@ -599,7 +617,7 @@ jobs:
           git rev-parse HEAD > app/build/outputs/apk/source-revision.txt
 
       - name: Retain built-revision instrumentation APKs
-        if: success() || (failure() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.media_sandbox_only && steps.instrumentation_apk_revision.outcome == 'success')
+        if: matrix.shard == 0 && (success() || (failure() && !cancelled() && github.event_name == 'workflow_dispatch' && inputs.media_sandbox_only && steps.instrumentation_apk_revision.outcome == 'success'))
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: android-instrumented-apks-${{ github.sha }}
@@ -611,6 +629,37 @@ jobs:
             scripts/outbound-share-fixture/build/control.apk
           if-no-files-found: error
           retention-days: 7
+
+  instrumented-required-cases:
+    needs: [changes, instrumented]
+    # Sharded master runs check every declared case against both shards' results,
+    # whenever the connected job was admitted, including after a shard failure.
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.changes.outputs.media_trace_allowed == 'true' && needs.changes.outputs.connected == 'true' && !inputs.mdk_qualification && !inputs.mdk_preview_qualification }}
+    name: Required connected cases (all shards)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: android-instrumented-reports*
+          path: ${{ runner.temp }}/shards
+      - name: Check required cases across shards
+        shell: bash
+        run: |
+          set -euo pipefail
+          merged="$RUNNER_TEMP/connected"
+          mkdir -p "$merged"
+          shopt -s nullglob
+          shards=("$RUNNER_TEMP"/shards/*/app/build/outputs/androidTest-results/connected)
+          [[ ${#shards[@]} == 2 ]] || { echo "Expected connected results from 2 shards, found ${#shards[@]}" >&2; exit 1; }
+          for index in "${!shards[@]}"; do cp -R "${shards[$index]}" "$merged/shard-$index"; done
+          python3 scripts/check_instrumented_required_cases.py "$merged"
 
   maestro-pilot:
     needs: changes
