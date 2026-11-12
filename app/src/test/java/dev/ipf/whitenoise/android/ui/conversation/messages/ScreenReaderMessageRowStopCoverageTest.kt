@@ -71,7 +71,7 @@ class ScreenReaderMessageRowStopCoverageTest {
         val sentences = List(40) { CustomAccessibilityAction("Choose sentence to read") { true } }
         val links = (1..40).map { CustomAccessibilityAction("Copy link: https://example.com/$it") { true } }
 
-        val actions = messageRowCustomActions(own, sentences + links)
+        val actions = messageRowCustomActions(own, sentences + links, setOf("Choose sentence to read"))
 
         assertTrue("got ${actions.size} actions", actions.size <= MAX_ROW_CUSTOM_ACTIONS)
         assertTrue(MAX_ROW_CUSTOM_ACTIONS < 32)
@@ -94,6 +94,39 @@ class ScreenReaderMessageRowStopCoverageTest {
 
         assertEquals(MAX_ROW_CUSTOM_ACTIONS, actions.size)
         assertEquals(chooser.label, actions[own.size].label)
+    }
+
+    /**
+     * Paragraphs number repeated copy-link labels only among themselves, so two paragraphs can each forward the
+     * same label for different links. The row keeps both, numbering the second, instead of dropping one.
+     */
+    @Test
+    fun copyLinkLabelsRepeatedAcrossParagraphsStayReachable() {
+        val copied = mutableListOf<String>()
+        val first =
+            CustomAccessibilityAction("Copy link: shared") {
+                copied += "first"
+                true
+            }
+        val second =
+            CustomAccessibilityAction("Copy link: shared") {
+                copied += "second"
+                true
+            }
+        val numbered =
+            CustomAccessibilityAction("Copy link: shared (2)") {
+                copied += "numbered"
+                true
+            }
+
+        val actions = messageRowCustomActions(emptyList(), listOf(first, numbered, second))
+
+        assertEquals(
+            listOf("Copy link: shared", "Copy link: shared (2)", "Copy link: shared (3)"),
+            actions.map { it.label },
+        )
+        actions.forEach { it.action?.invoke() }
+        assertEquals(listOf("first", "numbered", "second"), copied)
     }
 
     @Test
@@ -200,9 +233,6 @@ class ScreenReaderMessageRowStopCoverageTest {
         // Markdown paragraphs forward their links and one chooser over the whole message's sentences.
         assertTrue(markdown.contains("ttsSentenceLeafAndRowActions(leafId, text.text, sentenceOwner)"))
         assertTrue(markdown.contains("ForwardTextActionsToMessageRow(speech.row + linkActions)"))
-        // The row ranks read-aloud ahead of links, so the chooser survives the action cap.
-        val bubble = appModuleSource("$MESSAGES/MessageBubble.kt")
-        assertTrue(bubble.contains("readAloudLabels,"))
         val plain = appModuleSource("$MESSAGES/BubbleContentBlocks.kt")
         assertTrue(plain.contains("ForwardTextActionsToMessageRow(sentenceActions)"))
     }

@@ -37,10 +37,10 @@ internal class MessageRowAction(
 /**
  * Row actions in menu order, followed by the actions forwarded from the message text. Compose refuses a node
  * with 32 or more custom actions by throwing while an accessibility service reads it, and a long message
- * can forward many link actions. So forwarded actions with the same label collapse into the first, as a
- * screen reader could not tell them apart, and the list stops at [MAX_ROW_CUSTOM_ACTIONS]. The row's own
- * actions come first, then the forwarded [leading] actions, so the message's one read-aloud chooser
- * survives the cap however many links register before it.
+ * can forward many link actions, so the list stops at [MAX_ROW_CUSTOM_ACTIONS]. The row's own actions come
+ * first, then the forwarded [leading] read-aloud actions collapsed to one per label, so the message's chooser
+ * survives the cap however many links register before it. Paragraphs number repeated copy-link labels only
+ * among themselves, so a label repeated across paragraphs is numbered again here rather than dropped.
  */
 internal fun messageRowCustomActions(
     actions: List<MessageRowAction>,
@@ -56,13 +56,23 @@ internal fun messageRowCustomActions(
                     true
                 }
             }
-    val ownLabels = own.mapTo(mutableSetOf(), CustomAccessibilityAction::label)
-    val text =
-        forwarded
-            .filter { it.label !in ownLabels }
-            .distinctBy(CustomAccessibilityAction::label)
-            .sortedBy { it.label !in leading }
-    return (own + text).take(MAX_ROW_CUSTOM_ACTIONS)
+    val taken = own.mapTo(mutableSetOf(), CustomAccessibilityAction::label)
+    val text = forwarded.filter { it.label !in taken }
+    val readAloud = text.filter { it.label in leading }.distinctBy(CustomAccessibilityAction::label)
+    readAloud.mapTo(taken, CustomAccessibilityAction::label)
+    val others =
+        text
+            .filter { it.label !in leading }
+            .map { action ->
+                var label = action.label
+                var copy = 1
+                while (!taken.add(label)) {
+                    copy += 1
+                    label = "${action.label} ($copy)"
+                }
+                if (label == action.label) action else CustomAccessibilityAction(label, action.action)
+            }
+    return (own + readAloud + others).take(MAX_ROW_CUSTOM_ACTIONS)
 }
 
 /** Below Compose's limit of 32 custom actions per accessibility node. */
