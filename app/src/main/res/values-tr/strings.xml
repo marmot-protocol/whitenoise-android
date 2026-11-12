@@ -2650,4 +2650,5 @@
     <string name="android_notification_settings">Android bildirim ayarları</string>
     <string name="settings_help_support">Yardım ve destek</string>
     <string name="settings_voice_language">Ses ve dil</string>
+    <string name="toast_wipe_outcome_unconfirmed">Silme işleminin sonucu doğrulanamadı. Devam etmeden önce hesaplarınızı kontrol edin.</string>
 </resources>

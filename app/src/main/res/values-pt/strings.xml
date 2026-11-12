@@ -2657,4 +2657,5 @@
     <string name="android_notification_settings">Configurações de notificação do Android</string>
     <string name="settings_help_support">Ajuda e suporte</string>
     <string name="settings_voice_language">Voz e idioma</string>
+    <string name="toast_wipe_outcome_unconfirmed">Não foi possível confirmar o resultado da limpeza. Verifique suas contas antes de continuar.</string>
 </resources>

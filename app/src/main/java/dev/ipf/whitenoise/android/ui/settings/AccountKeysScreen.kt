@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.PersistableBundle
 import android.os.SystemClock
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
@@ -93,6 +94,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.WipeReport
 import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
+import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
@@ -1153,7 +1155,13 @@ private fun AccountWipeFlow(
                 // that nav reset.
                 appState.wipeInProgress = true
                 appState.launchMutation {
-                    try {
+                    runAccountWipeMutation(
+                        onUnconfirmed = { error ->
+                            Log.w("AccountWipe", "Wipe outcome could not be confirmed: ${error.javaClass.simpleName}")
+                            appState.present(R.string.toast_wipe_outcome_unconfirmed, copyable = true)
+                        },
+                        onFinished = { appState.wipeInProgress = false },
+                    ) {
                         val outcome = appState.signOutAndWipeActiveAccount()
                         if (outcome == null) {
                             // Total FFI failure: nothing was wiped and the
@@ -1172,8 +1180,6 @@ private fun AccountWipeFlow(
                                 appState.pendingWipeReport = report
                             }
                         }
-                    } finally {
-                        appState.wipeInProgress = false
                     }
                 }
             },
@@ -1602,3 +1608,23 @@ private fun wipeOutcomeStageSummary(stage: WipeStageReport): String =
                 if (stage.hasIssues) R.string.wipe_outcome_local_wipe_incomplete else R.string.wipe_outcome_local_wipe_done,
             )
     }
+
+/**
+ * Keeps admitted wipe errors distinct from confirmed native outcomes, without retrying destructive work.
+ * Native cleanup can fail after destructive work; every non-cancellation failure has an unconfirmed outcome.
+ */
+@Suppress("TooGenericExceptionCaught")
+internal suspend fun runAccountWipeMutation(
+    onUnconfirmed: (Exception) -> Unit,
+    onFinished: () -> Unit,
+    mutation: suspend () -> Unit,
+) {
+    try {
+        mutation()
+    } catch (error: Exception) {
+        rethrowIfCancellation(error)
+        onUnconfirmed(error)
+    } finally {
+        onFinished()
+    }
+}

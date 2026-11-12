@@ -2669,4 +2669,5 @@
     <string name="android_notification_settings">Android-Benachrichtigungseinstellungen</string>
     <string name="settings_help_support">Hilfe &amp; Support</string>
     <string name="settings_voice_language">Sprache &amp; Stimme</string>
+    <string name="toast_wipe_outcome_unconfirmed">Das Ergebnis der Löschung konnte nicht bestätigt werden. Prüfe deine Konten, bevor du fortfährst.</string>
 </resources>

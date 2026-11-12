@@ -2611,4 +2611,5 @@
     <string name="android_notification_settings">Android 通知设置</string>
     <string name="settings_help_support">帮助和支持</string>
     <string name="settings_voice_language">语音和语言</string>
+    <string name="toast_wipe_outcome_unconfirmed">无法确认清除结果。请先检查你的账户，然后再继续。</string>
 </resources>

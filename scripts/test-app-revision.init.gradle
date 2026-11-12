@@ -1,0 +1,26 @@
+// Run with APP_SOURCE_PR=3791 ./gradlew -I scripts/test-app-revision.init.gradle :app:verifyAppRevisionFlavorContract
+// Exercises actual Android variant registration and generated metadata without compiling the app.
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    def revisions = app.tasks.matching { it.name.startsWith('generate') && it.name.endsWith('AppRevision') }
+    app.tasks.register('verifyAppRevisionFlavorContract') {
+        dependsOn(revisions)
+        doLast {
+            assert System.getenv('APP_SOURCE_PR') == '3791': 'Run with APP_SOURCE_PR=3791'
+            def environments = [] as Set
+            revisions.each { revision ->
+                def environment = ['Dev', 'Preview', 'Staging', 'Production'].find { revision.name.startsWith("generate${it}") }
+                assert environment != null: "Unexpected variant: ${revision.name}"
+                environments.add(environment)
+                def expectedPr = environment == 'Production' ? '' : '3791'
+                assert revision.sourcePr.get() == expectedPr: "Incorrect PR metadata for ${revision.name}"
+                def generated = revision.outputDirectory.file('dev/ipf/whitenoise/android/AppRevision.kt').get().asFile.text
+                assert generated.contains('const val SOURCE_PR: String = "' + expectedPr + '"')
+                assert generated.contains('const val FULL_SHA: String = "' + revision.fullSha.get() + '"')
+                assert generated.contains('const val SHORT_SHA: String = "' + revision.shortSha.get() + '"')
+            }
+            assert environments == ['Dev', 'Preview', 'Staging', 'Production'] as Set
+            println "Verified generated revision metadata for ${revisions.size()} variants"
+        }
+    }
+}

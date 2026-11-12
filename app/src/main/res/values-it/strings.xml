@@ -2657,4 +2657,5 @@
     <string name="android_notification_settings">Impostazioni di notifica Android</string>
     <string name="settings_help_support">Aiuto e supporto</string>
     <string name="settings_voice_language">Voce e lingua</string>
+    <string name="toast_wipe_outcome_unconfirmed">Non è stato possibile confermare il risultato della cancellazione. Controlla i tuoi account prima di continuare.</string>
 </resources>

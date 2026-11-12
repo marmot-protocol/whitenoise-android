@@ -839,7 +839,7 @@ androidComponents {
             ) {
                 shortSha.set(buildShortSha)
                 fullSha.set(buildFullSha)
-                sourcePr.set(appSourcePr)
+                sourcePr.set(if (variant.productFlavors.contains("environment" to "production")) "" else appSourcePr)
             }
         variant.sources.kotlin?.addGeneratedSourceDirectory(generateAppRevision, GenerateAppRevision::outputDirectory)
     }

@@ -2657,4 +2657,5 @@
     <string name="android_notification_settings">Paramètres de notification Android</string>
     <string name="settings_help_support">Aide et assistance</string>
     <string name="settings_voice_language">Voix et langue</string>
+    <string name="toast_wipe_outcome_unconfirmed">Le résultat de la suppression n’a pas pu être confirmé. Vérifiez vos comptes avant de continuer.</string>
 </resources>

@@ -2657,4 +2657,5 @@
     <string name="android_notification_settings">Ajustes de notificaciones de Android</string>
     <string name="settings_help_support">Ayuda y soporte</string>
     <string name="settings_voice_language">Voz e idioma</string>
+    <string name="toast_wipe_outcome_unconfirmed">No se pudo confirmar el resultado del borrado. Revisa tus cuentas antes de continuar.</string>
 </resources>
