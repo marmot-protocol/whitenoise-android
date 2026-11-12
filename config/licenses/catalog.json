@@ -225,7 +225,7 @@
     {"coordinate": "org.jspecify:jspecify:1.0.1", "name": "jspecify-1.0.1.jar", "notice_ids": ["9cd5d5f186fc5d8aedb4a705c197d14d9c6ff20f6cb45a5268ddd5d2426bdeaf"], "sha256": "070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66"},
     {"coordinate": "org.osmdroid:osmdroid-android:6.1.20", "name": "osmdroid-android-6.1.20.aar", "notice_ids": ["835c95dd4d303ea0526ce2f6342492ca22350f32deca4de06491c1bb2b81b3bf"], "sha256": "2cbec2a2a1a671a76849897748080079a3158a7a4c8554b86f2c75860f91046a"}
   ],
-  "bundled_notice_ids": ["native-media-ffmpeg-9.0.2", "native-media-dav1d-1.5.4"],
+  "bundled_notice_ids": ["native-media-ffmpeg-9.0.2", "native-media-dav1d-1.5.4", "3c4dff58810f0b121c372528c71347a602ac66de332ee777df22e07f5cdf90d8", "afa2a31a871a5eee49523a27cf2e1856d44d4251916e08118871c50eea1d3d00"],
   "baseline": {"sha256": "1a3640fc3c0862a14234c420e21c52baf602282cea1b1a61a5a6a60f7a3fe93b", "source_sha": "a14aa1a41bfb72d6933b1bb584823eec513125ec"},
   "notices": [
     {"full_text": {"sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30", "source": "Apache License 2.0 full text, https://www.apache.org/licenses/LICENSE-2.0.txt", "text": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt"}, "id": "02015f9dc2b9d3ea1a7958ab20631e961cab828a0492ebf184fcfb0f04408654", "name": "Graphics Shapes", "sha256": "0dec6aeec4006c044352a33f0825bf879bcd810e5e38e2b3230e4475916cdd2f", "source": "Verified POM: androidx.graphics:graphics-shapes-android:1.0.1/graphics-shapes-android-1.0.1.pom sha256:81de7bcc8549084d104d5af33b120f93e10d45424a15a454cfa1f24304aa4d11", "text": "texts/0dec6aeec4006c044352a33f0825bf879bcd810e5e38e2b3230e4475916cdd2f.txt"},
