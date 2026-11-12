@@ -736,7 +736,7 @@
         "MSG-002",
         "MSG-026"
       ],
-      "assertions": "The inline expanded message retains its expanded state across configuration changes.",
+      "assertions": "The bubble stays expanded across configuration changes and Show less still restores its preview.",
       "postcondition": "none"
     },
     "reader-actions-cancel": {

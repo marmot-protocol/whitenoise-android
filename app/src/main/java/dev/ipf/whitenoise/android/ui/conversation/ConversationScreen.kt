@@ -2385,6 +2385,47 @@ internal fun ConversationScreen(
     ttsFollowEffects()
 
     /**
+     * Keeps the former preview near the viewport when its row grows in the reversed list.
+     * The height increase would otherwise leave the reader at the newest end of a tall message.
+     */
+    fun preserveReadingPositionOnExpansion(item: TimelineMessage) {
+        val beforeLayout = timelineViewport.readingLayoutInfo()
+        val preview = beforeLayout.visibleItemsInfo.firstOrNull { it.key == item.presentationId } ?: return
+        val maxLayoutFrames = 3
+        val continuationPx = beforeLayout.viewportSize.height / 5
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        scrollCoordinator.settleReadingAt(currentScrollAnchor())
+        val expansionRevision = scrollCoordinator.intentToken.revision
+
+        scope.launch {
+            if (scrollCoordinator.intentToken.revision != expansionRevision) return@launch
+            val completed =
+                scrollCoordinator.programmaticJump(
+                    targetMessageId = item.record.messageIdHex,
+                    reason = ConversationScrollReason.MessageExpansion,
+                ) {
+                    repeat(maxLayoutFrames) {
+                        withFrameNanos { }
+                        val expanded =
+                            timelineViewport
+                                .readingLayoutInfo()
+                                .visibleItemsInfo
+                                .firstOrNull { it.key == item.presentationId }
+                                ?: return@programmaticJump
+                        val growth = expanded.size - preview.size
+                        if (growth > 0) {
+                            // Reveal some new text while retaining the last lines of the preview.
+                            val reveal = growth.coerceAtMost(continuationPx)
+                            scrollToItem(expanded.index, growth - preview.offset - reveal)
+                            return@programmaticJump
+                        }
+                    }
+                }
+            if (completed) scrollCoordinator.settleReadingAt(currentScrollAnchor())
+        }
+    }
+
+    /**
      * Heights of the message bubbles currently on screen, used to estimate the
      * centering offset for a row that has not been measured yet.
      */
@@ -4902,6 +4943,9 @@ internal fun ConversationScreen(
                                                     } else {
                                                         null
                                                     },
+                                                onBeforeBodyExpand = {
+                                                    preserveReadingPositionOnExpansion(item)
+                                                },
                                                 onBeforeBodyCollapse = {
                                                     scrollCoordinator.cancelForegroundRestoreForUserIntent()
                                                     // Collapse cancels deferred movement while preserving

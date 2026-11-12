@@ -97,6 +97,7 @@ internal fun TimelineRowMessageBubble(
     onActionMenuOpenChange: (Boolean) -> Unit,
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
+    onBeforeBodyExpand: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
     showSenderName: Boolean,
     showSenderAvatar: Boolean,
@@ -161,6 +162,7 @@ internal fun TimelineRowMessageBubble(
             onTtsSentenceSeek = onTtsSentenceSeek,
             ttsRowInstance = ttsRowInstance,
             parseMarkdown = parseMarkdown,
+            onBeforeBodyExpand = onBeforeBodyExpand,
             onBeforeBodyCollapse = onBeforeBodyCollapse,
         )
     }

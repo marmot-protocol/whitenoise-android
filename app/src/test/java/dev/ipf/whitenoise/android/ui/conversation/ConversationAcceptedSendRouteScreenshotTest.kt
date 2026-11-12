@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -21,7 +22,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -536,8 +539,11 @@ class ConversationAcceptedSendRouteScreenshotTest {
                     SemanticsMatcher("visible footer action") { it.boundsInRoot.width > 0f },
             )
         readMore.performClick()
+        // Allow the expanded row to remeasure and the scroll coordinator to place it.
+        repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
         composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).assertIsDisplayed()
         readMore.assertDoesNotExist()
+        assertFirstNewLineIsVisible(evidence)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_read_more_inline.png")
         evidence.writes.clear()
 
@@ -562,6 +568,26 @@ class ConversationAcceptedSendRouteScreenshotTest {
         assertEquals("the composer publishes exactly once", 1, publishCount)
         assertTrue("accepted sends never animate across history", evidence.writes.none { it.animated })
         assertTrue(checkNotNull(evidence.viewport).mode is ConversationScrollMode.FollowingTail)
+    }
+
+    /** Checks actual line geometry because an oversized text node can be visible while its continuation is clipped. */
+    private fun assertFirstNewLineIsVisible(evidence: SendRouteEvidence) {
+        val body = composeRule.onNodeWithText("Long history line 0", substring = true, useUnmergedTree = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        body.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        val continuation = layout.layoutInput.text.text.indexOf("Long history line 52")
+        assertTrue("the expanded layout contains the first line past the preview", continuation >= 0)
+        val line = layout.getLineForOffset(continuation)
+        val node = body.fetchSemanticsNode()
+        val top = node.positionInRoot.y + layout.getLineTop(line)
+        val bottom = node.positionInRoot.y + layout.getLineBottom(line)
+        val composerTop = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot.top
+        assertTrue(
+            "first new line at $top..$bottom, visible body from ${node.boundsInRoot.top} to composer $composerTop, " +
+                "scroll writes: ${evidence.writes}",
+            top >= node.boundsInRoot.top && bottom <= composerTop,
+        )
     }
 
     /**
@@ -704,7 +730,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
     private companion object {
         const val SENT_TEXT = "Accepted send from older history"
         const val HISTORY_ANCHOR_INDEX = 10
-        const val LONG_MESSAGE_LINES = 70
+        const val LONG_MESSAGE_LINES = 120
     }
 }
 

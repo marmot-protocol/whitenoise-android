@@ -351,6 +351,7 @@ internal fun MessageBubble(
     onActionMenuOpenChange: (Boolean) -> Unit,
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
+    onBeforeBodyExpand: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
     showSenderName: Boolean = false,
     showSenderAvatar: Boolean = false,
@@ -2316,6 +2317,12 @@ internal fun MessageBubble(
                     listOfNotNull(editedLabel, reportedLabel).takeIf { it.isNotEmpty() }?.joinToString(" · ")
                 val bodyCanCollapse = (collapseOverride ?: collapseLongMessages) && !deleted && !persistedFailure
                 val collapsible = bodyCanCollapse && !textSelectionMode && !ttsBodyExpanded
+                val expandBody = {
+                    if (!deleted) {
+                        onBeforeBodyExpand()
+                        collapseOverride = false
+                    }
+                }
 
                 /**
                  * The sender-name label (group chats only). Rendered above the
@@ -2656,7 +2663,7 @@ internal fun MessageBubble(
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
-                                    onExpand = { if (!deleted) collapseOverride = false },
+                                    onExpand = expandBody,
                                 )
                             }
                         } else {
@@ -2747,7 +2754,7 @@ internal fun MessageBubble(
                                     showTimestamp = !fileFooterInCard && remoteGiphyMedia == null,
                                     invalidationWarning = outerInvalidationWarning,
                                     mine = mine,
-                                    onExpand = { if (!deleted) collapseOverride = false },
+                                    onExpand = expandBody,
                                 )
                             }
                         }
@@ -2828,7 +2835,7 @@ internal fun MessageBubble(
                             footerOnPendingVisual = footerOnPendingVisual,
                             invalidationWarning = invalidationWarning,
                             mine = mine,
-                            onExpand = { if (!deleted) collapseOverride = false },
+                            onExpand = expandBody,
                         )
                     }
                 }
@@ -2873,7 +2880,7 @@ internal fun MessageBubble(
                     // reactions, system copy).
                     canShowLess =
                         record.kind == 9uL &&
-                            item.status != MessageStatus.Failed &&
+                            (item.status != MessageStatus.Failed || collapseOverride == false) &&
                             !deleted &&
                             !persistedFailure &&
                             !collapsible &&

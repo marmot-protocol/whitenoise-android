@@ -62,6 +62,34 @@ class MessageBodyMarkdownComposeTest {
         composeRule.onNodeWithText(raw).assertDoesNotExist()
     }
 
+    /** A partial AST never conceals the tail of the retained message body. */
+    @Test
+    fun truncatedTokensKeepTheCompleteSourceVisible() {
+        val raw = "**Prefix**\nTail omitted by the parser"
+        val partial =
+            document(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("Prefix")))).copy(truncated = true)
+        composeRule.setContent {
+            val resolved =
+                rememberMessageMarkdownDocumentForDisplayedBody(
+                    messageIdHex = "capped-id",
+                    bodyText = raw,
+                    recordPlaintext = raw,
+                    storedDocument = partial,
+                    overrideDocument = null,
+                    deleted = false,
+                    persistedFailure = false,
+                    fallbackParsingEnabled = true,
+                    parseMarkdown = { error("The same input already hit the MDK parser cap") },
+                )
+            WhiteNoiseTheme {
+                if (resolved == null) Text(raw) else MarkdownMessageBody(document = resolved)
+            }
+        }
+
+        composeRule.onNodeWithText(raw).assertIsDisplayed()
+        composeRule.onNodeWithText("Prefix").assertDoesNotExist()
+    }
+
     @Test
     fun nonMarkdownMessageKindsKeepTheSafePlainTextFallback() {
         val raw = "**literal system text**"

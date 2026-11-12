@@ -33,7 +33,8 @@ class MessageShowLessBehaviorTest {
 
     /** Show less can also override the default when long messages normally start expanded. */
     @Test
-    fun explicitCollapseCanBeExpandedInlineWhenAutomaticCollapseIsDisabled() = assertInlineRoundTrip(collapseByDefault = false)
+    fun explicitCollapseCanBeExpandedInlineWhenAutomaticCollapseIsDisabled() =
+        assertInlineRoundTrip(collapseByDefault = false)
 
     /** Measures the rendered bubble to confirm that tapping Read More removes the preview height limit. */
     private fun assertInlineRoundTrip(collapseByDefault: Boolean) {
@@ -51,7 +52,11 @@ class MessageShowLessBehaviorTest {
                 onActionMenuOpenChange = { menuOpen = it },
             )
         }
-        val bubble = composeRule.onNodeWithTag(messageBubbleColumnTestTag(item.record.messageIdHex), useUnmergedTree = true)
+        val bubble =
+            composeRule.onNodeWithTag(
+                messageBubbleColumnTestTag(item.record.messageIdHex),
+                useUnmergedTree = true,
+            )
         if (!collapseByDefault) {
             bubble.performTouchInput { longClick() }
             composeRule.onNodeWithText("Show less").performClick()
@@ -72,13 +77,15 @@ class MessageShowLessBehaviorTest {
             surface = surface.copy(item = item.copy(record = item.record.copy(plaintext = "Short edit")))
             menuOpen = true
         }
+        composeRule.onNodeWithText("Copy text").assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
     }
 
     /** Finds the real footer action while ignoring the zero-size measurement copy. */
     private fun visibleReadMore() =
         composeRule.onNode(
-            hasText("Read More", ignoreCase = true) and SemanticsMatcher("visible footer action") { it.boundsInRoot.width > 0f },
+            hasText("Read More", ignoreCase = true) and
+                SemanticsMatcher("visible footer action") { it.boundsInRoot.width > 0f },
         )
 
     @Test
@@ -99,12 +106,13 @@ class MessageShowLessBehaviorTest {
                 isActionMenuOpen = true,
             )
         }
+        composeRule.onNodeWithText("Copy text").assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
     }
 
-    /** A row that becomes a failed send after expansion loses its collapse action. */
+    /** A rendered body stays collapsible when the send fails after the reader expands it. */
     @Test
-    fun expandedBubbleStopsOfferingShowLessWhenTheRowBecomesFailed() {
+    fun explicitlyExpandedBubbleCanStillCollapseWhenTheSendFails() {
         val fixture =
             swipeTestSurface(ApplicationProvider.getApplicationContext(), reacted = false, mine = true, media = false)
         val longBody = (1..90).joinToString("\n") { "Message line $it" }
@@ -130,7 +138,8 @@ class MessageShowLessBehaviorTest {
         visibleReadMore().performClick()
         composeRule.runOnIdle { surface = surface.copy(item = surface.item.copy(status = MessageStatus.Failed)) }
         composeRule.runOnIdle { menuOpen = true }
-        composeRule.onNodeWithText("Show less").assertDoesNotExist()
+        composeRule.onNodeWithText("Show less").performClick()
+        visibleReadMore().assertExists()
     }
 
     @Test
@@ -140,6 +149,7 @@ class MessageShowLessBehaviorTest {
         composeRule.setContent {
             SwipeTestBubbleHost(surface = surface, collapseLongMessages = false, isActionMenuOpen = true)
         }
+        composeRule.onNodeWithText("Copy text").assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
     }
 }
