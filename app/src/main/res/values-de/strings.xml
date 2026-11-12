@@ -2426,6 +2426,8 @@
     <string name="error_missing_member_inbox">Für diese Person gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox_for">Für %1$s gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_invite_welcome_too_large">Diese Einladung ist zu groß für die Posteingangs-Relays einer eingeladenen Person. Bitten Sie die Person, ein Posteingangs-Relay hinzuzufügen, das größere Nachrichten annimmt.</string>
+    <string name="error_update_too_large">Ihre Relays haben diese Aktualisierung abgelehnt, weil sie zu groß ist. Es wurde nichts geändert.</string>
+    <string name="error_group_change_too_large">Eine Gruppenänderung war zu groß für die Relays der Gruppe und wurde daher nicht vorgenommen.</string>
     <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
     <string name="notification_show_previews_detail">Wenn aus, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
     <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>

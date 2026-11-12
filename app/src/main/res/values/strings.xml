@@ -2592,6 +2592,8 @@
     <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_invite_welcome_too_large">This invitation is too large for a recipient’s inbox relays to accept. Ask them to add an inbox relay that accepts larger messages.</string>
+    <string name="error_update_too_large">Your relays refused this update because it’s too large. Nothing was changed.</string>
+    <string name="error_group_change_too_large">A group change was too large for the group’s relays, so it wasn’t made.</string>
     <string name="notification_show_previews">Show notification previews</string>
     <string name="notification_show_previews_detail">When off, hides names and message content. Applies to all accounts.</string>
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>

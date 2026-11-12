@@ -45,8 +45,13 @@ Four existing public types change:
   the account.
 - `MarmotKitException` gains `Nip46`. Android has no exhaustive `when` over the
   exception and uses no NIP-46 session, so it stays on existing fallbacks.
-- `GroupEventKindFfi.QueuedIntentRefused` adds `artifact` and `sizeClass`. Android
-  neither constructs nor destructures it.
+- `GroupEventKindFfi.QueuedIntentRefused` adds `artifact` and `sizeClass`. MDK drops a
+  queued group change it refuses and never retries it, so Android now tells the active
+  account about size refusals (reason `event_too_large`): a Welcome reuses the
+  oversized-invitation copy, anything else says a group change was too large for the
+  group's relays and wasn't made. The notice is titled with the chat's name when the chat
+  list has loaded that chat, and re-checks the active account on the main thread. Other
+  refusal reasons and other accounts' refusals still show nothing.
 - `MarmotDeploymentFfi` adds `relayEventLimits`. Android only calls
   `marmotDeploymentWhiteNoise()`, which already lists 2 MiB for both White Noise relays.
 
@@ -57,12 +62,18 @@ is too large for a recipient's inbox relays and asks them to add one that accept
 larger messages, instead of the generic retry text. It applies to direct chats, group
 creation and adding or inviting members alike.
 
-Other `EventTooLarge` sources fall to existing generic copy, which changes what two
-surfaces show. An oversized block edit used to fail as `BlockListUnavailable` and
-show `block_list_unavailable`; it now shows `block_change_failed`. An oversized
-sticker sync used to fail as `StickerNetwork` and show `sticker_error_network`; it
-now shows `error_try_again`. KeyPackage, profile and relay-list publishes have no
-dedicated copy. No generated
+`EventTooLarge(OTHER)` is now raised for the account's own updates: block edits
+(previously `BlockListUnavailable`), sticker sync (previously `StickerNetwork`), and
+KeyPackage, profile and relay-list publishes. Block edits now say the account's relays
+refused the update because it is too large and nothing was changed
+(`error_update_too_large`), through a new `BlockOutcome.TooLarge`; MDK clears the pending
+block publish first, so nothing changes. The publishes get the same detail through
+`presentFailure`, which replaces its generic retry detail for this error only. Android caps
+profiles, relay lists and KeyPackages far below MDK's 64 KiB check, so that copy is
+unit-tested but cannot be produced from the UI; whether MDK keeps a relay-list edit locally
+after such a refusal is unverified. Sticker sync runs in the background and its failure
+only marks the pack browser unreachable, so it gets no new copy; a sticker list over 64 KiB
+would need hundreds of packs. No generated
 binding is edited. Device-group and multi-device APIs stay unused and untouched.
 
 ## Native changes and migration boundary

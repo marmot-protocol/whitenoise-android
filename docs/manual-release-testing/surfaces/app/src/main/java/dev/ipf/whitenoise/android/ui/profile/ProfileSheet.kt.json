@@ -441,6 +441,15 @@
         "test_ids": [
           "ACC-002"
         ]
+      },
+      {
+        "surface": "Block list refused for size from the profile sheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.error_update_too_large",
+        "test_ids": [
+          "ACC-002",
+          "SEC-014"
+        ]
       }
     ]
   },

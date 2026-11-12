@@ -2372,6 +2372,8 @@
     <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請對方新增可接收較大訊息的收件匣中繼。</string>
+    <string name="error_update_too_large">此更新過大，你的中繼拒絕了它。未做任何變更。</string>
+    <string name="error_group_change_too_large">某項群組變更對該群組的中繼來說過大，因此未執行。</string>
     <string name="notification_show_previews">顯示通知預覽</string>
     <string name="notification_show_previews_detail">關閉後會隱藏姓名和訊息內容。適用於所有帳戶。</string>
     <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>
