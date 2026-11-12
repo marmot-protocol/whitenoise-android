@@ -35,7 +35,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -78,8 +77,6 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.mediaCacheKey
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.ANDROID_PACKAGE_MIME
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubbleContent
 import dev.ipf.whitenoise.android.ui.conversation.media.fileAttachmentCardTestTag
@@ -118,7 +115,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             initialMemberSnapshot = memberSnapshot(),
             groupRosterReader = { _, _ -> authoritativeRoster() },
         )
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
     private var originalTimeFormat: String? = null
 
     /** Pins the 12-hour and UTC clock inputs; each Robolectric config supplies the fixture locale. */
@@ -725,7 +721,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             item = item,
             controller = controller,
             appState = appState,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = selectionMode,
             textSelectionMode = false,
@@ -746,12 +741,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            inviteMutationInFlight = false,
-            onJoinInvite = {},
-            onDeclineInvite = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderAvatar = showSenderAvatar,
             parseMarkdown = ::markdown,
         )

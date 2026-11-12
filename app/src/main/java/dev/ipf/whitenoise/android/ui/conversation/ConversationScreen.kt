@@ -1930,11 +1930,8 @@ internal fun ConversationScreen(
         exitConversationRoute()
     }
 
-    // Row callbacks read the latest projections through stable holders. Capturing them directly makes every
-    // visible row's callback new whenever the timeline changes, so one send would re-run every unchanged row.
+    // Read the latest projections without changing every visible row callback when the timeline changes.
     val currentSelectableMessages by rememberUpdatedState(selectableMessages)
-    val currentExitConversation by rememberUpdatedState(exitConversation)
-    val rowExitConversation: () -> Unit = remember { { currentExitConversation() } }
 
     /** Restores and persists the imported-share shelf and stages newly shared items into this chat's draft. */
     @Composable
@@ -4807,7 +4804,6 @@ internal fun ConversationScreen(
                                                 },
                                                 eventCardResolver = eventCardResolver,
                                                 documentSaveFallback = documentSaveFallback,
-                                                composerTextState = composerTextState,
                                                 highlighted =
                                                     messageId == navigationState.targetHighlight.highlightedMessageId,
                                                 selectionMode = selectionMode,
@@ -4886,8 +4882,6 @@ internal fun ConversationScreen(
                                                 onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                                 onReplyPreviewClick = { navigateToReplyTarget(it) },
                                                 composerGate = composerGate,
-                                                blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                                                onUnblockBlockedDm = ::unblockBlockedDm,
                                                 onWave =
                                                     if (composerGate == ComposerGate.COMPOSER && canWave()) {
                                                         wave@{ accountIdHex, onAccepted ->
@@ -4908,13 +4902,6 @@ internal fun ConversationScreen(
                                                     } else {
                                                         null
                                                     },
-                                                onReaderSendAccepted = {
-                                                    acceptedSendRevealedTranscript = true
-                                                    revealSentMessage()
-                                                },
-                                                onBack = rowExitConversation,
-                                                mentionCandidates = mentionPicker.candidates,
-                                                mentionPickerEnabled = mentionPicker.enabled,
                                                 onBeforeBodyCollapse = {
                                                     scrollCoordinator.cancelForegroundRestoreForUserIntent()
                                                     // Collapse cancels deferred movement while preserving

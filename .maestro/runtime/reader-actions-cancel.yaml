@@ -10,14 +10,16 @@ name: reader-actions-cancel
     direction: UP
 - tapOn: "Read More"
 - assertVisible:
-    id: "message-full-screen"
+    id: "composer-pill-surface"
+- scrollUntilVisible:
+    element:
+      text: "Maestro reader heading"
+    direction: UP
 - assertVisible: "Maestro reader heading"
-- tapOn: "Message actions"
+- longPressOn:
+    text: "Maestro reader heading"
 - assertVisible: "Copy text"
 - back
+- assertVisible: "Maestro reader heading"
 - assertVisible:
-    id: "message-full-screen"
-- back
-- assertNotVisible:
-    id: "message-full-screen"
-- assertVisible: "Read More"
+    id: "composer-pill-surface"

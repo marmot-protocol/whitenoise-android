@@ -749,12 +749,6 @@
     <ID>MaxLineLength:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$clockPresenter.show(update(isMention = false), previewTextOverride = "first", shortNpub = { "npub1test" })</ID>
     <ID>MaxLineLength:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$runBlocking { presenter.show(update(isMention = true), previewTextOverride = "hi", shortNpub = { "npub1test" }) }</ID>
     <ID>MaxLineLength:LocationPickerScreen.kt:Icon(Icons.Default.MyLocation, contentDescription = stringResource(R.string.location_use_current))</ID>
-    <ID>MaxLineLength:LongMessageFullScreenComposerCoverageTest.kt:LongMessageFullScreenComposerCoverageTest$"ConversationScreen must compute one ComposerGate result and pass it both to the main bottom bar and expanded reader"</ID>
-    <ID>MaxLineLength:LongMessageFullScreenComposerCoverageTest.kt:LongMessageFullScreenComposerCoverageTest$"expanded long-message view must render through the same ComposerGate states as the normal conversation bottom bar"</ID>
-    <ID>MaxLineLength:LongMessageFullScreenComposerCoverageTest.kt:LongMessageFullScreenComposerCoverageTest$"the edge-to-edge dialog should not zero TopAppBar status-bar insets; otherwise the bar can sit under the status bar"</ID>
-    <ID>MaxLineLength:LongMessageFullScreenComposerCoverageTest.kt:LongMessageFullScreenComposerCoverageTest$"the full-screen long-message reader dialog must opt out of decor fitting so ComposerBar can receive IME insets"</ID>
-    <ID>MaxLineLength:LongMessageFullScreenComposerCoverageTest.kt:LongMessageFullScreenComposerCoverageTest$"the full-screen long-message reader must expose a Scaffold bottomBar so the composer stays docked while the body scrolls"</ID>
-    <ID>MaxLineLength:LongMessageFullScreenComposerCoverageTest.kt:LongMessageFullScreenComposerCoverageTest$Regex("""onReply\s*=\s*\{\s*if \(canUseExpandedComposer\) \{\s*beginReply\(\)\s*}\s*}""", RegexOption.DOT_MATCHES_ALL)</ID>
     <ID>MaxLineLength:Lud16ResolverTest.kt:Lud16ResolverTest$Lud16Resolver.isPayRequest("""{"tag":"payRequest","callback":"http://x.co/cb","minSendable":1,"maxSendable":2}""")</ID>
     <ID>MaxLineLength:Lud16ResolverTest.kt:Lud16ResolverTest$Lud16Resolver.isPayRequest("""{"tag":"payRequest","callback":"nonsense","minSendable":1,"maxSendable":2}""")</ID>
     <ID>MaxLineLength:MainShell.kt:var chatListReturnHeadSnap by remember { mutableStateOf&lt;ChatListReturnHeadSnapState&gt;(ChatListReturnHeadSnapState.Unarmed) }</ID>

@@ -13,7 +13,6 @@ import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -42,7 +41,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -66,7 +64,6 @@ class TimelineRowTwoMemberGroupChromeTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-    private val composerTextState = ComposerTextState(TextFieldValue())
     private val originalTimeZone = TimeZone.getDefault()
 
     /** Bubble timestamps render in the default zone; pin UTC so baselines match CI. */
@@ -201,7 +198,6 @@ class TimelineRowTwoMemberGroupChromeTest {
             onMeasured = { _, _ -> },
             appState = appState,
             controller = controller,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -223,9 +219,6 @@ class TimelineRowTwoMemberGroupChromeTest {
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
             composerGate = ComposerGate.COMPOSER,
-            onBack = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             collapseLongMessages = false,
         )
     }

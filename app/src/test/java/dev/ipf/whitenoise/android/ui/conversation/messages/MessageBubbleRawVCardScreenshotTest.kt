@@ -10,15 +10,12 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.mediaCacheKey
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -53,7 +50,6 @@ class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures(
             initialMemberSnapshot = memberSnapshot(),
             groupRosterReader = { _, _ -> authoritativeRoster() },
         )
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
     private var originalTimeFormat: String? = null
     private val originalTimeZone: TimeZone = TimeZone.getDefault()
 
@@ -134,7 +130,6 @@ class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures(
             item = item,
             controller = controller,
             appState = appState,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -155,12 +150,6 @@ class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures(
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            inviteMutationInFlight = false,
-            onJoinInvite = {},
-            onDeclineInvite = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderAvatar = false,
             parseMarkdown = ::markdown,
         )

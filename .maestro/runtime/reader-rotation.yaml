@@ -10,15 +10,17 @@ name: reader-rotation
     direction: UP
 - tapOn: "Read More"
 - assertVisible:
-    id: "message-full-screen"
-- assertVisible: "Maestro reader heading"
+    id: "composer-pill-surface"
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible:
-    id: "message-full-screen"
+    id: "composer-pill-surface"
 - setOrientation: PORTRAIT
-- assertVisible:
-    id: "message-full-screen"
+- scrollUntilVisible:
+    element:
+      text: "Maestro reader heading"
+    direction: UP
+- assertVisible: "Maestro reader heading"
+- longPressOn:
+    text: "Maestro reader heading"
+- assertVisible: "Show less"
 - back
-- assertNotVisible:
-    id: "message-full-screen"
-- assertVisible: "Read More"

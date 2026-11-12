@@ -47,16 +47,6 @@
           "MSG-010"
         ]
       }
-    ],
-    "composable_surfaces": [
-      {
-        "surface": "ReaderSendDismissal",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
-        "anchor": "fun ReaderSendDismissal(",
-        "test_ids": [
-          "MSG-039"
-        ]
-      }
     ]
   },
   "discovery_exceptions": []

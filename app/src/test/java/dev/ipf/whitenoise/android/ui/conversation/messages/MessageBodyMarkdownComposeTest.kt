@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -48,13 +50,7 @@ class MessageBodyMarkdownComposeTest {
                     parseMarkdown = { parsed },
                 )
             WhiteNoiseTheme {
-                MessageFullScreenBody(
-                    body = raw,
-                    markdownDocument = resolved,
-                    mentionDisplayName = null,
-                    onNostrProfileTap = null,
-                    onCopyMarkdownLink = {},
-                )
+                if (resolved == null) Text(raw) else MarkdownMessageBody(document = resolved)
             }
         }
 
@@ -88,13 +84,7 @@ class MessageBodyMarkdownComposeTest {
                     },
                 )
             WhiteNoiseTheme {
-                MessageFullScreenBody(
-                    body = raw,
-                    markdownDocument = resolved,
-                    mentionDisplayName = null,
-                    onNostrProfileTap = null,
-                    onCopyMarkdownLink = {},
-                )
+                if (resolved == null) Text(raw) else MarkdownMessageBody(document = resolved)
             }
         }
 

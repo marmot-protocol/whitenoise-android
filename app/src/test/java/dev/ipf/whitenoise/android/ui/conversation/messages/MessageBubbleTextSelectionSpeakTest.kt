@@ -34,7 +34,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -67,8 +66,6 @@ import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -1307,14 +1304,12 @@ class MessageBubbleTextSelectionSpeakTest {
         onActionMenuOpenChange: (Boolean) -> Unit = {},
         readOnly: Boolean = false,
     ) {
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         val ttsState by appState.ttsController.state.collectAsState()
         CompositionLocalProvider(LocalTextContextMenuToolbarProvider provides nativeTextMenuProvider) {
             MessageBubble(
                 item = item,
                 controller = controller,
                 appState = appState,
-                composerTextState = composerTextState,
                 highlighted = false,
                 selectionMode = false,
                 textSelectionMode = textSelectionMode,
@@ -1335,12 +1330,6 @@ class MessageBubbleTextSelectionSpeakTest {
                 onActionMenuOpenChange = onActionMenuOpenChange,
                 onQuickReactionsSave = {},
                 onReplyPreviewClick = {},
-                composerGate = ComposerGate.COMPOSER,
-                inviteMutationInFlight = false,
-                onJoinInvite = {},
-                onDeclineInvite = {},
-                mentionCandidates = emptyList(),
-                mentionPickerEnabled = false,
                 ttsHighlightPassage = timelineRowTtsHighlightPassage(item.record.messageIdHex, ttsState),
                 ttsReadAloudProgress = timelineRowTtsReadAloudProgress(item.record.messageIdHex, ttsState),
                 readOnly = readOnly,

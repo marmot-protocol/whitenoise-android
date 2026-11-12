@@ -13,12 +13,9 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -50,7 +47,6 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
-import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -522,39 +518,35 @@ class ConversationAcceptedSendRouteScreenshotTest {
     }
 
     /**
-     * Sending from a long message's Read more reader closes the reader once the send is accepted and reveals the
-     * pending bubble above the full conversation's composer, through the same snap the main composer uses (#3268).
+     * Expanding a long history message keeps the existing composer mounted. Sending from it still reveals the
+     * accepted outgoing message above that composer.
      */
     @Test
-    fun acceptedSendFromReadMoreReaderClosesItAndRevealsThePendingTail() {
+    fun acceptedSendAfterInlineReadMoreRevealsThePendingTail() {
         val conversation = createConversation(longHistoryMessage = true)
         val evidence = SendRouteEvidence()
         mountHistoryConversation(conversation, evidence)
         composeRule.waitForIdle()
         composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.ReadingHistory }
         val context = ApplicationProvider.getApplicationContext<Context>()
-        // The collapsed bubble also lays out a zero-size measurement copy of Read More; tap the visible one.
-        val readMoreId =
-            composeRule
-                .onAllNodesWithText(context.getString(R.string.message_read_more))
-                .fetchSemanticsNodes()
-                .first { it.boundsInRoot.width > 0f }
-                .id
-        composeRule.onNode(SemanticsMatcher("visible Read More") { it.id == readMoreId }).performClick()
-        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertIsDisplayed()
+        // Ignore the zero-size measurement copy of the footer action.
+        val readMore =
+            composeRule.onNode(
+                hasText(context.getString(R.string.message_read_more)) and
+                    SemanticsMatcher("visible footer action") { it.boundsInRoot.width > 0f },
+            )
+        readMore.performClick()
+        composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).assertIsDisplayed()
+        readMore.assertDoesNotExist()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_read_more_inline.png")
         evidence.writes.clear()
 
         composeRule.mainClock.autoAdvance = false
-        composeRule
-            .onNode(
-                hasContentDescription(context.getString(R.string.send)) and
-                    hasAnyAncestor(hasTestTag(MESSAGE_FULL_SCREEN_TAG)),
-            ).performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
         awaitConversationCondition { publishCount == 1 }
         repeat(30) { composeRule.mainClock.advanceTimeByFrame() }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertDoesNotExist()
         val sentId =
             conversation.timeline
                 .single { it.record.plaintext == SENT_TEXT }
@@ -567,10 +559,9 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 .boundsInRoot
         val composerBounds = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
         assertTrue("the pending bubble clears the conversation composer", bubbleBounds.bottom <= composerBounds.top)
-        assertEquals("the reader send publishes exactly once", 1, publishCount)
-        assertTrue("accepted reader sends never animate across history", evidence.writes.none { it.animated })
+        assertEquals("the composer publishes exactly once", 1, publishCount)
+        assertTrue("accepted sends never animate across history", evidence.writes.none { it.animated })
         assertTrue(checkNotNull(evidence.viewport).mode is ConversationScrollMode.FollowingTail)
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_send_read_more_tail.png")
     }
 
     /**
