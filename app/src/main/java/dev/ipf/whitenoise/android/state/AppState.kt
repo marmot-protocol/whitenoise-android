@@ -2395,6 +2395,9 @@ class WhiteNoiseAppState private constructor(
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
 
+    /** Queued-change size refusals already shown, so a redelivered refusal is not shown twice. Main thread only. */
+    internal val shownQueuedSizeRefusals = ShownQueuedRefusals()
+
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set
 
@@ -13862,7 +13865,8 @@ class WhiteNoiseAppState private constructor(
      * fails, and a failed open, are retried with the capped backoff for as long as the listener runs. Lookups run
      * as supervised children of this loop, so they end with it, and a failing one is logged without cancelling the
      * loop or the notification listener above it. The same stream carries MDK's accepted deletions, so each event
-     * also retracts removed notification content, and each open reconciles the cards already shown (#3323).
+     * also retracts removed notification content, and each open reconciles the cards already shown (#3323). It also
+     * tells the active account when MDK drops a queued group change for size, which nothing else surfaces.
      */
     internal suspend fun runMutedChatReceiptLoop(
         marmot: MarmotInterface,
@@ -13898,6 +13902,10 @@ class WhiteNoiseAppState private constructor(
                         while (event != null) {
                             backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                             handleNotificationContentEvent(event, readReconciliations)
+                            // MDK drops an oversized queued group change without retrying it, so the user is told.
+                            queuedSizeRefusal(event)?.let { refusal ->
+                                launch(Dispatchers.Main) { presentQueuedSizeRefusal(refusal) }
+                            }
                             val received = (event as? MarmotEventFfi.MessageReceived)?.received
                             // Only the cheap kind and sender check runs here; the suppression reads run with the
                             // lookup, as a child of this loop, so they never delay the next event.

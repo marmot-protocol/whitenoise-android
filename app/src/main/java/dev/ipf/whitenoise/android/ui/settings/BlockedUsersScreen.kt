@@ -90,5 +90,6 @@ internal fun blockOutcomeMessage(outcome: BlockOutcome): Int? =
         BlockOutcome.Confirmed -> null
         BlockOutcome.Uncertain -> R.string.block_publication_uncertain
         BlockOutcome.Unavailable -> R.string.block_list_unavailable
+        BlockOutcome.TooLarge -> R.string.error_update_too_large
         BlockOutcome.Failed -> R.string.block_change_failed
     }

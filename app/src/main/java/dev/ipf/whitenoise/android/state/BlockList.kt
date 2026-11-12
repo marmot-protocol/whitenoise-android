@@ -36,6 +36,9 @@ internal enum class BlockOutcome {
     /** The account's block list cannot be read or written right now. */
     Unavailable,
 
+    /** Every relay refused the updated block list for size; nothing changed and retrying cannot help. */
+    TooLarge,
+
     /** Any other failure; nothing changed. */
     Failed,
 }
@@ -176,6 +179,8 @@ internal suspend fun WhiteNoiseAppState.setUserBlocked(
         BlockOutcome.Uncertain
     } catch (unavailable: MarmotKitException.BlockListUnavailable) {
         BlockOutcome.Unavailable
+    } catch (tooLarge: MarmotKitException.EventTooLarge) {
+        BlockOutcome.TooLarge
     } catch (failure: MarmotKitException) {
         appStateDebug(failure) { "block state change failed" }
         BlockOutcome.Failed

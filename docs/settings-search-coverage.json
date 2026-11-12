@@ -607,6 +607,10 @@
         {
           "declaration": "\"refresh\"",
           "represented_by": "Developer.quarantined_groups"
+        },
+        {
+          "declaration": "\"reopen\"",
+          "excluded": "Per-group quarantine rows exist only while a group is quarantined and show a group identifier; the quarantined-groups destination stays indexed."
         }
       ]
     },

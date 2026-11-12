@@ -55,6 +55,28 @@ class QuarantinedGroupsScreenshotTest {
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
     fun largeRtl() = capture("quarantine_rtl_large", inventory(), rtl = true)
 
+    /** A failed rewind restore shows force-stop guidance in place of Retry. */
+    @Test fun rewindRestoreLight() = capture("quarantine_rewind_restore_light", rewindRestore())
+
+    /** The force-stop guidance wraps in dark theme, RTL and large text. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h780dp-mdpi")
+    fun rewindRestoreDarkLargeRtl() =
+        capture(
+            "quarantine_rewind_restore_dark_large_rtl",
+            rewindRestore(),
+            dark = true,
+            rtl = true,
+            scrollTo = "quarantine.reopen",
+        )
+
+    /** One group quarantined for a failed rewind restore, which offers no Retry. */
+    private fun rewindRestore() =
+        QuarantinedGroupsUiState(
+            loaded = true,
+            rows = listOf(QuarantinedGroupRow(GROUP, AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED)),
+        )
+
     private fun inventory() =
         QuarantinedGroupsUiState(
             loaded = true,
@@ -68,11 +90,13 @@ class QuarantinedGroupsScreenshotTest {
                 ),
         )
 
+    /** Renders [state] in the requested theme and direction, scrolls to [scrollTo] in RTL, and records [name]. */
     private fun capture(
         name: String,
         state: QuarantinedGroupsUiState,
         dark: Boolean = false,
         rtl: Boolean = false,
+        scrollTo: String = "quarantine.recover",
     ) {
         compose.setContent {
             val density = LocalDensity.current
@@ -86,7 +110,7 @@ class QuarantinedGroupsScreenshotTest {
             }
         }
         if (rtl) {
-            compose.onNodeWithTag("quarantine.list").performScrollToNode(hasTestTag("quarantine.recover"))
+            compose.onNodeWithTag("quarantine.list").performScrollToNode(hasTestTag(scrollTo))
         }
         compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

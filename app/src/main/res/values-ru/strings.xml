@@ -2490,6 +2490,9 @@
     <string name="error_invalid_key_package_for">Не удалось проверить опубликованный ключ чата для %1$s. Попросите обновить White Noise и опубликовать новый ключ чата, затем повторите попытку.</string>
     <string name="error_missing_member_inbox">Нет пригодного входящего ретранслятора для этого человека. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
     <string name="error_missing_member_inbox_for">Нет пригодного входящего ретранслятора для %1$s. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
+    <string name="error_invite_welcome_too_large">Это приглашение слишком велико для входящих ретрансляторов получателя. Попросите добавить входящий ретранслятор, который принимает сообщения большего размера.</string>
+    <string name="error_update_too_large">Это обновление слишком велико для ваших ретрансляторов. Ничего не изменено.</string>
+    <string name="error_group_change_too_large">Изменение группы оказалось слишком большим для ретрансляторов группы, поэтому оно не выполнено.</string>
     <string name="notification_show_previews">Показывать содержимое уведомлений</string>
     <string name="notification_show_previews_detail">Если выключено, скрывает имена и содержимое сообщений. Для всех аккаунтов.</string>
     <string name="notification_preview_update_failed">Изменения могут потеряться после перезапуска.</string>

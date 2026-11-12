@@ -2415,6 +2415,9 @@
     <string name="error_invalid_key_package_for">La clé de discussion publiée pour %1$s n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
     <string name="error_missing_member_inbox">Aucun relais de réception utilisable pour cette personne. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
     <string name="error_missing_member_inbox_for">Aucun relais de réception utilisable pour %1$s. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
+    <string name="error_invite_welcome_too_large">Cette invitation est trop volumineuse pour les relais de réception d’un destinataire. Demandez-lui d’ajouter un relais de réception qui accepte des messages plus volumineux.</string>
+    <string name="error_update_too_large">Cette mise à jour est trop volumineuse pour vos relais. Rien n’a été modifié.</string>
+    <string name="error_group_change_too_large">Une modification du groupe était trop volumineuse pour les relais du groupe. Elle n’a donc pas été appliquée.</string>
     <string name="notification_show_previews">Afficher les aperçus des notifications</string>
     <string name="notification_show_previews_detail">Désactivé, les noms et le contenu des messages sont masqués. Concerne tous les comptes.</string>
     <string name="notification_preview_update_failed">Les modifications peuvent être perdues après un redémarrage.</string>
