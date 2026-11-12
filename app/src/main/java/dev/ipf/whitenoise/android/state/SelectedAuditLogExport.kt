@@ -24,12 +24,11 @@ internal fun auditLogExportCandidates(files: List<AuditLogFileFfi>): List<AuditL
         .sortedWith(compareByDescending<AuditLogFileFfi> { it.modifiedAtMs }.thenBy { it.path })
 
 /** Fetches the current on-device file inventory from MarmotKit. */
-internal suspend fun WhiteNoiseAppState.listAuditLogExportCandidates(): List<AuditLogFileFfi> {
-    return marmotIo {
+internal suspend fun WhiteNoiseAppState.listAuditLogExportCandidates(): List<AuditLogFileFfi> =
+    marmotIo {
         val files = auditLogFiles()
         auditLogExportCandidates(files)
     }
-}
 
 /** Revalidates the selected paths so a stale or partial selection can never be silently exported. */
 internal suspend fun WhiteNoiseAppState.stageSelectedAuditLogs(selectedPaths: Set<String>): File {
