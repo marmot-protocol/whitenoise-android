@@ -90,36 +90,46 @@ class AuditDiagnosticsScreenshotTest {
 
     /** A stale native pause cannot trigger reads or a manual send without Android's consent receipt. */
     @Test
-    fun noConsentKeepsDeliveryOff() = runBlocking {
-        val audit = PrivacyAuditFixture(enabled = true, statuses = listOf(auditStatus("account").copy(paused = true)))
-        val settings = privacyAppState(UsageDiagnosticsDecisionFfi.DECLINED, audit = audit).auditDiagnosticsSettings()
-        settings.refreshDelivery()
-        settings.resumeDelivery()
-        assertEquals(AuditDeliveryState.OFF, settings.delivery?.getOrThrow()?.state)
-        assertEquals(0, audit.deliveryReads)
-        assertEquals(0, audit.resumeCalls)
-    }
+    fun noConsentKeepsDeliveryOff() =
+        runBlocking {
+            val audit =
+                PrivacyAuditFixture(
+                    enabled = true,
+                    statuses = listOf(auditStatus("account").copy(paused = true)),
+                )
+            val settings =
+                privacyAppState(
+                    UsageDiagnosticsDecisionFfi.DECLINED,
+                    audit = audit,
+                ).auditDiagnosticsSettings()
+            settings.refreshDelivery()
+            settings.resumeDelivery()
+            assertEquals(AuditDeliveryState.OFF, settings.delivery?.getOrThrow()?.state)
+            assertEquals(0, audit.deliveryReads)
+            assertEquals(0, audit.resumeCalls)
+        }
 
     /** A receiver still refusing delivery keeps the pause visible after an explicit retry. */
     @Test
-    fun manualAttemptDoesNotClearAReceiverPauseOnItsOwn() = runBlocking {
-        val audit =
-            PrivacyAuditFixture(
-                enabled = true,
-                statuses = listOf(auditStatus("account").copy(paused = true)),
-                clearPauseOnResume = false,
-            )
-        val settings =
-            privacyAppState(
-                UsageDiagnosticsDecisionFfi.DECLINED,
-                seedPreferences = { putInt("audit_upload_disclosure_revision", 2) },
-                audit = audit,
-            ).auditDiagnosticsSettings()
-        settings.refreshDelivery()
-        settings.resumeDelivery()
-        assertEquals(1, audit.resumeCalls)
-        assertEquals(AuditDeliveryState.PAUSED, settings.delivery?.getOrThrow()?.state)
-    }
+    fun manualAttemptDoesNotClearAReceiverPauseOnItsOwn() =
+        runBlocking {
+            val audit =
+                PrivacyAuditFixture(
+                    enabled = true,
+                    statuses = listOf(auditStatus("account").copy(paused = true)),
+                    clearPauseOnResume = false,
+                )
+            val settings =
+                privacyAppState(
+                    UsageDiagnosticsDecisionFfi.DECLINED,
+                    seedPreferences = { putInt("audit_upload_disclosure_revision", 2) },
+                    audit = audit,
+                ).auditDiagnosticsSettings()
+            settings.refreshDelivery()
+            settings.resumeDelivery()
+            assertEquals(1, audit.resumeCalls)
+            assertEquals(AuditDeliveryState.PAUSED, settings.delivery?.getOrThrow()?.state)
+        }
 
     /** Opens the integrated Settings route with a disposable runtime and optional consent. */
     private fun render(
@@ -157,5 +167,14 @@ class AuditDiagnosticsScreenshotTest {
 
     /** A configured account with no previous attempts. */
     private fun auditStatus(account: String) =
-        AuditDeliveryStatusV5Ffi(account, true, null, null, 0uL, 0uL, false, null)
+        AuditDeliveryStatusV5Ffi(
+            accountRef = account,
+            destinationConfigured = true,
+            lastSuccessAtMs = null,
+            lastFailure = null,
+            consecutiveFailures = 0uL,
+            rejectedBatches = 0uL,
+            paused = false,
+            backlog = null,
+        )
 }

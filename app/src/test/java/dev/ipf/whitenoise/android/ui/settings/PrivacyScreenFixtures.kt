@@ -126,8 +126,11 @@ internal class PrivacyAuditFixture(
     val clearPauseOnResume: Boolean = true,
 ) {
     @Volatile var retentionWrites = 0
+
     @Volatile var deliveryReads = 0
+
     @Volatile var resumeCalls = 0
+
     private var auditSettings = AuditLogSettingsFfi(enabled = enabled)
 
     /** Handles the audit subset of the fixture's Marmot interface. */
@@ -152,9 +155,10 @@ internal class PrivacyAuditFixture(
             "postAuditLogTrackerUpdateV5" -> {
                 resumeCalls++
                 if (clearPauseOnResume) {
-                    statuses = statuses.map {
-                        it.copy(paused = false, consecutiveFailures = 0uL, lastFailure = null)
-                    }
+                    statuses =
+                        statuses.map {
+                            it.copy(paused = false, consecutiveFailures = 0uL, lastFailure = null)
+                        }
                 }
                 AuditLogTrackerUpdateResultV5Ffi(true, emptyList(), null, null)
             }
