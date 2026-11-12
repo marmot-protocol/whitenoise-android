@@ -406,7 +406,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
         import yaml
         workflow = yaml.safe_load((ROOT / ".github/workflows/android-instrumented.yml").read_text())
         step = next(step["run"] for step in workflow["jobs"]["instrumented-required-cases"]["steps"]
-                    if step.get("name") == "Check required cases across shards")
+                    if step.get("name") == "Check shards are disjoint and required cases ran")
         cases = [line.strip() for line in (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
                  if line.strip() and not line.startswith("#")]
 
@@ -434,6 +434,31 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertEqual(run_step(cases[1::2]).returncode, 0)
         self.assertNotEqual(run_step(cases[1::2][1:]).returncode, 0)
         self.assertNotEqual(run_step(cases[1::2], with_shard_one=False).returncode, 0)
+        duplicated = run_step(cases[1::2] + cases[:1])
+        self.assertNotEqual(duplicated.returncode, 0)
+        self.assertIn(f"{cases[0]} ran in shards [0, 1]", duplicated.stderr)
+
+    def test_only_master_pushes_and_full_suite_dispatches_shard(self):
+        """connected_shards splits a dispatched full suite and rejects focused suites."""
+        import yaml
+        workflow = yaml.safe_load((ROOT / ".github/workflows/android-instrumented.yml").read_text())
+        step = next(step for step in workflow["jobs"]["changes"]["steps"] if step.get("id") == "shards")
+        self.assertEqual(workflow["jobs"]["changes"]["outputs"]["connected_shards"], "${{ steps.shards.outputs.count }}")
+
+        def count(event, requested="", focused=""):
+            with tempfile.TemporaryDirectory() as temp:
+                output = pathlib.Path(temp) / "output"
+                result = subprocess.run(["bash", "-c", step["run"]], capture_output=True, text=True, env={
+                    **os.environ, "GITHUB_OUTPUT": str(output), "CI_EVENT": event,
+                    "SHARDS_REQUESTED": requested, "FOCUSED_SUITE": focused})
+                return result.returncode, output.read_text() if output.exists() else ""
+
+        self.assertEqual(count("push"), (0, "count=2\n"))
+        self.assertEqual(count("pull_request"), (0, "count=1\n"))
+        self.assertEqual(count("workflow_dispatch", "false", "false"), (0, "count=1\n"))
+        self.assertEqual(count("workflow_dispatch", "true", "false"), (0, "count=2\n"))
+        self.assertEqual(count("workflow_dispatch", "true", "true"), (1, ""))
+        self.assertEqual(count("workflow_dispatch", "false", "true"), (0, "count=1\n"))
 
     def test_pull_request_smoke_does_not_require_full_suite_cases(self):
         """Bounded PR smoke runs stay annotation-selected and skip the full-suite case list."""

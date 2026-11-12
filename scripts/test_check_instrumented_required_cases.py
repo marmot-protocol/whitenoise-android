@@ -2,6 +2,7 @@
 
 import importlib.util
 import io
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,12 @@ SPEC = importlib.util.spec_from_file_location(
 )
 required = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(required)
+sys.path.insert(0, str(ROOT / 'scripts'))
+SHARDS_SPEC = importlib.util.spec_from_file_location(
+    'compare_instrumented_shards', ROOT / 'scripts/compare_instrumented_shards.py',
+)
+shards = importlib.util.module_from_spec(SHARDS_SPEC)
+SHARDS_SPEC.loader.exec_module(shards)
 
 RECIPIENT = (
     'dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePreparationAndroidTest'
@@ -106,6 +113,62 @@ class RequiredInstrumentedCasesTest(unittest.TestCase):
                 status, _, err = self.run_check(testcase(RECIPIENT), required_text=text)
                 self.assertEqual(status, 1)
                 self.assertIn(message, err)
+
+
+class InstrumentedShardComparisonTest(unittest.TestCase):
+    """Sharded runs must execute every test exactly once, not only the required ones."""
+
+    A, B, C = (f'dev.ipf.whitenoise.android.SampleAndroidTest#case{n}' for n in 'abc')
+
+    def run_compare(self, *shard_cases, baseline=None):
+        """Write each case list as one report directory and run the comparison CLI."""
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+
+        def write(name, cases):
+            results = root / name / 'debug/flavors/devZapstore'
+            results.mkdir(parents=True)
+            (results / 'TEST-emulator-5554.xml').write_text(
+                '<testsuite name="device">' + ''.join(map(testcase, cases)) + '</testsuite>')
+            return str(root / name)
+
+        argv = [write(f'shard-{index}', cases) for index, cases in enumerate(shard_cases)]
+        if baseline is not None:
+            argv += ['--baseline', write('unsharded', baseline)]
+        out, err = io.StringIO(), io.StringIO()
+        status = shards.main(argv, out=out, err=err)
+        return status, out.getvalue(), err.getvalue()
+
+    def test_disjoint_shards_matching_the_unsharded_run_pass(self):
+        """Every unsharded test ran in exactly one shard."""
+        status, out, _ = self.run_compare([self.A, self.C], [self.B], baseline=[self.A, self.B, self.C])
+        self.assertEqual(status, 0)
+        self.assertIn('3 tests ran exactly once (2 + 1), matching 3 unsharded', out)
+
+    def test_test_in_two_shards_fails(self):
+        """Overlapping shards fail even without a baseline."""
+        status, _, err = self.run_compare([self.A, self.B], [self.B])
+        self.assertEqual(status, 1)
+        self.assertIn(f'{self.B} ran in shards [0, 1]', err)
+
+    def test_unsharded_test_missing_from_every_shard_fails(self):
+        """A test outside the required list that no shard ran is reported."""
+        status, _, err = self.run_compare([self.A], [self.B], baseline=[self.A, self.B, self.C])
+        self.assertEqual(status, 1)
+        self.assertIn(f'{self.C} ran unsharded but in no shard', err)
+
+    def test_shard_only_test_fails_against_the_baseline(self):
+        """Shards cannot report tests that the unsharded run did not."""
+        status, _, err = self.run_compare([self.A], [self.B, self.C], baseline=[self.A, self.B])
+        self.assertEqual(status, 1)
+        self.assertIn(f'{self.C} ran in a shard but not unsharded', err)
+
+    def test_empty_shards_fail(self):
+        """Shards without any testcase cannot pass vacuously."""
+        status, _, err = self.run_compare([], [])
+        self.assertEqual(status, 1)
+        self.assertIn('no testcases in any shard', err)
 
 
 if __name__ == '__main__':

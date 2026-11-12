@@ -677,7 +677,8 @@ ET.ElementTree(suite).write(out/'results.xml')
                 allowed=eval(normalized(current['changes']['steps'][0]['env']['TRACE_MODE_VALID']),{'__builtins__':{}},context)
                 changes_output='true' if allowed else ''
             context['needs']=SimpleNamespace(changes=SimpleNamespace(outputs=SimpleNamespace(
-                connected='true',attachment_fixture='true',media_trace_allowed=changes_output)))
+                connected='true',attachment_fixture='true',media_trace_allowed=changes_output,
+                connected_shards='2' if event=='push' else '1')))
             return bool(eval(normalized(expr).replace('needs.maestro-runtime-build.result','runtime_build_result'),{'__builtins__':{}},context))
         flags=['maestro_pilot','responsiveness_only','outbound_share_only','mdk_adoption_only',
                'mdk_qualification','mdk_preview_qualification','range_selection_only','review_demo_e2e',

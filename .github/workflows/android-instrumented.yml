@@ -138,6 +138,11 @@ on:
         required: true
         type: boolean
         default: false
+      connected_shards:
+        description: Split the full connected suite across two emulators, as master pushes do
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [master]
   pull_request:
@@ -323,7 +328,7 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: ${{ github.event_name == 'workflow_dispatch' && inputs.media_startup_trace && 'android-media-startup-trace' || github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.mdk_preview_qualification && 'mdk-signed-preview' || inputs.mdk_qualification && 'mdk-qualification' || inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.range_selection_only && 'range-selection' || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.media_startup_trace && 'android-media-startup-trace' || github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}-{2}', github.workflow, github.ref, inputs.mdk_preview_qualification && 'mdk-signed-preview' || inputs.mdk_qualification && 'mdk-qualification' || inputs.outbound_share_only && format('outbound-share-{0}', inputs.outbound_share_api) || inputs.range_selection_only && 'range-selection' || inputs.connected_shards && 'sharded' || inputs.responsiveness_only && 'responsiveness' || 'standard') }}
   cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.media_startup_trace || inputs.mdk_qualification || inputs.mdk_preview_qualification)) }}
 
 permissions:
@@ -340,6 +345,7 @@ jobs:
       attachment_fixture: ${{ steps.select.outputs.attachment_fixture }}
       attachment_fixture_scope: ${{ steps.select.outputs.attachment_fixture_scope }}
       connected: ${{ steps.select.outputs.connected }}
+      connected_shards: ${{ steps.shards.outputs.count }}
       media_trace_allowed: ${{ steps.media-trace-selection.outputs.allowed }}
     steps:
       - name: Validate media trace selection before checkout or campaigns
@@ -349,6 +355,21 @@ jobs:
         run: |
           [[ "$TRACE_MODE_VALID" == "true" ]] || exit 1
           echo 'allowed=true' >> "$GITHUB_OUTPUT"
+      - name: Select connected shard count
+        id: shards
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          SHARDS_REQUESTED: ${{ inputs.connected_shards }}
+          FOCUSED_SUITE: ${{ inputs.media_startup_trace || inputs.media_sandbox_only || inputs.range_selection_only || inputs.responsiveness_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.maestro_pilot || inputs.review_demo_e2e || inputs.document_provider_matrix || inputs.mdk_qualification || inputs.mdk_preview_qualification }}
+        run: |
+          count=1
+          if [[ "$CI_EVENT" == push ]]; then
+            count=2
+          elif [[ "$CI_EVENT" == workflow_dispatch && "$SHARDS_REQUESTED" == true ]]; then
+            [[ "$FOCUSED_SUITE" != true ]] || { echo "connected_shards splits only the full connected suite" >&2; exit 1; }
+            count=2
+          fi
+          echo "count=$count" >> "$GITHUB_OUTPUT"
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -434,18 +455,18 @@ jobs:
   instrumented:
     needs: changes
     if: ${{ needs.changes.outputs.media_trace_allowed == 'true' && (needs.changes.outputs.connected == 'true' && (inputs.media_startup_trace || github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.range_selection_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
-    name: Connected Android tests (emulator${{ github.event_name == 'push' && format(', shard {0}', matrix.shard) || '' }})
+    name: Connected Android tests (emulator${{ needs.changes.outputs.connected_shards == '2' && format(', shard {0}', matrix.shard) || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        # Master pushes split the full suite across two emulators; the merged
-        # required-case check runs in instrumented-required-cases. PR smoke and
-        # dispatched suites stay single-job.
-        shard: ${{ fromJSON(github.event_name == 'push' && '[0, 1]' || '[0]') }}
+        # Master pushes (and dispatches with connected_shards) split the full suite
+        # across two emulators; instrumented-required-cases checks the merged
+        # results. PR smoke and other dispatched suites stay single-job.
+        shard: ${{ fromJSON(needs.changes.outputs.connected_shards == '2' && '[0, 1]' || '[0]') }}
     env:
-      INSTRUMENTED_SHARD_COUNT: ${{ github.event_name == 'push' && '2' || '1' }}
+      INSTRUMENTED_SHARD_COUNT: ${{ needs.changes.outputs.connected_shards }}
       INSTRUMENTED_SHARD_INDEX: ${{ matrix.shard }}
       OUTBOUND_SHARE_ANDROID_API: ${{ inputs.outbound_share_api || '34' }}
       RELEASE_VERIFY_REPORT_DIR: app/build/reports/outbound-share-contract
@@ -632,9 +653,9 @@ jobs:
 
   instrumented-required-cases:
     needs: [changes, instrumented]
-    # Sharded master runs check every declared case against both shards' results,
+    # Sharded runs check every declared case against both shards' results,
     # whenever the connected job was admitted, including after a shard failure.
-    if: ${{ !cancelled() && github.event_name == 'push' && needs.changes.outputs.media_trace_allowed == 'true' && needs.changes.outputs.connected == 'true' && !inputs.mdk_qualification && !inputs.mdk_preview_qualification }}
+    if: ${{ !cancelled() && needs.changes.outputs.connected_shards == '2' && needs.changes.outputs.media_trace_allowed == 'true' && needs.changes.outputs.connected == 'true' && !inputs.mdk_qualification && !inputs.mdk_preview_qualification }}
     name: Required connected cases (all shards)
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -649,7 +670,7 @@ jobs:
         with:
           pattern: android-instrumented-reports*
           path: ${{ runner.temp }}/shards
-      - name: Check required cases across shards
+      - name: Check shards are disjoint and required cases ran
         shell: bash
         run: |
           set -euo pipefail
@@ -665,6 +686,7 @@ jobs:
           done
           [[ ${#shards[@]} == 2 ]] || { echo "Expected connected results from 2 shards, found ${#shards[@]}" >&2; exit 1; }
           for index in "${!shards[@]}"; do cp -R "${shards[$index]}" "$merged/shard-$index"; done
+          python3 scripts/compare_instrumented_shards.py "$merged"/shard-*
           python3 scripts/check_instrumented_required_cases.py "$merged"
 
   maestro-pilot:
