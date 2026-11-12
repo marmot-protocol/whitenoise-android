@@ -22,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -39,6 +40,7 @@ import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -52,6 +54,8 @@ internal fun DiagnosticsImprovementsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val auditDiagnostics = rememberAuditDiagnosticsSettings(appState)
     val clearLogsDescription =
         listOf(
             stringResource(R.string.delete_audit_logs),
@@ -91,7 +95,10 @@ internal fun DiagnosticsImprovementsScreen(
             onDismiss = { confirmAuditUpload = false },
             onConfirm = {
                 confirmAuditUpload = false
-                runAuditMutation { appState.setAuditLogsEnabled(true) }
+                runAuditMutation {
+                    appState.setAuditLogsEnabled(true)
+                    auditDiagnostics.refreshDelivery()
+                }
             },
         )
     }
@@ -122,7 +129,10 @@ internal fun DiagnosticsImprovementsScreen(
                                 if (enabled) {
                                     confirmAuditUpload = true
                                 } else {
-                                    runAuditMutation { appState.setAuditLogsEnabled(false) }
+                                    runAuditMutation {
+                                        appState.setAuditLogsEnabled(false)
+                                        auditDiagnostics.refreshDelivery()
+                                    }
                                 }
                             },
                             subtitle = stringResource(R.string.audit_upload_subtitle),
@@ -133,11 +143,27 @@ internal fun DiagnosticsImprovementsScreen(
                 }
             }
             item(key = "search.DiagnosticsImprovements.2") { DiagnosticsDisclosure(appState) }
+            item(key = "search.DiagnosticsImprovements.delivery") {
+                AuditDeliverySection(
+                    settings = auditDiagnostics,
+                    consentBusy = auditLogsBusy,
+                    onRefresh = { scope.launch { auditDiagnostics.refreshDelivery() } },
+                    onResume = { scope.launch { auditDiagnostics.resumeDelivery() } },
+                )
+            }
             item(key = "search.DiagnosticsImprovements.3") {
                 SettingsSection(stringResource(R.string.stored_audit_logs))
             }
             item(key = "search.DiagnosticsImprovements.4") {
                 SettingsGroup(modifier = Modifier.testTag("diagnostics.stored.group")) {
+                    row("audit_retention") { rowContext ->
+                        AuditRetentionRow(
+                            context = rowContext,
+                            settings = auditDiagnostics,
+                            onRefresh = { scope.launch { auditDiagnostics.refreshRetention() } },
+                            onChoose = { days, confirmed -> scope.launch { auditDiagnostics.chooseRetention(days, confirmed) } },
+                        )
+                    }
                     row("select_audit_files") { rowContext ->
                         SettingsAction(
                             context = rowContext,

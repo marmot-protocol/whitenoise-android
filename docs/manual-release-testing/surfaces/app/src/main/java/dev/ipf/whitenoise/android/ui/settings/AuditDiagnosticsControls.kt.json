@@ -1,0 +1,227 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberAuditDiagnosticsSettings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "fun rememberAuditDiagnosticsSettings(",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "AuditDeliverySection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "fun AuditDeliverySection(",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "AuditRetentionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "fun AuditRetentionRow(",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "ShorterAuditRetentionDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "fun ShorterAuditRetentionDialog(",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "auditRetentionDays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "fun auditRetentionDays(",
+        "test_ids": [
+          "SEC-018"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "plurals:audit_retention_days",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.plurals.audit_retention_days",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_active",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_active",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_last_success",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_last_success",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_paused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_paused",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_resume",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_resume",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_resume_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_resume_failed",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_resuming",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_resuming",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_retrying",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_retrying",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_title",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_delivery_waiting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_delivery_waiting",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_retention_confirm_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_retention_confirm_action",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_retention_confirm_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_retention_confirm_body",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_retention_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_retention_confirm_title",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_retention_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_retention_save_failed",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_retention_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_retention_title",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:audit_settings_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.audit_settings_loading",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:download_never",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.download_never",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.refresh",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:relay_list_status_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.relay_list_status_unavailable",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.usage_diagnostics_off",
+        "test_ids": [
+          "SEC-018"
+        ]
+      },
+      {
+        "surface": "string:usage_diagnostics_unconfigured",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.usage_diagnostics_unconfigured",
+        "test_ids": [
+          "SEC-018"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

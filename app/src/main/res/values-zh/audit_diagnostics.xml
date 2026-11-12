@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">审计日志发送状态</string>
+    <string name="audit_delivery_last_success">上次成功检查</string>
+    <string name="audit_delivery_waiting">等待上传</string>
+    <string name="audit_delivery_resume">恢复发送</string>
+    <string name="audit_delivery_resuming">正在尝试发送审计日志…</string>
+    <string name="audit_delivery_resume_failed">无法恢复发送</string>
+    <string name="audit_delivery_active">已启用</string>
+    <string name="audit_delivery_retrying">正在自动重试</string>
+    <string name="audit_delivery_paused">已暂停</string>
+    <string name="audit_settings_loading">正在加载…</string>
+    <string name="audit_retention_title">审计日志保留期限</string>
+    <string name="audit_retention_save_failed">无法更改日志保留期限</string>
+    <string name="audit_retention_confirm_title">删除较早的审计日志？</string>
+    <string name="audit_retention_confirm_body">将保留期限设为 %1$s 后，此设备上更早的审计日志将被删除，包括仍在等待上传的日志。</string>
+    <string name="audit_retention_confirm_action">删除较早的日志</string>
+    <plurals name="audit_retention_days">
+        <item quantity="other">%d 天</item>
+    </plurals>
+</resources>

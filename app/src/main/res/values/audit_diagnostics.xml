@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Audit log delivery</string>
+    <string name="audit_delivery_last_success">Last successful check</string>
+    <string name="audit_delivery_waiting">Waiting to upload</string>
+    <string name="audit_delivery_resume">Resume delivery</string>
+    <string name="audit_delivery_resuming">Trying to send audit logs…</string>
+    <string name="audit_delivery_resume_failed">Couldn’t resume delivery</string>
+    <string name="audit_delivery_active">Active</string>
+    <string name="audit_delivery_retrying">Retrying automatically</string>
+    <string name="audit_delivery_paused">Paused</string>
+    <string name="audit_settings_loading">Loading…</string>
+    <string name="audit_retention_title">Keep audit logs for</string>
+    <string name="audit_retention_save_failed">Couldn’t change log retention</string>
+    <string name="audit_retention_confirm_title">Delete older audit logs?</string>
+    <string name="audit_retention_confirm_body">Keeping logs for %1$s deletes older audit logs on this device, including ones still waiting to upload.</string>
+    <string name="audit_retention_confirm_action">Delete older logs</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+</resources>
