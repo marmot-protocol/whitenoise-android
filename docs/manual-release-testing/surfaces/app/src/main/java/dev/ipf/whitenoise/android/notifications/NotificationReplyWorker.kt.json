@@ -11,6 +11,14 @@
           "NTF-016",
           "NTF-029"
         ]
+      },
+      {
+        "surface": "R.string.toast_message_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt",
+        "anchor": "R.string.toast_message_too_long",
+        "test_ids": [
+          "MSG-048"
+        ]
       }
     ]
   },

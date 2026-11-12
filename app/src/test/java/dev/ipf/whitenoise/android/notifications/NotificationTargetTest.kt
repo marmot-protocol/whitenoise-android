@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.ui.conversation.NotificationLandingTarget
 import dev.ipf.whitenoise.android.ui.conversation.toLandingTarget
 import kotlinx.coroutines.CancellationException
@@ -724,6 +725,35 @@ class NotificationTargetTest {
                 operationFailureAttempt = 2,
             ),
         )
+    }
+
+    /**
+     * A persisted reply over the limit is a terminal failure that is never retried, and the send path
+     * refuses it only after the commit probe, so a reply an earlier attempt already committed still recovers.
+     */
+    @Test
+    fun anOverLimitPersistedReplyFailsTerminallyAfterTheCommitProbe() {
+        assertFalse(
+            NotificationReplyWorker.shouldRetryAfterSendOutcome(
+                NotificationReplySendOutcome.TooLong,
+                operationFailureAttempt = 0,
+            ),
+        )
+        val result =
+            NotificationReplyWorker.resultAfterSendOutcome(
+                NotificationReplySendOutcome.TooLong,
+                operationFailureAttempt = 0,
+            )
+        assertEquals(ListenableWorker.Result.failure(), result)
+        val send =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
+                .substringAfter("internal suspend fun sendNotificationReply(")
+                .substringBefore("sendText(account, group, body)")
+        val probe = send.indexOf("NotificationReplyCommitProbe.Committed")
+        val limit = send.indexOf("exceedsOutgoingMessageLimit(body)")
+        val started = send.indexOf("completionStore.markStarted(")
+        assertTrue("limit check must follow the commit probe and precede the attempt", probe in 0 until limit)
+        assertTrue("limit check must precede marking the attempt started", limit < started)
     }
 
     @Test

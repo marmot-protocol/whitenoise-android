@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -219,6 +220,26 @@ class NotificationActionReceiverTest {
                 }
             }
             assertEquals(0, replyWorkCount())
+        }
+
+    /**
+     * Under app lock a reply is refused before its text is read, whatever its length, so an over-limit
+     * reply gets the lock's refusal rather than a length notice that would require reading it while locked.
+     */
+    @Test
+    fun anOverLimitReplyUnderAppLockIsRefusedUnreadAndNotQueued() =
+        runTest {
+            application.appState.setAppLockScreenVisibleForTest(true)
+            val action = testNotificationAction(NotificationActionKind.REPLY)
+            val intent = Intent()
+            NotificationActions.applyToIntent(intent, NotificationActionKind.REPLY, actionTarget(action))
+            intent.setClass(application, NotificationActionReceiver::class.java)
+            addRemoteInputResults(intent, NotificationActions.KEY_TEXT_REPLY, "\uD83D\uDE00".repeat(8_001))
+
+            dispatch(intent)
+
+            assertEquals(0, replyWorkCount())
+            assertNotEquals(application.getString(R.string.toast_message_too_long), ShadowToast.getTextOfLatestToast())
         }
 
     @Test

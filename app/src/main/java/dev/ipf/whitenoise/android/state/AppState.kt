@@ -10168,6 +10168,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * Sends one notification reply exactly once, reporting an earlier attempt that already committed instead of
+     * resending it, and refusing a reply over the outgoing limit before anything is sent.
+     */
     internal suspend fun sendNotificationReply(
         accountRef: String,
         groupIdHex: String,
@@ -10213,6 +10217,9 @@ class WhiteNoiseAppState private constructor(
                         NotificationReplyCommitProbe.NotCommitted -> Unit
                     }
                 }
+                // A reply queued before the limit existed may be over it. Refuse it only now, once the
+                // probe above has ruled out an earlier attempt that already committed it.
+                if (exceedsOutgoingMessageLimit(body)) return@withGroupCommitLock NotificationReplySendOutcome.TooLong
 
                 // A synthetic max-id cursor excludes every row in this wall-clock
                 // second. Wait for the next second before asking MDK to build the
