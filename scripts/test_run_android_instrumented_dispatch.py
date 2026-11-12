@@ -401,6 +401,40 @@ class InstrumentedDispatchTest(unittest.TestCase):
         """Single-job full suites keep the exact unsharded Gradle invocation."""
         self.assertNotIn("numShards", self.run_dispatch("push"))
 
+    def test_merged_shard_check_reads_both_artifact_layouts(self):
+        """Shard 1 has no cryptoBenchmark results, so its artifact is rooted at app/build."""
+        import yaml
+        workflow = yaml.safe_load((ROOT / ".github/workflows/android-instrumented.yml").read_text())
+        step = next(step["run"] for step in workflow["jobs"]["instrumented-required-cases"]["steps"]
+                    if step.get("name") == "Check required cases across shards")
+        cases = [line.strip() for line in (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
+                 if line.strip() and not line.startswith("#")]
+
+        def write_results(directory, shard_cases):
+            directory.mkdir(parents=True)
+            suite = ET.Element("testsuite")
+            for case in shard_cases:
+                classname, name = case.split("#")
+                ET.SubElement(suite, "testcase", classname=classname, name=name)
+            ET.ElementTree(suite).write(directory / "TEST-shard.xml")
+
+        def run_step(shard_one_cases, *, with_shard_one=True):
+            with tempfile.TemporaryDirectory() as temp:
+                shards = pathlib.Path(temp) / "shards"
+                full = shards / "android-instrumented-reports"
+                write_results(full / "app/build/outputs/androidTest-results/connected/debug/flavors/devZapstore",
+                              cases[::2])
+                write_results(full / "cryptoBenchmark/build/outputs/androidTest-results/connected/release", [])
+                if with_shard_one:
+                    write_results(shards / "android-instrumented-reports-shard-1"
+                                  / "outputs/androidTest-results/connected/debug/flavors/devZapstore", shard_one_cases)
+                return subprocess.run(["bash", "-c", step], cwd=ROOT, env={**os.environ, "RUNNER_TEMP": temp},
+                                      capture_output=True, text=True)
+
+        self.assertEqual(run_step(cases[1::2]).returncode, 0)
+        self.assertNotEqual(run_step(cases[1::2][1:]).returncode, 0)
+        self.assertNotEqual(run_step(cases[1::2], with_shard_one=False).returncode, 0)
+
     def test_pull_request_smoke_does_not_require_full_suite_cases(self):
         """Bounded PR smoke runs stay annotation-selected and skip the full-suite case list."""
         output = self.run_dispatch("pull_request")

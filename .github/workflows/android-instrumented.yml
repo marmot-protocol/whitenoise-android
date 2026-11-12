@@ -655,8 +655,14 @@ jobs:
           set -euo pipefail
           merged="$RUNNER_TEMP/connected"
           mkdir -p "$merged"
-          shopt -s nullglob
-          shards=("$RUNNER_TEMP"/shards/*/app/build/outputs/androidTest-results/connected)
+          # upload-artifact roots each artifact at its files' common ancestor, so a
+          # shard without cryptoBenchmark results is rooted at app/build instead.
+          shards=()
+          for artifact in "$RUNNER_TEMP"/shards/*/; do
+            mapfile -t found < <(find "$artifact" -type d -path '*/androidTest-results/connected' ! -path '*/cryptoBenchmark/*' -prune)
+            [[ ${#found[@]} == 1 ]] || { echo "Expected one app connected result directory in $artifact, found ${#found[@]}" >&2; exit 1; }
+            shards+=("${found[0]}")
+          done
           [[ ${#shards[@]} == 2 ]] || { echo "Expected connected results from 2 shards, found ${#shards[@]}" >&2; exit 1; }
           for index in "${!shards[@]}"; do cp -R "${shards[$index]}" "$merged/shard-$index"; done
           python3 scripts/check_instrumented_required_cases.py "$merged"
