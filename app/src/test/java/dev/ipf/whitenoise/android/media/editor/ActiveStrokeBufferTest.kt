@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media.editor
 
 import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -181,7 +182,10 @@ class ActiveStrokeBufferTest {
         assertTrue(buffer.isEmpty())
         assertFalse(buffer.exceededPointBudget)
         val screen = appModuleSource("$EDITOR_SOURCES/PhotoEditorScreen.kt")
-        val onCancel = screen.substringAfter("onDragCancel = {").substringBefore("},")
+        val marker = "onDragCancel = {"
+        val markerStart = screen.indexOf(marker)
+        assertTrue("onDragCancel marker missing", markerStart >= 0)
+        val onCancel = screen.kotlinBlockFrom(markerStart + marker.length - 1, "onDragCancel callback")
         assertTrue(onCancel.contains("activeStroke.clear()"))
         assertFalse(onCancel.contains("onStroke("))
     }
