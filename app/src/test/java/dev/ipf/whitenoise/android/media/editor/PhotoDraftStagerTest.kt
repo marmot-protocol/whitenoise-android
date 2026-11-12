@@ -398,11 +398,10 @@ class PhotoDraftStagerTest {
                 val fixture = fixture(ioDispatcher = io.asCoroutineDispatcher())
                 val uri = provider.register(app, "stalled", pngBytes())
 
-                val staged = fixture.stager.stage(uri, "slot-a", ACCOUNT, GROUP, MediaQuality.Standard)
+                val staged = fixture.stager.stage(uri, "slot-a", ACCOUNT, GROUP, MediaQuality.Original)
 
                 assertTrue(staged is PhotoDraftStageResult.Success)
-                val fileName = (staged as PhotoDraftStageResult.Success).photo.attachment.fileName
-                assertTrue(fileName, fileName.startsWith("image"))
+                assertEquals("image.png", (staged as PhotoDraftStageResult.Success).photo.attachment.fileName)
                 assertTrue(provider.entered.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
                 assertTrue(provider.cancelled.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
                 assertNotEquals(Thread.currentThread(), provider.queryThread)
