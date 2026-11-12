@@ -18,8 +18,11 @@ else:
 
 REPOSITORIES = ('https://dl.google.com/dl/android/maven2/',
                 'https://repo.maven.apache.org/maven2/', 'https://plugins.gradle.org/m2/')
+# Maven Central answers some payload reads with a redirect to its own Sonatype-run
+# mirror. The recorded source stays the registry URL and the bytes must still hash
+# to the candidate checksum.
 HOSTS = {'dl.google.com', 'maven.google.com', 'repo.maven.apache.org', 'repo1.maven.org',
-         'plugins.gradle.org', 'plugins-artifacts.gradle.org'}
+         'gcp.mirrors.maven.org', 'plugins.gradle.org', 'plugins-artifacts.gradle.org'}
 
 
 class OfficialRedirects(urllib.request.HTTPRedirectHandler):
