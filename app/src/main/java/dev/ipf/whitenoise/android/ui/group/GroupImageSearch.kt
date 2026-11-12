@@ -39,8 +39,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,8 +84,10 @@ import dev.ipf.whitenoise.android.media.ImageSearchException
 import dev.ipf.whitenoise.android.media.ImageSearchResult
 import dev.ipf.whitenoise.android.media.sanitizeHttpsAvatarUrl
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.SheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.EmojiEmotions
@@ -278,6 +282,8 @@ internal fun ImageSearchSheet(
     onPickPhoto: ((Uri) -> Unit)? = null,
     onPickEmoji: (() -> Unit)? = null,
     onDismiss: () -> Unit,
+    suppliedSheetState: SheetState? = null,
+    suppliedTerminal: SheetTerminalMotion? = null,
     previewPresentation: ImagePreviewPresentation = ImagePreviewPresentation.Avatar,
     choosePhotoLabel: String? = null,
     removeImageLabel: String? = null,
@@ -288,12 +294,15 @@ internal fun ImageSearchSheet(
     },
     resultImageCacheLookup: (String) -> ImageBitmap? = { AvatarImageLoader.peek(it) },
 ) {
+    val sheetState = suppliedSheetState ?: rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = suppliedTerminal ?: rememberSheetTerminalMotion(sheetState)
+    val inputBlocked = applyInFlight || !terminal.acceptsInput
     // Tracks which button initiated the current in-flight mutation, so the
     // spinner lands on that button while every competing action is disabled.
     var pendingAction by remember { mutableStateOf<GroupImageAction?>(null) }
     val photoPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null && !applyInFlight) {
+            if (uri != null && !inputBlocked) {
                 pendingAction = GroupImageAction.PickPhoto
                 onPickPhoto?.invoke(uri)
             }
@@ -301,10 +310,12 @@ internal fun ImageSearchSheet(
     // Reset when the caller reports completion. Success closes the sheet;
     // failure keeps it open and unlocks every action for a retry.
     LaunchedEffect(applyInFlight) {
-        if (!applyInFlight) pendingAction = null
+        if (!applyInFlight && terminal.acceptsInput) pendingAction = null
     }
     val scope = rememberCoroutineScope()
-    var urlDraft by remember(initialUrl) { mutableStateOf(initialUrl) }
+    // A picker session owns its draft. Parent mutation must not replace the outgoing preview.
+    var urlDraft by remember(terminal) { mutableStateOf(initialUrl) }
+    val presentedHasCurrentImage = remember(terminal) { hasCurrentImage }
     var queryDraft by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<ImageSearchResult>>(emptyList()) }
     var isSearching by remember { mutableStateOf(false) }
@@ -343,6 +354,7 @@ internal fun ImageSearchSheet(
     }
 
     fun launchSearch() {
+        if (inputBlocked) return
         searchJob?.cancel()
         val q = queryDraft.trim()
         if (q.isEmpty()) {
@@ -381,8 +393,14 @@ internal fun ImageSearchSheet(
 
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { if (!inputBlocked) terminal.close(onDismiss) },
+        sheetState = sheetState,
+        sheetGesturesEnabled = !inputBlocked,
+        properties =
+            ModalBottomSheetProperties(
+                shouldDismissOnBackPress = !inputBlocked,
+                shouldDismissOnClickOutside = !inputBlocked,
+            ),
     ) {
         Column(
             modifier =
@@ -427,7 +445,7 @@ internal fun ImageSearchSheet(
                             label = emojiSourceLabel,
                             accessibilityLabel = resolvedChooseEmojiLabel,
                             icon = Icons.Default.EmojiEmotions,
-                            enabled = !applyInFlight,
+                            enabled = !inputBlocked,
                             onClick = onPickEmoji,
                             modifier = Modifier.weight(1f),
                         )
@@ -435,8 +453,8 @@ internal fun ImageSearchSheet(
                             label = photoSourceLabel,
                             accessibilityLabel = resolvedChoosePhotoLabel,
                             icon = Icons.Default.PhotoLibrary,
-                            enabled = !applyInFlight,
-                            loading = applyInFlight && pendingAction == GroupImageAction.PickPhoto,
+                            enabled = !inputBlocked,
+                            loading = inputBlocked && pendingAction == GroupImageAction.PickPhoto,
                             onClick = {
                                 photoPicker.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -450,7 +468,7 @@ internal fun ImageSearchSheet(
                         label = emojiSourceLabel,
                         accessibilityLabel = resolvedChooseEmojiLabel,
                         icon = Icons.Default.EmojiEmotions,
-                        enabled = !applyInFlight,
+                        enabled = !inputBlocked,
                         onClick = onPickEmoji,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -459,8 +477,8 @@ internal fun ImageSearchSheet(
                         label = photoSourceLabel,
                         accessibilityLabel = resolvedChoosePhotoLabel,
                         icon = Icons.Default.PhotoLibrary,
-                        enabled = !applyInFlight,
-                        loading = applyInFlight && pendingAction == GroupImageAction.PickPhoto,
+                        enabled = !inputBlocked,
+                        loading = inputBlocked && pendingAction == GroupImageAction.PickPhoto,
                         onClick = {
                             photoPicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -471,7 +489,7 @@ internal fun ImageSearchSheet(
                 }
                 OutlinedTextField(
                     value = urlDraft,
-                    onValueChange = { urlDraft = it },
+                    onValueChange = { if (!inputBlocked) urlDraft = it },
                     label = { Text(urlLabel) },
                     placeholder = { Text("https://example.com/image.jpg") },
                     singleLine = true,
@@ -484,7 +502,7 @@ internal fun ImageSearchSheet(
                 ) {
                     OutlinedTextField(
                         value = queryDraft,
-                        onValueChange = { queryDraft = it },
+                        onValueChange = { if (!inputBlocked) queryDraft = it },
                         label = { Text(stringResource(R.string.group_image_search_query_label)) },
                         placeholder = { Text(stringResource(R.string.group_image_search_query_hint)) },
                         singleLine = true,
@@ -498,7 +516,7 @@ internal fun ImageSearchSheet(
                     )
                     IconButton(
                         onClick = { launchSearch() },
-                        enabled = !isSearching && queryDraft.trim().isNotEmpty(),
+                        enabled = !inputBlocked && !isSearching && queryDraft.trim().isNotEmpty(),
                     ) {
                         if (isSearching) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -546,7 +564,7 @@ internal fun ImageSearchSheet(
                                 isSelected = hit.imageUrl == trimmedUrl,
                                 imageLoader = resultImageLoader,
                                 imageCacheLookup = resultImageCacheLookup,
-                                onTap = { urlDraft = hit.imageUrl },
+                                onTap = { if (!inputBlocked) urlDraft = hit.imageUrl },
                             )
                         }
                     }
@@ -555,20 +573,20 @@ internal fun ImageSearchSheet(
                 // avatar — for a group without one there's nothing to remove.
                 // Greyed out while the mutation is running (no double-tap into
                 // a silently no-op'd second call inside withMutationLockResult).
-                if (hasCurrentImage) {
+                if (presentedHasCurrentImage) {
                     TextButton(
                         onClick = {
                             pendingAction = GroupImageAction.Remove
                             onApply(null)
                         },
-                        enabled = !applyInFlight,
+                        enabled = !inputBlocked,
                         modifier = Modifier.fillMaxWidth(),
                         colors =
                             ButtonDefaults.textButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error,
                             ),
                     ) {
-                        if (applyInFlight && pendingAction == GroupImageAction.Remove) {
+                        if (inputBlocked && pendingAction == GroupImageAction.Remove) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
@@ -591,8 +609,8 @@ internal fun ImageSearchSheet(
                         .testTag(IMAGE_SEARCH_ACTIONS_TAG),
             ) {
                 OutlinedButton(
-                    onClick = onDismiss,
-                    enabled = !applyInFlight,
+                    onClick = { terminal.close(onDismiss) },
+                    enabled = !inputBlocked,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.cancel))
@@ -613,9 +631,9 @@ internal fun ImageSearchSheet(
                     // is exclusively the "Remove image" button's job — a
                     // primary button that doubles as a destructive action
                     // makes accidental avatar loss one mistap away.
-                    enabled = previewUrl != null && !applyInFlight,
+                    enabled = previewUrl != null && !inputBlocked,
                 ) {
-                    if (applyInFlight && pendingAction == GroupImageAction.Apply) {
+                    if (inputBlocked && pendingAction == GroupImageAction.Apply) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,

@@ -38,8 +38,8 @@ internal fun MaestroPreviewPresentation(fixture: MaestroPresentationFixture) {
         onRemoveDocumentAt = { error("Generated image preview has no documents") },
         onAddPhotos = { fixture.finish("photos-handoff") },
         onAddDocuments = { fixture.finish("documents-handoff") },
-        onEditMediaAt = {
-            check(it == 0)
+        onEditMediaAt = { index, _ ->
+            check(index == 0)
             fixture.finish("edit-handoff")
         },
         previewOnly = fixture.scenario == "preview-view-only",

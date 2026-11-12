@@ -164,13 +164,15 @@ internal fun SettingsLink(
     trailing: (@Composable () -> Unit)? = null,
     leading: (@Composable () -> Unit)? = null,
 ) {
+    val (origin, navigate) = rememberSettingsRouteClick(onClick)
     val editable = enabled && !busy
     val summary = listOfNotNull(value, subtitle).distinct().joinToString("\n").takeIf { it.isNotEmpty() }
     ListItem(
-        onClick = onClick,
+        onClick = navigate,
         shapes = context.shapes,
         modifier =
             modifier
+                .then(origin)
                 .fillMaxWidth()
                 .settingsRowBorder(context)
                 .semantics { role = Role.Button },
@@ -206,13 +208,16 @@ internal fun SettingsAction(
     subtitle: String? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
+    opensRoute: Boolean = false,
     leading: (@Composable () -> Unit)? = null,
 ) {
+    val (origin, navigate) = rememberSettingsRouteClick(onClick)
     ListItem(
-        onClick = onClick,
+        onClick = if (opensRoute) navigate else onClick,
         shapes = context.shapes,
         modifier =
             modifier
+                .then(if (opensRoute) origin else Modifier)
                 .fillMaxWidth()
                 .settingsRowBorder(context)
                 .semantics { role = Role.Button },

@@ -7,19 +7,33 @@
         "surface": "MarkdownTimestampText",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
         "anchor": "fun MarkdownTimestampText(",
-        "test_ids": ["MSG-002"]
+        "test_ids": [
+          "MSG-002"
+        ]
       },
       {
         "surface": "Timestamp disclosure dismissal",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
         "anchor": "R.string.dismiss",
-        "test_ids": ["MSG-002"]
+        "test_ids": [
+          "MSG-002"
+        ]
       },
       {
         "surface": "TimestampOverlays",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
         "anchor": "fun TimestampOverlays(",
-        "test_ids": ["MSG-002"]
+        "test_ids": [
+          "MSG-002"
+        ]
+      },
+      {
+        "surface": "TimestampHoverTooltip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
+        "anchor": "fun TimestampHoverTooltip(",
+        "test_ids": [
+          "MSG-002"
+        ]
       }
     ],
     "source_coverage": [
@@ -27,7 +41,9 @@
         "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
         "anchor": "TIMESTAMP_TAG",
-        "test_ids": ["MSG-002"]
+        "test_ids": [
+          "MSG-002"
+        ]
       }
     ]
   },

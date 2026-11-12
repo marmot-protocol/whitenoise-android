@@ -91,6 +91,7 @@ internal fun IdentityImageCropDialog(
     shape: IdentityImageCropShape,
     onDismiss: () -> Unit,
     onConfirm: (IdentityImageCrop) -> Unit,
+    ownerKey: Any? = preview,
 ) {
     // Keyed on the source's dimensions rather than the preview bitmap: recreating the activity
     // decodes a new bitmap, so keying on that would discard the crop exactly when it is restored.
@@ -98,8 +99,15 @@ internal fun IdentityImageCropDialog(
         rememberSaveable(sourceSize, stateSaver = IdentityImageCropSaver) {
             mutableStateOf(IdentityImageCrop.Centered)
         }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxSize()) {
+    val surface =
+        dev.ipf.whitenoise.android.ui.design
+            .rememberPopupSurfaceMotion(true, onDismiss, ownerKey = ownerKey)
+    if (!surface.visible) return
+    Dialog(onDismissRequest = surface.dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxSize().then(fullScreenSurfaceMotion(surface)),
+        ) {
             Column(
                 modifier =
                     Modifier
@@ -108,7 +116,10 @@ internal fun IdentityImageCropDialog(
                         .testTag("identity_crop.dialog")
                         .exposePerformanceTestTags(),
             ) {
-                IdentityImageCropTopBar(onDismiss = onDismiss, onConfirm = { onConfirm(crop) })
+                IdentityImageCropTopBar(onDismiss = surface.dismiss, onConfirm = {
+                    val selected = crop
+                    surface.close { onConfirm(selected) }
+                })
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     IdentityImageCropCanvas(
                         preview = preview,

@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -103,6 +104,7 @@ internal data class FocusedMessageAction(
     val destructive: Boolean,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit,
+    val onClickAt: ((Rect?) -> Unit)? = null,
 )
 
 /**
@@ -288,16 +290,28 @@ internal fun FocusedMessageActions(
     // Saveable so a popup window re-shown after an app switch does not hide content it already
     // revealed; the value lives in the host composition, not in the popup's own.
     var measured by rememberSaveable { mutableStateOf(false) }
-    val currentOnDismiss by rememberUpdatedState(onDismiss)
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
         popupPositionProvider = FocusedMessageOverlayFrameProvider,
+        animateWindowContent = false,
         scrimModifier =
             Modifier.background(
                 MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = FOCUSED_BACKDROP_ALPHA),
             ),
     ) {
+        val popupMotion = this
+        val currentOnDismiss by rememberUpdatedState(popupMotion.dismiss)
+        val terminalActions =
+            actions.map { action ->
+                action.copy(
+                    onClick = { popupMotion.close(action.onClick) },
+                    onClickAt =
+                        action.onClickAt?.let { activate ->
+                            { origin -> popupMotion.close { activate(origin) } }
+                        },
+                )
+            }
         BoxWithConstraints(
             modifier =
                 Modifier
@@ -352,6 +366,7 @@ internal fun FocusedMessageActions(
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .heightIn(max = maxHeight)
+                        .then(popupMotion.modifier())
                         .offset { IntOffset(0, travel.offset.value.roundToInt()) }
                         .onSizeChanged {
                             measured = it.width > 0 && it.height > 0
@@ -366,7 +381,7 @@ internal fun FocusedMessageActions(
                             customActions =
                                 listOf(
                                     CustomAccessibilityAction(close) {
-                                        onDismiss()
+                                        currentOnDismiss()
                                         true
                                     },
                                 )
@@ -382,9 +397,9 @@ internal fun FocusedMessageActions(
                             quickReactions = quickReactions,
                             sizing = reactionSizing,
                             selectedReactions = selectedReactions,
-                            onReact = onReact,
+                            onReact = { emoji -> popupMotion.close { onReact(emoji) } },
                             onReactionOrigin = onReactionOrigin,
-                            onMoreReactions = onMoreReactions,
+                            onMoreReactions = { popupMotion.close(onMoreReactions) },
                         )
                     }
                 }
@@ -443,7 +458,7 @@ internal fun FocusedMessageActions(
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
-                    FocusedActionMenu(actions)
+                    FocusedActionMenu(terminalActions)
                 }
             }
         }

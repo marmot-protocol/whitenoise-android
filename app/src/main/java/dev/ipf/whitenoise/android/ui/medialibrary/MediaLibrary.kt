@@ -26,7 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,6 +110,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternall
 import dev.ipf.whitenoise.android.ui.conversation.media.validatedAttachmentCacheFile
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Language
@@ -1223,71 +1223,75 @@ internal fun FileLibraryRow(
                     )
                 }
                 val menuScrollState = rememberScrollState()
-                DropdownMenu(
+                AnimatedDropdownMenu(
                     scrollState = menuScrollState,
                     modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     shape = MenuDefaults.shape,
                     border = amoledSurfaceBorderStroke(),
-                ) {
+                ) { surface ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.shared_media_save)) },
                         onClick = {
-                            menuOpen = false
-                            scope.launch {
-                                val outcome =
-                                    runCatchingCancellable {
-                                        val file = fetchFile()
-                                        val saved =
-                                            saveDocumentWithFallback(
-                                                context = context,
-                                                source = file,
-                                                fileName = row.reference.fileName,
-                                                mediaType = row.reference.mediaType,
-                                                fallback = documentSaveFallback,
-                                            )
-                                        check(saved) { "MediaStore save returned false" }
-                                    }
-                                appState.presentMediaSaveOutcome(
-                                    outcome = outcome,
-                                    successTitleRes = R.string.shared_media_saved,
-                                    failureTitleRes = R.string.shared_media_save_failed,
-                                    operationCode = "MEDIA_LIBRARY_FILE_SAVE",
-                                )
+                            surface.close {
+                                menuOpen = false
+                                scope.launch {
+                                    val outcome =
+                                        runCatchingCancellable {
+                                            val file = fetchFile()
+                                            val saved =
+                                                saveDocumentWithFallback(
+                                                    context = context,
+                                                    source = file,
+                                                    fileName = row.reference.fileName,
+                                                    mediaType = row.reference.mediaType,
+                                                    fallback = documentSaveFallback,
+                                                )
+                                            check(saved) { "MediaStore save returned false" }
+                                        }
+                                    appState.presentMediaSaveOutcome(
+                                        outcome = outcome,
+                                        successTitleRes = R.string.shared_media_saved,
+                                        failureTitleRes = R.string.shared_media_save_failed,
+                                        operationCode = "MEDIA_LIBRARY_FILE_SAVE",
+                                    )
+                                }
                             }
                         },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.shared_media_share)) },
                         onClick = {
-                            menuOpen = false
-                            scope.launch {
-                                val sharedRow = row
-                                runCatchingCancellable {
-                                    // Streams the whole verified file to the share sheet, whatever its size, as
-                                    // Open and Save do. Leaving the screen cancels this scope, and a row rebound
-                                    // to another attachment opens no share sheet.
-                                    shareLibraryFile(
-                                        context = context,
-                                        row = sharedRow,
-                                        chooserTitle = shareChooserTitle,
-                                        currentRow = { currentRow },
-                                    ) {
-                                        attachmentSource(
-                                            controller,
-                                            sharedRow.messageIdHex,
-                                            sharedRow.attachmentIndex,
-                                            sharedRow.reference,
-                                            sharedRow.mine,
+                            surface.close {
+                                menuOpen = false
+                                scope.launch {
+                                    val sharedRow = row
+                                    runCatchingCancellable {
+                                        // Streams the whole verified file to the share sheet, whatever its size, as
+                                        // Open and Save do. Leaving the screen cancels this scope, and a row rebound
+                                        // to another attachment opens no share sheet.
+                                        shareLibraryFile(
+                                            context = context,
+                                            row = sharedRow,
+                                            chooserTitle = shareChooserTitle,
+                                            currentRow = { currentRow },
+                                        ) {
+                                            attachmentSource(
+                                                controller,
+                                                sharedRow.messageIdHex,
+                                                sharedRow.attachmentIndex,
+                                                sharedRow.reference,
+                                                sharedRow.mine,
+                                            )
+                                        }
+                                    }.onFailure { error ->
+                                        appState.presentMediaLaunchFailure(
+                                            R.string.media_couldnt_open,
+                                            "MEDIA_LIBRARY_FILE_SHARE",
+                                            error,
                                         )
                                     }
-                                }.onFailure { error ->
-                                    appState.presentMediaLaunchFailure(
-                                        R.string.media_couldnt_open,
-                                        "MEDIA_LIBRARY_FILE_SHARE",
-                                        error,
-                                    )
                                 }
                             }
                         },

@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 import android.content.Context
 import android.graphics.Bitmap
 import android.view.View
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -185,7 +184,10 @@ internal abstract class DictationNavigationRenderFixture {
                             }
                             if (!fixture.locked) {
                                 val transition =
-                                    updateTransition(fixture.route.selectedChatId, label = "dictation route")
+                                    rememberConversationRouteTransition(
+                                        fixture.route.selectedChatId,
+                                        suppressMotion = false,
+                                    )
                                 ConversationRouteAnimatedContent(
                                     transition = transition,
                                     routeForwardDirection = 1,

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -37,6 +36,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -97,6 +97,7 @@ import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardTextActionsToMessageRow
 import dev.ipf.whitenoise.android.ui.conversation.messages.MAX_ROW_CUSTOM_ACTIONS
@@ -173,7 +174,7 @@ internal fun MarkdownMessageBody(
     val inAppLinks = LocalInAppLinkHandler.current
     // A tapped spoofable `[label](url)` link parks its destination here until
     // the user confirms it in the dialog below (#273).
-    var pendingLinkUrl by remember { mutableStateOf<String?>(null) }
+    var pendingLinkUrl by remember(document, context) { mutableStateOf<String?>(null) }
     // One listener for every link in the document; the tapped destination rides
     // in on the annotation. Autolink URL annotations open directly because their
     // visible text is the supplied destination; confirm-link Clickable annotations
@@ -238,9 +239,10 @@ internal fun MarkdownMessageBody(
             blankLinesBefore = document.blankLinesBefore,
         )
     }
+    val currentOnWebLinkActivated by rememberUpdatedState(onWebLinkActivated)
     pendingLinkUrl?.let { url ->
         val parsedLink = remember(url) { parsedOpenableMarkdownLink(url) }
-        AlertDialog(
+        AnimatedAlertDialog(
             onDismissRequest = { pendingLinkUrl = null },
             title = { Text(stringResource(R.string.link_confirm_title)) },
             text = {
@@ -263,13 +265,17 @@ internal fun MarkdownMessageBody(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        pendingLinkUrl = null
-                        openMarkdownLink(context, url, onWebLinkActivated)
+                        close {
+                            if (pendingLinkUrl == url) {
+                                pendingLinkUrl = null
+                                openMarkdownLink(context, url, currentOnWebLinkActivated)
+                            }
+                        }
                     },
                 ) { Text(stringResource(R.string.link_confirm_open)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingLinkUrl = null }) {
+                TextButton(onClick = dismiss) {
                     Text(stringResource(R.string.cancel))
                 }
             },

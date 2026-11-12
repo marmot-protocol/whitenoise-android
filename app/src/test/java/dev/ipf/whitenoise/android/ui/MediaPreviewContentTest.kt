@@ -85,7 +85,7 @@ class MediaPreviewContentTest {
         initialMedia: List<Uri>,
         preparingMedia: Set<Uri> = emptySet(),
         preparedQualities: Map<Uri, PreparedPhotoQuality> = emptyMap(),
-        onEditMediaAt: ((Int) -> Unit)? = null,
+        onEditMediaAt: ((Int, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
         onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
         onSend: (String, (Boolean) -> Unit) -> Unit = { _, onResult -> onResult(true) },
         onClose: () -> Unit = {},
@@ -218,7 +218,7 @@ class MediaPreviewContentTest {
         var editedIndex: Int? = null
         renderPreview(
             initialMedia = listOf(staged),
-            onEditMediaAt = { editedIndex = it },
+            onEditMediaAt = { index, _ -> editedIndex = index },
         )
 
         composeRule
@@ -253,7 +253,7 @@ class MediaPreviewContentTest {
         var editedIndex: Int? = null
         renderPreview(
             initialMedia = listOf(duplicate, duplicate),
-            onEditMediaAt = { editedIndex = it },
+            onEditMediaAt = { index, _ -> editedIndex = index },
         )
 
         composeRule.onNodeWithContentDescription(string(R.string.media_preview_position_badge, 2)).performClick()

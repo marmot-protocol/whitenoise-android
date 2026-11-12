@@ -11,10 +11,12 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -26,11 +28,12 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog as AlertDialog
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet as ModalBottomSheet
 
 data class OnboardingSavedAccountUi(
@@ -72,11 +75,12 @@ internal fun OnboardingSavedAccountActions(
 ) {
     var pickerVisible by remember { mutableStateOf(false) }
     var recoveryAccountLabel by remember { mutableStateOf<String?>(null) }
+    val recoveryEnabled by rememberUpdatedState(enabled && reactivatingAccountLabel == null)
     val continuing = accounts.firstOrNull { it.label == reactivatingAccountLabel } ?: accounts.firstOrNull()
 
     /** Selects a saved account, routing recovery-required accounts to their prompt. */
     fun select(account: OnboardingSavedAccountUi) {
-        if (!enabled || reactivatingAccountLabel != null) return
+        if (!recoveryEnabled) return
         pickerVisible = false
         if (account.recoveryRequired) recoveryAccountLabel = account.label else onContinue(account.label)
     }
@@ -97,25 +101,32 @@ internal fun OnboardingSavedAccountActions(
     if (pickerVisible) {
         RetainedProfilesSheet(
             accounts = accounts,
-            enabled = enabled && reactivatingAccountLabel == null,
+            enabled = recoveryEnabled,
             onSelect = ::select,
             onDismiss = { pickerVisible = false },
         )
     }
     val recoveryAccount = accounts.firstOrNull { it.label == recoveryAccountLabel }
-    if (recoveryAccount != null && enabled && reactivatingAccountLabel == null) {
-        AlertDialog(
+    val currentRecoveryAccount by rememberUpdatedState(recoveryAccount)
+    val currentOnRecover by rememberUpdatedState(onRecover)
+    if (recoveryAccount != null && recoveryEnabled) {
+        AnimatedAlertDialog(
             onDismissRequest = { recoveryAccountLabel = null },
+            ownerKey = recoveryAccount,
             title = { Text(stringResource(R.string.onboarding_recover_setup_title)) },
             text = { Text(stringResource(R.string.onboarding_recover_setup_explanation)) },
             confirmButton = {
                 TextButton(onClick = {
-                    recoveryAccountLabel = null
-                    onRecover(recoveryAccount.label)
+                    close {
+                        if (recoveryEnabled && currentRecoveryAccount == recoveryAccount) {
+                            recoveryAccountLabel = null
+                            currentOnRecover(recoveryAccount.label)
+                        }
+                    }
                 }) { Text(stringResource(R.string.onboarding_recover_setup_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { recoveryAccountLabel = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -134,8 +145,13 @@ internal fun RetainedProfilesSheet(
     onSelect: (OnboardingSavedAccountUi) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        WhiteNoiseSheetHeader(stringResource(R.string.onboarding_choose_profile), onClose = onDismiss)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
+    ModalBottomSheet(sheetState = sheetState, onDismissRequest = { terminal.close(onDismiss) }) {
+        WhiteNoiseSheetHeader(
+            stringResource(R.string.onboarding_choose_profile),
+            onClose = { terminal.close(onDismiss) },
+        )
         WhiteNoiseLazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
             items(accounts, key = OnboardingSavedAccountUi::label) { account ->
                 ListItem(
@@ -151,7 +167,11 @@ internal fun RetainedProfilesSheet(
                         )
                     },
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    modifier = Modifier.clickable(enabled = enabled, role = Role.Button) { onSelect(account) },
+                    modifier =
+                        Modifier.clickable(
+                            enabled = enabled,
+                            role = Role.Button,
+                        ) { terminal.close(account, onSelect) },
                 )
             }
         }

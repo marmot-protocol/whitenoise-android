@@ -14,8 +14,9 @@ import dev.ipf.whitenoise.android.core.emojiSetAddress
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.settings.EmojiSetsScreen
+import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 
 internal fun runShareChatPickerDismissal(
     clearFocus: () -> Unit,
@@ -27,8 +28,12 @@ internal fun runShareChatPickerDismissal(
     dismiss()
 }
 
-/** Modal window boundary that prevents the underlying shell from receiving touch or accessibility focus. */
+/**
+ * Modal window boundary that prevents the underlying shell from receiving touch or accessibility focus.
+ * Native modal, retained picker state and nested route share one presentation owner.
+ */
 @Composable
+@Suppress("LongMethod")
 internal fun ShareChatPickerFullScreen(
     appState: WhiteNoiseAppState,
     requestId: String = "",
@@ -48,8 +53,14 @@ internal fun ShareChatPickerFullScreen(
         }
     var setAccount by rememberSaveable(requestId, appState.activeAccountRef) { mutableStateOf<String?>(null) }
     val pickerState = rememberSaveableStateHolder()
-    PlaybackDialog(
-        onDismissRequest = {},
+    val protectedContent =
+        appState.appLockScreenVisible || appState.signOutInProgress || !appState.allowChatScreenshotsInChats
+    MeasuredPlaybackDialog(
+        origin = null,
+        // This completion retires the share request, including a successful cross-account stage.
+        // Live account/privacy content is separately invalidated by SettingsRouteMotion below.
+        ownerKey = requestId to payload,
+        onDismissRequest = onDismiss,
         onSourceDismiss = onDismiss,
         properties =
             DialogProperties(
@@ -59,27 +70,44 @@ internal fun ShareChatPickerFullScreen(
                 decorFitsSystemWindows = false,
             ),
     ) {
-        val targetAccount = setAccount
-        if (targetAccount != null && setAddress != null) {
-            EmojiSetsScreen(
-                appState,
-                onBack = { setAccount = null },
-                initialAddress = setAddress,
-                targetAccount = targetAccount,
-            )
-        } else {
-            pickerState.SaveableStateProvider(requestId) {
-                ShareChatPickerFullScreenContent(
-                    appState = appState,
-                    requestId = requestId,
-                    payload = payload,
-                    onDismiss = onDismiss,
-                    onStage = onStage,
-                    overlayBackRegistrar = overlayBackRegistrar,
-                    controllerFactory = controllerFactory,
-                    controllerBinder = controllerBinder,
-                    onOpenEmojiSet = if (setAddress == null) null else ({ setAccount = it }),
+        // Retire captured frames across source/account/privacy boundaries. The external share
+        // entry has no measured origin; only the internal button supplies one.
+        SettingsRouteMotion(
+            target = setAccount.takeIf { setAddress != null },
+            depth = if (setAccount != null && setAddress != null) 1 else 0,
+            ownerKey =
+                listOf(
+                    requestId,
+                    payload,
+                    appState.activeAccountRef,
+                    appState.runtimeGeneration,
+                    protectedContent,
+                ),
+            suppressMotion = protectedContent,
+            contentVisible = !appState.appLockScreenVisible,
+            cardMorph = !protectedContent,
+        ) { targetAccount ->
+            if (targetAccount != null && setAddress != null) {
+                EmojiSetsScreen(
+                    appState,
+                    onBack = { setAccount = null },
+                    initialAddress = setAddress,
+                    targetAccount = targetAccount,
                 )
+            } else {
+                pickerState.SaveableStateProvider(requestId) {
+                    ShareChatPickerFullScreenContent(
+                        appState = appState,
+                        requestId = requestId,
+                        payload = payload,
+                        onDismiss = dismiss,
+                        onStage = onStage,
+                        overlayBackRegistrar = overlayBackRegistrar,
+                        controllerFactory = controllerFactory,
+                        controllerBinder = controllerBinder,
+                        onOpenEmojiSet = if (setAddress == null) null else ({ setAccount = it }),
+                    )
+                }
             }
         }
     }

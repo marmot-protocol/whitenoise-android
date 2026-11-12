@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
 import android.provider.Settings
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -182,9 +181,9 @@ class ComposerFabPenMotionTest {
                             ) {
                                 handoff = LocalComposerFabHandoff.current
                                 val route =
-                                    updateTransition(
+                                    rememberConversationRouteTransition(
                                         if (destination == ComposerFabEndpoint.Composer) "chat" else null,
-                                        label = "unequal height route",
+                                        suppressMotion = false,
                                     )
                                 ConversationRouteAnimatedContent(route, 1, false, { it ?: "list" }) { chat ->
                                     Endpoints(chat != null)

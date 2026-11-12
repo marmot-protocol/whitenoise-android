@@ -93,6 +93,7 @@ internal fun SharedContentCategories(
                     }
                 SettingsAction(
                     context = it,
+                    opensRoute = true,
                     title = stringResource(category.titleRes),
                     subtitle =
                         if (category != SharedContentCategory.Links) {

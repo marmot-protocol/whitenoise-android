@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -17,6 +16,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Keeps the native relay mutation result visible above the secure full-screen window, including safe-report Copy. */
@@ -31,7 +31,7 @@ internal fun ChatRelayFeedbackDialog(
     val clipboard = LocalClipboardManager.current
     val report = feedback.diagnosticReport?.takeIf { feedback.copyable }
     val outline = amoledOutlineBorder()
-    AlertDialog(
+    AnimatedAlertDialog(
         modifier = if (outline != null) Modifier.border(outline, MaterialTheme.shapes.extraLarge) else Modifier,
         properties = DialogProperties(securePolicy = securePolicy),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -40,7 +40,7 @@ internal fun ChatRelayFeedbackDialog(
         title = { Text(feedback.title.resolve(context)) },
         text = { feedback.detail?.let { SelectionContainer { Text(it.resolve(context)) } } },
         confirmButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("chat-relay-feedback-dismiss")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("chat-relay-feedback-dismiss")) {
                 Text(stringResource(R.string.ok))
             }
         },

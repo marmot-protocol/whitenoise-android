@@ -132,6 +132,7 @@ internal fun ChatListBatchStatusDialog(
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = { if (result != null) onDismiss() },
+        dismissEnabled = { result != null },
         title = { Text(stringResource(command.labelResource())) },
         text = {
             val outcome = result

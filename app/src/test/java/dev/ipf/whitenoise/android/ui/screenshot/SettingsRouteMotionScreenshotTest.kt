@@ -11,10 +11,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -70,7 +74,7 @@ class SettingsRouteMotionScreenshotTest {
                 accounts = emptyList(),
                 activeAccountRef = null,
             )
-        val detail = mutableStateOf<SettingsDetail?>(null)
+        val detail = mutableStateOf<SettingsDetail?>(SettingsDetail.Chats)
         rule.mainClock.autoAdvance = false
         rule.setContent {
             CompositionLocalProvider(
@@ -94,10 +98,13 @@ class SettingsRouteMotionScreenshotTest {
                 }
             }
         }
-        rule.runOnIdle { detail.value = SettingsDetail.Gestures }
+        rule.mainClock.autoAdvance = true
+        val gestures = rule.onNodeWithText(app.getString(R.string.gestures_title))
+        gestures.performScrollTo()
+        rule.mainClock.autoAdvance = false
+        gestures.performClick()
         rule.mainClock.advanceTimeByFrame()
-        // The card morph moves the bubbles first and fades the text in after, so the first frame is
-        // shapes only; the row must already be composed and must show ink from the midpoint on.
+        // The actual Gestures row supplies the container origin; capture its first, middle and settled frames.
         captureFrame(name, "first", inked = false)
         rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS / 2L)
         captureFrame(name, "middle")

@@ -10,6 +10,15 @@
         "test_ids": [
           "AXY-013"
         ]
+      },
+      {
+        "surface": "Modifier.editedLabelTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleAccessibility.kt",
+        "anchor": "fun Modifier.editedLabelTarget(",
+        "test_ids": [
+          "NAV-011",
+          "AXY-013"
+        ]
       }
     ],
     "source_coverage": [

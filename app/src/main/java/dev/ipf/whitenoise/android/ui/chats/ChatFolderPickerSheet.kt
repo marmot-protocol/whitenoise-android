@@ -153,7 +153,7 @@ internal fun ChatFolderPickerSheet(
             }
         },
         dismissButton = {
-            TextButton(onClick = { session.leave { dismiss() } }, modifier = Modifier.testTag("chat.folderCancel")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("chat.folderCancel")) {
                 Text(stringResource(R.string.cancel))
             }
         },

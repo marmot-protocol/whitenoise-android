@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.share
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -27,7 +28,7 @@ import org.robolectric.annotation.GraphicsMode
 /** Opening a shared emoji-set link from the share sheet. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class ShareChatPickerEmojiSetTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -86,6 +87,66 @@ class ShareChatPickerEmojiSetTest {
         showPicker(payload.copy(text = "https://njump.me/$set"))
         composeRule.onNodeWithText(app.getString(R.string.emoji_sets_open)).performClick()
         composeRule.onNodeWithText(app.getString(R.string.emoji_sets_title)).assertExists()
+    }
+
+    /** Actual in-app route with the fixture backend's unavailable-data state, not a populated set. */
+    @Test
+    fun captureInternalEmojiSetRouteFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val coordinates = nip19Tlv(0, "forest".utf8Ints()) + nip19Tlv(2, List(32) { 1 })
+        val address = nip19("naddr", coordinates + nip19Tlv(3, nip19Uint(30_030u)))
+        val state = appStateWithDirectChats(GROUP_A to PEER_A)
+        state.updateAllowChatScreenshotsInChats(true)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled provides true,
+                ) {
+                    ShareChatPickerFullScreen(
+                        appState = state,
+                        payload = payload.copy(text = "https://njump.me/$address"),
+                        onDismiss = {},
+                        onStage = { _, _ -> false },
+                        controllerBinder = { _, _ -> },
+                    )
+                }
+            }
+        }
+        try {
+            captureEmojiRouteFrames("share-emoji/forward") {
+                composeRule.onNodeWithText(app.getString(R.string.emoji_sets_open)).performClick()
+            }
+            composeRule.onNodeWithText(app.getString(R.string.emoji_sets_title)).assertExists()
+            captureEmojiRouteFrames("share-emoji/reverse") {
+                composeRule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+            }
+            composeRule.onNodeWithText(app.getString(R.string.emoji_sets_open)).assertIsDisplayed()
+            composeRule.onNodeWithText(app.getString(R.string.emoji_sets_title)).assertDoesNotExist()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun captureEmojiRouteFrames(
+        name: String,
+        action: () -> Unit,
+    ) {
+        val folder = java.io.File("build/animation-frames/$name").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        com.github.takahirom.roborazzi
+            .captureScreenRoboImage(java.io.File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            com.github.takahirom.roborazzi
+                .captureScreenRoboImage(java.io.File(folder, "frame-%03d.png".format(frame)).path)
+        }
     }
 
     /** Renders the share sheet's full-screen picker for [shared] with one direct chat. */

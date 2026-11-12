@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatRowPortFixtures
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.navigation.CONVERSATION_ROUTE_TRANSITION_MILLIS
 import dev.ipf.whitenoise.android.ui.navigation.ConversationRouteAnimatedContent
+import dev.ipf.whitenoise.android.ui.navigation.rememberConversationRouteTransition
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
@@ -296,9 +296,9 @@ class PlaybackHeaderNavigationScreenshotTest {
                     ) {
                         if (animated) {
                             val transition =
-                                updateTransition(
+                                rememberConversationRouteTransition(
                                     targetState = if (conversation.value) "conversation" else null,
-                                    label = "playback route",
+                                    suppressMotion = false,
                                 )
                             ConversationRouteAnimatedContent(
                                 transition = transition,

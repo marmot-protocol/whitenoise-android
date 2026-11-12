@@ -322,13 +322,15 @@ private fun HelpOpenFailureDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    onDismiss()
-                    onRetry()
+                    close {
+                        onDismiss()
+                        onRetry()
+                    }
                 },
             ) { Text(stringResource(R.string.retry)) }
         },
         modifier = Modifier.testTag("help.open_failed"),
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
         title = { Text(title) },
         text = { Text(body) },
     )

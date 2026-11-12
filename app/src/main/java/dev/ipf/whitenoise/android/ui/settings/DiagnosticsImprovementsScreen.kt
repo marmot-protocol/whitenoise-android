@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.auditLogExportMimeType
 import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
@@ -92,6 +93,7 @@ internal fun DiagnosticsImprovementsScreen(
 
     if (confirmAuditUpload) {
         AuditUploadConsentDialog(
+            ownerKey = Triple(appState, appState.activeAccountRef, appState.runtimeGeneration),
             onDismiss = { confirmAuditUpload = false },
             onConfirm = {
                 confirmAuditUpload = false
@@ -233,26 +235,16 @@ internal fun DiagnosticsImprovementsScreen(
         runAuditMutation = ::runAuditMutation,
     )
     if (deleteConfirmOpen) {
-        WhiteNoiseAlertDialog(
-            onDismissRequest = { deleteConfirmOpen = false },
-            title = { Text(stringResource(R.string.diagnostics_clear_confirm_title)) },
-            text = { Text(stringResource(R.string.diagnostics_clear_confirm_body)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        deleteConfirmOpen = false
-                        runAuditMutation { appState.deleteAuditLogs() }
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.diagnostics_clear_confirm_action),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
+        ConfirmDialog(
+            title = stringResource(R.string.diagnostics_clear_confirm_title),
+            message = stringResource(R.string.diagnostics_clear_confirm_body),
+            confirmLabel = stringResource(R.string.diagnostics_clear_confirm_action),
+            onConfirm = {
+                deleteConfirmOpen = false
+                runAuditMutation { appState.deleteAuditLogs() }
             },
-            dismissButton = {
-                TextButton(onClick = { deleteConfirmOpen = false }) { Text(stringResource(R.string.cancel)) }
-            },
+            onDismiss = { deleteConfirmOpen = false },
+            destructive = true,
         )
     }
 }
@@ -453,10 +445,14 @@ internal fun AuditLogExportDestinationDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onSave) { Text(stringResource(R.string.export_audit_logs_save)) }
+            TextButton(onClick = {
+                close(onSave)
+            }, enabled = acceptsInput) { Text(stringResource(R.string.export_audit_logs_save)) }
         },
         dismissButton = {
-            TextButton(onClick = onShare) { Text(stringResource(R.string.export_audit_logs_share)) }
+            TextButton(onClick = {
+                close(onShare)
+            }, enabled = acceptsInput) { Text(stringResource(R.string.export_audit_logs_share)) }
         },
     )
 }
@@ -473,10 +469,12 @@ internal fun AuditLogExportConsentDialog(
         title = { Text(stringResource(R.string.export_audit_logs_confirm_title)) },
         text = { Text(stringResource(R.string.export_audit_logs_confirm_body)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.export_audit_logs_confirm_action)) }
+            TextButton(onClick = {
+                close(onConfirm)
+            }, enabled = acceptsInput) { Text(stringResource(R.string.export_audit_logs_confirm_action)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

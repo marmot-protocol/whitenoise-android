@@ -29,6 +29,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -44,8 +45,92 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+// Shared Compose fixture covers this dialog across visual variants and terminal ownership boundaries.
+@Suppress("LargeClass")
 class GroupMembersReviewScreenshotTest {
     @get:Rule val rule = createComposeRule()
+
+    @Test fun cancelWaitsForExit() = checkTerminalExit(cancel = true)
+
+    @Test fun confirmWaitsForExit() = checkTerminalExit()
+
+    @Test fun busyAtCompletionRejectsAndRetiresReview() = checkTerminalExit(changeBusy = true)
+
+    @Test fun adminChangeAtCompletionRejectsAndRetiresReview() = checkTerminalExit(changeAdmins = true)
+
+    @Test fun replacementSelectionCancelsOldCompletion() = checkTerminalExit(replaceSelection = true)
+
+    // Keep the action, mid-exit mutation, and final exactly-once assertions in chronological order.
+    @Suppress("LongMethod")
+    private fun checkTerminalExit(
+        cancel: Boolean = false,
+        changeBusy: Boolean = false,
+        changeAdmins: Boolean = false,
+        replaceSelection: Boolean = false,
+    ) {
+        val state =
+            emptyAppState(accounts = listOf(testAccount("Owner", "a".repeat(64))), activeAccountRef = "Owner")
+                .withGroupReviewActorNpub()
+        val busy = mutableStateOf(false)
+        val admins = mutableStateOf(emptySet<String>())
+        val member = mutableStateOf(REVIEW_FIRST_MEMBER_HEX)
+        val open = mutableStateOf(true)
+        var confirmed = 0
+        var dismissed = 0
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    if (open.value) {
+                        GroupMembersReviewDialog(
+                            appState = state,
+                            groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                            members = listOf(RecipientSearch.Candidate(member.value, "Alice", "")),
+                            busy = busy.value,
+                            initialAdminIds = admins.value,
+                            onConfirm = {
+                                confirmed++
+                                open.value = false
+                            },
+                            onDismiss = {
+                                dismissed++
+                                open.value = false
+                            },
+                            confirmLabel = "Add member",
+                        )
+                    }
+                }
+            }
+        }
+        rule.mainClock.advanceTimeBy(400)
+        if (cancel) {
+            rule.onNodeWithText("Cancel").performClick()
+        } else {
+            rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        }
+        rule.mainClock.advanceTimeBy(80)
+        rule.runOnIdle {
+            assertEquals(0, confirmed)
+            assertEquals(0, dismissed)
+            assertTrue(open.value)
+            if (changeBusy) busy.value = true
+            if (changeAdmins) admins.value = setOf(REVIEW_FIRST_MEMBER_HEX)
+            if (replaceSelection) member.value = REVIEW_SECOND_MEMBER_HEX
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        val expectsDismissal = cancel || changeBusy || changeAdmins
+        val expectedDismissals = if (expectsDismissal) 1 else 0
+        val expectedConfirmations = if (expectsDismissal || replaceSelection) 0 else 1
+        rule.mainClock.advanceTimeBy(800)
+        rule.runOnIdle {
+            assertEquals(expectedConfirmations, confirmed)
+            assertEquals(expectedDismissals, dismissed)
+            assertEquals(replaceSelection, open.value)
+        }
+        rule.mainClock.advanceTimeBy(800)
+        rule.runOnIdle { assertEquals(expectedDismissals, dismissed) }
+    }
 
     /** Captures the destination and public member identity in the light theme. */
     @Test fun destinationAndPublicIdentityLight() = capture("light")
@@ -163,6 +248,7 @@ class GroupMembersReviewScreenshotTest {
                 retained()
                 retained()
             }
+            completeTerminalExit()
             assertEquals(1, submitted)
         } else {
             rule.onNodeWithText("Cancel").performClick()
@@ -172,6 +258,7 @@ class GroupMembersReviewScreenshotTest {
             rule.runOnIdle { invokeDetachedReviewClick(retained) }
             assertEquals(0, submitted)
             rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+            completeTerminalExit()
             assertEquals(1, submitted)
         }
     }
@@ -373,6 +460,7 @@ class GroupMembersReviewScreenshotTest {
             .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_overflow.png")
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        completeTerminalExit()
         assertEquals(1, submits)
     }
 
@@ -538,6 +626,7 @@ class GroupMembersReviewScreenshotTest {
         }
         rule.onNode(hasTestTag(SELECTED_MEMBERS_CONFIRM_TAG) and hasText("Make admin")).assertIsNotEnabled()
         rule.onNodeWithText("Cancel").performClick()
+        completeTerminalExit()
         assertEquals(1, dismisses)
     }
 
@@ -634,6 +723,16 @@ class GroupMembersReviewScreenshotTest {
         rule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_member_review_multiple_$suffix.png")
     }
 
+    /** Commit the accepted action and drain its exit before checking business callbacks. */
+    private fun completeTerminalExit() {
+        rule.runOnUiThread {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        rule.mainClock.advanceTimeBy(400)
+        rule.waitForIdle()
+    }
+
     /** Renders the production member-review dialog in the requested visual variant. */
     private fun capture(
         name: String,
@@ -648,6 +747,7 @@ class GroupMembersReviewScreenshotTest {
             .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_$name.png")
         rule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).assertIsDisplayed().performClick()
+        completeTerminalExit()
         assertEquals(1, submits)
     }
 }

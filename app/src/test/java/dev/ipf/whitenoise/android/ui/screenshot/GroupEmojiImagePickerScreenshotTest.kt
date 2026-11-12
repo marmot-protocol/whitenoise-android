@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.ui.test.junit4.createComposeRule

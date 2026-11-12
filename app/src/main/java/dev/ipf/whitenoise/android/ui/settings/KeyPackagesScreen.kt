@@ -235,7 +235,7 @@ private fun KeyPackagesScreenForAccount(
                 }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

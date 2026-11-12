@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
 import android.provider.Settings
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -250,9 +249,9 @@ class ComposerFabHandoffScreenshotTest {
                             handoff = LocalComposerFabHandoff.current
                             SideEffect { committedDestination = destination }
                             val route =
-                                updateTransition(
+                                rememberConversationRouteTransition(
                                     if (destination == ComposerFabEndpoint.Composer) "chat" else null,
-                                    label = "fixture route",
+                                    suppressMotion = false,
                                 )
                             ConversationRouteAnimatedContent(
                                 transition = route,
@@ -344,11 +343,11 @@ class ComposerFabHandoffScreenshotTest {
         assertInterpolating(source, end)
         val middle = pixels()
         capture("${direction}_mid_$variant")
-        // Placement admission and the first animation sample precede the 200 ms morph.
+        // Placement admission and the first sample precede the shared 340 ms morph.
         // Keep first/midpoint clocks exact, then allow two presentation frames for final retirement.
-        rule.mainClock.advanceTimeBy(176)
+        rule.mainClock.advanceTimeBy(320)
         rule.waitForIdle()
-        assertEquals(start + 272L, rule.mainClock.currentTime)
+        assertEquals(start + 416L, rule.mainClock.currentTime)
         assertCurrentEndpoint(target)
         rule.runOnIdle { assertNull(handoff?.renderedBounds) }
         val settled = pixels()

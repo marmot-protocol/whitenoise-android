@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +55,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.settleControlMorph
@@ -230,16 +230,16 @@ internal fun ConversationDictationMicrophoneDialog(
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag("dictation-microphone-dialog"),
         title = { Text(stringResource(R.string.dictation_microphone_muted)) },
         text = { Text(stringResource(R.string.dictation_microphone_muted_help)) },
         confirmButton = {
-            TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.open_settings)) }
+            TextButton(onClick = { close(onOpenSettings) }) { Text(stringResource(R.string.open_settings)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

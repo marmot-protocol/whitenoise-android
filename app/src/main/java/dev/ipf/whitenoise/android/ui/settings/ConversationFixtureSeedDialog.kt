@@ -145,6 +145,7 @@ internal fun ConversationFixtureSeedDialogContent(
     val requested = seedCountOrNull(count.text)
     WhiteNoiseAlertDialog(
         onDismissRequest = { if (!running) onDismiss() },
+        dismissEnabled = { !running },
         title = { Text(stringResource(R.string.seed_fixture_title)) },
         text = {
             Column(Modifier.heightIn(max = 420.dp).fadingVerticalScroll(rememberScrollState())) {

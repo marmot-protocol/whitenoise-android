@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -13,12 +12,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
@@ -129,13 +130,15 @@ private fun sentenceChooserActions(
     choices: List<TtsSentenceChoice>,
     owner: TtsSentenceActions?,
 ): List<CustomAccessibilityAction> {
+    val currentOwner = rememberUpdatedState(owner)
+    val currentChoices = rememberUpdatedState(choices)
     var choosing by remember(owner, choices) { mutableStateOf(false) }
     var page by remember(owner, choices) { mutableStateOf(0) }
     val pages = remember(choices) { choices.chunked(SENTENCE_CHOICES_PER_PAGE) }
     val readLabel = stringResource(R.string.tts_read_from_sentence)
     val chooseLabel = stringResource(R.string.tts_choose_sentence)
     if (choosing && choices.isNotEmpty()) {
-        AlertDialog(
+        AnimatedAlertDialog(
             modifier = Modifier.testTag("tts_sentence_chooser").exposePerformanceTestTags(),
             onDismissRequest = { choosing = false },
             title = { Text(chooseLabel) },
@@ -144,8 +147,12 @@ private fun sentenceChooserActions(
                 Column(Modifier.fadingVerticalScroll(key(page) { rememberScrollState() })) {
                     pages.getOrNull(page).orEmpty().forEach { choice ->
                         TextButton(onClick = {
-                            owner?.select?.invoke(choice)
-                            choosing = false
+                            close {
+                                if (currentOwner.value === owner && choice in currentChoices.value) {
+                                    currentOwner.value?.select?.invoke(choice)
+                                    choosing = false
+                                }
+                            }
                         }) {
                             Text("${choice.ordinal + 1}. ${choice.excerpt}")
                         }
@@ -166,7 +173,7 @@ private fun sentenceChooserActions(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

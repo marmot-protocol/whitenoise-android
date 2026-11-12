@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,9 +82,12 @@ fun WhiteNoiseEntityPickerSheet(
     val visible = if (needle.isEmpty()) items else items.filter { it.title.contains(needle, ignoreCase = true) }
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
     val maxHeight = with(LocalDensity.current) { (windowHeightPx * SHEET_HEIGHT_SHARE).toDp() }
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet)
+    val close = { terminal.close(onDismiss) }
+    WhiteNoiseModalBottomSheet(onDismissRequest = close, sheetState = sheet) {
         Column(Modifier.fillMaxWidth().heightIn(max = maxHeight)) {
-            WhiteNoiseSheetHeader(title, onClose = onDismiss)
+            WhiteNoiseSheetHeader(title, onClose = close)
             if (description != null) {
                 EmojiLabel(
                     description,
@@ -129,14 +133,17 @@ fun WhiteNoiseEntityPickerSheet(
                         count = visible.size,
                         checked = item.id in selectedIds,
                         multiple = multiple,
-                        onSelect = onSelect,
+                        onSelect =
+                            onSelect?.let { select ->
+                                { id -> if (multiple) select(id) else terminal.close(id, select) }
+                            },
                         modifier = Modifier.testTag("$rowTagPrefix.${item.id}"),
                     )
                 }
             }
             if (onDone != null) {
                 WhiteNoiseButton(
-                    onClick = onDone,
+                    onClick = { terminal.close(onDone) },
                     modifier = Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin),
                 ) { Text(stringResource(R.string.done)) }
             }

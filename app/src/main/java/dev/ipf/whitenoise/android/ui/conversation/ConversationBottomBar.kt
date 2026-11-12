@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -21,6 +22,7 @@ import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isDeviceRemovedCopy
@@ -64,6 +66,7 @@ internal fun ConversationBottomBar(
     onSaveSelection: () -> Unit,
     onReplySelection: () -> Unit,
     onInfoSelection: () -> Unit,
+    onSelectionRouteOrigin: (MessageSelectionBarAction, Rect?) -> Unit = { _, _ -> },
     onDeleteSelection: () -> Unit,
     batchDeleteRetryState: BatchDeleteRetryState?,
     batchDeleteInFlight: Boolean,
@@ -98,6 +101,7 @@ internal fun ConversationBottomBar(
     onCaptureFromCamera: () -> Unit,
     onPickDocument: () -> Unit,
     onShareLocation: () -> Unit,
+    onAttachmentRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
     onShareUser: () -> Unit,
     onShareContact: () -> Unit,
     onCreatePoll: (() -> Unit)? = null,
@@ -146,6 +150,7 @@ internal fun ConversationBottomBar(
                         )
                     }
                     MessageSelectionBottomBar(
+                        onRouteOrigin = onSelectionRouteOrigin,
                         availability = selectionActionAvailability,
                         forwardBlockedReason = selectionForwardBlockedReason,
                         onCopy = onCopySelection,
@@ -278,6 +283,7 @@ internal fun ConversationBottomBar(
                             onCaptureFromCamera = onCaptureFromCamera,
                             onPickDocument = onPickDocument,
                             onShareLocation = onShareLocation,
+                            onAttachmentRouteOrigin = onAttachmentRouteOrigin,
                             onShareUser = onShareUser,
                             onShareContact = onShareContact,
                             onCreatePoll = onCreatePoll,

@@ -1,8 +1,9 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.animation.core.SeekableTransitionState
-import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -162,8 +164,23 @@ class ConversationRouteFrameStabilityTest {
         val coroutineScope = rememberCoroutineScope()
         val transition = rememberTransition(state.transitionState, label = "seekable conversation route test")
         SideEffect { state.coroutineScope = coroutineScope }
+        val progress =
+            transition.animateFloat(
+                transitionSpec = { tween(CONVERSATION_ROUTE_TRANSITION_MILLIS, easing = ConversationRouteEasing) },
+                label = "manual route visibility",
+            ) { if (it == null) 0f else 1f }
+        val route =
+            remember(transition) {
+                object : ConversationRouteTransition<String?> {
+                    override val currentState get() = transition.currentState
+                    override val targetState get() = transition.targetState
+                    override val isRunning get() = transition.isRunning
+                    override val visibility = progress
+                    override val retainedStates get() = listOf(currentState, targetState).distinct()
+                }
+            }
         RouteHarnessContent(
-            transition = transition,
+            transition = route,
             hydrationStage = state.hydrationStage,
             layoutDirection = layoutDirection,
             destinationLabel = destinationLabel,
@@ -174,7 +191,7 @@ class ConversationRouteFrameStabilityTest {
     @Composable
     @Suppress("FunctionNaming")
     private fun RouteHarnessContent(
-        transition: Transition<String?>,
+        transition: ConversationRouteTransition<String?>,
         hydrationStage: Int,
         layoutDirection: LayoutDirection,
         destinationLabel: String,

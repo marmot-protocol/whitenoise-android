@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -29,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.OpenInNew
 import dev.ipf.whitenoise.android.ui.icons.outlined.ContentCopy
 import dev.ipf.whitenoise.android.ui.icons.outlined.ErrorOutline
 import dev.ipf.whitenoise.android.ui.icons.outlined.Refresh
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 @Composable
 internal fun EventCardActions(
@@ -38,7 +40,13 @@ internal fun EventCardActions(
     onCopy: () -> Unit,
     onOpen: () -> Unit,
     openIcon: ImageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+    onLaunchOrigin: (Rect?) -> Unit = {},
 ) {
+    val (openModifier, open) =
+        rememberMeasuredControlClick {
+            onLaunchOrigin(it)
+            onOpen()
+        }
     Row {
         IconButton(onClick = onCopy, modifier = Modifier.size(48.dp)) {
             Icon(
@@ -48,7 +56,7 @@ internal fun EventCardActions(
                 tint = contentColor.copy(alpha = 0.8f),
             )
         }
-        IconButton(onClick = onOpen, modifier = Modifier.size(48.dp)) {
+        IconButton(onClick = open, modifier = openModifier.size(48.dp)) {
             Icon(
                 openIcon,
                 contentDescription = openDescription,

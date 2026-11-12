@@ -102,6 +102,7 @@ internal fun PersonProfileContent(
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
     startingAs: StartingAccount? = null,
+    onStartGroupMeasured: ((androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
 ) {
     SettingsScaffold(
         topBarActions = { StartingAccountIndicator(startingAs) },
@@ -145,13 +146,18 @@ internal fun PersonProfileContent(
                     }
                     SettingsGroup {
                         row("start_group") { row ->
+                            val launch =
+                                dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                    onStartGroupMeasured?.invoke(origin) ?: onStartGroup()
+                                }
                             SettingsAction(
                                 row,
                                 stringResource(R.string.person_start_group),
-                                onStartGroup,
+                                launch.second,
+                                opensRoute = true,
                                 enabled = !busy,
                                 leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
-                                modifier = Modifier.testTag("person_profile.start_group"),
+                                modifier = launch.first.testTag("person_profile.start_group"),
                             )
                         }
                         row("add_to_group") { row ->
@@ -159,6 +165,7 @@ internal fun PersonProfileContent(
                                 row,
                                 stringResource(R.string.person_add_to_group),
                                 onAddToGroup,
+                                opensRoute = true,
                                 enabled = !busy,
                                 leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
                                 modifier = Modifier.testTag("person_profile.add_to_group"),
@@ -194,6 +201,7 @@ internal fun PersonProfileContent(
                                 row,
                                 stringResource(R.string.profile_nickname_and_notes),
                                 onPrivateDetails,
+                                opensRoute = true,
                                 enabled = !busy,
                                 leading = { Icon(painterResource(R.drawable.ic_edit), null) },
                                 modifier = Modifier.testTag("person_profile.private_details"),
@@ -205,6 +213,7 @@ internal fun PersonProfileContent(
                                     row,
                                     stringResource(R.string.person_promote_groups),
                                     onPromote,
+                                    opensRoute = true,
                                     enabled = !busy,
                                     leading = { Icon(painterResource(R.drawable.ic_admin_panel_settings), null) },
                                     modifier = Modifier.testTag("person_profile.promote_groups"),
@@ -475,10 +484,17 @@ internal fun PersonProfileBottomAction(
         if (scrolled) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         label = "PersonProfileBottomAction",
     )
+    val (originModifier, routeClick) =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsRouteClick(onClick)
     SettingsBottomAction(modifier, color, tonalElevation = 0.dp) {
         WhiteNoiseButton(
-            onClick,
-            Modifier.widthIn(max = 520.dp).fillMaxWidth().align(Alignment.CenterHorizontally),
+            routeClick,
+            Modifier
+                .widthIn(max = 520.dp)
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+                .then(originModifier),
             enabled = enabled,
         ) {
             if (busy) {

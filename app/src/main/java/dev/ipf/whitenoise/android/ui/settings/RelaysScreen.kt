@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.first
 
@@ -173,8 +175,9 @@ internal fun RelaysScreen(
             existing = relays,
             busy = busy,
             rejectedUrl = rejectedUrl,
+            ownerKey = account to appState.runtimeGeneration,
             onDismiss = { addSheet = false },
-            onAdd = { url, roles ->
+            onAdd = { url, roles, finishExit ->
                 rejectedUrl = null
                 runEdit {
                     var updated: AccountRelayListsFfi? = null
@@ -183,7 +186,7 @@ internal fun RelaysScreen(
                         val result = appState.addAccountRelay(account, role.kind, url)
                         if (result == null) allAdded = false else updated = result
                     }
-                    if (allAdded) addSheet = false else rejectedUrl = url
+                    if (allAdded) finishExit() else rejectedUrl = url
                     updated
                 }
             },
@@ -203,7 +206,7 @@ internal fun RelaysScreen(
                 ) { Text(stringResource(R.string.restore_defaults), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { restoreDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -462,7 +465,7 @@ internal fun RelayDetailsScreen(
                 ) { Text(stringResource(R.string.remove_relay), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { removeDialog = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -477,7 +480,8 @@ internal fun AddRelaySheet(
     busy: Boolean,
     rejectedUrl: String?,
     onDismiss: () -> Unit,
-    onAdd: (String, Set<AccountRelayRole>) -> Unit,
+    onAdd: (String, Set<AccountRelayRole>, () -> Unit) -> Unit,
+    ownerKey: Any? = Unit,
 ) {
     val value: TextFieldState = rememberTextFieldState()
     var roles by rememberSaveable { mutableStateOf(AccountRelayRole.entries.toSet()) }
@@ -490,9 +494,16 @@ internal fun AddRelaySheet(
     val duplicate = acceptable && roles.isNotEmpty() && missingRelayRoles(existing, currentValue, roles).isEmpty()
     val rejected = rejectedUrl != null && rejectedUrl == currentValue
     val canAdd = acceptable && !duplicate && roles.isNotEmpty() && !busy
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet, ownerKey)
+    val close = { terminal.close(onDismiss) }
+    WhiteNoiseModalBottomSheet(
+        onDismissRequest = close,
+        sheetState = sheet,
+        interactionEnabled = terminal.acceptsInput,
+    ) {
         Column(Modifier.fillMaxWidth()) {
-            WhiteNoiseSheetHeader(title = stringResource(R.string.add_relay), onClose = onDismiss)
+            WhiteNoiseSheetHeader(title = stringResource(R.string.add_relay), onClose = close)
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                 WhiteNoiseTextField(
                     state = value,
@@ -527,9 +538,9 @@ internal fun AddRelaySheet(
             }
             SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                 WhiteNoiseButton(
-                    onClick = { onAdd(currentValue, roles) },
+                    onClick = { onAdd(currentValue, roles) { terminal.close(onDismiss) } },
                     modifier = Modifier.fillMaxWidth().testTag("relay.add.submit"),
-                    enabled = canAdd,
+                    enabled = canAdd && terminal.acceptsInput,
                     loading = busy,
                     loadingLabel = stringResource(R.string.relay_list_publishing),
                 ) { Text(stringResource(R.string.add_relay)) }

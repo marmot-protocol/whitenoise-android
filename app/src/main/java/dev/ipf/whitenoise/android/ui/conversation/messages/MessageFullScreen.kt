@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -46,7 +47,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.readerScrollIndicator
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
 internal const val MESSAGE_FULL_SCREEN_TAG = "message-full-screen"
@@ -85,12 +86,16 @@ internal fun MessageFullScreenView(
     bottomBar: @Composable () -> Unit,
     selectionController: ReaderTextSelectionController? = null,
     onShowLess: (() -> Unit)? = null,
+    origin: Rect? = null,
+    readerSurfaces: MessageBubbleSurfaceState? = null,
+    onReaderSendAccepted: () -> Unit = {},
 ) {
     val selectionKey = remember(body, bodyMarkdownDocument) { Any() }
     val selection = rememberReaderTextSelectionController(selectionKey, selectionController)
     // Save with the owning message, outside the dialog’s separate saveable registry.
     val scrollState = rememberScrollState()
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -101,8 +106,11 @@ internal fun MessageFullScreenView(
                 decorFitsSystemWindows = false,
             ),
     ) {
+        readerSurfaces?.let { surfaces ->
+            ReaderSendDismissal(surfaces, onReaderSendAccepted) { action -> close(action) }
+        }
         BackHandler {
-            if (selection.active) selection.reset() else onDismiss()
+            if (selection.active) selection.reset() else dismiss()
         }
         var overflowOpen by remember { mutableStateOf(false) }
         Scaffold(
@@ -141,7 +149,7 @@ internal fun MessageFullScreenView(
                         navigationIcon = {
                             IconButton(
                                 onClick = {
-                                    if (selection.active) selection.reset() else onDismiss()
+                                    if (selection.active) selection.reset() else dismiss()
                                 },
                             ) {
                                 Icon(
@@ -170,7 +178,7 @@ internal fun MessageFullScreenView(
                                                         icon = R.drawable.ic_arrow_up,
                                                         onClick = {
                                                             selection.reset()
-                                                            onShowLess()
+                                                            close { onShowLess() }
                                                         },
                                                     ),
                                                 )

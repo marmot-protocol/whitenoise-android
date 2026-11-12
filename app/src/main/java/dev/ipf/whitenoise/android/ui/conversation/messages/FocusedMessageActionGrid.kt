@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 private val FocusedActionCellHorizontalPadding = 12.dp
@@ -174,10 +175,14 @@ private fun FocusedActionCell(
 ) {
     val contentColor =
         if (action.destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    val (originModifier, activate) =
+        rememberMeasuredControlClick { origin ->
+            action.onClickAt?.invoke(origin) ?: action.onClick()
+        }
     TextButton(
-        onClick = action.onClick,
+        onClick = activate,
         enabled = action.enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = minimumHeight),
+        modifier = modifier.then(originModifier).fillMaxWidth().heightIn(min = minimumHeight),
         contentPadding =
             PaddingValues(
                 horizontal = FocusedActionCellHorizontalPadding,

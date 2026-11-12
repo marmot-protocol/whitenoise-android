@@ -562,7 +562,7 @@ internal fun SmartFolderConditionDialog(
                     Text(stringResource(R.string.save))
                 }
             },
-            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+            dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

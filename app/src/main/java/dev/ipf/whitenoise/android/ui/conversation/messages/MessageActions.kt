@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.res.painterResource
@@ -129,6 +130,8 @@ internal fun MessageActionMenu(
     selectedReactionEmojis: Set<String> = emptySet(),
     previewDescription: String = "",
     previewReady: Boolean = true,
+    onInfoAt: ((Rect?) -> Unit)? = null,
+    onForwardAt: ((Rect?) -> Unit)? = null,
     preview: (@Composable () -> Unit)? = null,
 ) {
     if (!expanded) return
@@ -187,6 +190,12 @@ internal fun MessageActionMenu(
                         null
                     },
                 enabled = kind != MessageActionKind.Forward || canForward,
+                onClickAt =
+                    when (kind) {
+                        MessageActionKind.Info -> onInfoAt
+                        MessageActionKind.Forward -> onForwardAt
+                        else -> null
+                    },
                 destructive = kind == null,
                 icon = { MessageActionIcon(kind) },
                 onClick = {
@@ -637,6 +646,7 @@ internal fun ForwardMessageSheet(
     originGroupIdHex: String,
     onDismiss: () -> Unit,
     restoredRequest: PendingForwardRequest? = null,
+    origin: Rect? = null,
 ) {
     // Plain remember on purpose: the encrypted store owns recreation, and the
     // saved-state Bundle must not carry forward-request identifiers.
@@ -650,6 +660,7 @@ internal fun ForwardMessageSheet(
         onDismiss()
     }
     ForwardMessagePickerFullScreen(
+        origin = origin,
         appState = appState,
         messageCount = payloads.size,
         attachmentCount =

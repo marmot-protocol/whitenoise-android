@@ -8,15 +8,16 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +33,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -160,7 +162,7 @@ internal fun GroupRecoveryCard(
         }
     }
 
-    selectedInvitation?.let { invitation ->
+    selectedInvitation?.takeIf { it in status?.rejoinInvitations.orEmpty() }?.let { invitation ->
         GroupRejoinInvitationDialog(
             invitation = invitation,
             busy = busy,
@@ -276,37 +278,53 @@ private fun GroupRejoinInvitationDialog(
     onConfirm: (GroupRejoinInvitationFfi) -> Unit,
     onDecline: (GroupRejoinInvitationFfi) -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(R.string.group_rejoin_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                EmojiLabel(stringResource(R.string.group_rejoin_invited_by, inviterName, inviterIdentity))
-                Text(stringResource(R.string.group_rejoin_replaces_state))
-                Text(stringResource(R.string.group_rejoin_trust_warning))
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onDismiss()
-                    onConfirm(invitation)
-                },
-                enabled = !busy,
-            ) {
-                Text(stringResource(R.string.group_rejoin_confirm))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    onDismiss()
-                    onDecline(invitation)
-                },
-                enabled = !busy,
-            ) {
-                Text(stringResource(R.string.group_rejoin_decline))
-            }
-        },
-    )
+    val currentBusy = rememberUpdatedState(busy)
+    val currentInvitation = rememberUpdatedState(invitation)
+    val currentOnDismiss = rememberUpdatedState(onDismiss)
+    val currentOnConfirm = rememberUpdatedState(onConfirm)
+    val currentOnDecline = rememberUpdatedState(onDecline)
+    key(invitation, busy) {
+        AnimatedAlertDialog(
+            onDismissRequest = { if (!busy) onDismiss() },
+            dismissEnabled = { !busy },
+            title = { Text(stringResource(R.string.group_rejoin_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    EmojiLabel(stringResource(R.string.group_rejoin_invited_by, inviterName, inviterIdentity))
+                    Text(stringResource(R.string.group_rejoin_replaces_state))
+                    Text(stringResource(R.string.group_rejoin_trust_warning))
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        close {
+                            if (!currentBusy.value && currentInvitation.value == invitation) {
+                                currentOnDismiss.value()
+                                currentOnConfirm.value(invitation)
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                ) {
+                    Text(stringResource(R.string.group_rejoin_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        close {
+                            if (!currentBusy.value && currentInvitation.value == invitation) {
+                                currentOnDismiss.value()
+                                currentOnDecline.value(invitation)
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                ) {
+                    Text(stringResource(R.string.group_rejoin_decline))
+                }
+            },
+        )
+    }
 }

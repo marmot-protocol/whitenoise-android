@@ -77,7 +77,7 @@ internal fun TextToSpeechScreen(
     var refreshToken by remember { mutableIntStateOf(0) }
     var picker by rememberSaveable { mutableStateOf<SpeechSetting?>(null) }
     var customRateOpen by rememberSaveable { mutableStateOf(false) }
-    var pendingEnginePackage by remember { mutableStateOf<String?>(null) }
+    var pendingEngineWarning by remember { mutableStateOf<Pair<Any, String>?>(null) }
     var settingsFailed by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
@@ -247,7 +247,7 @@ internal fun TextToSpeechScreen(
                                     appState.ttsWarningPreferences,
                                 )
                             if (warn) {
-                                pendingEnginePackage = engine.packageName
+                                pendingEngineWarning = Any() to engine.packageName
                             } else {
                                 appState.selectTtsEngine(engine.packageName)
                             }
@@ -328,14 +328,17 @@ internal fun TextToSpeechScreen(
             },
         )
     }
-    pendingEnginePackage?.let { enginePackage ->
+    pendingEngineWarning?.let { request ->
         TtsTrustWarningDialog(
+            ownerKey = request.first,
             onProceed = {
-                appState.acknowledgeTtsTrustWarning(enginePackage)
-                pendingEnginePackage = null
-                appState.selectTtsEngine(enginePackage)
+                if (pendingEngineWarning === request) {
+                    appState.acknowledgeTtsTrustWarning(request.second)
+                    pendingEngineWarning = null
+                    appState.selectTtsEngine(request.second)
+                }
             },
-            onDismiss = { pendingEnginePackage = null },
+            onDismiss = { if (pendingEngineWarning === request) pendingEngineWarning = null },
         )
     }
 }
@@ -400,11 +403,11 @@ private fun SpeechCustomRateDialog(
             TextButton(
                 onClick = {
                     attempted = true
-                    parsed?.let(onRateSelected)
+                    parsed?.let { rate -> close { onRateSelected(rate) } }
                 },
             ) { Text(stringResource(R.string.tts_rate_apply)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 

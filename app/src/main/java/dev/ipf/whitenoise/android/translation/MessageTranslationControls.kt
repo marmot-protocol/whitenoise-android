@@ -8,6 +8,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -26,6 +27,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 
 /**
  * The message's translation identity for its current text and target, or null when it cannot be translated.
@@ -114,7 +116,10 @@ internal fun MessageTranslationDialog(
     val context = LocalContext.current
     var target by remember(source) { mutableStateOf(source?.target.orEmpty()) }
     var from by remember(source) { mutableStateOf("") }
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet, session to source)
+    val close = { terminal.close(onDismiss) }
+    WhiteNoiseModalBottomSheet(onDismissRequest = close, sheetState = sheet) {
         MessageTranslationForm(
             from = from,
             target = target,
@@ -123,16 +128,20 @@ internal fun MessageTranslationDialog(
             onFromChange = { from = it },
             onTargetChange = { target = it },
             onTranslate = {
-                source?.let {
-                    onTargetSelected(target)
-                    session.retry()
-                    session.remove(it)
-                    session.remove(it.copy(target = target))
-                    session.request(it.copy(target = target), from)
+                terminal.close(Triple(source, target, from)) { (acceptedSource, acceptedTarget, acceptedFrom) ->
+                    if (session.isCurrent()) {
+                        acceptedSource?.let {
+                            onTargetSelected(acceptedTarget)
+                            session.retry()
+                            session.remove(it)
+                            session.remove(it.copy(target = acceptedTarget))
+                            session.request(it.copy(target = acceptedTarget), acceptedFrom)
+                        }
+                        onDismiss()
+                    }
                 }
-                onDismiss()
             },
-            onDismiss = onDismiss,
+            onDismiss = close,
             onOpenEngine = { openOfflineTranslator(context) },
         )
     }

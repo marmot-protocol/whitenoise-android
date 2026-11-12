@@ -229,7 +229,7 @@ internal fun DataUsageScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { picker = null }) { Text(stringResource(R.string.download_done)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.download_done)) }
             },
         )
     }
@@ -262,7 +262,7 @@ internal fun DataUsageScreen(
                 ) { Text(stringResource(R.string.download_stop)) }
             },
             dismissButton = {
-                TextButton(onClick = { stopConfirmation = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

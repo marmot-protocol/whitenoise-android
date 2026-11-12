@@ -6,14 +6,15 @@ import android.text.format.Formatter
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +26,7 @@ import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareImportProgress
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
@@ -42,7 +44,7 @@ internal fun ShareImportStatus(
     val hasContent = request?.payload?.let { !it.text.isNullOrBlank() || it.streamUris.isNotEmpty() } == true
     when {
         importing ->
-            AlertDialog(
+            AnimatedAlertDialog(
                 onDismissRequest = onCancel,
                 title = { Text(stringResource(R.string.share_import_title)) },
                 text = {
@@ -71,10 +73,12 @@ internal fun ShareImportStatus(
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) } },
+                confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
             )
         errors.isNotEmpty() && !errorsAcknowledged && request != null ->
-            ShareImportErrorDialog(request.payload, hasContent, onCancel) { errorsAcknowledged = true }
+            key(request.requestId) {
+                ShareImportErrorDialog(request.payload, hasContent, onCancel) { errorsAcknowledged = true }
+            }
         else -> content(!importing && hasContent)
     }
 }
@@ -87,29 +91,42 @@ internal fun ShareImportErrorDialog(
     onCancel: () -> Unit,
     onContinue: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onCancel,
-        title = { Text(stringResource(R.string.share_import_error_title)) },
-        text = {
-            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
-                if (payload.importRejectedCount > 0) {
-                    Text(stringResource(R.string.share_import_rejected_count, payload.importRejectedCount))
+    val currentOnContinue = rememberUpdatedState(onContinue)
+    val currentHasContent = rememberUpdatedState(hasContent)
+    val currentPayload = rememberUpdatedState(payload)
+    key(payload, hasContent) {
+        AnimatedAlertDialog(
+            onDismissRequest = onCancel,
+            title = { Text(stringResource(R.string.share_import_error_title)) },
+            text = {
+                Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
+                    if (payload.importRejectedCount > 0) {
+                        Text(stringResource(R.string.share_import_rejected_count, payload.importRejectedCount))
+                    }
+                    payload.importErrors.distinct().forEach { Text(it.localizedMessage(payload)) }
+                    Text(stringResource(R.string.share_import_recovery))
                 }
-                payload.importErrors.distinct().forEach { Text(it.localizedMessage(payload)) }
-                Text(stringResource(R.string.share_import_recovery))
-            }
-        },
-        confirmButton = {
-            if (hasContent) {
-                TextButton(onClick = onContinue) { Text(stringResource(R.string.share_to)) }
-            } else {
-                TextButton(onClick = onCancel) { Text(stringResource(R.string.close)) }
-            }
-        },
-        dismissButton = {
-            if (hasContent) TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
-        },
-    )
+            },
+            confirmButton = {
+                if (hasContent) {
+                    TextButton(onClick = {
+                        close {
+                            if (currentHasContent.value &&
+                                currentPayload.value == payload
+                            ) {
+                                currentOnContinue.value()
+                            }
+                        }
+                    }) { Text(stringResource(R.string.share_to)) }
+                } else {
+                    TextButton(onClick = dismiss) { Text(stringResource(R.string.close)) }
+                }
+            },
+            dismissButton = {
+                if (hasContent) TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
 
 /** Formats the imported policy snapshot without linking native code or reading providers during composition. */

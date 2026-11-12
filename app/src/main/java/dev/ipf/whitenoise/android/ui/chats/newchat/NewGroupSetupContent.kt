@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -309,12 +310,15 @@ internal fun GroupCreationBottomAction(
     onClick: () -> Unit,
     tag: String,
 ) {
+    // Only the picker Continue action navigates to another full-screen page.
+    val (origin, navigate) =
+        if (tag == "new_group.continue") rememberSettingsRouteClick(onClick) else Modifier to onClick
     SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         WhiteNoiseButton(
-            onClick = onClick,
+            onClick = navigate,
             enabled = enabled,
             modifier =
-                Modifier.widthIn(max = 520.dp).fillMaxWidth().testTag(tag).let {
+                Modifier.then(origin).widthIn(max = 520.dp).fillMaxWidth().testTag(tag).let {
                     if (tag == "new_group.continue") {
                         it.performanceTestTag(PerformanceTestTags.CONTACT_PICKER_NEXT)
                     } else {

@@ -88,7 +88,8 @@ internal fun GroupSystemTimelineRow(
             groupSystem = item.projected?.groupSystem,
             onWave = onWave,
             waveAccountRef = owner.accountRef,
-            onOpenProfile = { appState.presentProfile(appState.npub(it)) },
+            // Inline subject links do not expose span bounds; never morph from the unrelated row.
+            onOpenProfile = { appState.presentProfile(appState.npub(it), origin = null) },
             onOpenActions =
                 if (actions.canReact || actions.canDelete) {
                     { text, bounds ->

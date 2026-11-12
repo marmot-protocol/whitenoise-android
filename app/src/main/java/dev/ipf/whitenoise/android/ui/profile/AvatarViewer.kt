@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -84,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Download
@@ -440,19 +440,21 @@ internal fun AvatarViewerFrame(
                     )
                 }
                 val menuScrollState = rememberScrollState()
-                DropdownMenu(
+                AnimatedDropdownMenu(
                     scrollState = menuScrollState,
                     modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
-                ) {
+                ) { surface ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.media_save)) },
                         leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
                         enabled = saveEnabled,
                         onClick = {
-                            onMenuOpenChange(false)
-                            onSave()
+                            surface.close {
+                                onMenuOpenChange(false)
+                                onSave()
+                            }
                         },
                     )
                     if (editActionLabel != null && onEditPicture != null) {
@@ -460,8 +462,10 @@ internal fun AvatarViewerFrame(
                             text = { Text(editActionLabel) },
                             leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                             onClick = {
-                                onMenuOpenChange(false)
-                                onEditPicture()
+                                surface.close {
+                                    onMenuOpenChange(false)
+                                    onEditPicture()
+                                }
                             },
                         )
                     }

@@ -180,12 +180,16 @@ private fun NewGroupRecipientAccountScreen(
                     },
                     retry = { if (owner.isCurrent()) retry++ },
                     toggle = ::toggle,
-                    profile = { candidate ->
+                    profile = { candidate, origin ->
                         if (owner.isCurrent()) {
                             if (candidate.searchProfile != null) {
-                                appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
+                                appState.presentDiscoveredProfile(
+                                    candidate.npub,
+                                    candidate.searchProfile,
+                                    origin = origin,
+                                )
                             } else {
-                                appState.presentProfile(candidate.npub)
+                                appState.presentProfile(candidate.npub, origin = origin)
                             }
                         }
                     },

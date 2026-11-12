@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -49,6 +51,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -75,6 +78,21 @@ internal fun QrScannerSheet(
     val torch = remember(context) { QrScannerTorch(ContextCompat.getMainExecutor(context)) }
     val currentScan by rememberUpdatedState(onScan)
     var active by remember { mutableStateOf(true) }
+    val sheet =
+        rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = {
+            active ||
+                it == SheetValue.Hidden
+        })
+    val terminal = rememberSheetTerminalMotion(sheet)
+
+    fun finish(action: () -> Unit) {
+        if (!active) return
+        // Revoke camera ingress and torch before the decorative exit begins.
+        active = false
+        torch.bind(null)
+        terminal.close(action)
+    }
+    val close = { finish(onDismiss) }
     val cameraUnavailable = stringResource(R.string.camera_unavailable)
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -95,8 +113,8 @@ internal fun QrScannerSheet(
             torch.bind(null)
         }
     }
-    LaunchedEffect(permissionGranted, permissionFinished) {
-        if (!permissionGranted && !permissionFinished) launcher.launch(Manifest.permission.CAMERA)
+    LaunchedEffect(active, permissionGranted, permissionFinished) {
+        if (active && !permissionGranted && !permissionFinished) launcher.launch(Manifest.permission.CAMERA)
     }
     val height =
         with(LocalDensity.current) {
@@ -104,8 +122,14 @@ internal fun QrScannerSheet(
                 .toDp() * 0.94f
         }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = close,
+        sheetState = sheet,
+        sheetGesturesEnabled = active,
+        properties =
+            ModalBottomSheetProperties(
+                shouldDismissOnBackPress = active,
+                shouldDismissOnClickOutside = active,
+            ),
         containerColor = Color.Black,
         contentColor = Color.White,
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
@@ -114,7 +138,7 @@ internal fun QrScannerSheet(
         QrScannerSheetContent(
             permissionGranted = permissionGranted,
             scannerError = scannerError,
-            onDismiss = onDismiss,
+            onDismiss = close,
             onRequestPermission = { permissionFinished = false },
             modifier = Modifier.height(height.coerceAtLeast(0.dp)),
             permissionPending = !permissionFinished,
@@ -140,11 +164,13 @@ internal fun QrScannerSheet(
             onToggleTorch = torch::toggle,
             onRetry = { scannerError = null },
             cameraPreview = {
-                cameraContent(
-                    { if (active) currentScan(it) },
-                    { if (active) scannerError = it },
-                    { if (active) torch.bind(it) },
-                )
+                if (active) {
+                    cameraContent(
+                        { raw -> finish { currentScan(raw) } },
+                        { if (active) scannerError = it },
+                        { if (active) torch.bind(it) },
+                    )
+                }
             },
         )
     }

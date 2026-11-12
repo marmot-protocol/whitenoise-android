@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -324,7 +325,12 @@ internal fun ContactPickerScreen(
                                 appState.npubForDisplay(resolvedAccountIdHex),
                                 keySubtitle = !alreadyMember,
                             )
+                        val (profileModifier, profileClick) =
+                            rememberMeasuredControlClick { origin ->
+                                appState.presentProfile(candidate.npub, origin = origin)
+                            }
                         ContactRow(
+                            modifier = profileModifier,
                             title = candidate.displayName,
                             subtitle =
                                 if (alreadyMember) {
@@ -338,7 +344,7 @@ internal fun ContactPickerScreen(
                             avatarUrl = appState.contactAvatarSource(resolvedAccountIdHex),
                             enabled = !busy && !alreadyMember,
                             onClick = { toggle(candidate) },
-                            onLongClick = { appState.presentProfile(candidate.npub) },
+                            onLongClick = profileClick,
                             publicKey = keys.publicKey,
                             publicKeyInTitle = keys.inTitle,
                             publicKeyCopyEnabled = !busy,
@@ -376,7 +382,20 @@ internal fun ContactPickerScreen(
                             !addressQuery && !candidate.isFollowing && candidate.searchProfile == null
                         val candidateNpub = appState.npubForDisplay(candidate.accountIdHex)
                         val keys = candidateKeyPlacement(candidate.displayName, candidateNpub, subtitleIsKey)
+                        val (profileModifier, profileClick) =
+                            rememberMeasuredControlClick { origin ->
+                                if (candidate.searchProfile != null) {
+                                    appState.presentDiscoveredProfile(
+                                        candidate.npub,
+                                        candidate.searchProfile,
+                                        origin = origin,
+                                    )
+                                } else {
+                                    appState.presentProfile(candidate.npub, origin = origin)
+                                }
+                            }
                         ContactRow(
+                            modifier = profileModifier,
                             title = candidate.displayName,
                             subtitle =
                                 when {
@@ -398,13 +417,7 @@ internal fun ContactPickerScreen(
                             selectionState = isSelected,
                             enabled = !busy,
                             onClick = { toggle(candidate) },
-                            onLongClick = {
-                                if (candidate.searchProfile != null) {
-                                    appState.presentDiscoveredProfile(candidate.npub, candidate.searchProfile)
-                                } else {
-                                    appState.presentProfile(candidate.npub)
-                                }
-                            },
+                            onLongClick = profileClick,
                             trailing = { SelectionIndicator(selected = isSelected) },
                             avatarDomain = AvatarImageLoader.publicProfiles(),
                         )

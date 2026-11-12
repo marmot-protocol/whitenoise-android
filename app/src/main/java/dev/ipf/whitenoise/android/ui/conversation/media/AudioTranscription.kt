@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,6 +34,7 @@ import dev.ipf.whitenoise.android.audio.AttachmentSpeechFailure
 import dev.ipf.whitenoise.android.audio.transcribeAttachment
 import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.openOfflineSpeechToTextListing
 import kotlinx.coroutines.CancellationException
@@ -144,14 +144,14 @@ internal fun AudioTranscriptDialog(
     onGetProvider: () -> Unit,
 ) {
     val cancellable = state.phase == AudioTranscriptPhase.WORKING || state.phase == AudioTranscriptPhase.CONFIRM
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
         title = { Text(stringResource(R.string.audio_transcription_title)) },
         text = { AudioTranscriptBody(state, listingError) },
         confirmButton = { AudioTranscriptConfirm(state, onStart, onGetProvider) },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = dismiss) {
                 Text(stringResource(if (cancellable) R.string.cancel else R.string.close))
             }
         },

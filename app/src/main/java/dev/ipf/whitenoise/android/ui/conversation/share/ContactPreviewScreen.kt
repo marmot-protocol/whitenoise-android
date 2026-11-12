@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.disabled
@@ -37,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
@@ -56,9 +57,11 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Phone
 internal fun ContactPreviewScreen(
     contact: SharedContact,
     onDismiss: () -> Unit,
+    origin: Rect? = null,
     onSend: (SharedContact) -> Unit,
 ) {
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
@@ -78,7 +81,7 @@ internal fun ContactPreviewScreen(
                                 .padding(horizontal = 4.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = onDismiss) {
+                        IconButton(onClick = dismiss) {
                             Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
                         }
                         Text(
@@ -129,12 +132,12 @@ internal fun ContactPreviewScreen(
                     onClick = {
                         if (sending || !canSend) return@FloatingActionButton
                         sending = true
-                        onSend(
+                        val selected =
                             contact.copy(
                                 phone = contact.phone?.takeIf { includePhone },
                                 email = contact.email?.takeIf { includeEmail },
-                            ),
-                        )
+                            )
+                        close { onSend(selected) }
                     },
                     modifier =
                         Modifier

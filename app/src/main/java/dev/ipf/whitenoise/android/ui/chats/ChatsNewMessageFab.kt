@@ -23,16 +23,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.whitenoise.android.R
@@ -44,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
@@ -53,6 +56,7 @@ import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -73,6 +77,7 @@ internal fun ChatsNewMessageFab(
     onNewMessage: () -> Unit,
     loadRelays: suspend (String) -> AccountRelayListsFfi? = appState::loadAccountRelayLists,
     minimumTopInWindow: State<Float?>? = null,
+    onNewMessageOrigin: (Rect?) -> Unit = {},
 ) {
     val account = appState.activeAccountRef
     val runtime = appState.runtimeGeneration
@@ -101,14 +106,20 @@ internal fun ChatsNewMessageFab(
             }
         if (current()) missing = chatsFabNeedsRelays(result)
     }
+    var relayOrigin by remember(appState, account, runtime) { mutableStateOf<Rect?>(null) }
+    var fabBounds by remember { mutableStateOf<Rect?>(null) }
     val penFlight = LocalNewMessagePenFlight.current
     val motionAllowed = rememberSystemAnimationsEnabled()
-    ChatsNewMessageFabContent(missing, minimumTopInWindow = minimumTopInWindow, onClick = {
+    ChatsNewMessageFabContent(missing, minimumTopInWindow = minimumTopInWindow, onBounds = {
+        fabBounds = it
+    }, onClick = {
         if (current()) {
             if (missing) {
+                relayOrigin = fabBounds
                 relayOpening = Any()
             } else {
                 penFlight?.launchFromPen(motionAllowed)
+                onNewMessageOrigin(fabBounds)
                 onNewMessage()
             }
         }
@@ -123,11 +134,13 @@ internal fun ChatsNewMessageFab(
                     refresh++
                 }
             }
-            Dialog(
+            MeasuredPlaybackDialog(
+                origin = relayOrigin,
+                ownerKey = relayToken,
                 onDismissRequest = close,
                 properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
             ) {
-                RelaysScreen(appState, onBack = close, onFeedback = { result ->
+                RelaysScreen(appState, onBack = dismiss, onFeedback = { result ->
                     if (relayOpening === relayToken && current()) feedback = result
                 })
                 feedback?.let { result ->
@@ -146,6 +159,7 @@ internal fun ChatsNewMessageFab(
 internal fun ChatsNewMessageFabContent(
     missingRelays: Boolean,
     minimumTopInWindow: State<Float?>? = null,
+    onBounds: (Rect) -> Unit = {},
     onClick: () -> Unit,
 ) {
     if (!LocalControlHandoffEndpointCurrent.current) {
@@ -154,6 +168,7 @@ internal fun ChatsNewMessageFabContent(
     }
     // Keep the pen one action row tall, aligned with the last composer's upper edge.
     // Retaining height rather than window coordinates lets current insets remain authoritative.
+    val view = LocalView.current
     val composerHeight = LocalComposerFabHeight.current
     val outline =
         if (missingRelays) amoledOutlineBorder() else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -168,6 +183,7 @@ internal fun ChatsNewMessageFabContent(
                 .alignWithComposer(composerHeight, minimumTopInWindow, placementTopInWindow, maxHeight, !missingRelays)
                 .floatingDictationAnchor(followsComposerFab = !missingRelays)
                 .newMessagePenOrigin()
+                .onGloballyPositioned { onBounds(it.settingsMorphBounds(view)) }
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         val chrome =
             if (morphing || outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape)

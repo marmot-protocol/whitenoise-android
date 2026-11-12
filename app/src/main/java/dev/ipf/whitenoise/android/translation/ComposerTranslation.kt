@@ -82,6 +82,10 @@ internal class ComposerTranslationState(
     var consenting by mutableStateOf(false)
         private set
 
+    /** Identifies the displayed consent request, including a reopen for the same provider. */
+    var consentRequestId by mutableLongStateOf(0L)
+        private set
+
     /** The saved outgoing language, or null until the person chooses one from the catalog. */
     var target by mutableStateOf(initialTarget?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget))
         private set
@@ -109,20 +113,25 @@ internal class ComposerTranslationState(
         when {
             active -> close()
             noticeAccepted() -> open()
-            else -> consenting = true
+            else -> {
+                consentRequestId += 1
+                consenting = true
+            }
         }
     }
 
     /** Records the accepted notice once, then opens translate mode. */
-    fun acceptNotice() {
-        if (!consenting) return
+    fun acceptNotice(expectedRequest: Long = consentRequestId) {
+        if (!consenting || expectedRequest != consentRequestId) return
         consenting = false
+        if (!ownerCurrent()) return
         onNoticeAccepted()
         open()
     }
 
     /** Leaves translate mode off; no text has been sent to the engine. */
-    fun declineNotice() {
+    fun declineNotice(expectedRequest: Long = consentRequestId) {
+        if (expectedRequest != consentRequestId) return
         consenting = false
     }
 
@@ -259,12 +268,14 @@ internal fun rememberComposerTranslation(
 @Composable
 internal fun ComposerTranslationNotice(state: ComposerTranslationState) {
     if (!state.consenting) return
+    val request = state.consentRequestId
     ConfirmDialog(
         title = stringResource(R.string.translation_composer_toggle),
         message = stringResource(R.string.translation_privacy_warning),
         confirmLabel = stringResource(R.string.accept),
-        onConfirm = state::acceptNotice,
-        onDismiss = state::declineNotice,
+        ownerKey = state to request,
+        onConfirm = { state.acceptNotice(request) },
+        onDismiss = { state.declineNotice(request) },
     )
 }
 

@@ -22,7 +22,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeRegion
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 
 private val LocalPlaybackSourceAllowed = staticCompositionLocalOf { true }
-private val LocalPlaybackDismissals = staticCompositionLocalOf<List<() -> Unit>> { emptyList() }
+private val LocalPlaybackDismissals = staticCompositionLocalOf<List<(() -> Unit) -> Unit>> { emptyList() }
 
 /**
  * Full-screen destinations retain their own secure window and Back behavior while sharing transport controls.
@@ -33,22 +33,31 @@ private val LocalPlaybackDismissals = staticCompositionLocalOf<List<() -> Unit>>
  * Non-shell previews and fixtures keep their original layout when no host is installed.
  */
 @Composable
-@Suppress("FunctionNaming")
+// One composition owns the secure window, transport/banner insets and inherited exit chain.
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 internal fun PlaybackDialog(
     onDismissRequest: () -> Unit,
     properties: DialogProperties = DialogProperties(),
     onSourceDismiss: (() -> Unit)? = onDismissRequest,
+    onSourceExit: (((() -> Unit) -> Unit))? = null,
+    rootModifier: @Composable () -> Modifier = { Modifier },
     content: @Composable () -> Unit,
 ) {
     val host = LocalShellPlaybackHost.current
     val sourceAllowed = LocalPlaybackSourceAllowed.current && onSourceDismiss != null
     val parentDismissals = LocalPlaybackDismissals.current
     val latestDismissal by rememberUpdatedState(onSourceDismiss)
+    val latestExit by rememberUpdatedState(onSourceExit)
     val dismissCurrent =
         remember {
-            {
-                latestDismissal?.invoke()
-                Unit
+            { next: () -> Unit ->
+                val exit = latestExit
+                if (exit != null) {
+                    exit(next)
+                } else {
+                    latestDismissal?.invoke()
+                    next()
+                }
             }
         }
     val hasSourceDismissal = onSourceDismiss != null
@@ -58,43 +67,55 @@ internal fun PlaybackDialog(
             if (hasSourceDismissal) parentDismissals + dismissCurrent else parentDismissals
         }
     Dialog(onDismissRequest = onDismissRequest, properties = properties) {
-        if (host == null) {
-            content()
-        } else {
-            CompositionLocalProvider(
-                LocalPlaybackDismissals provides dismissals,
-                LocalPlaybackSourceAllowed provides sourceAllowed,
-            ) {
-                val visible = host.appState.observePlaybackTransportVisible() && !host.appState.appLockScreenVisible
-                val noticeSlot = rememberTopNoticeSlot()
-                // With no strip above it, a presented banner is the first thing under the status bar.
-                val bannerOwnsStatusBar =
-                    !visible &&
-                        !properties.decorFitsSystemWindows &&
-                        noticeSlot.presents(noticeSlot.hostNotice, LocalTopNoticeScope.current)
-                Column(Modifier.fillMaxSize()) {
-                    if (visible) {
-                        Box(if (properties.decorFitsSystemWindows) Modifier else Modifier.statusBarsPadding()) {
-                            PlaybackTransportBar(
-                                host.appState,
-                                onBodyClick =
-                                    onSourceDismiss?.takeIf { sourceAllowed }?.let {
-                                        {
-                                            host.requestOpenSource {
-                                                dismissals.asReversed().forEach { dismiss -> dismiss() }
+        Box(rootModifier()) {
+            if (host == null) {
+                content()
+            } else {
+                CompositionLocalProvider(
+                    LocalPlaybackDismissals provides dismissals,
+                    LocalPlaybackSourceAllowed provides sourceAllowed,
+                ) {
+                    val visible = host.appState.observePlaybackTransportVisible() && !host.appState.appLockScreenVisible
+                    val noticeSlot = rememberTopNoticeSlot()
+                    // With no strip above it, a presented banner is the first thing under the status bar.
+                    val bannerOwnsStatusBar =
+                        !visible &&
+                            !properties.decorFitsSystemWindows &&
+                            noticeSlot.presents(noticeSlot.hostNotice, LocalTopNoticeScope.current)
+                    Column(Modifier.fillMaxSize()) {
+                        if (visible) {
+                            Box(if (properties.decorFitsSystemWindows) Modifier else Modifier.statusBarsPadding()) {
+                                PlaybackTransportBar(
+                                    host.appState,
+                                    onBodyClick =
+                                        onSourceDismiss?.takeIf { sourceAllowed }?.let {
+                                            {
+                                                host.requestOpenSourceAfterExit { isCurrent, navigate ->
+                                                    dismissals
+                                                        .fold(navigate) { next, dismiss ->
+                                                            { if (isCurrent()) dismiss(next) }
+                                                        }.invoke()
+                                                }
                                             }
-                                        }
-                                    },
-                            )
+                                        },
+                                )
+                            }
                         }
+                        TopNoticeRegion(
+                            slot = noticeSlot,
+                            modifier = if (bannerOwnsStatusBar) Modifier.statusBarsPadding() else Modifier,
+                        )
+                        val statusBarOwned = visible || bannerOwnsStatusBar
+                        val insets =
+                            if (statusBarOwned) {
+                                Modifier.consumeWindowInsets(
+                                    WindowInsets.statusBars,
+                                )
+                            } else {
+                                Modifier
+                            }
+                        Box(Modifier.weight(1f).then(insets)) { content() }
                     }
-                    TopNoticeRegion(
-                        slot = noticeSlot,
-                        modifier = if (bannerOwnsStatusBar) Modifier.statusBarsPadding() else Modifier,
-                    )
-                    val statusBarOwned = visible || bannerOwnsStatusBar
-                    val insets = if (statusBarOwned) Modifier.consumeWindowInsets(WindowInsets.statusBars) else Modifier
-                    Box(Modifier.weight(1f).then(insets)) { content() }
                 }
             }
         }

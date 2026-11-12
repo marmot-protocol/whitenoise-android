@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.WarningAmber
@@ -126,7 +126,7 @@ internal fun LargeGroupInviteConfirmationDialog(
     onDismiss: () -> Unit,
     identity: (@Composable () -> Unit)? = null,
 ) {
-    AlertDialog(
+    AnimatedAlertDialog(
         modifier = Modifier.testTag(LARGE_GROUP_INVITE_CONFIRMATION_TAG),
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.WarningAmber, contentDescription = null) },
@@ -146,12 +146,12 @@ internal fun LargeGroupInviteConfirmationDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onContinue) {
+            TextButton(onClick = { close(onContinue) }) {
                 Text(stringResource(R.string.group_action_add_members))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = dismiss) {
                 Text(stringResource(R.string.cancel))
             }
         },

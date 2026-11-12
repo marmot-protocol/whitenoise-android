@@ -55,9 +55,9 @@ fun WhiteNoiseScaffold(
     contentColor: Color = MaterialTheme.colorScheme.onBackground,
     contentWindowInsets: WindowInsets = WindowInsets.safeDrawing,
     topNoticeSlot: Boolean = true,
+    scrollBehavior: TopAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
     content: @Composable (PaddingValues) -> Unit,
 ) {
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     CompositionLocalProvider(LocalWhiteNoiseHeaderScroll provides scrollBehavior) {
         Scaffold(
             modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),

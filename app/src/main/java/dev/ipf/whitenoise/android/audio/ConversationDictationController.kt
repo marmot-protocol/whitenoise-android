@@ -848,8 +848,12 @@ internal class ConversationDictationController internal constructor(
     fun providerActivityIntent(): Intent = platform.providerActivityIntent()
 
     /** Records the first-use disclosure and resumes its exact pending target. */
-    fun acceptDisclosure() {
-        val pending = state as? ConversationDictationState.DisclosureRequired ?: return
+    fun acceptDisclosure(
+        expected: ConversationDictationState.DisclosureRequired? =
+            state as? ConversationDictationState.DisclosureRequired,
+    ) {
+        val pending = expected ?: return
+        if (state !== pending) return
         if (pending.usesOfflineSpeechToText) {
             markOfflineDisclosureAccepted()
         } else {

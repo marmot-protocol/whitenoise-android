@@ -25,13 +25,15 @@ internal fun TtsAutoReadPickerDialog(
                 globalDefaultEnabled = globalDefaultEnabled,
                 selectedOverride = selectedOverride,
                 onSelect = { override ->
-                    onSelect(override)
-                    onDismiss()
+                    close {
+                        onSelect(override)
+                        onDismiss()
+                    }
                 },
             )
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss, enabled = acceptsInput) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

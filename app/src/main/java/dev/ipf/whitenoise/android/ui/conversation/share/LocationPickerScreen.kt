@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -42,7 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
@@ -77,11 +78,13 @@ private fun configureOsmdroid(context: Context) {
 internal fun LocationPickerScreen(
     hasFineGrant: Boolean,
     onDismiss: () -> Unit,
+    origin: Rect? = null,
     onPick: (SharedLocation) -> Unit,
     useDataConnection: Boolean = true,
     locationLookup: suspend (Context, Boolean) -> SharedLocation? = ::fetchCurrentLocation,
 ) {
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -190,7 +193,7 @@ internal fun LocationPickerScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = dismiss) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
                     }
                 }
@@ -248,13 +251,13 @@ internal fun LocationPickerScreen(
                 Button(
                     onClick = {
                         val center = mapView.mapCenter
-                        onPick(
+                        val picked =
                             SharedLocation(
                                 latitude = center.latitude,
                                 longitude = center.longitude,
                                 accuracyMeters = null,
-                            ),
-                        )
+                            )
+                        close { onPick(picked) }
                     },
                     enabled = selectedCenter != null,
                     modifier = Modifier.fillMaxWidth(),

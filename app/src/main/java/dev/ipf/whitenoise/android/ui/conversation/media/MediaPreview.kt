@@ -29,11 +29,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.DialogProperties
@@ -46,6 +51,7 @@ import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -304,7 +310,7 @@ internal fun MediaPreviewScreen(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
-    onEditMediaAt: ((Int) -> Unit)? = null,
+    onEditMediaAt: ((Int, Rect?) -> Unit)? = null,
     onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
     preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
@@ -315,9 +321,28 @@ internal fun MediaPreviewScreen(
     previewOnly: Boolean = false,
     initialIndex: Int = 0,
     onCollectionChange: ((StagedCollectionOrder) -> Unit)? = null,
+    interactive: Boolean = true,
 ) {
+    // Picker/camera and restored entries do not retain an activated app control.
+    // Keep the fullscreen fallback; do not infer an origin from the whole preview.
     PlaybackDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (interactive) onDismiss() },
+        onSourceDismiss = onDismiss,
+        // The real preview remains under the editor, including its source Edit button.
+        // Only the top editor owns interaction until its final exit frame.
+        rootModifier = {
+            if (interactive) {
+                Modifier
+            } else {
+                Modifier.clearAndSetSemantics {}.onPreviewKeyEvent { true }.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            }
+        },
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
@@ -367,7 +392,7 @@ internal fun MediaPreviewContent(
     onRemoveDocumentAt: (Int) -> Unit,
     onAddPhotos: () -> Unit,
     onAddDocuments: () -> Unit,
-    onEditMediaAt: ((Int) -> Unit)? = null,
+    onEditMediaAt: ((Int, Rect?) -> Unit)? = null,
     onSelectMediaQuality: ((String, MediaQuality) -> Unit)? = null,
     preparedPhotoPreviews: Map<String, PreparedPhotoPreview> = emptyMap(),
     preparedPhotoQualities: Map<String, PreparedPhotoQuality> = emptyMap(),
@@ -438,7 +463,7 @@ internal fun MediaPreviewContent(
                                             nonEditableSlotIds = nonEditableMediaSlotIds,
                                             genericRefusal = genericEditRefusal,
                                         ),
-                                    onEdit = { onEditMediaAt?.invoke(pagerState.currentPage) },
+                                    onEdit = { origin -> onEditMediaAt?.invoke(pagerState.currentPage, origin) },
                                 )
                             },
                     onClose = onClose,
@@ -521,7 +546,7 @@ internal fun MediaPreviewContent(
 internal data class MediaPreviewEditAction(
     val enabled: Boolean,
     val description: String?,
-    val onEdit: () -> Unit,
+    val onEdit: (Rect?) -> Unit,
 )
 
 /**
@@ -610,7 +635,8 @@ private fun MediaPreviewTopBar(
             editAction?.let { action ->
                 val fallback = stringResource(R.string.photo_editor_edit_action)
                 val describe = Modifier.semantics { contentDescription = action.description ?: fallback }
-                TextButton(onClick = action.onEdit, enabled = action.enabled, modifier = describe) {
+                val (editBounds, editClick) = rememberMeasuredControlClick(action.onEdit)
+                TextButton(onClick = editClick, enabled = action.enabled, modifier = describe.then(editBounds)) {
                     Text(stringResource(R.string.photo_editor_title))
                 }
             }

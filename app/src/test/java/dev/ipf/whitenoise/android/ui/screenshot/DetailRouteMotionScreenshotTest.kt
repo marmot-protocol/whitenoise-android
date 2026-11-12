@@ -24,9 +24,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -69,6 +71,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class DetailRouteMotionScreenshotTest {
     @get:Rule val rule = createComposeRule()
     private val app: Application = ApplicationProvider.getApplicationContext()
+    private val transitionSources = mutableMapOf<String, Bitmap>()
     private val captureFrames = System.getenv("ANIMATION_CAPTURE_FRAMES") == "1"
     private var activeController: ConversationController? = null
     private var routeBackground: Int? = null
@@ -192,24 +195,40 @@ class DetailRouteMotionScreenshotTest {
             rowsPublished.close()
         }
         captureTransition(name, profile)
+        if (!profile) {
+            val destination = rule.onRoot().captureToImage().asAndroidBitmap()
+            org.junit.Assert.assertFalse(
+                "Notification destination must replace the group details pixels",
+                destination.sameAs(transitionSources.getValue(name)),
+            )
+        }
         val destinationTitle =
             app.getString(
                 if (profile) R.string.profile_notification_scope_detail else R.string.sounds_and_notifications,
             )
         rule.onNodeWithText(destinationTitle).assertExists()
         // Back is routed by the production child, not by a test-only target setter.
+        captureSource("${name}_back", profile)
         rule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
         rule.mainClock.advanceTimeByFrame()
-        action.assertExists()
         captureTransition("${name}_back", profile)
         action.assertIsDisplayed()
         if (!profile) {
+            captureSource("${name}_entry_back", profile)
             rule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
             rule.mainClock.advanceTimeByFrame()
             captureTransition("${name}_entry_back", profile)
             // The closing cards cover the chat and hold back taps until they have folded away.
             rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS.toLong())
-            rule.onNode(opensDetails()).assertExists()
+            try {
+                rule.onNode(opensDetails()).assertExists()
+            } catch (failure: AssertionError) {
+                File("build/detail-route-motion").mkdirs()
+                File(
+                    "build/detail-route-motion/${name}_return_semantics.txt",
+                ).writeText(rule.onRoot(useUnmergedTree = true).printToString())
+                throw failure
+            }
             rule.onNode(opensDetails()).performClick()
             rule.mainClock.advanceTimeBy(240)
             // Scrolling is setup; pause again before the next timed navigation/lock assertion.
@@ -265,7 +284,7 @@ class DetailRouteMotionScreenshotTest {
         }
         rule.mainClock.advanceTimeByFrame()
         captureTransition("${name}_entry", profile = false)
-        rule.mainClock.autoAdvance = true
+        captureSource("${name}_entry_back", profile = false)
         rule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
         rule.mainClock.autoAdvance = false
         rule.mainClock.advanceTimeByFrame()
@@ -350,10 +369,12 @@ class DetailRouteMotionScreenshotTest {
         name: String,
         profile: Boolean,
     ) {
+        val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
+        val bitmap = node.captureToImage().asAndroidBitmap()
+        transitionSources[name] = bitmap.copy(Bitmap.Config.ARGB_8888, false)
         if (!captureFrames) return
         val frames = File("build/detail-route-motion/$name").apply { mkdirs() }
-        val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
-        node.captureToImage().asAndroidBitmap().captureRoboImage(File(frames, "source.png").path)
+        captureScreenRoboImage(File(frames, "source.png").path)
     }
 
     /**
@@ -366,12 +387,18 @@ class DetailRouteMotionScreenshotTest {
         profile: Boolean,
     ) {
         val frames = if (captureFrames) File("build/detail-route-motion/$name").apply { mkdirs() } else null
-        for (frame in 0..20) {
+        // Ordinary checks retain their timing; private exports include settled frames after preparation.
+        for (frame in 0..(if (captureFrames) 31 else 22)) {
             if (captureFrames || frame in listOf(0, 6, 20)) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
-                if (frames != null) bitmap.captureRoboImage(File(frames, "frame-%03d.png".format(frame)).path)
-                if (frame == 0) assertFirstFrameBackplate(name, bitmap)
+                if (frames != null) captureScreenRoboImage(File(frames, "frame-%03d.png".format(frame)).path)
+                if (frame == 0) {
+                    // Keep the current failing image, rather than diagnosing stale tracked goldens.
+                    val diagnostic = File("build/detail-route-motion/diagnostics").apply { mkdirs() }
+                    bitmap.captureRoboImage(File(diagnostic, "${name}_first.png").path)
+                    assertFirstFrameBackplate(name, bitmap)
+                }
                 if (frame in listOf(0, 6, 20)) {
                     bitmap.captureRoboImage(
                         "src/test/snapshots/detail_motion_${name}_$frame.png",
@@ -393,7 +420,8 @@ class DetailRouteMotionScreenshotTest {
         val morph = name.endsWith("_entry") || name.endsWith("_entry_back")
         val exposedLeft = name.endsWith("_back") == name.contains("_rtl")
         val edge = if (morph || exposedLeft) 1 else bitmap.width - 2
-        val expected = if (morph) checkNotNull(morphBackplate) else checkNotNull(routeBackground)
+        val source = transitionSources[name].takeIf { name.endsWith("_back") }
+        if (name.endsWith("_back")) checkNotNull(source) { "Back requires its actual settled source frame" }
         val message =
             if (morph) {
                 "$name must draw the card morph over its backplate"
@@ -401,6 +429,9 @@ class DetailRouteMotionScreenshotTest {
                 "$name must expose its themed backplate, not the window behind the moving page"
             }
         for (y in listOf(bitmap.height / 4, bitmap.height / 2, bitmap.height * 3 / 4)) {
+            // A reverse starts with the outgoing page still covering this edge. Its
+            // real source pixels, rather than a theme-color guess, define continuity.
+            val expected = source?.getPixel(edge, y) ?: checkNotNull(morphBackplate)
             assertEquals(message, expected, bitmap.getPixel(edge, y))
         }
     }

@@ -64,6 +64,7 @@ class SmartFolderEditorTest {
         val root = render(SmartFolderFilter.Group(children = listOf(child, second)))
         composeRule.onNodeWithTag("folder.match.").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_any)).performClick()
+        composeRule.waitForIdle()
         assertFalse(root.value.all)
         composeRule
             .onNodeWithText(
@@ -73,6 +74,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.options.0").performClick()
         composeRule.onNodeWithTag("folder.not.0").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_not_hint)).performClick()
+        composeRule.waitForIdle()
         assertTrue((root.value.children.first() as SmartFolderFilter.Group).not)
         assertFalse(root.value.not)
     }
@@ -429,6 +431,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.quick.advanced").performScrollTo().performClick()
         composeRule.onNodeWithTag("folder.match.").performScrollTo().performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_any)).performClick()
+        composeRule.waitForIdle()
         val any = root.value
         assertFalse(any!!.all)
         composeRule.onNodeWithTag("folder.quick.advanced").assertDoesNotExist()

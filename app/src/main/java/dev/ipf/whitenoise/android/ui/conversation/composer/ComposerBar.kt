@@ -466,6 +466,7 @@ internal fun ComposerBar(
     onCaptureFromCamera: (() -> Unit)? = null,
     onPickDocument: (() -> Unit)? = null,
     onShareLocation: (() -> Unit)? = null,
+    onAttachmentRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
     onShareUser: (() -> Unit)? = null,
     onShareContact: (() -> Unit)? = null,
     onCreatePoll: (() -> Unit)? = null,
@@ -1684,6 +1685,7 @@ internal fun ComposerBar(
                     }
                 val toolbarBindings =
                     ComposerToolbarBindings(
+                        onRouteOrigin = onAttachmentRouteOrigin,
                         settings = renderedToolbar.first,
                         shortcuts = renderedToolbar.second,
                         attachmentActions =
@@ -1831,6 +1833,7 @@ internal fun ComposerBar(
                         attachmentSheetOpen = false,
                         attachmentMenu = { bounds, textShortcuts ->
                             ComposerAttachmentMenu(
+                                onRouteOrigin = onAttachmentRouteOrigin,
                                 anchorBounds = bounds,
                                 expanded = attachmentSheetState.isOpen,
                                 onDismiss = attachmentSheetState::dismiss,

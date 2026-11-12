@@ -30,6 +30,13 @@ dependencyResolutionManagement {
     }
 }
 
+// Each checkout owns task outputs; dependency caches remain shared across parallel builds.
+buildCache {
+    local {
+        directory = File(settingsDir, ".gradle/local-build-cache")
+    }
+}
+
 rootProject.name = "whitenoise-android"
 include(":app")
 include(":benchmark")

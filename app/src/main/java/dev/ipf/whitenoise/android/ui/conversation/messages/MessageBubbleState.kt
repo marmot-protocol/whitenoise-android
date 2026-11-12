@@ -46,12 +46,17 @@ internal class MessageBubbleSurfaceState {
     /** The reader session whose composer send was accepted and is waiting for [ReaderSendDismissal] to close it. */
     var readerSendAcceptedSession by mutableStateOf<Int?>(null)
         private set
+    var expandedOrigin: Rect? = null
+        private set
+    var infoOrigin: Rect? = null
+    var forwardOrigin: Rect? = null
     var infoSheetOpen by mutableStateOf(false)
     var forwardSheetOpen by mutableStateOf(false)
 
     /** The payload captured when the forward sheet opened, so a pending source changing state cannot rewrite it. */
     var forwardSnapshot by mutableStateOf<ForwardMessagePayload?>(null)
     var editHistoryOpen by mutableStateOf(false)
+    var editHistoryOrigin by mutableStateOf<Rect?>(null)
     var reactionSheetOpen by mutableStateOf(false)
     var customizeReactionsOpen by mutableStateOf(false)
     var configureReactionsDraft by mutableStateOf<List<String>>(emptyList())
@@ -75,7 +80,8 @@ internal class MessageBubbleSurfaceState {
     }
 
     /** Opens the Read more reader as a new session. */
-    fun openExpandedFullView() {
+    fun openExpandedFullView(origin: Rect? = null) {
+        expandedOrigin = origin
         expandedFullViewSession += 1
         readerSendAcceptedSession = null
         expandedFullView = true
@@ -109,12 +115,15 @@ internal class MessageBubbleSurfaceState {
 internal fun ReaderSendDismissal(
     surfaces: MessageBubbleSurfaceState,
     onReaderSendAccepted: () -> Unit,
+    requestClose: ((() -> Unit) -> Unit)? = null,
 ) {
     val session = surfaces.readerSendAcceptedSession ?: return
     val currentOnReaderSendAccepted by rememberUpdatedState(onReaderSendAccepted)
     LaunchedEffect(surfaces, session) {
         repeat(READER_SEND_DISMISSAL_FRAMES) { withFrameNanos { } }
-        if (surfaces.closeReaderAfterAcceptedSend(session)) currentOnReaderSendAccepted()
+        val accepted = currentOnReaderSendAccepted
+        val finish = { if (surfaces.closeReaderAfterAcceptedSend(session)) accepted() }
+        if (requestClose == null) finish() else requestClose(finish)
     }
 }
 

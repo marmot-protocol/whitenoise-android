@@ -346,7 +346,7 @@ internal fun DeveloperContent(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmStart = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -365,7 +365,7 @@ internal fun DeveloperContent(
                 ) { Text(stringResource(R.string.review_demo_clear)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

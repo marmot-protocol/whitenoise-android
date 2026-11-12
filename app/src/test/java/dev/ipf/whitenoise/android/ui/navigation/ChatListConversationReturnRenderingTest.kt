@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.SavedStateHandle
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -57,6 +58,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
@@ -65,6 +68,7 @@ import kotlin.coroutines.startCoroutine
 
 /** Layout control through the production Back route; pixel/alpha visibility requires separate qualification. */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ChatListConversationReturnRenderingTest {
     @get:Rule
@@ -256,6 +260,72 @@ class ChatListConversationReturnRenderingTest {
             condition()
         }
         composeRule.waitForIdle()
+    }
+
+    @Test fun captureRootRouteFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val fixture = ReturnFixture()
+        val mounted = mutableStateOf(true)
+        val holder = MainShellStateHolder(fixture.appState, SavedStateHandle())
+        val controller =
+            holder.chatsController(
+                ConversationTimelineTestIds.ACCOUNT_REF,
+                fixture.appState.runtimeGeneration,
+            )
+        fixture.appState.setAppInForeground(true)
+        composeRule.setContent {
+            if (mounted.value) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled provides true,
+                    ) { MainShell(appState = fixture.appState, stateHolder = holder) }
+                }
+            }
+        }
+        try {
+            awaitCondition { controller.items.size == fixture.rows.size && !controller.isLoading }
+            composeRule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+            captureTransitionFrames("chats-conversation/forward") {
+                composeRule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").performClick()
+            }
+            captureTransitionFrames("chats-conversation/reverse") {
+                composeRule.onNodeWithContentDescription("Back").performClick()
+            }
+            captureTransitionFrames("chats-settings/forward") {
+                composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
+            }
+            captureTransitionFrames(
+                "chats-settings/reverse",
+            ) { composeRule.onNodeWithContentDescription("Back").performClick() }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            composeRule.runOnIdle {
+                mounted.value = false
+                holder.release()
+            }
+            composeRule.waitForIdle()
+        }
+    }
+
+    private fun captureTransitionFrames(
+        name: String,
+        action: () -> Unit,
+    ) {
+        check(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val folder = File("build/animation-frames/$name").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        captureScreenRoboImage(File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
     }
 }
 

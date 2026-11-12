@@ -6,7 +6,6 @@ import android.animation.ValueAnimator
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.items
@@ -103,6 +102,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 internal data class ConversationOpenContext(
+    val activationBounds: androidx.compose.ui.geometry.Rect? = null,
     val focusMessageId: String? = null,
     // Set only when focusMessageId is a search result opened from the chat list (#1945). Voice, playback and
     // attachment-speech destinations also name a message to focus, but land with their own rules and wording.
@@ -135,6 +135,7 @@ internal data class PendingConversationOpen(
     val focusMessageId: String?,
     val justCreated: Boolean,
     val visibleActiveListHead: ChatListReturnHead?,
+    val activationBounds: androidx.compose.ui.geometry.Rect? = null,
 )
 
 internal fun pendingConversationOpenBelongsToAccount(
@@ -234,11 +235,19 @@ internal class ProfileGroupForegroundState {
     var initialMember by mutableStateOf<RecipientSearch.Candidate?>(null)
         private set
 
-    fun open(member: RecipientSearch.Candidate) {
+    var launchOrigin by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+        private set
+
+    fun open(
+        member: RecipientSearch.Candidate,
+        origin: androidx.compose.ui.geometry.Rect? = null,
+    ) {
+        launchOrigin = origin
         initialMember = member
     }
 
     fun close() {
+        launchOrigin = null
         initialMember = null
     }
 }
@@ -282,21 +291,23 @@ internal fun ProfileGroupForegroundCoordinator(
     when (route) {
         is ProfileForegroundRoute.NewGroup -> {
             secureWindowEnabled?.let { WindowSecureFlag(enabled = it) }
-            NewGroupFlow(
-                appState = appState,
-                initialMembers = listOf(route.initialMember),
-                onCreateCompletedOpen = { item, requestToken ->
-                    foregroundState.close()
-                    onGroupCreateCompletedOpen(item, requestToken)
-                },
-                onCreateSubmitted = onGroupCreateSubmitted,
-                onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
-                onClose = {
-                    onClosePicker()
-                    foregroundState.close()
-                    onGroupCreateFlowSuperseded()
-                },
-            )
+            ProfileGroupOpeningPage(foregroundState.launchOrigin, route.initialMember) {
+                NewGroupFlow(
+                    appState = appState,
+                    initialMembers = listOf(route.initialMember),
+                    onCreateCompletedOpen = { item, requestToken ->
+                        foregroundState.close()
+                        onGroupCreateCompletedOpen(item, requestToken)
+                    },
+                    onCreateSubmitted = onGroupCreateSubmitted,
+                    onCreateFlowSuperseded = onGroupCreateFlowSuperseded,
+                    onClose = {
+                        onClosePicker()
+                        foregroundState.close()
+                        onGroupCreateFlowSuperseded()
+                    },
+                )
+            }
             return
         }
         else -> content()
@@ -308,19 +319,25 @@ internal fun ProfileGroupForegroundCoordinator(
             else -> null
         }
     profileNpub?.let {
-        ProfileSheet(
-            appState = appState,
-            npub = it,
-            onOpenGroup = onOpenConversation,
-            onStartGroup = { candidate ->
-                appState.clearPresentedProfile()
-                foregroundState.open(candidate)
-            },
-            onDismiss = onDismissProfile,
-            adminController = conversationController,
-            securePolicy = profileSecurePolicy,
-            openGroupsInCommon = appState.pendingProfileGroupsInCommon,
-        )
+        key(appState.pendingProfilePresentationId) {
+            ProfileSheet(
+                appState = appState,
+                npub = it,
+                onOpenGroup = onOpenConversation,
+                onStartGroupMeasured = { candidate, origin ->
+                    appState.clearPresentedProfile()
+                    foregroundState.open(candidate, origin)
+                },
+                onStartGroup = { candidate ->
+                    appState.clearPresentedProfile()
+                    foregroundState.open(candidate)
+                },
+                onDismiss = onDismissProfile,
+                adminController = conversationController,
+                securePolicy = profileSecurePolicy,
+                openGroupsInCommon = appState.pendingProfileGroupsInCommon,
+            )
+        }
     }
 }
 
@@ -497,6 +514,8 @@ internal fun MainShell(
     // Once ready, the same controller is promoted into the conversation route,
     // so that route's first composition already owns real data and final index
     // math instead of painting an empty destination and filling it afterward.
+    val conversationRouteOrigin =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) { ConversationRouteOrigin() }
     var pendingConversationOpen by remember { mutableStateOf<PendingConversationOpen?>(null) }
     var nextPendingConversationOpenRequestId by remember { mutableLongStateOf(0L) }
     // Open-time conversation state. Search hits carry a focus id; every
@@ -520,7 +539,9 @@ internal fun MainShell(
     // Visible active-list head provenance while a conversation opened from
     // ChatsScreen is foregrounded. Published back to the list only after
     // setChatListVisible(true) flushes pending recompute (issue #1313).
-    var chatListReturnHeadSnap by remember { mutableStateOf<ChatListReturnHeadSnapState>(ChatListReturnHeadSnapState.Unarmed) }
+    var chatListReturnHeadSnap by remember {
+        mutableStateOf<ChatListReturnHeadSnapState>(ChatListReturnHeadSnapState.Unarmed)
+    }
     // Active chat-list folder filter (null = All). Owned here so opening a
     // conversation does not dispose the selection when ChatsScreen leaves
     // composition (issue #1897).
@@ -1744,6 +1765,7 @@ internal fun MainShell(
                 // Canonicalized once here, so every lookup during the landing compares exact ids.
                 focusMessageId = request.focusMessageId?.let(::canonicalMessageId),
                 focusFromSearch = request.focusMessageId != null,
+                activationBounds = request.activationBounds,
             )
         selectedChatJustCreated = request.justCreated
         selectedChatOpenedAsDmHint = request.justCreated
@@ -1822,7 +1844,7 @@ internal fun MainShell(
     ) { dictationControlOwner ->
         if (!navAccountStable && !quickSwitchOwnsTargetFrame) {
             // Account invalidation is a privacy boundary, not an ordinary Back
-            // navigation. Remove the AnimatedContent subtree immediately so its
+            // navigation. Remove the retained route subtree immediately so its
             // outgoing slot cannot retain a decrypted route for the exit tween.
             LoadingScreen()
             return@MainShellNoticeLayout
@@ -1874,7 +1896,16 @@ internal fun MainShell(
                         }
                     }
                 }
-            val routeTransition = updateTransition(targetState = transitionContent, label = "conversation route")
+            val suppressConversationMotion =
+                routingNotification || routingShare || routingAppUpdate || pendingTtsDestinationNavigation != null
+            val routeTransition =
+                rememberConversationRouteTransition(
+                    transitionContent,
+                    suppressConversationMotion,
+                    ownerKey =
+                        (if (navAccountStable) conversationAccountRef else appState.activeAccountRef) to
+                            appState.runtimeGeneration,
+                ) { it?.chat?.id ?: MAIN_SHELL_ROUTE_KEY }
             LaunchedEffect(exitingConversationContent?.chat?.id, selectedChat?.id, routeTransition) {
                 val exiting = exitingConversationContent ?: return@LaunchedEffect
                 if (selectedChat?.id == exiting.chat.id) {
@@ -1888,7 +1919,7 @@ internal fun MainShell(
                     )
                 }.filter { it }
                     .first()
-                // AnimatedContent removes its outgoing slot at completion. Give that
+                // The route owner removes its outgoing slot at completion. Give that
                 // disposal one committed frame before releasing the controller that
                 // the outgoing ConversationScreen may still reference.
                 withFrameNanos { }
@@ -1897,12 +1928,10 @@ internal fun MainShell(
             ConversationRouteAnimatedContent(
                 transition = routeTransition,
                 routeForwardDirection = routeForwardDirection,
-                suppressMotion =
-                    routingNotification ||
-                        routingShare ||
-                        routingAppUpdate ||
-                        pendingTtsDestinationNavigation != null,
+                suppressMotion = suppressConversationMotion,
                 contentKey = { content -> content?.chat?.id ?: MAIN_SHELL_ROUTE_KEY },
+                activatingBounds = { it?.openContext?.activationBounds },
+                originOwner = conversationRouteOrigin,
             ) { animatedConversation ->
                 when (
                     resolveMainShellContentRoute(
@@ -2060,7 +2089,13 @@ internal fun MainShell(
                                         conversationScrollSnapshots[scrollKey] = snapshot
                                     }
                                 },
-                                onStartGroupWithPeer = profileGroupForegroundState::open,
+                                onStartGroupWithPeer = { profileGroupForegroundState.open(it) },
+                                onStartGroupWithPeerMeasured = {
+                                    member,
+                                    origin,
+                                    ->
+                                    profileGroupForegroundState.open(member, origin)
+                                },
                                 onBack = {
                                     // A very quick Back can leave before the provisional
                                     // open receives its chat-list projection. The entry
@@ -2126,6 +2161,7 @@ internal fun MainShell(
                                     pendingTtsDestinationNavigation != null,
                             contentVisible = !appState.appLockScreenVisible,
                             topLevelBubble = true,
+                            cardMorph = true,
                         ) { animatedSection ->
                             when (animatedSection) {
                                 MainSection.Chats -> {
@@ -2209,6 +2245,10 @@ internal fun MainShell(
                                                     focusMessageId = focusMessageId,
                                                     justCreated = justCreated,
                                                     visibleActiveListHead = visibleHead,
+                                                    activationBounds =
+                                                        conversationRouteOrigin.take(
+                                                            item.group.groupIdHex,
+                                                        ),
                                                 )
                                         },
                                         onPresentProfile = { npub, visibleHead ->

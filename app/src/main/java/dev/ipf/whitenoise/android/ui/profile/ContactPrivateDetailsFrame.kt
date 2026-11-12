@@ -28,7 +28,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.DialogWindowMotion
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
+import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -39,12 +42,16 @@ import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 internal fun ContactPrivateDetailsFrame(
     securePolicy: SecureFlagPolicy,
     onDismiss: () -> Unit,
-    actions: @Composable () -> Unit,
+    actions: @Composable PopupSurfaceMotion.() -> Unit,
     form: @Composable () -> Unit,
     viewportInsets: WindowInsets? = null,
+    popupMotion: PopupSurfaceMotion? = null,
+    dismissEnabled: () -> Boolean = { true },
 ) {
+    val surface = popupMotion ?: rememberPopupSurfaceMotion(true, onDismiss, dismissEnabled = dismissEnabled)
+    if (!surface.visible) return
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = surface.dismiss,
         properties =
             DialogProperties(
                 securePolicy = securePolicy,
@@ -52,6 +59,7 @@ internal fun ContactPrivateDetailsFrame(
                 decorFitsSystemWindows = false,
             ),
     ) {
+        DialogWindowMotion(surface.presence)
         BoxWithConstraints(
             Modifier
                 .fillMaxSize()
@@ -61,7 +69,13 @@ internal fun ContactPrivateDetailsFrame(
             contentAlignment = Alignment.Center,
         ) {
             Surface(
-                modifier = Modifier.widthIn(max = 560.dp).fillMaxWidth().heightIn(max = maxHeight),
+                modifier =
+                    surface
+                        .modifier()
+                        .then(surface.inputModifier())
+                        .widthIn(max = 560.dp)
+                        .fillMaxWidth()
+                        .heightIn(max = maxHeight),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -85,7 +99,7 @@ internal fun ContactPrivateDetailsFrame(
                         )
                         form()
                     }
-                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions() }
+                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { actions(surface) }
                 }
             }
         }

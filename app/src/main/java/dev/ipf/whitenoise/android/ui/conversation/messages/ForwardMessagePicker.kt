@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -75,7 +76,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
@@ -115,6 +116,7 @@ internal fun ForwardMessagePickerFullScreen(
     sourceAccountRef: String?,
     onDismiss: () -> Unit,
     onForward: (destinationAccountRef: String, targetGroupIds: List<String>) -> Boolean,
+    origin: Rect? = null,
     initialDestinationAccountRef: String? = null,
     initialSelectedGroupIds: List<String> = emptyList(),
     onPickerStateChanged: PickerStateListener = { _, _, _ -> },
@@ -134,7 +136,12 @@ internal fun ForwardMessagePickerFullScreen(
             onDismiss()
         }
     }
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
+        onDismissStart = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        },
         onDismissRequest = dismissPicker,
         properties =
             DialogProperties(
@@ -148,7 +155,7 @@ internal fun ForwardMessagePickerFullScreen(
             attachmentCount = attachmentCount,
             originGroupIdHex = originGroupIdHex,
             sourceAccountRef = sourceAccountRef,
-            onDismiss = dismissPicker,
+            onDismiss = dismiss,
             onForward = onForward,
             initialDestinationAccountRef = initialDestinationAccountRef,
             initialSelectedGroupIds = initialSelectedGroupIds,

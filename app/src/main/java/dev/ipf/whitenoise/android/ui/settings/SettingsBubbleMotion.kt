@@ -83,13 +83,19 @@ private fun ContentDrawScope.drawAndRecord(snapshot: SettingsCardSnapshot) {
 
 /** Draws the content and records the same frame into [picture]. */
 internal fun ContentDrawScope.drawAndRecord(picture: Picture) {
-    drawContent()
     val width = ceil(size.width).toInt()
     val height = ceil(size.height).toInt()
-    if (width <= 0 || height <= 0) return
+    if (width <= 0 || height <= 0) {
+        drawContent()
+        return
+    }
     val recording = Canvas(picture.beginRecording(width, height))
-    draw(this, layoutDirection, recording, size) { this@drawAndRecord.drawContent() }
-    picture.endRecording()
+    try {
+        draw(this, layoutDirection, recording, size) { this@drawAndRecord.drawContent() }
+    } finally {
+        picture.endRecording()
+    }
+    drawIntoCanvas { it.nativeCanvas.drawPicture(picture) }
 }
 
 /** Keeps the settled top-level Settings frame when it was reached without the card motion. */

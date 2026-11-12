@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -13,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import java.security.MessageDigest
 
 /** Only an opaque account/chat binding and presence bit survive recreation; no file, audio, key, or duration does. */
@@ -81,15 +81,15 @@ internal fun VoiceReviewUnavailableNotice(
     onDismiss: () -> Unit,
     onRecordAgain: () -> Unit,
 ) {
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.voice_review_unavailable_title)) },
         text = { Text(stringResource(R.string.voice_review_unavailable_message)) },
         confirmButton = {
-            TextButton(onClick = onRecordAgain) { Text(stringResource(R.string.voice_record_again)) }
+            TextButton(onClick = { close(onRecordAgain) }) { Text(stringResource(R.string.voice_record_again)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.dismiss)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.dismiss)) }
         },
     )
 }

@@ -64,7 +64,7 @@ class NewMessagePreparationAndroidTest {
                     connectQrEnabled = false,
                     creatingHex = null,
                     error = null,
-                    actions = NewMessageActions({}, {}, {}, {}, {}, {}, {}, { taps++ }, {}, {}),
+                    actions = NewMessageActions({}, {}, {}, {}, {}, {}, {}, { _, _ -> taps++ }, { _, _ -> }, {}),
                     isValidNpub = { true },
                 )
             }

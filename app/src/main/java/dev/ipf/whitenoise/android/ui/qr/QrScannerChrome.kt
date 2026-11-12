@@ -179,7 +179,7 @@ internal fun ScannerErrorDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("qr_scanner.error_close")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("qr_scanner.error_close")) {
                 Text(stringResource(R.string.close))
             }
         },

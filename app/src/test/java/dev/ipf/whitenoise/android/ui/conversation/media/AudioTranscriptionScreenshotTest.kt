@@ -1,14 +1,23 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.whitenoise.android.audio.AttachmentSpeechFailure
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -18,10 +27,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h640dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 @OptIn(ExperimentalCoroutinesApi::class)
 class AudioTranscriptionScreenshotTest {
     @get:Rule
@@ -93,4 +103,47 @@ class AudioTranscriptionScreenshotTest {
         )
 
     private enum class Appearance { LIGHT, DARK, AMOLED_RTL }
+
+    @Test fun captureTranscriptFrames() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val shown = mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                Box(Modifier.fillMaxSize().background(Color.Black))
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    if (shown.value) {
+                        AudioTranscriptDialog(
+                            completed(),
+                            onStart = {},
+                            onDismiss = { shown.value = false },
+                            onGetProvider = {},
+                        )
+                    }
+                }
+            }
+        }
+        captureTransitionFrames("transcript/forward") { composeRule.runOnIdle { shown.value = true } }
+        captureTransitionFrames("transcript/reverse") { composeRule.onNodeWithText("Close").performClick() }
+    }
+
+    private fun captureTransitionFrames(
+        name: String,
+        action: () -> Unit,
+    ) {
+        check(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val folder = File("build/animation-frames/$name").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        captureScreenRoboImage(File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
+    }
 }

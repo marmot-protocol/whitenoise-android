@@ -15,7 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -37,6 +36,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
+import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -85,7 +86,7 @@ internal fun <T> ChoiceDialog(
     supportingText: String? = null,
     subtitle: (T) -> String? = { null },
 ) {
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         modifier = modifier.exposePerformanceTestTags(),
         title = { Text(title) },
@@ -101,7 +102,8 @@ internal fun <T> ChoiceDialog(
                         WhiteNoiseDialogChoiceRow(
                             title = label(value),
                             selected = value == selected,
-                            onClick = { onSelect(value) },
+                            onClick = { close { onSelect(value) } },
+                            enabled = acceptsInput,
                             fontFamily = labelFontFamily(value),
                             subtitle = subtitle(value),
                         )
@@ -118,7 +120,7 @@ internal fun <T> ChoiceDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss, enabled = acceptsInput) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -215,18 +217,24 @@ private fun dialogSelectionColor(): Color =
 @Composable
 internal fun WhiteNoiseAlertDialog(
     onDismissRequest: () -> Unit,
-    confirmButton: @Composable () -> Unit,
+    confirmButton: @Composable PopupSurfaceMotion.() -> Unit,
     modifier: Modifier = Modifier,
-    dismissButton: (@Composable () -> Unit)? = null,
+    dismissButton: (@Composable PopupSurfaceMotion.() -> Unit)? = null,
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
-    text: (@Composable () -> Unit)? = null,
+    text: (@Composable PopupSurfaceMotion.() -> Unit)? = null,
+    dismissEnabled: () -> Boolean = { true },
+    onDismissStart: () -> Unit = {},
+    ownerKey: Any? = LocalSettingsCardMorph.current,
 ) {
     val scheme = MaterialTheme.colorScheme
     val outline = amoledOutlineBorder()
     CompositionLocalProvider(LocalWhiteNoiseTextFieldContainerColor provides scheme.surfaceContainerLowest) {
-        AlertDialog(
+        AnimatedAlertDialog(
             onDismissRequest = onDismissRequest,
+            dismissEnabled = dismissEnabled,
+            onDismissStart = onDismissStart,
+            ownerKey = ownerKey,
             confirmButton = confirmButton,
             modifier =
                 (if (outline != null) modifier.border(outline, MaterialTheme.shapes.extraLarge) else modifier)
@@ -264,7 +272,7 @@ internal fun SpeechChoiceDialog(
     choices: List<SpeechChoice>,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.exposePerformanceTestTags(),
         title = { Text(title) },
@@ -281,16 +289,21 @@ internal fun SpeechChoiceDialog(
                     WhiteNoiseDialogChoiceRow(
                         title = choice.title,
                         selected = choice.selected,
-                        onClick = choice.onClick,
+                        onClick = { close(choice.onClick) },
                         modifier = Modifier.testTag("speech.choice.$index"),
                         subtitle = choice.subtitle,
-                        enabled = choice.enabled,
+                        enabled = choice.enabled && acceptsInput,
                         accessibilityLabel = choice.accessibilityLabel,
                     )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        confirmButton = {
+            TextButton(
+                onClick = dismiss,
+                enabled = acceptsInput,
+            ) { Text(stringResource(R.string.cancel)) }
+        },
     )
 }
 

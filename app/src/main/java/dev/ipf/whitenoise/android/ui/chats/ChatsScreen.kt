@@ -1162,6 +1162,7 @@ internal fun ChatsScreen(
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
     val penFlight = remember { NewMessagePenFlight() }
+    var newChatFlowOrigin by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     val openNewMessageFlow = {
         newChatFlowOriginHead = visibleReturnHead()
         showNewChatFlow = true
@@ -1837,34 +1838,42 @@ internal fun ChatsScreen(
     }
 
     if (showNewChatFlow) {
-        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
-            enabled = showPlaybackTransport,
-            onSourceLeave = {
-                showNewChatFlow = false
-                onGroupCreateFlowSuperseded()
-            },
+        CompositionLocalProvider(
+            dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost provides
+                dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost.current
+                    .takeIf { showPlaybackTransport },
         ) {
-            LaunchedEffect(penFlight.origin) { penFlight.fly() }
-            CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                NewChatFlowHost(
-                    appState = appState,
-                    onOpenConversation = { item, justCreated ->
-                        showNewChatFlow = false
-                        onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
-                    },
-                    onClose = {
-                        showNewChatFlow = false
-                        onGroupCreateFlowSuperseded()
-                    },
-                    onGroupCreateSubmitted = onGroupCreateSubmitted,
-                    onGroupCreateCompletedOpen = { item, requestToken ->
-                        showNewChatFlow = false
-                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
-                    },
-                )
+            dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog(
+                origin = newChatFlowOrigin,
+                ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
+                properties =
+                    androidx.compose.ui.window.DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false,
+                    ),
+                onDismissRequest = {
+                    showNewChatFlow = false
+                    onGroupCreateFlowSuperseded()
+                },
+            ) {
+                LaunchedEffect(penFlight.origin) { penFlight.fly() }
+                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
+                    NewChatFlowHost(
+                        appState = appState,
+                        onOpenConversation = { item, justCreated ->
+                            showNewChatFlow = false
+                            onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
+                        },
+                        onClose = dismiss,
+                        onGroupCreateSubmitted = onGroupCreateSubmitted,
+                        onGroupCreateCompletedOpen = { item, requestToken ->
+                            showNewChatFlow = false
+                            onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
+                        },
+                    )
+                }
             }
         }
-        return
     }
 
     // Folder editor handoff: create-from-selection (folderId = null) or
@@ -2531,7 +2540,12 @@ internal fun ChatsScreen(
                 motionEnabled = rememberSystemAnimationsEnabled(),
             ) {
                 CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
-                    ChatsNewMessageFab(appState, openNewMessageFlow, minimumTopInWindow = fabMinimumTopInWindow)
+                    ChatsNewMessageFab(
+                        appState,
+                        openNewMessageFlow,
+                        minimumTopInWindow = fabMinimumTopInWindow,
+                        onNewMessageOrigin = { newChatFlowOrigin = it },
+                    )
                 }
             }
         },
@@ -2820,7 +2834,7 @@ internal fun ChatsScreen(
                             messageResultsMode -> Unit
                             sourceList.isEmpty() && showArchived && !unreadOnly -> EmptyArchivedChats()
                             sourceList.isEmpty() && !unreadOnly ->
-                                EmptyChats(onCreate = openNewMessageFlow)
+                                EmptyChats(onCreate = openNewMessageFlow, onCreateOrigin = { newChatFlowOrigin = it })
                             visibleItems.isEmpty() && identifierResolution != IdentifierResolution.None ->
                                 controller.error
                                     ?.takeIf { loadFailurePlacement == LoadFailurePlacement.Inline }
@@ -2923,6 +2937,7 @@ internal fun ChatsScreen(
     pendingBulkDelete?.let { request ->
         val isCurrent = { request.isCurrent(appState, controller) }
         ChatDeleteConfirmationDialog(
+            ownerKey = request,
             count = request.groupIds.size,
             confirmEnabled = isCurrent(),
             identity = {
@@ -2942,6 +2957,7 @@ internal fun ChatsScreen(
                 }
             },
             onConfirm = {
+                if (pendingBulkDelete !== request) return@ChatDeleteConfirmationDialog
                 pendingBulkDelete = null
                 if (!isCurrent()) return@ChatDeleteConfirmationDialog
                 if (request.groupIds.any { it in leavingAndDeleting }) {
@@ -2989,7 +3005,7 @@ internal fun ChatsScreen(
                     }
                 }
             },
-            onDismiss = { pendingBulkDelete = null },
+            onDismiss = { if (pendingBulkDelete === request) pendingBulkDelete = null },
         )
     }
 }

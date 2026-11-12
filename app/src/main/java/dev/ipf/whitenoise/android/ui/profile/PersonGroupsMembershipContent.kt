@@ -58,6 +58,7 @@ internal class MembershipVisitState(
     var retriesByGroup by mutableStateOf<Map<String, Int>>(emptyMap())
     var busy by mutableStateOf(false)
     var confirmId by mutableStateOf<String?>(null)
+    var confirmRequest by mutableIntStateOf(0)
 
     /** A failed row retries independently; successful siblings keep their controller and confirmation. */
     fun retryGroup(id: String) {
@@ -123,7 +124,12 @@ internal fun PersonGroupsMembershipContent(
         avatar = avatar,
         groupAnimation = groupAnimation,
         removeLabel = { labelTemplate.format(personName, it.title) },
-        onRemove = { id -> if (state.owner.canAct() && !state.busy) state.confirmId = id },
+        onRemove = { id ->
+            if (state.owner.canAct() && !state.busy) {
+                state.confirmRequest += 1
+                state.confirmId = id
+            }
+        },
         canRemove = { state.canRemove(it, personHex) },
         busy = state.busy,
     )
@@ -244,7 +250,9 @@ internal fun MembershipRemovalConfirmation(
 ) {
     val actingAccountId = appState.accounts.firstOrNull { it.label == context.account }?.accountIdHex ?: context.account
     var showGroupId by remember(context.row.id) { mutableStateOf(false) }
+    val request = state.confirmRequest
     ConfirmDialog(
+        ownerKey = Triple(state.owner, request, state.controllerLoads[context.row.id]),
         title = labelTemplate.format(personName, context.row.title),
         message =
             stringResource(
@@ -264,12 +272,21 @@ internal fun MembershipRemovalConfirmation(
         confirmLabel = stringResource(R.string.remove_from_group),
         confirmEnabled = !state.busy,
         destructive = true,
-        onDismiss = { if (state.owner.canAct()) state.confirmId = null },
-        onConfirm = {
-            if (state.owner.canAct() && !state.busy) {
+        onDismiss = {
+            if (state.owner.canAct() &&
+                state.confirmRequest == request &&
+                state.confirmId == context.row.id
+            ) {
                 state.confirmId = null
-                state.busy = true
-                onConfirm()
+            }
+        },
+        onConfirm = {
+            if (state.confirmRequest == request && state.confirmId == context.row.id) {
+                state.confirmId = null
+                if (state.owner.canAct() && !state.busy && state.canRemove(context.row.id, context.person)) {
+                    state.busy = true
+                    onConfirm()
+                }
             }
         },
     )

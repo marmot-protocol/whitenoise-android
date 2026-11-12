@@ -20,6 +20,7 @@ import dev.ipf.marmotkit.AuditDeliveryStatusV5Ffi
 import dev.ipf.marmotkit.AuditLogRetentionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.whitenoise.android.state.AuditDeliveryState
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -84,8 +85,40 @@ class AuditDiagnosticsScreenshotTest {
 
         chooseSevenDays()
         composeRule.onNodeWithText("Delete older logs").performClick()
+        composeRule.waitForIdle()
         composeRule.waitUntil { audit.retentionWrites == 1 }
         assertEquals(AuditLogRetentionFfi(7u, 64uL * 1024uL * 1024uL), audit.retention)
+    }
+
+    /** Clearing starts only after the visible confirmation has completed its shared exit. */
+    @Test
+    fun clearLogsWaitsForExitAndDispatchesOnce() {
+        val audit = PrivacyAuditFixture()
+        val state = privacyAppState(UsageDiagnosticsDecisionFfi.DECLINED, audit = audit)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        composeRule.setContent {
+            CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                    DiagnosticsImprovementsScreen(state, onBack = {})
+                }
+            }
+        }
+        scrollTo("Clear Diagnostic Logs")
+        composeRule.onNodeWithText("Clear Diagnostic Logs").performClick()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.onNodeWithTag("confirmation.confirm").performClick()
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.runOnIdle { assertEquals(0, audit.clearInventoryReads) }
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        // Native IO can finish after the first idle check while the animation clock is paused.
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.waitForIdle()
+            audit.clearInventoryReads == 1
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(1, audit.clearInventoryReads) }
     }
 
     /** A stale native pause cannot trigger reads or a manual send without Android's consent receipt. */

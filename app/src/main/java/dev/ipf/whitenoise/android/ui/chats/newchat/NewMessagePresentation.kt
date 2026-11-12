@@ -26,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -50,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -80,8 +82,8 @@ internal data class NewMessageActions(
     val retrySearch: () -> Unit,
     val retryChat: () -> Unit,
     val pasteRejected: () -> Unit,
-    val person: (RecipientSearch.Candidate) -> Unit,
-    val profile: (RecipientSearch.Candidate) -> Unit,
+    val person: (RecipientSearch.Candidate, Rect?) -> Unit,
+    val profile: (RecipientSearch.Candidate, Rect?) -> Unit,
     val copyError: (String) -> Unit,
     val agentSettings: () -> Unit = {},
 )
@@ -159,8 +161,8 @@ internal fun NewMessageContent(
                         count = rows.size,
                         enabled = !busy,
                         creating = creatingHex == row.candidate.accountIdHex,
-                        onClick = { actions.person(row.candidate) },
-                        onLongClick = { actions.profile(row.candidate) },
+                        onClick = { origin -> actions.person(row.candidate, origin) },
+                        onLongClick = { origin -> actions.profile(row.candidate, origin) },
                     )
                 }
             }
@@ -229,16 +231,18 @@ internal fun NewMessagePersonRow(
     count: Int,
     enabled: Boolean,
     creating: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    onClick: (Rect?) -> Unit,
+    onLongClick: (Rect?) -> Unit,
 ) {
+    val (personModifier, personClick) = rememberMeasuredControlClick(onClick)
+    val (profileModifier, profileClick) = rememberMeasuredControlClick(onLongClick)
     val candidate = person.candidate
     val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
     val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
     Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
         ListItem(
-            onClick = onClick,
-            onLongClick = onLongClick,
+            onClick = personClick,
+            onLongClick = profileClick,
             enabled = enabled,
             shapes = shapes,
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
@@ -246,6 +250,8 @@ internal fun NewMessagePersonRow(
                 Modifier
                     .fillMaxWidth()
                     .amoledSurfaceBorder(shapes.shape)
+                    .then(personModifier)
+                    .then(profileModifier)
                     .testTag("creation.person.${candidate.accountIdHex}")
                     .semantics { role = Role.Button }
                     .recipientRelationshipSemantics(followed, null),

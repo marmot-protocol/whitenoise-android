@@ -47,6 +47,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -56,6 +59,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -446,6 +450,8 @@ internal fun FullScreenMediaViewer(
             )
         }
     val actionGate = remember(actionOwner) { MediaViewerActionGate(actionOwner) }
+    var closingMotion by remember(actionOwner) { mutableStateOf(false) }
+    var afterSourceExit by remember(actionOwner) { mutableStateOf<(() -> Unit)?>(null) }
 
     /** Owner token binding viewer actions to the account and conversation that opened it. */
     fun currentActionOwner() =
@@ -455,12 +461,17 @@ internal fun FullScreenMediaViewer(
             appState.runtimeGeneration,
         )
 
+    @Suppress("MaxLineLength")
+    fun viewerPrivacyBlocked(): Boolean = appState.appLockScreenVisible || appState.signOutInProgress || appState.wipeInProgress
+
     /** Rejects exports after the opening account, runtime, or retained conversation controller loses ownership. */
     fun exportOwnerIsCurrent(): Boolean {
         val currentOwner = currentActionOwner()
-        return actionGate.ownerIsCurrent(currentOwner) &&
-            controller.ownsRetainedForegroundPresentation &&
-            controller.boundAccountRef == actionOwner.accountRef
+        val accountCurrent =
+            actionGate.ownerIsCurrent(currentOwner) &&
+                controller.ownsRetainedForegroundPresentation &&
+                controller.boundAccountRef == actionOwner.accountRef
+        return accountCurrent && !viewerPrivacyBlocked()
     }
 
     /** A cross-chat page may export only through its own still-bound account and conversation. */
@@ -486,8 +497,20 @@ internal fun FullScreenMediaViewer(
         if (!exportPageOwnerIsCurrent(page, sourceController)) throw CancellationException("Media page owner changed")
     }
 
-    val sourceOwnerCurrent = exportOwnerIsCurrent()
-    LaunchedEffect(sourceOwnerCurrent) { if (!sourceOwnerCurrent) onDismiss() }
+    // Render ownership is independent of action retirement during a valid visual exit.
+    val accountOwnerCurrent = actionOwner.accountRef != null && currentActionOwner() == actionOwner
+    val sourceOwnerCurrent =
+        accountOwnerCurrent &&
+            controller.ownsRetainedForegroundPresentation &&
+            controller.boundAccountRef == actionOwner.accountRef
+    val privacyBlocked = viewerPrivacyBlocked()
+    LaunchedEffect(sourceOwnerCurrent, privacyBlocked) {
+        if (!sourceOwnerCurrent || privacyBlocked) onDismiss()
+    }
+    if (!sourceOwnerCurrent || privacyBlocked) {
+        actionGate.close()
+        return
+    }
     // Group-image failures are app toasts. The viewer's modal claims the app's banner slot, so they show in
     // this window above the viewer, once, with their Copy and dismiss actions (#3312).
     val pictureFailures =
@@ -607,7 +630,6 @@ internal fun FullScreenMediaViewer(
             )
         }
 
-    var closingMotion by remember { mutableStateOf(false) }
     val openingMotionAttachment =
         remember {
             ConversationMediaViewerAttachmentId(
@@ -615,11 +637,36 @@ internal fun FullScreenMediaViewer(
                 pages[startIndex.coerceIn(pages.indices)].attachmentIndex,
             )
         }
-    val dismissWithMotion: () -> Unit = { closingMotion = true }
+    val dismissWithMotion: () -> Unit = {
+        if (!closingMotion) {
+            actionGate.close()
+            pictureSession.close()
+            closingMotion = true
+        }
+    }
 
     PlaybackDialog(
         onDismissRequest = dismissWithMotion,
         onSourceDismiss = onDismiss,
+        onSourceExit = { next ->
+            if (!closingMotion && exportOwnerIsCurrent()) {
+                afterSourceExit = next
+                dismissWithMotion()
+            }
+        },
+        rootModifier = {
+            if (!closingMotion) {
+                Modifier
+            } else {
+                Modifier.clearAndSetSemantics {}.onPreviewKeyEvent { true }.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            }
+        },
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
@@ -650,7 +697,12 @@ internal fun FullScreenMediaViewer(
                                 currentPage.attachmentIndex,
                             )
                     ),
-            onClosed = onDismiss,
+            onClosed = {
+                val next = afterSourceExit
+                afterSourceExit = null
+                onDismiss()
+                if (sourceOwnerCurrent && !viewerPrivacyBlocked()) next?.invoke()
+            },
             selectedSourceEpoch = currentReference.sourceEpoch,
             attachmentAspectRatio = aspectRatioFromDim(currentReference.dim),
             fallbackCloseAllowed =
@@ -918,6 +970,7 @@ internal fun FullScreenMediaViewer(
             source.preview.asImageBitmap(),
             source.orientedSize,
             IdentityImageCropShape.RoundedSquare,
+            ownerKey = pictureSession to source,
             onDismiss = {
                 pictureSession.cancel()
                 pictureFailures.clear()

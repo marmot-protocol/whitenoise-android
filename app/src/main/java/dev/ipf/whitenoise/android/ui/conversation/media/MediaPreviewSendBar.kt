@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -39,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val ADD_MORE_TILE = 56.dp
@@ -137,26 +137,31 @@ internal fun AddMoreThumb(
             )
         }
         val menuScrollState = rememberScrollState()
-        DropdownMenu(
+        AnimatedDropdownMenu(
+            keyboardPreserving = true,
             scrollState = menuScrollState,
             modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
             shape = MenuDefaults.shape,
             border = amoledSurfaceBorderStroke(),
-        ) {
+        ) { surface ->
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.attach_photo_library)) },
                 onClick = {
-                    menuOpen = false
-                    onAddPhotos()
+                    surface.close {
+                        menuOpen = false
+                        onAddPhotos()
+                    }
                 },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.attach_document)) },
                 onClick = {
-                    menuOpen = false
-                    onAddDocuments()
+                    surface.close {
+                        menuOpen = false
+                        onAddDocuments()
+                    }
                 },
             )
         }

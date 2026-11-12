@@ -270,7 +270,7 @@ private fun GlobalSearchCheckDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.done)) }
         },
     )
 }

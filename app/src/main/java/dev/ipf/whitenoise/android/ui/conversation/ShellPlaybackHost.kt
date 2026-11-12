@@ -15,14 +15,37 @@ internal class ShellPlaybackHost(
 ) {
     private val leaveGuards = linkedMapOf<Any, (() -> Unit) -> Unit>()
 
-    /** Revalidates playback ownership after any asynchronous dirty-draft confirmation, then closes modal windows. */
-    fun requestOpenSource(beforeNavigate: () -> Unit = {}) {
+    /** Synchronous route owners remain compatible; modal exits use the completion form below. */
+    fun requestOpenSource(beforeNavigate: () -> Unit = {}) =
+        requestOpenSourceAfterExit { _, next ->
+            beforeNavigate()
+            next()
+        }
+
+    /** Revalidate both before closing windows and after asynchronous exit/dirty-draft confirmation. */
+    fun requestOpenSourceAfterExit(closeWindows: (() -> Boolean, () -> Unit) -> Unit) {
         val destination = appState.currentPlaybackConversationDestination() ?: return
+        val runtime = appState.runtimeGeneration
+        val account = appState.activeAccountRef
+
+        @Suppress("MaxLineLength")
+        fun privacyAllowed(): Boolean = !appState.appLockScreenVisible && !appState.signOutInProgress && !appState.wipeInProgress
+
+        fun isCurrent(): Boolean {
+            val identityCurrent = runtime == appState.runtimeGeneration && account == appState.activeAccountRef
+            return identityCurrent &&
+                privacyAllowed() &&
+                destination.matchesPlaybackSession(appState.currentPlaybackConversationDestination())
+        }
+        var completed = false
         val navigate = {
-            val current = destination.matchesPlaybackSession(appState.currentPlaybackConversationDestination())
-            if (current && !appState.appLockScreenVisible) {
-                beforeNavigate()
-                openSource()
+            if (isCurrent()) {
+                closeWindows(::isCurrent) {
+                    if (!completed && isCurrent()) {
+                        completed = true
+                        openSource()
+                    }
+                }
             }
         }
         leaveGuards.values.fold(navigate) { next, guard -> { guard(next) } }.invoke()

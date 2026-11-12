@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetAvatarAc
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetMembersPreview
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsRouteClick
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -133,6 +134,8 @@ internal fun ShareChatPickerFullScreenContent(
 
 /** Builds the edge-to-edge modal surface and exports its first-frame benchmark selector. */
 @Composable
+// Keep modal Back ownership, scaffold slots, and terminal completion together.
+@Suppress("LongMethod")
 private fun ShareChatPickerScaffold(
     pickerState: ShareChatPickerState,
     presentedTargets: List<ShareChatPickerTargetPresentation>,
@@ -174,7 +177,8 @@ private fun ShareChatPickerScaffold(
                         actions = {
                             val selected = pickerState.selectedAccountRef
                             if (onOpenEmojiSet != null && selected != null) {
-                                TextButton(onClick = { onOpenEmojiSet(selected) }) {
+                                val (origin, open) = rememberSettingsRouteClick { onOpenEmojiSet(selected) }
+                                TextButton(onClick = open, modifier = origin) {
                                     Text(stringResource(R.string.emoji_sets_open))
                                 }
                             }

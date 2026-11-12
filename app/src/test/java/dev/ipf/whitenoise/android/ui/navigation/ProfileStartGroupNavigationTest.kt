@@ -4,15 +4,20 @@ import android.app.Application
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -35,6 +40,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -44,6 +50,140 @@ class ProfileStartGroupNavigationTest {
     val composeRule = createComposeRule()
 
     private val app: Application = ApplicationProvider.getApplicationContext()
+
+    /** Optional real production owners with controlled local backend data; no relay/signing work. */
+    @Test
+    // Optional frame export follows the real support/profile/group ownership handoff in one session.
+    @Suppress("LongMethod")
+    fun captureSupportProfileAndStartGroupOwners() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val supportNpub = dev.ipf.whitenoise.android.core.SupportContact.NPUB
+        val state =
+            WhiteNoiseAppState(
+                context = app,
+                draftStore = DraftStore(EmptyDraftPersistence()),
+                accountIdHexResolver = { ref -> TARGET_HEX.takeIf { ref == supportNpub } },
+                accounts = listOf(activeAccount()),
+                activeAccountRef = ACTIVE_ACCOUNT_REF,
+            )
+        val foreground = ProfileGroupForegroundState()
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled provides true,
+                ) {
+                    ProfileGroupForegroundCoordinator(
+                        appState = state,
+                        conversationController = null,
+                        profileGroupForegroundState = foreground,
+                        secureWindowEnabled = null,
+                        profileSecurePolicy = SecureFlagPolicy.Inherit,
+                        onOpenConversation = { _, _ -> },
+                        onDismissProfile = state::clearPresentedProfile,
+                        onClosePicker = {},
+                    ) {
+                        dev.ipf.whitenoise.android.ui.settings.SupportScreen(
+                            appState = state,
+                            onBack = {},
+                            onOpenSupportChat = {},
+                            onRelays = {},
+                            loadRelayLists = {
+                                dev.ipf.whitenoise.android.ui.settings.relayLists(
+                                    emptyList(),
+                                    listOf("wss://inbox.example.com"),
+                                )
+                            },
+                            existingChat = { null },
+                        )
+                    }
+                }
+            }
+        }
+        try {
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("support.start").performScrollTo().assertIsEnabled()
+            captureRemainingOwnerFrames("profile-sheet/forward") {
+                composeRule.onNodeWithTag("support.start").performClick()
+            }
+            assertProfileActionVisible(scrollToAction = false)
+            captureRemainingOwnerFrames("profile-sheet/reverse") {
+                composeRule
+                    .onNode(
+                        hasContentDescription(app.getString(R.string.back)) and hasAnyAncestor(isDialog()),
+                    ).performClick()
+            }
+            assertProfileOverlayAbsent()
+            composeRule.onNodeWithTag("support.start").assertIsDisplayed()
+            composeRule.onNodeWithTag("support.start").performClick()
+            composeRule.mainClock.advanceTimeBy(500L)
+            assertProfileActionVisible(scrollToAction = false)
+            captureRemainingOwnerFrames("profile-start-group/forward") {
+                composeRule.onNodeWithText(app.getString(R.string.person_start_group)).performClick()
+            }
+            assertProfileOverlayAbsent()
+            composeRule.onNodeWithText(app.getString(R.string.new_group)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+            composeRule.mainClock.advanceTimeBy(500L)
+            composeRule.onNodeWithTag("support.start").assertIsDisplayed()
+            composeRule.runOnIdle { assertNull(state.pendingProfileNpub) }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun captureProductionBubbleColorsDropdown() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val state = profileFixture(SHELL_SURFACE).appState
+        // Seed all existing theme variants, since the editor resolves app preference separately.
+        dev.ipf.whitenoise.android.state.BubbleTheme.entries.forEach { theme ->
+            state.updateGlobalBubbleColor(theme, dev.ipf.whitenoise.android.state.BubbleSide.Mine, 0xff225588L)
+        }
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled provides true,
+                ) {
+                    dev.ipf.whitenoise.android.ui.settings
+                        .ChatBubbleColorsScreen(state, onBack = {})
+                }
+            }
+        }
+        try {
+            captureRemainingOwnerFrames("anchored-dropdown/forward") {
+                composeRule.onNodeWithTag("bubble_colors.menu").performClick()
+            }
+            composeRule.onNodeWithText(app.getString(R.string.reset_to_default)).assertIsDisplayed()
+            captureRemainingOwnerFrames("anchored-dropdown/reverse") {
+                composeRule.onNodeWithText(app.getString(R.string.reset_to_default)).performClick()
+            }
+            composeRule.onNodeWithText(app.getString(R.string.reset_to_default)).assertDoesNotExist()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun captureRemainingOwnerFrames(
+        name: String,
+        action: () -> Unit,
+    ) {
+        check(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val folder = File("build/animation-frames/$name").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        captureScreenRoboImage(File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle {
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        // Include dialog composition/startup frames as well as the 340 ms opening clock.
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
+    }
 
     @Test
     fun shellProfileStartGroupPromotesPickerWithViewedMember() {

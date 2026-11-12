@@ -118,7 +118,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
@@ -462,6 +462,7 @@ internal fun ProfileSheet(
     adminController: ConversationController? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
     openGroupsInCommon: Boolean = false,
+    onStartGroupMeasured: ((RecipientSearch.Candidate, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -802,7 +803,7 @@ internal fun ProfileSheet(
         remember(accountAtOpen, hex, notificationRevision) {
             appState.profileNotificationOverrides.get(accountAtOpen, hex)
         }
-    val profileContent: @Composable () -> Unit = {
+    val profileContent: @Composable (() -> Unit) -> Unit = { dismissProfile ->
         PersonProfileContent(
             startingAs =
                 if (hex != null && !targetIsSelf) {
@@ -840,7 +841,7 @@ internal fun ProfileSheet(
                     ),
             showSharedGroups = hex != null && !targetIsSelf,
             copied = copied,
-            onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
+            onBack = { if (!creatingChat) dismissProfile() },
             onMessage = { openOrCreateProfileChat() },
             notificationSummary =
                 if (accountAtOpen != null && hex != null && !targetIsSelf) {
@@ -940,6 +941,16 @@ internal fun ProfileSheet(
                     }
                 }
             },
+            onStartGroupMeasured = { origin ->
+                if (owner.canAct()) {
+                    hex?.let { target ->
+                        owner.leave {
+                            val candidate = RecipientSearch.Candidate(target, displayTitle, npub)
+                            onStartGroupMeasured?.invoke(candidate, origin) ?: onStartGroup(candidate)
+                        }
+                    }
+                }
+            },
             onGroupEntry = {
                 if (owner.canAct()) {
                     pickerParent = ProfileSheetPage.PROFILE
@@ -1006,7 +1017,10 @@ internal fun ProfileSheet(
         )
     }
 
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = appState.pendingProfileOrigin,
+        ownerKey = owner to appState.pendingProfilePresentationId,
+        dismissEnabled = { !creatingChat && !addingToGroups && !promotingAdmin },
         onSourceDismiss =
             ({ owner.leave { currentDismiss() } }).takeUnless {
                 creatingChat || addingToGroups || promotingAdmin
@@ -1026,7 +1040,7 @@ internal fun ProfileSheet(
         BackHandler {
             if (!creatingChat && !addingToGroups && !promotingAdmin) {
                 if (page == ProfileSheetPage.PROFILE) {
-                    owner.leave { currentDismiss() }
+                    dismiss()
                 } else {
                     page = if (page == ProfileSheetPage.ADD_TO_GROUPS) pickerParent else ProfileSheetPage.PROFILE
                 }
@@ -1040,6 +1054,7 @@ internal fun ProfileSheet(
                 ownerKey = owner,
                 contentVisible = owner.canAct() && !appState.appLockScreenVisible,
                 animationsEnabled = rememberConversationMotionEnabled(),
+                cardMorph = true,
             ) { targetPage ->
                 when (targetPage) {
                     ProfileSheetPage.ADD_TO_GROUPS -> {
@@ -1146,7 +1161,7 @@ internal fun ProfileSheet(
                             }
                         }
                     }
-                    ProfileSheetPage.PROFILE -> profileContent()
+                    ProfileSheetPage.PROFILE -> profileContent(dismiss)
                 }
             }
         }
@@ -1288,6 +1303,7 @@ internal fun ContactPrivateDetailsDialog(
     onRepositionPicture: () -> Unit = {},
     onClearPicture: () -> Unit = {},
     viewportInsets: WindowInsets? = null,
+    popupMotion: dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion? = null,
 ) {
     val nickname =
         remember(initialNickname) {
@@ -1307,9 +1323,11 @@ internal fun ContactPrivateDetailsDialog(
             securePolicy = securePolicy,
             viewportInsets = viewportInsets,
             onDismiss = onDismiss,
+            popupMotion = popupMotion,
+            dismissEnabled = { pictureState?.busy != true },
             actions = {
                 TextButton(
-                    onDismiss,
+                    dismiss,
                     Modifier.testTag("person_profile.private_cancel"),
                     enabled = pictureState?.busy != true,
                 ) { Text(stringResource(R.string.cancel)) }

@@ -152,7 +152,7 @@ internal fun InviteDeclineStepDownDialog(
             ) { Text(stringResource(R.string.invite_decline_step_down_confirm)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("invite.decline.stepDown.cancel")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("invite.decline.stepDown.cancel")) {
                 Text(stringResource(R.string.cancel))
             }
         },

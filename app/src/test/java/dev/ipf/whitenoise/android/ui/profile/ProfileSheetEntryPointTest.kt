@@ -18,6 +18,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +32,33 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class ProfileSheetEntryPointTest {
+    @Test
+    fun replacementPresentationOwnsItsOriginAndClearingRetiresIt() {
+        val first =
+            androidx.compose.ui.geometry
+                .Rect(10f, 20f, 90f, 70f)
+        val replacement =
+            androidx.compose.ui.geometry
+                .Rect(20f, 80f, 300f, 140f)
+        val state = renderProfile { it.presentProfile(TARGET_NPROFILE, origin = first) }
+        val initial = state.pendingProfilePresentationId
+        composeRule.runOnIdle {
+            assertEquals(first, state.pendingProfileOrigin)
+            state.presentProfile(TARGET_NPROFILE, groupsInCommon = true, origin = replacement)
+            assertTrue(state.pendingProfilePresentationId > initial)
+            assertEquals(replacement, state.pendingProfileOrigin)
+        }
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.runOnIdle {
+            state.presentProfile(TARGET_NPROFILE)
+            assertEquals(null, state.pendingProfileOrigin)
+            val beforeClear = state.pendingProfilePresentationId
+            state.clearPresentedProfile()
+            assertTrue(state.pendingProfilePresentationId > beforeClear)
+            assertEquals(null, state.pendingProfileOrigin)
+        }
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 

@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -43,6 +44,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
 /** Current native person reference plus sanitized display data; this is not a discovery cache. */
@@ -63,14 +65,16 @@ internal fun GroupCreationPersonRow(
     selected: Boolean?,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
-    onLongClick: (() -> Unit)? = null,
+    onLongClick: ((Rect?) -> Unit)? = null,
 ) {
     val candidate = person.candidate
     val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
     val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
+    val (profileModifier, profileClick) = rememberMeasuredControlClick { origin -> onLongClick?.invoke(origin) }
     val modifier =
         Modifier
             .fillMaxWidth()
+            .then(profileModifier)
             .amoledSurfaceBorder(shapes.shape)
             .testTag("new_group.person.${candidate.accountIdHex}")
             .recipientRelationshipSemantics(followed, selected)
@@ -104,7 +108,7 @@ internal fun GroupCreationPersonRow(
         } else {
             ListItem(
                 onClick = onClick,
-                onLongClick = onLongClick,
+                onLongClick = profileClick.takeIf { onLongClick != null },
                 enabled = enabled,
                 shapes = shapes,
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),

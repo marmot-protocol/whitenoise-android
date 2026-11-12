@@ -219,7 +219,7 @@ internal class MeasuredControlHandoff(
         end = target
         progress.snapTo(0f)
         awaitingFrame = false
-        progress.animateTo(1f, tween(CONTROL_MORPH_MILLIS))
+        progress.animateTo(1f, tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing))
         if (request === token) finish()
     }
 
@@ -308,7 +308,7 @@ internal class MeasuredControlHandoff(
         start = origin
         end = target
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(CONTROL_HANDOFF_MILLIS))
+        progress.animateTo(1f, tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing))
         start = null
         end = null
     }
@@ -393,8 +393,6 @@ internal fun MeasuredControlHandoffHost(
     ) { content() }
 }
 
-private const val CONTROL_HANDOFF_MILLIS = 180
-
 /** Stable artwork shared by two container shapes; it contains no content or behavior. */
 internal data class ControlMorphSurface(
     val fill: Color,
@@ -457,8 +455,6 @@ internal fun Modifier.controlMorphSurface(
             }
         }
 }
-
-private const val CONTROL_MORPH_MILLIS = 200
 
 /** Outgoing route pixels have no live controls or editor semantics. */
 internal val LocalControlHandoffEndpointCurrent = staticCompositionLocalOf { true }

@@ -25,18 +25,22 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -79,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarOverlay
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.group.ImagePreviewPresentation
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -606,11 +611,29 @@ internal fun ProfileEditScreen(
     // not a developer surface. See #286.
     var showPictureSheet by remember(activeAccountId) { mutableStateOf(false) }
     var showBannerSheet by remember(activeAccountId) { mutableStateOf(false) }
+    val imageRuntime = appState.runtimeGeneration
+    val sheetBusy by rememberUpdatedState(pictureUploading || bannerUploading)
+    val pictureSheetState =
+        key(activeAccountId, editRevision, imageRuntime, showPictureSheet) {
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+                confirmValueChange = { it != SheetValue.Hidden || !sheetBusy },
+            )
+        }
+    val pictureSheetTerminal = rememberSheetTerminalMotion(pictureSheetState)
+    val bannerSheetState =
+        key(activeAccountId, editRevision, imageRuntime, showBannerSheet) {
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+                confirmValueChange = { it != SheetValue.Hidden || !sheetBusy },
+            )
+        }
+    val bannerSheetTerminal = rememberSheetTerminalMotion(bannerSheetState)
+
     var fullPictureOpen by remember(activeAccountId) { mutableStateOf(false) }
     var pendingAvatarCropUri by rememberSaveable(activeAccountId) { mutableStateOf<android.net.Uri?>(null) }
     var fullBannerOpen by remember(activeAccountId) { mutableStateOf(false) }
     val imageAccountRef = appState.activeAccountRef
-    val imageRuntime = appState.runtimeGeneration
     val cropRecovery =
         rememberAvatarPreparationRecovery(
             origin = "$imageRuntime:$activeAccountId:profile-picture",
@@ -773,6 +796,8 @@ internal fun ProfileEditScreen(
         acceptedCrop: Boolean = false,
         prepare: suspend () -> dev.ipf.whitenoise.android.media.ImageUploadDraft,
     ) {
+        val pictureExit = pictureSheetTerminal
+        val bannerExit = bannerSheetTerminal
         val accountRef = appState.activeAccountRef ?: return
         val alreadyUploading =
             when (target) {
@@ -819,8 +844,16 @@ internal fun ProfileEditScreen(
                     if (activeAccountRef != accountRef) return@launch
                     if (acceptedCrop) cropRecovery.settled()
                     when (target) {
-                        ProfileImageTarget.Picture -> showPictureSheet = false
-                        ProfileImageTarget.Banner -> showBannerSheet = false
+                        ProfileImageTarget.Picture ->
+                            pictureExit.closeWhenReady(ready = { !sheetBusy }) {
+                                showPictureSheet =
+                                    false
+                            }
+                        ProfileImageTarget.Banner ->
+                            bannerExit.closeWhenReady(ready = { !sheetBusy }) {
+                                showBannerSheet =
+                                    false
+                            }
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -1052,6 +1085,8 @@ internal fun ProfileEditScreen(
 
     if (showPictureSheet) {
         ImageSearchSheet(
+            suppliedSheetState = pictureSheetState,
+            suppliedTerminal = pictureSheetTerminal,
             initialUrl = picture,
             header = stringResource(R.string.profile_picture_sheet_title),
             title = displayName.ifBlank { active?.let { appState.shortNpub(it.accountIdHex) }.orEmpty() },
@@ -1063,7 +1098,7 @@ internal fun ProfileEditScreen(
             onApply = { picked ->
                 if (picked == null) {
                     imageDrafts = imageDrafts.without(ProfileImageTarget.Picture)
-                    showPictureSheet = false
+                    pictureSheetTerminal.close { showPictureSheet = false }
                 } else {
                     uploadProfileDraft(target = ProfileImageTarget.Picture) {
                         ProfilePictureDraftProcessor.fromRemoteUrl(picked)
@@ -1077,6 +1112,8 @@ internal fun ProfileEditScreen(
 
     if (showBannerSheet) {
         ImageSearchSheet(
+            suppliedSheetState = bannerSheetState,
+            suppliedTerminal = bannerSheetTerminal,
             initialUrl = banner,
             hasCurrentImage = banner.isNotBlank(),
             header = stringResource(R.string.profile_banner_sheet_title),
@@ -1087,7 +1124,7 @@ internal fun ProfileEditScreen(
             onApply = { picked ->
                 if (picked == null) {
                     imageDrafts = imageDrafts.without(ProfileImageTarget.Banner)
-                    showBannerSheet = false
+                    bannerSheetTerminal.close { showBannerSheet = false }
                 } else {
                     uploadProfileDraft(target = ProfileImageTarget.Banner) {
                         GroupImageDraftProcessor.fromRemoteUrl(picked)

@@ -25,8 +25,9 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
  * the question can outlive the screen that started it. Continuing is the risky choice, so it takes the error role, and
  * dismissing the dialog waits.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
+// Keep the confirmation copy and guarded terminal action in the same dialog declaration.
 internal fun GroupChangeConfirmationDialog(
     question: GroupChangeConfirmation,
     appState: WhiteNoiseAppState? = null,
@@ -34,10 +35,15 @@ internal fun GroupChangeConfirmationDialog(
     val (title, message, confirm) = groupChangeConfirmationText(question.caution, question.invite)
     val chat = question.target.title
     ConfirmDialog(
+        ownerKey = question,
         title = stringResource(title),
         message = stringResource(message),
         confirmLabel = stringResource(confirm),
-        onConfirm = { question.answer(proceed = appState?.ownsGroupChange(question.target) != false) },
+        onConfirm = {
+            if (appState == null || appState.groupChangeConfirmations.pending === question) {
+                question.answer(proceed = appState?.ownsGroupChange(question.target) != false)
+            }
+        },
         onDismiss = { question.answer(proceed = false) },
         destructive = true,
         dismissLabel = stringResource(R.string.group_change_wait),

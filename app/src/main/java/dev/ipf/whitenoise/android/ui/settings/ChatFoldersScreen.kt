@@ -222,11 +222,11 @@ internal fun ChatFolderDeleteDialog(
         confirmButton = {
             TextButton(
                 modifier = Modifier.testTag("folder.delete_confirm"),
-                onClick = onConfirm,
+                onClick = { close(onConfirm) },
             ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }

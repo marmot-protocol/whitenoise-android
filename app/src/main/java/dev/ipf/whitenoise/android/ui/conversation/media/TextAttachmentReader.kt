@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -42,6 +41,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
@@ -58,12 +58,13 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
@@ -71,6 +72,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRender
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Info
 import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
+import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -148,6 +150,7 @@ internal fun TextAttachmentReaderDialog(
     loadBytes: suspend () -> ByteArray,
     onOpenExternal: suspend () -> Unit,
     onDismiss: () -> Unit,
+    origin: Rect? = null,
 ) {
     var loadGeneration by remember(candidate, actions) { mutableIntStateOf(0) }
     var state by remember(candidate, actions) {
@@ -214,7 +217,9 @@ internal fun TextAttachmentReaderDialog(
         if (actions.isCurrent()) state = loaded
     }
 
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
+        ownerKey = Triple(LocalSettingsCardMorph.current, actions, candidate),
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -226,7 +231,7 @@ internal fun TextAttachmentReaderDialog(
         TextAttachmentReaderScreen(
             candidate = candidate,
             state = state,
-            onDismiss = onDismiss,
+            onDismiss = dismiss,
             onRetry = { loadGeneration += 1 },
             onCopy = { value ->
                 scope.launch {
@@ -239,7 +244,7 @@ internal fun TextAttachmentReaderDialog(
             onShare = { scope.launch { actions.share() } },
             shareBusy = actions.sharing,
             readAloudBusy = speechRequested,
-            onOpenExternal = { scope.launch { onOpenExternal() } },
+            onOpenExternal = { close { scope.launch { onOpenExternal() } } },
             mentionDisplayName = appState::mentionDisplayName,
             onNostrProfileTap = appState::presentProfile,
             transport = {
@@ -489,7 +494,7 @@ private fun TextAttachmentFilenameDialog(
     onCopy: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    AnimatedAlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.testTag(TEXT_ATTACHMENT_READER_FILENAME_DIALOG_TAG),
         title = { Text(stringResource(R.string.text_attachment_filename)) },
@@ -514,7 +519,7 @@ private fun TextAttachmentFilenameDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = dismiss) {
                 Text(stringResource(R.string.close))
             }
         },

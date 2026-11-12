@@ -5,7 +5,6 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -15,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -83,11 +83,13 @@ internal fun GroupDetailsConfirmation(
     onDismiss: () -> Unit,
     identity: (@Composable () -> Unit)? = null,
     confirmEnabled: Boolean = true,
+    ownerKey: Any? = Unit,
 ) {
     if (model is GroupDetailsConfirmationState.StepDownSoleAdmin) {
-        AlertDialog(
+        AnimatedAlertDialog(
             modifier = Modifier.exposePerformanceTestTags(),
             onDismissRequest = onDismiss,
+            ownerKey = ownerKey,
             title = { Text(stringResource(R.string.sole_admin_leave_blocked_title)) },
             text = {
                 Column(Modifier.fadingVerticalScroll(rememberScrollState()), Arrangement.spacedBy(16.dp)) {
@@ -97,21 +99,22 @@ internal fun GroupDetailsConfirmation(
             },
             confirmButton = {
                 TextButton(
-                    onClick = model.onConfirm,
+                    onClick = { close(model.onConfirm) },
                     enabled = confirmEnabled,
                     modifier = Modifier.testTag("group.details.confirm"),
                 ) {
                     Text(stringResource(R.string.transfer_admin))
                 }
             },
-            dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+            dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
         )
         return
     }
     if (model is GroupDetailsConfirmationState.BlockedLeave) {
-        AlertDialog(
+        AnimatedAlertDialog(
             modifier = Modifier.exposePerformanceTestTags(),
             onDismissRequest = onDismiss,
+            ownerKey = ownerKey,
             title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
             text = {
                 Column(Modifier.fadingVerticalScroll(rememberScrollState()), Arrangement.spacedBy(16.dp)) {
@@ -119,7 +122,7 @@ internal fun GroupDetailsConfirmation(
                     identity?.invoke()
                 }
             },
-            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
         )
         return
     }
@@ -165,6 +168,7 @@ internal fun GroupDetailsConfirmation(
         message = message,
         confirmLabel = stringResource(action),
         onConfirm = (model as GroupDetailsConfirmationState.Action).onConfirm,
+        ownerKey = ownerKey,
         onDismiss = onDismiss,
         destructive = model !is GroupDetailsConfirmationState.TransferAdmin,
         identity = identity,

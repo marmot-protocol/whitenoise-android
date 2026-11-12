@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
+import android.speech.tts.TextToSpeech
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
@@ -13,6 +16,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -30,6 +34,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -42,6 +47,9 @@ import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.EngineTrust
+import dev.ipf.whitenoise.android.audio.tts.TtsEngineInfo
+import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -66,10 +74,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+// Shared real group-details fixture covers child-route return and retained-state regressions.
+@Suppress("LargeClass")
 class GroupDetailsEditNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -231,17 +242,19 @@ class GroupDetailsEditNavigationTest {
     private fun assertManualAddMembersEntryMovesAndBackReturnsToDetails() {
         composeRule.mainClock.autoAdvance = true
         composeRule.onNodeWithTag("chat_info.add_people").performScrollTo()
+        val sourceBounds = composeRule.onNodeWithTag("chat_info.add_people").fetchSemanticsNode().boundsInRoot
         composeRule.mainClock.autoAdvance = false
         composeRule.onNodeWithTag("chat_info.add_people").performClick()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeByFrame()
-        val first = addMembersTitleLeft()
-        composeRule.mainClock.advanceTimeBy(240)
-        val settled = addMembersTitleLeft()
-        assertTrue("Manual picker should move in from the forward edge", first > settled + 1f)
+        val first = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        composeRule.mainClock.advanceTimeBy(400)
+        val settled = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        assertTrue("Manual picker must grow from its activating row", !first.sameAs(settled))
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
-        composeRule.mainClock.advanceTimeBy(240)
-        composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.onNodeWithTag("chat_info.add_people").assertIsDisplayed()
+        assertEquals(sourceBounds, composeRule.onNodeWithTag("chat_info.add_people").fetchSemanticsNode().boundsInRoot)
     }
 
     /** Overview search keeps the conversation callback and the native mute picker is directly reachable. */
@@ -352,6 +365,182 @@ class GroupDetailsEditNavigationTest {
         assertEquals(offset, overviewScrollOffset(), 1f)
         composeRule.onNodeWithTag("chat_info.name").performScrollTo()
         composeRule.onNodeWithTag("chat_info.header_identity").assertDoesNotExist()
+    }
+
+    /** Inspect the first returning frame, not just the eventually settled identity. */
+    @Test
+    fun documentsRoundTripsRetainTheFirstReturningHeaderFrameAndViewport() {
+        val fixture =
+            controller(group(), identity = GroupDetailsIdentityFixture(marmotRuntime = unavailableAttachmentRuntime()))
+        composeRule.setContent {
+            CompositionLocalProvider(LocalConversationMotionEnabled provides false) {
+                WhiteNoiseTheme {
+                    GroupDetailsScreen(fixture.appState, fixture.controller, onBack = {}, onLeft = {})
+                }
+            }
+        }
+        composeRule.onNodeWithTag("chat_info.list").performTouchInput { swipeUp(durationMillis = 1_000) }
+        composeRule.onNodeWithText(context.getString(R.string.media_type_documents)).performScrollTo()
+        composeRule.onNodeWithTag("chat_info.header_name").assertIsDisplayed()
+        val offset = overviewScrollOffset()
+        val before = composeRule.onRoot().captureToImage().toPixelMap()
+        repeat(3) {
+            composeRule.onNodeWithText(context.getString(R.string.media_type_documents)).performClick()
+            composeRule.onNodeWithTag("shared.destination.Documents").assertIsDisplayed()
+            composeRule.mainClock.autoAdvance = false
+            composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+            composeRule.runOnIdle {
+                androidx.compose.runtime.snapshots.Snapshot
+                    .sendApplyNotifications()
+            }
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("chat_info.header_name").assertIsDisplayed()
+            val returning = composeRule.onRoot().captureToImage().toPixelMap()
+            // Fixed normal-density fixture: status bar plus the full app bar, excluding the scrolling body.
+            for (y in 0 until minOf(88, before.height)) {
+                for (x in 0 until before.width) {
+                    assertEquals("Header changed on first return at $x,$y", before[x, y], returning[x, y])
+                }
+            }
+            composeRule.mainClock.autoAdvance = true
+            composeRule.onNodeWithTag("chat_info.header_name").assertIsDisplayed()
+            assertEquals(offset, overviewScrollOffset(), 1f)
+        }
+    }
+
+    /** Optional native-window exports; the ordinary first-return regression above stays unchanged. */
+    @Test
+    // Optional frame export exercises real child-route round trips in one chronological capture session.
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
+    fun captureRealGroupChildRoundTripsForVideo() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        val fixture =
+            controller(
+                group(),
+                extraMembers = 5,
+                verifiedRoster = true,
+                identity = GroupDetailsIdentityFixture(marmotRuntime = unavailableAttachmentRuntime()),
+            )
+        // Controlled unit-test catalog only: exposes the real production row/dialog.
+        // This is not evidence of an installed/working TTS engine or provider success.
+        fixture.appState.applyCaptureSpeechCatalog()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalConversationMotionEnabled provides true) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true, fontScale = 1f) {
+                    GroupDetailsScreen(fixture.appState, fixture.controller, onBack = {}, onLeft = {})
+                }
+            }
+        }
+        try {
+            // Each entry is the actual overview control and each return uses its real Back owner.
+            listOf(
+                "group-name-edit",
+                "group-description-edit",
+                "group-documents",
+                "group-members",
+                "group-technical",
+            ).forEach { name ->
+                // Compose scroll actions need an advancing clock. Scroll before freezing the source frame.
+                composeRule.mainClock.autoAdvance = true
+                when (name) {
+                    "group-name-edit" -> composeRule.onNodeWithTag("chat_info.name").performScrollTo()
+                    "group-description-edit" ->
+                        composeRule
+                            .onNodeWithText(
+                                context.getString(R.string.add_group_description),
+                            ).performScrollTo()
+                    "group-documents" ->
+                        composeRule
+                            .onNodeWithText(
+                                context.getString(R.string.media_type_documents),
+                            ).performScrollTo()
+                    "group-members" -> composeRule.onNodeWithTag("chat_info.all_members").performScrollTo()
+                    "group-technical" -> composeRule.onNodeWithTag("chat_info.developer_tools").performScrollTo()
+                }
+                captureGroupFrames("$name/forward") {
+                    // Only the click runs while paused; never call performScrollTo on a paused clock.
+                    when (name) {
+                        "group-name-edit" -> composeRule.onNodeWithTag("chat_info.name").performClick()
+                        "group-description-edit" ->
+                            composeRule
+                                .onNodeWithText(
+                                    context.getString(R.string.add_group_description),
+                                ).performClick()
+                        "group-documents" ->
+                            composeRule
+                                .onNodeWithText(
+                                    context.getString(R.string.media_type_documents),
+                                ).performClick()
+                        "group-members" -> composeRule.onNodeWithTag("chat_info.all_members").performClick()
+                        "group-technical" -> composeRule.onNodeWithTag("chat_info.developer_tools").performClick()
+                    }
+                }
+                if (name.endsWith("edit")) assertEditorIsOpen()
+                if (name == "group-members") composeRule.onNodeWithTag("chat_info.members_screen").assertIsDisplayed()
+                if (name ==
+                    "group-technical"
+                ) {
+                    composeRule.onNodeWithText(context.getString(R.string.mls_group_id)).assertIsDisplayed()
+                }
+                captureGroupFrames("$name/reverse") {
+                    composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+                }
+                composeRule.onNodeWithTag("chat_info.list").assertExists()
+            }
+            // Open through the production overview row; exit through the dialog's real Cancel.
+            composeRule.mainClock.autoAdvance = true
+            composeRule.onNodeWithText(context.getString(R.string.tts_auto_read_title)).performScrollTo()
+            captureGroupFrames("group-read-aloud/forward") {
+                composeRule.onNodeWithText(context.getString(R.string.tts_auto_read_title)).performClick()
+            }
+            composeRule.onNodeWithText(context.getString(R.string.cancel)).assertIsDisplayed()
+            captureGroupFrames("group-read-aloud/reverse") {
+                composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+            }
+            composeRule.onNodeWithText(context.getString(R.string.cancel)).assertDoesNotExist()
+            composeRule.onNodeWithTag("chat_info.list").assertExists()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            fixture.controller.onCleared()
+        }
+    }
+
+    /** Controlled source-render fixture copied from GroupAdvancedSettingsIconsTest; no engine handle. */
+    private fun WhiteNoiseAppState.applyCaptureSpeechCatalog() {
+        val delegate = WhiteNoiseAppState::class.java.getDeclaredField("ttsResolution\$delegate")
+        delegate.isAccessible = true
+
+        @Suppress("UNCHECKED_CAST")
+        val state = delegate.get(this) as androidx.compose.runtime.MutableState<TtsResolutionResult?>
+        state.value =
+            TtsResolutionResult(
+                status = TextToSpeech.SUCCESS,
+                engines = listOf(TtsEngineInfo("com.test.tts", "Test TTS", EngineTrust.Local)),
+                defaultEnginePackage = "com.test.tts",
+                handle = null,
+            )
+    }
+
+    private fun captureGroupFrames(
+        name: String,
+        action: () -> Unit,
+    ) {
+        val folder = File("build/animation-frames/$name").apply { mkdirs() }
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        captureScreenRoboImage(File(folder, "source.png").path)
+        action()
+        composeRule.runOnIdle { Snapshot.sendApplyNotifications() }
+        // Include route composition and measurement before the 340 ms opening clock.
+        repeat(32) { frame ->
+            composeRule.mainClock.advanceTimeBy(16)
+            composeRule.waitForIdle()
+            captureScreenRoboImage(File(folder, "frame-%03d.png".format(frame)).path)
+        }
     }
 
     /** A new controller cannot inherit the preceding group's overview viewport. */
@@ -1134,3 +1323,23 @@ private fun invokeDetachedReviewClick(action: () -> Boolean) {
 
 /** Reuses the same controller, group and account fixture for independently selected notification tests. */
 internal fun notificationControlsFixture(): GroupDetailsTestController = controller(group())
+
+/** Keep the real Documents route mounted while its native library reports a controlled read failure. */
+private fun unavailableAttachmentRuntime(): dev.ipf.whitenoise.android.state.AppMarmotRuntime {
+    val native =
+        java.lang.reflect.Proxy.newProxyInstance(
+            dev.ipf.marmotkit.MarmotInterface::class.java.classLoader,
+            arrayOf(dev.ipf.marmotkit.MarmotInterface::class.java),
+        ) { proxy, method, args ->
+            when (method.name.substringBefore('-')) {
+                "equals" -> proxy === args?.firstOrNull()
+                "hashCode" -> System.identityHashCode(proxy)
+                "toString" -> "UnavailableAttachmentRuntime"
+                "npub" -> null
+                "recordHostTiming" -> dev.ipf.marmotkit.ProductRecordResultFfi.IGNORED_DISABLED
+                else -> error("Read unavailable in Documents header fixture: ${method.name}")
+            }
+        } as dev.ipf.marmotkit.MarmotInterface
+    return dev.ipf.whitenoise.android.state
+        .AppMarmotRuntime("documents-test", native)
+}

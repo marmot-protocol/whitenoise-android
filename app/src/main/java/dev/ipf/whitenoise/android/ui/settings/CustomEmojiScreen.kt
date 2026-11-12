@@ -235,11 +235,13 @@ internal fun CustomEmojiNameDialog(
     existing: CustomEmojiSet,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
+    ownerKey: Any? = preview,
 ) {
     val field = rememberTextFieldState(suggestedCode)
     val code = field.text.toString()
     val replaces = code.isNotEmpty() && existing[":$code:"] != null
     WhiteNoiseAlertDialog(
+        ownerKey = ownerKey,
         onDismissRequest = onDismiss,
         icon = { Image(preview, contentDescription = null, modifier = Modifier.size(CustomEmojiPreviewSize)) },
         title = { Text(stringResource(R.string.custom_emoji_name_title)) },
@@ -263,12 +265,12 @@ internal fun CustomEmojiNameDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(code) }, enabled = code.isNotEmpty()) {
+            TextButton(onClick = { close { onSave(code) } }, enabled = code.isNotEmpty()) {
                 Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -355,12 +357,12 @@ internal fun ConfirmEmojiRemoval(
         title = { Text(stringResource(R.string.custom_emoji_remove_title, emoji.shortcode)) },
         text = { Text(stringResource(R.string.custom_emoji_remove_detail)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = { close(onConfirm) }) {
                 Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -413,6 +415,7 @@ internal fun StagedEmojiDialog(
     val scope = rememberCoroutineScope()
     pending?.let {
         CustomEmojiNameDialog(
+            ownerKey = Pair(store, it),
             preview = it.preview,
             suggestedCode = it.suggestedCode,
             existing = store.emoji,

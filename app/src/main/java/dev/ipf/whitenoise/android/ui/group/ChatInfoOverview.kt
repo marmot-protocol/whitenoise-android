@@ -39,6 +39,7 @@ internal fun QuickInfoAction(
     modifier: Modifier = Modifier,
     state: String? = null,
     enabled: Boolean = true,
+    buttonModifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier,
@@ -49,7 +50,7 @@ internal fun QuickInfoAction(
             onClick = onClick,
             enabled = enabled,
             modifier =
-                Modifier.fillMaxWidth().height(56.dp).semantics {
+                buttonModifier.fillMaxWidth().height(56.dp).semantics {
                     state?.let { stateDescription = it }
                 },
         ) {
