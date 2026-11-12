@@ -688,7 +688,6 @@ private fun liveTailProjection(conversation: ConversationController): dev.ipf.ma
     )
 }
 
-
 internal const val SEND_ROUTE_HISTORY_ANCHOR_INDEX = 10
 
 /** Projects the fixture's plain source with explicit soft breaks like the native parser. */

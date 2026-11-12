@@ -147,13 +147,15 @@ class ConversationInlineReadMoreScreenshotTest {
         val layouts = mutableListOf<TextLayoutResult>()
         body.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
-        val continuation = layout.layoutInput.text.text.indexOf("Long history line 52")
+        val bodyText = layout.layoutInput.text.text
+        val continuation = bodyText.indexOf("Long history line 52")
         assertTrue("the expanded layout contains the first line past the preview", continuation >= 0)
         val line = layout.getLineForOffset(continuation)
         val node = body.fetchSemanticsNode()
         val top = node.positionInRoot.y + layout.getLineTop(line)
         val bottom = node.positionInRoot.y + layout.getLineBottom(line)
-        val composerTop = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot.top
+        val composer = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode()
+        val composerTop = composer.boundsInRoot.top
         assertTrue(
             "first new line at $top..$bottom, visible body from ${node.boundsInRoot.top} to composer $composerTop, " +
                 "scroll writes: ${evidence.writes}",
