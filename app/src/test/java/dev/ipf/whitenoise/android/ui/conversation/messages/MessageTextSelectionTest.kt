@@ -64,10 +64,12 @@ class MessageTextSelectionTest {
         var selectTextClicks = 0
         renderActionMenu(canCopyText = true, onSelectText = { selectTextClicks++ })
 
+        composeRule.onNodeWithText(string(R.string.copy)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.select_text)).assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
 
         assertEquals(1, selectTextClicks)
-        composeRule.onNodeWithText(string(R.string.copy)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.copy)).assertDoesNotExist()
     }
 
     @Test

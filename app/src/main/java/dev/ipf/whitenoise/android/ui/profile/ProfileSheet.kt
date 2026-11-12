@@ -488,9 +488,9 @@ internal fun ProfileSheet(
         appState.wipeInProgress,
         appState.retainedAccountReactivationRef,
     ) {
-        if (!owner.canAct()) currentDismiss()
+        if (!owner.canPresent()) currentDismiss()
     }
-    if (!owner.canAct() || appState.appLockScreenVisible) return
+    if (!owner.canPresent() || appState.appLockScreenVisible) return
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
@@ -1021,13 +1021,12 @@ internal fun ProfileSheet(
         origin = appState.pendingProfileOrigin,
         ownerKey = owner to appState.pendingProfilePresentationId,
         dismissEnabled = { !creatingChat && !addingToGroups && !promotingAdmin },
+        onDismissStart = owner::dispose,
         onSourceDismiss =
-            ({ owner.leave { currentDismiss() } }).takeUnless {
+            ({ currentDismiss() }).takeUnless {
                 creatingChat || addingToGroups || promotingAdmin
             },
-        onDismissRequest = {
-            if (!creatingChat && !addingToGroups && !promotingAdmin) owner.leave { currentDismiss() }
-        },
+        onDismissRequest = { currentDismiss() },
         properties =
             DialogProperties(
                 securePolicy = securePolicy,
@@ -1052,7 +1051,7 @@ internal fun ProfileSheet(
                 target = motionPage,
                 depth = profileSheetPageDepth(motionPage, pickerParent),
                 ownerKey = owner,
-                contentVisible = owner.canAct() && !appState.appLockScreenVisible,
+                contentVisible = owner.canPresent() && !appState.appLockScreenVisible,
                 animationsEnabled = rememberConversationMotionEnabled(),
                 cardMorph = true,
             ) { targetPage ->

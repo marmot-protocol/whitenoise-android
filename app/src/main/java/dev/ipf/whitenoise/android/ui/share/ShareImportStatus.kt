@@ -37,15 +37,19 @@ internal fun ShareImportStatus(
     progress: ShareImportProgress?,
     request: ShareRequest?,
     onCancel: () -> Unit,
+    importRequestId: String? = request?.requestId,
     content: @Composable (Boolean) -> Unit,
 ) {
+    var importCancellationAccepted by remember(importRequestId) { mutableStateOf(false) }
     var errorsAcknowledged by remember(request?.requestId) { mutableStateOf(false) }
     val errors = request?.payload?.importErrors.orEmpty()
     val hasContent = request?.payload?.let { !it.text.isNullOrBlank() || it.streamUris.isNotEmpty() } == true
     when {
-        importing ->
+        importing || importCancellationAccepted ->
             AnimatedAlertDialog(
                 onDismissRequest = onCancel,
+                ownerKey = importRequestId,
+                onDismissStart = { importCancellationAccepted = true },
                 title = { Text(stringResource(R.string.share_import_title)) },
                 text = {
                     Column {

@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
@@ -50,6 +51,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowSystemClock
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -128,6 +130,42 @@ class AccountKeysExportDeliveryTest {
         assertEquals(1, fixture.native.rawCalls.get())
     }
 
+    /** Retained raw consent actions cannot start a fresh export after cancellation begins. */
+    @Test
+    fun capturedRawActionsCannotRestartExportDuringCancelledExit() {
+        val fixture = render()
+        composeRule.onNodeWithTag("profile_keys.export_raw").performScrollTo().performClick()
+        val export =
+            requireNotNull(
+                dialogButton(R.string.export_nsec).fetchSemanticsNode().config[SemanticsActions.OnClick].action,
+            )
+        val share =
+            requireNotNull(
+                dialogButton(R.string.share).fetchSemanticsNode().config[SemanticsActions.OnClick].action,
+            )
+        val cancel =
+            requireNotNull(
+                dialogButton(R.string.cancel).fetchSemanticsNode().config[SemanticsActions.OnClick].action,
+            )
+        val dialog = requireNotNull(ShadowDialog.getLatestDialog())
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle {
+            assertTrue(cancel())
+            assertTrue(export())
+            assertTrue(share())
+            assertTrue("cancel retains only an inert exit window", dialog.isShowing)
+        }
+        androidx.compose.runtime.snapshots.Snapshot
+            .sendApplyNotifications()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        assertEquals(0, fixture.native.rawCalls.get())
+        assertEquals(0, fixture.picker.launchCount)
+        assertNull(shadowOf(composeRule.activity).nextStartedActivity)
+        assertFalse(dialog.isShowing)
+    }
+
     /** Password drafts are gone and inputs disabled before the synchronous native encryption returns. */
     @Test
     fun blockedEncryptionClearsAndDisablesBothPasswordsBeforeReturning() {
@@ -148,13 +186,19 @@ class AccountKeysExportDeliveryTest {
         beginExport(encrypted = true, encryptedAction = R.string.key_export_view_backup)
         composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedStarted.get() }
         assertClearedPasswordDrafts()
+        val dialog = requireNotNull(ShadowDialog.getLatestDialog())
+        composeRule.mainClock.autoAdvance = false
         dialogButton(R.string.cancel).performClick()
+        composeRule.runOnIdle { assertTrue("cancel must retain the inert exit window", dialog.isShowing) }
         fixture.native.finishEncrypted()
         composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.encryptedFinished.get() }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
         assertEquals(0, fixture.picker.launchCount)
         assertEquals(1, fixture.native.encryptedCalls.get())
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertFalse("completed exit must remove its window", dialog.isShowing) }
     }
 
     /** Copy preserves the exact sensitive native value; Hide discards it without opening a file picker. */

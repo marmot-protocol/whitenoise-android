@@ -76,11 +76,19 @@ class ChatOrganizationOwnerTest {
         composeRule.onNodeWithTag("chat.folderChoice.${folder.id}").performClick()
         val save = click("chat.folderSave")
         val cancel = click("chat.folderCancel")
+        composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle {
             cancel()
             save()
+            assertEquals(0, dismissed)
+            assertTrue(app.chatFolderPreferences.membershipFor("alice", folder.id).isEmpty())
         }
-        assertEquals(1, dismissed)
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.runOnIdle { assertEquals(0, dismissed) }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(1, dismissed) }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(1, dismissed) }
         assertTrue(app.chatFolderPreferences.membershipFor("alice", folder.id).isEmpty())
     }
 

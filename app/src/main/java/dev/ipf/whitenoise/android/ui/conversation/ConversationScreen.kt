@@ -2245,6 +2245,7 @@ internal fun ConversationScreen(
             dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewUnavailableNotice(
                 onDismiss = { voiceReviewRecovery.updatePresence(false) },
                 onRecordAgain = {
+                    var accepted = false
                     voiceReviewRecovery.consume {
                         val ownsRecorder =
                             conversationAccountRef != null &&
@@ -2254,8 +2255,10 @@ internal fun ConversationScreen(
                         if (ownsRecorder && voiceRecordingController.start()) {
                             voiceReviewRecovery.updatePresence(false)
                             voiceRecordingController.lock()
+                            accepted = true
                         }
                     }
+                    accepted
                 },
             )
         }

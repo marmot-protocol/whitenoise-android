@@ -32,11 +32,19 @@ class SettingsPageMorphHostTest {
         val parent = SettingsCardMorph(fullScreen = true)
         val child = SettingsCardMorph(fullScreen = true, parent = parent)
         val color = mutableStateOf(Color.Red)
+        val routeFrame = mutableStateOf(0)
         val colors = SettingsMorphColors(Color.Black, Color.Black, Color.Unspecified)
         rule.setContent {
-            Box(Modifier.fillMaxSize().settingsCardMorphHost(parent, colors)) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        routeFrame.value
+                        drawContent()
+                    }.settingsCardMorphHost(parent, colors),
+            ) {
                 Box(Modifier.fillMaxSize().settingsCardMorphHost(child, colors)) {
-                    Box(Modifier.fillMaxSize().drawWithContent { drawRect(color.value) })
+                    Box(Modifier.fillMaxSize().graphicsLayer().drawWithContent { drawRect(color.value) })
                 }
             }
         }
@@ -49,6 +57,24 @@ class SettingsPageMorphHostTest {
         rule.runOnIdle { color.value = Color.Green }
         val prepared = rule.onRoot().captureToImage().toPixelMap()
         assertTrue(prepared[8, 80].green > 0.95f)
+        rule.runOnIdle {
+            parent.page!!.pendingOrigin = Rect(16f, 340f, 344f, 392f)
+            assertTrue(parent.beginPage("documents", true, true))
+            parent.finish()
+            routeFrame.value++
+        }
+        rule.onRoot().captureToImage()
+        rule.runOnIdle { assertTrue(parent.page!!.hasSettledPicture) }
+        // A layer-only repaint must refresh the inert outgoing frame as well as live content.
+        rule.runOnIdle { color.value = Color.Blue }
+        val latest = rule.onRoot().captureToImage().toPixelMap()
+        assertTrue(latest[8, 80].blue > 0.95f)
+        rule.runOnIdle {
+            assertTrue(parent.beginPage("details", false, true))
+            parent.time = { 0f }
+        }
+        val outgoing = rule.onRoot().captureToImage().toPixelMap()
+        assertEquals(latest[8, 80], outgoing[8, 80])
     }
 
     @Test fun descendantViewportChangesRefreshTheAncestorExitPicture() {

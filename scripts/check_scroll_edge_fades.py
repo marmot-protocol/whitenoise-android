@@ -11,9 +11,11 @@ SOURCE = 'app/src/main/java/dev/ipf/whitenoise/android/ui'
 INVENTORY = 'docs/scroll-edge-fade-surfaces.json'
 METHODS = {
     'verticalScroll', 'LazyColumn', 'LazyVerticalGrid', 'fadingVerticalScroll',
-    'WhiteNoiseLazyColumn', 'WhiteNoiseLazyVerticalGrid', 'whiteNoiseVerticalScroll', 'SettingsList', 'DropdownMenu',
+    'WhiteNoiseLazyColumn', 'WhiteNoiseLazyVerticalGrid', 'whiteNoiseVerticalScroll', 'SettingsList', 'DropdownMenu', 'AnimatedDropdownMenu',
 }
 RAW_ALLOWED = {
+    # Shared animated menu owns scrolling; callers bind their stable fade to the same state.
+    ('design/AnimatedDropdownMenu.kt', 'verticalScroll'),
     ('common/WhiteNoiseScrollContainers.kt', 'verticalScroll'),
     ('common/WhiteNoiseScrollContainers.kt', 'LazyColumn'),
     ('common/WhiteNoiseScrollContainers.kt', 'LazyVerticalGrid'),
@@ -84,7 +86,7 @@ def inventory_errors(root: Path = ROOT) -> list[str]:
             short = path.relative_to(root / SOURCE).as_posix()
             if (short, method) not in RAW_ALLOWED:
                 errors.append(f'{relative}: use the shared fade container for {method}')
-        if 'DropdownMenu' in found and not menu_scroll_state_bound(text):
+        if {'DropdownMenu', 'AnimatedDropdownMenu'} & found.keys() and not menu_scroll_state_bound(text):
             errors.append(f'{relative}: native menu must bind its mask to its actual scroll state with a stable render target')
     for stale in entries.keys() - observed:
         errors.append(f'{stale}: stale viewport inventory')

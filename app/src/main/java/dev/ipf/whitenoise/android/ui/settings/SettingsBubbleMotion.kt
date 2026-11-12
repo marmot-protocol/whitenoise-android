@@ -95,7 +95,9 @@ internal fun ContentDrawScope.drawAndRecord(picture: Picture) {
     } finally {
         picture.endRecording()
     }
-    drawIntoCanvas { it.nativeCanvas.drawPicture(picture) }
+    // Nested RenderNode invalidations must reach the live canvas, not a replayed Picture.
+    // Retain the inert copy only for the outgoing transition.
+    drawContent()
 }
 
 /** Keeps the settled top-level Settings frame when it was reached without the card motion. */

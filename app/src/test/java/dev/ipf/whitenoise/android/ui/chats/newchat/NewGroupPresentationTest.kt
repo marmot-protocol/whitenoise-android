@@ -271,8 +271,10 @@ class NewGroupPresentationTest {
         ).forEach { (label, expected) ->
             composeRule.runOnIdle { expanded.value = true }
             composeRule.onNodeWithText(context.getString(label)).performClick()
-            assertEquals(expected, actions.last())
-            assertFalse(expanded.value)
+            composeRule.runOnIdle {
+                assertEquals(expected, actions.last())
+                assertFalse(expanded.value)
+            }
         }
     }
 

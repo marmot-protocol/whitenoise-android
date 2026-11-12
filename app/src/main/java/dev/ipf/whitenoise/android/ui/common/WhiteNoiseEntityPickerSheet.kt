@@ -36,6 +36,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -85,8 +88,26 @@ fun WhiteNoiseEntityPickerSheet(
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val terminal = rememberSheetTerminalMotion(sheet)
     val close = { terminal.close(onDismiss) }
-    WhiteNoiseModalBottomSheet(onDismissRequest = close, sheetState = sheet) {
-        Column(Modifier.fillMaxWidth().heightIn(max = maxHeight)) {
+    WhiteNoiseModalBottomSheet(
+        onDismissRequest = close,
+        sheetState = sheet,
+        interactionEnabled = terminal.acceptsInput,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = maxHeight)
+                .then(if (terminal.acceptsInput) Modifier else Modifier.clearAndSetSemantics {})
+                .onPreviewKeyEvent { !terminal.acceptsInput }
+                .pointerInput(terminal) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (!terminal.acceptsInput) event.changes.forEach { it.consume() }
+                        }
+                    }
+                },
+        ) {
             WhiteNoiseSheetHeader(title, onClose = close)
             if (description != null) {
                 EmojiLabel(
@@ -98,7 +119,7 @@ fun WhiteNoiseEntityPickerSheet(
             }
             WhiteNoiseCompactSearchField(
                 value = query,
-                onValueChange = { query = it },
+                onValueChange = { if (terminal.acceptsInput) query = it },
                 placeholder = stringResource(R.string.folder_search),
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                 modifier =
@@ -135,7 +156,11 @@ fun WhiteNoiseEntityPickerSheet(
                         multiple = multiple,
                         onSelect =
                             onSelect?.let { select ->
-                                { id -> if (multiple) select(id) else terminal.close(id, select) }
+                                { id ->
+                                    if (terminal.acceptsInput) {
+                                        if (multiple) select(id) else terminal.close(id, select)
+                                    }
+                                }
                             },
                         modifier = Modifier.testTag("$rowTagPrefix.${item.id}"),
                     )

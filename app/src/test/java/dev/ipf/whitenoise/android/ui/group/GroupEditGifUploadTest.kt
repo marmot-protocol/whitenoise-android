@@ -236,6 +236,7 @@ class GroupEditGifUploadTest {
     private fun launchDocument() {
         composeRule.onNodeWithTag("group_edit.photoAction").performClick()
         composeRule.onNodeWithText(fixture.context.getString(R.string.choose_files)).performClick()
+        composeRule.waitForIdle()
     }
 
     private fun pick(
@@ -249,6 +250,8 @@ class GroupEditGifUploadTest {
 
     /** Waits until every launched upload attempt has finished, then checks how many reached the server. */
     private fun awaitSettledUploads(expected: Int) {
+        composeRule.waitForIdle()
+        if (expected > 0) awaitProgress { fixture.uploads.get() == expected }
         val mutations = fixture.state.mutationsScope.coroutineContext[Job]!!
         awaitProgress { mutations.children.none { it.isActive } }
         assertEquals(expected, fixture.uploads.get())

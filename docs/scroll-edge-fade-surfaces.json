@@ -333,7 +333,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseMenus.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "common",
       "policy": "ordinary",
@@ -422,7 +422,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "conversation/GroupSystemRow.kt",
       "policy": "ordinary",
@@ -464,7 +464,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "conversation/TtsTransportRatePicker.kt",
       "policy": "ordinary",
@@ -601,7 +601,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "conversation/media",
       "policy": "ordinary",
@@ -839,7 +839,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AppMenus.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "design",
       "policy": "ordinary",
@@ -897,7 +897,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
       "calls": {
-        "whiteNoiseVerticalScroll": 1
+        "fadingVerticalScroll": 1
       },
       "family": "group",
       "policy": "ordinary",
@@ -1012,7 +1012,7 @@
       "calls": {
         "WhiteNoiseLazyVerticalGrid": 1,
         "WhiteNoiseLazyColumn": 1,
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "medialibrary",
       "policy": "ordinary",
@@ -1096,7 +1096,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "profile",
       "policy": "ordinary",
@@ -1126,7 +1126,7 @@
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
       "calls": {
         "WhiteNoiseLazyColumn": 1,
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "profile",
       "policy": "ordinary",
@@ -1732,7 +1732,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "settings",
       "policy": "ordinary",
@@ -1760,7 +1760,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
       "calls": {
-        "DropdownMenu": 1
+        "AnimatedDropdownMenu": 1
       },
       "family": "settings",
       "policy": "ordinary",
@@ -1996,7 +1996,21 @@
         "SCR-003",
         "SCR-004"
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AnimatedDropdownMenu.kt",
+      "family": "design",
+      "policy": "Shared menu scroll owner; caller binds its stable fade to this same scroll state.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ],
+      "calls": {
+        "verticalScroll": 1
+      }
     }
   ],
-  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
+  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport\u2019s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
 }

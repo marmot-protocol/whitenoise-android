@@ -94,7 +94,10 @@ class LongMessageFullScreenComposerCoverageTest {
         )
         assertTrue(
             "the reader must close through the deferred dismissal that reveals through the conversation",
-            "ReaderSendDismissal(surfaces, onReaderSendAccepted)" in body,
+            "readerSurfaces = surfaces" in fullScreenCall &&
+                "onReaderSendAccepted = onReaderSendAccepted" in fullScreenCall &&
+                "ReaderSendDismissal(surfaces, onReaderSendAccepted) { action -> close(action) }" in
+                messageBubbleSource().resolveSibling("MessageFullScreen.kt").readText(),
         )
         val state = messageBubbleSource().resolveSibling("MessageBubbleState.kt").readText()
         val dismissal = state.substringAfter("internal fun ReaderSendDismissal(").substringBefore("\n}\n")

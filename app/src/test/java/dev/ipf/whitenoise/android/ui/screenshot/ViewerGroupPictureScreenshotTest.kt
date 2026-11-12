@@ -74,6 +74,7 @@ class ViewerGroupPictureScreenshotTest {
             .onNode(isPopup())
             .captureRoboImage("src/test/snapshots/media_viewer_group_picture_menu_dark_large_rtl.png")
         composeRule.onNodeWithText(context.getString(R.string.media_set_group_picture)).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, choices)
     }
 

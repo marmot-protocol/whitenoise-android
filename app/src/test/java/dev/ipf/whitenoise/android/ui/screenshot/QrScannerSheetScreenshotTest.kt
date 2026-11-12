@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.qr.QR_SCANNER_SHEET_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheetContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -159,7 +160,7 @@ class QrScannerSheetScreenshotTest {
                 }
             }
         }
-        composeRule.mainClock.advanceTimeBy(250)
+        composeRule.mainClock.advanceTimeBy(APP_MOTION_OPEN_MILLIS.toLong() + 32)
         if (recoveryVisible) {
             composeRule.mainClock.autoAdvance = true
             composeRule.onNodeWithTag("qr_scanner.recovery").performScrollTo()

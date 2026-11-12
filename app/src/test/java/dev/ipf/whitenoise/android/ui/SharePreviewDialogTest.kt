@@ -54,6 +54,7 @@ class SharePreviewDialogTest {
         composeRule.onNodeWithText("+1 555 0100").assertIsDisplayed()
         assertNull(sent)
         composeRule.onNodeWithContentDescription(app.getString(R.string.send)).performClick()
+        composeRule.waitForIdle()
         assertEquals("+1 555 0100", sent?.phone)
         assertEquals("ada@example.org", sent?.email)
         assertFalse(dismissed)
@@ -74,6 +75,7 @@ class SharePreviewDialogTest {
         // Untick the email row, then send — only the phone should ride along.
         composeRule.onNodeWithText("ada@example.org").performClick()
         composeRule.onNodeWithContentDescription(app.getString(R.string.send)).performClick()
+        composeRule.waitForIdle()
         assertEquals("+1 555 0100", sent?.phone)
         assertNull(sent?.email)
     }
@@ -92,6 +94,7 @@ class SharePreviewDialogTest {
             }
         }
         composeRule.onNodeWithContentDescription(app.getString(R.string.close)).performClick()
+        composeRule.waitForIdle()
         assertTrue(dismissed)
         assertNull(sent)
     }

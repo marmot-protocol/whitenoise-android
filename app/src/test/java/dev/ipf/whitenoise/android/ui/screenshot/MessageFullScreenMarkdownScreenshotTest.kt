@@ -246,6 +246,7 @@ class MessageFullScreenMarkdownScreenshotTest {
             composeRule.onNodeWithContentDescription("Message actions").performClick()
             composeRule.onNodeWithText("Delete").assertDoesNotExist()
             composeRule.onNodeWithText(label).performClick()
+            composeRule.waitForIdle()
             assertEquals(expected, callbacks.last())
         }
         assertEquals(listOf("reply", "react", "copy"), callbacks)

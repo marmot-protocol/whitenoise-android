@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
@@ -44,6 +46,7 @@ class MessageActionMenuLayoutTest {
             .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
             .captureRoboImage("src/test/snapshots/message_action_menu_literal_code_rtl_large_font.png")
         composeRule.onNodeWithText("Read code literally").performClick()
+        composeRule.waitForIdle()
         assertEquals(listOf("literalCode"), callbacks)
     }
 
@@ -56,6 +59,7 @@ class MessageActionMenuLayoutTest {
             .onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG)
             .captureRoboImage("src/test/snapshots/message_action_menu_show_less_rtl.png")
         composeRule.onNodeWithText("Show less").performClick()
+        composeRule.waitForIdle()
         assertEquals(listOf("showLess"), callbacks)
     }
 
@@ -94,6 +98,7 @@ class MessageActionMenuLayoutTest {
         val gapY = preview.bottom - column.top + with(composeRule.density) { 4.dp.toPx() }
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).performTouchInput { click(Offset(1f, gapY)) }
 
+        composeRule.waitForIdle()
         assertEquals(1, dismissals)
     }
 
@@ -106,6 +111,7 @@ class MessageActionMenuLayoutTest {
 
         composeRule.onNodeWithTag("message-actions-preview").performTouchInput { click() }
 
+        composeRule.waitForIdle()
         assertEquals(1, dismissals)
         assertTrue(callbacks.isEmpty())
     }
@@ -159,7 +165,8 @@ class MessageActionMenuLayoutTest {
     @Test
     fun everyMaximumVariantActionInvokesItsOriginalCallback() {
         val callbacks = mutableListOf<String>()
-        renderMenu(fontScale = 1f, callbacks = callbacks)
+        val lifetime = mutableStateOf(0)
+        renderMenu(fontScale = 1f, callbacks = callbacks, lifetime = { lifetime.value })
 
         listOf(
             "Edit",
@@ -174,7 +181,12 @@ class MessageActionMenuLayoutTest {
             "Select",
             "Info",
             "Delete",
-        ).forEach { composeRule.onNodeWithText(it, substring = false).performScrollTo().performClick() }
+        ).forEachIndexed { index, label ->
+            // A terminal action consumes its popup; the next action needs a fresh mounted menu.
+            composeRule.runOnIdle { lifetime.value = index }
+            composeRule.onNodeWithText(label, substring = false).performScrollTo().performClick()
+            composeRule.waitForIdle()
+        }
 
         assertEquals(
             listOf(
@@ -302,61 +314,62 @@ class MessageActionMenuLayoutTest {
         showLess: Boolean = false,
         onDismiss: () -> Unit = {},
         quickReactionEmojis: List<String> = if (canReact) listOf("👍") else emptyList(),
+        lifetime: () -> Int = { 0 },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = fontScale) {
-                CompositionLocalProvider(
-                    LocalLayoutDirection provides layoutDirection,
-                ) {
-                    MessageActionMenu(
-                        expanded = true,
-                        anchorBoundsInWindow = null,
-                        anchorWindowYPx = 8f,
-                        canReply = true,
-                        canReact = canReact,
-                        canDelete = true,
-                        canEdit = true,
-                        canForward = true,
-                        canSelect = true,
-                        canCopyText = true,
-                        canSpeak = true,
-                        canSpeakCodeLiterally = literalCode,
-                        canSelectText = true,
-                        canKeepOnScreen = true,
-                        canShowLess = showLess,
-                        canShare = true,
-                        canSave = true,
-                        quickReactionEmojis = quickReactionEmojis,
-                        onDismissRequest = onDismiss,
-                        onReact = {},
-                        onOpenEmojiPicker = {},
-                        onReply = { callbacks += "reply" },
-                        onEdit = { callbacks += "edit" },
-                        onForward = { callbacks += "forward" },
-                        onSelect = { callbacks += "select" },
-                        onSelectText = { callbacks += "selectText" },
-                        onCopyText = { callbacks += "copy" },
-                        onSpeak = { callbacks += "speak" },
-                        onSpeakCodeLiterally = { callbacks += "literalCode" },
-                        onKeepOnScreen = { callbacks += "keepOnScreen" },
-                        onShowLess = { callbacks += "showLess" },
-                        onShare = { callbacks += "share" },
-                        onSave = { callbacks += "save" },
-                        onInfo = { callbacks += "info" },
-                        onDelete = { callbacks += "delete" },
-                        previewDescription = "A real presentation-only message preview",
-                        preview = {
-                            FocusedTextMessagePreview(
-                                presentation = messageBubblePresentation(deleted = false, mine = false),
-                                mine = false,
-                                text = "A real presentation-only message preview",
-                                document = null,
-                                time = "12:34",
-                                status = dev.ipf.whitenoise.android.state.MessageStatus.Received,
-                                showStatus = false,
-                            )
-                        },
-                    )
+                CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                    key(lifetime()) {
+                        MessageActionMenu(
+                            expanded = true,
+                            anchorBoundsInWindow = null,
+                            anchorWindowYPx = 8f,
+                            canReply = true,
+                            canReact = canReact,
+                            canDelete = true,
+                            canEdit = true,
+                            canForward = true,
+                            canSelect = true,
+                            canCopyText = true,
+                            canSpeak = true,
+                            canSpeakCodeLiterally = literalCode,
+                            canSelectText = true,
+                            canKeepOnScreen = true,
+                            canShowLess = showLess,
+                            canShare = true,
+                            canSave = true,
+                            quickReactionEmojis = quickReactionEmojis,
+                            onDismissRequest = onDismiss,
+                            onReact = {},
+                            onOpenEmojiPicker = {},
+                            onReply = { callbacks += "reply" },
+                            onEdit = { callbacks += "edit" },
+                            onForward = { callbacks += "forward" },
+                            onSelect = { callbacks += "select" },
+                            onSelectText = { callbacks += "selectText" },
+                            onCopyText = { callbacks += "copy" },
+                            onSpeak = { callbacks += "speak" },
+                            onSpeakCodeLiterally = { callbacks += "literalCode" },
+                            onKeepOnScreen = { callbacks += "keepOnScreen" },
+                            onShowLess = { callbacks += "showLess" },
+                            onShare = { callbacks += "share" },
+                            onSave = { callbacks += "save" },
+                            onInfo = { callbacks += "info" },
+                            onDelete = { callbacks += "delete" },
+                            previewDescription = "A real presentation-only message preview",
+                            preview = {
+                                FocusedTextMessagePreview(
+                                    presentation = messageBubblePresentation(deleted = false, mine = false),
+                                    mine = false,
+                                    text = "A real presentation-only message preview",
+                                    document = null,
+                                    time = "12:34",
+                                    status = dev.ipf.whitenoise.android.state.MessageStatus.Received,
+                                    showStatus = false,
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }

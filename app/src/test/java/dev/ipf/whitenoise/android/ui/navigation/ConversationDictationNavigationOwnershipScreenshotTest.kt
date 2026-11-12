@@ -22,6 +22,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_HANDLE_TAG
@@ -500,7 +501,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
             composeRule.onRoot().captureRoboImage(
                 "src/test/snapshots/dictation_combined_${direction}_middle_amoled.png",
             )
-            composeRule.mainClock.advanceTimeBy(192)
+            settleDictationHandoff(fixture)
             assertSingleActionSet()
             composeRule.onRoot().captureRoboImage(
                 "src/test/snapshots/dictation_combined_${direction}_settled_amoled.png",
@@ -515,7 +516,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         composeRule.mainClock.advanceTimeBy(64)
         assertSingleActionSet()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_middle_amoled.png")
-        composeRule.mainClock.advanceTimeBy(192)
+        settleDictationHandoff(fixture)
         assertSingleActionSet()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_settled_amoled.png")
     }
@@ -531,12 +532,24 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
                 .fetchSemanticsNode()
                 .boundsInRoot
         fixture.gripTopOffset = initialGrip.top - initialTarget.top
+        // Include the placement/start frames before the shared tween begins advancing.
+        val settleFrameBudget = (APP_MOTION_OPEN_MILLIS + 15) / 16 + 2
+
+        fun exportUntilSettled(
+            scene: String,
+            firstIndex: Int,
+        ) {
+            var frames = 0
+            while (requireNotNull(fixture.handoff).active && frames < settleFrameBudget) {
+                composeRule.mainClock.advanceTimeByFrame()
+                frames++
+                exportCurrentFrame(scene, firstIndex + frames)
+            }
+            assertTrue("$scene must settle within the shared motion budget", !requireNotNull(fixture.handoff).active)
+        }
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
         exportCurrentFrame("active_departure", 0)
-        repeat(16) { index ->
-            composeRule.mainClock.advanceTimeByFrame()
-            exportCurrentFrame("active_departure", index + 1)
-        }
+        exportUntilSettled("active_departure", 0)
         fixture.incomingCapsuleLeft =
             composeRule
                 .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
@@ -544,10 +557,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
                 .boundsInRoot.left
         firstNavigationFrame { fixture.route = origin }
         exportCurrentFrame("active_return", 0)
-        repeat(16) { index ->
-            composeRule.mainClock.advanceTimeByFrame()
-            exportCurrentFrame("active_return", index + 1)
-        }
+        exportUntilSettled("active_return", 0)
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
         exportCurrentFrame("active_reverse", 0)
         repeat(4) { index ->
@@ -556,10 +566,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         }
         firstNavigationFrame { fixture.route = origin }
         exportCurrentFrame("active_reverse", 5)
-        repeat(16) { index ->
-            composeRule.mainClock.advanceTimeByFrame()
-            exportCurrentFrame("active_reverse", index + 6)
-        }
+        exportUntilSettled("active_reverse", 5)
         assertTrue("Every route must exercise its settled pixel checks", fixture.checkedArtworkFrames >= 3)
     }
 }

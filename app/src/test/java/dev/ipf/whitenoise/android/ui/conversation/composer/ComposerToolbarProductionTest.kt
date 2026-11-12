@@ -457,6 +457,7 @@ class ComposerToolbarProductionTest {
         render(ComposerToolbarSettings(listOf(ComposerShortcut.More)))
         composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
         composeRule.onNodeWithText(context.getString(R.string.poll_create)).performClick()
+        composeRule.waitForIdle()
         assertEquals(mapOf("poll" to 1), extraCalls)
     }
 

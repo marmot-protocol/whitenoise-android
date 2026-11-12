@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,6 +63,7 @@ class VoiceReviewRecoveryTest {
                                 recordedAgain += 1
                                 current.updatePresence(false)
                             }
+                            !current.hasReview
                         },
                     )
                 }
@@ -75,6 +78,119 @@ class VoiceReviewRecoveryTest {
         composeRule.runOnIdle {
             assertEquals(1, recordedAgain)
             assertFalse(requireNotNull(marker).hasReview)
+        }
+    }
+
+    /** A refused native start is not a completed recovery action. */
+    @Test
+    fun refusedRecordAgainKeepsRetryAndDismissActionable() = recoveryRetry(false)
+
+    @Test
+    fun refusedRecordAgainCanLaterStartExactlyOnce() = recoveryRetry(true)
+
+    // Keep the complete retained-window sequence together.
+    @Suppress("LongMethod")
+    private fun recoveryRetry(acceptSecondAttempt: Boolean) {
+        composeRule.mainClock.autoAdvance = false
+        val current = VoiceReviewRecoveryMarker("owner", true)
+        var attempts = 0
+        var starts = 0
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    if (current.hasReview) {
+                        VoiceReviewUnavailableNotice(
+                            onDismiss = {
+                                dismissals++
+                                current.updatePresence(false)
+                            },
+                            onRecordAgain = {
+                                var accepted = false
+                                current.consume {
+                                    attempts++
+                                    if (acceptSecondAttempt && attempts == 2) {
+                                        starts++
+                                        current.updatePresence(false)
+                                        accepted = true
+                                    }
+                                }
+                                accepted
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val retry = context.getString(R.string.voice_record_again)
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.onNodeWithText(retry).performClick()
+        composeRule.runOnIdle { assertEquals(0, attempts) }
+        composeRule.mainClock.advanceTimeBy(1600)
+        composeRule.runOnIdle {
+            assertEquals(1, attempts)
+            assertTrue(current.hasReview)
+            assertEquals(0, starts)
+        }
+        composeRule.onNodeWithText(retry).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.dismiss)).assertIsDisplayed()
+        if (acceptSecondAttempt) {
+            composeRule.onNodeWithText(retry).performClick()
+            composeRule.runOnIdle { assertEquals(1, attempts) }
+        } else {
+            composeRule.onNodeWithText(context.getString(R.string.dismiss)).performClick()
+            composeRule.runOnIdle { assertEquals(0, dismissals) }
+        }
+        composeRule.mainClock.advanceTimeBy(1600)
+        composeRule.runOnIdle {
+            assertFalse(current.hasReview)
+            assertEquals(if (acceptSecondAttempt) 2 else 1, attempts)
+            assertEquals(if (acceptSecondAttempt) 1 else 0, starts)
+            assertEquals(if (acceptSecondAttempt) 0 else 1, dismissals)
+        }
+        composeRule.mainClock.advanceTimeBy(1600)
+        composeRule.runOnIdle { assertEquals(if (acceptSecondAttempt) 1 else 0, starts) }
+    }
+
+    @Test
+    fun leavingOwnerDuringRecordAgainExitCannotStartRecorder() {
+        composeRule.mainClock.autoAdvance = false
+        val current = VoiceReviewRecoveryMarker("old-owner", true)
+        var visible by mutableStateOf(true)
+        var starts = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    if (visible) {
+                        VoiceReviewUnavailableNotice(
+                            onDismiss = { current.updatePresence(false) },
+                            onRecordAgain = {
+                                var accepted = false
+                                current.consume {
+                                    starts++
+                                    current.updatePresence(false)
+                                    accepted = true
+                                }
+                                accepted
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.onNodeWithText(context.getString(R.string.voice_record_again)).performClick()
+        composeRule.runOnIdle {
+            assertEquals(0, starts)
+            current.release()
+            visible = false
+        }
+        composeRule.mainClock.advanceTimeBy(1600)
+        composeRule.runOnIdle {
+            assertEquals(0, starts)
+            assertTrue(current.hasReview)
         }
     }
 

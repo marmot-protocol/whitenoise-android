@@ -172,14 +172,19 @@ private class ProfileKeysUiState {
         privateKey = null
     }
 
-    /** Cancels a dismissed confirmation before its suspended native export can open the file picker. */
-    fun cancelExport() {
+    /** Invalidates native work immediately while the inert confirmation finishes its exit. */
+    fun cancelExportPreparation() {
         exportOperation.cancel()
         exportBusy = false
+        clearPasswords()
+    }
+
+    /** Removes the confirmation after exit, or immediately when its sensitive owner is lost. */
+    fun cancelExport() {
+        cancelExportPreparation()
         rawExportDialog = false
         passwordDialog = false
         encryptedBackup = null
-        clearPasswords()
     }
 
     /** True when no export is being prepared, picked or written. */
@@ -764,7 +769,7 @@ private fun ProfileKeysDialogs(
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
             onDismissRequest = ui::cancelExport,
-            onDismissStart = ui::cancelExport,
+            onDismissStart = ui::cancelExportPreparation,
             title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
             text = {
                 Text(
@@ -774,10 +779,16 @@ private fun ProfileKeysDialogs(
             },
             confirmButton = {
                 FlowRow(horizontalArrangement = Arrangement.End) {
-                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.Share) }) {
+                    TextButton(
+                        enabled = !ui.exportBusy,
+                        onClick = { if (acceptsInput) onExport(false, KeyExportDestination.Share) },
+                    ) {
                         Text(stringResource(R.string.share), color = MaterialTheme.colorScheme.error)
                     }
-                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.File) }) {
+                    TextButton(
+                        enabled = !ui.exportBusy,
+                        onClick = { if (acceptsInput) onExport(false, KeyExportDestination.File) },
+                    ) {
                         Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
                     }
                 }
@@ -795,6 +806,7 @@ private fun ProfileKeysDialogs(
             onConfirm = { onExport(true, KeyExportDestination.File) },
             onViewBackup = { onExport(true, KeyExportDestination.Preview) },
             onDismiss = ui::cancelExport,
+            onDismissStart = ui::cancelExportPreparation,
         )
     }
     ui.encryptedBackup?.let { backup ->
@@ -881,12 +893,14 @@ private fun ExportPasswordDialog(
     onConfirm: () -> Unit,
     onViewBackup: () -> Unit,
     onDismiss: () -> Unit,
+    onDismissStart: () -> Unit,
 ) {
     val passwordValue = password.text.toString()
     val confirmationValue = confirmation.text.toString()
     val mismatch = confirmationValue.isNotEmpty() && passwordValue != confirmationValue
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
+        onDismissStart = onDismissStart,
         title = { Text(stringResource(R.string.encrypted_private_key)) },
         text = {
             Column(

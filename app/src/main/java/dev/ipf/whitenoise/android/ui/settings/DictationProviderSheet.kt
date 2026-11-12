@@ -80,7 +80,7 @@ internal fun DictationProviderSheet(
     onSelect: (ConversationDictationProviderChoice?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState()
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     ModalBottomSheet(sheetState = sheetState, onDismissRequest = {
         terminal.close(onDismiss)

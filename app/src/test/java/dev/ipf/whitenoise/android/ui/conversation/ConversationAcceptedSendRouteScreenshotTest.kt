@@ -551,7 +551,13 @@ class ConversationAcceptedSendRouteScreenshotTest {
                     hasAnyAncestor(hasTestTag(MESSAGE_FULL_SCREEN_TAG)),
             ).performClick()
         awaitConversationCondition { publishCount == 1 }
-        repeat(30) { composeRule.mainClock.advanceTimeByFrame() }
+        // Reader exit precedes the viewport handoff; bound the actual terminal state.
+        var settlementFrames = 0
+        while (evidence.viewport?.mode !is ConversationScrollMode.FollowingTail && settlementFrames < 120) {
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            settlementFrames++
+        }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertDoesNotExist()

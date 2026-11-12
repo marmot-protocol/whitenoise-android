@@ -470,12 +470,18 @@ class AccountSwitchLocalSnapshotOrderingTest {
     @Test
     fun selectorDismissesAtActivationBoundaryInsteadOfAwaitingPostSwitchWork() {
         val selection = source("ui/account/ProfileSwitcherSelection.kt").readText().kotlinFunctionBody("select")
-        val sheet = accountSelectorSource().readText().kotlinFunctionBody("AccountSelectorSheet")
+        // The shared body parser stops at a default lambda in the signature; inspect the actual selection slot.
+        val sheet = accountSelectorSource().readText()
 
         val switchCall = selection.substringAfter("appState.setActiveAccount(")
         val activation = switchCall.indexOf("onActivated = {")
         val completion = switchCall.indexOf("onActivated()", startIndex = maxOf(activation, 0))
-        val selectCall = sheet.substringAfter("selection.select(appState, label)")
+        val selectionSlot = sheet.substringAfter("onSelectProfile = { label ->").substringBefore("onAddProfileOrigin")
+        assertTrue(
+            "selection must remain owned by the activation callback",
+            "selection.select(appState, label) {" in selectionSlot,
+        )
+        val selectCall = selectionSlot.substringAfter("selection.select(appState, label) {")
         val dismiss = selectCall.indexOf("close()")
         val reset = selectCall.indexOf("switched()")
 

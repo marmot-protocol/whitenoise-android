@@ -244,7 +244,10 @@ private fun UnavailableRecordingPresentation(fixture: MaestroPresentationFixture
                 fixture.record("notice-dismiss")
                 showing = false
             },
-            onRecordAgain = { fixture.finish("record-again") },
+            onRecordAgain = {
+                fixture.finish("record-again")
+                true
+            },
         )
     } else {
         Button(onClick = { showing = true }) { Text("Reopen recording notice") }

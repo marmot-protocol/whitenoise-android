@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.share
 
 import android.net.Uri
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -35,6 +38,7 @@ class ShareImportStatusBehaviorTest {
         }
         composeRule.onNodeWithText("Recipients").assertDoesNotExist()
         composeRule.onNodeWithText(text(R.string.cancel)).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, cancels)
     }
 
@@ -88,8 +92,83 @@ class ShareImportStatusBehaviorTest {
         }
         composeRule.onNodeWithText(text(R.string.share_to)).assertDoesNotExist()
         composeRule.onNodeWithText(text(R.string.close)).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, cancels)
         composeRule.onNodeWithText("Recipients").assertDoesNotExist()
+    }
+
+    /** A real import completion cannot dispose the accepted cancellation before its terminal frame. */
+    @Test
+    fun progressCancellationSurvivesImportCompletionDuringExit() {
+        var importing by mutableStateOf(true)
+        var request by mutableStateOf<ShareRequest?>(null)
+        var cancels = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ShareImportStatus(
+                    importing = importing,
+                    progress = null,
+                    request = request,
+                    onCancel = {
+                        cancels++
+                        request = null
+                    },
+                    importRequestId = "finishing-import",
+                ) { if (it) Text("Recipients") }
+            }
+        }
+        composeRule.mainClock.autoAdvance = false
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(text(R.string.cancel)).performClick()
+        composeRule.runOnIdle {
+            assertEquals(0, cancels)
+            // The producer completes before the popup's 280 ms close animation.
+            request = ShareRequest(SharePayload("accepted", emptyList(), null, true), null, "finishing-import")
+            importing = false
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Recipients").assertDoesNotExist()
+        composeRule.onNode(isDialog()).assertExists()
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.waitForIdle()
+        assertEquals(1, cancels)
+        composeRule.onNodeWithText("Recipients").assertDoesNotExist()
+    }
+
+    /** Replacing the producer owner cancels the old accepted action without blocking the new import. */
+    @Test
+    fun replacingImportOwnerRevokesPendingCancellation() {
+        var owner by mutableStateOf("first-import")
+        var importing by mutableStateOf(true)
+        var request by mutableStateOf<ShareRequest?>(null)
+        val cancelled = mutableListOf<String>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val currentOwner = owner
+                ShareImportStatus(
+                    importing = importing,
+                    progress = null,
+                    request = request,
+                    onCancel = { cancelled += currentOwner },
+                    importRequestId = currentOwner,
+                ) { if (it) Text("Recipients") }
+            }
+        }
+        composeRule.mainClock.autoAdvance = false
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.onNodeWithText(text(R.string.cancel)).performClick()
+        composeRule.runOnIdle {
+            owner = "second-import"
+            importing = false
+            request = ShareRequest(SharePayload("accepted", emptyList(), null, true), null, owner)
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.waitForIdle()
+        assertEquals(emptyList<String>(), cancelled)
+        composeRule.onNodeWithText("Recipients").assertExists()
+        composeRule.onNode(isDialog()).assertDoesNotExist()
     }
 
     private fun text(id: Int): String = RuntimeEnvironment.getApplication().getString(id)

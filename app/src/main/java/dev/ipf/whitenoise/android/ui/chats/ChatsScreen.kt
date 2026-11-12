@@ -1921,7 +1921,7 @@ internal fun ChatsScreen(
             folderHandoff.pickerChatIds != null ||
             pendingBulkDelete != null ||
             pendingLeaveAndDelete != null
-    if (!anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
+    if (!showNewChatFlow && !anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
         diagnosticsPrompt()
     }
 

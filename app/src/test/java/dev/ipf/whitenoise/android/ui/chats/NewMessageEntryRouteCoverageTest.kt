@@ -12,17 +12,12 @@ class NewMessageEntryRouteCoverageTest {
         val source = sourceFile().readText()
 
         assertTrue("the shared transition must open NewChatFlowHost", "if (showNewChatFlow)" in source)
-        assertEquals(1, occurrences(source, "ChatsNewMessageFab(appState, openNewMessageFlow,"))
-        assertEquals(1, occurrences(source, "EmptyChats(onCreate = openNewMessageFlow)"))
+        assertEquals(1, Regex("""ChatsNewMessageFab\(\s*appState,\s*openNewMessageFlow,""").findAll(source).count())
+        assertEquals(1, Regex("""EmptyChats\(onCreate = openNewMessageFlow(?:,|\))""").findAll(source).count())
     }
 
     private fun sourceFile(): File =
         generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
             .map { File(it, "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt") }
             .first(File::isFile)
-
-    private fun occurrences(
-        source: String,
-        needle: String,
-    ): Int = source.windowed(needle.length).count { it == needle }
 }

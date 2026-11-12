@@ -318,10 +318,10 @@ class ProfileAddToGroupsFlowTest {
         composeRule.runOnIdle { busy.value = false }
         composeRule.onNode(hasText(action) and hasClickAction()).performClick()
         composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
-        assertEquals(1, submissions)
+        composeRule.runOnIdle { assertEquals(1, submissions) }
         composeRule.onNode(hasText(action) and hasClickAction()).performClick()
         composeRule.onNodeWithTag("selected_members_confirm").performClick()
-        assertEquals(2, submissions)
+        composeRule.runOnIdle { assertEquals(2, submissions) }
     }
 
     /** Keeps the bottom action fixed while scrolling to the last eligible group. */

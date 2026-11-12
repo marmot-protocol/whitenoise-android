@@ -73,7 +73,7 @@ internal fun ConfigureReactionsSheet(
     onApply: (List<String>) -> Unit,
     onPickSlot: (Int, List<String>) -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState()
     val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var draft by remember(current) { mutableStateOf(RecentEmojiList.normalizeQuickChoices(current)) }
     ModalBottomSheet(sheetState = sheetState, onDismissRequest = {

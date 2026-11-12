@@ -80,14 +80,15 @@ internal fun ChatFolderPickerSheet(
         appState.wipeInProgress,
         appState.retainedAccountReactivationRef,
     ) {
-        if (!session.isCurrent()) dismiss()
+        if (!session.isAvailable()) dismiss()
     }
-    if (!session.isCurrent()) return
+    if (!session.isAvailable()) return
     val storeState by store.state.collectAsState()
     val folders = remember(storeState, account) { account?.let(store::foldersFor).orEmpty() }
     var failed by remember(session) { mutableStateOf(false) }
     WhiteNoiseAlertDialog(
-        onDismissRequest = { session.leave { dismiss() } },
+        onDismissRequest = { dismiss() },
+        onDismissStart = session::dispose,
         title = { Text(stringResource(R.string.chat_list_action_add_to_folder)) },
         text = {
             Column(
@@ -153,7 +154,7 @@ internal fun ChatFolderPickerSheet(
             }
         },
         dismissButton = {
-            TextButton(onClick = dismiss, modifier = Modifier.testTag("chat.folderCancel")) {
+            TextButton(onClick = this.dismiss, modifier = Modifier.testTag("chat.folderCancel")) {
                 Text(stringResource(R.string.cancel))
             }
         },

@@ -33,6 +33,7 @@ class MessageAttachmentSaveTest {
         renderActionMenu(canSave = true, onSave = { saveClicks++ })
 
         composeRule.onNodeWithText(string(R.string.save_attachments)).assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
 
         assertEquals(1, saveClicks)
     }

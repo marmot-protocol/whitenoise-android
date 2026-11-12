@@ -133,6 +133,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLooper
 import java.io.ByteArrayOutputStream
 import java.lang.reflect.Proxy
+import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.Continuation
@@ -175,7 +176,10 @@ class GroupAvatarLocalAssetScreenshotTest {
             urlFetches.incrementAndGet()
             error("network blocked")
         }
+        val originalTimeZone = TimeZone.getDefault()
         try {
+            // Epoch-based chat-row dates use the fixture zone, independent of the test host.
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
             composeRule.setContent {
                 WhiteNoiseTheme(darkTheme = false) {
                     Surface(color = MaterialTheme.colorScheme.background) {
@@ -207,6 +211,7 @@ class GroupAvatarLocalAssetScreenshotTest {
             assertEquals(0, fixture.requests.get())
             assertEquals(0, fixture.legacyDownloads.get())
         } finally {
+            TimeZone.setDefault(originalTimeZone)
             surface.controller.onCleared()
             surface.chats.onCleared()
         }

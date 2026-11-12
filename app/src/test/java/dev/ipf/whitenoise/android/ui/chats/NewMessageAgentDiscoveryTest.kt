@@ -19,6 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowDialog
 
 /** Exercises the production Home pencil entry and OS Back, rather than an injected navigation callback. */
 @RunWith(RobolectricTestRunner::class)
@@ -35,9 +36,9 @@ class NewMessageAgentDiscoveryTest {
             composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).performClick()
             composeRule.onNodeWithTag("new_message.agentSettings").performClick()
             composeRule.onNodeWithText(context.getString(R.string.ai_agents)).assertIsDisplayed()
-            composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+            composeRule.runOnIdle { requireNotNull(ShadowDialog.getLatestDialog()).onBackPressed() }
             composeRule.onNodeWithTag("new_message.agentSettings").assertIsDisplayed()
-            composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+            composeRule.runOnIdle { requireNotNull(ShadowDialog.getLatestDialog()).onBackPressed() }
             composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).assertIsDisplayed()
         } finally {
             controller.onCleared()

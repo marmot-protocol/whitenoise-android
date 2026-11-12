@@ -396,7 +396,9 @@ class DetailRouteMotionScreenshotTest {
                 if (frame == 0) {
                     // Keep the current failing image, rather than diagnosing stale tracked goldens.
                     val diagnostic = File("build/detail-route-motion/diagnostics").apply { mkdirs() }
-                    bitmap.captureRoboImage(File(diagnostic, "${name}_first.png").path)
+                    File(diagnostic, "${name}_first.png").outputStream().use { output ->
+                        check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                    }
                     assertFirstFrameBackplate(name, bitmap)
                 }
                 if (frame in listOf(0, 6, 20)) {

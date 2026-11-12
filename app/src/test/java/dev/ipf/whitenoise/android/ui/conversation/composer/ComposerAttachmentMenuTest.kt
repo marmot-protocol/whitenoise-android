@@ -68,12 +68,16 @@ class ComposerAttachmentMenuTest {
     fun unpinnedTextActionsFollowSourcesAndDismissOnce() {
         val calls = mutableListOf<String>()
         var dismissals = 0
+        val expanded = mutableStateOf(true)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 ComposerAttachmentMenu(
                     IntRect(16, 700, 56, 748),
-                    true,
-                    { dismissals++ },
+                    expanded.value,
+                    {
+                        expanded.value = false
+                        dismissals++
+                    },
                     onCamera = {},
                     onGallery = {},
                     onFiles = null,
@@ -96,6 +100,7 @@ class ComposerAttachmentMenuTest {
             .onNodeWithTag("conversation.attachment.menu")
             .captureRoboImage("src/test/snapshots/composer_attachment_menu_text_actions_amoled.png")
         listOf("emoji", "paste", "dictation").forEachIndexed { index, id ->
+            if (index > 0) composeRule.runOnIdle { expanded.value = true }
             composeRule.onNodeWithTag("conversation.attachment.menu.$id").performTouchInput { click() }
             composeRule.waitForIdle()
             assertEquals(id, calls[index])
@@ -183,6 +188,7 @@ class ComposerAttachmentMenuTest {
         menu.captureRoboImage("src/test/snapshots/composer_attachment_menu_poll_scrolled_amoled.png")
         composeRule.onNodeWithText("Create poll").assertIsDisplayed()
         composeRule.onNodeWithText("Create poll").performTouchInput { click() }
+        composeRule.waitForIdle()
         assertEquals(1, polls)
         assertEquals(1, dismissals)
     }
@@ -223,6 +229,7 @@ class ComposerAttachmentMenuTest {
             .onNodeWithTag("conversation.attachment.menu")
             .captureRoboImage("src/test/snapshots/composer_attachment_menu_scrolled_large_rtl.png")
         composeRule.onNodeWithText("Create poll").performTouchInput { click() }
+        composeRule.waitForIdle()
         assertEquals(1, polls)
     }
 

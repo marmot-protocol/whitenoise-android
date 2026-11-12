@@ -2380,6 +2380,7 @@ internal fun MainShell(
                     progress = shareImportProgress,
                     request = visibleShareRequest,
                     onCancel = clearSharePickerRequest,
+                    importRequestId = inboundShareRequest?.requestId ?: visibleShareRequest?.requestId,
                 ) { importAccepted ->
                     visiblePickerRequest?.takeIf { importAccepted && it.payload.isSupported() }?.let { request ->
                         ShareChatPickerFullScreen(

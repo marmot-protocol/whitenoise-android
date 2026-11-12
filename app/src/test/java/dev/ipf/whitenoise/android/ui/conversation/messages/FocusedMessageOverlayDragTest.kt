@@ -1,14 +1,19 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -209,25 +214,25 @@ class FocusedMessageOverlayDragTest {
         assertTrue("the second drag must move it back, was " + afterFirst, stackTop() > afterFirst)
     }
 
-    /** A drag still works after a gesture the tap detector handled. */
+    /** A terminal preview tap closes once even when the owner leaves the composable mounted. */
     @Test
-    fun theStackStillDragsAfterATapIsHandled() {
+    fun tappingThePreviewDismissesOnceAndRemovesThePopup() {
         var dismissals = 0
         render(anchorTop = 600, anchorBottom = 680, onDismiss = { dismissals += 1 })
-        val resting = stackTop()
 
         composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { click() }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeUp() }
-        composeRule.waitForIdle()
 
-        assertEquals("the tap must still dismiss", 1, dismissals)
-        assertTrue("the drag after a tap must move the stack, rested at " + resting, stackTop() < resting)
+        assertEquals("the tap must dismiss exactly once", 1, dismissals)
+        composeRule.onNodeWithTag(PREVIEW_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertDoesNotExist()
+        composeRule.waitForIdle()
+        assertEquals("leaving the owner mounted must not repeat dismissal", 1, dismissals)
     }
 
-    /** The initiating hold cannot drag the lifted preview; a fresh post-release gesture can. */
+    /** Isolated input-gate contract; this synthetic DOWN is not the initiating source pointer. */
     @Test
-    fun liftedPreviewDragsOnlyAfterInitiatingHoldEnds() {
+    fun aNewPreviewDragIsBlockedWhileTheSourceHoldIsActive() {
         var holdActive by mutableStateOf(true)
         render(anchorTop = 600, anchorBottom = 680, initiatingHoldActive = { holdActive })
         val resting = stackTop()
@@ -240,6 +245,47 @@ class FocusedMessageOverlayDragTest {
         composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeUp() }
         composeRule.waitForIdle()
         assertTrue(stackTop() < resting)
+    }
+
+    /** The original source pointer survives popup creation; only a new preview drag moves it. */
+    @Test
+    fun liftedPreviewDragsOnlyAfterInitiatingHoldEnds() {
+        var dismissals = 0
+        render(
+            anchorTop = 600,
+            anchorBottom = 680,
+            mountOnLongPress = true,
+            onDismiss = { dismissals += 1 },
+        )
+        composeRule.onNodeWithTag(PREVIEW_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(SOURCE_TAG).performTouchInput {
+            down(Offset(180f, 640f))
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            move()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(PREVIEW_TAG).assertExists()
+        val resting = stackTop()
+
+        // Continue the same pointer in the original host root. Do not start a synthetic
+        // DOWN in the newly created popup: that would model a different gesture.
+        composeRule.onNodeWithTag(SOURCE_TAG).performTouchInput {
+            moveTo(Offset(180f, 400f), delayMillis = 100)
+        }
+        composeRule.waitForIdle()
+        assertEquals("the original hold must not move the stack", resting, stackTop(), 0.5f)
+        assertEquals(0, dismissals)
+
+        composeRule.onNodeWithTag(SOURCE_TAG).performTouchInput { up() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(PREVIEW_TAG).assertExists()
+        assertEquals("releasing the initiating hold must not dismiss", 0, dismissals)
+        assertEquals(resting, stackTop(), 0.5f)
+
+        composeRule.onNodeWithTag(PREVIEW_TAG).performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        assertTrue("a fresh preview drag must move the stack", stackTop() < resting)
+        assertEquals("dragging must remain nonterminal", 0, dismissals)
     }
 
     /**
@@ -313,12 +359,30 @@ class FocusedMessageOverlayDragTest {
         anchorBottom: Int,
         onDismiss: () -> Unit = {},
         actionCount: Int = REALISTIC_ACTIONS,
+        mountOnLongPress: Boolean = false,
         initiatingHoldActive: () -> Boolean = { false },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
+                var overlayVisible by remember { mutableStateOf(!mountOnLongPress) }
+                var holdActive by remember { mutableStateOf(false) }
+                if (mountOnLongPress) {
+                    Box(
+                        Modifier.size(360.dp, 780.dp).testTag(SOURCE_TAG).pointerInput(Unit) {
+                            detectTapGestures(
+                                onPress = {
+                                    holdActive = true
+                                    tryAwaitRelease()
+                                    holdActive = false
+                                },
+                                onLongPress = { overlayVisible = true },
+                            )
+                        },
+                    ) { Text("Source message") }
+                }
+                if (!overlayVisible) return@WhiteNoiseTheme
                 FocusedMessageActions(
-                    initiatingHoldActive = initiatingHoldActive(),
+                    initiatingHoldActive = holdActive || initiatingHoldActive(),
                     sourceBounds = IntRect(0, anchorTop, 360, anchorBottom),
                     touchY = anchorTop.toFloat(),
                     mine = true,
@@ -353,6 +417,7 @@ class FocusedMessageOverlayDragTest {
     }
 
     private companion object {
+        const val SOURCE_TAG = "message-actions-source-host"
         const val PREVIEW_TAG = "message-actions-preview"
         const val FRAME = 780
         const val STACK = 212

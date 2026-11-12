@@ -8,7 +8,6 @@ import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.indication
@@ -57,7 +56,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
@@ -225,7 +223,12 @@ private fun rememberFocusedStackTravel(
  * rather than leaving it to land on an overlay that is no longer there.
  */
 @Composable
-private fun Modifier.focusedStackDrag(travel: FocusedStackTravel): Modifier {
+private fun Modifier.focusedStackDrag(
+    travel: FocusedStackTravel,
+    initiatingHoldActive: Boolean,
+): Modifier {
+    // The initiating hold still owns the pointer until its release.
+    if (initiatingHoldActive) return this
     val scope = rememberCoroutineScope()
     val decay = rememberSplineBasedDecay<Float>()
     return draggable(
@@ -302,6 +305,7 @@ internal fun FocusedMessageActions(
     ) {
         val popupMotion = this
         val currentOnDismiss by rememberUpdatedState(popupMotion.dismiss)
+        val currentInitiatingHold by rememberUpdatedState(initiatingHoldActive)
         val terminalActions =
             actions.map { action ->
                 action.copy(
@@ -321,8 +325,10 @@ internal fun FocusedMessageActions(
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     // A tap reaching the frame landed beside the stack, on nothing, and dismisses
                     // exactly as the scrim underneath it would have before the frame covered it.
-                    .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                    .testTag(FOCUSED_OVERLAY_FRAME_TEST_TAG),
+                    .focusedDismissOnTap(
+                        initiatingHoldActive = { currentInitiatingHold },
+                        onDismiss = { currentOnDismiss() },
+                    ).testTag(FOCUSED_OVERLAY_FRAME_TEST_TAG),
         ) {
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
@@ -374,8 +380,10 @@ internal fun FocusedMessageActions(
                         }.graphicsLayer { alpha = if (measured && previewReady && travel.placed) 1f else 0f }
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
-                        .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                        .padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
+                        .focusedDismissOnTap(
+                            initiatingHoldActive = { currentInitiatingHold },
+                            onDismiss = { currentOnDismiss() },
+                        ).padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
                         .semantics {
                             paneTitle = title
                             customActions =
@@ -397,8 +405,17 @@ internal fun FocusedMessageActions(
                             quickReactions = quickReactions,
                             sizing = reactionSizing,
                             selectedReactions = selectedReactions,
-                            onReact = { emoji -> popupMotion.close { onReact(emoji) } },
-                            onReactionOrigin = onReactionOrigin,
+                            onReact = { emoji ->
+                                if (popupMotion.acceptsInput) {
+                                    // The native flight replaces its source in this frame,
+                                    // rather than after a faded gap.
+                                    popupMotion.close {}
+                                    onReact(emoji)
+                                }
+                            },
+                            onReactionOrigin = { emoji, bounds ->
+                                if (popupMotion.acceptsInput) onReactionOrigin?.invoke(emoji, bounds)
+                            },
                             onMoreReactions = { popupMotion.close(onMoreReactions) },
                         )
                     }
@@ -420,7 +437,7 @@ internal fun FocusedMessageActions(
                                 .onPlaced {
                                     previewCenterInStackPx =
                                         it.positionInParent().y.roundToInt() + it.size.height / 2
-                                }.then(if (initiatingHoldActive) Modifier else Modifier.focusedStackDrag(travel))
+                                }.focusedStackDrag(travel, initiatingHoldActive)
                                 .clearAndSetSemantics {
                                     contentDescription = previewDescription
                                     // The same dismissal the tap performs, reachable without one: a
@@ -434,15 +451,11 @@ internal fun FocusedMessageActions(
                                 // control. Tapping it used to be swallowed, which made the overlay feel
                                 // as though it dismissed only in some places; it dismisses like the
                                 // scrim, and the actions beside it consume their own taps first.
-                                .pointerInput(Unit) {
-                                    // The overlay opens under the finger that long-pressed, so the
-                                    // release of that same press would otherwise land here as a tap and
-                                    // dismiss what it just opened. Wait for the gesture to end first.
-                                    awaitPointerEventScope {
-                                        while (currentEvent.changes.any { it.pressed }) awaitPointerEvent()
-                                    }
-                                    detectTapGestures { currentOnDismiss() }
-                                },
+                                .focusedDismissOnTap(
+                                    initiatingHoldActive = { currentInitiatingHold },
+                                    onDismiss = { currentOnDismiss() },
+                                    awaitRelease = true,
+                                ),
                     ) { preview() }
                 }
                 // When the IME shortens the safe frame, only the actions overflow. Scrolling the

@@ -5,6 +5,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -79,14 +80,18 @@ internal fun rememberVoiceReviewRecoveryMarker(
 @Suppress("FunctionNaming")
 internal fun VoiceReviewUnavailableNotice(
     onDismiss: () -> Unit,
-    onRecordAgain: () -> Unit,
+    onRecordAgain: () -> Boolean,
 ) {
+    var attempt by remember { mutableIntStateOf(0) }
     AnimatedAlertDialog(
+        ownerKey = attempt,
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.voice_review_unavailable_title)) },
         text = { Text(stringResource(R.string.voice_review_unavailable_message)) },
         confirmButton = {
-            TextButton(onClick = { close(onRecordAgain) }) { Text(stringResource(R.string.voice_record_again)) }
+            TextButton(
+                onClick = { close { if (!onRecordAgain()) attempt++ } },
+            ) { Text(stringResource(R.string.voice_record_again)) }
         },
         dismissButton = {
             TextButton(onClick = dismiss) { Text(stringResource(R.string.dismiss)) }

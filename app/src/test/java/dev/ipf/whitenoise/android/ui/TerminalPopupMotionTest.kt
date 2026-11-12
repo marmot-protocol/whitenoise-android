@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.GroupRecoveryCard
+import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewUnavailableNotice
 import dev.ipf.whitenoise.android.ui.conversation.media.GroupPictureFailureDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
@@ -75,7 +76,7 @@ class TerminalPopupMotionTest {
         accept: () -> Unit,
         invalidate: (() -> Unit)? = null,
     ) {
-        capture(name, "forward", open)
+        capture(name, "forward", action = open)
         capture(name, "reverse") {
             accept()
             rule.runOnIdle {
@@ -88,6 +89,69 @@ class TerminalPopupMotionTest {
         rule.runOnIdle { assertEquals(if (invalidate == null) listOf("current") else emptyList<String>(), calls) }
         rule.mainClock.advanceTimeBy(800)
         rule.runOnIdle { assertEquals(if (invalidate == null) listOf("current") else emptyList<String>(), calls) }
+    }
+
+    @Test fun cancelledImportKeepsItsWindowUntilTerminalExit() {
+        val importing = mutableStateOf(true)
+        val request = mutableStateOf<ShareRequest?>(null)
+        show {
+            if (visible.value) {
+                ShareImportStatus(
+                    importing = importing.value,
+                    progress = null,
+                    request = request.value,
+                    importRequestId = "captured-import",
+                    onCancel = {
+                        calls += "cancelled"
+                        visible.value = false
+                    },
+                ) { if (it) Text("Recipients") }
+            }
+        }
+        capture("import-cancel", "forward") { visible.value = true }
+        capture("import-cancel", "reverse") {
+            rule.onNodeWithText("Cancel").performClick()
+            rule.runOnIdle {
+                importing.value = false
+                request.value =
+                    ShareRequest(SharePayload("Shared text", emptyList(), "text/plain"), null, "captured-import")
+            }
+        }
+        rule.runOnIdle { assertEquals(listOf("cancelled"), calls) }
+        rule.onNodeWithText("Recipients").assertDoesNotExist()
+    }
+
+    @Test fun refusedRecordingReopensBeforeAnotherAcceptedRetry() {
+        var attempts = 0
+        show {
+            if (visible.value) {
+                VoiceReviewUnavailableNotice(
+                    onDismiss = { visible.value = false },
+                    onRecordAgain = {
+                        attempts++
+                        if (attempts == 2) {
+                            calls += "started"
+                            visible.value = false
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+        }
+        capture("voice-retry", "forward") { visible.value = true }
+        capture("voice-retry", "refused", frames = 64) { rule.onNodeWithText("Record again").performClick() }
+        rule.runOnIdle {
+            assertEquals(1, attempts)
+            assertEquals(emptyList<String>(), calls)
+        }
+        rule.onNodeWithText("Record again").assertExists()
+        capture("voice-retry", "reverse") { rule.onNodeWithText("Record again").performClick() }
+        rule.runOnIdle {
+            assertEquals(2, attempts)
+            assertEquals(listOf("started"), calls)
+        }
     }
 
     @Test fun pictureRetryWaitsForExitAndUsesCurrentCallback() {
@@ -129,7 +193,7 @@ class TerminalPopupMotionTest {
             SharePayload("Shared text", emptyList(), "text/plain", importErrors = listOf(ShareImportError.Unreadable))
         val request = mutableStateOf(ShareRequest(payload, null, "first"))
         show {
-            ShareImportStatus(false, null, request.value, {}, { ready ->
+            ShareImportStatus(false, null, request.value, {}, content = { ready ->
                 if (ready) Text("Destination ready")
             })
         }
@@ -324,6 +388,7 @@ class TerminalPopupMotionTest {
     private fun capture(
         name: String,
         direction: String,
+        frames: Int = 32,
         action: () -> Unit,
     ) {
         val recording = System.getenv("ANIMATION_CAPTURE_FRAMES") == "1"
@@ -341,7 +406,7 @@ class TerminalPopupMotionTest {
             androidx.compose.runtime.snapshots.Snapshot
                 .sendApplyNotifications()
         }
-        repeat(32) { frame ->
+        repeat(frames) { frame ->
             rule.mainClock.advanceTimeByFrame()
             rule.waitForIdle()
             if (direction == "reverse" && frame == 4) rule.runOnIdle { assertEquals(emptyList<String>(), calls) }
