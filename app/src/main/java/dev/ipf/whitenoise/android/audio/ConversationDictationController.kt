@@ -3940,16 +3940,20 @@ internal fun mergeConversationDictationTranscript(
  * Re-anchors a dictation on the draft as it stands now, with the transcript's insertion point remapped
  * exactly as [mergeConversationDictationTranscript] would place it, or at the end when that is ambiguous.
  */
-internal fun ConversationDictationTarget.rebasedOnto(current: ConversationDictationDraftSnapshot): ConversationDictationTarget {
-    if (current.revision == capturedDraftRevision && current.value.text == capturedDraft.text) return this
-    val selection =
-        if (current.value.text == capturedDraft.text) {
-            capturedDraft.selection
-        } else {
-            remapConversationDictationSelection(capturedDraft, current.value) ?: TextRange(current.value.text.length)
+internal fun ConversationDictationTarget.rebasedOnto(current: ConversationDictationDraftSnapshot) =
+    when {
+        current.revision == capturedDraftRevision && current.value.text == capturedDraft.text -> this
+        current.value.text == capturedDraft.text -> copy(capturedDraftRevision = current.revision)
+        else -> {
+            val selection =
+                remapConversationDictationSelection(capturedDraft, current.value)
+                    ?: TextRange(current.value.text.length)
+            copy(
+                capturedDraft = TextFieldValue(current.value.text, selection),
+                capturedDraftRevision = current.revision,
+            )
         }
-    return copy(capturedDraft = TextFieldValue(current.value.text, selection), capturedDraftRevision = current.revision)
-}
+    }
 
 /** Appends a recognized segment to the draft and places the cursor after the inserted text. */
 internal fun appendConversationDictationTranscript(
