@@ -452,6 +452,33 @@ class PhotoDraftStagerTest {
             }
         }
 
+    /** A provider without a name, or one whose query throws, keeps the default name and returns its lookup slot. */
+    @Test
+    fun missingOrFailingProviderNameKeepsTheDefaultName() =
+        runTest {
+            val fixture = fixture()
+            try {
+                listOf(
+                    DisplayNameProvider(name = null),
+                    DisplayNameProvider(name = "beach.png", failure = IllegalStateException("provider failed")),
+                ).forEachIndexed { round, provider ->
+                    val bytes = pngBytes()
+                    repeat(PICKS_PAST_LOOKUP_CAP) { index ->
+                        val uri = provider.register(app, "unnamed-$round-$index", bytes, reset = index == 0)
+                        val slot = "slot-$round-$index"
+                        val staged = fixture.stager.stage(uri, slot, ACCOUNT, GROUP, MediaQuality.Original)
+
+                        assertTrue(staged is PhotoDraftStageResult.Success)
+                        assertEquals("image.png", (staged as PhotoDraftStageResult.Success).photo.attachment.fileName)
+                    }
+                    // Every pick queried: no failed lookup kept its slot.
+                    assertEquals(PICKS_PAST_LOOKUP_CAP, provider.queries.get())
+                }
+            } finally {
+                ShadowContentResolver.reset()
+            }
+        }
+
     /** A stager over in-memory stores whose picks decode in [outgoingDomain], single-use unless a test names one. */
     private fun fixture(
         onEncode: () -> Unit = {},
@@ -558,6 +585,7 @@ class PhotoDraftStagerTest {
         private const val SENSITIVE_METADATA = "private gps metadata"
         private const val IO_THREADS = 4
         private const val TIMEOUT_SECONDS = 5L
+        private const val PICKS_PAST_LOOKUP_CAP = ProviderDisplayNames.MAX_NAME_LOOKUPS + 1
     }
 }
 
@@ -565,6 +593,7 @@ class PhotoDraftStagerTest {
 private class DisplayNameProvider(
     private val name: String?,
     val gate: CountDownLatch? = null,
+    private val failure: Exception? = null,
 ) : ContentProvider() {
     val queries = AtomicInteger()
     val entered = CountDownLatch(1)
@@ -613,6 +642,7 @@ private class DisplayNameProvider(
             entered.countDown()
             stall.await(STALL_SECONDS, TimeUnit.SECONDS)
         }
+        failure?.let { throw it }
         return MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME)).apply { addRow(arrayOf(name)) }
     }
 

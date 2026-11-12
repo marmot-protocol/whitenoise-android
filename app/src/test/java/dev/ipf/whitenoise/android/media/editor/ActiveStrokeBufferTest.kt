@@ -168,6 +168,24 @@ class ActiveStrokeBufferTest {
         assertFalse(screen.contains("strokePoints.toList()"))
     }
 
+    /** A cancelled drag drops the long gesture: nothing is committed and the next stroke starts clean. */
+    @Test
+    fun cancelledLongGestureIsDiscarded() {
+        val buffer = ActiveStrokeBuffer(limits)
+        buffer.start(point(0))
+        for (index in 1..limits.maxPointsPerStroke * 3) buffer.add(point(index))
+        assertTrue(buffer.exceededPointBudget)
+
+        buffer.clear()
+
+        assertTrue(buffer.isEmpty())
+        assertFalse(buffer.exceededPointBudget)
+        val screen = appModuleSource("$EDITOR_SOURCES/PhotoEditorScreen.kt")
+        val onCancel = screen.substringAfter("onDragCancel = {").substringBefore("},")
+        assertTrue(onCancel.contains("activeStroke.clear()"))
+        assertFalse(onCancel.contains("onStroke("))
+    }
+
     /** A raster sweep whose neighbouring samples sit [ROW_LENGTH]ths of the width apart, above the minimum distance. */
     private fun point(index: Int): NormalizedPoint {
         val x = (index % ROW_LENGTH).toFloat() / ROW_LENGTH
