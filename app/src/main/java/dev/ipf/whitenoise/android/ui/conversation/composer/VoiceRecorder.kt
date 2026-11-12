@@ -348,7 +348,7 @@ internal fun LockHintAbove(
 
 @Composable
 internal fun rememberInfiniteRecordingPulse(): State<Float> {
-    // With animations off the dot rests at its base size instead of freezing mid-pulse.
+    // With animations off the dot rests at its 10 dp base size instead of the 1.6x peak Compose would park it on.
     if (!rememberSystemAnimationsEnabled()) return remember { mutableFloatStateOf(1f) }
     val transition = rememberInfiniteTransition(label = "rec-pulse")
     return transition.animateFloat(
