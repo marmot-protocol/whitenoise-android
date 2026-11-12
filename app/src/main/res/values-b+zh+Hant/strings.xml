@@ -2371,7 +2371,7 @@
     <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
     <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
-    <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請嘗試較小的群組。</string>
+    <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請對方新增可接收較大訊息的收件匣中繼。</string>
     <string name="notification_show_previews">顯示通知預覽</string>
     <string name="notification_show_previews_detail">關閉後會隱藏姓名和訊息內容。適用於所有帳戶。</string>
     <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>

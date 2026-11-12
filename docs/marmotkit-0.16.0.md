@@ -30,8 +30,9 @@ Counts move from 447/447/5 to **463 public types / 477 checksums / 5 helpers**.
 types are additions: NIP-46 sessions (5 records/enums plus the session interface),
 relay liveness (3 plus the subscription interface), `RelayEventLimitFfi`, and audit
 delivery status and retention (5). The 30 new checksums cover the new methods,
-including `startDirectConversation` and `reconnectRelay`. Android adopts none of these
-optional APIs here.
+including `startDirectConversation` and `reconnectRelay`. One existing checksum changes:
+`marmot_deployment_white_noise`, because the record it returns gained a field. Android
+adopts none of the new optional APIs here.
 
 Four existing public types change:
 
@@ -49,9 +50,16 @@ Four existing public types change:
 `EventTooLarge` is now raised up front for a group create or invite whose Welcome
 fits none of an invitee's inbox relays. Before, that create succeeded with the
 Welcome owed. Retry cannot help, so `EventTooLarge(WELCOME)` now says the invitation
-is too large for a recipient's inbox relays instead of the generic retry text.
-`EventTooLarge` from block edits, KeyPackage republishing, sticker sync and
-profile/relay-list publishes keeps the existing generic failure copy. No generated
+is too large for a recipient's inbox relays and asks them to add one that accepts
+larger messages, instead of the generic retry text. It applies to direct chats, group
+creation and adding or inviting members alike.
+
+Other `EventTooLarge` sources fall to existing generic copy, which changes what two
+surfaces show. An oversized block edit used to fail as `BlockListUnavailable` and
+show `block_list_unavailable`; it now shows `block_change_failed`. An oversized
+sticker sync used to fail as `StickerNetwork` and show `sticker_error_network`; it
+now shows `error_try_again`. KeyPackage, profile and relay-list publishes have no
+dedicated copy. No generated
 binding is edited. Device-group and multi-device APIs stay unused and untouched.
 
 ## Native changes and migration boundary

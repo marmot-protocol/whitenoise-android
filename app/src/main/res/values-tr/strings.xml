@@ -2406,7 +2406,7 @@
     <string name="error_invalid_key_package_for">%1$s için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox">Bu kişi için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox_for">%1$s için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
-    <string name="error_invite_welcome_too_large">Bu davet, bir alıcının gelen kutusu röleleri için çok büyük. Daha küçük bir grup deneyin.</string>
+    <string name="error_invite_welcome_too_large">Bu davet, bir alıcının gelen kutusu röleleri için çok büyük. Daha büyük mesajları kabul eden bir gelen kutusu rölesi eklemesini isteyin.</string>
     <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
     <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplara uygulanır.</string>
     <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>

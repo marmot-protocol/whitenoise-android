@@ -115,8 +115,13 @@ internal fun quarantineGuidance(reason: AppGroupHydrationQuarantineReasonFfi): I
  */
 internal fun quarantineRetryable(reason: AppGroupHydrationQuarantineReasonFfi): Boolean =
     when (reason) {
+        AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED,
+        AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_GROUP_MISSING,
+        AppGroupHydrationQuarantineReasonFfi.MEMBER_VALIDATION_FAILED,
+        AppGroupHydrationQuarantineReasonFfi.GROUP_RECORD_LOAD_FAILED,
+        AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED,
+        -> true
         AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED -> false
-        else -> true
     }
 
 internal fun quarantineOutcome(outcome: QuarantineRecoveryOutcome): Int =

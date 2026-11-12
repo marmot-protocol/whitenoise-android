@@ -2413,7 +2413,7 @@
     <string name="error_invalid_key_package_for">Não foi possível validar a chave de conversa publicada de %1$s. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
     <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
-    <string name="error_invite_welcome_too_large">Este convite é grande demais para os relays de entrada de um destinatário. Tente um grupo menor.</string>
+    <string name="error_invite_welcome_too_large">Este convite é grande demais para os relays de entrada de um destinatário. Peça para ele adicionar um relay de entrada que aceite mensagens maiores.</string>
     <string name="notification_show_previews">Mostrar prévias das notificações</string>
     <string name="notification_show_previews_detail">Quando desativado, oculta nomes e conteúdo das mensagens. Vale para todas as contas.</string>
     <string name="notification_preview_update_failed">Alterações podem ser perdidas após reiniciar.</string>

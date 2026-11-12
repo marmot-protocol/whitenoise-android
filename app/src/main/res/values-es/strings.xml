@@ -2413,7 +2413,7 @@
     <string name="error_invalid_key_package_for">No se pudo validar la clave de chat publicada de %1$s. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>
     <string name="error_missing_member_inbox">No hay un relay de entrada utilizable para esta persona. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
     <string name="error_missing_member_inbox_for">No hay un relay de entrada utilizable para %1$s. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
-    <string name="error_invite_welcome_too_large">Esta invitación es demasiado grande para los relays de entrada de un destinatario. Prueba con un grupo más pequeño.</string>
+    <string name="error_invite_welcome_too_large">Esta invitación es demasiado grande para los relays de entrada de un destinatario. Pídele que añada un relay de entrada que acepte mensajes más grandes.</string>
     <string name="notification_show_previews">Mostrar vistas previas de notificaciones</string>
     <string name="notification_show_previews_detail">Si está desactivado, se ocultan nombres y contenido de mensajes. Afecta a todas las cuentas.</string>
     <string name="notification_preview_update_failed">Los cambios pueden perderse al reiniciar.</string>

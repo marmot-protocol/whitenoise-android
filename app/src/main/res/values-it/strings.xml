@@ -2413,7 +2413,7 @@
     <string name="error_invalid_key_package_for">Non è stato possibile convalidare la chiave di chat pubblicata per %1$s. Chiedi di aggiornare White Noise e pubblicare una nuova chiave di chat, poi riprova.</string>
     <string name="error_missing_member_inbox">Non c’è un relay di ricezione utilizzabile per questa persona. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
     <string name="error_missing_member_inbox_for">Non c’è un relay di ricezione utilizzabile per %1$s. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
-    <string name="error_invite_welcome_too_large">Questo invito è troppo grande per i relay di ricezione di un destinatario. Prova con un gruppo più piccolo.</string>
+    <string name="error_invite_welcome_too_large">Questo invito è troppo grande per i relay di ricezione di un destinatario. Chiedi di aggiungere un relay di ricezione che accetti messaggi più grandi.</string>
     <string name="notification_show_previews">Mostra anteprime delle notifiche</string>
     <string name="notification_show_previews_detail">Se disattivato, nasconde nomi e contenuto dei messaggi. Vale per tutti gli account.</string>
     <string name="notification_preview_update_failed">Le modifiche potrebbero andare perse dopo il riavvio.</string>

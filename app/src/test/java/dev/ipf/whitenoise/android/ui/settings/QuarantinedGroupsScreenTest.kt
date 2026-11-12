@@ -117,15 +117,19 @@ class QuarantinedGroupsScreenTest {
         assertEquals(emptyList<String>(), actions)
     }
 
-    /** Only a failed rewind restore withholds Retry, every earlier reason keeps it. */
+    /** Retry stays for the five earlier reasons, a failed rewind restore withholds it. */
     @Test fun onlyRewindRestoreFailureWithholdsRetry() {
-        AppGroupHydrationQuarantineReasonFfi.entries.forEach { reason ->
-            assertEquals(
-                reason.name,
-                reason != AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED,
-                quarantineRetryable(reason),
+        val expected =
+            mapOf(
+                AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_GROUP_MISSING to true,
+                AppGroupHydrationQuarantineReasonFfi.MEMBER_VALIDATION_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.GROUP_RECORD_LOAD_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED to false,
             )
-        }
+        assertEquals(AppGroupHydrationQuarantineReasonFfi.entries.toSet(), expected.keys)
+        expected.forEach { (reason, retryable) -> assertEquals(reason.name, retryable, quarantineRetryable(reason)) }
     }
 
     @Test fun activeRecoveryDisablesBothRefreshAndAnotherRetry() {
