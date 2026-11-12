@@ -448,8 +448,8 @@ private fun MarkdownBodyText(
         if (onCopyLink == null) {
             emptyList()
         } else {
-            linkDestinations.map { destination ->
-                CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
+            linkDestinations.zip(markdownCopyLinkLabels(copyLabel, linkDestinations)) { destination, label ->
+                CustomAccessibilityAction(label) {
                     onCopyLink(destination)
                     true
                 }
@@ -575,6 +575,29 @@ internal fun markdownLinkDestinations(text: AnnotatedString): List<String> =
         .getLinkAnnotations(0, text.length)
         .mapNotNull { range -> markdownLinkDestination(range.item) }
         .distinct()
+
+/**
+ * One copy-link action label per distinct destination, in order. Shown text stops after
+ * [MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH] code points, so links that differ only past that point would share
+ * a label, and actions collapse by label. A repeated label therefore gets a numbered suffix, keeping each link
+ * copyable.
+ */
+internal fun markdownCopyLinkLabels(
+    copyLabel: String,
+    destinations: List<String>,
+): List<String> {
+    val taken = HashSet<String>()
+    return destinations.map { destination ->
+        val base = "$copyLabel: ${markdownSafeDisplayText(destination)}"
+        var label = base
+        var copy = 1
+        while (!taken.add(label)) {
+            copy += 1
+            label = "$base ($copy)"
+        }
+        label
+    }
+}
 
 internal fun markdownLinkDestination(annotation: LinkAnnotation): String? =
     when (annotation) {
