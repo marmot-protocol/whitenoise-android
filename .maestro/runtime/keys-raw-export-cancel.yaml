@@ -19,6 +19,9 @@ name: keys-raw-export-cancel
     direction: UP
 - assertVisible: Private key hidden
 - tapOn: Back
+- assertVisible:
+    id: settings.account.group
+- tapOn: Back
 - assertVisible: Settings
 - tapOn: Back
 - assertVisible: Maestro group
