@@ -33,8 +33,9 @@ class MessageShowLessBehaviorTest {
 
     /** Show less can also override the default when long messages normally start expanded. */
     @Test
-    fun explicitCollapseCanBeExpandedInlineWhenAutomaticCollapseIsDisabled() =
+    fun explicitCollapseCanBeExpandedInlineWhenAutomaticCollapseIsDisabled() {
         assertInlineRoundTrip(collapseByDefault = false)
+    }
 
     /** Measures the rendered bubble to confirm that tapping Read More removes the preview height limit. */
     private fun assertInlineRoundTrip(collapseByDefault: Boolean) {

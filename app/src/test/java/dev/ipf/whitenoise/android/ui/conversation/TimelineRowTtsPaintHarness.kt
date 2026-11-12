@@ -14,7 +14,6 @@ internal class PaintTimelineRow(
     private val appState: WhiteNoiseAppState,
     private val sentenceLayouts: ConversationTtsSentenceLayoutRegistry,
 ) {
-
     @Composable
     @Suppress("FunctionNaming", "LongMethod")
     fun Render(
