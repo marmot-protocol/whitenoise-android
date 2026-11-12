@@ -43,11 +43,13 @@ class VoicePlaybackControllerCancellationTest {
     fun cancellationDuringPreparedHandoffReleasesTheUndeliveredPlayer() {
         val routes = attachWithNoisyRoutes()
         val mediaPlayer = PreparedProbePlayer()
-        setControllerField("playerFactory", VoicePlaybackPlayer.Factory { _, _ -> mediaPlayer })
+        val callerSuspended = CountDownLatch(1)
+        setControllerField("playerFactory", heldFactory(callerSuspended) { mediaPlayer })
         val caller = QueuedDispatcher()
 
         val job = CoroutineScope(caller).launch { VoicePlaybackController.play("new-source", File("voice.amr")) }
         caller.runNext()
+        callerSuspended.countDown()
         // The IO block has returned the player and its resume is queued on the held caller.
         caller.awaitQueued()
         job.cancel()
@@ -101,9 +103,10 @@ class VoicePlaybackControllerCancellationTest {
         attachWithNoisyRoutes()
         val mediaPlayer = PreparedProbePlayer()
         val replacement = VoicePlaybackController.PlaybackState(key = "other", sessionId = Long.MAX_VALUE)
+        val callerSuspended = CountDownLatch(1)
         setControllerField(
             "playerFactory",
-            VoicePlaybackPlayer.Factory { _, _ ->
+            heldFactory(callerSuspended) {
                 setPlaybackState(replacement)
                 mediaPlayer
             },
@@ -112,6 +115,7 @@ class VoicePlaybackControllerCancellationTest {
 
         val job = CoroutineScope(caller).launch { VoicePlaybackController.play("new-source", File("voice.amr")) }
         caller.runNext()
+        callerSuspended.countDown()
         caller.awaitQueued()
         job.cancel()
         caller.drain()
@@ -197,11 +201,26 @@ private fun setControllerField(
     field.set(VoicePlaybackController, value)
 }
 
+/**
+ * Returns [player] only after the test releases [callerSuspended]. Without the hold a warm IO
+ * thread can finish before the caller suspends, and withContext then continues inline instead
+ * of dispatching the resume this fixture needs to intercept.
+ */
+private fun heldFactory(
+    callerSuspended: CountDownLatch,
+    player: () -> VoicePlaybackPlayer,
+): VoicePlaybackPlayer.Factory =
+    VoicePlaybackPlayer.Factory { _, _ ->
+        check(callerSuspended.await(30, TimeUnit.SECONDS)) { "caller never suspended" }
+        player()
+    }
+
 /** Reports whether the controller's play serializer is still held. */
 private fun serializerLocked(): Boolean {
-    val serializer = controllerField("playSerializer")!!
-    val mutex = serializer.javaClass.getDeclaredField("mutex").apply { isAccessible = true }.get(serializer)
-    return (mutex as Mutex).isLocked
+    val serializer = checkNotNull(controllerField("playSerializer"))
+    val field = serializer.javaClass.getDeclaredField("mutex")
+    field.isAccessible = true
+    return (field.get(serializer) as Mutex).isLocked
 }
 
 /** Publishes a replacement session through the controller state flow. */
@@ -223,7 +242,7 @@ private class QueuedDispatcher : CoroutineDispatcher() {
         queue.put(block)
     }
 
-    /** Waits for the IO handoff; generous because loaded CI shards can stall the IO pool for seconds. */
+    /** Waits for the IO handoff to queue the caller's resume. */
     fun awaitQueued() {
         val next =
             checkNotNull(queue.poll(30, TimeUnit.SECONDS)) {
