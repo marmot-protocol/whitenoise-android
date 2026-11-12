@@ -151,6 +151,15 @@ internal fun LocalGroupFieldAuthority.reconciled(row: ChatListRowFfi): ChatListR
     return if (name == row.groupName) row else row.copy(groupName = name, title = name)
 }
 
+/**
+ * [row] carrying a retained local rename or clear in place of a superseded name, without settling
+ * the commit. Off-window lookups use it so search and sort match the title they show.
+ */
+internal fun LocalGroupFieldAuthority.retainedRow(row: ChatListRowFfi): ChatListRowFfi {
+    val name = retainedFor(row.groupIdHex, row.groupName) ?: return row
+    return row.copy(groupName = name, title = name)
+}
+
 /** [presentation] retitled to a retained local rename, decided from its own [row]'s name. */
 internal fun LocalGroupFieldAuthority.reconciledPresentation(
     row: ChatListRowFfi,
