@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Intent
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
@@ -26,6 +27,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Opt-in 20-cycle real-device acceptance scenario for issue #2395.
@@ -143,28 +145,44 @@ class OfflineRecoveryLatencyDeviceTest {
     }
 
     /**
-     * Enables Wi-Fi, waits until Android validates the restored transport and returns the last
-     * monotonic time it was confirmed offline, so measured recovery latency is never understated.
-     * [whileOffline] runs on each poll that finds the device offline, and connectivity is checked
-     * again afterwards, so its duration is not counted when the device is still offline after it.
+     * Enables Wi-Fi, waits until Android validates the restored transport and returns the reconnect edge.
+     * The edge is the monotonic time the platform delivered validation to this process, recorded by a
+     * network callback independently of polling, so neither the poll interval nor a slow [whileOffline]
+     * observation is counted. The last poll that found the device offline is the fallback, which can only
+     * overstate latency. [whileOffline] runs on each poll that finds the device offline.
      */
     private fun restoreWifi(whileOffline: () -> Unit = {}): Long {
-        var lastOfflineAt = SystemClock.elapsedRealtime()
-        shell("svc wifi enable")
-        val validated =
-            waitUntil(NETWORK_TRANSITION_TIMEOUT_MILLIS) {
-                val now = SystemClock.elapsedRealtime()
-                hasValidatedInternet().also { online ->
-                    if (!online) {
-                        lastOfflineAt = now
-                        whileOffline()
-                        val recheckedAt = SystemClock.elapsedRealtime()
-                        if (!hasValidatedInternet()) lastOfflineAt = recheckedAt
+        val validatedAt = AtomicLong(0L)
+        val callback =
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    capabilities: NetworkCapabilities,
+                ) {
+                    if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+                        validatedAt.compareAndSet(0L, SystemClock.elapsedRealtime())
                     }
                 }
             }
-        assertTrue("Wi-Fi did not regain validated internet", validated)
-        return lastOfflineAt
+        var lastOfflineAt = SystemClock.elapsedRealtime()
+        connectivity.registerDefaultNetworkCallback(callback)
+        try {
+            shell("svc wifi enable")
+            val validated =
+                waitUntil(NETWORK_TRANSITION_TIMEOUT_MILLIS) {
+                    val now = SystemClock.elapsedRealtime()
+                    hasValidatedInternet().also { online ->
+                        if (!online) {
+                            lastOfflineAt = now
+                            whileOffline()
+                        }
+                    }
+                }
+            assertTrue("Wi-Fi did not regain validated internet", validated)
+        } finally {
+            connectivity.unregisterNetworkCallback(callback)
+        }
+        return validatedAt.get().takeIf { it > 0L } ?: lastOfflineAt
     }
 
     /** Exercises a short failed restore before the final validated edge owns recovery. */

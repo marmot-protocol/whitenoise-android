@@ -63,8 +63,10 @@ internal object IsolatedMediaDecoder {
 
     /** Stores a still-image worker's receipt and counts it for per-operation evidence. */
     internal fun recordStillImageIsolation(result: android.os.Bundle) {
-        recordIsolation(result)
-        lastStillImageIsolation = lastIsolation
+        // One parsed value for both fields, so an animation or A/V receipt cannot land in between.
+        val receipt = isolationReceipt(result)
+        lastIsolation = receipt
+        lastStillImageIsolation = receipt
         workerReceipts.incrementAndGet()
     }
 
