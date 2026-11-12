@@ -211,10 +211,16 @@ private fun Modifier.copyOnKeyActivation(
 /**
  * Runs [copy] for a tap released before the long-press timeout and consumes only that release, so the row's own tap
  * is skipped. A press held past the timeout is left unconsumed and reaches the row's long-press handler.
+ *
+ * Compose widens a target this small to the minimum touch size, and that margin reaches into the name above the key.
+ * A press that lands only in the margin belongs to the surrounding row, so it is left alone and the row still opens.
  */
 private suspend fun PointerInputScope.copyOnShortTap(copy: () -> Unit) {
     awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false)
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val onTheKey =
+            down.position.x in 0f..size.width.toFloat() && down.position.y in 0f..size.height.toFloat()
+        if (!onTheKey) return@awaitEachGesture
         val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { waitForUpOrCancellation() }
         if (up != null) {
             up.consume()

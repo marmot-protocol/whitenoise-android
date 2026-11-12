@@ -10,6 +10,14 @@
         "test_ids": [
           "ACC-002"
         ]
+      },
+      {
+        "surface": "Short-key tap copies only from the key text, leaving its touch margin to the row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
+        "anchor": "if (!onTheKey) return@awaitEachGesture",
+        "test_ids": [
+          "ACC-002"
+        ]
       }
     ],
     "settings_controls": [

@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.ui.account.AccountSelectorAccountState
+import dev.ipf.whitenoise.android.ui.account.AccountSelectorState
+import dev.ipf.whitenoise.android.ui.account.ProfileSwitcherSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.CandidateKeyPlacement
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.candidateKeyPlacement
@@ -64,7 +67,8 @@ import java.io.File
 /**
  * Invariant gate for #3565: a person profile shows its public key once, completely and copyably, and every compact
  * public-key label on a person route copies the complete canonical key on its own tap, never a shortened label. The
- * row keeps its own action and its spoken label, and gains a Copy public key action beside it.
+ * row keeps its own action and its spoken label, and gains a Copy public key action beside it. A tap on the name
+ * just above the key, inside the key's touch margin, still belongs to the row.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -108,6 +112,67 @@ class PublicKeyCopyPresentationCoverageTest {
         assertTrue("the key target leaves its row", key.left >= row.left && key.right <= row.right)
         assertTrue("the key target spans the whole row", key.right - key.left < row.right - row.left)
         assertRowKeepsLabelAndActions(ROW, FIRST_KEY, "Alice", SHORT_KEY)
+    }
+
+    /**
+     * A tap on the name just above the key opens the row and copies nothing. Compose widens a small pointer target to
+     * the minimum touch size, and that margin reaches into the name above the key.
+     */
+    @Test
+    fun aTapBesideTheKeyBelongsToTheRow() {
+        var rowTaps = 0
+        composeRule.setContent {
+            Themed {
+                ContactRow(
+                    title = "Alice",
+                    subtitle = SHORT_KEY,
+                    avatarSeed = "alice",
+                    avatarUrl = null,
+                    onClick = { rowTaps += 1 },
+                    publicKey = FIRST_KEY,
+                    modifier = Modifier.testTag(ROW),
+                )
+            }
+        }
+
+        tapJustAboveTheKey(ROW)
+        assertEquals("", clipText())
+        assertEquals(1, rowTaps)
+    }
+
+    /** Tapping another profile's name in the switcher selects that profile instead of copying its key (#3721). */
+    @Test
+    fun profileSwitcherNameTapSelectsTheProfile() {
+        val selected = mutableListOf<String>()
+        composeRule.setContent {
+            Themed {
+                ProfileSwitcherSheet(
+                    state =
+                        AccountSelectorState(
+                            accounts =
+                                listOf(
+                                    AccountSelectorAccountState(ALICE, ALICE_HEX, false, false, isActive = true),
+                                    AccountSelectorAccountState(BOB, BOB_HEX, false, false, isActive = false),
+                                ),
+                            refreshing = false,
+                        ),
+                    displayName = { if (it == BOB_HEX) "Bob" else "Alice" },
+                    shortNpub = { SHORT_KEY },
+                    avatarUrl = { null },
+                    unreadCountForAccount = { 0uL },
+                    onSelectProfile = { selected += it },
+                    onAddProfile = {},
+                    npub = { if (it == BOB_HEX) SECOND_KEY else FIRST_KEY },
+                )
+            }
+        }
+
+        tapJustAboveTheKey("profile_switcher.profile.$BOB")
+        assertEquals("", clipText())
+        assertEquals(listOf(BOB), selected)
+        keyText("profile_switcher.profile.$BOB").performClick()
+        assertEquals(SECOND_KEY, clipText())
+        assertEquals(listOf(BOB), selected)
     }
 
     /** A nameless title keeps its text in the row label; each row's copy action and tap copy that row's own key. */
@@ -471,6 +536,17 @@ class PublicKeyCopyPresentationCoverageTest {
         return List(map.width * map.height) { map[it % map.width, it / map.width] }
     }
 
+    /** Taps the row tagged [tag] on its name, just above the key text, inside the key's minimum touch margin. */
+    private fun tapJustAboveTheKey(tag: String) {
+        val row = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
+        val key = keyText(tag).getUnclippedBoundsInRoot()
+        assertTrue("the key text is no shorter than a touch target", key.bottom - key.top < MIN_TOUCH_TARGET)
+        val x = (key.left + key.right) / 2 - row.left
+        val y = key.top - ABOVE_THE_KEY - row.top
+        composeRule.onNodeWithTag(tag).performTouchInput { click(Offset(x.toPx(), y.toPx())) }
+        composeRule.waitForIdle()
+    }
+
     /** The unmerged key text inside the node tagged [tag]. */
     private fun keyText(tag: String): SemanticsNodeInteraction =
         composeRule.onNode(hasText("npub1qqqq", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
@@ -526,6 +602,12 @@ class PublicKeyCopyPresentationCoverageTest {
 
     private companion object {
         const val FOCUS_SETTLE_MILLIS = 500L
+        const val ALICE = "alice-account"
+        const val BOB = "bob-account"
+        const val ALICE_HEX = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+        const val BOB_HEX = "b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0"
+        val MIN_TOUCH_TARGET = 48.dp
+        val ABOVE_THE_KEY = 4.dp
         const val FIRST_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t"
         const val SECOND_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqzzzzzzzzqqqqqqqqqqqqqqqqqqqqqqqrx4cs5"
         const val SHORT_KEY = "npub1qqqqqqqqqq...qqqqqqqq"
