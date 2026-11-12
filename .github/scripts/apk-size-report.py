@@ -80,7 +80,7 @@ def read_marmot_version(path: Path | None) -> dict:
         return {}
     keys = {"artifact-id", "artifact-tag", "mdk-sha", "features"}
     values = {}
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         key, separator, value = line.partition("=")
         if separator and key in keys:
             values[key] = value
@@ -131,9 +131,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     text = markdown(report)
     if args.json:
-        args.json.write_text(json.dumps(report, indent=2) + "\n")
+        args.json.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if args.markdown:
-        args.markdown.write_text(text)
+        args.markdown.write_text(text, encoding="utf-8")
     if not args.json and not args.markdown:
         sys.stdout.write(text)
     return 0

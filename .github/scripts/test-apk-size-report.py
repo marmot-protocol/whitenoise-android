@@ -32,6 +32,7 @@ class ApkSizeReportTest(unittest.TestCase):
             archive.writestr("res/layout/b.xml", b"y" * 300, compress_type=zipfile.ZIP_DEFLATED)
             archive.writestr("assets/big.json", b"j" * 900, compress_type=zipfile.ZIP_STORED)
             archive.writestr("assets/small.txt", b"t" * 10, compress_type=zipfile.ZIP_STORED)
+            archive.writestr("assets/fonts/café.ttf", b"f" * 5, compress_type=zipfile.ZIP_STORED)
             archive.writestr("META-INF/CERT.SF", b"c" * 50, compress_type=zipfile.ZIP_DEFLATED)
             archive.writestr("kotlin/kotlin.kotlin_builtins", b"k" * 40, compress_type=zipfile.ZIP_DEFLATED)
 
@@ -56,21 +57,22 @@ class ApkSizeReportTest(unittest.TestCase):
 
     def test_cli_writes_json_and_markdown_with_provenance(self):
         version = self.root / "MARMOT_VERSION"
-        version.write_text("mdk-sha=abc123\nartifact-tag=marmotkit-v0.15.0\nfeatures=otlp-export\nunrelated=x\n")
+        version.write_text(encoding="utf-8", data="mdk-sha=abc123\nartifact-tag=marmotkit-v0.15.0\nfeatures=otlp-export\nunrelated=x\n")
         out_json, out_md = self.root / "report.json", self.root / "report.md"
         self.assertEqual(report.main([str(self.apk), "--flavor", "staging", "--commit", "deadbeef",
                                       "--marmot-version", str(version), "--json", str(out_json),
                                       "--markdown", str(out_md)]), 0)
-        data = json.loads(out_json.read_text())
+        data = json.loads(out_json.read_text(encoding="utf-8"))
         self.assertEqual(data["schema"], 1)
         self.assertEqual(data["flavor"], "staging")
         self.assertEqual(data["marmotkit"], {"mdk-sha": "abc123", "artifact-tag": "marmotkit-v0.15.0",
                                              "features": "otlp-export"})
-        text = out_md.read_text()
+        text = out_md.read_text(encoding="utf-8")
         self.assertIn("### APK size report: staging", text)
         self.assertIn("Commit `deadbeef`.", text)
         self.assertIn("| `lib/arm64-v8a/libmarmot_uniffi.so` (stored) |", text)
         self.assertIn("| `lib/arm64-v8a/libsmall.so` |", text)
+        self.assertIn("| `assets/fonts/café.ttf` |", text)
 
     def test_rejects_missing_symlinked_and_invalid_apks(self):
         link = self.root / "link.apk"
