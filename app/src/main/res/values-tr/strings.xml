@@ -2011,12 +2011,11 @@
     <string name="setup_acknowledge_single_device">Anladım — devam et</string>
     <string name="setup_continue_without_profile">Profil olmadan devam et</string>
     <string name="setup_review_suggested_changes">Önerilen değişiklikleri inceleyin</string>
-    <string name="setup_one_phone_per_account">Hesap başına bir telefon</string>
-    <string name="setup_one_phone_per_account_help">Sohbetler telefonlar arasında senkronize edilmez. Bu hesabı aynı anda tek bir telefonda kullanın.</string>
+    <string name="setup_chats_on_this_device">Bu cihazdaki sohbetler</string>
+    <string name="setup_chats_on_this_device_help">Yalnızca giriş yapmak mevcut sohbetlerinizi veya mesajlarınızı geri yüklemez. Başka bir cihaz kullanıyorsanız, sohbetlerinizi burada kontrol edene kadar oradaki uygulamayı ve verilerini saklayın.</string>
     <string name="setup_device_stage">Cihaz kullanımı</string>
-    <string name="setup_device_discovery_none">Kontrol edilen rölelerde başka bir kurulum bulunamadı.</string>
-    <string name="setup_other_device_possible">Bu hesabı başka bir cihaz kullanıyor olabilir.</string>
-    <string name="setup_device_discovery_unknown">Diğer cihazlar kontrol edilemedi.</string>
+    <string name="setup_other_sign_ins_found">Başka giriş kayıtları bulundu. Bunlar başka bir kuruluma veya daha önceki bir kuruluma ait olabilir.</string>
+    <string name="setup_other_sign_ins_unchecked">Diğer girişler kontrol edilemedi.</string>
     <string name="setup_approval_saved_pending">Onayınız kaydedildi. Değişiklik hâlâ beklemede.</string>
     <string name="setup_profile_scope_help">Bu, diğer Nostr uygulamalarındaki profilinizi günceller.</string>
     <string name="setup_optional_profile_help">İsteğe bağlı. Daha sonra profil ekleyebilirsiniz.</string>
@@ -2116,7 +2115,6 @@
     <string name="setup_finding_interrupted">Kurulum kesintiye uğradı. Kaydedilen adımdan devam edebilirsiniz.</string>
     <string name="setup_finding_too_many_relays">Listede çok fazla röle var.</string>
     <string name="setup_finding_multi_device_unsupported">Sohbetler cihazlar arasında eşitlenmez.</string>
-    <string name="setup_finding_other_installation_possible">Başka bir kurulum bu kimliği kullanıyor olabilir.</string>
     <string name="setup_finding_discovery_incomplete">Keşif tamamlanamadı. Bu sonuçtan bir değiştirme önerisi çıkarılmayacak.</string>
     <string name="setup_profile_help">İnsanların sizi tanıması için bir ad ekleyin. Bunu daha sonra yapabilirsiniz.</string>
     <string name="setup_details">Ayrıntılar</string>

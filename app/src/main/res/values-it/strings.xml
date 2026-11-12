@@ -2018,12 +2018,11 @@
     <string name="setup_acknowledge_single_device">Ho capito — continua</string>
     <string name="setup_continue_without_profile">Continua senza un profilo</string>
     <string name="setup_review_suggested_changes">Esamina le modifiche suggerite</string>
-    <string name="setup_one_phone_per_account">Un telefono per account</string>
-    <string name="setup_one_phone_per_account_help">Le chat non si sincronizzano tra i telefoni. Utilizza questo account su un telefono alla volta.</string>
+    <string name="setup_chats_on_this_device">Chat su questo dispositivo</string>
+    <string name="setup_chats_on_this_device_help">Il solo accesso non ripristina le chat né i messaggi esistenti. Se usi un altro dispositivo, conserva la sua app e i suoi dati finché non hai controllato le chat qui.</string>
     <string name="setup_device_stage">Utilizzo del dispositivo</string>
-    <string name="setup_device_discovery_none">Non è stata trovata nessun\'altra installazione sui relay controllati.</string>
-    <string name="setup_other_device_possible">Un altro dispositivo potrebbe utilizzare questo account.</string>
-    <string name="setup_device_discovery_unknown">Impossibile verificare la presenza di altri dispositivi.</string>
+    <string name="setup_other_sign_ins_found">Sono stati trovati altri record di accesso. Potrebbero appartenere a un’altra installazione o a una precedente.</string>
+    <string name="setup_other_sign_ins_unchecked">Non è stato possibile controllare altri accessi.</string>
     <string name="setup_approval_saved_pending">La tua approvazione è salvata. La modifica è ancora in sospeso.</string>
     <string name="setup_profile_scope_help">Questo aggiorna il tuo profilo in altre app Nostr.</string>
     <string name="setup_optional_profile_help">Opzionale. Puoi aggiungere un profilo in un secondo momento.</string>
@@ -2123,7 +2122,6 @@
     <string name="setup_finding_interrupted">La configurazione è stata interrotta. Puoi riprendere il passaggio salvato.</string>
     <string name="setup_finding_too_many_relays">L’elenco contiene troppi relay.</string>
     <string name="setup_finding_multi_device_unsupported">Le conversazioni non si sincronizzano tra dispositivi.</string>
-    <string name="setup_finding_other_installation_possible">Un’altra installazione potrebbe usare questa identità.</string>
     <string name="setup_finding_discovery_incomplete">La ricerca non è stata completata. Da questo risultato non verrà dedotta alcuna sostituzione.</string>
     <string name="setup_profile_help">Aggiungi un nome per farti riconoscere. Puoi farlo più tardi.</string>
     <string name="setup_details">Dettagli</string>

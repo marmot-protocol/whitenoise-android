@@ -1978,12 +1978,11 @@
     <string name="setup_acknowledge_single_device">我明白了 — 继续</string>
     <string name="setup_continue_without_profile">不添加个人资料，继续</string>
     <string name="setup_review_suggested_changes">查看建议的更改</string>
-    <string name="setup_one_phone_per_account">每个帐户一部电话</string>
-    <string name="setup_one_phone_per_account_help">聊天不会在手机之间同步。请一次只在一部手机上使用此账号。</string>
+    <string name="setup_chats_on_this_device">此设备上的聊天</string>
+    <string name="setup_chats_on_this_device_help">仅登录不会恢复你现有的聊天或消息。如果你使用另一台设备，请保留该设备上的应用和数据，直到你在这里检查过聊天。</string>
     <string name="setup_device_stage">设备使用</string>
-    <string name="setup_device_discovery_none">在已检查的中继器上未发现其他设备安装。</string>
-    <string name="setup_other_device_possible">另一台设备可能正在使用该帐户。</string>
-    <string name="setup_device_discovery_unknown">无法检查其他设备。</string>
+    <string name="setup_other_sign_ins_found">发现了其他登录记录。它们可能属于另一处安装或较早的安装。</string>
+    <string name="setup_other_sign_ins_unchecked">无法检查其他登录。</string>
     <string name="setup_approval_saved_pending">您的批准已保存。变更仍在等待中。</string>
     <string name="setup_profile_scope_help">这会更新您在其他 Nostr 应用程序中的个人资料。</string>
     <string name="setup_optional_profile_help">可选。你可以稍后添加个人资料。</string>
@@ -2083,7 +2082,6 @@
     <string name="setup_finding_interrupted">设置已中断。你可以继续已保存的步骤。</string>
     <string name="setup_finding_too_many_relays">列表中的中继器过多。</string>
     <string name="setup_finding_multi_device_unsupported">对话不会在设备之间同步。</string>
-    <string name="setup_finding_other_installation_possible">另一处安装可能正在使用此身份。</string>
     <string name="setup_finding_discovery_incomplete">发现过程未能完成。不会根据此结果推断替换方案。</string>
     <string name="setup_profile_help">添加名字，让别人认出你。也可以稍后再设置。</string>
     <string name="setup_details">详情</string>

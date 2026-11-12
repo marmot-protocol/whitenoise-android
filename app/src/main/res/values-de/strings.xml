@@ -2030,12 +2030,11 @@
     <string name="setup_acknowledge_single_device">Ich verstehe – weiter</string>
     <string name="setup_continue_without_profile">Ohne Profil fortfahren</string>
     <string name="setup_review_suggested_changes">Vorgeschlagene Änderungen prüfen</string>
-    <string name="setup_one_phone_per_account">Ein Telefon pro Konto</string>
-    <string name="setup_one_phone_per_account_help">Chats werden nicht zwischen Telefonen synchronisiert. Verwende dieses Konto nur auf einem Telefon gleichzeitig.</string>
+    <string name="setup_chats_on_this_device">Chats auf diesem Gerät</string>
+    <string name="setup_chats_on_this_device_help">Die Anmeldung allein stellt deine bestehenden Chats und Nachrichten nicht wieder her. Wenn du ein anderes Gerät verwendest, behalte dort die App und ihre Daten, bis du deine Chats hier überprüft hast.</string>
     <string name="setup_device_stage">Gerätenutzung</string>
-    <string name="setup_device_discovery_none">Auf den überprüften Relays wurde keine andere Installation gefunden.</string>
-    <string name="setup_other_device_possible">Möglicherweise verwendet ein anderes Gerät dieses Konto.</string>
-    <string name="setup_device_discovery_unknown">Es konnte nicht nach anderen Geräten gesucht werden.</string>
+    <string name="setup_other_sign_ins_found">Es wurden weitere Anmeldeeinträge gefunden. Sie können zu einer anderen oder einer früheren Installation gehören.</string>
+    <string name="setup_other_sign_ins_unchecked">Weitere Anmeldungen konnten nicht geprüft werden.</string>
     <string name="setup_approval_saved_pending">Deine Zustimmung ist gespeichert. Die Änderung steht noch aus.</string>
     <string name="setup_profile_scope_help">Dadurch wird dein Profil in anderen Nostr-Apps aktualisiert.</string>
     <string name="setup_optional_profile_help">Optional. Du kannst später ein Profil hinzufügen.</string>
@@ -2135,7 +2134,6 @@
     <string name="setup_finding_interrupted">Die Einrichtung wurde unterbrochen. Du kannst den gespeicherten Schritt fortsetzen.</string>
     <string name="setup_finding_too_many_relays">Die Liste enthält zu viele Relays.</string>
     <string name="setup_finding_multi_device_unsupported">Unterhaltungen werden nicht zwischen Geräten synchronisiert.</string>
-    <string name="setup_finding_other_installation_possible">Eine andere Installation verwendet möglicherweise diese Identität.</string>
     <string name="setup_finding_discovery_incomplete">Die Suche konnte nicht abgeschlossen werden. Aus diesem Ergebnis wird keine Ersatzliste abgeleitet.</string>
     <string name="setup_profile_help">Füge einen Namen hinzu, damit andere dich erkennen. Das geht auch später.</string>
     <string name="setup_details">Details</string>

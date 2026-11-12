@@ -289,7 +289,8 @@ private fun SetupDecisionContent(state: AccountSetupState) {
         SetupOperationNotice(snapshot, step)
         SetupStepFindings(state, snapshot, step)
         if (step.step == OnboardingStepFfi.SINGLE_DEVICE) {
-            SetupSingleDeviceNotice(snapshot.singleDeviceNotice?.discovery)
+            val shownFindings = if (state.routineDeviceNotice) emptyList() else step.findings
+            SetupSingleDeviceNotice(snapshot.singleDeviceNotice?.discovery, shownFindings)
         }
         snapshot.proposal?.takeIf { it.step == step.step }?.let { proposal ->
             if (OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
@@ -337,14 +338,19 @@ private fun SetupOperationNotice(
     }
 }
 
-/** Explains device evidence without treating published packages as online presence. */
+/**
+ * Explains what signing in restores, adding a note only when other sign-ins were found or could not
+ * be checked, and not when one of the [shownFindings] already says it.
+ */
 @Composable
-private fun SetupSingleDeviceNotice(discovered: OnboardingDeviceDiscoveryFfi?) {
-    val discovery = discovered ?: OnboardingDeviceDiscoveryFfi.UNKNOWN
-    Text(stringResource(R.string.setup_one_phone_per_account_help))
-    if (discovery == OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE) {
-        SetupNotice(stringResource(R.string.setup_other_device_possible))
-    }
+private fun SetupSingleDeviceNotice(
+    discovered: OnboardingDeviceDiscoveryFfi?,
+    shownFindings: List<OnboardingFindingFfi>,
+) {
+    Text(stringResource(R.string.setup_chats_on_this_device_help))
+    setupDeviceDiscoveryNote(discovered)
+        ?.takeUnless { note -> shownFindings.any { setupFindingTitle(it.issue) == note } }
+        ?.let { SetupNotice(stringResource(it)) }
 }
 
 /** Shows usable relay routes and explains recommendation preservation versus custom replacement. */

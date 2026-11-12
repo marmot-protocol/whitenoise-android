@@ -190,11 +190,19 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.setup_finding_other_installation_possible",
+        "surface": "Imported-account setup: R.string.setup_other_sign_ins_found",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupLabels.kt",
-        "anchor": "R.string.setup_finding_other_installation_possible",
+        "anchor": "R.string.setup_other_sign_ins_found",
         "test_ids": [
           "ONB-015"
+        ]
+      },
+      {
+        "surface": "Device step: R.string.setup_other_sign_ins_unchecked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupLabels.kt",
+        "anchor": "R.string.setup_other_sign_ins_unchecked",
+        "test_ids": [
+          "ONB-018"
         ]
       },
       {

@@ -46,9 +46,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_other_device_possible",
+        "surface": "R.string.setup_other_sign_ins_found",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_other_device_possible",
+        "anchor": "setupDeviceDiscoveryNote(discovered)",
         "test_ids": [
           "ONB-017"
         ]
@@ -143,9 +143,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_one_phone_per_account_help",
+        "surface": "R.string.setup_chats_on_this_device_help",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_one_phone_per_account_help",
+        "anchor": "R.string.setup_chats_on_this_device_help",
         "test_ids": [
           "ONB-017"
         ]
@@ -199,9 +199,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_one_phone_per_account",
+        "surface": "R.string.setup_chats_on_this_device",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_one_phone_per_account",
+        "anchor": "R.string.setup_chats_on_this_device",
         "test_ids": [
           "ONB-017"
         ]
@@ -445,7 +445,7 @@
       {
         "surface": "Imported-account setup: R.string.setup_device_possible",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_other_device_possible",
+        "anchor": "setupDeviceDiscoveryNote(discovered)",
         "test_ids": [
           "ONB-018"
         ]
@@ -542,7 +542,7 @@
       {
         "surface": "Imported-account setup: R.string.setup_single_device_help",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_one_phone_per_account_help",
+        "anchor": "R.string.setup_chats_on_this_device_help",
         "test_ids": [
           "ONB-018"
         ]

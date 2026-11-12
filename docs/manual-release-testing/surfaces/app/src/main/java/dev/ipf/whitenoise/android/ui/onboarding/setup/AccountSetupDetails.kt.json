@@ -4,25 +4,17 @@
   "categories": {
     "settings_controls": [
       {
-        "surface": "R.string.setup_device_discovery_none",
+        "surface": "R.string.setup_other_sign_ins_found",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "R.string.setup_device_discovery_none",
+        "anchor": "setupDeviceDiscoveryNote(snapshot.singleDeviceNotice?.discovery)",
         "test_ids": [
           "ONB-017"
         ]
       },
       {
-        "surface": "R.string.setup_other_device_possible",
+        "surface": "R.string.setup_other_sign_ins_unchecked",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "R.string.setup_other_device_possible",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_device_discovery_unknown",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "R.string.setup_device_discovery_unknown",
+        "anchor": "setupDeviceDiscoveryNote(snapshot.singleDeviceNotice?.discovery)",
         "test_ids": [
           "ONB-017"
         ]
@@ -140,9 +132,9 @@
         ]
       },
       {
-        "surface": "R.string.setup_one_phone_per_account",
+        "surface": "R.string.setup_chats_on_this_device",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "R.string.setup_one_phone_per_account",
+        "anchor": "R.string.setup_chats_on_this_device",
         "test_ids": [
           "ONB-017"
         ]
@@ -202,17 +194,9 @@
         ]
       },
       {
-        "surface": "Device discovery details: R.string.setup_device_none",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "R.string.setup_device_discovery_none",
-        "test_ids": [
-          "ONB-018"
-        ]
-      },
-      {
         "surface": "Device discovery details: R.string.setup_device_possible",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "R.string.setup_other_device_possible",
+        "anchor": "setupDeviceDiscoveryNote(snapshot.singleDeviceNotice?.discovery)",
         "test_ids": [
           "ONB-018"
         ]
@@ -220,7 +204,7 @@
       {
         "surface": "Device discovery details: R.string.setup_device_unknown",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupDetails.kt",
-        "anchor": "R.string.setup_device_discovery_unknown",
+        "anchor": "setupDeviceDiscoveryNote(snapshot.singleDeviceNotice?.discovery)",
         "test_ids": [
           "ONB-018"
         ]
