@@ -16,8 +16,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.ui.conversation.removeStagedDocumentAt
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,7 +35,8 @@ import java.io.ByteArrayOutputStream
 /**
  * Invariant gate: pressing Done in the staged-attachment preview removes exactly the entries the user
  * unchecked, through the draft's own index-based removal callbacks. Checked siblings, including repeated
- * picks of one document URI, keep their original identity and order.
+ * picks of one document URI, keep their original identity and order, and removing one copy of a document
+ * releases its shared prepared bytes only once no other copy stays staged.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -52,6 +57,7 @@ class MediaPreviewExclusionCoverageTest {
         var media: List<PendingMediaSlot>,
         var documents: List<TaggedDocument>,
         var closed: Int = 0,
+        val released: MutableList<Uri> = mutableListOf(),
     )
 
     private val documentA = Uri.parse("content://test/document-a")
@@ -62,6 +68,7 @@ class MediaPreviewExclusionCoverageTest {
         return TaggedDocument(tag, uri)
     }
 
+    /** Shows the preview over plain state whose removal callbacks apply the production document release rule. */
     private fun renderDraft(
         media: List<PendingMediaSlot>,
         documents: List<TaggedDocument>,
@@ -87,6 +94,8 @@ class MediaPreviewExclusionCoverageTest {
                         draft.media = slots
                     },
                     onRemoveDocumentAt = { index ->
+                        // The release rule runs on the URIs; the tags only let assertions tell repeated picks apart.
+                        removeStagedDocumentAt(docs.map { it.uri }, index, draft.released::add)
                         docs = docs.filterIndexed { itemIndex, _ -> itemIndex != index }
                         draft.documents = docs
                     },
@@ -135,6 +144,7 @@ class MediaPreviewExclusionCoverageTest {
         assertEquals("Done closes the preview exactly once", 1, draft.closed)
     }
 
+    /** Unchecking the first of two copies keeps the second copy and the bytes both copies share. */
     @Test
     fun excludingTheFirstOfTwoDuplicateDocumentsKeepsTheSecond() {
         val draft = renderDraft(emptyList(), listOf(document("A1"), document("A2")))
@@ -143,8 +153,10 @@ class MediaPreviewExclusionCoverageTest {
         applyExclusions(draft)
 
         assertEquals(listOf("A2"), draft.documents.map { it.tag })
+        assertEquals("the kept copy keeps the shared prepared bytes", emptyList<Uri>(), draft.released)
     }
 
+    /** Unchecking the middle of three copies keeps both neighbours and the bytes they share. */
     @Test
     fun excludingTheMiddleOfThreeDuplicateDocumentsKeepsBothNeighbours() {
         val draft = renderDraft(emptyList(), listOf(document("A1"), document("A2"), document("A3")))
@@ -153,8 +165,46 @@ class MediaPreviewExclusionCoverageTest {
         applyExclusions(draft)
 
         assertEquals(listOf("A1", "A3"), draft.documents.map { it.tag })
+        assertEquals("the kept copies keep the shared prepared bytes", emptyList<Uri>(), draft.released)
     }
 
+    /** Unchecking every copy of one document releases its shared bytes exactly once, after the last copy. */
+    @Test
+    fun excludingEveryCopyOfADocumentReleasesItOnce() {
+        val draft = renderDraft(emptyList(), listOf(document("A1"), document("A2"), document("B1")))
+
+        exclude(1)
+        exclude(2)
+        applyExclusions(draft)
+
+        assertEquals(listOf("B1"), draft.documents.map { it.tag })
+        assertEquals(listOf(documentA), draft.released)
+    }
+
+    /** Both production shelves remove a staged document through the shared release rule, never by index alone. */
+    @Test
+    fun everyStagedDocumentRemovalUsesTheSharedReleaseRule() {
+        // Compared without whitespace, so rewrapping either call does not trip the gate.
+        val preview = compact(source("ui/conversation/ConversationMediaDraft.kt"))
+        val composer = compact(source("ui/conversation/ConversationScreen.kt"))
+
+        assertTrue(
+            "the preview removes documents through the shared rule",
+            "removeStagedDocumentAt(documentUris,index,state::releasePreparedDocument" in preview,
+        )
+        assertTrue(
+            "the composer shelf removes documents through the shared rule",
+            "removeStagedDocumentAt(pendingDocumentUris,index,mediaDraftState::releasePreparedDocument" in composer,
+        )
+        listOf(preview, composer).forEach { text ->
+            assertFalse(
+                "no shelf releases a document by index without checking for another copy",
+                Regex("""getOrNull\(index\)\?\.let\(\w+::releasePreparedDocument""").containsMatchIn(text),
+            )
+        }
+    }
+
+    /** Mixed media and repeated documents lose only the entries unchecked when Done was pressed. */
     @Test
     fun mixedMediaAndDuplicateDocumentsLoseOnlyTheUncheckedEntries() {
         val photo = Uri.parse("content://test/photo")
@@ -184,6 +234,12 @@ class MediaPreviewExclusionCoverageTest {
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
         return stream.toByteArray()
     }
+
+    /** Reads a main-source file under the app package, failing when it is missing. */
+    private fun source(relative: String) = appModuleSource("src/main/java/dev/ipf/whitenoise/android/$relative")
+
+    /** [text] with every whitespace run removed, so source checks ignore wrapping and indentation. */
+    private fun compact(text: String) = text.replace(Regex("""\s+"""), "")
 
     private companion object {
         const val INCLUSION_TARGET = "conversation.media.inclusion.target"
