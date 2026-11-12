@@ -25,7 +25,6 @@ import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
-import dev.ipf.marmotkit.OnboardingSingleDeviceNoticeFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
@@ -441,11 +440,18 @@ class AccountSetupContentTest {
     /** Finding no other sign-ins proves nothing, so neither the step nor Details adds a note. */
     @Test fun noOtherSignInsFoundAddsNoNote() {
         val snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE)
-        snapshot.singleDeviceNotice = deviceNotice(OnboardingDeviceDiscoveryFfi.NONE_FOUND)
+        snapshot.singleDeviceNotice = setupDeviceNotice(OnboardingDeviceDiscoveryFfi.NONE_FOUND)
         show(AccountSetupState(snapshot = snapshot, detailsExpanded = true))
         composeRule.onNodeWithText(CHATS_HELP).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(UNCHECKED_NOTE).assertCountEquals(0)
         composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
+    }
+
+    /** Opening Details does not repeat the unchecked note the step already shows. */
+    @Test fun uncheckedSignInsAreNotedOnceWithDetailsOpen() {
+        show(AccountSetupState(snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE), detailsExpanded = true))
+        composeRule.onNodeWithText("Setup checks").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(UNCHECKED_NOTE).assertCountEquals(1)
     }
 
     /** On the routine step, found sign-ins are explained once by the note rather than the native finding. */
@@ -652,19 +658,10 @@ class AccountSetupContentTest {
     /** A device step whose discovery and native finding both report other sign-ins. */
     private fun foundSignInsSnapshot() =
         setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)).also { snapshot ->
-            snapshot.singleDeviceNotice = deviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE)
+            snapshot.singleDeviceNotice = setupDeviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE)
             snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.findings =
                 listOf(setupFinding(OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE, null))
         }
-
-    /** A completed device notice reporting [discovery]. */
-    private fun deviceNotice(discovery: OnboardingDeviceDiscoveryFfi) =
-        OnboardingSingleDeviceNoticeFfi(
-            discovery = discovery,
-            otherPackages = emptyList(),
-            discoveryComplete = true,
-            acknowledgedAt = null,
-        )
 
     private companion object {
         const val CHATS_HELP =

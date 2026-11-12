@@ -70,6 +70,7 @@ private fun setupPendingHeadingTitle(
         else -> null
     }
 
+/** The heading for [step] when no pending operation or review overrides it; the device step names what it covers. */
 private fun setupDefaultHeadingTitle(
     step: OnboardingStepStateFfi,
     proposal: OnboardingRepairProposalFfi?,
@@ -194,7 +195,10 @@ internal fun SetupStepIcon(step: OnboardingStepFfi) {
     )
 }
 
-/** Diagnostic history is available on demand rather than repeated above every decision. */
+/**
+ * Diagnostic history is available on demand rather than repeated above every decision. The device step's discovery
+ * note stays with the step, so Details does not repeat it.
+ */
 @Composable
 internal fun SetupDetails(state: AccountSetupState) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceMd)) {
@@ -206,13 +210,6 @@ internal fun SetupDetails(state: AccountSetupState) {
             Text(state.accountLabel, style = MaterialTheme.typography.labelMedium)
             state.currentStep?.findings?.forEach { finding ->
                 SetupFindingContent(finding)
-            }
-            if (state.currentStep?.step == OnboardingStepFfi.SINGLE_DEVICE) {
-                val shownFindings = state.currentStep?.findings.orEmpty()
-                // An other-installation finding above already carries the same sentence.
-                setupDeviceDiscoveryNote(snapshot.singleDeviceNotice?.discovery)
-                    ?.takeUnless { note -> shownFindings.any { setupFindingTitle(it.issue) == note } }
-                    ?.let { Text(stringResource(it)) }
             }
             SetupChecklist(snapshot)
         }
