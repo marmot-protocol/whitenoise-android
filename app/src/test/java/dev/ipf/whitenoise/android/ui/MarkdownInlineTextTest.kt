@@ -229,6 +229,18 @@ class MarkdownInlineTextTest {
         assertEquals(MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH, markdownSafeDisplayText(long).length)
     }
 
+    /** Links that differ only after the shown text stops get distinct copy labels, so neither action collapses. */
+    @Test
+    fun copyLinkLabelsStayDistinctWhenLongLinksShareTheirShownText() {
+        val shared = "https://example.com/" + "a".repeat(MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH)
+        val destinations = listOf("${shared}1", "${shared}2", "${shared}3", "https://example.com/b")
+
+        val labels = markdownCopyLinkLabels("Copy", destinations)
+
+        val first = "Copy: ${markdownSafeDisplayText("${shared}1")}"
+        assertEquals(listOf(first, "$first (2)", "$first (3)", "Copy: https://example.com/b"), labels)
+    }
+
     @Test
     fun linkConfirmationAuthorityCannotBeHiddenBehindUserInfoOrUnsafeCharacters() {
         val paddedUserInfo = "https://${"accounts.google.com.".repeat(25)}@evil.example/login"

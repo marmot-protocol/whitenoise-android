@@ -392,8 +392,6 @@
     <string name="dismiss">Dismiss</string>
     <string name="edit">Edit</string>
     <string name="edit_group_info_title">Edit Group</string>
-    <string name="group_private_image">Private group photo</string>
-    <string name="group_private_image_detail">Visible to group members.</string>
     <string name="group_description">Description (optional)</string>
     <string name="save_group">Save Group</string>
     <string name="saving_group">Saving group...</string>
@@ -604,6 +602,7 @@
     <string name="forward_blocked_unavailable">Download this attachment before forwarding</string>
     <string name="forward_blocked_restricted">Forwarding isn’t allowed for this attachment</string>
     <string name="forward_blocked_unsupported">This message can’t be forwarded</string>
+    <string name="forward_blocked_too_long">This message is too long to forward</string>
     <string name="forward_blocked_selection">Forward unavailable: %1$s</string>
     <string name="forward_progress_title">Forwarding</string>
     <string name="forward_preparing_attachments">Preparing attachments %1$d of %2$d</string>
@@ -707,6 +706,8 @@
     <string name="allow_chat_screenshots_subtitle">Blocks screenshots and Recents previews</string>
     <string name="audit_logs">Audit logs</string>
     <string name="audit_logs_settings_subtitle">Record and export diagnostic logs for your groups on this device</string>
+    <string name="choose_audit_files">Choose Audit Files</string>
+    <string name="choose_audit_files_subtitle">Save or share selected Marmot audit files</string>
     <string name="export_audit_logs">Export Diagnostic Logs</string>
     <string name="export_audit_logs_subtitle">Save or share this device’s diagnostic logs as one archive</string>
     <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>
@@ -1205,6 +1206,7 @@
     <string name="toast_profile_published_detail">Your profile is now on %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
+    <string name="toast_message_too_long">Message too long. Shorten your message, then send again.</string>
     <string name="toast_send_storage_full">Not enough storage to send. Free up space and try again.</string>
     <string name="error_storage_full">Not enough storage on this device. Free up space and try again.</string>
     <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
@@ -2062,8 +2064,8 @@
     <string name="tts_bar_history_loading">Loading more messages…</string>
     <string name="tts_bar_history_error">Couldn\'t load more messages. Tap again to retry.</string>
     <string name="tts_auto_read_title">Read messages aloud</string>
-    <string name="tts_composer_shortcut_title">Show speaker shortcut</string>
-    <string name="tts_composer_shortcut_subtitle">Show the Read Aloud toggle in the conversation header.</string>
+    <string name="tts_header_shortcut_title">Show speaker shortcut</string>
+    <string name="tts_header_shortcut_subtitle">Always show Read Aloud in the header. Also shown when auto-read is on globally or for this chat.</string>
     <string name="tts_auto_read_default_global_title">Read messages aloud by default</string>
     <string name="tts_auto_read_default_global_subtitle">Reads unread messages when a chat opens, unless the chat overrides it</string>
     <string name="tts_auto_read_use_default_off">Use default (Off)</string>
@@ -2224,12 +2226,11 @@
     <string name="setup_acknowledge_single_device">I understand — continue</string>
     <string name="setup_continue_without_profile">Continue without a profile</string>
     <string name="setup_review_suggested_changes">Review suggested changes</string>
-    <string name="setup_one_phone_per_account">One phone per account</string>
-    <string name="setup_one_phone_per_account_help">Chats don’t sync between phones. Use this account on one phone at a time.</string>
+    <string name="setup_chats_on_this_device">Chats on this device</string>
+    <string name="setup_chats_on_this_device_help">Signing in alone does not restore your existing chats or messages. If you use another device, keep its app and data until you’ve checked your chats here.</string>
     <string name="setup_device_stage">Device use</string>
-    <string name="setup_device_discovery_none">No other installation was found on the checked relays.</string>
-    <string name="setup_other_device_possible">Another device may be using this account.</string>
-    <string name="setup_device_discovery_unknown">Couldn’t check for other devices.</string>
+    <string name="setup_other_sign_ins_found">Other sign-in records were found. They may belong to another installation or an earlier one.</string>
+    <string name="setup_other_sign_ins_unchecked">Other sign-ins could not be checked.</string>
     <string name="setup_approval_saved_pending">Your approval is saved. The change is still pending.</string>
     <string name="setup_profile_scope_help">This updates your profile in other Nostr apps.</string>
     <string name="setup_optional_profile_help">Optional. You can add a profile later.</string>
@@ -2329,7 +2330,6 @@
     <string name="setup_finding_interrupted">Setup was interrupted. You can resume the saved step.</string>
     <string name="setup_finding_too_many_relays">The list contains too many relays.</string>
     <string name="setup_finding_multi_device_unsupported">Conversations do not sync across devices.</string>
-    <string name="setup_finding_other_installation_possible">Another installation may be using this identity.</string>
     <string name="setup_finding_discovery_incomplete">Discovery could not finish. No replacement will be inferred from this result.</string>
     <string name="setup_profile_help">Optional. You can add a profile later.</string>
     <string name="setup_details">Details</string>
@@ -2595,6 +2595,9 @@
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
+    <string name="error_invite_welcome_too_large">This invitation is too large for a recipient’s inbox relays to accept. Ask them to add an inbox relay that accepts larger messages.</string>
+    <string name="error_update_too_large">This update is too large for your relays. Nothing was changed.</string>
+    <string name="error_group_change_too_large">A group change was too large for the group’s relays, so it wasn’t made.</string>
     <string name="notification_show_previews">Show notification previews</string>
     <string name="notification_show_previews_detail">When off, hides names and message content. Applies to all accounts.</string>
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>

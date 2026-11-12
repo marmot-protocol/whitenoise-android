@@ -124,6 +124,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Forward unavailable for an over-limit message or caption",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.forward_blocked_too_long",
+        "test_ids": [
+          "MSG-048"
+        ]
       }
     ],
     "settings_controls": [

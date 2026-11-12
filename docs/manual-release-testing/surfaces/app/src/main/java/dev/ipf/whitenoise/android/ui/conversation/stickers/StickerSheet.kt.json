@@ -71,6 +71,30 @@
           "MSG-045",
           "MSG-046"
         ]
+      },
+      {
+        "surface": "StickerLoadFailed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "fun StickerLoadFailed(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy packs load failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "R.string.sticker_packs_load_failed",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker copy try again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerSheet.kt",
+        "anchor": "R.string.sticker_packs_try_again",
+        "test_ids": [
+          "MSG-046"
+        ]
       }
     ]
   },

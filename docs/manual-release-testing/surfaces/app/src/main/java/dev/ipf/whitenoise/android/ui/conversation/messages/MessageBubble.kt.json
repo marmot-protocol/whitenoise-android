@@ -4,6 +4,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Explicit message speech requests engine consent before projection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "requestTtsTrust {",
+        "test_ids": ["TTS-001", "TTS-003"]
+      },
+      {
         "surface": "Custom emoji authored labels: MessageBubble",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "EmojiLabel(",
@@ -54,6 +60,12 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "Speech projection failure preserves the message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.tts_bar_error",
+        "test_ids": ["TTS-001", "TTS-003"]
+      },
       {
         "surface": "string:message_deleted_by_other",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
@@ -293,6 +305,22 @@
         "anchor": "R.string.discard_failed_message",
         "test_ids": [
           "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.tts_choose_sentence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.tts_choose_sentence",
+        "test_ids": [
+          "AXY-002"
+        ]
+      },
+      {
+        "surface": "R.string.tts_read_from_sentence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.tts_read_from_sentence",
+        "test_ids": [
+          "AXY-002"
         ]
       }
     ],

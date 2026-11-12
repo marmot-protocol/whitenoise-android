@@ -74,6 +74,7 @@ import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
+import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
@@ -87,6 +88,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -108,6 +110,7 @@ import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.TimeFormatPreference
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
@@ -1902,6 +1905,7 @@ class WhiteNoiseAppState private constructor(
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
+        if (!canStartTtsAutoRead()) return false
         val owner = ttsAutoReadKey(activeAccountRef, groupIdHex) ?: return false
         val started = speakAloud(entries, locale, startSentenceIndex)
         if (started) {
@@ -1977,7 +1981,7 @@ class WhiteNoiseAppState private constructor(
         backgroundPreparation: Boolean,
         canCommit: () -> Boolean = { true },
     ): Boolean {
-        if (!canCommit()) return false
+        if (!canCommit() || !canStartTtsAutoRead()) return false
         val ownerAccount = activeAccountRef
         return if (!backgroundPreparation) {
             speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
@@ -1988,7 +1992,7 @@ class WhiteNoiseAppState private constructor(
                     locale,
                     startSentenceIndex,
                     startRenderedHit,
-                    isCurrent = canCommit,
+                    isCurrent = { canCommit() && canStartTtsAutoRead() },
                 ).also { started ->
                     if (started) {
                         ttsAutoReadSessionKey = owner
@@ -1999,6 +2003,24 @@ class WhiteNoiseAppState private constructor(
             } ?: false
         }
     }
+
+    internal val ttsPlaybackEnginePackage: String?
+        get() = ttsResolution?.let { it.handle?.enginePackage ?: it.defaultEnginePackage }
+
+    /** Uses runtime trust for the actual engine, not only the saved engine-selection preference. */
+    internal fun ttsEngineRequiringConsent(): String? {
+        val resolution = ttsResolution ?: return null
+        val enginePackage = ttsPlaybackEnginePackage ?: return null
+        val trust =
+            resolution.handle?.trust
+                ?: resolution.engines.firstOrNull { it.packageName == enginePackage }?.trust
+                ?: EngineTrust.Unknown
+        return enginePackage.takeIf { requiresTtsTrustWarning(it, trust, ttsWarningPreferences) }
+    }
+
+    /** Recheck the effective engine's consent and microphone lease before preparation and commit. */
+    private fun canStartTtsAutoRead(): Boolean =
+        !microphoneCaptureCoordinator.isHeld && ttsEngineRequiringConsent() == null
 
     /**
      * History paging for the read-aloud transport. The backing conversation
@@ -2065,8 +2087,8 @@ class WhiteNoiseAppState private constructor(
         reconcileOwnedTtsAutoReadSession()
     }
 
-    fun setTtsComposerShortcutVisible(visible: Boolean) {
-        ttsAutoReadPreferences.setComposerShortcutVisible(visible)
+    fun setTtsHeaderShortcutVisible(visible: Boolean) {
+        ttsAutoReadPreferences.setHeaderShortcutVisible(visible)
     }
 
     fun setConversationAutoReadOverride(
@@ -2397,6 +2419,9 @@ class WhiteNoiseAppState private constructor(
 
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
+
+    /** Queued-change size refusals already shown, so a redelivered refusal is not shown twice. Main thread only. */
+    internal val shownQueuedSizeRefusals = ShownQueuedRefusals()
 
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set
@@ -3198,10 +3223,14 @@ class WhiteNoiseAppState private constructor(
                 )
         ) {
             ConversationDictationReplyTargetResolution.Detached ->
-                if (request.replyToMessageIdHex == null) {
-                    sendDetachedDictationText(request)
-                } else {
-                    rejectDictationDispatchBeforeTransport(request)
+                when {
+                    request.replyToMessageIdHex != null -> rejectDictationDispatchBeforeTransport(request)
+                    // No composer is mounted to refuse it, and this path sends straight to MDK.
+                    exceedsOutgoingMessageLimit(request.payload.trim()) -> {
+                        present(R.string.toast_message_too_long)
+                        rejectDictationDispatchBeforeTransport(request)
+                    }
+                    else -> sendDetachedDictationText(request)
                 }
             ConversationDictationReplyTargetResolution.Mismatch -> rejectDictationDispatchBeforeTransport(request)
             is ConversationDictationReplyTargetResolution.Mounted ->
@@ -3337,11 +3366,14 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
 
-    /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
-    internal fun refreshDraftSummaries(accountRef: String) {
+    /**
+     * Refreshes draft summaries behind account, request, and local-fingerprint fences. Returns the
+     * refresh job, so tests can wait for its fenced publication rather than only the native read.
+     */
+    internal fun refreshDraftSummaries(accountRef: String): Job {
         val refresh = draftSummaryRefreshLifetime.advance()
         val expected = draftStore.captureSummaryRefresh(accountRef)
-        mutationsScope.launch {
+        return mutationsScope.launch {
             messageDraftRepository
                 .summaries(accountRef)
                 .onSuccess { summaries ->
@@ -3862,8 +3894,9 @@ class WhiteNoiseAppState private constructor(
     fun applyLocalGroupUpdate(
         record: AppGroupRecordFfi,
         accountRef: String? = null,
+        clearedName: String? = null,
     ) {
-        chatsController.applyLocalGroupUpdateForAccount(record, accountRef)
+        chatsController.applyLocalGroupUpdateForAccount(record, accountRef, clearedName)
     }
 
     // Same temporary projection backchannel as [applyLocalGroupUpdate], but for
@@ -4448,7 +4481,10 @@ class WhiteNoiseAppState private constructor(
     ) {
         val trimmed = text.trim()
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        if (trimmed.isEmpty() || targets.isEmpty()) return
+        // Forward eligibility already blocks these, this keeps any other caller from sending one.
+        val tooLong = exceedsOutgoingMessageLimit(trimmed)
+        if (tooLong) present(R.string.toast_message_too_long)
+        if (trimmed.isEmpty() || targets.isEmpty() || tooLong) return
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var failures = 0
@@ -4499,7 +4535,9 @@ class WhiteNoiseAppState private constructor(
     ) {
         val bodies = MessageProjector.validatedForwardTextBodies(texts)
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        if (bodies.isEmpty() || targets.isEmpty()) return
+        val tooLong = bodies.any { exceedsOutgoingMessageLimit(it.trim()) }
+        if (tooLong) present(R.string.toast_message_too_long)
+        if (bodies.isEmpty() || targets.isEmpty() || tooLong) return
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var completeTargets = 0
@@ -5288,7 +5326,7 @@ class WhiteNoiseAppState private constructor(
         // Resuming the backlog is a resume-everything signal, and it is the one
         // point where per-file cancel records can be dropped in bulk instead of
         // accumulating for attachments the user never opens again.
-        attachmentDownloadIntents.clearSuppressedAutomatic()
+        attachmentDownloadIntents.clearSuppressedAutomatic(accountRef)
         attachmentDownloadPolicyRevision += 1
     }
 
@@ -6429,11 +6467,20 @@ class WhiteNoiseAppState private constructor(
         unreadCount: ULong,
     ) = accountUnreadStore.updateCount(accountRef, unreadCount)
 
+    /**
+     * Publishes a chat-list row fold only while no complete native total exists for [accountRef]. The fold sees
+     * just the bounded loaded rows, so it must not replace a Ready total that also counts chats outside the
+     * window, such as an older unread chat or a manual reminder (#3729).
+     */
     internal fun updateAccountUnreadProjection(
         accountRef: String?,
         unreadCount: ULong,
         hasManualUnread: Boolean,
-    ) = accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    ) {
+        val accountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+        if (accountIdHex != null && runtimeMirrors.attention.latest?.hasReadyTotal(accountIdHex) == true) return
+        accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    }
 
     /**
      * Accounts with at least one manually-marked-unread chat. A boolean
@@ -8331,6 +8378,50 @@ class WhiteNoiseAppState private constructor(
     /** Retries the failed user choice, rather than discarding it with a passive settings read. */
     internal suspend fun retryUsageDiagnostics() = diagnostics.retry(marmot())
 
+    /** Gives the diagnostics screen a fresh controller bound to the runtime it opened with. */
+    internal fun auditDiagnosticsSettings(): AuditDiagnosticsSettings {
+        val generation = runtimeGeneration
+        return AuditDiagnosticsSettings(
+            loadRetention = { auditDiagnosticsIo(generation) { auditLogRetention() } },
+            saveRetention = { days, confirmedShortening ->
+                auditDiagnosticsIo(generation) {
+                    val current = auditLogRetention()
+                    check(days >= current.maxAgeDays || confirmedShortening) {
+                        "Audit retention shortening requires confirmation"
+                    }
+                    if (days == current.maxAgeDays) current else setAuditLogRetention(current.copy(maxAgeDays = days))
+                }
+            },
+            loadDelivery = {
+                auditDiagnosticsIo(generation) {
+                    if (auditUploadConsent.granted && auditLogSettings().enabled) {
+                        summarizeAuditDelivery(auditDeliveryStatusV5())
+                    } else {
+                        AuditDeliverySummary(AuditDeliveryState.OFF)
+                    }
+                }
+            },
+            retryDelivery = {
+                auditDiagnosticsIo(generation) {
+                    val sharingEnabled = auditUploadConsent.granted && auditLogSettings().enabled
+                    if (sharingEnabled && auditDeliveryStatusV5().any { it.destinationConfigured && it.paused }) {
+                        postAuditLogTrackerUpdateV5()
+                    }
+                }
+            },
+        )
+    }
+
+    /** Runs against the captured runtime generation so a replaced screen cannot act on its successor. */
+    private suspend fun <T> auditDiagnosticsIo(
+        generation: Int,
+        block: suspend MarmotInterface.() -> T,
+    ): T =
+        marmotIo {
+            if (generation != runtimeGeneration) throw CancellationException("Audit settings runtime changed")
+            block()
+        }
+
     /** Whether the current MDK policy has a confirmed explicit grant. */
     fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
 
@@ -8419,7 +8510,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Clears audit, dictation, and performance files while surfacing native deletion failures. */
+    /**
+     * Clears audit, dictation, and performance files while surfacing native deletion failures. Every
+     * listed file is attempted, but any failed native deletion makes the result a failure, so a
+     * deleted sibling never reports logs that are still on disk as cleared (#3705).
+     */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     suspend fun deleteAuditLogs(): Boolean {
         var engineFailure: Throwable? = null
@@ -8447,7 +8542,6 @@ class WhiteNoiseAppState private constructor(
             presentTransient(R.string.toast_no_audit_logs_to_delete)
             return false
         }
-        var anyDeleted = false
         for (file in files) {
             val outcome =
                 runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
@@ -8455,22 +8549,20 @@ class WhiteNoiseAppState private constructor(
                         if (engineFailure == null) engineFailure = it
                         appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
                     }.getOrNull() ?: continue
-            anyDeleted = true
             appStateDebug { "audit log deleted still_recording=${outcome.stillRecording}" }
         }
         cacheFailure?.let {
             presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
             return false
         }
-        val deleted = anyDeleted || (preparedDeleted && engineFailure == null)
-        if (deleted) {
+        // Files were listed, so every one was deleted exactly when no native deletion failed.
+        val failure = engineFailure
+        if (failure == null) {
             presentTransient(R.string.toast_audit_logs_deleted)
         } else {
-            engineFailure?.let {
-                presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
-            } ?: present(R.string.toast_couldnt_delete_audit_logs)
+            presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", failure)
         }
-        return deleted
+        return failure == null
     }
 
     fun updateThemeMode(mode: AppThemeMode) {
@@ -10149,6 +10241,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * Sends one notification reply exactly once, reporting an earlier attempt that already committed instead of
+     * resending it, and refusing a reply over the outgoing limit before anything is sent.
+     */
     internal suspend fun sendNotificationReply(
         accountRef: String,
         groupIdHex: String,
@@ -10194,6 +10290,9 @@ class WhiteNoiseAppState private constructor(
                         NotificationReplyCommitProbe.NotCommitted -> Unit
                     }
                 }
+                // A reply queued before the limit existed may be over it. Refuse it only now, once the
+                // probe above has ruled out an earlier attempt that already committed it.
+                if (exceedsOutgoingMessageLimit(body)) return@withGroupCommitLock NotificationReplySendOutcome.TooLong
 
                 // A synthetic max-id cursor excludes every row in this wall-clock
                 // second. Wait for the next second before asking MDK to build the
@@ -13835,7 +13934,8 @@ class WhiteNoiseAppState private constructor(
      * fails, and a failed open, are retried with the capped backoff for as long as the listener runs. Lookups run
      * as supervised children of this loop, so they end with it, and a failing one is logged without cancelling the
      * loop or the notification listener above it. The same stream carries MDK's accepted deletions, so each event
-     * also retracts removed notification content, and each open reconciles the cards already shown (#3323).
+     * also retracts removed notification content, and each open reconciles the cards already shown (#3323). It also
+     * tells the active account when MDK drops a queued group change for size, which nothing else surfaces.
      */
     internal suspend fun runMutedChatReceiptLoop(
         marmot: MarmotInterface,
@@ -13871,6 +13971,10 @@ class WhiteNoiseAppState private constructor(
                         while (event != null) {
                             backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                             handleNotificationContentEvent(event, readReconciliations)
+                            // MDK drops an oversized queued group change without retrying it, so the user is told.
+                            queuedSizeRefusal(event)?.let { refusal ->
+                                launch(Dispatchers.Main) { presentQueuedSizeRefusal(refusal) }
+                            }
                             val received = (event as? MarmotEventFfi.MessageReceived)?.received
                             // Only the cheap kind and sender check runs here; the suppression reads run with the
                             // lookup, as a child of this loop, so they never delay the next event.

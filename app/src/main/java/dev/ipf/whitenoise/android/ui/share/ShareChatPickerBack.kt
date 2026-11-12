@@ -9,24 +9,28 @@ import android.window.OnBackInvokedDispatcher
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.annotation.RequiresApi
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.util.lerp
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
 private const val PREDICTIVE_BACK_MIN_SCALE = 0.9f
+private const val PREDICTIVE_BACK_CANCEL_MILLIS = 200
 private val PredictiveBackTransformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotFractionY = 1f)
 
 internal fun interface ShareChatPickerOverlayBackRegistrar {
@@ -43,19 +47,22 @@ internal fun ShareChatPickerBackAwareScreen(
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
     content: @Composable () -> Unit,
 ) {
-    var predictiveBackProgress by remember { mutableFloatStateOf(0f) }
-    val animatedPredictiveBackProgress by animateFloatAsState(
-        targetValue = predictiveBackProgress,
-        label = "sharePickerPredictiveBack",
-    )
-    val onProgress: (Float) -> Unit = { predictiveBackProgress = it }
-    val onCancel: () -> Unit = { predictiveBackProgress = 0f }
+    // The scale follows the finger frame for frame; only a cancelled gesture eases back to rest.
+    val predictiveBackProgress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val motion = rememberSystemAnimationsEnabled()
+    val onProgress: (Float) -> Unit = { scope.launch { predictiveBackProgress.snapTo(it) } }
+    val onCancel: () -> Unit = {
+        scope.launch {
+            predictiveBackProgress.animateTo(0f, if (motion) tween(PREDICTIVE_BACK_CANCEL_MILLIS) else snap())
+        }
+    }
 
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .shareChatPickerPredictiveBackScale(animatedPredictiveBackProgress),
+                .shareChatPickerPredictiveBackScale { predictiveBackProgress.value },
     ) {
         if (overlayBack && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             ShareChatPickerOverlayBackHandler(
@@ -160,9 +167,10 @@ private fun ShareChatPickerOverlayBackHandler(
     BackHandler { currentOnCommit() }
 }
 
-private fun Modifier.shareChatPickerPredictiveBackScale(progress: Float): Modifier =
+// Read in the layer block so a gesture redraws the scale without recomposing the picker.
+private fun Modifier.shareChatPickerPredictiveBackScale(progress: () -> Float): Modifier =
     graphicsLayer {
-        val scale = lerp(1f, PREDICTIVE_BACK_MIN_SCALE, progress)
+        val scale = lerp(1f, PREDICTIVE_BACK_MIN_SCALE, progress())
         scaleX = scale
         scaleY = scale
         transformOrigin = PredictiveBackTransformOrigin

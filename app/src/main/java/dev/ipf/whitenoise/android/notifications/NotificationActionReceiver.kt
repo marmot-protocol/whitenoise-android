@@ -4,13 +4,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.core.app.RemoteInput
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -103,6 +106,11 @@ class NotificationActionReceiver : BroadcastReceiver() {
                 ?.trim()
                 .orEmpty()
         if (reply.isBlank()) return
+        if (exceedsOutgoingMessageLimit(reply)) {
+            // Refused before queueing: an over-limit reply is never stored and may not fit in work input.
+            surfaceNotificationReplyFailure(appContext, action, R.string.toast_message_too_long)
+            return
+        }
         val enqueued =
             withContext(Dispatchers.IO) {
                 NotificationReplyWorker.enqueue(appContext, action, reply)
@@ -278,6 +286,40 @@ internal suspend fun dismissReactedNotification(
         if (failure is CancellationException) throw failure
         notificationWarning("DMNotifyAction", "notification reaction cleanup failed", failure) {
             "group=${action.target.groupIdHex.take(LOGGED_GROUP_ID_PREFIX)}"
+        }
+    }
+}
+
+/**
+ * Restores a replied card to a repliable state stamped with [notice] and shows [notice] as a toast.
+ * The shade clears its reply field on send, so without this an unsent reply looks sent. Best-effort.
+ */
+internal suspend fun surfaceNotificationReplyFailure(
+    context: Context,
+    action: NotificationAction,
+    @StringRes notice: Int,
+) {
+    withContext(NonCancellable) {
+        val failureNotice = context.getString(notice)
+        runCatching {
+            val presenter = LocalNotificationPresenter(context)
+            // Same bounded retry as the success-path re-post: the system
+            // applies the direct-reply lifetime extension a beat after the
+            // reply broadcast, so a fast terminal failure can look before
+            // the card is in the active set and must try again.
+            retryReplyCardRestore {
+                presenter.markDirectReplyFailed(
+                    notificationTag = action.notificationTag,
+                    notificationId = action.notificationId,
+                    repliedMessageIdHex = action.target.messageIdHex,
+                    failureNotice = failureNotice,
+                )
+            }
+        }
+        runCatching {
+            withContext(Dispatchers.Main.immediate) {
+                Toast.makeText(context, failureNotice, Toast.LENGTH_LONG).show()
+            }
         }
     }
 }

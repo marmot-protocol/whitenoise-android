@@ -69,9 +69,16 @@ class StickerLibrary(
     var hasTriedInstalled: Boolean by mutableStateOf(false)
         private set
 
+    /** Whether the latest installed read failed and settled; a successful read clears it. */
+    var installedReadFailed: Boolean by mutableStateOf(false)
+        private set
+
     private val loadMutex = Mutex()
     private val syncMutex = Mutex()
     private var synced = false
+
+    /** Advances on every install or uninstall, so a read that started before it can't overwrite its effect. */
+    private var membershipGeneration = 0L
 
     /** Whether the pack at [coordinate] was in the last installed list. */
     fun isInstalled(coordinate: String): Boolean = installed.any { it.coordinate == coordinate }
@@ -82,14 +89,23 @@ class StickerLibrary(
         loadMutex.withLock { if (!hasLoadedInstalled) reloadInstalled() }
     }
 
-    /** A failed read keeps the last list; the next caller tries again. */
+    /**
+     * A failed read keeps the last list and settles as [installedReadFailed]; the next caller tries again. A read,
+     * or a read failure, that overlapped an install or uninstall is dropped, because it may predate that change.
+     */
     @Suppress("TooGenericExceptionCaught")
     suspend fun reloadInstalled() {
+        val generation = membershipGeneration
         try {
-            installed = packs(true, null)
-            hasLoadedInstalled = true
+            val read = packs(true, null)
+            if (generation == membershipGeneration) {
+                installed = read
+                hasLoadedInstalled = true
+                installedReadFailed = false
+            }
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
+            if (generation == membershipGeneration) installedReadFailed = true
         }
         hasTriedInstalled = true
     }
@@ -117,12 +133,23 @@ class StickerLibrary(
     /** The pack an naddr or share link names, fetched from relays. */
     suspend fun lookUp(input: String): StickerPackFfi = fetchPack(input)
 
-    /** Installs [pack] and rereads the installed list. */
-    suspend fun install(pack: StickerPackFfi): StickerPackFfi = installPack(pack.coordinate).also { reloadInstalled() }
+    /** Installs [pack], lists it at once and rereads the installed list. */
+    suspend fun install(pack: StickerPackFfi): StickerPackFfi {
+        val added = installPack(pack.coordinate)
+        membershipGeneration++
+        installed = installed.filterNot { it.coordinate == added.coordinate } + added
+        reloadInstalled()
+        return added
+    }
 
-    /** Uninstalls [pack] and rereads the installed list. */
+    /**
+     * Uninstalls [pack] and drops it from [installed] before rereading, so a failed or stale reread can't keep
+     * loading a removed pack's stickers automatically. A failed uninstall leaves the list unchanged.
+     */
     suspend fun uninstall(pack: StickerPackFfi) {
         uninstallPack(pack.coordinate)
+        membershipGeneration++
+        installed = installed.filterNot { it.coordinate == pack.coordinate }
         reloadInstalled()
     }
 }

@@ -263,13 +263,13 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
-                "TextToSpeech.composer_shortcut",
-                R.string.tts_composer_shortcut_title,
+                "TextToSpeech.header_shortcut",
+                R.string.tts_header_shortcut_title,
                 R.string.settings_read_aloud,
                 SettingsDetail.TextToSpeech,
                 itemKey = "search.TextToSpeech.3",
-                rowKey = "composer_shortcut",
-                summaryRes = R.string.tts_composer_shortcut_subtitle,
+                rowKey = "header_shortcut",
+                summaryRes = R.string.tts_header_shortcut_subtitle,
             ),
         )
         add(
@@ -374,6 +374,37 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 itemKey = "search.DiagnosticsImprovements.1",
                 rowKey = "audit_logs",
                 summaryRes = R.string.audit_upload_subtitle,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "DiagnosticsImprovements.delivery",
+                R.string.audit_delivery_title,
+                R.string.diagnostics_improvements,
+                SettingsDetail.DiagnosticsImprovements,
+                itemKey = "search.DiagnosticsImprovements.delivery",
+                rowKey = "audit_delivery_status",
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "DiagnosticsImprovements.retention",
+                R.string.audit_retention_title,
+                R.string.diagnostics_improvements,
+                SettingsDetail.DiagnosticsImprovements,
+                itemKey = "search.DiagnosticsImprovements.4",
+                rowKey = "audit_retention",
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "DiagnosticsImprovements.choose_audit_files",
+                R.string.choose_audit_files,
+                R.string.diagnostics_improvements,
+                SettingsDetail.DiagnosticsImprovements,
+                itemKey = "search.DiagnosticsImprovements.4",
+                rowKey = "select_audit_files",
+                summaryRes = R.string.choose_audit_files_subtitle,
             ),
         )
         add(

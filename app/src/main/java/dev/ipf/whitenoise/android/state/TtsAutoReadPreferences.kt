@@ -37,13 +37,13 @@ class TtsAutoReadPreferences(
         return _state.value.overrides[key]
     }
 
-    fun isComposerShortcutVisibleFor(
+    fun isHeaderShortcutVisibleFor(
         accountRef: String,
         groupIdHex: String,
     ): Boolean {
         val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return false
         val snapshot = _state.value
-        return snapshot.showComposerShortcut ||
+        return snapshot.showHeaderShortcut ||
             snapshot.globalDefaultEnabled ||
             resolveConversationAutoRead(snapshot.globalDefaultEnabled, snapshot.overrides[key])
     }
@@ -57,12 +57,12 @@ class TtsAutoReadPreferences(
         }
     }
 
-    fun setComposerShortcutVisible(visible: Boolean) {
+    fun setHeaderShortcutVisible(visible: Boolean) {
         synchronized(mutationLock) {
             val current = _state.value
-            if (current.showComposerShortcut == visible) return
-            publishLocked(current.copy(showComposerShortcut = visible))
-            preferences.edit().putBoolean(KEY_COMPOSER_SHORTCUT, visible).apply()
+            if (current.showHeaderShortcut == visible) return
+            publishLocked(current.copy(showHeaderShortcut = visible))
+            preferences.edit().putBoolean(KEY_HEADER_SHORTCUT, visible).apply()
         }
     }
 
@@ -105,7 +105,7 @@ class TtsAutoReadPreferences(
             return TtsAutoReadPreferenceState(
                 globalDefaultEnabled = globalDefault,
                 overrides = overrides,
-                showComposerShortcut = preferences.getBoolean(KEY_COMPOSER_SHORTCUT, false),
+                showHeaderShortcut = preferences.getBoolean(KEY_HEADER_SHORTCUT, false),
             )
         }
     }
@@ -181,7 +181,7 @@ class TtsAutoReadPreferences(
         internal const val PREFERENCES_NAME = "whitenoise.tts_auto_read"
         internal const val KEY_LEGACY_ENABLED = "autoReadConversations"
         private const val KEY_GLOBAL_DEFAULT = "globalDefaultEnabled"
-        private const val KEY_COMPOSER_SHORTCUT = "showComposerShortcut"
+        private const val KEY_HEADER_SHORTCUT = "showHeaderShortcut"
         private const val KEY_OVERRIDE_ON = "overrideOnConversations"
         private const val KEY_OVERRIDE_OFF = "overrideOffConversations"
         private const val KEY_LEGACY_MIGRATED = "legacyBinaryMigrated"

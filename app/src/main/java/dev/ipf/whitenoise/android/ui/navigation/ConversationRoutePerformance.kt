@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.state.INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.flow.filter
@@ -121,6 +122,6 @@ internal suspend fun awaitPreparedConversationOpen(
                 withTimeoutOrNull(INITIAL_PRESENTATION_EVENT_CARD_WARM_BUDGET_MILLIS) { awaitReady() } != null
         )
 
-internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = 200
+internal const val CONVERSATION_ROUTE_TRANSITION_MILLIS = APP_MOTION_OPEN_MILLIS
 internal const val CONVERSATION_PENDING_OPEN_TIMEOUT_MILLIS = 300L
 internal const val MAIN_SHELL_ROUTE_KEY = "main-shell"

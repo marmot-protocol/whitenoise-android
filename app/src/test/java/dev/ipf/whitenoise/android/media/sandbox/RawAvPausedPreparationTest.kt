@@ -183,7 +183,7 @@ class RawAvPausedPreparationTest {
     fun realPauseStillRevokesPlayingGenerationAndRepeatedPauseClearsTransientResume() {
         val player = player()
         val engine = field(player, "engine") as RawAvPlaybackEngine
-        val pending = SettableFuture.create<Void>()
+        val pending = SettableFuture.create<Void?>()
         setField(engine, "playIntent", true)
         setField(engine, "pausedUs", 2250000L)
         setField(engine, "pendingSeek", pending)

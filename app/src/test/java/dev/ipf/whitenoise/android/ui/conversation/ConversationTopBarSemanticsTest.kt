@@ -74,7 +74,7 @@ class ConversationTopBarSemanticsTest {
     @Test
     fun readAloudShortcutAppearsAtHeaderEndAndToggles() {
         val state = appState()
-        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        state.ttsAutoReadPreferences.setHeaderShortcutVisible(true)
         val controller = ConversationController(state, group())
         var detailsCalls = 0
         render(state, controller, onOpenDetails = { detailsCalls += 1 })
@@ -103,7 +103,7 @@ class ConversationTopBarSemanticsTest {
     @Test
     fun readAloudShortcutDarkStates() {
         val state = appState()
-        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        state.ttsAutoReadPreferences.setHeaderShortcutVisible(true)
         render(state, ConversationController(state, group()), darkTheme = true)
         val speaker = composeRule.onNodeWithContentDescription("Read messages aloud")
         speaker.assertIsOff()
@@ -120,7 +120,7 @@ class ConversationTopBarSemanticsTest {
     @Test
     fun readAloudShortcutLongLtrHeader() {
         val state = appState()
-        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        state.ttsAutoReadPreferences.setHeaderShortcutVisible(true)
         val controller =
             ConversationController(state, group().copy(name = "White Noise friends and family community group"))
         render(state, controller, darkTheme = true)
@@ -148,7 +148,7 @@ class ConversationTopBarSemanticsTest {
     @Config(qualifiers = "en-w320dp-h780dp-mdpi")
     fun readAloudShortcutLargeRtlHeader() {
         val state = appState()
-        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        state.ttsAutoReadPreferences.setHeaderShortcutVisible(true)
         val controller = ConversationController(state, group().copy(name = "A long conversation title"))
         render(state, controller, compactHeight = true, fontScale = 2f, rtl = true)
         val speaker = composeRule.onNodeWithContentDescription("Read messages aloud")
@@ -183,7 +183,7 @@ class ConversationTopBarSemanticsTest {
     @Test
     fun readAloudShortcutHiddenDuringSelection() {
         val state = appState()
-        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        state.ttsAutoReadPreferences.setHeaderShortcutVisible(true)
         render(state, ConversationController(state, group()), selectionMode = true)
         composeRule.onNodeWithContentDescription("Read messages aloud").assertDoesNotExist()
     }
@@ -192,7 +192,7 @@ class ConversationTopBarSemanticsTest {
     @Test
     fun readAloudShortcutHiddenDuringSearch() {
         val state = appState()
-        state.ttsAutoReadPreferences.setComposerShortcutVisible(true)
+        state.ttsAutoReadPreferences.setHeaderShortcutVisible(true)
         render(state, ConversationController(state, group()), searchOpen = true)
         composeRule.onNodeWithContentDescription("Read messages aloud").assertDoesNotExist()
     }

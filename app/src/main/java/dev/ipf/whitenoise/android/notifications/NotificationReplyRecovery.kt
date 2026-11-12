@@ -53,6 +53,9 @@ internal enum class NotificationReplySendOutcome {
     AlreadyCommitted,
     RetryableFailure,
     NonRetryableFailure,
+
+    /** A reply queued before the length limit existed exceeds it and was never sent. */
+    TooLong,
 }
 
 internal fun NotificationReplyTimelineRecord.cursor(): NotificationReplyRecoveryBoundary =

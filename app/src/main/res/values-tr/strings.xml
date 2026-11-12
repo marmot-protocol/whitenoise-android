@@ -318,8 +318,6 @@
     <string name="dismiss">Kapat</string>
     <string name="edit">Düzenle</string>
     <string name="edit_group_info_title">Grubu düzenle</string>
-    <string name="group_private_image">Özel grup fotoğrafı</string>
-    <string name="group_private_image_detail">Grup üyelerine görünür.</string>
     <string name="group_description">Açıklama (isteğe bağlı)</string>
     <string name="save_group">Grubu Kaydet</string>
     <string name="saving_group">Grup kaydediliyor...</string>
@@ -463,6 +461,7 @@
     <string name="forward_blocked_unavailable">İletmeden önce bu eki indirin</string>
     <string name="forward_blocked_restricted">Bu ekin iletilmesine izin verilmiyor</string>
     <string name="forward_blocked_unsupported">Bu mesaj iletilemiyor</string>
+    <string name="forward_blocked_too_long">Bu mesaj iletmek için çok uzun</string>
     <string name="forward_blocked_selection">İletme kullanılamıyor: %1$s</string>
     <string name="forward_progress_title">İletiliyor</string>
     <string name="forward_preparing_attachments">Ekler hazırlanıyor: %1$d / %2$d</string>
@@ -856,6 +855,7 @@
     <string name="toast_profile_published_detail">Profiliniz artık %1$d rölede yayında.</string>
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
+    <string name="toast_message_too_long">Mesaj çok uzun. Mesajınızı kısaltıp yeniden gönderin.</string>
     <string name="toast_send_storage_full">Göndermek için yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="error_storage_full">Bu cihazda yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="toast_send_connection_failed">Aktarıcıya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>
@@ -1761,8 +1761,8 @@
     <string name="tts_bar_history_loading">Diğer mesajlar yükleniyor…</string>
     <string name="tts_bar_history_error">Diğer mesajlar yüklenemedi. Yeniden denemek için tekrar dokunun.</string>
     <string name="tts_auto_read_title">Mesajları sesli oku</string>
-    <string name="tts_composer_shortcut_title">Hoparlör kısayolunu göster</string>
-    <string name="tts_composer_shortcut_subtitle">Sohbet başlığında sesli okuma düğmesini göster.</string>
+    <string name="tts_header_shortcut_title">Hoparlör kısayolunu göster</string>
+    <string name="tts_header_shortcut_subtitle">Sesli okumayı başlıkta her zaman göster. Otomatik okuma genel olarak veya bu sohbet için açıkken de gösterilir.</string>
     <string name="tts_auto_read_default_global_title">Mesajları varsayılan olarak sesli oku</string>
     <string name="tts_auto_read_default_global_subtitle">Sohbet açılınca okunmamış mesajları okur; sohbet geçersiz kılmadıkça</string>
     <string name="tts_auto_read_use_default_off">Varsayılanı kullan (Kapalı)</string>
@@ -2015,12 +2015,11 @@
     <string name="setup_acknowledge_single_device">Anladım — devam et</string>
     <string name="setup_continue_without_profile">Profil olmadan devam et</string>
     <string name="setup_review_suggested_changes">Önerilen değişiklikleri inceleyin</string>
-    <string name="setup_one_phone_per_account">Hesap başına bir telefon</string>
-    <string name="setup_one_phone_per_account_help">Sohbetler telefonlar arasında senkronize edilmez. Bu hesabı aynı anda tek bir telefonda kullanın.</string>
+    <string name="setup_chats_on_this_device">Bu cihazdaki sohbetler</string>
+    <string name="setup_chats_on_this_device_help">Yalnızca giriş yapmak mevcut sohbetlerinizi veya mesajlarınızı geri yüklemez. Başka bir cihaz kullanıyorsanız, sohbetlerinizi burada kontrol edene kadar oradaki uygulamayı ve verilerini saklayın.</string>
     <string name="setup_device_stage">Cihaz kullanımı</string>
-    <string name="setup_device_discovery_none">Kontrol edilen rölelerde başka bir kurulum bulunamadı.</string>
-    <string name="setup_other_device_possible">Bu hesabı başka bir cihaz kullanıyor olabilir.</string>
-    <string name="setup_device_discovery_unknown">Diğer cihazlar kontrol edilemedi.</string>
+    <string name="setup_other_sign_ins_found">Başka giriş kayıtları bulundu. Bunlar başka bir kuruluma veya daha önceki bir kuruluma ait olabilir.</string>
+    <string name="setup_other_sign_ins_unchecked">Diğer girişler kontrol edilemedi.</string>
     <string name="setup_approval_saved_pending">Onayınız kaydedildi. Değişiklik hâlâ beklemede.</string>
     <string name="setup_profile_scope_help">Bu, diğer Nostr uygulamalarındaki profilinizi günceller.</string>
     <string name="setup_optional_profile_help">İsteğe bağlı. Daha sonra profil ekleyebilirsiniz.</string>
@@ -2120,7 +2119,6 @@
     <string name="setup_finding_interrupted">Kurulum kesintiye uğradı. Kaydedilen adımdan devam edebilirsiniz.</string>
     <string name="setup_finding_too_many_relays">Listede çok fazla röle var.</string>
     <string name="setup_finding_multi_device_unsupported">Sohbetler cihazlar arasında eşitlenmez.</string>
-    <string name="setup_finding_other_installation_possible">Başka bir kurulum bu kimliği kullanıyor olabilir.</string>
     <string name="setup_finding_discovery_incomplete">Keşif tamamlanamadı. Bu sonuçtan bir değiştirme önerisi çıkarılmayacak.</string>
     <string name="setup_profile_help">İnsanların sizi tanıması için bir ad ekleyin. Bunu daha sonra yapabilirsiniz.</string>
     <string name="setup_details">Ayrıntılar</string>
@@ -2372,6 +2370,8 @@
     <string name="diagnostics_clear_confirm_action">Günlükleri Temizle</string>
     <string name="donate_open_failed">Bağış sayfası açılamadı. Tekrar deneyin.</string>
     <string name="export_audit_logs_confirm_body">Günlükler teknik tanımlayıcılar ve etkinlik ayrıntıları içerir. Yalnızca güvendiğiniz kişiyle paylaşın.</string>
+    <string name="choose_audit_files">Denetim dosyalarını seç</string>
+    <string name="choose_audit_files_subtitle">Seçili Marmot denetim dosyalarını kaydet veya paylaş</string>
     <string name="export_audit_logs">Tanılama Günlüklerini Dışa Aktar</string>
     <string name="export_audit_logs_subtitle">Bu cihazın tanılama günlüklerini tek arşiv olarak kaydedin veya paylaşın</string>
     <string name="export_audit_logs_confirm_title">Tanılama günlükleri dışa aktarılsın mı?</string>
@@ -2410,6 +2410,9 @@
     <string name="error_invalid_key_package_for">%1$s için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox">Bu kişi için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox_for">%1$s için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
+    <string name="error_invite_welcome_too_large">Bu davet, bir alıcının gelen kutusu röleleri için çok büyük. Daha büyük mesajları kabul eden bir gelen kutusu rölesi eklemesini isteyin.</string>
+    <string name="error_update_too_large">Bu güncelleme röleleriniz için çok büyük. Hiçbir şey değiştirilmedi.</string>
+    <string name="error_group_change_too_large">Bir grup değişikliği grubun röleleri için çok büyüktü, bu yüzden yapılmadı.</string>
     <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
     <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplara uygulanır.</string>
     <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>

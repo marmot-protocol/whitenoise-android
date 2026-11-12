@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "StickerBrowserTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun StickerBrowserTopBar(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
         "surface": "StickerLinkField",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
         "anchor": "fun StickerLinkField(",
@@ -223,6 +231,22 @@
         "surface": "Sticker copy share",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
         "anchor": "R.string.share",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "DiscoveryRetry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "fun DiscoveryRetry(",
+        "test_ids": [
+          "MSG-046"
+        ]
+      },
+      {
+        "surface": "Sticker browser packs load failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+        "anchor": "R.string.sticker_packs_load_failed",
         "test_ids": [
           "MSG-046"
         ]

@@ -86,7 +86,12 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
                 .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true)
                 .fetchSemanticsNode()
                 .boundsInRoot
-        assertEquals("Gap must exclude the composer's outer padding", 12f, paintedComposer.top - capsule.bottom, 0.5f)
+        assertEquals(
+            "Gap must exclude the composer's outer padding",
+            CapsuleGapDp,
+            paintedComposer.top - capsule.bottom,
+            0.5f,
+        )
     }
 
     /** Captures each chat-list theme after checking the capsule gap above the pen. */
@@ -101,7 +106,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         val pen = composeRule.onNodeWithContentDescription("New Message").fetchSemanticsNode().boundsInRoot
         assertEquals(
             "Capsule gap uses the painted pen, including its baseline offset",
-            12f,
+            CapsuleGapDp,
             pen.top - capsule.bottom,
             0.5f,
         )
@@ -318,8 +323,8 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
             otherRoot.right - otherCapsule.right,
             0.5f,
         )
-        assertEquals("Actual pen-to-capsule gap", 12f, penGap, 0.5f)
-        assertEquals("Actual composer-to-capsule gap", 12f, composerGap, 0.5f)
+        assertEquals("Actual pen-to-capsule gap", CapsuleGapDp, penGap, 0.5f)
+        assertEquals("Actual composer-to-capsule gap", CapsuleGapDp, composerGap, 0.5f)
         if (!largeRtl) {
             assertEquals(
                 "Normal resting routes preserve the capsule absolute height",
@@ -420,7 +425,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         val movingBorder = requireNotNull(fixture.handoff?.presentationBounds ?: fixture.handoff?.targetBounds)
         assertEquals(
             "The persistent bubble follows the painted border",
-            12f,
+            CapsuleGapDp,
             movingBorder.top - departingActions.bottom,
             1.6f,
         )
@@ -446,7 +451,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         val source = requireNotNull(motion.renderedBounds)
         val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInWindow
         val sourceGap = source.top - capsule.bottom
-        assertEquals("The persistent bubble begins at its native gap", 12f, sourceGap, 1.6f)
+        assertEquals("The persistent bubble begins at its native gap", CapsuleGapDp, sourceGap, 1.6f)
         capturePersistentFrame("${leg}_first", variant)
         repeat(frames) { index ->
             if (moveIme && index == 2) {
@@ -469,7 +474,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
             )
             val fraction = ((moving.width - source.width) / (target.width - source.width)).coerceIn(0f, 1f)
             val current = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInWindow
-            val expectedGap = sourceGap + (12f - sourceGap) * fraction
+            val expectedGap = sourceGap + (CapsuleGapDp - sourceGap) * fraction
             assertEquals(
                 "Persistent commands must follow the restarted container on the same frame",
                 expectedGap,
@@ -497,7 +502,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInWindow
         assertEquals(
             "Persistent actions follow the painted border without a final-anchor jump",
-            12f,
+            CapsuleGapDp,
             painted.top - capsule.bottom,
             0.6f,
         )
@@ -611,3 +616,6 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         captureGolden("src/test/snapshots/dictation_navigation_${phase}_$variant.png")
     }
 }
+
+/** The shared floating control gap, in dp, that the capsule keeps above the pen or composer. */
+private val CapsuleGapDp = FloatingControlGap.value

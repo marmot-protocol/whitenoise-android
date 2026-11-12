@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -202,13 +203,13 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ComposerSendMotionMediaG
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
+import dev.ipf.whitenoise.android.ui.conversation.media.LocalPickMediaDomains
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachmentSaveSummaries
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
-import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.newPendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
@@ -260,8 +261,10 @@ import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.ComposerSettingsScreen
+import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
-import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsCardMorphHost
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
@@ -1983,6 +1986,8 @@ internal fun ConversationScreen(
     val attachmentOwnerCurrent = {
         appState.activeAccountRef == conversationAccountRef && appState.runtimeGeneration == attachmentRuntime
     }
+    val imageDropImport = rememberComposerImageDropImport(scope, conversationAccountRef, chat.id)
+    val imageDropImporting = imageDropImport.isImporting
 
     // PickMultipleVisualMedia uses the system Photo Picker — no READ_MEDIA_IMAGES
     // permission needed (Android 13+ scopes the picker's own grant); on older
@@ -3712,8 +3717,12 @@ internal fun ConversationScreen(
                         MEDIA_PICKER_MAX_ITEMS,
                         importedShareFiles::owns,
                     )
-                if (!withinLimit) appState.present(R.string.share_import_recovered_limit)
-                withinLimit
+                val captionTooLong = exceedsOutgoingMessageLimit(caption.trim())
+                when {
+                    !withinLimit -> appState.present(R.string.share_import_recovered_limit)
+                    captionTooLong -> appState.present(R.string.toast_message_too_long)
+                }
+                withinLimit && !captionTooLong
             },
         ) { onAccepted, onRejected ->
             val sendingMedia = pendingMediaSlots
@@ -3756,10 +3765,10 @@ internal fun ConversationScreen(
         val sender =
             StagedAttachmentSender(
                 hasStaged = {
-                    controller.editingMessageId == null &&
-                        (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty())
+                    val staged = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()
+                    controller.editingMessageId == null && (staged || imageDropImport.isImporting)
                 },
-                isBusy = { attachmentSendClaim.isHeld || mediaDraftState.isPreparing },
+                isBusy = { attachmentSendClaim.isHeld || mediaDraftState.isPreparing || imageDropImport.isImporting },
                 dispatch = { caption, onResult -> stagedAttachmentDispatch(caption, onResult) },
             )
         controller.stagedAttachmentSender = sender
@@ -3769,15 +3778,25 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
-    // One motion owner for the transcript and both full-screen routes, so Back animates the return.
+    // One card morph for the transcript and both full-screen routes, so Back animates the return.
+    // The header (or composer) becomes the next route's cards and they fold back into it, the same
+    // container transform as Settings. Nothing travels with the closing keyboard.
+    val routeMorph =
+        remember(controller, appState.runtimeGeneration) {
+            // Composer settings survive recreation, so their Back must still fold into the pill.
+            SettingsCardMorph().apply {
+                anchor = if (showComposerSettings) ConversationMorphAnchor.Composer else ConversationMorphAnchor.Details
+            }
+        }
     val transcriptRouteMotion =
-        rememberRouteMotionModifier(
+        rememberSettingsCardMorphHost(
+            morph = routeMorph,
             target = showDetails to showComposerSettings,
-            depth = if (transcriptRoutedAway) 1 else 0,
             ownerKey = controller to appState.runtimeGeneration,
-            animationsEnabled = surfaceMotionEnabled,
-            suppressMotion = routeTransitionInProgress || routePresentationFrozen,
-        )
+            motion = surfaceMotionEnabled && !routeTransitionInProgress && !routePresentationFrozen,
+        ).second
+    // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
+    val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
     if (transcriptRoutedAway) {
         if (showDetails) {
             /** Shows group details in place of the transcript while they are open. */
@@ -3811,11 +3830,15 @@ internal fun ConversationScreen(
                     onStartGroupWithPeer = onStartGroupWithPeer,
                 )
             }
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) { groupDetailsRoute() }
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
+                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) { groupDetailsRoute() }
+            }
         } else {
             // The same full-screen editor as Settings; Back returns to this conversation.
-            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) {
-                ComposerSettingsScreen(appState) { showComposerSettings = false }
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
+                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+                    ComposerSettingsScreen(appState) { showComposerSettings = false }
+                }
             }
         }
         return
@@ -4078,400 +4101,417 @@ internal fun ConversationScreen(
             topBar = {
                 ConversationHeaderFrame(
                     header = {
-                        ConversationTopBar(
-                            showAutoReadShortcut = composerGate == ComposerGate.COMPOSER,
-                            selectionMode = selectionMode,
-                            selectedCount = batchSelectionUi.actionItems.size,
-                            onCloseSelection = {
-                                if (!batchDeleteInFlight) {
-                                    batchDeleteRetryState = null
-                                    selectedMessages.clear()
-                                }
-                            },
-                            searchOpen = navigationState.searchOpen,
-                            searchQuery = navigationState.searchQuery,
-                            onSearchQueryChange = {
-                                navigationState.searchJob?.cancel()
-                                navigationState.searchJob = null
-                                navigationState.navigateReplyJob?.cancel()
-                                navigationState.targetNavigation.cancel()
-                                navigationState.targetHighlight.clear()
-                                updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, it) }
-                                navigationState.searchPinnedMatchId = null
-                            },
-                            onClearSearch = {
-                                navigationState.searchJob?.cancel()
-                                navigationState.searchJob = null
-                                navigationState.navigateReplyJob?.cancel()
-                                navigationState.targetNavigation.cancel()
-                                navigationState.targetHighlight.clear()
-                                updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, "") }
-                                navigationState.searchPinnedMatchId = null
-                            },
-                            onCloseSearch = ::closeSearch,
-                            onSearchAction = { navigateToSearchMatch(forward = true) },
-                            searchFocusRequester = navigationState.searchFocusRequester,
-                            searchFilterAction = {
-                                ChatListSearchFilterAction(
-                                    state = conversationSearchState,
-                                    conversationScope = true,
-                                    onCategory = { category ->
-                                        updateConversationSearch {
-                                            GlobalSearchTransitions.openFilterCategory(it, category)
-                                        }
-                                    },
-                                    onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
-                                )
-                            },
-                            searchFilterControls = {
-                                val byMeLabel = stringResource(R.string.you)
-                                dev.ipf.whitenoise.android.ui.chats.GlobalSearchAttachmentModes(
-                                    state = conversationSearchState,
-                                    onSelectionChange = { selection ->
-                                        updateConversationSearch { it.copy(contentFilterSelection = selection) }
-                                    },
-                                    // By me keeps the chat scope, so the arrows step through this chat's own messages.
-                                    byMe =
-                                        rememberGlobalSearchByMe(conversationSelfAccountIdHex, byMeLabel) { self ->
-                                            updateConversationSearch { toggleGlobalSearchByMe(it, self, byMeLabel) }
+                        CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+                            ConversationTopBar(
+                                showAutoReadShortcut = composerGate == ComposerGate.COMPOSER,
+                                selectionMode = selectionMode,
+                                selectedCount = batchSelectionUi.actionItems.size,
+                                onCloseSelection = {
+                                    if (!batchDeleteInFlight) {
+                                        batchDeleteRetryState = null
+                                        selectedMessages.clear()
+                                    }
+                                },
+                                searchOpen = navigationState.searchOpen,
+                                searchQuery = navigationState.searchQuery,
+                                onSearchQueryChange = {
+                                    navigationState.searchJob?.cancel()
+                                    navigationState.searchJob = null
+                                    navigationState.navigateReplyJob?.cancel()
+                                    navigationState.targetNavigation.cancel()
+                                    navigationState.targetHighlight.clear()
+                                    updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, it) }
+                                    navigationState.searchPinnedMatchId = null
+                                },
+                                onClearSearch = {
+                                    navigationState.searchJob?.cancel()
+                                    navigationState.searchJob = null
+                                    navigationState.navigateReplyJob?.cancel()
+                                    navigationState.targetNavigation.cancel()
+                                    navigationState.targetHighlight.clear()
+                                    updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, "") }
+                                    navigationState.searchPinnedMatchId = null
+                                },
+                                onCloseSearch = ::closeSearch,
+                                onSearchAction = { navigateToSearchMatch(forward = true) },
+                                searchFocusRequester = navigationState.searchFocusRequester,
+                                searchFilterAction = {
+                                    ChatListSearchFilterAction(
+                                        state = conversationSearchState,
+                                        conversationScope = true,
+                                        onCategory = { category ->
+                                            updateConversationSearch {
+                                                GlobalSearchTransitions.openFilterCategory(it, category)
+                                            }
                                         },
-                                )
-                                GlobalSearchFilterControlsRow(
-                                    state = conversationSearchState,
-                                    onRemoveFilter = { chip ->
-                                        updateConversationSearch { GlobalSearchTransitions.removeFilter(it, chip) }
-                                    },
-                                    onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
-                                    folderNames = searchControls.folderNames,
-                                    conversationScope =
-                                        conversationSearchState.chatFilters.singleOrNull()?.takeIf {
-                                            canonicalChatListGroupId(it.stableId) == canonicalChatListGroupId(chat.id)
+                                        onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
+                                    )
+                                },
+                                searchFilterControls = {
+                                    val byMeLabel = stringResource(R.string.you)
+                                    dev.ipf.whitenoise.android.ui.chats.GlobalSearchAttachmentModes(
+                                        state = conversationSearchState,
+                                        onSelectionChange = { selection ->
+                                            updateConversationSearch { it.copy(contentFilterSelection = selection) }
                                         },
-                                    onSearchOtherChats = { updateConversationSearch(::broadenConversationSearch) },
-                                )
-                            },
-                            appState = appState,
-                            controller = controller,
-                            groupTitleCopy = groupTitleCopy,
-                            openedAsDmHint = openedAsDmHint,
-                            firstFrameAvatar = chat.firstFrameAvatar,
-                            freezeRoutePresentation = freezeRoutePresentation,
-                            openDetailsDescription = openDetailsDescription,
-                            onOpenDetails = { showDetails = true },
-                            onBack = exitConversation,
-                            compactHeight = compactHeightConversation,
-                        )
+                                        // By me keeps the chat scope, so the arrows step through my messages here.
+                                        byMe =
+                                            rememberGlobalSearchByMe(conversationSelfAccountIdHex, byMeLabel) { self ->
+                                                updateConversationSearch { toggleGlobalSearchByMe(it, self, byMeLabel) }
+                                            },
+                                    )
+                                    GlobalSearchFilterControlsRow(
+                                        state = conversationSearchState,
+                                        onRemoveFilter = { chip ->
+                                            updateConversationSearch { GlobalSearchTransitions.removeFilter(it, chip) }
+                                        },
+                                        onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
+                                        folderNames = searchControls.folderNames,
+                                        conversationScope =
+                                            conversationSearchState.chatFilters.singleOrNull()?.takeIf {
+                                                canonicalChatListGroupId(it.stableId) ==
+                                                    canonicalChatListGroupId(chat.id)
+                                            },
+                                        onSearchOtherChats = { updateConversationSearch(::broadenConversationSearch) },
+                                    )
+                                },
+                                appState = appState,
+                                controller = controller,
+                                groupTitleCopy = groupTitleCopy,
+                                openedAsDmHint = openedAsDmHint,
+                                firstFrameAvatar = chat.firstFrameAvatar,
+                                freezeRoutePresentation = freezeRoutePresentation,
+                                openDetailsDescription = openDetailsDescription,
+                                onOpenDetails = {
+                                    // The keyboard starts closing as the header unfolds into the
+                                    // details cards, not after the composer leaves.
+                                    routeMorph.anchor = ConversationMorphAnchor.Details
+                                    keyboardController?.hide()
+                                    showDetails = true
+                                },
+                                onBack = exitConversation,
+                                compactHeight = compactHeightConversation,
+                            )
+                        }
                     },
                     playbackTransport = playbackTransport,
                 )
             },
             bottomBar = {
-                ConversationBottomBar(
-                    onCustomizeComposer = { showComposerSettings = true },
-                    compactHeight = compactHeightConversation,
-                    dictationControlsVisible = dictationControlsVisible,
-                    dictationOriginVisible = dictationOriginVisible,
-                    selectionMode = selectionMode,
-                    selectionActionAvailability =
-                        batchSelectionUi.actionAvailability.let { availability ->
-                            if (batchDeleteInFlight) {
-                                BatchSelectionActionAvailability(
-                                    canCopy = false,
-                                    canForward = false,
-                                    canSave = false,
-                                    canReply = false,
-                                    canInfo = false,
-                                    canDelete = false,
-                                )
-                            } else {
-                                availability.copy(
-                                    canSave = availability.canSave && !batchAttachmentSaveInFlight,
-                                    canDelete = availability.canDelete && batchDeleteRetryState == null,
-                                )
+                CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+                    ConversationBottomBar(
+                        onCustomizeComposer = {
+                            routeMorph.anchor = ConversationMorphAnchor.Composer
+                            keyboardController?.hide()
+                            showComposerSettings = true
+                        },
+                        compactHeight = compactHeightConversation,
+                        dictationControlsVisible = dictationControlsVisible,
+                        dictationOriginVisible = dictationOriginVisible,
+                        selectionMode = selectionMode,
+                        selectionActionAvailability =
+                            batchSelectionUi.actionAvailability.let { availability ->
+                                if (batchDeleteInFlight) {
+                                    BatchSelectionActionAvailability(
+                                        canCopy = false,
+                                        canForward = false,
+                                        canSave = false,
+                                        canReply = false,
+                                        canInfo = false,
+                                        canDelete = false,
+                                    )
+                                } else {
+                                    availability.copy(
+                                        canSave = availability.canSave && !batchAttachmentSaveInFlight,
+                                        canDelete = availability.canDelete && batchDeleteRetryState == null,
+                                    )
+                                }
+                            },
+                        selectionForwardBlockedReason = batchSelectionUi.forwardBlockedReason,
+                        onCopySelection = {
+                            if (batchSelectionUi.copyText.isNotBlank()) {
+                                clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
+                                selectedMessages.clear()
                             }
                         },
-                    selectionForwardBlockedReason = batchSelectionUi.forwardBlockedReason,
-                    onCopySelection = {
-                        if (batchSelectionUi.copyText.isNotBlank()) {
-                            clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
-                            selectedMessages.clear()
-                        }
-                    },
-                    onForwardSelection = {
-                        if (batchSelectionUi.forwardPayloads.isNotEmpty()) {
-                            batchForwardSnapshot = batchSelectionUi.forwardPayloads
-                        }
-                    },
-                    onSaveSelection = {
-                        if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
-                            batchAttachmentSaveInFlight = true
-                            val selections = orderedBatchSelections(selectedMessages.values)
-                            selectedMessages.clear()
-                            appState.launchMutation {
-                                try {
-                                    val summary =
-                                        aggregateMessageAttachmentSaveSummaries(
-                                            selections.map { selection ->
-                                                val record = selection.record
-                                                saveMessageMediaAttachments(
-                                                    context = context,
-                                                    controller = controller,
-                                                    messageIdHex = record.messageIdHex,
-                                                    attachments = controller.attachmentsFor(record),
-                                                    mine = controller.isMessageMine(record),
-                                                    documentSaveFallback = documentSaveFallback,
-                                                )
-                                            },
-                                        )
-                                    appState.presentAttachmentSaveOutcome(
-                                        context = context,
-                                        summary = summary,
-                                        conversation =
-                                            controller.boundAccountRef?.let { accountRef ->
-                                                ConversationNoticeDestination(accountRef, controller.group.groupIdHex)
-                                            },
-                                    )
-                                } finally {
-                                    batchAttachmentSaveInFlight = false
-                                }
+                        onForwardSelection = {
+                            if (batchSelectionUi.forwardPayloads.isNotEmpty()) {
+                                batchForwardSnapshot = batchSelectionUi.forwardPayloads
                             }
-                        }
-                    },
-                    onReplySelection = {
-                        batchSelectionUi.selections.singleOrNull()?.let { selection ->
-                            controller.replyingTo = selection.record
-                            selectedMessages.clear()
-                        }
-                    },
-                    onInfoSelection = {
-                        batchInfoSelection = batchSelectionUi.selections.singleOrNull()
-                    },
-                    onDeleteSelection = { showBatchDeleteConfirm = true },
-                    batchDeleteRetryState = batchDeleteRetryState,
-                    batchDeleteInFlight = batchDeleteInFlight,
-                    onRetryBatchDelete = {
-                        batchDeleteRetryState?.let { retryState ->
-                            startBatchDelete(retryState.failedAttempts, retryState)
-                        }
-                    },
-                    onDismissBatchDeleteFailure = {
-                        if (!batchDeleteInFlight) {
-                            batchDeleteRetryState = null
-                            selectedMessages.clear()
-                        }
-                    },
-                    onCopyBatchDeleteReport = {
-                        batchDeleteRetryState?.let { retryState ->
-                            clipboard.setText(AnnotatedString(batchDeleteDiagnosticReport(retryState)))
-                        }
-                    },
-                    searchOpen = navigationState.searchOpen,
-                    searchMatchCount = effectiveSearchMatchIds.size,
-                    searchActiveIndex = searchActiveIndex,
-                    searchScanStatus = searchScanStatus,
-                    onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
-                    onNextSearchMatch = { navigateToSearchMatch(forward = true) },
-                    onRetrySearchScan = { navigationState.historySearchRetryGeneration += 1 },
-                    hasError =
-                        loadFailurePlacement == LoadFailurePlacement.FullScreen ||
-                            navigationState.initialTimelineBackfillNoProgress ||
-                            transcriptPresentationNeedsRetry,
-                    composerGate = composerGate,
-                    blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                    onUnblockBlockedDm = ::unblockBlockedDm,
-                    controller = controller,
-                    appState = appState,
-                    messageTextCopy = messageTextCopy,
-                    onBack = exitConversation,
-                    initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-                    onDraftChange =
-                        conversationDictationDraftWriter(
-                            dictation = appState.conversationDictation,
-                            accountRef = draftAccountRef,
-                            groupIdHex = controller.group.groupIdHex,
-                            presentationRevision = composerDictationRevision,
-                            write = { value, textChanged ->
-                                // A local edit is not a newly restored navigation-entry draft.
-                                composerAutoFocusConsumed.value = true
-                                appState.setDraft(draftAccountRef, controller.group.groupIdHex, value, textChanged)
-                            },
-                        ),
-                    composerTextState = composerTextState,
-                    composerAttachmentSheet = composerAttachmentSheet,
-                    hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),
-                    attachmentsPreparing = mediaDraftState.isPreparing,
-                    attachmentContent =
-                        if (pendingMediaSlots.size + pendingDocumentUris.size > 0 || collectionPanels != null) {
-                            {
-                                collectionPanels?.invoke()
-                                if (pendingMediaSlots.size + pendingDocumentUris.size > 0) {
-                                    CompositionLocalProvider(
-                                        dev.ipf.whitenoise.android.ui.conversation.media.LocalPickMediaDomains provides
-                                            controller::outgoingMediaTrustDomain,
-                                    ) {
-                                        dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
-                                            mediaSlots = pendingMediaSlots,
-                                            documentUris = pendingDocumentUris,
-                                            enabled = !attachmentSendClaim.isHeld,
-                                            prepared = mediaDraftState.preparedPreviews(),
-                                            preparing = mediaDraftState.isPreparing,
-                                            onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
-                                            onRemoveMedia = { slot ->
-                                                if (!attachmentSendClaim.isHeld) {
-                                                    mediaDraftState.releasePreparedPhoto(slot.id)
-                                                    pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
-                                                }
-                                            },
-                                            onRemoveDocument = { index ->
-                                                if (!attachmentSendClaim.isHeld) {
-                                                    val kept = pendingDocumentUris.filterIndexed { i, _ -> i != index }
-                                                    // A second occurrence of the same file keeps its prepared bytes.
-                                                    pendingDocumentUris
-                                                        .getOrNull(index)
-                                                        ?.takeIf { it !in kept }
-                                                        ?.let(mediaDraftState::releasePreparedDocument)
-                                                    pendingDocumentUris = kept
-                                                }
-                                            },
+                        },
+                        onSaveSelection = {
+                            if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
+                                batchAttachmentSaveInFlight = true
+                                val selections = orderedBatchSelections(selectedMessages.values)
+                                selectedMessages.clear()
+                                appState.launchMutation {
+                                    try {
+                                        val summary =
+                                            aggregateMessageAttachmentSaveSummaries(
+                                                selections.map { selection ->
+                                                    val record = selection.record
+                                                    saveMessageMediaAttachments(
+                                                        context = context,
+                                                        controller = controller,
+                                                        messageIdHex = record.messageIdHex,
+                                                        attachments = controller.attachmentsFor(record),
+                                                        mine = controller.isMessageMine(record),
+                                                        documentSaveFallback = documentSaveFallback,
+                                                    )
+                                                },
+                                            )
+                                        appState.presentAttachmentSaveOutcome(
+                                            context = context,
+                                            summary = summary,
+                                            conversation =
+                                                controller.boundAccountRef?.let { accountRef ->
+                                                    ConversationNoticeDestination(
+                                                        accountRef,
+                                                        controller.group.groupIdHex,
+                                                    )
+                                                },
                                         )
+                                    } finally {
+                                        batchAttachmentSaveInFlight = false
                                     }
                                 }
                             }
-                        } else {
-                            null
                         },
-                    onSendAttachments = { caption, onResult ->
-                        sendStagedAttachmentsWithCaption(
-                            caption,
-                            onResult,
-                            composerTextState.captureCaptionSettlement(),
-                        )
-                    },
-                    onAfterSend = {
-                        acceptedSendRevealedTranscript = true
-                        revealSentMessage()
-                    },
-                    onPickFromGallery = {
-                        imagePickerLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                        )
-                    },
-                    onCaptureFromCamera = {
-                        val granted =
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                                PackageManager.PERMISSION_GRANTED
-                        if (granted) {
-                            launchCameraCapture()
-                        } else {
-                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                        }
-                    },
-                    onPickDocument = {
-                        documentPickerLauncher.launch(arrayOf("*/*"))
-                    },
-                    onShareLocation = {
-                        if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                            hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
-                        ) {
-                            locationPickerOpen = true
-                        } else {
-                            locationPermissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                ),
-                            )
-                        }
-                    },
-                    onShareUser = { shareUserPickerOpen = true },
-                    onShareContact = {
-                        contactPickerLauncher.launch(Unit)
-                    },
-                    onCreatePoll =
-                        if (!controller.isDirectConversation) {
-                            { pollCreateOpen = true }
-                        } else {
-                            null
-                        },
-                    // MDK sends stickers without a reply target, so the action stays hidden while replying or editing.
-                    onOpenStickers =
-                        if (controller.replyingTo == null && controller.editingMessageId == null) {
-                            { stickerSheetOpen = true }
-                        } else {
-                            null
-                        },
-                    onPasteImageUris = { uris ->
-                        val admission =
-                            admitComposerAttachments(
-                                uris,
-                                pendingMediaSlots.size,
-                                pendingDocumentUris.size,
-                                MEDIA_PICKER_MAX_ITEMS,
-                            )
-                        val pasteCandidates = admission.accepted
-                        val localUris =
-                            pasteCandidates.mapNotNull { uri ->
-                                materializeReceiveContentImageUri(context, uri)
+                        onReplySelection = {
+                            batchSelectionUi.selections.singleOrNull()?.let { selection ->
+                                controller.replyingTo = selection.record
+                                selectedMessages.clear()
                             }
-                        val unreadableCount = pasteCandidates.size - localUris.size
-                        val unreadable = unreadableCount > 0
-                        // One notice carries both outcomes, since a second notice would replace the first.
-                        if (admission.droppedCount > 0) {
-                            val detail = AppText.Resource(R.string.toast_couldnt_decode_image).takeIf { unreadable }
-                            appState.presentAdmission(context, admission, detail, unreadableCount)
-                        } else if (unreadable) {
-                            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
-                        }
-                        if (localUris.isNotEmpty()) {
-                            pendingMediaSlots = pendingMediaSlots + localUris.map(::newPendingMediaSlot)
-                        }
-                    },
-                    voiceRecordingController = voiceRecordingController,
-                    voiceReview = voiceReview,
-                    mentionCandidates = mentionPicker.candidates,
-                    mentionPickerEnabled = mentionPicker.enabled,
-                    autoFocusOnEnter = justCreated && !freezeRoutePresentation,
-                    autoFocusOnDraftRestore =
-                        shouldAutoFocusComposerOnDraftRestore(
-                            snapshot = restoredDraftSnapshot,
-                            dictationRevisionOnEntry = composerDictationRevisionOnEntry,
-                            currentDictationRevision = composerDictationRevision,
-                        ) &&
-                            !freezeRoutePresentation,
-                    autoFocusConsumedState = composerAutoFocusConsumed,
-                    composerFocus = composerFocus,
-                    onComposerFocusChanged = { focused ->
-                        if (focused) composerDismissInProgress = false
-                        if (focused && !composerFocused && !imeIsOpen) {
-                            imeTransitionBookmark = scrollCoordinator.bookmark(currentScrollAnchor())
-                        } else if (!focused && !imeIsOpen) {
-                            imeTransitionBookmark = null
-                        }
-                        composerFocused = focused
-                    },
-                    onComposerPreImeBack = {
-                        if (composerDismissInProgress) {
-                            exitConversation()
-                        } else {
-                            composerDismissInProgress = true
-                            keyboardController?.hide()
-                        }
-                    },
-                    composerDismissInProgress = composerDismissInProgress,
-                    onBottomInputChanged = { bottomInputRevision++ },
-                    onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
-                    onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
-                    recentEmojis = recentEmojiRecentsOwner.recents,
-                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                    onTimelineComposerMeasured = timelineViewport::onComposerMeasured,
-                    onBottomChromeMeasured = { heightPx ->
-                        timelineViewport.onBottomChromeMeasured(heightPx)
-                        bottomChromeHeightObserver.onMeasured(heightPx)
-                        if (measuredBottomChromeHeightPx != heightPx) {
-                            measuredBottomChromeHeightPx = heightPx
-                        }
-                    },
-                )
+                        },
+                        onInfoSelection = {
+                            batchInfoSelection = batchSelectionUi.selections.singleOrNull()
+                        },
+                        onDeleteSelection = { showBatchDeleteConfirm = true },
+                        batchDeleteRetryState = batchDeleteRetryState,
+                        batchDeleteInFlight = batchDeleteInFlight,
+                        onRetryBatchDelete = {
+                            batchDeleteRetryState?.let { retryState ->
+                                startBatchDelete(retryState.failedAttempts, retryState)
+                            }
+                        },
+                        onDismissBatchDeleteFailure = {
+                            if (!batchDeleteInFlight) {
+                                batchDeleteRetryState = null
+                                selectedMessages.clear()
+                            }
+                        },
+                        onCopyBatchDeleteReport = {
+                            batchDeleteRetryState?.let { retryState ->
+                                clipboard.setText(AnnotatedString(batchDeleteDiagnosticReport(retryState)))
+                            }
+                        },
+                        searchOpen = navigationState.searchOpen,
+                        searchMatchCount = effectiveSearchMatchIds.size,
+                        searchActiveIndex = searchActiveIndex,
+                        searchScanStatus = searchScanStatus,
+                        onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
+                        onNextSearchMatch = { navigateToSearchMatch(forward = true) },
+                        onRetrySearchScan = { navigationState.historySearchRetryGeneration += 1 },
+                        hasError =
+                            loadFailurePlacement == LoadFailurePlacement.FullScreen ||
+                                navigationState.initialTimelineBackfillNoProgress ||
+                                transcriptPresentationNeedsRetry,
+                        composerGate = composerGate,
+                        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                        onUnblockBlockedDm = ::unblockBlockedDm,
+                        controller = controller,
+                        appState = appState,
+                        messageTextCopy = messageTextCopy,
+                        onBack = exitConversation,
+                        initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+                        onDraftChange =
+                            conversationDictationDraftWriter(
+                                dictation = appState.conversationDictation,
+                                accountRef = draftAccountRef,
+                                groupIdHex = controller.group.groupIdHex,
+                                presentationRevision = composerDictationRevision,
+                                write = { value, textChanged ->
+                                    // A local edit is not a newly restored navigation-entry draft.
+                                    composerAutoFocusConsumed.value = true
+                                    appState.setDraft(draftAccountRef, controller.group.groupIdHex, value, textChanged)
+                                },
+                            ),
+                        composerTextState = composerTextState,
+                        composerAttachmentSheet = composerAttachmentSheet,
+                        hasPendingAttachments =
+                            pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty() || imageDropImporting,
+                        attachmentsPreparing = mediaDraftState.isPreparing || imageDropImporting,
+                        attachmentContent =
+                            if (pendingMediaSlots.size + pendingDocumentUris.size > 0 || collectionPanels != null) {
+                                {
+                                    collectionPanels?.invoke()
+                                    if (pendingMediaSlots.size + pendingDocumentUris.size > 0) {
+                                        CompositionLocalProvider(
+                                            LocalPickMediaDomains provides
+                                                controller::outgoingMediaTrustDomain,
+                                        ) {
+                                            dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
+                                                mediaSlots = pendingMediaSlots,
+                                                documentUris = pendingDocumentUris,
+                                                enabled = !attachmentSendClaim.isHeld,
+                                                prepared = mediaDraftState.preparedPreviews(),
+                                                preparing = mediaDraftState.isPreparing,
+                                                onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
+                                                onRemoveMedia = { slot ->
+                                                    if (!attachmentSendClaim.isHeld) {
+                                                        mediaDraftState.releasePreparedPhoto(slot.id)
+                                                        pendingMediaSlots =
+                                                            pendingMediaSlots.filterNot { it.id == slot.id }
+                                                    }
+                                                },
+                                                onRemoveDocument = { index ->
+                                                    if (!attachmentSendClaim.isHeld) {
+                                                        pendingDocumentUris =
+                                                            removeStagedDocumentAt(
+                                                                pendingDocumentUris,
+                                                                index,
+                                                                mediaDraftState::releasePreparedDocument,
+                                                            )
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                null
+                            },
+                        onSendAttachments = { caption, onResult ->
+                            sendStagedAttachmentsWithCaption(
+                                caption,
+                                onResult,
+                                composerTextState.captureCaptionSettlement(),
+                            )
+                        },
+                        onAfterSend = {
+                            acceptedSendRevealedTranscript = true
+                            revealSentMessage()
+                        },
+                        onPickFromGallery = {
+                            imagePickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                            )
+                        },
+                        onCaptureFromCamera = {
+                            val granted =
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                                    PackageManager.PERMISSION_GRANTED
+                            if (granted) {
+                                launchCameraCapture()
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
+                        onPickDocument = {
+                            documentPickerLauncher.launch(arrayOf("*/*"))
+                        },
+                        onShareLocation = {
+                            if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                                hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
+                            ) {
+                                locationPickerOpen = true
+                            } else {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    ),
+                                )
+                            }
+                        },
+                        onShareUser = { shareUserPickerOpen = true },
+                        onShareContact = {
+                            contactPickerLauncher.launch(Unit)
+                        },
+                        onCreatePoll =
+                            if (!controller.isDirectConversation) {
+                                { pollCreateOpen = true }
+                            } else {
+                                null
+                            },
+                        // MDK sends stickers without a reply target, so the action stays hidden
+                        // while replying or editing.
+                        onOpenStickers =
+                            if (controller.replyingTo == null && controller.editingMessageId == null) {
+                                { stickerSheetOpen = true }
+                            } else {
+                                null
+                            },
+                        onPasteImageUris = { uris ->
+                            imageDropImport.import(
+                                uris = uris,
+                                maxItems = MEDIA_PICKER_MAX_ITEMS,
+                                stagedCount = { pendingMediaSlots.size + pendingDocumentUris.size },
+                                isCurrent = {
+                                    attachmentOwnerCurrent() && !appState.signOutInProgress && !appState.wipeInProgress
+                                },
+                            ) { (admission, localUris, unreadableCount) ->
+                                val unreadable = unreadableCount > 0
+                                // One notice carries both outcomes, since a second notice would replace the first.
+                                if (admission.droppedCount > 0) {
+                                    val detail =
+                                        AppText.Resource(R.string.toast_couldnt_decode_image).takeIf { unreadable }
+                                    appState.presentAdmission(context, admission, detail, unreadableCount)
+                                } else if (unreadable) {
+                                    appState.present(R.string.toast_couldnt_decode_image, copyable = true)
+                                }
+                                if (localUris.isNotEmpty()) {
+                                    pendingMediaSlots = pendingMediaSlots + localUris.map(::newPendingMediaSlot)
+                                }
+                            }
+                        },
+                        voiceRecordingController = voiceRecordingController,
+                        voiceReview = voiceReview,
+                        mentionCandidates = mentionPicker.candidates,
+                        mentionPickerEnabled = mentionPicker.enabled,
+                        autoFocusOnEnter = justCreated && !freezeRoutePresentation,
+                        autoFocusOnDraftRestore =
+                            shouldAutoFocusComposerOnDraftRestore(
+                                snapshot = restoredDraftSnapshot,
+                                dictationRevisionOnEntry = composerDictationRevisionOnEntry,
+                                currentDictationRevision = composerDictationRevision,
+                            ) &&
+                                !freezeRoutePresentation,
+                        autoFocusConsumedState = composerAutoFocusConsumed,
+                        composerFocus = composerFocus,
+                        onComposerFocusChanged = { focused ->
+                            if (focused) composerDismissInProgress = false
+                            if (focused && !composerFocused && !imeIsOpen) {
+                                imeTransitionBookmark = scrollCoordinator.bookmark(currentScrollAnchor())
+                            } else if (!focused && !imeIsOpen) {
+                                imeTransitionBookmark = null
+                            }
+                            composerFocused = focused
+                        },
+                        onComposerPreImeBack = {
+                            if (composerDismissInProgress) {
+                                exitConversation()
+                            } else {
+                                composerDismissInProgress = true
+                                keyboardController?.hide()
+                            }
+                        },
+                        composerDismissInProgress = composerDismissInProgress,
+                        onBottomInputChanged = { bottomInputRevision++ },
+                        onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
+                        onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
+                        recentEmojis = recentEmojiRecentsOwner.recents,
+                        onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                        onTimelineComposerMeasured = timelineViewport::onComposerMeasured,
+                        onBottomChromeMeasured = { heightPx ->
+                            timelineViewport.onBottomChromeMeasured(heightPx)
+                            bottomChromeHeightObserver.onMeasured(heightPx)
+                            if (measuredBottomChromeHeightPx != heightPx) {
+                                measuredBottomChromeHeightPx = heightPx
+                            }
+                        },
+                    )
+                }
             },
         ) { padding ->
             CompositionLocalProvider(
@@ -4576,6 +4616,7 @@ internal fun ConversationScreen(
                                 EmptyGroupConversation(
                                     onAddMembers = {
                                         openAddMemberOnDetails = true
+                                        routeMorph.anchor = ConversationMorphAnchor.Details
                                         showDetails = true
                                     },
                                 )
@@ -5016,7 +5057,9 @@ internal fun ConversationScreen(
                                 if (transcriptReadyToReveal) {
                                     ConversationNavigationStack(composerOverlap = overlayPadding) {
                                         // Selection hides these controls; paging progress never covers message rows.
-                                        if (!selectionMode && ttsFollowHandle.showResumeAction) {
+                                        ConversationNavigationControl(
+                                            visible = !selectionMode && ttsFollowHandle.showResumeAction,
+                                        ) {
                                             TtsResumeFollowButton(
                                                 onClick = {
                                                     ttsFollowHandle.revealCurrentPassage(

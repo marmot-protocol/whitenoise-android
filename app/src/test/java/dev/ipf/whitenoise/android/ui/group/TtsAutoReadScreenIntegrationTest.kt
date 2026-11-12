@@ -75,21 +75,21 @@ class TtsAutoReadScreenIntegrationTest {
     }
 
     @Test
-    fun composerShortcutIsAnIndependentOptInSetting() {
+    fun headerShortcutIsAnIndependentOptInSetting() {
         val appState = appState(activeAccountRef = accountA)
         composeRule.setContent {
             WhiteNoiseTheme {
                 TextToSpeechScreen(appState = appState, onBack = {})
             }
         }
-        val shortcut = composeRule.onNodeWithTag("speech.composer_shortcut")
+        val shortcut = composeRule.onNodeWithTag("speech.header_shortcut")
         shortcut
             .performScrollTo()
             .assertIsOff()
             .performClick()
             .assertIsOn()
         composeRule.runOnIdle {
-            assertTrue(TtsAutoReadPreferences(context).state.value.showComposerShortcut)
+            assertTrue(TtsAutoReadPreferences(context).state.value.showHeaderShortcut)
             assertFalse(appState.isConversationAutoRead(groupId))
         }
         shortcut.performClick().assertIsOff()
@@ -121,8 +121,8 @@ class TtsAutoReadScreenIntegrationTest {
                 appState.ttsAutoReadPreferences.overrideFor(accountA, groupId),
             )
             assertNull(appState.ttsAutoReadPreferences.overrideFor(accountB, groupId))
-            assertTrue(appState.ttsAutoReadPreferences.isComposerShortcutVisibleFor(accountA, groupId))
-            assertFalse(appState.ttsAutoReadPreferences.isComposerShortcutVisibleFor(accountB, groupId))
+            assertTrue(appState.ttsAutoReadPreferences.isHeaderShortcutVisibleFor(accountA, groupId))
+            assertFalse(appState.ttsAutoReadPreferences.isHeaderShortcutVisibleFor(accountB, groupId))
         }
 
         composeRule.runOnIdle { runBlocking { appState.setActiveAccount(accountB) } }
@@ -142,8 +142,8 @@ class TtsAutoReadScreenIntegrationTest {
                 TtsAutoReadOverride.ON,
                 appState.ttsAutoReadPreferences.overrideFor(accountA, groupId),
             )
-            assertTrue(TtsAutoReadPreferences(context).isComposerShortcutVisibleFor(accountA, groupId))
-            assertFalse(TtsAutoReadPreferences(context).isComposerShortcutVisibleFor(accountB, groupId))
+            assertTrue(TtsAutoReadPreferences(context).isHeaderShortcutVisibleFor(accountA, groupId))
+            assertFalse(TtsAutoReadPreferences(context).isHeaderShortcutVisibleFor(accountB, groupId))
         }
     }
 

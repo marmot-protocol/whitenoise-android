@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.chats
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotEventFfi
+import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -15,14 +17,14 @@ import kotlinx.coroutines.test.TestScope
 
 /** Shared fakes and records for the global message-search controller tests (#1944). */
 internal object GlobalSearchTestFixtures {
-    /** One projection update of [group] carrying [change]. */
+    /** One projection update of [group] carrying [changes]. */
     fun update(
         group: String,
-        change: TimelineMessageChangeFfi,
+        vararg changes: TimelineMessageChangeFfi,
     ) = TimelineProjectionUpdateFfi(
         groupIdHex = group,
         messages = emptyList(),
-        changes = listOf(change),
+        changes = changes.toList(),
         chatListRow = null,
         chatListTrigger = ChatListUpdateTriggerFfi.entries.first(),
     )
@@ -49,11 +51,34 @@ internal object GlobalSearchTestFixtures {
     /** The keys of the loaded results in display order. */
     fun keys(controller: GlobalSearchResultsController) = controller.state.results.map { it.key }
 
-    /** A controller whose batches run as children of the test, with the given local hides and owner check. */
+    /**
+     * Delivers [update] for the session's account the way the session's observer does: removed, deleted and
+     * restored keys are reported first, then the answer says whether a recheck is still needed. [drain] runs the
+     * session's main-thread revoke at once; without it a read that lands first must withdraw the reported keys itself.
+     */
+    fun GlobalSearchResultsController.deliver(
+        update: TimelineProjectionUpdateFfi,
+        drain: Boolean = true,
+    ): Boolean {
+        val touched =
+            touchesLoadedRows(
+                MarmotEventFfi.ProjectionUpdated(RuntimeProjectionUpdateFfi("ff".repeat(32), ACCOUNT, update)),
+                ACCOUNT,
+                this,
+                this::reportChanged,
+            )
+        if (drain) revoke()
+        return touched
+    }
+
+    private const val ACCOUNT = "personal"
+
+    /** A controller whose batches run as children of the test, with the given local hides, owner check and clock. */
     fun TestScope.controller(
         reader: GlobalSearchTimelineReader,
         hidden: (String) -> Set<String> = { emptySet() },
         isCurrent: () -> Boolean = { true },
+        nowMillis: () -> Long = { NOW_MILLIS },
     ) = GlobalSearchResultsController(
         reader = reader,
         scope = this,
@@ -61,7 +86,7 @@ internal object GlobalSearchTestFixtures {
             GlobalSearchResultsEnvironment(
                 hiddenMessageIds = hidden,
                 isCurrent = isCurrent,
-                nowMillis = { NOW_MILLIS },
+                nowMillis = nowMillis,
                 ioDispatcher = StandardTestDispatcher(testScheduler),
             ),
     )

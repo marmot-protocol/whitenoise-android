@@ -725,30 +725,31 @@ class BaselineStagingTest(unittest.TestCase):
             destination = Path(directory)
             pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
             pin.parent.mkdir(parents=True)
-            pin.write_text('mdk-sha=b3e484687968d5e1172d3c7a998c09da44e7e005\n')
+            pin.write_text('mdk-sha=827687ba7fdbb05ec1b8f17667ad919fedde7266\n')
             original = pin.read_bytes()
             with patch.object(staging.shutil, 'copytree') as copy, patch.object(staging.shutil, 'copyfile') as swap:
                 staging.stage(destination)
             relative = Path('app/src/androidTest/java/dev/ipf/whitenoise/android/qualification')
             copy.assert_called_once_with(relative, destination / relative, dirs_exist_ok=True)
-            overlay = Path('scripts/mdk-baseline-overlay/QualificationTimelineQuery.kt.txt')
-            swap.assert_called_once_with(overlay, destination / relative / 'QualificationTimelineQuery.kt')
+            self.assertEqual(
+                swap.call_args_list,
+                [((source, destination / relative / source.name.removesuffix('.txt')),)
+                 for source in sorted(staging.OVERLAY.glob('*.kt.txt'))],
+            )
             self.assertEqual(pin.read_bytes(), original)
 
     def test_baseline_overlay_replaces_a_candidate_source(self):
         """Each overlay stands in for a qualification source the candidate compiles, so none adds a stray file."""
         from scripts import stage_mdk_baseline_fixture as staging
         relative = Path('app/src/androidTest/java/dev/ipf/whitenoise/android/qualification')
-        overlays = sorted(staging.OVERLAY.glob('*.kt.txt'))
-        self.assertTrue(overlays)
-        for source in overlays:
+        for source in sorted(staging.OVERLAY.glob('*.kt.txt')):
             self.assertTrue((relative / source.name.removesuffix('.txt')).is_file(), source)
 
     def test_other_native_revisions_cannot_seed_the_reviewed_pair(self):
         """The former baseline, candidate itself and a partial SHA all fail before any source overlay."""
         from scripts import stage_mdk_baseline_fixture as staging
-        for source in ('580082a5840cc86d05263a0337041897f39864b0',
-                       '827687ba7fdbb05ec1b8f17667ad919fedde7266', 'b3e48468'):
+        for source in ('b3e484687968d5e1172d3c7a998c09da44e7e005',
+                       'a2e0558a634bbd20607cdd5afb93abc6220ee58d', '827687ba'):
             with self.subTest(source=source), tempfile.TemporaryDirectory() as directory:
                 destination = Path(directory)
                 pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Отправка журналов аудита</string>
+    <string name="audit_delivery_last_success">Последняя успешная проверка</string>
+    <string name="audit_delivery_waiting">Ожидает отправки</string>
+    <string name="audit_delivery_resume">Возобновить отправку</string>
+    <string name="audit_delivery_resuming">Попытка отправки журналов аудита…</string>
+    <string name="audit_delivery_resume_failed">Не удалось возобновить отправку</string>
+    <string name="audit_delivery_active">Активна</string>
+    <string name="audit_delivery_retrying">Автоматическая повторная попытка</string>
+    <string name="audit_delivery_paused">Приостановлена</string>
+    <string name="audit_settings_loading">Загрузка…</string>
+    <string name="audit_retention_title">Срок хранения журналов аудита</string>
+    <string name="audit_retention_save_failed">Не удалось изменить срок хранения</string>
+    <string name="audit_retention_confirm_title">Удалить старые журналы аудита?</string>
+    <string name="audit_retention_confirm_body">При сроке хранения %1$s более старые журналы аудита будут удалены с этого устройства, даже если они ещё не отправлены.</string>
+    <string name="audit_retention_confirm_action">Удалить старые журналы</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d день</item>
+        <item quantity="few">%d дня</item>
+        <item quantity="many">%d дней</item>
+        <item quantity="other">%d дня</item>
+    </plurals>
+</resources>

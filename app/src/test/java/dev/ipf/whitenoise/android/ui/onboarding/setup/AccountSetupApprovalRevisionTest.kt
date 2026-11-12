@@ -18,7 +18,7 @@ class AccountSetupApprovalRevisionTest {
     fun unchangedProposalCanBeApprovedAfterTheSnapshotAdvances() =
         runTest {
             val client = FakeSetupClient(repairSnapshot(5uL))
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             client.current = repairSnapshot(6uL)
@@ -42,7 +42,15 @@ class AccountSetupApprovalRevisionTest {
             for (action in listOf(OnboardingActionFfi.APPROVE_REPAIR, OnboardingActionFfi.CONTINUE_ANYWAY)) {
                 val initial = repairSnapshot(3uL, actions = listOf(action)).copy(recoveryEpoch = "reviewed-epoch")
                 val client = FakeSetupClient(initial)
-                val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+                val controller =
+                    AccountSetupController(
+                        SETUP_TEST_ACCOUNT,
+                        client,
+                        backgroundScope,
+                        { true },
+                        { true },
+                        {},
+                    )
                 controller.reconnect()
                 runCurrent()
                 client.current = initial.copy(recoveryEpoch = "replacement-epoch")
@@ -85,7 +93,7 @@ class AccountSetupApprovalRevisionTest {
     fun retryUsesSnapshotRevisionEvenWhenAProposalIsRetained() =
         runTest {
             val client = FakeSetupClient(repairSnapshot(5uL, actions = listOf(OnboardingActionFfi.RETRY)))
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             val request = SetupRequest(5uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.RETRY)
@@ -100,7 +108,7 @@ class AccountSetupApprovalRevisionTest {
     private fun rejectFreshRepair(latest: OnboardingSnapshotFfi) =
         runTest {
             val client = FakeSetupClient(repairSnapshot(5uL))
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             client.current = latest

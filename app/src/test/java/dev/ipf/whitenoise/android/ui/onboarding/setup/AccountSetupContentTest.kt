@@ -7,12 +7,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -20,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
@@ -60,7 +63,7 @@ class AccountSetupContentTest {
         assertFalse(skip.contains("Pas maintenant"))
         assertFalse(
             french
-                .getString(R.string.setup_one_phone_per_account_help)
+                .getString(R.string.setup_chats_on_this_device_help)
                 .contains("White Noise fonctionne sur un seul appareil"),
         )
     }
@@ -426,14 +429,41 @@ class AccountSetupContentTest {
         assertTrue(actions.isEmpty())
     }
 
-    /** Incomplete discovery remains available without expanding the normal acknowledgment copy. */
-    @Test fun unknownDeviceDiscoveryAppearsInDetails() {
+    /** Sign-ins that could not be checked add a note under the explanation of what signing in restores. */
+    @Test fun uncheckedSignInsAddANote() {
+        show(AccountSetupState(snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE)))
+        composeRule.onNodeWithText("Chats on this device").assertIsDisplayed()
+        composeRule.onNodeWithText(CHATS_HELP).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(UNCHECKED_NOTE).performScrollTo().assertIsDisplayed()
+    }
+
+    /** Finding no other sign-ins proves nothing, so neither the step nor Details adds a note. */
+    @Test fun noOtherSignInsFoundAddsNoNote() {
+        val snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE)
+        snapshot.singleDeviceNotice = setupDeviceNotice(OnboardingDeviceDiscoveryFfi.NONE_FOUND)
+        show(AccountSetupState(snapshot = snapshot, detailsExpanded = true))
+        composeRule.onNodeWithText(CHATS_HELP).performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(UNCHECKED_NOTE).assertCountEquals(0)
+        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
+    }
+
+    /** Opening Details does not repeat the unchecked note the step already shows. */
+    @Test fun uncheckedSignInsAreNotedOnceWithDetailsOpen() {
         show(AccountSetupState(snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE), detailsExpanded = true))
-        composeRule
-            .onNodeWithText(
-                "Couldn’t check for other devices.",
-            ).performScrollTo()
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("Setup checks").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(UNCHECKED_NOTE).assertCountEquals(1)
+    }
+
+    /** On the routine step, found sign-ins are explained once by the note rather than the native finding. */
+    @Test fun foundSignInsAreExplainedOnceOnTheRoutineStep() {
+        show(AccountSetupState(snapshot = foundSignInsSnapshot()))
+        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(1)
+    }
+
+    /** When the step shows its native finding, the note does not repeat the same sentence. */
+    @Test fun foundSignInsAreExplainedOnceBesideTheFinding() {
+        show(AccountSetupState(snapshot = foundSignInsSnapshot(), error = true))
+        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(1)
     }
 
     /** Missing finding grants retain the full native step actions without offering an inline shortcut. */
@@ -623,5 +653,22 @@ class AccountSetupContentTest {
                 )
             }
         }
+    }
+
+    /** A device step whose discovery and native finding both report other sign-ins. */
+    private fun foundSignInsSnapshot() =
+        setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)).also { snapshot ->
+            snapshot.singleDeviceNotice = setupDeviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE)
+            snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.findings =
+                listOf(setupFinding(OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE, null))
+        }
+
+    private companion object {
+        const val CHATS_HELP =
+            "Signing in alone does not restore your existing chats or messages. " +
+                "If you use another device, keep its app and data until you’ve checked your chats here."
+        const val FOUND_NOTE =
+            "Other sign-in records were found. They may belong to another installation or an earlier one."
+        const val UNCHECKED_NOTE = "Other sign-ins could not be checked."
     }
 }

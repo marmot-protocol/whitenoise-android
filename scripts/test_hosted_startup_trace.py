@@ -677,7 +677,8 @@ ET.ElementTree(suite).write(out/'results.xml')
                 allowed=eval(normalized(current['changes']['steps'][0]['env']['TRACE_MODE_VALID']),{'__builtins__':{}},context)
                 changes_output='true' if allowed else ''
             context['needs']=SimpleNamespace(changes=SimpleNamespace(outputs=SimpleNamespace(
-                connected='true',attachment_fixture='true',media_trace_allowed=changes_output)))
+                connected='true',attachment_fixture='true',media_trace_allowed=changes_output,
+                connected_shards='2' if event=='push' else '1')))
             return bool(eval(normalized(expr).replace('needs.maestro-runtime-build.result','runtime_build_result'),{'__builtins__':{}},context))
         flags=['maestro_pilot','responsiveness_only','outbound_share_only','mdk_adoption_only',
                'mdk_qualification','mdk_preview_qualification','range_selection_only','review_demo_e2e',
@@ -687,10 +688,16 @@ ET.ElementTree(suite).write(out/'results.xml')
             for draft in [False,True]:
                 for target in ['healthy','']:
                     for values in cases:
-                        for job in current:
+                        for job in before:
                             with self.subTest(event=event,draft=draft,target=target,values=values,job=job):
                                 self.assertEqual(evaluate(current[job]['if'],event,draft,media_trace_target=target,**values),
                                                  evaluate(before[job]['if'],event,draft,media_trace_target=target,**values))
+                        # The merged shard check follows the connected job on master pushes only.
+                        with self.subTest(event=event,draft=draft,target=target,values=values,job='instrumented-required-cases'):
+                            self.assertEqual(evaluate(current['instrumented-required-cases']['if'],event,draft,media_trace_target=target,**values),
+                                             event=='push' and evaluate(current['instrumented']['if'],event,draft,media_trace_target=target,**values))
+        self.assertEqual(set(current)-set(before),{'instrumented-required-cases'})
+        self.assertFalse(evaluate(current['instrumented-required-cases']['if'],'push',cancelled=True))
         valid=dict(media_trace_target='av',media_startup_trace=True,media_sandbox_only=True)
         for api in ['30','36']:
             values={**valid,'media_sandbox_api':api}

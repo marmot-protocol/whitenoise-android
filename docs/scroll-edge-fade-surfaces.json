@@ -1677,6 +1677,17 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SelectAuditLogExportDialog.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SEC-009"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
       "calls": {
         "SettingsList": 1

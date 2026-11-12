@@ -145,12 +145,11 @@ import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
-import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
-import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
@@ -373,6 +372,8 @@ internal fun ComposerPill(
     modifier: Modifier = Modifier,
     onDictation: (() -> Unit)? = null,
     dictationControls: (@Composable RowScope.() -> Unit)? = null,
+    // Width the dictation commands settle at; the composer reserves exactly this, never a stale slot.
+    dictationControlsWidth: Dp = DICTATION_ACTIVE_ACTIONS_WIDTH,
     // Gate inputs only: the sheet these open lives in ComposerBar, but the
     // attach button must appear whenever ANY attachment action is wired, not
     // just gallery/document.
@@ -511,17 +512,13 @@ internal fun ComposerPill(
                     val onPaste = latestOnPasteImageUris ?: return transferableContent
                     if (!transferableContent.hasMediaType(MediaType.Image)) return transferableContent
 
+                    // #3715: this runs on the main thread and must answer now, so it claims every URI of an
+                    // image-declaring clip without asking the provider anything. The conversation then resolves
+                    // each type and copies the bytes off the main thread, skipping a URI that is not an image.
                     val imageUris = mutableListOf<Uri>()
                     val remaining =
                         transferableContent.consume { item ->
-                            val imageUri =
-                                receiveContentImageUriOrNull(
-                                    item = item,
-                                    clipDescription = transferableContent.clipMetadata.clipDescription,
-                                    resolveMime = { uri -> safeGetType(context.contentResolver, uri) },
-                                )
-                            if (imageUri != null) imageUris += imageUri
-                            imageUri != null
+                            item.uri?.also { imageUris += it } != null
                         }
                     if (imageUris.isNotEmpty()) onPaste(imageUris.distinct())
                     return remaining
@@ -730,7 +727,7 @@ internal fun ComposerPill(
             (if (trailingAction != null) ComposerToolbarSlotWidth else 0.dp)
     val minimumDictationWidth =
         when {
-            dictationControls != null -> DICTATION_ACTIVE_ACTIONS_WIDTH
+            dictationControls != null -> dictationControlsWidth
             onDictation != null && toolbar == null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
@@ -860,17 +857,19 @@ internal fun ComposerPill(
                 val optionalMinimum = if (toolbar != null) ComposerShortcutTarget else leadingControlsWidth
                 (navigationSurfaceWidth - optionalMinimum - toolbarGeometryPrimaryWidth).coerceAtLeast(0.dp)
             }
-        } ?: DICTATION_ACTIVE_ACTIONS_WIDTH
+        } ?: dictationControlsWidth
     val targetDictationControlWidth =
         when {
-            dictationControls != null -> minOf(DICTATION_ACTIVE_ACTIONS_WIDTH, availableDictationWidth)
+            dictationControls != null -> minOf(dictationControlsWidth, availableDictationWidth)
             onDictation != null && toolbar == null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
+    val dictationMotionEnabled = rememberSystemAnimationsEnabled()
     val dictationControlWidthState =
         animateDpAsState(
             targetValue = targetDictationControlWidth,
-            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+            // Same clock as the commands' own resize, so the bubble edge and the buttons land together.
+            animationSpec = if (dictationMotionEnabled) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
             label = "composer dictation control morph",
         )
     val dictationControlWidth by dictationControlWidthState
@@ -2038,7 +2037,7 @@ internal fun ComposerPill(
                                         // Row constraints already exclude preceding children such as draft navigation.
                                         val maximum =
                                             minOf(
-                                                DICTATION_ACTIVE_ACTIONS_WIDTH.roundToPx(),
+                                                dictationControlsWidth.roundToPx(),
                                                 availableDictationWidth.roundToPx(),
                                                 constraints.maxWidth,
                                             )

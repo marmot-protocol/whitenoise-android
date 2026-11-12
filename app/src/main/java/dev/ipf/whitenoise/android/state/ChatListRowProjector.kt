@@ -27,7 +27,7 @@ internal class ChatListRowProjector(
     private val activitySequences: Map<String, ULong>,
     private val optimisticPreviews: Map<String, OptimisticChatListPreviewState>,
     private val archiveActions: ChatListArchiveActions,
-    private val localGroupNames: LocalGroupNameAuthority,
+    private val localGroupNames: LocalGroupFieldAuthority,
     private val presentations: Map<String, ConversationPresentationFfi>,
     private val avatars: Map<String, AvatarAssetFfi>,
     private val previews: Map<String, SelectedChatPreviewFfi>,
@@ -49,7 +49,7 @@ internal class ChatListRowProjector(
     /** Uses the keyed MDK result without inserting it into the bounded window or borrowing its overlay. */
     fun presented(presented: PresentedChatRowFfi): ChatListItem =
         project(
-            presented.row,
+            localGroupNames.retainedRow(presented.row),
             localGroupNames.reconciledPresentation(presented.row, presented.presentation),
             presented.avatarAsset,
             presented.preview,

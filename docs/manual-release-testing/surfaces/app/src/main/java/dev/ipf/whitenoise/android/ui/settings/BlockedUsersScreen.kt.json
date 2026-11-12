@@ -1,0 +1,93 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+  "legacy_sha256": "9b6800e2847ca190c2b04cf0758706a4dd85d3a728a5b95729ef02c3a81b4d4f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Block change failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_change_failed",
+        "test_ids": [
+          "SEC-014",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Block list unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_list_unavailable",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Block publication uncertain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.block_publication_uncertain",
+        "test_ids": [
+          "SEC-014",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Blocked users title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users_detail",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users empty state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.blocked_users_empty",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "Blocked users unblock action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.profile_unblock",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "BlockedUsersGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "fun BlockedUsersGroup(",
+        "test_ids": [
+          "SEC-014"
+        ]
+      },
+      {
+        "surface": "BlockedUsersScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "fun BlockedUsersScreen(",
+        "test_ids": [
+          "SEC-014"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Block list refused for size from Blocked users",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.error_update_too_large",
+        "test_ids": [
+          "SEC-014"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

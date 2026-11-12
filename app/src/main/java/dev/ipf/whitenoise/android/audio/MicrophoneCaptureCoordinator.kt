@@ -13,6 +13,10 @@ class MicrophoneCaptureCoordinator {
     private val lock = Any()
     private var owner: Any? = null
 
+    /** Automatic playback must not take audio focus from a live capture lease. */
+    val isHeld: Boolean
+        get() = synchronized(lock) { owner != null }
+
     fun tryAcquire(candidate: Any): Boolean =
         synchronized(lock) {
             when (owner) {

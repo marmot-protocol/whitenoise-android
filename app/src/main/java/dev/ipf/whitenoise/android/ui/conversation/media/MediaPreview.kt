@@ -544,6 +544,10 @@ private fun editActionDescription(
  * Removes the frames the user unchecked one at a time. The staging callbacks each rewrite the whole
  * list from one snapshot, so a batch has to walk back-to-front across recompositions instead of
  * firing every removal inside a single frame.
+ *
+ * The exact positions are captured once when Done is pressed. Re-reading keys after each removal would
+ * renumber a checked duplicate document into the removed occurrence's key and drop it too. Walking
+ * back-to-front keeps every captured position below the last removal valid.
  */
 @Composable
 @Suppress("LongParameterList")
@@ -556,9 +560,14 @@ private fun ApplyPreviewExclusions(
     onRemoveDocumentAt: (Int) -> Unit,
     onFinished: () -> Unit,
 ) {
+    val startSize = remember(active) { items.size }
+    val removals =
+        remember(active) {
+            items.indices.filter { active && mediaPreviewItemKey(items[it], it) in excluded }.reversed()
+        }
     LaunchedEffect(active, items.size) {
         if (!active) return@LaunchedEffect
-        val index = items.indices.lastOrNull { mediaPreviewItemKey(items[it], it) in excluded }
+        val index = removals.getOrNull(startSize - items.size)
         if (index == null) {
             onFinished()
         } else if (items[index] is StagedPreviewItem.Media) {

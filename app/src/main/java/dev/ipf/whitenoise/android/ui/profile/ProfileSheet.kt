@@ -876,6 +876,7 @@ internal fun ProfileSheet(
                                     BlockOutcome.Confirmed -> blocked = !currentlyBlocked
                                     BlockOutcome.Uncertain -> appState.present(R.string.block_publication_uncertain)
                                     BlockOutcome.Unavailable -> appState.present(R.string.block_list_unavailable)
+                                    BlockOutcome.TooLarge -> appState.present(R.string.error_update_too_large)
                                     BlockOutcome.Failed -> appState.present(R.string.block_change_failed)
                                 }
                                 if (outcome != BlockOutcome.Confirmed) feedback = appState.toast

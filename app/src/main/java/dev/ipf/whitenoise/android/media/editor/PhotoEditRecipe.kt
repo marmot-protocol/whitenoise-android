@@ -183,7 +183,11 @@ internal data class PhotoEditHistory(
 
     fun applyRecipe(recipe: PhotoEditRecipe): PhotoEditHistory = commit(recipe)
 
-    fun addStroke(stroke: PhotoEditStroke): PhotoEditMutation {
+    /** [exceededPointBudget] reports the stroke limit for points the caller already reduced before passing them in. */
+    fun addStroke(
+        stroke: PhotoEditStroke,
+        exceededPointBudget: Boolean = false,
+    ): PhotoEditMutation {
         if (current.strokes.size >= limits.maxStrokes) {
             return PhotoEditMutation(this, PhotoEditLimit.StrokeCount)
         }
@@ -198,11 +202,11 @@ internal data class PhotoEditHistory(
                 minimumDistance = limits.minimumPointDistance,
             )
         val appliedPointCap = min(limits.maxPointsPerStroke, remainingPoints)
+        val reachedCap = sanitized.size >= appliedPointCap || exceededPointBudget
         val limit =
             when {
-                sanitized.size >= appliedPointCap && remainingPoints < limits.maxPointsPerStroke ->
-                    PhotoEditLimit.TotalPoints
-                sanitized.size >= appliedPointCap && stroke.points.size > appliedPointCap ->
+                reachedCap && remainingPoints < limits.maxPointsPerStroke -> PhotoEditLimit.TotalPoints
+                exceededPointBudget || (reachedCap && stroke.points.size > appliedPointCap) ->
                     PhotoEditLimit.StrokePoints
                 else -> null
             }

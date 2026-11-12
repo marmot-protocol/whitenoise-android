@@ -1138,6 +1138,8 @@ internal fun MessageBubble(
                 }
             }
 
+    val requestTtsTrust = dev.ipf.whitenoise.android.audio.tts.rememberTtsTrustAction(appState)
+
     /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
         startRenderedHit: RenderedTextHit? = null,
@@ -1158,40 +1160,43 @@ internal fun MessageBubble(
         if (!canCommit()) return
         val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
         val locale = java.util.Locale.getDefault()
-        appState.launchMutation {
-            val entries = speakFromHereEntries(literalCode)
-            if (!canCommit() || !projectionStillCurrent()) {
-                return@launchMutation
-            }
-            if (entries.firstOrNull()?.messageIdHex != record.messageIdHex) {
-                appState.present(R.string.tts_bar_error)
-                return@launchMutation
-            }
-            val fallbackSentenceIndex =
-                if (fallbackVisibleText == null || fallbackVisibleOffset == null) {
-                    0
-                } else {
-                    speakableSentenceIndexAtVisibleOffset(
-                        visibleText = fallbackVisibleText,
-                        speakableText = entries.first().text,
-                        visibleOffset = fallbackVisibleOffset,
-                        locale = locale,
-                    )
+        requestTtsTrust {
+            appState.launchMutation {
+                if (!canCommit()) return@launchMutation
+                val entries = speakFromHereEntries(literalCode)
+                if (!canCommit() || !projectionStillCurrent()) {
+                    return@launchMutation
                 }
-            val started =
-                appState.speakAloudAutoRead(
-                    controller.group.groupIdHex,
-                    entries,
-                    locale,
-                    startSentenceIndex = fallbackSentenceIndex,
-                    startRenderedHit =
-                        startRenderedHit?.let {
-                            preparedHitFromRenderedHit(entries.first(), it)
-                        },
-                    backgroundPreparation = true,
-                    canCommit = canCommit,
-                )
-            if (!started && canCommit()) appState.present(appState.ttsStartFailureMessage())
+                if (entries.firstOrNull()?.messageIdHex != record.messageIdHex) {
+                    appState.present(R.string.tts_bar_error)
+                    return@launchMutation
+                }
+                val fallbackSentenceIndex =
+                    if (fallbackVisibleText == null || fallbackVisibleOffset == null) {
+                        0
+                    } else {
+                        speakableSentenceIndexAtVisibleOffset(
+                            visibleText = fallbackVisibleText,
+                            speakableText = entries.first().text,
+                            visibleOffset = fallbackVisibleOffset,
+                            locale = locale,
+                        )
+                    }
+                val started =
+                    appState.speakAloudAutoRead(
+                        controller.group.groupIdHex,
+                        entries,
+                        locale,
+                        startSentenceIndex = fallbackSentenceIndex,
+                        startRenderedHit =
+                            startRenderedHit?.let {
+                                preparedHitFromRenderedHit(entries.first(), it)
+                            },
+                        backgroundPreparation = true,
+                        canCommit = canCommit,
+                    )
+                if (!started && canCommit()) appState.present(appState.ttsStartFailureMessage())
+            }
         }
     }
 
@@ -1657,6 +1662,8 @@ internal fun MessageBubble(
         // (#3603): its nested controls read as text and their actions move here.
         val rowMerged = !selectionMode && !textSelectionMode
         val rowTextActions = LocalMessageRowTextActions.current
+        val readAloudLabels =
+            setOf(stringResource(R.string.tts_choose_sentence), stringResource(R.string.tts_read_from_sentence))
         val failedOwnSend = mine && item.status == MessageStatus.Failed
         val rowActions =
             listOf(
@@ -1920,7 +1927,12 @@ internal fun MessageBubble(
                                         true
                                     }
                                 }
-                                customActions = messageRowCustomActions(rowActions, rowTextActions?.actions.orEmpty())
+                                customActions =
+                                    messageRowCustomActions(
+                                        rowActions,
+                                        rowTextActions?.actions.orEmpty(),
+                                        readAloudLabels,
+                                    )
                             }
                         },
                     )

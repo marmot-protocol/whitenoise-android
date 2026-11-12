@@ -117,6 +117,37 @@ class SelectedSecurityEvidenceTest(unittest.TestCase):
             with self.assertRaises(InvalidEvidence):
                 below(selected, "2.3.35")
 
+    def test_guava_edition_suffix_is_not_a_prerelease(self):
+        editions = ["-android", "-jre"]
+        for version in ("33.7.2-android", "33.7.2-jre", "33.8.0-android", "34.0.0-jre"):
+            self.assertFalse(below(version, "33.7.2", editions))
+        for version in ("33.3.1-android", "33.7.1-jre", "33.7.2-rc1-android", "33.7.2-SNAPSHOT"):
+            self.assertTrue(below(version, "33.7.2", editions))
+        # Without the policy's edition list the suffix still reads as a prerelease.
+        self.assertTrue(below("33.7.2-android", "33.7.2"))
+        with self.assertRaises(InvalidEvidence):
+            below("-android", "33.7.2", editions)
+        guava = "com.google.guava:guava"
+        self.report["components"] = [{"group": "com.google.guava", "name": "guava", "version": "33.7.2-android"}]
+        self.assertEqual(verify(self.report, {guava: "33.7.2"}, editions={guava: editions}), 1)
+        self.report["components"][0]["version"] = "33.3.1-android"
+        with self.assertRaises(InvalidEvidence):
+            verify(self.report, {guava: "33.7.2"}, editions={guava: editions})
+
+    def test_cli_rejects_malformed_edition_policy(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "reports").mkdir()
+            (root / "reports" / "a.json").write_text(json.dumps(self.report))
+            for editions in ({"org.example:absent": ["-jre"]}, {"org.freemarker:freemarker": "-jre"},
+                             {"org.freemarker:freemarker": []}, {"org.freemarker:freemarker": ["jre"]}):
+                policy = root / "policy.json"
+                policy.write_text(json.dumps({"schema": 1, "minimum_versions": self.policy,
+                                              "edition_suffixes": editions}))
+                with mock.patch("sys.argv", ["verify", str(root / "reports"), "--policy", str(policy)]), \
+                        mock.patch("subprocess.check_output", return_value="a" * 40):
+                    self.assertEqual(validator.main(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

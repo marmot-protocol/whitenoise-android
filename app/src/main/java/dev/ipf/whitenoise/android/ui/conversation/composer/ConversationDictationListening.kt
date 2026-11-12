@@ -10,13 +10,16 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -32,14 +35,27 @@ private const val DICTATION_LISTENING_BAR_MIN_HEIGHT_DP = 6f
 private const val DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP = 8f
 private const val DICTATION_PULSE_FADE_MILLIS = 120
 
-/** The listening pulse fades in place; the commands keep their positions when capture stops. */
+/**
+ * The listening pulse takes and gives back its width as capture starts and stops, in step with the
+ * compact actions' own width so the capsule closes the gap instead of keeping blank space.
+ */
 @Composable
 internal fun ConversationDictationListeningSlot(visible: Boolean) {
     val motion = rememberSystemAnimationsEnabled()
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap()),
-        exit = fadeOut(if (motion) tween(DICTATION_PULSE_FADE_MILLIS) else snap()),
+        enter =
+            fadeIn(if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap()) +
+                expandHorizontally(
+                    animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
+                    expandFrom = Alignment.Start,
+                ),
+        exit =
+            fadeOut(if (motion) tween(DICTATION_PULSE_FADE_MILLIS) else snap()) +
+                shrinkHorizontally(
+                    animationSpec = if (motion) tween(DICTATION_ACTIONS_RESIZE_MILLIS) else snap(),
+                    shrinkTowards = Alignment.Start,
+                ),
     ) {
         ConversationDictationListeningIndicator()
     }
@@ -64,7 +80,7 @@ private fun ConversationDictationListeningIndicator() {
     Canvas(
         modifier =
             Modifier
-                .size(24.dp)
+                .size(DICTATION_LISTENING_PULSE_WIDTH)
                 .testTag(DICTATION_LISTENING_INDICATOR_TAG),
     ) {
         val barWidth = 3.dp.toPx()

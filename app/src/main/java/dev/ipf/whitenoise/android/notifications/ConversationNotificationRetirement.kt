@@ -179,6 +179,11 @@ internal class ConversationNotificationRetirement(
         ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
             val writtenByApp =
                 ConversationCardPostedRegistry.clearPosted(key.tag, key.id, cutoffMs)
+            // The tray snapshot predates this lock. A newer accepted app write under the same key replaced the
+            // listed card after the cutoff, so the stale listing must not cancel it (#3711).
+            if (!writtenByApp && ConversationCardPostedRegistry.hasPostedAfter(key.tag, key.id, cutoffMs)) {
+                return@withLock ConversationCardDismissalOutcome.ABSENT
+            }
             val listed = active?.any { it.tag == key.tag && it.id == key.id && dismissalTime(it) <= cutoffMs } == true
             if (active != null && !writtenByApp && !listed) return@withLock ConversationCardDismissalOutcome.ABSENT
             try {

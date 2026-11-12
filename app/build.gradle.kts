@@ -139,7 +139,7 @@ val mediaDecoderPreparedDir =
 val prepareNativeMediaDecoder =
     tasks.register<Exec>("prepareNativeMediaDecoder") {
         group = "build setup"
-        description = "Build verified software codecs for the permissionless media worker"
+        description = "Prepare verified software codecs for the permissionless media worker"
         inputs.dir(rootProject.file("native/media-decoder"))
         inputs.file(rootProject.file("scripts/prepare_media_decoder.py"))
         inputs.property("abiSelection", mediaDecoderAbis)
@@ -148,19 +148,26 @@ val prepareNativeMediaDecoder =
         outputs.upToDateWhen { false }
         environment("PYTHONDONTWRITEBYTECODE", "1")
         doFirst {
-            commandLine(
-                marmotKitPreparationLauncher +
+            val ndkArguments =
+                if (System.getProperty("os.name").startsWith("Mac", ignoreCase = true)) {
+                    emptyList()
+                } else {
                     listOf(
-                        rootProject.file("scripts/prepare_media_decoder.py").absolutePath,
                         "--ndk",
                         androidComponents.sdkComponents.ndkDirectory
                             .get()
                             .asFile.absolutePath,
+                    )
+                }
+            commandLine(
+                marmotKitPreparationLauncher +
+                    listOf(
+                        rootProject.file("scripts/prepare_media_decoder.py").absolutePath,
                         "--output",
                         mediaDecoderPreparedDir.absolutePath,
                         "--jobs",
                         "2",
-                    ) + mediaDecoderAbiArguments,
+                    ) + ndkArguments + mediaDecoderAbiArguments,
             )
         }
     }
@@ -1315,6 +1322,14 @@ tasks.withType<Test>().configureEach {
     inputs
         .file(rootProject.file("docs/invariant-gates.md"))
         .withPropertyName("invariantGateRegistry")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    // DependencySecurityPolicyCoverageTest reads the policy and both enforcers from disk for the same reason.
+    inputs
+        .files(
+            rootProject.file("gradle/dependency-security.json"),
+            rootProject.file("gradle/dependency-security.settings.gradle"),
+            rootProject.file("scripts/verify_dependency_security.py"),
+        ).withPropertyName("dependencySecurityPolicy")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     // Any instrumented Kotlin test can be registered, even without the CoverageTest suffix. Unit-test tasks do
     // not compile these sources, so their additions, deletions and renames must invalidate cached validation.

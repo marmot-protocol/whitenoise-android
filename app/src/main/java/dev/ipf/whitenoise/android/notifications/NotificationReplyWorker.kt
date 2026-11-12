@@ -2,7 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -136,6 +136,7 @@ class NotificationReplyWorker(
 
                 NotificationReplySendOutcome.RetryableFailure,
                 NotificationReplySendOutcome.NonRetryableFailure,
+                NotificationReplySendOutcome.TooLong,
                 -> {
                     notificationReplyActionHandled(sent = false)
                     replySendFailureResult(
@@ -205,6 +206,7 @@ class NotificationReplyWorker(
         )
     }
 
+    /** Retries a retryable send within its budget, and otherwise ends the reply with a notice matching the outcome. */
     private suspend fun replySendFailureResult(
         action: NotificationAction,
         outcome: NotificationReplySendOutcome,
@@ -235,14 +237,21 @@ class NotificationReplyWorker(
             retryStore,
             retryKey,
             failureReason =
-                if (outcome == NotificationReplySendOutcome.NonRetryableFailure) {
-                    "non-retryable send failure"
+                when (outcome) {
+                    NotificationReplySendOutcome.NonRetryableFailure -> "non-retryable send failure"
+                    NotificationReplySendOutcome.TooLong -> "over-limit reply"
+                    else -> null
+                },
+            notice =
+                if (outcome == NotificationReplySendOutcome.TooLong) {
+                    R.string.toast_message_too_long
                 } else {
-                    null
+                    R.string.toast_send_failed
                 },
         )
     }
 
+    /** Records the reply as abandoned, then restores the card with [notice] so the user can try again. */
     private suspend fun finalizeReplyFailure(
         action: NotificationAction,
         containsLegacyPlaintext: Boolean,
@@ -251,6 +260,7 @@ class NotificationReplyWorker(
         retryStore: NotificationActionRetryStore,
         retryKey: String,
         failureReason: String? = null,
+        @StringRes notice: Int = R.string.toast_send_failed,
     ): Result {
         // Only persist the abandon marker once we're actually giving up (off the
         // worker thread); if it can't be recorded, retry so recovery state isn't lost.
@@ -264,7 +274,7 @@ class NotificationReplyWorker(
             "group=${action.target.groupIdHex.take(8)}"
         }
         retryStore.clear(retryKey)
-        surfaceReplyFailure(action)
+        surfaceReplyFailure(action, notice)
         return Result.failure()
     }
 
@@ -275,31 +285,10 @@ class NotificationReplyWorker(
      * restore the card to a repliable state stamped with the failure notice.
      * Best-effort on both fronts — the abandon marker is already durable.
      */
-    private suspend fun surfaceReplyFailure(action: NotificationAction) {
-        withContext(NonCancellable) {
-            val failureNotice = applicationContext.getString(R.string.toast_send_failed)
-            runCatching {
-                val presenter = LocalNotificationPresenter(applicationContext)
-                // Same bounded retry as the success-path re-post: the system
-                // applies the direct-reply lifetime extension a beat after the
-                // reply broadcast, so a fast terminal failure can look before
-                // the card is in the active set and must try again.
-                retryReplyCardRestore {
-                    presenter.markDirectReplyFailed(
-                        notificationTag = action.notificationTag,
-                        notificationId = action.notificationId,
-                        repliedMessageIdHex = action.target.messageIdHex,
-                        failureNotice = failureNotice,
-                    )
-                }
-            }
-            runCatching {
-                withContext(Dispatchers.Main.immediate) {
-                    Toast.makeText(applicationContext, failureNotice, Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
+    private suspend fun surfaceReplyFailure(
+        action: NotificationAction,
+        @StringRes notice: Int = R.string.toast_send_failed,
+    ) = surfaceNotificationReplyFailure(applicationContext, action, notice)
 
     private fun cryptoFailureResult(
         failure: Throwable,

@@ -3,8 +3,8 @@ package dev.ipf.whitenoise.android.qualification
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 
 /**
- * The newest [limit] messages of [group] on the candidate runtime. The baseline build replaces this file with
- * scripts/mdk-baseline-overlay/QualificationTimelineQuery.kt.txt, since the query's fields differ between the two.
+ * The newest [limit] messages of [group]. The baseline and candidate runtimes share this query's fields, so both builds
+ * compile this file unchanged.
  */
 internal fun qualificationTimelineQuery(
     group: String,

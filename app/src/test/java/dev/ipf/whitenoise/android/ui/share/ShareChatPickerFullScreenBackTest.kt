@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.share
 
 import android.content.Context
+import android.provider.Settings
 import android.window.BackEvent
 import android.window.OnBackAnimationCallback
 import android.window.OnBackInvokedDispatcher
@@ -181,6 +182,44 @@ class ShareChatPickerFullScreenBackTest {
         assertEquals(0, tracker.dismissCount)
         assertEquals(0, tracker.routeBackCount)
         composeRule.onNodeWithText(shareToLabel).assertIsDisplayed()
+    }
+
+    /** The scale tracks gesture progress frame-for-frame, then eases (not snaps) back on cancel. */
+    @Test
+    fun predictiveBackScaleFollowsGestureWithoutLag() {
+        val resolver = ApplicationProvider.getApplicationContext<Context>().contentResolver
+        val originalScale = Settings.Global.getFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        try {
+            mountSharePicker(modal = false)
+            val initialWidth = screenTitleWidth()
+            val dispatcher = screenOnBackPressedDispatcher()
+
+            composeRule.mainClock.autoAdvance = false
+            composeRule.runOnIdle {
+                dispatcher.dispatchOnBackStarted(predictiveBackEvent(progress = 0f))
+                dispatcher.dispatchOnBackProgressed(predictiveBackEvent(progress = 0.5f))
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.mainClock.advanceTimeByFrame()
+
+            // Halfway through the gesture the screen is already at halfway scale, not easing toward it.
+            assertEquals(initialWidth * 0.95f, screenTitleWidth(), 1f)
+
+            composeRule.runOnIdle { dispatcher.dispatchOnBackCancelled() }
+            composeRule.mainClock.advanceTimeBy(100)
+            val easingWidth = screenTitleWidth()
+            assertTrue(
+                "cancel should ease back, width was $easingWidth of $initialWidth",
+                easingWidth > initialWidth * 0.95f + 1f && easingWidth < initialWidth - 1f,
+            )
+
+            composeRule.mainClock.autoAdvance = true
+            composeRule.waitForIdle()
+            assertEquals(initialWidth, screenTitleWidth(), 1f)
+        } finally {
+            Settings.Global.putFloat(resolver, Settings.Global.ANIMATOR_DURATION_SCALE, originalScale)
+        }
     }
 
     @Test

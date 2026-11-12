@@ -46,6 +46,7 @@ import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScanResult
 import dev.ipf.whitenoise.android.ui.qr.QrScanUseCase
@@ -226,7 +227,11 @@ internal fun ContactPickerScreen(
                         }
                     }
                 },
-                modifier = Modifier.performanceTestTag(PerformanceTestTags.CONTACT_PICKER_NEXT),
+                // Registered so the floating dictation capsule stacks above Next instead of covering it.
+                modifier =
+                    Modifier
+                        .floatingDictationAnchor()
+                        .performanceTestTag(PerformanceTestTags.CONTACT_PICKER_NEXT),
                 containerColor =
                     if (canConfirm) {
                         MaterialTheme.colorScheme.primaryContainer

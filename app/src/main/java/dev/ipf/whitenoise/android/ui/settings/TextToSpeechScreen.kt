@@ -173,14 +173,14 @@ internal fun TextToSpeechScreen(
                             subtitle = stringResource(R.string.tts_auto_read_default_global_subtitle),
                         )
                     }
-                    row("composer_shortcut") { context ->
+                    row("header_shortcut") { context ->
                         SettingsSwitch(
                             context = context,
-                            title = stringResource(R.string.tts_composer_shortcut_title),
-                            checked = ttsAutoReadPrefs.showComposerShortcut,
-                            onCheckedChange = appState::setTtsComposerShortcutVisible,
-                            modifier = Modifier.testTag("speech.composer_shortcut"),
-                            subtitle = stringResource(R.string.tts_composer_shortcut_subtitle),
+                            title = stringResource(R.string.tts_header_shortcut_title),
+                            checked = ttsAutoReadPrefs.showHeaderShortcut,
+                            onCheckedChange = appState::setTtsHeaderShortcutVisible,
+                            modifier = Modifier.testTag("speech.header_shortcut"),
+                            subtitle = stringResource(R.string.tts_header_shortcut_subtitle),
                         )
                     }
                     row("media_mix") { context ->

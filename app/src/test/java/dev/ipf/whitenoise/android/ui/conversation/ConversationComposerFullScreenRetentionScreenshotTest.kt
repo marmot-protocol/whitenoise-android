@@ -15,9 +15,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties.EditableText
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -25,7 +22,6 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -35,9 +31,6 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
-import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
-import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -46,8 +39,6 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
-import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
-import dev.ipf.whitenoise.android.state.TtsAutoReadPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
@@ -64,7 +55,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.util.Locale
 
 /** Production re-entry evidence for retained full-screen geometry under dense, narrow RTL layout. */
 @RunWith(RobolectricTestRunner::class)
@@ -114,130 +104,6 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         composeRule.onRoot().captureRoboImage(
             "src/test/snapshots/conversation_composer_full_screen_retained_reentry_amoled_rtl_xhdpi.png",
         )
-    }
-
-    @Test
-    fun conversationSettingRevealsSpeakerAndSpeakerKeepsTogglingOnlyThisChat() {
-        val appState = createAppState("")
-        val chat = createConversation(appState)
-        val speaker = composeRule.onNodeWithContentDescription(context.getString(R.string.tts_auto_read_title))
-        mountConversation(appState, chat)
-        speaker.assertDoesNotExist()
-
-        composeRule.runOnIdle { appState.setConversationAutoReadOverride(GROUP_A, TtsAutoReadOverride.ON) }
-        speaker.assertIsDisplayed().assertIsOn()
-        composeRule.mainClock.autoAdvance = false
-        speaker.performClick()
-        composeRule.mainClock.advanceTimeByFrame()
-        speaker.assertIsOff().assertIsNotEnabled()
-        composeRule.mainClock.advanceTimeBy(250)
-        speaker.assertIsDisplayed().assertIsOff()
-        composeRule.mainClock.advanceTimeBy(1_000)
-        speaker.assertDoesNotExist()
-        composeRule.mainClock.autoAdvance = true
-        composeRule.runOnIdle {
-            val reloaded = TtsAutoReadPreferences(context)
-            assertEquals(false, reloaded.isComposerShortcutVisibleFor(ACCOUNT_A, GROUP_A))
-            assertEquals(false, reloaded.isConversationAutoRead(ACCOUNT_A, GROUP_A))
-            assertEquals(false, reloaded.isComposerShortcutVisibleFor(ACCOUNT_A, GROUP_B))
-            assertEquals(false, reloaded.isComposerShortcutVisibleFor(ACCOUNT_B, GROUP_A))
-        }
-        composeRule.runOnIdle { appState.setConversationAutoReadOverride(GROUP_A, TtsAutoReadOverride.ON) }
-        speaker.assertIsOn()
-        composeRule.runOnIdle {
-            assertEquals(TtsAutoReadOverride.ON, appState.ttsAutoReadPreferences.overrideFor(ACCOUNT_A, GROUP_A))
-            assertNull(appState.ttsAutoReadPreferences.overrideFor(ACCOUNT_A, GROUP_B))
-            assertNull(appState.ttsAutoReadPreferences.overrideFor(ACCOUNT_B, GROUP_A))
-        }
-        composeRule.runOnUiThread { conversationVisible = false }
-        composeRule.onNodeWithTag(CHAT_LIST_TAG).assertIsDisplayed()
-        composeRule.runOnUiThread { conversationVisible = true }
-        speaker.assertIsDisplayed().assertIsOn()
-        composeRule.runOnIdle { appState.setConversationAutoReadOverride(GROUP_A, null) }
-        speaker.assertDoesNotExist()
-        composeRule.runOnIdle {
-            assertEquals(false, TtsAutoReadPreferences(context).isComposerShortcutVisibleFor(ACCOUNT_A, GROUP_A))
-            assertEquals(false, appState.isConversationAutoRead(GROUP_A))
-        }
-    }
-
-    @Test
-    fun globalSpeechKeepsSpeakerAvailableWhenConversationSpeechIsToggledOff() {
-        val appState = createAppState("")
-        val chat = createConversation(appState)
-        val speaker = composeRule.onNodeWithContentDescription(context.getString(R.string.tts_auto_read_title))
-        mountConversation(appState, chat)
-        speaker.assertDoesNotExist()
-
-        composeRule.runOnIdle { appState.setTtsAutoReadGlobalDefault(true) }
-        speaker.assertIsDisplayed().assertIsOn()
-        speaker.performClick().assertIsOff()
-        speaker.performClick().assertIsOn()
-        speaker.performClick().assertIsOff()
-        composeRule.runOnIdle {
-            assertTrue(appState.ttsAutoReadPreferences.state.value.globalDefaultEnabled)
-            assertEquals(TtsAutoReadOverride.OFF, appState.ttsAutoReadPreferences.overrideFor(ACCOUNT_A, GROUP_A))
-            assertNull(appState.ttsAutoReadPreferences.overrideFor(ACCOUNT_B, GROUP_A))
-        }
-        composeRule.runOnIdle { appState.setTtsAutoReadGlobalDefault(false) }
-        speaker.assertDoesNotExist()
-    }
-
-    @Test
-    fun speakerOffStopsManualSpeechInThisConversation() = assertManualSpeakerStop(paused = false, sameGroup = true)
-
-    @Test
-    fun speakerOffStopsPausedManualSpeechInThisConversation() = assertManualSpeakerStop(paused = true, sameGroup = true)
-
-    @Test
-    fun speakerOffPreservesManualSpeechInAnotherConversation() {
-        assertManualSpeakerStop(paused = false, sameGroup = false)
-    }
-
-    private fun assertManualSpeakerStop(
-        paused: Boolean,
-        sameGroup: Boolean,
-    ) {
-        val appState = createAppState("")
-        val chat = createConversation(appState)
-        appState.ttsController.attachEngine(FakeSessionEngine())
-        appState.setConversationAutoReadOverride(GROUP_A, TtsAutoReadOverride.ON)
-        mountConversation(appState, chat)
-        try {
-            composeRule.runOnIdle {
-                val entries = listOf(TtsSpeakableEntry("manual", "Sender", "Manual playback."))
-                assertTrue(appState.speakAloud(entries, Locale.US))
-                appState.ttsHistorySession.onConversationSessionStarted(ACCOUNT_A, if (sameGroup) GROUP_A else GROUP_B)
-                if (paused) appState.ttsController.pause()
-            }
-            val manual = appState.ttsController.state.value
-            composeRule.onNodeWithContentDescription(context.getString(R.string.tts_auto_read_title)).performClick()
-            composeRule.runOnIdle {
-                val current = appState.ttsController.state.value
-                assertEquals(sameGroup, current is TtsState.Idle)
-                if (!sameGroup) {
-                    assertEquals(manual.sessionId, current.sessionId)
-                    assertEquals(manual.javaClass, current.javaClass)
-                }
-            }
-        } finally {
-            appState.stopSpeaking()
-        }
-    }
-
-    @Test
-    fun speakerShortcutFollowsOptInWithoutChangingSpeechPolicy() {
-        val appState = createAppState("")
-        val chat = createConversation(appState)
-        val speaker = composeRule.onNodeWithContentDescription(context.getString(R.string.tts_auto_read_title))
-        mountConversation(appState, chat)
-        speaker.assertDoesNotExist()
-
-        composeRule.runOnIdle { appState.setTtsComposerShortcutVisible(true) }
-        speaker.assertIsDisplayed()
-        composeRule.runOnIdle { appState.setTtsComposerShortcutVisible(false) }
-        speaker.assertDoesNotExist()
-        composeRule.runOnIdle { assertEquals(false, appState.isConversationAutoRead(GROUP_A)) }
     }
 
     /** Mounts the real route with framework density retained and large-text RTL presentation. */

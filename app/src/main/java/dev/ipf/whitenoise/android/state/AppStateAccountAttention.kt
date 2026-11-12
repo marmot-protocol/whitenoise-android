@@ -84,6 +84,10 @@ internal fun AccountAttentionSnapshotFfi.readyMessageCount(accountIdHex: String)
         ?.total
         ?.unreadCount
 
+/** Whether the newest native summary holds a complete Ready total for [accountIdHex]. */
+internal fun AccountAttentionSnapshotFfi.hasReadyTotal(accountIdHex: String): Boolean =
+    accounts.any { it.accountIdHex == accountIdHex && it.state is AccountAttentionStateFfi.Ready }
+
 /** Current native replacement value; null while its runtime or account has no Ready snapshot. */
 internal fun WhiteNoiseAppState.activeAccountMessageCount(): ULong? =
     activeAccount?.accountIdHex?.let { runtimeMirrors.attention.latest?.readyMessageCount(it) }
@@ -95,7 +99,12 @@ internal fun WhiteNoiseAppState.applyAccountAttention(snapshot: AccountAttention
     snapshot.accounts.forEach { entry ->
         val ref = refsByAccountId[entry.accountIdHex] ?: return@forEach
         when (val state = entry.state) {
-            is AccountAttentionStateFfi.Ready -> updateAccountUnreadCount(ref, state.total.badgeCount())
+            // The complete badge count already includes manual reminders, so it also replaces any manual-only
+            // flag a bounded chat-list projection left behind (#3729).
+            is AccountAttentionStateFfi.Ready ->
+                accountUnreadStore.updateValue(ref) {
+                    AccountUnreadValue(state.total.badgeCount(), AccountUnreadFreshness.CONFIRMED, false)
+                }
             is AccountAttentionStateFfi.Unavailable -> accountUnreadStore.markUnknown(ref)
         }
     }

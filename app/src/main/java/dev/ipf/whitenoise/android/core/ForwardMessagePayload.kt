@@ -41,6 +41,9 @@ internal enum class ForwardBlockedReason {
     ExpiredAttachment,
     UnavailableAttachment,
     RestrictedAttachment,
+
+    /** The text or caption is longer than other clients show in full. */
+    TooLong,
 }
 
 internal sealed interface ForwardEligibility {

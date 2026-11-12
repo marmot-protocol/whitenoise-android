@@ -20,7 +20,7 @@ class AccountSetupControllerTest {
     fun initialSnapshotFailureStillClosesTheNativeSubscription() =
         runTest {
             val client = FakeSetupClient().apply { failInitialSnapshot = true }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             assertTrue(client.closed)
@@ -36,7 +36,7 @@ class AccountSetupControllerTest {
                 FakeSetupClient().apply {
                     metadata = UserProfileMetadataFfi("fallback", null, "Before", null, null, null, null)
                 }
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.PROFILE, OnboardingActionFfi.EDIT_PROFILE, 3uL)
@@ -66,7 +66,10 @@ class AccountSetupControllerTest {
                     client,
                     backgroundScope,
                     { true },
-                    { activated = true },
+                    {
+                        activated = true
+                        true
+                    },
                     {},
                 )
             controller.reconnect()
@@ -87,7 +90,7 @@ class AccountSetupControllerTest {
     fun repeatedTapsPublishOnlyOneDecisionWithTheDisplayedRevision() =
         runTest {
             val client = FakeSetupClient()
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             client.hold = CompletableDeferred()
@@ -108,7 +111,7 @@ class AccountSetupControllerTest {
     fun newerStoredRevisionRequiresFreshReviewWithoutPublishing() =
         runTest {
             val client = FakeSetupClient()
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             client.current = setupSnapshot(revision = 4uL)
@@ -129,7 +132,7 @@ class AccountSetupControllerTest {
     fun actionsAbsentFromTheSnapshotNeverReachTheEngine() =
         runTest {
             val client = FakeSetupClient(setupSnapshot(OnboardingStepFfi.RELAYS, listOf(OnboardingActionFfi.RETRY)))
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.submit(SetupRequest(3uL, OnboardingStepFfi.RELAYS, OnboardingActionFfi.USE_RECOMMENDED_RELAYS))
@@ -150,7 +153,10 @@ class AccountSetupControllerTest {
                     client,
                     backgroundScope,
                     { true },
-                    { activations++ },
+                    {
+                        activations++
+                        true
+                    },
                     {},
                 )
             controller.reconnect()
@@ -162,6 +168,40 @@ class AccountSetupControllerTest {
             runCurrent()
             assertEquals(1, activations)
             assertTrue(client.snapshotReads > 0)
+            controller.close()
+        }
+
+    /**
+     * A normally declined activation, such as a transient recovery read failure, keeps Open Chats
+     * retryable on the same controller, and only the successful retry suppresses later attempts (#3697).
+     */
+    @Test
+    fun declinedActivationStaysRetryableUntilOneSucceeds() =
+        runTest {
+            val client = FakeSetupClient(setupSnapshot(ready = true))
+            val outcomes = ArrayDeque(listOf(false, true))
+            var attempts = 0
+            val controller =
+                AccountSetupController(
+                    SETUP_TEST_ACCOUNT,
+                    client,
+                    backgroundScope,
+                    { true },
+                    {
+                        attempts++
+                        outcomes.removeFirstOrNull() ?: true
+                    },
+                    {},
+                )
+            controller.reconnect()
+            runCurrent()
+            repeat(3) {
+                controller.openChats()
+                runCurrent()
+            }
+
+            assertEquals("one declined attempt, then exactly one successful retry", 2, attempts)
+            assertTrue(outcomes.isEmpty())
             controller.close()
         }
 
@@ -177,7 +217,10 @@ class AccountSetupControllerTest {
                     client,
                     backgroundScope,
                     { true },
-                    { activated = true },
+                    {
+                        activated = true
+                        true
+                    },
                     {},
                 )
             client.snapshotOverride = setupSnapshot(revision = 4uL)
@@ -198,7 +241,7 @@ class AccountSetupControllerTest {
     fun foreignAccountAndOldRevisionUpdatesAreDiscarded() =
         runTest {
             val client = FakeSetupClient()
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             client.updates.send(setupSnapshot(revision = 9uL, ready = true).copy(accountIdHex = "cd".repeat(32)))
@@ -229,7 +272,10 @@ class AccountSetupControllerTest {
                     client,
                     backgroundScope,
                     { current },
-                    { activated = true },
+                    {
+                        activated = true
+                        true
+                    },
                     {},
                 )
             client.beforeSnapshot = { current = false }
@@ -248,7 +294,15 @@ class AccountSetupControllerTest {
         runTest {
             val client = FakeSetupClient()
             var current = true
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { current }, {}, {})
+            val controller =
+                AccountSetupController(
+                    SETUP_TEST_ACCOUNT,
+                    client,
+                    backgroundScope,
+                    { current },
+                    { true },
+                    {},
+                )
             controller.reconnect()
             runCurrent()
             val request = SetupRequest(3uL, OnboardingStepFfi.PROFILE, OnboardingActionFfi.CONTINUE_WITHOUT)
@@ -290,7 +344,7 @@ class AccountSetupControllerTest {
                     "tip@example.com",
                     "https://example.com/b.png",
                 )
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.edit(OnboardingStepFfi.PROFILE, OnboardingActionFfi.EDIT_PROFILE, 3uL)
@@ -327,7 +381,7 @@ class AccountSetupControllerTest {
                         listOf(OnboardingActionFfi.RETRY),
                     ),
                 )
-            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, {}, {})
+            val controller = AccountSetupController(SETUP_TEST_ACCOUNT, client, backgroundScope, { true }, { true }, {})
             controller.reconnect()
             runCurrent()
             controller.submit(SetupRequest(3uL, OnboardingStepFfi.INBOX_RELAYS, OnboardingActionFfi.RETRY))
@@ -354,7 +408,7 @@ class AccountSetupControllerTest {
                     client,
                     backgroundScope,
                     { true },
-                    {},
+                    { true },
                     { exits++ },
                 )
             controller.reconnect()

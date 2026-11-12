@@ -72,6 +72,9 @@ texts are libyuv's (bundled in Camera Core) and Protocol Buffers'; JNA's LGPL-2.
 row uses the text from JNA's repository. The Google Play services and Firebase
 rows stay links to the Android SDK terms. The required notices come from the retained original plugin
 output in `config/licenses/evidence/`, so a catalogue edit cannot drop one.
+`bundled_notice_ids` lists notices that always ship without a runtime artifact:
+the native FFmpeg and dav1d builds, and the Checker Qual and FindBugs-jsr305
+baseline rows, which stayed after Guava 33.7.2 stopped depending on those jars.
 
 `verify_notice_resources.py` follows the optimized APK's resource table to the
 actual ZIP entries, validates every UTF-8 range, checks the baseline's full notice

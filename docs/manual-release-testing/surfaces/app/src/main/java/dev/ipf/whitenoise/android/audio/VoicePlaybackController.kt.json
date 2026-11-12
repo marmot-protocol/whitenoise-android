@@ -10,6 +10,14 @@
         "test_ids": [
           "MED-047"
         ]
+      },
+      {
+        "surface": "Voice playback abandoned while its clip prepares",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/VoicePlaybackController.kt",
+        "anchor": "private suspend fun playLocked(",
+        "test_ids": [
+          "MED-050"
+        ]
       }
     ]
   },

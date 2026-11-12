@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.onboarding.setup
 
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStatusFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
@@ -69,7 +70,18 @@ internal fun setupFindingTitle(value: OnboardingIssueFfi): Int =
         OnboardingIssueFfi.INTERRUPTED -> R.string.setup_finding_interrupted
         OnboardingIssueFfi.TOO_MANY_RELAYS -> R.string.setup_finding_too_many_relays
         OnboardingIssueFfi.MULTI_DEVICE_UNSUPPORTED -> R.string.setup_finding_multi_device_unsupported
-        OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE -> R.string.setup_finding_other_installation_possible
+        OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE -> R.string.setup_other_sign_ins_found
         OnboardingIssueFfi.DISCOVERY_INCOMPLETE -> R.string.setup_finding_discovery_incomplete
         OnboardingIssueFfi.INSPECTION_COMPLETED -> R.string.setup_finding_inspection_completed
+    }
+
+/**
+ * The advisory note for the device step's discovery result. Finding nothing proves nothing, so
+ * only found or unchecked sign-ins add a note, and missing evidence counts as unchecked.
+ */
+internal fun setupDeviceDiscoveryNote(discovery: OnboardingDeviceDiscoveryFfi?): Int? =
+    when (discovery ?: OnboardingDeviceDiscoveryFfi.UNKNOWN) {
+        OnboardingDeviceDiscoveryFfi.NONE_FOUND -> null
+        OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE -> R.string.setup_other_sign_ins_found
+        OnboardingDeviceDiscoveryFfi.UNKNOWN -> R.string.setup_other_sign_ins_unchecked
     }

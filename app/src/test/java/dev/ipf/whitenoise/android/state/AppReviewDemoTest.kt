@@ -187,6 +187,75 @@ class AppReviewDemoTest {
             assertEquals(2, backend.messages.size)
         }
 
+    /**
+     * Creation that resumes an account which existed before the run, such as an unfinished generated setup, must
+     * not receive demo data: no profile, conversation or message, and the original account stays selected (#3702).
+     */
+    @Test
+    fun resumedPreexistingAccountIsRefusedBeforeAnyDemoMutation() =
+        runTest {
+            val unfinished = ReviewDemoAccount("unfinished", "d".repeat(64), localSigning = true, signedOut = false)
+            val backend =
+                FakeBackend().apply {
+                    accountList += unfinished
+                    resumedAccount = unfinished
+                }
+            val store = MemoryStore()
+            val demo = AppReviewDemo(backend, store, this, StandardTestDispatcher(testScheduler))
+
+            demo.start()
+            advanceUntilIdle()
+
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.AmbiguousAccount),
+                demo.status,
+            )
+            assertEquals(1, backend.accountCreates)
+            assertEquals(0, backend.profilePublishes)
+            assertTrue(backend.qualifications.isEmpty())
+            assertEquals(0, backend.groupCreates)
+            assertTrue(backend.messages.isEmpty())
+            assertEquals(original.ref, backend.activeAccountRef)
+            assertEquals(null, store.checkpoint?.demoRef)
+
+            // Retrying stays refused without another creation, until the saved setup is cleared.
+            demo.start()
+            advanceUntilIdle()
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.AmbiguousAccount),
+                demo.status,
+            )
+            assertEquals(1, backend.accountCreates)
+            demo.clearSavedSetup()
+            advanceUntilIdle()
+            assertEquals(ReviewDemoStatus.Idle, demo.status)
+            assertEquals(null, store.checkpoint)
+        }
+
+    /** The identity check alone refuses a resumed account that reappears under a different local ref. */
+    @Test
+    fun resumedIdentityUnderANewRefIsRefused() =
+        runTest {
+            val unfinished = ReviewDemoAccount("unfinished", "d".repeat(64), localSigning = true, signedOut = false)
+            val backend =
+                FakeBackend().apply {
+                    accountList += unfinished
+                    resumedAccount = unfinished.copy(ref = "resumed-ref", id = unfinished.id.uppercase())
+                }
+            val demo = AppReviewDemo(backend, MemoryStore(), this, StandardTestDispatcher(testScheduler))
+
+            demo.start()
+            advanceUntilIdle()
+
+            assertEquals(
+                ReviewDemoStatus.Failed(ReviewDemoStage.CreatingAccount, ReviewDemoProblem.AmbiguousAccount),
+                demo.status,
+            )
+            assertEquals(0, backend.profilePublishes)
+            assertTrue(backend.qualifications.isEmpty())
+            assertEquals(0, backend.groupCreates)
+        }
+
     @Test
     fun unrelatedSoleNewAccountIsNeverAdoptedByAResumedDemo() =
         runTest {
@@ -474,10 +543,15 @@ class AppReviewDemoTest {
         var loseAccountCreateReply = false
         var hideCreatedAccount = false
 
+        /** An existing unfinished account that creation resumes instead of making a new one. */
+        var resumedAccount: ReviewDemoAccount? = null
+        val qualifications = mutableListOf<String>()
+
         override suspend fun accounts() = accountList.filter { !hideCreatedAccount || it.ref == original.ref }
 
         override suspend fun createAccount(): ReviewDemoAccount {
             accountCreates++
+            resumedAccount?.let { return it }
             accountList += johnny
             if (loseAccountCreateReply) {
                 loseAccountCreateReply = false
@@ -490,7 +564,9 @@ class AppReviewDemoTest {
             return johnny
         }
 
-        override suspend fun qualifyAccount(ref: String) = Unit
+        override suspend fun qualifyAccount(ref: String) {
+            qualifications += ref
+        }
 
         override suspend fun accountNetworkReady(ref: String) = accountReady
 

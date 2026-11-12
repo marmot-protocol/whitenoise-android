@@ -15,6 +15,7 @@
     <string name="quarantine_member_validation">A validação dos membros ou do estado de criptografia falhou.</string>
     <string name="quarantine_group_record">Não foi possível carregar o registro do grupo.</string>
     <string name="quarantine_pending_commit">Não foi possível recuperar uma atualização de grupo interrompida.</string>
+    <string name="quarantine_rewind_restore">Não foi possível restaurar o grupo depois de ler seu estado anterior. Para tentar novamente, force a parada do White Noise nas configurações do Android ou reinicie o telefone e abra o White Noise de novo.</string>
     <string name="quarantine_recovered">Recuperação concluída. O grupo pode voltar à lista de conversas.</string>
     <string name="quarantine_still_quarantined">O grupo continua em quarentena. Seu histórico não foi apagado.</string>
     <string name="quarantine_retry_failed">Não foi possível concluir a recuperação. Tente novamente mais tarde.</string>

@@ -4820,7 +4820,7 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
-      "symbol": "ttsSentenceAccessibilityActions",
+      "symbol": "sentenceChooserActions",
       "bindings": [
         {
           "case": "presentation-modal-sentences-select",
@@ -6158,11 +6158,11 @@
         {
           "case": "presentation-modal-translation-composer",
           "selector": {
-            "text": "Translate as you type"
+            "text": "Offline Translator can write message text.*"
           },
-          "scope": "Audited production owner and distinctive asserted title; controlled presentation proves acceptance precedes any engine request, not the real Android entrypoint.",
+          "scope": "Audited production owner and distinctive asserted consent text; controlled presentation proves acceptance precedes any engine request, not the real Android entrypoint.",
           "entry_assertion": {
-            "text": "Translate as you type"
+            "text": "Offline Translator can write message text.*"
           },
           "visible_on_entry": true
         }
@@ -6477,6 +6477,82 @@
           },
           "opened_by": {
             "text": "Stickers"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+      "symbol": "AuditRetentionRow",
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "7 days"
+          },
+          "scope": "Open the production audit retention chooser and directly assert its seven-day option.",
+          "entry_assertion": {
+            "text": "7 days"
+          },
+          "opened_by": {
+            "id": "audit.retention"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+      "symbol": "ShorterAuditRetentionDialog",
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "Delete older audit logs\\?"
+          },
+          "scope": "Selecting seven days from the fresh fixture's thirty-day default opens the destructive confirmation. Cancel without writing.",
+          "entry_assertion": {
+            "text": "Delete older audit logs\\?"
+          },
+          "opened_by": {
+            "text": "7 days"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SelectAuditLogExportDialog.kt",
+      "symbol": "AuditLogPickerDialog",
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "Export"
+          },
+          "scope": "Assert the raw audit picker export control and cancel without exporting a file.",
+          "entry_assertion": {
+            "text": "Choose Audit Files"
+          },
+          "opened_by": {
+            "id": "audit.files.open"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SelectAuditLogExportDialog.kt",
+      "symbol": "SelectAuditLogExportDialog",
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "Choose Audit Files"
+          },
+          "scope": "Open the production raw audit picker through Diagnostics and assert the dialog entry.",
+          "entry_assertion": {
+            "text": "Choose Audit Files"
+          },
+          "opened_by": {
+            "id": "audit.files.open"
           }
         }
       ]

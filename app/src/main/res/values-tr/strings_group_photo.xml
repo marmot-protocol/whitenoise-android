@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="group_gif_upload_title">Bu GIF grup için kullanılsın mı?</string>
+    <string name="group_gif_upload_notice">Animasyonlu GIF herkese açık bir görsel sunucusuna yüklenecek. Bağlantıya sahip herkes görüntüleyebilir. GIF kırpılmadan, tamamı kullanılacak.</string>
+    <string name="group_gif_upload_confirm">GIF yükle</string>
+    <string name="group_photo_title">Grup fotoğrafı</string>
+    <string name="group_photo_encrypted_detail">Şifreli. Yalnızca grup üyeleri görebilir.</string>
+    <string name="group_photo_public_detail">Herkese açık bir görsel sunucusunda. Bağlantıya sahip herkes görüntüleyebilir.</string>
+    <string name="group_photo_upload_title">Bu fotoğraf grup için kullanılsın mı?</string>
+    <string name="group_photo_upload_notice">Fotoğraf herkese açık bir görsel sunucusuna yüklenecek. Bağlantıya sahip herkes görüntüleyebilecek.</string>
+    <string name="group_photo_upload_confirm">Devam</string>
+</resources>

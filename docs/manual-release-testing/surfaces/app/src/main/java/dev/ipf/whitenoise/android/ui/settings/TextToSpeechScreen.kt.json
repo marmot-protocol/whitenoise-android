@@ -33,15 +33,15 @@
     ],
     "settings_controls": [
       {
-        "surface": "setting:tts_composer_shortcut_title",
+        "surface": "setting:tts_header_shortcut_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
-        "anchor": "R.string.tts_composer_shortcut_title",
+        "anchor": "R.string.tts_header_shortcut_title",
         "test_ids": ["TTS-006"]
       },
       {
-        "surface": "setting:tts_composer_shortcut_subtitle",
+        "surface": "setting:tts_header_shortcut_subtitle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
-        "anchor": "R.string.tts_composer_shortcut_subtitle",
+        "anchor": "R.string.tts_header_shortcut_subtitle",
         "test_ids": ["TTS-006"]
       },
       {

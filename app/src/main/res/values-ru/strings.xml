@@ -344,8 +344,6 @@
     <string name="dismiss">Закрыть</string>
     <string name="edit">Изменить</string>
     <string name="edit_group_info_title">Изменить группу</string>
-    <string name="group_private_image">Приватное фото группы</string>
-    <string name="group_private_image_detail">Видно участникам группы.</string>
     <string name="group_description">Описание (необязательно)</string>
     <string name="save_group">Сохранить группу</string>
     <string name="saving_group">Сохранение группы...</string>
@@ -489,6 +487,7 @@
     <string name="forward_blocked_unavailable">Скачайте это вложение перед пересылкой</string>
     <string name="forward_blocked_restricted">Пересылка этого вложения запрещена</string>
     <string name="forward_blocked_unsupported">Это сообщение нельзя переслать</string>
+    <string name="forward_blocked_too_long">Это сообщение слишком длинное для пересылки</string>
     <string name="forward_blocked_selection">Пересылка недоступна: %1$s</string>
     <string name="forward_progress_title">Пересылка</string>
     <string name="forward_preparing_attachments">Подготовка вложений: %1$d из %2$d</string>
@@ -894,6 +893,7 @@
     <string name="toast_profile_published_detail">Ваш профиль теперь доступен на %1$d реле.</string>
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
+    <string name="toast_message_too_long">Сообщение слишком длинное. Сократите его и отправьте снова.</string>
     <string name="toast_send_storage_full">Недостаточно места для отправки. Освободите место и попробуйте снова.</string>
     <string name="error_storage_full">Недостаточно места на этом устройстве. Освободите место и попробуйте снова.</string>
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>
@@ -1850,8 +1850,8 @@
     <string name="tts_bar_history_loading">Загрузка других сообщений…</string>
     <string name="tts_bar_history_error">Не удалось загрузить другие сообщения. Нажмите ещё раз, чтобы повторить.</string>
     <string name="tts_auto_read_title">Читать сообщения вслух</string>
-    <string name="tts_composer_shortcut_title">Показывать кнопку динамика</string>
-    <string name="tts_composer_shortcut_subtitle">Показывать переключатель чтения вслух в заголовке чата.</string>
+    <string name="tts_header_shortcut_title">Показывать кнопку динамика</string>
+    <string name="tts_header_shortcut_subtitle">Всегда показывать чтение вслух в заголовке. Кнопка также видна, когда авточтение включено глобально или для этого чата.</string>
     <string name="tts_auto_read_default_global_title">Читать сообщения вслух по умолчанию</string>
     <string name="tts_auto_read_default_global_subtitle">Читает непрочитанные сообщения при открытии чата, если чат не задаёт иное</string>
     <string name="tts_auto_read_use_default_off">Использовать по умолчанию (Выкл.)</string>
@@ -2091,12 +2091,11 @@
     <string name="setup_acknowledge_single_device">Понятно — продолжить</string>
     <string name="setup_continue_without_profile">Продолжить без профиля</string>
     <string name="setup_review_suggested_changes">Просмотрите предлагаемые изменения</string>
-    <string name="setup_one_phone_per_account">Один телефон на аккаунт</string>
-    <string name="setup_one_phone_per_account_help">Чаты не синхронизируются между телефонами. Используйте этот аккаунт только на одном телефоне одновременно.</string>
+    <string name="setup_chats_on_this_device">Чаты на этом устройстве</string>
+    <string name="setup_chats_on_this_device_help">Сам по себе вход не восстанавливает ваши существующие чаты и сообщения. Если вы пользуетесь другим устройством, сохраните на нём приложение и данные, пока не проверите свои чаты здесь.</string>
     <string name="setup_device_stage">Использование устройства</string>
-    <string name="setup_device_discovery_none">На проверенных реле не найдено другой установки.</string>
-    <string name="setup_other_device_possible">Возможно, эту учетную запись использует другое устройство.</string>
-    <string name="setup_device_discovery_unknown">Не удалось проверить наличие других устройств.</string>
+    <string name="setup_other_sign_ins_found">Найдены другие записи о входе. Они могут относиться к другой установке или к более ранней.</string>
+    <string name="setup_other_sign_ins_unchecked">Не удалось проверить другие входы.</string>
     <string name="setup_approval_saved_pending">Ваше одобрение сохранено. Изменение все еще ожидается.</string>
     <string name="setup_profile_scope_help">Это обновит ваш профиль в других приложениях Nostr.</string>
     <string name="setup_optional_profile_help">Необязательно. Профиль можно добавить позже.</string>
@@ -2196,7 +2195,6 @@
     <string name="setup_finding_interrupted">Настройка прервана. Вы можете продолжить сохранённый шаг.</string>
     <string name="setup_finding_too_many_relays">В списке слишком много реле.</string>
     <string name="setup_finding_multi_device_unsupported">Разговоры не синхронизируются между устройствами.</string>
-    <string name="setup_finding_other_installation_possible">Другая установка может использовать эту идентичность.</string>
     <string name="setup_finding_discovery_incomplete">Поиск не удалось завершить. На основании этого результата замена предлагаться не будет.</string>
     <string name="setup_profile_help">Добавьте имя, чтобы вас узнавали. Это можно сделать позже.</string>
     <string name="setup_details">Подробности</string>
@@ -2454,6 +2452,8 @@
     <string name="diagnostics_clear_confirm_action">Очистить журналы</string>
     <string name="donate_open_failed">Не удалось открыть страницу пожертвований. Повторите попытку.</string>
     <string name="export_audit_logs_confirm_body">Журналы содержат технические идентификаторы и сведения об активности. Делитесь только с тем, кому доверяете.</string>
+    <string name="choose_audit_files">Выбрать файлы аудита</string>
+    <string name="choose_audit_files_subtitle">Сохраните выбранные файлы аудита Marmot или поделитесь ими</string>
     <string name="export_audit_logs">Экспортировать диагностические журналы</string>
     <string name="export_audit_logs_subtitle">Сохраните или отправьте диагностические журналы этого устройства одним архивом</string>
     <string name="export_audit_logs_confirm_title">Экспортировать диагностические журналы?</string>
@@ -2492,6 +2492,9 @@
     <string name="error_invalid_key_package_for">Не удалось проверить опубликованный ключ чата для %1$s. Попросите обновить White Noise и опубликовать новый ключ чата, затем повторите попытку.</string>
     <string name="error_missing_member_inbox">Нет пригодного входящего ретранслятора для этого человека. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
     <string name="error_missing_member_inbox_for">Нет пригодного входящего ретранслятора для %1$s. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
+    <string name="error_invite_welcome_too_large">Это приглашение слишком велико для входящих ретрансляторов получателя. Попросите добавить входящий ретранслятор, который принимает сообщения большего размера.</string>
+    <string name="error_update_too_large">Это обновление слишком велико для ваших ретрансляторов. Ничего не изменено.</string>
+    <string name="error_group_change_too_large">Изменение группы оказалось слишком большим для ретрансляторов группы, поэтому оно не выполнено.</string>
     <string name="notification_show_previews">Показывать содержимое уведомлений</string>
     <string name="notification_show_previews_detail">Если выключено, скрывает имена и содержимое сообщений. Для всех аккаунтов.</string>
     <string name="notification_preview_update_failed">Изменения могут потеряться после перезапуска.</string>

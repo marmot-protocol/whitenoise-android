@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.graphics.Picture
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -21,16 +20,20 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
+import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
+import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import kotlin.math.ceil
 
-internal const val SETTINGS_BUBBLE_OPEN_MILLIS = 340
-internal const val SETTINGS_BUBBLE_CLOSE_MILLIS = 280
+internal const val SETTINGS_BUBBLE_OPEN_MILLIS = APP_MOTION_OPEN_MILLIS
+internal const val SETTINGS_BUBBLE_CLOSE_MILLIS = APP_MOTION_CLOSE_MILLIS
 
-/** Emphasized decelerate: the card arrives quickly and settles softly. */
-internal val SettingsBubbleOpenEasing: Easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+/** The card arrives quickly and settles softly. */
+internal val SettingsBubbleOpenEasing: Easing = AppMotionOpenEasing
 
-/** Emphasized accelerate: the card leaves without lingering over Chats. */
-internal val SettingsBubbleCloseEasing: Easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+/** The card leaves without lingering over Chats. */
+internal val SettingsBubbleCloseEasing: Easing = AppMotionCloseEasing
 
 private const val SETTINGS_CARD_MIN_SCALE = 0.88f
 private const val SETTINGS_CARD_OPEN_FADE_END = 0.35f
@@ -74,11 +77,16 @@ private fun DrawScope.drawSettingsCard(
 
 /** Draws the content and keeps a copy of the frame for the next close. */
 private fun ContentDrawScope.drawAndRecord(snapshot: SettingsCardSnapshot) {
+    val picture = snapshot.picture ?: Picture().also { snapshot.picture = it }
+    drawAndRecord(picture)
+}
+
+/** Draws the content and records the same frame into [picture]. */
+internal fun ContentDrawScope.drawAndRecord(picture: Picture) {
     drawContent()
     val width = ceil(size.width).toInt()
     val height = ceil(size.height).toInt()
     if (width <= 0 || height <= 0) return
-    val picture = snapshot.picture ?: Picture().also { snapshot.picture = it }
     val recording = Canvas(picture.beginRecording(width, height))
     draw(this, layoutDirection, recording, size) { this@drawAndRecord.drawContent() }
     picture.endRecording()

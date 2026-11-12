@@ -8,7 +8,10 @@ import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /** Marks a local engine usable so bubbles mount their speak-aloud and text double-tap affordances. */
-internal fun WhiteNoiseAppState.forceUsableTtsResolutionForTests() {
+internal fun WhiteNoiseAppState.forceUsableTtsResolutionForTests(
+    trust: EngineTrust = EngineTrust.Local,
+    enginePackage: String = "com.test.tts",
+) {
     val delegateField = WhiteNoiseAppState::class.java.getDeclaredField("ttsResolution\$delegate")
     delegateField.isAccessible = true
     @Suppress("UNCHECKED_CAST")
@@ -16,8 +19,8 @@ internal fun WhiteNoiseAppState.forceUsableTtsResolutionForTests() {
     delegate.value =
         TtsResolutionResult(
             status = TextToSpeech.SUCCESS,
-            engines = listOf(TtsEngineInfo("com.test.tts", "Test TTS", EngineTrust.Local)),
-            defaultEnginePackage = "com.test.tts",
+            engines = listOf(TtsEngineInfo(enginePackage, "Test TTS", trust)),
+            defaultEnginePackage = enginePackage,
             handle = null,
         )
 }

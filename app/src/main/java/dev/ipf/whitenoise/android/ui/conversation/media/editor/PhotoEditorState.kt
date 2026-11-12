@@ -167,7 +167,10 @@ internal class PhotoEditorStateHolder(
         }
     }
 
-    fun commitStroke(points: List<NormalizedPoint>) {
+    fun commitStroke(
+        points: List<NormalizedPoint>,
+        exceededPointBudget: Boolean = false,
+    ) {
         if (state.isSaving || state.activeTool == PhotoEditorTool.Crop || points.isEmpty()) return
         val mutation =
             state.history.addStroke(
@@ -183,6 +186,7 @@ internal class PhotoEditorStateHolder(
                     colorArgb = state.drawColorArgb,
                     points = points,
                 ),
+                exceededPointBudget,
             )
         state =
             state.copy(

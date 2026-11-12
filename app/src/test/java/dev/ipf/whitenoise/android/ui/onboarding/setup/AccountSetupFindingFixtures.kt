@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui.onboarding.setup
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
 import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
+import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
+import dev.ipf.marmotkit.OnboardingSingleDeviceNoticeFfi
 
 /** Legacy observations stay unknown; tests must explicitly supply native evidence and per-finding grants. */
 @Suppress("LongParameterList") // Explicit native evidence stays independent in test records.
@@ -21,3 +23,12 @@ internal fun setupFinding(
     observedRevision: ULong? = null,
 ): OnboardingFindingFfi =
     OnboardingFindingFfi(issue, endpoint, context, purpose, outcome, capability, actions, observedRevision)
+
+/** A completed device notice reporting [discovery]. */
+internal fun setupDeviceNotice(discovery: OnboardingDeviceDiscoveryFfi): OnboardingSingleDeviceNoticeFfi =
+    OnboardingSingleDeviceNoticeFfi(
+        discovery = discovery,
+        otherPackages = emptyList(),
+        discoveryComplete = true,
+        acknowledgedAt = null,
+    )

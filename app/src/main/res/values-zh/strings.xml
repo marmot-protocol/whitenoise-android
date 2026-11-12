@@ -305,8 +305,6 @@
     <string name="dismiss">关闭</string>
     <string name="edit">编辑</string>
     <string name="edit_group_info_title">编辑群组</string>
-    <string name="group_private_image">群组私密照片</string>
-    <string name="group_private_image_detail">仅群组成员可见。</string>
     <string name="group_description">描述（可选）</string>
     <string name="save_group">保存组</string>
     <string name="saving_group">正在保存群组...</string>
@@ -450,6 +448,7 @@
     <string name="forward_blocked_unavailable">请先下载此附件再转发</string>
     <string name="forward_blocked_restricted">不允许转发此附件</string>
     <string name="forward_blocked_unsupported">无法转发此消息</string>
+    <string name="forward_blocked_too_long">此消息过长，无法转发</string>
     <string name="forward_blocked_selection">无法转发：%1$s</string>
     <string name="forward_progress_title">正在转发</string>
     <string name="forward_preparing_attachments">正在准备附件 %1$d / %2$d</string>
@@ -841,6 +840,7 @@
     <string name="toast_profile_published_detail">你的个人资料已发布到 %1$d 个中继。</string>
     <string name="toast_couldnt_publish_profile">无法发布个人资料</string>
     <string name="toast_send_failed">发送失败</string>
+    <string name="toast_message_too_long">消息过长。请缩短后再发送。</string>
     <string name="toast_send_storage_full">存储空间不足，无法发送。请释放空间后重试。</string>
     <string name="error_storage_full">此设备存储空间不足。请释放空间后重试。</string>
     <string name="toast_send_connection_failed">无法连接到中继。请检查网络连接，然后重试。</string>
@@ -1741,8 +1741,8 @@
     <string name="tts_bar_history_loading">正在加载更多消息…</string>
     <string name="tts_bar_history_error">无法加载更多消息。再次点按可重试。</string>
     <string name="tts_auto_read_title">朗读消息</string>
-    <string name="tts_composer_shortcut_title">显示扬声器快捷按钮</string>
-    <string name="tts_composer_shortcut_subtitle">在聊天标题栏中显示朗读开关。</string>
+    <string name="tts_header_shortcut_title">显示扬声器快捷按钮</string>
+    <string name="tts_header_shortcut_subtitle">始终在标题栏显示朗读开关。全局或此聊天启用自动朗读时也会显示。</string>
     <string name="tts_auto_read_default_global_title">默认朗读消息</string>
     <string name="tts_auto_read_default_global_subtitle">打开聊天时朗读未读消息，除非该聊天另有设置</string>
     <string name="tts_auto_read_use_default_off">使用默认（关）</string>
@@ -1982,12 +1982,11 @@
     <string name="setup_acknowledge_single_device">我明白了 — 继续</string>
     <string name="setup_continue_without_profile">不添加个人资料，继续</string>
     <string name="setup_review_suggested_changes">查看建议的更改</string>
-    <string name="setup_one_phone_per_account">每个帐户一部电话</string>
-    <string name="setup_one_phone_per_account_help">聊天不会在手机之间同步。请一次只在一部手机上使用此账号。</string>
+    <string name="setup_chats_on_this_device">此设备上的聊天</string>
+    <string name="setup_chats_on_this_device_help">仅登录不会恢复你现有的聊天或消息。如果你使用另一台设备，请保留该设备上的应用和数据，直到你在这里检查过聊天。</string>
     <string name="setup_device_stage">设备使用</string>
-    <string name="setup_device_discovery_none">在已检查的中继器上未发现其他设备安装。</string>
-    <string name="setup_other_device_possible">另一台设备可能正在使用该帐户。</string>
-    <string name="setup_device_discovery_unknown">无法检查其他设备。</string>
+    <string name="setup_other_sign_ins_found">发现了其他登录记录。它们可能属于另一处安装或较早的安装。</string>
+    <string name="setup_other_sign_ins_unchecked">无法检查其他登录。</string>
     <string name="setup_approval_saved_pending">您的批准已保存。变更仍在等待中。</string>
     <string name="setup_profile_scope_help">这会更新您在其他 Nostr 应用程序中的个人资料。</string>
     <string name="setup_optional_profile_help">可选。你可以稍后添加个人资料。</string>
@@ -2087,7 +2086,6 @@
     <string name="setup_finding_interrupted">设置已中断。你可以继续已保存的步骤。</string>
     <string name="setup_finding_too_many_relays">列表中的中继器过多。</string>
     <string name="setup_finding_multi_device_unsupported">对话不会在设备之间同步。</string>
-    <string name="setup_finding_other_installation_possible">另一处安装可能正在使用此身份。</string>
     <string name="setup_finding_discovery_incomplete">发现过程未能完成。不会根据此结果推断替换方案。</string>
     <string name="setup_profile_help">添加名字，让别人认出你。也可以稍后再设置。</string>
     <string name="setup_details">详情</string>
@@ -2336,6 +2334,8 @@
     <string name="diagnostics_clear_confirm_action">清除日志</string>
     <string name="donate_open_failed">无法打开捐赠页面。请重试。</string>
     <string name="export_audit_logs_confirm_body">日志包含技术标识符和活动详情。仅分享给你信任的人。</string>
+    <string name="choose_audit_files">选择审计文件</string>
+    <string name="choose_audit_files_subtitle">保存或分享所选的 Marmot 审计文件</string>
     <string name="export_audit_logs">导出诊断日志</string>
     <string name="export_audit_logs_subtitle">将此设备的诊断日志保存或分享为一个压缩包</string>
     <string name="export_audit_logs_confirm_title">导出诊断日志？</string>
@@ -2374,6 +2374,9 @@
     <string name="error_invalid_key_package_for">无法验证%1$s发布的聊天密钥。请对方更新 White Noise 并发布新的聊天密钥，然后重试。</string>
     <string name="error_missing_member_inbox">此用户没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
     <string name="error_missing_member_inbox_for">%1$s没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
+    <string name="error_invite_welcome_too_large">此邀请过大，收件人的收件箱中继无法接收。请对方添加可接收更大消息的收件箱中继。</string>
+    <string name="error_update_too_large">此更新对你的中继来说过大。未做任何更改。</string>
+    <string name="error_group_change_too_large">某项群组更改对该群组的中继来说过大，因此未执行。</string>
     <string name="notification_show_previews">显示通知预览</string>
     <string name="notification_show_previews_detail">关闭后会隐藏姓名和消息内容。适用于所有账户。</string>
     <string name="notification_preview_update_failed">重新启动后更改可能会丢失。</string>

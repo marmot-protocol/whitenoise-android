@@ -7,15 +7,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -138,6 +135,7 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.RetainedGroupAvatarPreparation
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
@@ -145,12 +143,16 @@ import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
+import dev.ipf.whitenoise.android.ui.navigation.FloatingControlGap
+import dev.ipf.whitenoise.android.ui.navigation.FloatingControlVisibility
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationCapsuleClearance
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -799,10 +801,34 @@ internal fun ChatsScreen(
         globalSearchState.folderFilters.isNotEmpty() ||
             globalSearchState.chatTypeFilters.isNotEmpty() ||
             globalSearchState.chatFilters.isNotEmpty()
+    // Search covers every chat of the account, not just the retained Home window (#3720).
+    val completeScopeState =
+        rememberGlobalSearchCompleteScope(
+            appState = appState,
+            controller = controller,
+            titleCopy = groupTitleCopy,
+            enabled = searchOpen && searchActive,
+            seed = completeUnreadSnapshot,
+            homeFolderId = selectedFolder?.id,
+            folderFilters = globalSearchState.folderFilters,
+            folderStore = folderStoreState,
+            // A changed query or filter waits for a proven scope; the same one keeps its last scope meanwhile.
+            queryKey = globalSearchState.copy(query = trimmedQuery, openFilterCategory = null),
+        )
+    val completeScope = completeScopeState.scope
+    val scopedChatIds =
+        remember(completeScope, libraryChatScoped, globalSearchState) {
+            completeScope?.takeIf { libraryChatScoped }?.scopedChatIds(globalSearchState)
+        }
+    // A chat-scoped search never runs on a window-only or empty scope while the complete one resolves.
+    val scopeUnresolved = searchOpen && searchActive && libraryChatScoped && completeScope == null
+    // A scope that failed to resolve shows the existing error state with Retry rather than loading forever.
+    val scopeFailed = scopeUnresolved && completeScopeState.failed
+    val scopePending = scopeUnresolved && !scopeFailed
     val libraryQuery =
-        remember(libraryChatScoped, scopedSourceList, messageSearchConstraints, libraryKinds, trimmedQuery) {
+        remember(libraryChatScoped, scopedChatIds, messageSearchConstraints, libraryKinds, trimmedQuery) {
             globalAttachmentLibraryQuery(
-                scopedChatIds = scopedSourceList.takeIf { libraryChatScoped }?.map { it.group.groupIdHex },
+                scopedChatIds = scopedChatIds,
                 constraints = messageSearchConstraints,
                 kinds = libraryKinds,
                 rawQuery = trimmedQuery,
@@ -816,11 +842,11 @@ internal fun ChatsScreen(
             messageFiltersActive = messageSearchConstraints != null,
         )
     val messageResultsQuery =
-        remember(trimmedQuery, messageSearchConstraints, libraryChatScoped, scopedSourceList) {
+        remember(trimmedQuery, messageSearchConstraints, scopedChatIds) {
             globalSearchResultsQuery(
                 rawQuery = trimmedQuery,
                 constraints = messageSearchConstraints,
-                scopedChatIds = scopedSourceList.takeIf { libraryChatScoped }?.map { it.group.groupIdHex },
+                scopedChatIds = scopedChatIds,
             )
         }
     val messageResults =
@@ -830,14 +856,21 @@ internal fun ChatsScreen(
             messageResultsQuery,
             messageResultsMode,
             searchViewport?.messageResults,
+            paused = scopeUnresolved,
         )
-    val messageResultsState = messageResults?.shownState(messageResultsQuery)
+    val messageResultsState =
+        if (scopeFailed) {
+            GlobalSearchResultsState(generation = 0, batches = 1, failed = true)
+        } else {
+            messageResults?.shownState(messageResultsQuery)
+        }
     // Pending until the session adopts this query, and on a return to a held session (#1945) until its first
     // recheck lands, so a restored deep viewport never measures a shorter list and no row unverified since the
     // reader came back is shown. Rows of an older query are never shown.
     // A failed recheck stays pending too, so a restored deep anchor keeps its guard until Retry succeeds.
     val messageResultsPending =
-        messageResultsMode && (messageResultsState == null || messageResults?.recheckFailed == true)
+        messageResultsMode &&
+            (scopePending || messageResultsState == null || messageResults?.recheckFailed == true)
     val messageResultChats =
         rememberSearchChats(
             controller,
@@ -851,7 +884,7 @@ internal fun ChatsScreen(
             appState,
             libraryAccount,
             libraryQuery,
-            browsingAttachments,
+            browsingAttachments && !scopeUnresolved,
             searchViewport?.libraryExtent,
         )
     // A returning session holds its rows back until it has reread as far as before, so the grid keeps its place.
@@ -874,8 +907,19 @@ internal fun ChatsScreen(
             val fallback = groupTitleCopy.unavailableConversationTitle
             libraryEntries.mapNotNull { entry -> entry.toLibraryItem { libraryTitles[it.lowercase()] ?: fallback } }
         }
-    val libraryLoading = browsingAttachments && !libraryQuery.matchesNothing && libraryPager?.state?.loading != false
-    val libraryContent = GlobalAttachmentLibraryContent(libraryItems, libraryKinds, libraryLoading, libraryPager)
+    val libraryLoading =
+        browsingAttachments &&
+            !scopeFailed &&
+            (scopePending || (!libraryQuery.matchesNothing && libraryPager?.state?.loading != false))
+    val libraryContent =
+        GlobalAttachmentLibraryContent(
+            libraryItems,
+            libraryKinds,
+            libraryLoading,
+            libraryPager,
+            scopeFailed = browsingAttachments && scopeFailed,
+            onRetryScope = completeScopeState.retry,
+        )
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
     // address shows a loading state, then a `/.well-known/nostr.json` lookup
@@ -951,7 +995,19 @@ internal fun ChatsScreen(
     }
     var programmaticViewportGeneration by remember(chatListState) { mutableLongStateOf(0L) }
     val viewportGeneration = userGestureGeneration + programmaticViewportGeneration
-    val searchSections =
+    val completeSearchSections =
+        rememberCompleteChatSearchSections(
+            appState = appState,
+            scope = completeScope,
+            state = globalSearchState,
+            rawQuery = trimmedQuery,
+            normalizedQuery = normalizedSearchQuery,
+            titleCopy = groupTitleCopy,
+            profileRevision = profileRev,
+            messageOnly = messageSearchConstraints != null,
+            searchActive = searchActive,
+        )
+    val windowSearchSections =
         // Keyed on the normalized query: whitespace and case-only edits change
         // nothing the filter can see, so they must not re-run the O(n) pass.
         remember(
@@ -963,7 +1019,7 @@ internal fun ChatsScreen(
             messageSearchConstraints,
         ) {
             val attempt =
-                if (searchActive) {
+                if (searchActive && completeScope == null) {
                     appState.beginHostPerformance(HostPerformanceOperationFfi.CONVERSATION_SEARCH)
                 } else {
                     null
@@ -982,6 +1038,7 @@ internal fun ChatsScreen(
                 throw throwable
             }
         }
+    val searchSections = completeSearchSections ?: windowSearchSections
     val visibleItems =
         remember(
             searchSections,
@@ -1183,11 +1240,11 @@ internal fun ChatsScreen(
             } ?: loaded
         }
     val bulkArchiveAction = selectionActions.archiveAction
-    // Engine-normalized manual order of the pinned block, for the selection
-    // bar's move actions. Ids keep the projection's casing — they round-trip
-    // straight back into setPinnedChatOrder, which must receive the pinned
-    // set exactly. Active items suffice: the engine only pins unarchived
-    // chats and clears a pin on archive, so no archived row can be pinned.
+    // Engine-normalized order of the loaded pinned rows, which decides where a
+    // row sits for its Move up/down menu. It covers only the loaded window, so
+    // moves themselves read MDK's complete pin order (#3709). Active items
+    // suffice: the engine only pins unarchived chats and clears a pin on
+    // archive, so no archived row can be pinned.
     val pinnedOrderedIds =
         remember(controller.items) {
             controller.items
@@ -1334,20 +1391,44 @@ internal fun ChatsScreen(
         }
     }
 
+    /**
+     * Moves [ids] by [delta] within MDK's complete pin order, never the loaded window, and tells the
+     * user when the order did not change. Selection and single-row moves share this path (#3709).
+     */
+    fun movePinnedChats(
+        ids: Set<String>,
+        delta: Int,
+        fromSelection: Boolean = true,
+    ) {
+        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
+        appState.launchMutation {
+            val result =
+                runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
+                    .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
+            // The unchanged notice describes a selection; a single row already at the end just stays put.
+            val quiet =
+                result == ChatListPinMoveResult.MOVED ||
+                    (!fromSelection && result == ChatListPinMoveResult.UNCHANGED)
+            if (controller.chatListActionIsCurrent(owner) && !quiet) {
+                val message =
+                    when (result) {
+                        ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
+                        ChatListPinMoveResult.UNCONFIRMED -> R.string.chat_batch_order_unconfirmed
+                        else -> R.string.chat_batch_order_failed
+                    }
+                appState.presentTransient(resources.getString(message))
+            }
+        }
+    }
+
+    /** Moves one pinned row from its long-press menu through the complete-order path. */
     fun movePinnedChat(
         item: ChatListItem,
         delta: Int,
     ) {
-        val index = pinnedIndex(item) ?: return
-        val target = index + delta
-        if (target !in pinnedOrderedIds.indices) return
-        val reordered =
-            pinnedOrderedIds.toMutableList().also { ids ->
-                val id = ids.removeAt(index)
-                ids.add(target, id)
-            }
+        if (pinnedIndex(item) == null) return
         clearSelection()
-        appState.launchMutation { controller.setPinnedOrder(reordered) }
+        movePinnedChats(setOf(item.projection?.groupIdHex ?: item.group.groupIdHex), delta, fromSelection = false)
     }
 
     // Hoisted list state so the jump-to-top FAB (issue #413) can both read the
@@ -1857,11 +1938,11 @@ internal fun ChatsScreen(
         openSearchMessage(result.groupIdHex, result.messageIdHex, messageResultChats)
     }
     val messageResultsActions =
-        remember(messageResults) {
+        remember(messageResults, scopeFailed, completeScopeState) {
             GlobalSearchResultsActions(
                 onOpen = { openMessageResult(it) },
                 onLoadMore = { messageResults?.loadMore() },
-                onRetry = { messageResults?.retry() },
+                onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() },
             )
         }
     val messageResultSelected =
@@ -2084,7 +2165,8 @@ internal fun ChatsScreen(
                             pinned = item.pinned(),
                             showPinToggle = !item.group.archived,
                             showMovePinnedUp = (pinnedIndex ?: 0) > 0,
-                            showMovePinnedDown = pinnedIndex != null && pinnedIndex < pinnedOrderedIds.lastIndex,
+                            // Pins below the loaded window still count; a move at the true end leaves the row in place.
+                            showMovePinnedDown = pinnedIndex != null,
                             onMarkRead = { markChatRead(item, unread = false) },
                             onMarkUnread = { markChatRead(item, unread = true) },
                             onAddToFolder = { openFolderPicker(listOf(item)) },
@@ -2396,30 +2478,7 @@ internal fun ChatsScreen(
                         },
                         onMarkRead = { startStateBatch(ChatListBatchCommand.READ) },
                         onMarkUnread = { startStateBatch(ChatListBatchCommand.UNREAD) },
-                        onMovePinned = { delta ->
-                            val owner = controller.captureChatListActionOwner { batchScope.get() }
-                            val ids = selectedChatIds.toSet()
-                            if (owner != null) {
-                                appState.launchMutation {
-                                    val result =
-                                        runCatchingCancellable { controller.movePinnedSelection(ids, delta, owner) }
-                                            .getOrDefault(ChatListPinMoveResult.UNAVAILABLE)
-                                    if (
-                                        controller.chatListActionIsCurrent(owner) &&
-                                        result != ChatListPinMoveResult.MOVED
-                                    ) {
-                                        val message =
-                                            when (result) {
-                                                ChatListPinMoveResult.UNCHANGED -> R.string.chat_batch_order_unchanged
-                                                ChatListPinMoveResult.UNCONFIRMED ->
-                                                    R.string.chat_batch_order_unconfirmed
-                                                else -> R.string.chat_batch_order_failed
-                                            }
-                                        appState.presentTransient(resources.getString(message))
-                                    }
-                                }
-                            }
-                        },
+                        onMovePinned = { delta -> movePinnedChats(selectedChatIds.toSet(), delta) },
                         onSelectAll = {
                             selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
                             // #2925: extend past the loaded window to MDK's complete view where it owns membership.
@@ -2467,7 +2526,10 @@ internal fun ChatsScreen(
             }
         },
         floatingActionButton = {
-            if (!searchOpen && !selectionMode) {
+            FloatingControlVisibility(
+                visible = !searchOpen && !selectionMode,
+                motionEnabled = rememberSystemAnimationsEnabled(),
+            ) {
                 CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
                     ChatsNewMessageFab(appState, openNewMessageFlow, minimumTopInWindow = fabMinimumTopInWindow)
                 }
@@ -2789,75 +2851,23 @@ internal fun ChatsScreen(
                                 }
                             else -> Unit
                         }
-                        // Jump-to-top FAB (issue #413). Overlaid on the chat-list Box
-                        // (a sibling of the list `when`) and aligned bottom-end so it
-                        // floats above the rows. Fades + slides in from the bottom-right
-                        // when the user is scrolled deep, hides near the top — the
-                        // `jumpToTopVisible` hysteresis above debounces threshold
-                        // jitter. Lifted by QUICK_ACTION_FAB_CLEARANCE on top of the
-                        // navigation-bar inset so it clears the quick-action FAB and the
-                        // nav bar (#352/#356).
-                        // Fully-qualified so Kotlin binds the top-level overload rather
-                        // than the ColumnScope extension (the outer Column is also an
-                        // implicit receiver here) — the bottom-end alignment is carried
-                        // by the Modifier in the BoxScope, not a scoped AnimatedVisibility.
-                        androidx.compose.animation.AnimatedVisibility(
+                        ChatListJumpToTopControl(
                             visible = jumpToTopVisible && !selectionMode,
-                            enter = fadeIn() + slideInHorizontally { it / 2 },
-                            exit = fadeOut() + slideOutHorizontally { it / 2 },
-                            modifier =
-                                Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .navigationBarsPadding()
-                                    // end = 23dp (not 16) so this 42dp control's centre
-                                    // lines up with the 56dp quick-action FAB above it,
-                                    // which the Scaffold insets 16dp from the edge:
-                                    // 23 + 42/2 == 16 + 56/2 (#451).
-                                    .padding(end = 23.dp, bottom = QUICK_ACTION_FAB_CLEARANCE),
-                        ) {
-                            val scrollToTopLabel = stringResource(R.string.scroll_to_top)
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(42.dp)
-                                        .semantics { contentDescription = scrollToTopLabel }
-                                        .clickable(role = Role.Button) {
-                                            scope.launch {
-                                                programmaticViewportGeneration += 1L
-                                                // For a very deep scroll, animating every row to
-                                                // the top is a multi-second crawl. Snap to a
-                                                // near-top index first, then animate the final
-                                                // viewport so the motion stays short and smooth
-                                                // regardless of how far down the user was.
-                                                if (
-                                                    chatListState.firstVisibleItemIndex >
-                                                    CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX
-                                                ) {
-                                                    chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
-                                                }
-                                                chatListState.animateScrollToItem(0)
-                                                controller.returnChatListToTop(chatListWindowView)
-                                            }
-                                        },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    shadowElevation = 2.dp,
-                                    modifier = Modifier.size(34.dp),
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            painterResource(R.drawable.ic_jump_to_edge),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                        )
+                            modifier = Modifier.matchParentSize(),
+                            onClick = {
+                                scope.launch {
+                                    programmaticViewportGeneration += 1L
+                                    // For a very deep scroll, animating every row to the top is a
+                                    // multi-second crawl. Snap to a near-top index first, then animate
+                                    // the final viewport so the motion stays short at any depth.
+                                    if (chatListState.firstVisibleItemIndex > CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX) {
+                                        chatListState.scrollToItem(CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX)
                                     }
+                                    chatListState.animateScrollToItem(0)
+                                    controller.returnChatListToTop(chatListWindowView)
                                 }
-                            }
-                        }
+                            },
+                        )
                     }
                 }
             }
@@ -3094,11 +3104,72 @@ private fun ChatListIdentifierResult(
     }
 }
 
-// Approximate clearance the chat-list quick-action FAB occupies above the
-// navigation bar. The toggle FAB is ~56.dp and the Scaffold floats it 16.dp
-// above the bottom inset; 80.dp clears that stack with a small gap, so the
-// jump-to-top control stacked above it never overlaps it (#352, #413).
-private val QUICK_ACTION_FAB_CLEARANCE = 80.dp
+/**
+ * Jump-to-top control (#413): the top of the bottom-end floating stack. It rests just above the
+ * navigation bar and lifts above the dictation capsule and the pen, centred on the pen's column, so
+ * it never overlaps either of them.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListJumpToTopControl(
+    visible: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier) {
+        val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
+        FloatingControlVisibility(
+            visible = visible,
+            motionEnabled = rememberSystemAnimationsEnabled(),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = paneInset + JUMP_TO_TOP_END_INSET, bottom = FloatingControlGap)
+                    .floatingDictationCapsuleClearance(clearColumnObstacles = true),
+        ) {
+            ChatListJumpToTopButton(onClick = onClick)
+        }
+    }
+}
+
+/** The chat list's jump-to-top control: a 34dp disc inside a 42dp touch box. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ChatListJumpToTopButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scrollToTopLabel = stringResource(R.string.scroll_to_top)
+    Box(
+        modifier =
+            modifier
+                .size(42.dp)
+                .semantics { contentDescription = scrollToTopLabel }
+                .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shadowElevation = 2.dp,
+            modifier = Modifier.size(34.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    painterResource(R.drawable.ic_jump_to_edge),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
+    }
+}
+
+// Centres the 42dp jump control on the 48dp pen, which the Scaffold insets 16dp from the end edge:
+// 19 + 42 / 2 == 16 + 48 / 2.
+internal val JUMP_TO_TOP_END_INSET = 19.dp
 
 // Chat-list jump-to-top FAB thresholds (issue #413). The button shows once the
 // first visible row index reaches SHOW, and only hides again once it falls back

@@ -74,6 +74,14 @@
         ]
       },
       {
+        "surface": "Mixed album failure notice classified without blocking the UI",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "val pickHasVideo",
+        "test_ids": [
+          "MED-007"
+        ]
+      },
+      {
         "surface": "Video private metadata refusal feedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.toast_video_metadata_not_removable",
