@@ -225,6 +225,7 @@ jobs:
         run: |
           ./scripts/release_test.sh
           .github/scripts/test-staging-apk-transport.sh
+          python3 .github/scripts/test-apk-size-report.py
 
       - name: Test production release safety gates
         run: python3 -m unittest scripts/test_release_pipeline.py scripts/test_keystore_gen.py

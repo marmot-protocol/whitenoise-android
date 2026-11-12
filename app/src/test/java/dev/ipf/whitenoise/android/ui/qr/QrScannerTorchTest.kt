@@ -150,7 +150,7 @@ class QrScannerTorchTest {
             } as T
     }
 
-    private class ControlledFuture : ListenableFuture<Void> {
+    private class ControlledFuture : ListenableFuture<Void?> {
         private val listeners = mutableListOf<Pair<Runnable, Executor>>()
         private var done = false
         private var failure: Throwable? = null

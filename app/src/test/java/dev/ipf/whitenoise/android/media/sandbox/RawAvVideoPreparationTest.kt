@@ -68,7 +68,7 @@ class RawAvVideoPreparationTest {
             paused.get(1, TimeUnit.SECONDS)
             assertSame(job, field(engine, "prepareJob"))
             val activation = engine.intent().activation
-            val pendingSeek = SettableFuture.create<Void>()
+            val pendingSeek = SettableFuture.create<Void?>()
             setField(engine, "targetUs", 2_000_000L)
             setField(engine, "seekRevision", 7L)
             setField(engine, "pendingSeek", pendingSeek)

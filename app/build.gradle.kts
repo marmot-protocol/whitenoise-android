@@ -1323,6 +1323,14 @@ tasks.withType<Test>().configureEach {
         .file(rootProject.file("docs/invariant-gates.md"))
         .withPropertyName("invariantGateRegistry")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // DependencySecurityPolicyCoverageTest reads the policy and both enforcers from disk for the same reason.
+    inputs
+        .files(
+            rootProject.file("gradle/dependency-security.json"),
+            rootProject.file("gradle/dependency-security.settings.gradle"),
+            rootProject.file("scripts/verify_dependency_security.py"),
+        ).withPropertyName("dependencySecurityPolicy")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     // Any instrumented Kotlin test can be registered, even without the CoverageTest suffix. Unit-test tasks do
     // not compile these sources, so their additions, deletions and renames must invalidate cached validation.
     inputs

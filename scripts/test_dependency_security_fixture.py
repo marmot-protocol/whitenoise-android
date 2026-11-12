@@ -39,6 +39,8 @@ def main():
         wire_versions = ['7.0.0-alpha03', '7.0.0-alpha04', '7.0.0-alpha04-SNAPSHOT', '7.0.0-alpha05']
         for version in wire_versions:
             module(repository, 'wire-runtime', version, group='com.squareup.wire')
+        for version in ('33.3.1-android', '33.4.0-jre', '33.7.2-android', '33.7.2-jre'):
+            module(repository, 'guava', version, group='com.google.guava')
         module(repository, 'legacy', '1.0')
         module(repository, 'directory', '1.0', group='example')
         module(repository, 'metadata-only', '1.0', group='example')
@@ -68,8 +70,10 @@ def main():
         (project / 'gradle/dependency-security.json').write_text(json.dumps({
             'schema': 1, 'minimum_versions': {'org.freemarker:freemarker': '2.3.35',
                                             'org.freemarker:affected': '2.3.35',
-                                            'com.squareup.wire:wire-runtime': '6.4.5'},
-            'fixed_prerelease_versions': {'com.squareup.wire:wire-runtime': '7.0.0-alpha04'}}))
+                                            'com.squareup.wire:wire-runtime': '6.4.5',
+                                            'com.google.guava:guava': '33.7.2'},
+            'fixed_prerelease_versions': {'com.squareup.wire:wire-runtime': '7.0.0-alpha04'},
+            'edition_suffixes': {'com.google.guava:guava': ['-android', '-jre']}}))
         (project / 'settings.gradle').write_text(
             "rootProject.name='security-fixture'\ninclude ':producer'\n"
             "apply from: 'gradle/dependency-security.settings.gradle'\n")
@@ -134,6 +138,7 @@ repositories {
 }
 configurations {
     belowFloor; newer; dynamic; affectedRange; wireAlpha; wireSuffix; wireDynamic; legacyPom; graphOnly
+    guavaAndroid; guavaJre; guavaFixed
     directoryArtifact {
         attributes.attribute(Attribute.of('artifactType', String), 'fixture-directory')
     }
@@ -157,6 +162,9 @@ dependencies {
     wireSuffix 'com.squareup.wire:wire-runtime:7.0.0-alpha04-SNAPSHOT'
     wireDynamic 'com.squareup.wire:wire-runtime:7.0.0-alpha04+'
     legacyPom 'org.freemarker:legacy:1.0'
+    guavaAndroid 'com.google.guava:guava:33.3.1-android'
+    guavaJre 'com.google.guava:guava:33.4.0-jre'
+    guavaFixed 'com.google.guava:guava:33.7.2-android'
     projectVariants project(':producer')
 }
 tasks.register('verifyGraphOnlyFixture') {
@@ -189,6 +197,10 @@ tasks.register('verifySecurityFixture') {
         assert selected(configurations.wireSuffix) == '7.0.0-alpha04'
         assert selected(configurations.wireDynamic) == '7.0.0-alpha04'
         assert selected(configurations.legacyPom) == '1.0'
+        // Raising a Guava request keeps its -android or -jre edition.
+        assert selected(configurations.guavaAndroid) == '33.7.2-android'
+        assert selected(configurations.guavaJre) == '33.7.2-jre'
+        assert selected(configurations.guavaFixed) == '33.7.2-android'
         def legacyArtifact = configurations.legacyPom.incoming.artifacts.artifacts.first().file
         assert new File(legacyArtifact.parentFile, 'legacy-1.0.pom').text.contains('<!DOCTYPE project')
         // Graph resolution and external-module observations must not select project artifacts.
@@ -279,7 +291,8 @@ tasks.register('verifySecurityFixture') {
         expected_project_edge = json.loads((project / 'expected-project-edge.json').read_text())
         assert expected_project_edge in project_report['edges'], project_report['edges']
         print('Gradle fixture PASS: raised exact request, retained newer/dynamic selection, '
-              'rejected affected-only range and unsafe Wire alpha/suffixes, plugin/project reports, '
+              'rejected affected-only range and unsafe Wire alpha/suffixes, raised Guava within its edition, '
+              'plugin/project reports, '
               'external artifacts isolated from ambiguous project variants, local inventory disabled, '
               'opt-in graph-only missing JAR recorded as partial coverage')
 

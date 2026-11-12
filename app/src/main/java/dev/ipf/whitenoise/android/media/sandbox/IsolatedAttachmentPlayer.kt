@@ -252,7 +252,7 @@ internal class IsolatedAttachmentPlayer(
     }
 
     /** Acknowledges synchronous presentation-only changes with an already completed Player future. */
-    private fun done(): ListenableFuture<Void> = SettableFuture.create<Void>().apply { set(null) }
+    private fun done(): ListenableFuture<Void?> = SettableFuture.create<Void?>().apply { set(null) }
 
     companion object {
         private val commands =

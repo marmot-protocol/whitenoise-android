@@ -55,7 +55,7 @@ class RawAvSeekPublicationTest {
             withEngine { engine ->
                 val old = bitmap()
                 adopt(engine, old)
-                val completion = engine.seekToAsync(1500) as SettableFuture<Void>
+                val completion = engine.seekToAsync(1500) as SettableFuture<Void?>
                 engine.attachVideo(surface)
                 RecordingCanvasSurface.posts = 0 // Attachment clears are separate from retained-frame publication.
                 render(engine)

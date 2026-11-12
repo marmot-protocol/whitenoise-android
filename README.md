@@ -185,7 +185,12 @@ dependency inputs change, and not while draft. Neither is a required check.
 
 Pushes to `master` also run `.github/workflows/android-staging-apk.yml`, which
 builds and uploads a signed `arm64-v8a` staging release APK for internal
-installation. That workflow is also manually runnable from GitHub Actions. It
+installation. That workflow is also manually runnable from GitHub Actions. Its
+summary shows the APK's size by component (each native library and dex file,
+`resources.arsc`, `res/`, `assets/`, `META-INF/` and ZIP overhead), and the same
+report is kept as an `apk-size-staging-*` artifact. The production build workflow
+records an `apk-size-production-*` report the same way. Both steps are observational;
+run `.github/scripts/apk-size-report.py <apk> --flavor <name>` for a local APK. It
 uses the checksum-verified MarmotKit artifact pinned by the repository and requires these repository Actions
 secrets:
 
