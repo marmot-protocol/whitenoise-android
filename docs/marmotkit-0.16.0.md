@@ -51,7 +51,8 @@ Four existing public types change:
   oversized-invitation copy, anything else says a group change was too large for the
   group's relays and wasn't made. The notice is titled with the chat's name when the chat
   list has loaded that chat, and re-checks the active account on the main thread. Other
-  refusal reasons and other accounts' refusals still show nothing.
+  refusal reasons and other accounts' refusals still show nothing. A refusal MDK delivers
+  again is shown once, keyed by account and `intent_id_hex`.
 - `MarmotDeploymentFfi` adds `relayEventLimits`. Android only calls
   `marmotDeploymentWhiteNoise()`, which already lists 2 MiB for both White Noise relays.
 
@@ -64,8 +65,9 @@ creation and adding or inviting members alike.
 
 `EventTooLarge(OTHER)` is now raised for the account's own updates: block edits
 (previously `BlockListUnavailable`), sticker sync (previously `StickerNetwork`), and
-KeyPackage, profile and relay-list publishes. Block edits now say the account's relays
-refused the update because it is too large and nothing was changed
+KeyPackage, profile and relay-list publishes. MDK refuses these against the relays'
+known size limits before publishing anything. Block edits now say the update is too large
+for the account's relays and nothing was changed
 (`error_update_too_large`), through a new `BlockOutcome.TooLarge`; MDK clears the pending
 block publish first, so nothing changes. The publishes get the same detail through
 `presentFailure`, which replaces its generic retry detail for this error only. Android caps

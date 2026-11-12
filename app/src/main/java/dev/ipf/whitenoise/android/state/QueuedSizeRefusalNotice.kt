@@ -12,6 +12,7 @@ internal const val QUEUED_INTENT_REFUSED_TOO_LARGE = "event_too_large"
 internal data class QueuedSizeRefusal(
     val accountRef: String,
     val groupIdHex: String,
+    val intentIdHex: String,
     val message: AppText,
 )
 
@@ -28,6 +29,7 @@ internal fun queuedSizeRefusal(event: MarmotEventFfi): QueuedSizeRefusal? {
         QueuedSizeRefusal(
             accountRef = groupEvent.accountLabel,
             groupIdHex = groupEvent.groupIdHex,
+            intentIdHex = refusal.intentIdHex,
             message =
                 AppText.Resource(
                     if (refusal.artifact == OversizedArtifactFfi.WELCOME) {
@@ -45,10 +47,12 @@ internal fun queuedSizeRefusal(event: MarmotEventFfi): QueuedSizeRefusal? {
 /**
  * Shows [refusal] while its account is still active, titled with the chat's name when the chat list knows it, so the
  * notice says which chat it is about even when it arrives after the user has moved elsewhere. Another account's
- * refusal shows nothing, because its group is not on screen. Must run on the main thread.
+ * refusal shows nothing, because its group is not on screen, and a refusal MDK delivers again (the event stream
+ * resubscribes after a failure) is shown once. Must run on the main thread.
  */
 internal fun WhiteNoiseAppState.presentQueuedSizeRefusal(refusal: QueuedSizeRefusal) {
     if (activeAccountRef != refusal.accountRef) return
+    if (!shownQueuedSizeRefusals.firstShowing(refusal.accountRef, refusal.intentIdHex)) return
     val (title, detail) = queuedSizeRefusalToast(chatTitle(refusal.accountRef, refusal.groupIdHex), refusal.message)
     presentText(title, detail)
 }
@@ -61,3 +65,27 @@ internal fun queuedSizeRefusalToast(
     chat: String?,
     message: AppText,
 ): Pair<AppText, AppText?> = if (chat == null) message to null else AppText.Plain(chat) to message
+
+/**
+ * The most recent queued-change refusals already shown, by account and MDK intent ID, which MDK documents as the key
+ * for ignoring a repeated delivery. Bounded so a long session cannot grow it without limit; an intent old enough to
+ * be evicted is no longer redelivered in practice. Not thread-safe: use it from the main thread.
+ */
+internal class ShownQueuedRefusals(
+    private val capacity: Int = SHOWN_QUEUED_REFUSALS_CAPACITY,
+) {
+    private val shown = LinkedHashSet<String>()
+
+    /** Records this refusal and returns whether it had not been shown yet. */
+    fun firstShowing(
+        accountRef: String,
+        intentIdHex: String,
+    ): Boolean {
+        val key = "$accountRef|${intentIdHex.lowercase()}"
+        if (!shown.add(key)) return false
+        if (shown.size > capacity) shown.remove(shown.first())
+        return true
+    }
+}
+
+private const val SHOWN_QUEUED_REFUSALS_CAPACITY = 64

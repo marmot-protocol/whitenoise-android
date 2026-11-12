@@ -2414,7 +2414,7 @@
     <string name="error_missing_member_inbox">Non c’è un relay di ricezione utilizzabile per questa persona. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
     <string name="error_missing_member_inbox_for">Non c’è un relay di ricezione utilizzabile per %1$s. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
     <string name="error_invite_welcome_too_large">Questo invito è troppo grande per i relay di ricezione di un destinatario. Chiedi di aggiungere un relay di ricezione che accetti messaggi più grandi.</string>
-    <string name="error_update_too_large">I tuoi relay hanno rifiutato questo aggiornamento perché è troppo grande. Non è stato modificato nulla.</string>
+    <string name="error_update_too_large">Questo aggiornamento è troppo grande per i tuoi relay. Non è stato modificato nulla.</string>
     <string name="error_group_change_too_large">Una modifica al gruppo era troppo grande per i relay del gruppo, quindi non è stata applicata.</string>
     <string name="notification_show_previews">Mostra anteprime delle notifiche</string>
     <string name="notification_show_previews_detail">Se disattivato, nasconde nomi e contenuto dei messaggi. Vale per tutti gli account.</string>

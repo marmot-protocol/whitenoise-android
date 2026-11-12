@@ -2371,7 +2371,7 @@
     <string name="error_missing_member_inbox">此用户没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
     <string name="error_missing_member_inbox_for">%1$s没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
     <string name="error_invite_welcome_too_large">此邀请过大，收件人的收件箱中继无法接收。请对方添加可接收更大消息的收件箱中继。</string>
-    <string name="error_update_too_large">此更新过大，你的中继拒绝了它。未做任何更改。</string>
+    <string name="error_update_too_large">此更新对你的中继来说过大。未做任何更改。</string>
     <string name="error_group_change_too_large">某项群组更改对该群组的中继来说过大，因此未执行。</string>
     <string name="notification_show_previews">显示通知预览</string>
     <string name="notification_show_previews_detail">关闭后会隐藏姓名和消息内容。适用于所有账户。</string>

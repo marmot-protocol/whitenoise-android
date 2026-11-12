@@ -8,7 +8,9 @@ import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -21,7 +23,7 @@ class QueuedSizeRefusalNoticeTest {
     @Test
     fun refusedWelcomeSaysTheInvitationIsTooLarge() {
         assertEquals(
-            QueuedSizeRefusal(ACCOUNT, GROUP, AppText.Resource(R.string.error_invite_welcome_too_large)),
+            QueuedSizeRefusal(ACCOUNT, GROUP, INTENT, AppText.Resource(R.string.error_invite_welcome_too_large)),
             queuedSizeRefusal(refusal(OversizedArtifactFfi.WELCOME)),
         )
     }
@@ -49,7 +51,7 @@ class QueuedSizeRefusalNoticeTest {
     fun activeAccountSeesTheRefusal() {
         val state = appState(active = ACCOUNT)
         val message = AppText.Resource(R.string.error_group_change_too_large)
-        state.presentQueuedSizeRefusal(QueuedSizeRefusal(ACCOUNT, GROUP, message))
+        state.presentQueuedSizeRefusal(QueuedSizeRefusal(ACCOUNT, GROUP, INTENT, message))
         assertEquals(message, state.toast?.title)
         assertNull(state.toast?.detail)
     }
@@ -62,12 +64,37 @@ class QueuedSizeRefusalNoticeTest {
         assertEquals(message to null, queuedSizeRefusalToast(null, message))
     }
 
+    /** A refusal MDK delivers again after the stream resubscribes is shown once; a different intent still shows. */
+    @Test
+    fun repeatedRefusalIsShownOnce() {
+        val state = appState(active = ACCOUNT)
+        val refusal = queuedSizeRefusal(refusal(OversizedArtifactFfi.COMMIT))!!
+        state.presentQueuedSizeRefusal(refusal)
+        assertEquals(refusal.message, state.toast?.title)
+        state.clearToast()
+        state.presentQueuedSizeRefusal(queuedSizeRefusal(refusal(OversizedArtifactFfi.COMMIT))!!)
+        assertNull(state.toast)
+        state.presentQueuedSizeRefusal(refusal.copy(intentIdHex = "12".repeat(32)))
+        assertEquals(refusal.message, state.toast?.title)
+    }
+
+    /** The shown set stays bounded, so the oldest refusal can be shown again once evicted. */
+    @Test
+    fun shownRefusalsAreBounded() {
+        val shown = ShownQueuedRefusals(capacity = 2)
+        assertTrue(shown.firstShowing(ACCOUNT, "a"))
+        assertFalse(shown.firstShowing(ACCOUNT, "A"))
+        assertTrue(shown.firstShowing("other", "a"))
+        assertTrue(shown.firstShowing(ACCOUNT, "b"))
+        assertTrue(shown.firstShowing(ACCOUNT, "a"))
+    }
+
     /** A refusal for an account that is no longer active shows nothing. */
     @Test
     fun anotherAccountsRefusalShowsNothing() {
         val state = appState(active = "other")
         state.presentQueuedSizeRefusal(
-            QueuedSizeRefusal(ACCOUNT, GROUP, AppText.Resource(R.string.error_group_change_too_large)),
+            QueuedSizeRefusal(ACCOUNT, GROUP, INTENT, AppText.Resource(R.string.error_group_change_too_large)),
         )
         assertNull(state.toast)
     }
@@ -92,7 +119,7 @@ class QueuedSizeRefusalNoticeTest {
         groupIdHex = GROUP,
         event =
             GroupEventKindFfi.QueuedIntentRefused(
-                intentIdHex = "cd".repeat(32),
+                intentIdHex = INTENT,
                 intentKind = "invite",
                 reason = reason,
                 artifact = artifact,
@@ -104,5 +131,6 @@ class QueuedSizeRefusalNoticeTest {
         const val ACCOUNT = "account-a"
         val ACCOUNT_HEX = "ab".repeat(32)
         val GROUP = "ef".repeat(32)
+        val INTENT = "cd".repeat(32)
     }
 }

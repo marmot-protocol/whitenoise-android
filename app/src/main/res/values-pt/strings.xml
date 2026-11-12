@@ -2414,7 +2414,7 @@
     <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_invite_welcome_too_large">Este convite é grande demais para os relays de entrada de um destinatário. Peça para ele adicionar um relay de entrada que aceite mensagens maiores.</string>
-    <string name="error_update_too_large">Seus relays recusaram esta atualização porque ela é grande demais. Nada foi alterado.</string>
+    <string name="error_update_too_large">Esta atualização é grande demais para seus relays. Nada foi alterado.</string>
     <string name="error_group_change_too_large">Uma alteração do grupo era grande demais para os relays do grupo, então não foi feita.</string>
     <string name="notification_show_previews">Mostrar prévias das notificações</string>
     <string name="notification_show_previews_detail">Quando desativado, oculta nomes e conteúdo das mensagens. Vale para todas as contas.</string>

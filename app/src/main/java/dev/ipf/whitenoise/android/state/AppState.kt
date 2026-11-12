@@ -2394,6 +2394,9 @@ class WhiteNoiseAppState private constructor(
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
 
+    /** Queued-change size refusals already shown, so a redelivered refusal is not shown twice. Main thread only. */
+    internal val shownQueuedSizeRefusals = ShownQueuedRefusals()
+
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set
 
