@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="relay_editor_restriction_detail">Un relé marcado puede conectarse, pero podría eliminarse al editar una lista que lo incluya.</string>
+    <string name="relay_editor_restriction_note">Puede eliminarse al editar</string>
+    <string name="relay_connection_status">Estado de conexión</string>
+    <string name="relay_connection_connected">Conectado</string>
+    <string name="relay_connection_connecting">Conectando</string>
+    <string name="relay_connection_offline">Sin conexión</string>
+    <string name="relay_connection_unknown">Aún no comprobado</string>
+    <string name="relay_connection_attempt">Último intento de conexión</string>
+    <string name="relay_connection_retry">Volver a conectar</string>
+    <string name="relay_connection_retrying">Solicitando reconexión…</string>
+    <string name="relay_connection_retry_failed">No se pudo solicitar la reconexión. Inténtalo de nuevo.</string>
+</resources>

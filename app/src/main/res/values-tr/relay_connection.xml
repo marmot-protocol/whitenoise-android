@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="relay_editor_restriction_detail">İşaretli bir aktarıcı bağlanabilir, ancak onu içeren bir listeyi düzenlemek aktarıcıyı listeden kaldırabilir.</string>
+    <string name="relay_editor_restriction_note">Düzenleme sırasında kaldırılabilir</string>
+    <string name="relay_connection_status">Bağlantı durumu</string>
+    <string name="relay_connection_connected">Bağlı</string>
+    <string name="relay_connection_connecting">Bağlanıyor</string>
+    <string name="relay_connection_offline">Çevrimdışı</string>
+    <string name="relay_connection_unknown">Henüz denetlenmedi</string>
+    <string name="relay_connection_attempt">Son bağlantı denemesi</string>
+    <string name="relay_connection_retry">Yeniden bağlan</string>
+    <string name="relay_connection_retrying">Yeniden bağlantı isteniyor…</string>
+    <string name="relay_connection_retry_failed">Yeniden bağlantı isteği gönderilemedi. Tekrar deneyin.</string>
+</resources>

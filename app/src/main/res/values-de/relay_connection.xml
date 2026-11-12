@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="relay_editor_restriction_detail">Ein markiertes Relay kann sich verbinden. Beim Bearbeiten einer Liste, die es enthält, kann es entfernt werden.</string>
+    <string name="relay_editor_restriction_note">Kann beim Bearbeiten entfernt werden</string>
+    <string name="relay_connection_status">Verbindungsstatus</string>
+    <string name="relay_connection_connected">Verbunden</string>
+    <string name="relay_connection_connecting">Verbindung wird hergestellt</string>
+    <string name="relay_connection_offline">Nicht verbunden</string>
+    <string name="relay_connection_unknown">Noch nicht geprüft</string>
+    <string name="relay_connection_attempt">Letzter Verbindungsversuch</string>
+    <string name="relay_connection_retry">Erneut verbinden</string>
+    <string name="relay_connection_retrying">Neuverbinden wird angefordert…</string>
+    <string name="relay_connection_retry_failed">Erneutes Verbinden konnte nicht angefordert werden. Versuche es noch einmal.</string>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="relay_editor_restriction_detail">Отмеченный ретранслятор может подключаться, но при изменении списка он может быть удалён из него.</string>
+    <string name="relay_editor_restriction_note">Может быть удалён при изменении списка</string>
+    <string name="relay_connection_status">Состояние подключения</string>
+    <string name="relay_connection_connected">Подключён</string>
+    <string name="relay_connection_connecting">Подключение</string>
+    <string name="relay_connection_offline">Нет подключения</string>
+    <string name="relay_connection_unknown">Ещё не проверено</string>
+    <string name="relay_connection_attempt">Последняя попытка подключения</string>
+    <string name="relay_connection_retry">Подключить заново</string>
+    <string name="relay_connection_retrying">Запрос повторного подключения…</string>
+    <string name="relay_connection_retry_failed">Не удалось запросить повторное подключение. Попробуйте ещё раз.</string>
+</resources>

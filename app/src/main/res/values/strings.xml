@@ -1024,17 +1024,6 @@
     <string name="relay_lists_section">Relay lists</string>
     <string name="relay_list_published">Published</string>
     <string name="relay_list_missing">Missing</string>
-    <string name="relay_editor_restriction_detail">A marked relay can connect, but editing a list that includes it may remove it.</string>
-    <string name="relay_editor_restriction_note">May be removed when editing</string>
-    <string name="relay_connection_status">Connection status</string>
-    <string name="relay_connection_connected">Connected</string>
-    <string name="relay_connection_connecting">Connecting</string>
-    <string name="relay_connection_offline">Offline</string>
-    <string name="relay_connection_unknown">Not checked yet</string>
-    <string name="relay_connection_attempt">Last connection attempt</string>
-    <string name="relay_connection_retry">Reconnect</string>
-    <string name="relay_connection_retrying">Requesting reconnect…</string>
-    <string name="relay_connection_retry_failed">Couldn’t request a reconnect. Try again.</string>
     <string name="relay_list_status_unavailable">Status unavailable</string>
     <string name="relay_list_refresh">Refresh status</string>
     <string name="relay_list_refreshing">Refreshing…</string>
