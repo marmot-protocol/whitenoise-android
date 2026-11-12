@@ -87,13 +87,9 @@ class OfflineRecoveryLatencyDeviceTest {
                 val edge =
                     OfflineReconnectEdge(
                         baseline,
-                        restoreWifi {
-                            // An observation that outlived the offline state is left to the post-edge polls.
-                            if (!backgroundCycle) {
-                                val offlinePoll = observe(expectedText, offline = true)
-                                if (!hasValidatedInternet()) observations += offlinePoll
-                            }
-                        },
+                        // Every offline poll's observation is kept, even one that overlaps validation: a row
+                        // visible then fails the cycle rather than passing as a fast completion.
+                        restoreWifi { if (!backgroundCycle) observations += observe(expectedText, offline = true) },
                     )
 
                 if (backgroundCycle) {
@@ -148,8 +144,9 @@ class OfflineRecoveryLatencyDeviceTest {
 
     /**
      * Enables Wi-Fi, waits until Android validates the restored transport and returns the last
-     * monotonic time it was still seen offline, so measured recovery latency is never understated.
-     * [whileOffline] runs on each poll that still finds the device offline.
+     * monotonic time it was confirmed offline, so measured recovery latency is never understated.
+     * [whileOffline] runs on each poll that finds the device offline, and connectivity is checked
+     * again afterwards, so its duration is not counted when the device is still offline after it.
      */
     private fun restoreWifi(whileOffline: () -> Unit = {}): Long {
         var lastOfflineAt = SystemClock.elapsedRealtime()
@@ -159,8 +156,10 @@ class OfflineRecoveryLatencyDeviceTest {
                 val now = SystemClock.elapsedRealtime()
                 hasValidatedInternet().also { online ->
                     if (!online) {
-                        whileOffline()
                         lastOfflineAt = now
+                        whileOffline()
+                        val recheckedAt = SystemClock.elapsedRealtime()
+                        if (!hasValidatedInternet()) lastOfflineAt = recheckedAt
                     }
                 }
             }

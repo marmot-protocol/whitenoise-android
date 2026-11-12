@@ -24,6 +24,10 @@ internal object IsolatedMediaDecoder {
     @Volatile internal var lastAvIsolation: WorkerIsolation? = null
         private set
 
+    /** The latest still-image receipt alone, which animation and A/V receipts never overwrite. */
+    @Volatile internal var lastStillImageIsolation: WorkerIsolation? = null
+        private set
+
     // Observation only (#3722): how many still-image requests reached an isolated worker, and how many replies
     // carried a receipt. A device test reads both around one operation to tie its evidence to that operation.
     private val workerDispatches =
@@ -60,6 +64,7 @@ internal object IsolatedMediaDecoder {
     /** Stores a still-image worker's receipt and counts it for per-operation evidence. */
     internal fun recordStillImageIsolation(result: android.os.Bundle) {
         recordIsolation(result)
+        lastStillImageIsolation = lastIsolation
         workerReceipts.incrementAndGet()
     }
 

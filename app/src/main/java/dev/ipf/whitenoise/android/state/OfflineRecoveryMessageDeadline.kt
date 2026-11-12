@@ -6,7 +6,8 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
  * The final validated reconnect that owns one offline-recovery cycle (#3723).
  * [generationBaseline] is the newest recovery generation before that reconnect, so earlier
  * flaps cannot supply the cycle's markers. [atMillis] is the last monotonic time the device
- * was still seen offline, which never understates the measured latency.
+ * was confirmed offline. The bias is deliberate: latency is never understated, and is overstated
+ * by at most one connectivity poll, since each offline observation is followed by a recheck.
  */
 internal data class OfflineReconnectEdge(
     val generationBaseline: Long,

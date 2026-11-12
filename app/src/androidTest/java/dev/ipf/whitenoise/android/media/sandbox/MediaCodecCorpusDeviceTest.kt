@@ -305,7 +305,7 @@ class MediaCodecCorpusDeviceTest {
             operation,
             dispatched = IsolatedMediaDecoder.dispatchCount - dispatchesBefore,
             receipts = IsolatedMediaDecoder.receiptCount - receiptsBefore,
-            receipt = IsolatedMediaDecoder.lastIsolation,
+            receipt = IsolatedMediaDecoder.lastStillImageIsolation,
             producedResult = result != null,
             hostUid = Process.myUid(),
         )
@@ -336,6 +336,9 @@ class MediaCodecCorpusDeviceTest {
                 // Even an empty failure reply must come from an isolated uid, never the app or another app.
                 EvidenceCase(1L, 1L, isolated.copy(uid = host), producedResult = false),
                 EvidenceCase(1L, 1L, isolated.copy(uid = 10_500), producedResult = false),
+                // Nor may an empty reply come from a worker with network access or the app runtime.
+                EvidenceCase(1L, 1L, threw.copy(internetGranted = true), producedResult = false),
+                EvidenceCase(1L, 1L, threw.copy(runtimeInitialized = true), producedResult = false),
                 // A receipt from a non-isolated, host-uid, networked or initialised process is not containment.
                 EvidenceCase(1L, 1L, isolated.copy(isolated = false)),
                 EvidenceCase(1L, 1L, isolated.copy(uid = host)),
@@ -391,12 +394,14 @@ internal fun checkOperationEvidence(
         "$operation was answered outside an isolated uid: $worker (host uid $hostUid)",
         worker.uid != hostUid && (worker.uid % PER_USER_UID_RANGE) in ISOLATED_APP_IDS,
     )
+    // An empty failure reply reports every flag false, so no reply may claim network access or the app runtime.
+    assertTrue(
+        "$operation was answered by a networked or initialised worker: $worker",
+        !worker.internetGranted && !worker.runtimeInitialized,
+    )
     // A worker that threw replies without its attestation, which is acceptable only when nothing came back.
     if (producedResult) {
-        assertTrue(
-            "$operation returned output from a worker that did not attest isolation: $worker",
-            worker.isolated && !worker.internetGranted && !worker.runtimeInitialized,
-        )
+        assertTrue("$operation returned output from a worker that did not attest isolation: $worker", worker.isolated)
     }
 }
 
