@@ -27711,8 +27711,8 @@
       },
       {
         "surface": "A committed group rename is retained on its chat-list row until the subscription agrees",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupNameAuthority.kt",
-        "anchor": "internal class LocalGroupNameAuthority",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupFieldAuthority.kt",
+        "anchor": "internal class LocalGroupFieldAuthority",
         "test_ids": [
           "GRP-002",
           "CHL-016"
