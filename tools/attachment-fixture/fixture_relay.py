@@ -9,6 +9,8 @@ import threading
 from http.server import BaseHTTPRequestHandler
 
 MAX_FRAME = 2 * 1024 * 1024
+MAX_FILTER_LIMIT = 500
+NIP11_MEDIA_TYPE = "application/nostr+json"
 
 
 def matches(event, query):
@@ -112,7 +114,8 @@ class RelayHandler(BaseHTTPRequestHandler):
                 events = sorted(self.server.events.values(), key=lambda e: e["created_at"], reverse=True)
                 selected = {}
                 for query in filters:
-                    matching = [e for e in events if matches(e, query)][:query.get("limit", 10000)]
+                    limit = max(0, min(query.get("limit", MAX_FILTER_LIMIT), MAX_FILTER_LIMIT))
+                    matching = [e for e in events if matches(e, query)][:limit]
                     selected.update({e["id"]: e for e in matching})
                 for event in selected.values():
                     self.send_frame(["EVENT", subscription, event])
@@ -122,9 +125,18 @@ class RelayHandler(BaseHTTPRequestHandler):
                 self.subscriptions.pop(value[1], None)
 
     def do_GET(self):
-        """Upgrade a loopback connection and remove its subscriptions on every exit."""
+        """Serve relay information or upgrade a loopback connection and manage its subscriptions."""
         if self.headers.get("Upgrade", "").lower() != "websocket":
-            self.send_error(400)
+            if self.headers.get("Accept") != NIP11_MEDIA_TYPE:
+                self.send_error(400)
+                return
+            # Marmot's recovery uses this cap to tell a complete replay from a truncated one.
+            body = json.dumps({"limitation": {"max_limit": MAX_FILTER_LIMIT}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", NIP11_MEDIA_TYPE)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         key = self.headers.get("Sec-WebSocket-Key", "")
         accept = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest())

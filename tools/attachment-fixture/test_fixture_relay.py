@@ -7,6 +7,7 @@ import socket
 import struct
 import threading
 import unittest
+from http.client import HTTPConnection
 
 from fixture_relay import FixtureRelay, matches
 
@@ -22,8 +23,8 @@ class RelayContractTest(unittest.TestCase):
         self.assertFalse(matches(event, {"#h": ["wrong"]}))
         self.assertFalse(matches(event, {"until": 9}))
 
-    def test_published_event_survives_client_reconnect_and_matches_subscription(self):
-        """Reconnect retrieves published events without accepting unrelated tag subscriptions."""
+    def test_replay_after_reconnect_respects_requested_and_advertised_limits(self):
+        """Replay retains matching events and enforces the cap it advertises over HTTP."""
         server = FixtureRelay()
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
@@ -64,6 +65,18 @@ class RelayContractTest(unittest.TestCase):
             finally:
                 reader.close()
                 client.close()
+            info = HTTPConnection("127.0.0.1", server.port, timeout=5)
+            try:
+                media_type = "application/nostr+json"
+                info.request("GET", "/", headers={"Accept": media_type})
+                response = info.getresponse()
+                self.assertEqual(200, response.status)
+                self.assertEqual(media_type, response.getheader("Content-Type"))
+                cap = json.load(response)["limitation"]["max_limit"]
+                self.assertGreater(cap, 1)
+            finally:
+                info.close()
+
             client, reader = connect()
             try:
                 send(client, ["REQ", "fixture", {"kinds": [445], "#h": ["group"]}])
@@ -71,6 +84,19 @@ class RelayContractTest(unittest.TestCase):
                 self.assertEqual(["EOSE", "fixture"], receive(reader))
                 send(client, ["REQ", "denied", {"#h": ["other"]}])
                 self.assertEqual(["EOSE", "denied"], receive(reader))
+                replay_events = [
+                    {**event, "id": f"replay-{index}", "created_at": 11 + index}
+                    for index in range(cap)
+                ]
+                with server.lock:
+                    server.events.update({entry["id"]: entry for entry in replay_events})
+                send(client, ["REQ", "capped", {"#h": ["group"], "limit": cap + 1}])
+                for entry in reversed(replay_events):
+                    self.assertEqual(["EVENT", "capped", entry], receive(reader))
+                self.assertEqual(["EOSE", "capped"], receive(reader))
+                send(client, ["REQ", "one", {"#h": ["group"], "limit": 1}])
+                self.assertEqual(["EVENT", "one", replay_events[-1]], receive(reader))
+                self.assertEqual(["EOSE", "one"], receive(reader))
             finally:
                 reader.close()
                 client.close()
