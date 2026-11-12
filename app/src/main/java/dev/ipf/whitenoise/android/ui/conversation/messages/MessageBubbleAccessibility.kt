@@ -34,19 +34,39 @@ internal class MessageRowAction(
     val perform: () -> Unit,
 )
 
-/** Row actions in menu order, followed by the actions forwarded from the message text. */
+/**
+ * Row actions in menu order, followed by the actions forwarded from the message text. Compose refuses a node
+ * with 32 or more custom actions by throwing while an accessibility service reads it, and a long message
+ * can forward many link actions. So forwarded actions with the same label collapse into the first, as a
+ * screen reader could not tell them apart, and the list stops at [MAX_ROW_CUSTOM_ACTIONS]. The row's own
+ * actions come first, then the forwarded [leading] actions, so the message's one read-aloud chooser
+ * survives the cap however many links register before it.
+ */
 internal fun messageRowCustomActions(
     actions: List<MessageRowAction>,
     forwarded: List<CustomAccessibilityAction>,
-): List<CustomAccessibilityAction> =
-    actions
-        .filter(MessageRowAction::available)
-        .map { action ->
-            CustomAccessibilityAction(action.label) {
-                action.perform()
-                true
+    leading: Set<String> = emptySet(),
+): List<CustomAccessibilityAction> {
+    val own =
+        actions
+            .filter(MessageRowAction::available)
+            .map { action ->
+                CustomAccessibilityAction(action.label) {
+                    action.perform()
+                    true
+                }
             }
-        } + forwarded
+    val ownLabels = own.mapTo(mutableSetOf(), CustomAccessibilityAction::label)
+    val text =
+        forwarded
+            .filter { it.label !in ownLabels }
+            .distinctBy(CustomAccessibilityAction::label)
+            .sortedBy { it.label !in leading }
+    return (own + text).take(MAX_ROW_CUSTOM_ACTIONS)
+}
+
+/** Below Compose's limit of 32 custom actions per accessibility node. */
+internal const val MAX_ROW_CUSTOM_ACTIONS = 31
 
 /**
  * Replaces a nested control's semantics while the merged row owns its action. [label] stays as plain

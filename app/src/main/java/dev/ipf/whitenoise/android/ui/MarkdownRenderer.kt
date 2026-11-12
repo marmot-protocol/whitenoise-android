@@ -99,6 +99,7 @@ import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardTextActionsToMessageRow
+import dev.ipf.whitenoise.android.ui.conversation.messages.MAX_ROW_CUSTOM_ACTIONS
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSearchHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighlight
@@ -440,22 +441,28 @@ private fun MarkdownBodyText(
         sentenceLayoutReporter?.invoke(leafId, text.text, measuredLayout, coordinates)
     }
 
-    val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
+    val sentenceOwner = LocalTtsSentenceActions.current
+    val speech = ttsSentenceLeafAndRowActions(leafId, text.text, sentenceOwner)
     LaunchedEffect(sentenceLayoutReporter) { reportIfReady() }
-    val leafActions =
-        speechActions +
-            if (onCopyLink == null) {
-                emptyList()
-            } else {
-                linkDestinations.map { destination ->
-                    CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
-                        onCopyLink(destination)
-                        true
-                    }
+    val linkActions =
+        if (onCopyLink == null) {
+            emptyList()
+        } else {
+            linkDestinations.zip(markdownCopyLinkLabels(copyLabel, linkDestinations)) { destination, label ->
+                CustomAccessibilityAction(label) {
+                    onCopyLink(destination)
+                    true
                 }
             }
-    // Inside a merged message row this leaf is not focusable; the row republishes its actions.
-    ForwardTextActionsToMessageRow(leafActions)
+        }
+    // A paragraph with many links must stay below Compose's custom-action limit too.
+    val leafActions =
+        (speech.own + linkActions)
+            .distinctBy(CustomAccessibilityAction::label)
+            .take(MAX_ROW_CUSTOM_ACTIONS)
+    // Inside a merged message row this leaf is not focusable, so the row republishes its links and one
+    // chooser over the whole message's sentences.
+    ForwardTextActionsToMessageRow(speech.row + linkActions)
     val accessibilityModifier = Modifier.semantics { customActions = leafActions }
 
     MarkdownTimestampText(
@@ -568,6 +575,29 @@ internal fun markdownLinkDestinations(text: AnnotatedString): List<String> =
         .getLinkAnnotations(0, text.length)
         .mapNotNull { range -> markdownLinkDestination(range.item) }
         .distinct()
+
+/**
+ * One copy-link action label per distinct destination, in order. Shown text stops after
+ * [MARKDOWN_LINK_CONFIRM_DISPLAY_MAX_LENGTH] code points, so links that differ only past that point would share
+ * a label, and actions collapse by label. A repeated label therefore gets a numbered suffix, keeping each link
+ * copyable.
+ */
+internal fun markdownCopyLinkLabels(
+    copyLabel: String,
+    destinations: List<String>,
+): List<String> {
+    val taken = HashSet<String>()
+    return destinations.map { destination ->
+        val base = "$copyLabel: ${markdownSafeDisplayText(destination)}"
+        var label = base
+        var copy = 1
+        while (!taken.add(label)) {
+            copy += 1
+            label = "$base ($copy)"
+        }
+        label
+    }
+}
 
 internal fun markdownLinkDestination(annotation: LinkAnnotation): String? =
     when (annotation) {

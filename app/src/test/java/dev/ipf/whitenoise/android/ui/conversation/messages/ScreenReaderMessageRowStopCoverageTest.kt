@@ -60,6 +60,42 @@ class ScreenReaderMessageRowStopCoverageTest {
         assertEquals(listOf("info"), performed)
     }
 
+    /**
+     * A long message forwards one read-aloud action per paragraph. The row keeps its own actions first, offers
+     * one entry per distinct label, and stays below Compose's limit of 32 custom actions, which throws while an
+     * accessibility service such as TalkBack reads the row.
+     */
+    @Test
+    fun longMessageRowStaysBelowTheCustomActionLimit() {
+        val own = (1..8).map { MessageRowAction("Action $it", available = true) {} }
+        val sentences = List(40) { CustomAccessibilityAction("Choose sentence to read") { true } }
+        val links = (1..40).map { CustomAccessibilityAction("Copy link: https://example.com/$it") { true } }
+
+        val actions = messageRowCustomActions(own, sentences + links)
+
+        assertTrue("got ${actions.size} actions", actions.size <= MAX_ROW_CUSTOM_ACTIONS)
+        assertTrue(MAX_ROW_CUSTOM_ACTIONS < 32)
+        assertEquals(own.map { it.label }, actions.take(own.size).map { it.label })
+        assertEquals(1, actions.count { it.label == "Choose sentence to read" })
+        assertEquals(actions.size, actions.map { it.label }.distinct().size)
+    }
+
+    /**
+     * The message's read-aloud chooser registers after other paragraphs' links when its paragraph has none,
+     * so the row ranks it right after its own actions and the cap cannot cut it.
+     */
+    @Test
+    fun readAloudChooserSurvivesLinksThatRegisteredFirst() {
+        val own = (1..10).map { MessageRowAction("Action $it", available = true) {} }
+        val links = (1..30).map { CustomAccessibilityAction("Copy link: https://example.com/$it") { true } }
+        val chooser = CustomAccessibilityAction("Choose sentence to read") { true }
+
+        val actions = messageRowCustomActions(own, links + chooser, setOf(chooser.label))
+
+        assertEquals(MAX_ROW_CUSTOM_ACTIONS, actions.size)
+        assertEquals(chooser.label, actions[own.size].label)
+    }
+
     @Test
     fun textLeavesRegisterByIdentityAndLeaveWhenRemoved() {
         val registry = MessageRowTextActions()
@@ -155,12 +191,18 @@ class ScreenReaderMessageRowStopCoverageTest {
         assertTrue(giphy.contains("editedLabelTarget(label, footer.onEditedClick)"))
     }
 
+    /** Markdown and plain-text bodies forward their read-aloud and link actions to the merged message row. */
     @Test
     fun everyTextRendererForwardsItsActionsToTheRow() {
         val host = appModuleSource("$CONVERSATION/TimelineRowTtsHighlight.kt")
         assertTrue(host.contains("LocalMessageRowTextActions provides rowTextActions"))
         val markdown = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt")
-        assertTrue(markdown.contains("ForwardTextActionsToMessageRow(leafActions)"))
+        // Markdown paragraphs forward their links and one chooser over the whole message's sentences.
+        assertTrue(markdown.contains("ttsSentenceLeafAndRowActions(leafId, text.text, sentenceOwner)"))
+        assertTrue(markdown.contains("ForwardTextActionsToMessageRow(speech.row + linkActions)"))
+        // The row ranks read-aloud ahead of links, so the chooser survives the action cap.
+        val bubble = appModuleSource("$MESSAGES/MessageBubble.kt")
+        assertTrue(bubble.contains("readAloudLabels,"))
         val plain = appModuleSource("$MESSAGES/BubbleContentBlocks.kt")
         assertTrue(plain.contains("ForwardTextActionsToMessageRow(sentenceActions)"))
     }

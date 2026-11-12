@@ -11,6 +11,16 @@
           "AXY-013"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Message row custom actions stay below the platform limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleAccessibility.kt",
+        "anchor": "internal const val MAX_ROW_CUSTOM_ACTIONS",
+        "test_ids": [
+          "AXY-002"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

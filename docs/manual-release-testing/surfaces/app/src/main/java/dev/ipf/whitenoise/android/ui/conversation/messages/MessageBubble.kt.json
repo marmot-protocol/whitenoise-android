@@ -294,6 +294,22 @@
         "test_ids": [
           "AXY-013"
         ]
+      },
+      {
+        "surface": "R.string.tts_choose_sentence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.tts_choose_sentence",
+        "test_ids": [
+          "AXY-002"
+        ]
+      },
+      {
+        "surface": "R.string.tts_read_from_sentence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.tts_read_from_sentence",
+        "test_ids": [
+          "AXY-002"
+        ]
       }
     ],
     "message_rendering_contracts": [

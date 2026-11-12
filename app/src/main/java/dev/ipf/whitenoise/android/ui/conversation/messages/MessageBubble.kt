@@ -1657,6 +1657,8 @@ internal fun MessageBubble(
         // (#3603): its nested controls read as text and their actions move here.
         val rowMerged = !selectionMode && !textSelectionMode
         val rowTextActions = LocalMessageRowTextActions.current
+        val readAloudLabels =
+            setOf(stringResource(R.string.tts_choose_sentence), stringResource(R.string.tts_read_from_sentence))
         val failedOwnSend = mine && item.status == MessageStatus.Failed
         val rowActions =
             listOf(
@@ -1920,7 +1922,12 @@ internal fun MessageBubble(
                                         true
                                     }
                                 }
-                                customActions = messageRowCustomActions(rowActions, rowTextActions?.actions.orEmpty())
+                                customActions =
+                                    messageRowCustomActions(
+                                        rowActions,
+                                        rowTextActions?.actions.orEmpty(),
+                                        readAloudLabels,
+                                    )
                             }
                         },
                     )
