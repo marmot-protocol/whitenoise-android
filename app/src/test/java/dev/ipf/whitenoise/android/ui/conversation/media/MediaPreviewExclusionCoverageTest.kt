@@ -184,23 +184,22 @@ class MediaPreviewExclusionCoverageTest {
     /** Both production shelves remove a staged document through the shared release rule, never by index alone. */
     @Test
     fun everyStagedDocumentRemovalUsesTheSharedReleaseRule() {
-        val preview = source("ui/conversation/ConversationMediaDraft.kt")
-        val composer = source("ui/conversation/ConversationScreen.kt")
+        // Compared without whitespace, so rewrapping either call does not trip the gate.
+        val preview = compact(source("ui/conversation/ConversationMediaDraft.kt"))
+        val composer = compact(source("ui/conversation/ConversationScreen.kt"))
 
         assertTrue(
             "the preview removes documents through the shared rule",
-            "removeStagedDocumentAt(documentUris, index, state::releasePreparedDocument)" in preview,
+            "removeStagedDocumentAt(documentUris,index,state::releasePreparedDocument" in preview,
         )
-        val composerRemoval =
-            "removeStagedDocumentAt(pendingDocumentUris,index,mediaDraftState::releasePreparedDocument,"
         assertTrue(
             "the composer shelf removes documents through the shared rule",
-            composerRemoval in composer.replace(Regex("""\s+"""), ""),
+            "removeStagedDocumentAt(pendingDocumentUris,index,mediaDraftState::releasePreparedDocument" in composer,
         )
         listOf(preview, composer).forEach { text ->
             assertFalse(
                 "no shelf releases a document by index without checking for another copy",
-                Regex("""getOrNull\(index\)\s*\?\.let\(\s*\w+::releasePreparedDocument""").containsMatchIn(text),
+                Regex("""getOrNull\(index\)\?\.let\(\w+::releasePreparedDocument""").containsMatchIn(text),
             )
         }
     }
@@ -238,6 +237,9 @@ class MediaPreviewExclusionCoverageTest {
 
     /** Reads a main-source file under the app package, failing when it is missing. */
     private fun source(relative: String) = appModuleSource("src/main/java/dev/ipf/whitenoise/android/$relative")
+
+    /** [text] with every whitespace run removed, so source checks ignore wrapping and indentation. */
+    private fun compact(text: String) = text.replace(Regex("""\s+"""), "")
 
     private companion object {
         const val INCLUSION_TARGET = "conversation.media.inclusion.target"
