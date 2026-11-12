@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Terminal quick-reply failure restores the card with the send-failed notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt",
+        "anchor": "R.string.toast_send_failed",
+        "test_ids": [
+          "NTF-016",
+          "NTF-029"
+        ]
+      },
+      {
+        "surface": "R.string.toast_message_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReplyWorker.kt",
+        "anchor": "R.string.toast_message_too_long",
+        "test_ids": [
+          "MSG-048"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

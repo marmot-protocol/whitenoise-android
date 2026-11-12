@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.TimeFormatPreference
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
@@ -3194,10 +3195,14 @@ class WhiteNoiseAppState private constructor(
                 )
         ) {
             ConversationDictationReplyTargetResolution.Detached ->
-                if (request.replyToMessageIdHex == null) {
-                    sendDetachedDictationText(request)
-                } else {
-                    rejectDictationDispatchBeforeTransport(request)
+                when {
+                    request.replyToMessageIdHex != null -> rejectDictationDispatchBeforeTransport(request)
+                    // No composer is mounted to refuse it, and this path sends straight to MDK.
+                    exceedsOutgoingMessageLimit(request.payload.trim()) -> {
+                        present(R.string.toast_message_too_long)
+                        rejectDictationDispatchBeforeTransport(request)
+                    }
+                    else -> sendDetachedDictationText(request)
                 }
             ConversationDictationReplyTargetResolution.Mismatch -> rejectDictationDispatchBeforeTransport(request)
             is ConversationDictationReplyTargetResolution.Mounted ->
@@ -4448,7 +4453,10 @@ class WhiteNoiseAppState private constructor(
     ) {
         val trimmed = text.trim()
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        if (trimmed.isEmpty() || targets.isEmpty()) return
+        // Forward eligibility already blocks these, this keeps any other caller from sending one.
+        val tooLong = exceedsOutgoingMessageLimit(trimmed)
+        if (tooLong) present(R.string.toast_message_too_long)
+        if (trimmed.isEmpty() || targets.isEmpty() || tooLong) return
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var failures = 0
@@ -4499,7 +4507,9 @@ class WhiteNoiseAppState private constructor(
     ) {
         val bodies = MessageProjector.validatedForwardTextBodies(texts)
         val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        if (bodies.isEmpty() || targets.isEmpty()) return
+        val tooLong = bodies.any { exceedsOutgoingMessageLimit(it.trim()) }
+        if (tooLong) present(R.string.toast_message_too_long)
+        if (bodies.isEmpty() || targets.isEmpty() || tooLong) return
         val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
         launchMutation {
             var completeTargets = 0
@@ -10159,6 +10169,10 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /**
+     * Sends one notification reply exactly once, reporting an earlier attempt that already committed instead of
+     * resending it, and refusing a reply over the outgoing limit before anything is sent.
+     */
     internal suspend fun sendNotificationReply(
         accountRef: String,
         groupIdHex: String,
@@ -10204,6 +10218,9 @@ class WhiteNoiseAppState private constructor(
                         NotificationReplyCommitProbe.NotCommitted -> Unit
                     }
                 }
+                // A reply queued before the limit existed may be over it. Refuse it only now, once the
+                // probe above has ruled out an earlier attempt that already committed it.
+                if (exceedsOutgoingMessageLimit(body)) return@withGroupCommitLock NotificationReplySendOutcome.TooLong
 
                 // A synthetic max-id cursor excludes every row in this wall-clock
                 // second. Wait for the next second before asking MDK to build the

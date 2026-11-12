@@ -244,6 +244,7 @@ internal fun forwardBlockedReasonLabel(reason: ForwardBlockedReason): String =
         ForwardBlockedReason.UnavailableAttachment -> stringResource(R.string.forward_blocked_unavailable)
         ForwardBlockedReason.RestrictedAttachment -> stringResource(R.string.forward_blocked_restricted)
         ForwardBlockedReason.Unsupported -> stringResource(R.string.forward_blocked_unsupported)
+        ForwardBlockedReason.TooLong -> stringResource(R.string.forward_blocked_too_long)
     }
 
 /**

@@ -461,6 +461,7 @@
     <string name="forward_blocked_unavailable">İletmeden önce bu eki indirin</string>
     <string name="forward_blocked_restricted">Bu ekin iletilmesine izin verilmiyor</string>
     <string name="forward_blocked_unsupported">Bu mesaj iletilemiyor</string>
+    <string name="forward_blocked_too_long">Bu mesaj iletmek için çok uzun</string>
     <string name="forward_blocked_selection">İletme kullanılamıyor: %1$s</string>
     <string name="forward_progress_title">İletiliyor</string>
     <string name="forward_preparing_attachments">Ekler hazırlanıyor: %1$d / %2$d</string>
@@ -854,6 +855,7 @@
     <string name="toast_profile_published_detail">Profiliniz artık %1$d rölede yayında.</string>
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
+    <string name="toast_message_too_long">Mesaj çok uzun. Mesajınızı kısaltıp yeniden gönderin.</string>
     <string name="toast_send_storage_full">Göndermek için yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="error_storage_full">Bu cihazda yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="toast_send_connection_failed">Aktarıcıya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>

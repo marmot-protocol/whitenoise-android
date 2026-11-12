@@ -487,6 +487,7 @@
     <string name="forward_blocked_unavailable">Скачайте это вложение перед пересылкой</string>
     <string name="forward_blocked_restricted">Пересылка этого вложения запрещена</string>
     <string name="forward_blocked_unsupported">Это сообщение нельзя переслать</string>
+    <string name="forward_blocked_too_long">Это сообщение слишком длинное для пересылки</string>
     <string name="forward_blocked_selection">Пересылка недоступна: %1$s</string>
     <string name="forward_progress_title">Пересылка</string>
     <string name="forward_preparing_attachments">Подготовка вложений: %1$d из %2$d</string>
@@ -892,6 +893,7 @@
     <string name="toast_profile_published_detail">Ваш профиль теперь доступен на %1$d реле.</string>
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
+    <string name="toast_message_too_long">Сообщение слишком длинное. Сократите его и отправьте снова.</string>
     <string name="toast_send_storage_full">Недостаточно места для отправки. Освободите место и попробуйте снова.</string>
     <string name="error_storage_full">Недостаточно места на этом устройстве. Освободите место и попробуйте снова.</string>
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>

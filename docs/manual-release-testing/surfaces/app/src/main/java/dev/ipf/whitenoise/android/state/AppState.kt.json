@@ -509,6 +509,14 @@
         ]
       },
       {
+        "surface": "Over-limit dictation sent with no conversation open is refused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_message_too_long",
+        "test_ids": [
+          "MSG-048"
+        ]
+      },
+      {
         "surface": "Account dot follows the complete native total",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "hasReadyTotal(accountIdHex)",

@@ -463,6 +463,7 @@
     <string name="forward_blocked_unavailable">Baixe este anexo antes de encaminhar</string>
     <string name="forward_blocked_restricted">Não é permitido encaminhar este anexo</string>
     <string name="forward_blocked_unsupported">Esta mensagem não pode ser encaminhada</string>
+    <string name="forward_blocked_too_long">Esta mensagem é longa demais para ser encaminhada</string>
     <string name="forward_blocked_selection">Encaminhamento indisponível: %1$s</string>
     <string name="forward_progress_title">Encaminhando</string>
     <string name="forward_preparing_attachments">Preparando anexos: %1$d de %2$d</string>
@@ -856,6 +857,7 @@
     <string name="toast_profile_published_detail">Seu perfil agora está em %1$d relays.</string>
     <string name="toast_couldnt_publish_profile">Não foi possível publicar o perfil</string>
     <string name="toast_send_failed">Falha no envio</string>
+    <string name="toast_message_too_long">Mensagem muito longa. Encurte a mensagem e envie novamente.</string>
     <string name="toast_send_storage_full">Não há espaço suficiente para enviar. Libere espaço e tente novamente.</string>
     <string name="error_storage_full">Não há espaço suficiente neste dispositivo. Libere espaço e tente novamente.</string>
     <string name="toast_send_connection_failed">Não foi possível acessar o relay. Verifique sua conexão e tente novamente.</string>

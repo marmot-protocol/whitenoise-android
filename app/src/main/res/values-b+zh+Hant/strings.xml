@@ -448,6 +448,7 @@
     <string name="forward_blocked_unavailable">請先下載此附件再轉發</string>
     <string name="forward_blocked_restricted">不允許轉發此附件</string>
     <string name="forward_blocked_unsupported">此訊息無法轉發</string>
+    <string name="forward_blocked_too_long">此訊息過長，無法轉發</string>
     <string name="forward_blocked_selection">無法轉發：%1$s</string>
     <string name="forward_progress_title">正在轉發</string>
     <string name="forward_preparing_attachments">正在準備附件 %1$d / %2$d</string>
@@ -839,6 +840,7 @@
     <string name="toast_profile_published_detail">你的個人檔案已發布到 %1$d 個中繼站。</string>
     <string name="toast_couldnt_publish_profile">無法發布個人檔案</string>
     <string name="toast_send_failed">發送失敗</string>
+    <string name="toast_message_too_long">訊息過長。請縮短後再傳送。</string>
     <string name="toast_send_storage_full">儲存空間不足，無法發送。請釋放空間後重試。</string>
     <string name="error_storage_full">此裝置儲存空間不足。請釋放空間後重試。</string>
     <string name="toast_send_connection_failed">無法連線至中繼站。請檢查網路連線後再試一次。</string>

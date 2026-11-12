@@ -18,6 +18,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
@@ -175,6 +176,63 @@ class ConversationSendAdmissionTest {
             } finally {
                 releaseParse.complete(styled)
                 send.cancelAndJoin()
+                controller.onCleared()
+            }
+        }
+
+    /** Text over the outgoing limit sends nothing, keeps the composer and says why. */
+    @Test
+    fun overLimitTextIsRejectedInsteadOfSent() =
+        runTest {
+            var publishCalls = 0
+            var accepted = 0
+            val appState = testAppState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        publishCalls += 1
+                        sentSummary()
+                    },
+                )
+            try {
+                controller.send("a".repeat(8_001), onAccepted = { accepted += 1 })
+
+                assertEquals(0, publishCalls)
+                assertEquals(0, accepted)
+                assertTrue(controller.timeline.isEmpty())
+                assertEquals(AppText.Resource(R.string.toast_message_too_long), appState.toast?.title)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** An over-limit edit leaves the original alone and keeps the editor open on the new text. */
+    @Test
+    fun overLimitEditKeepsTheEditorOpen() =
+        runTest {
+            var editCalls = 0
+            val appState = testAppState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ ->
+                        editCalls += 1
+                        sentSummary()
+                    },
+                )
+            try {
+                controller.editingMessageId = CONFIRMED_MESSAGE_ID
+                controller.send("a".repeat(8_001))
+
+                assertEquals(0, editCalls)
+                assertEquals(CONFIRMED_MESSAGE_ID, controller.editingMessageId)
+                assertEquals(AppText.Resource(R.string.toast_message_too_long), appState.toast?.title)
+            } finally {
                 controller.onCleared()
             }
         }

@@ -997,6 +997,14 @@
         "test_ids": [
           "CON-003"
         ]
+      },
+      {
+        "surface": "Over-limit send or edit refused before any bubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_message_too_long",
+        "test_ids": [
+          "MSG-048"
+        ]
       }
     ]
   },

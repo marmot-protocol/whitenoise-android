@@ -461,6 +461,7 @@
     <string name="forward_blocked_unavailable">Lade diesen Anhang vor dem Weiterleiten herunter</string>
     <string name="forward_blocked_restricted">Das Weiterleiten dieses Anhangs ist nicht erlaubt</string>
     <string name="forward_blocked_unsupported">Diese Nachricht kann nicht weitergeleitet werden</string>
+    <string name="forward_blocked_too_long">Diese Nachricht ist zu lang zum Weiterleiten</string>
     <string name="forward_blocked_selection">Weiterleiten nicht verfügbar: %1$s</string>
     <string name="forward_progress_title">Weiterleiten läuft</string>
     <string name="forward_preparing_attachments">Anhänge werden vorbereitet: %1$d von %2$d</string>
@@ -854,6 +855,7 @@
     <string name="toast_profile_published_detail">Dein Profil ist jetzt auf %1$d Relays.</string>
     <string name="toast_couldnt_publish_profile">Profil konnte nicht veröffentlicht werden</string>
     <string name="toast_send_failed">Senden fehlgeschlagen</string>
+    <string name="toast_message_too_long">Nachricht zu lang. Kürze deine Nachricht und sende sie erneut.</string>
     <string name="toast_send_storage_full">Nicht genügend Speicherplatz zum Senden. Gib Speicherplatz frei und versuche es erneut.</string>
     <string name="error_storage_full">Nicht genügend Speicherplatz auf diesem Gerät. Gib Speicherplatz frei und versuche es erneut.</string>
     <string name="toast_send_connection_failed">Relay konnte nicht erreicht werden. Überprüfe deine Verbindung und versuche es erneut.</string>

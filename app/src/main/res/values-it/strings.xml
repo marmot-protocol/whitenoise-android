@@ -463,6 +463,7 @@
     <string name="forward_blocked_unavailable">Scarica questo allegato prima di inoltrarlo</string>
     <string name="forward_blocked_restricted">Non è consentito inoltrare questo allegato</string>
     <string name="forward_blocked_unsupported">Questo messaggio non può essere inoltrato</string>
+    <string name="forward_blocked_too_long">Questo messaggio è troppo lungo per essere inoltrato</string>
     <string name="forward_blocked_selection">Inoltro non disponibile: %1$s</string>
     <string name="forward_progress_title">Inoltro in corso</string>
     <string name="forward_preparing_attachments">Preparazione allegati: %1$d di %2$d</string>
@@ -856,6 +857,7 @@
     <string name="toast_profile_published_detail">Il tuo profilo è ora su %1$d relay.</string>
     <string name="toast_couldnt_publish_profile">Impossibile pubblicare il profilo</string>
     <string name="toast_send_failed">Invio non riuscito</string>
+    <string name="toast_message_too_long">Messaggio troppo lungo. Accorcialo, poi invialo di nuovo.</string>
     <string name="toast_send_storage_full">Spazio insufficiente per l’invio. Libera spazio e riprova.</string>
     <string name="error_storage_full">Spazio insufficiente su questo dispositivo. Libera spazio e riprova.</string>
     <string name="toast_send_connection_failed">Impossibile raggiungere il relay. Controlla la connessione e riprova.</string>

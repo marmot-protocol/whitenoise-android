@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
+import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
@@ -3716,8 +3717,12 @@ internal fun ConversationScreen(
                         MEDIA_PICKER_MAX_ITEMS,
                         importedShareFiles::owns,
                     )
-                if (!withinLimit) appState.present(R.string.share_import_recovered_limit)
-                withinLimit
+                val captionTooLong = exceedsOutgoingMessageLimit(caption.trim())
+                when {
+                    !withinLimit -> appState.present(R.string.share_import_recovered_limit)
+                    captionTooLong -> appState.present(R.string.toast_message_too_long)
+                }
+                withinLimit && !captionTooLong
             },
         ) { onAccepted, onRejected ->
             val sendingMedia = pendingMediaSlots
