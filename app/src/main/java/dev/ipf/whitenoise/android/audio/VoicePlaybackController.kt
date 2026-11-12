@@ -7,6 +7,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.util.LruCache
 import dev.ipf.whitenoise.android.state.StalenessGuard
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -18,7 +19,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -299,22 +299,26 @@ object VoicePlaybackController {
         noisyListener.arm()
         val sessionId = ++nextSessionId
         _state.value = PlaybackState(key = key, speed = currentSpeed, source = source, sessionId = sessionId)
+        // Cancellation can land after preparation succeeds but before withContext delivers the
+        // player back here; the prompt-cancellation guarantee then discards it. Hold it outside
+        // so this request releases what it created and nothing else can (#370).
+        var prepared: VoicePlaybackPlayer? = null
         val mp =
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    val context = checkNotNull(applicationContext) { "Voice playback is not attached" }
-                    playerFactory.prepare(context, file)
-                }.onFailure { Log.w(TAG, "voice_playback_prepare_failed") }
-                    .getOrNull()
-                    ?.also {
-                        // If the caller was cancelled while prepare() ran (the
-                        // clip scrolled away, the screen was left, a sign-out
-                        // landed), withContext discards this result on resume and
-                        // releasePlayerInternal can never find it — release here
-                        // so the native player + its file descriptor don't leak.
-                        // See #370.
-                        if (!isActive) it.runCatching { release() }
-                    }?.takeIf { isActive }
+            try {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val context = checkNotNull(applicationContext) { "Voice playback is not attached" }
+                        playerFactory.prepare(context, file).also { prepared = it }
+                    }.onFailure { Log.w(TAG, "voice_playback_prepare_failed") }
+                        .getOrNull()
+                }
+            } catch (cancelled: CancellationException) {
+                prepared?.runCatching { release() }
+                // The serializer keeps newer plays out until this returns and no player is adopted,
+                // so the route listener is ours; the loading UI is ours only while it shows this session.
+                noisyListener.disarm()
+                if (_state.value.sessionId == sessionId) _state.value = PlaybackState()
+                throw cancelled
             } ?: run {
                 noisyListener.disarm()
                 _state.value = PlaybackState()
