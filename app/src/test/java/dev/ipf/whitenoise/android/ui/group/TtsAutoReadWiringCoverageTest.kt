@@ -168,7 +168,7 @@ class TtsAutoReadWiringCoverageTest {
         val app = source("state/AppState.kt")
         assertTrue("Automatic admission must protect the microphone", "microphoneCaptureCoordinator.isHeld" in app)
         assertTrue("Automatic admission must honor engine consent", "requiresTtsTrustWarning(" in app)
-        assertTrue("Asynchronous commit must recheck the same guards", "canCommit() && canStartTtsAutoRead()" in app)
+        assertTrue("Asynchronous commit must recheck the same guards", "canCommit() && canAutoRead()" in app)
         val explicit = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
         assertTrue("Explicit speech must offer consent before projection/playback", "requestTtsTrust {" in explicit)
     }

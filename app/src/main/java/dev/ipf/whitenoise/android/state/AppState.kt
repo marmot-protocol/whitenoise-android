@@ -1906,7 +1906,7 @@ class WhiteNoiseAppState private constructor(
         startSentenceIndex: Int = 0,
     ): Boolean {
         val owner =
-            ttsAutoReadKey(activeAccountRef, groupIdHex)?.takeIf { canStartTtsAutoRead() } ?: return false
+            ttsAutoReadKey(activeAccountRef, groupIdHex)?.takeIf { canAutoRead() } ?: return false
         val started = speakAloud(entries, locale, startSentenceIndex)
         if (started) {
             ttsAutoReadSessionKey = owner
@@ -1981,7 +1981,7 @@ class WhiteNoiseAppState private constructor(
         backgroundPreparation: Boolean,
         canCommit: () -> Boolean = { true },
     ): Boolean {
-        if (!canCommit() || !canStartTtsAutoRead()) return false
+        if (!canCommit() || !canAutoRead()) return false
         val ownerAccount = activeAccountRef
         return if (!backgroundPreparation) {
             speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
@@ -1992,7 +1992,7 @@ class WhiteNoiseAppState private constructor(
                     locale,
                     startSentenceIndex,
                     startRenderedHit,
-                    isCurrent = { canCommit() && canStartTtsAutoRead() },
+                    isCurrent = { canCommit() && canAutoRead() },
                 ).also { started ->
                     if (started) {
                         ttsAutoReadSessionKey = owner
@@ -2020,9 +2020,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Recheck the effective engine's consent and microphone lease before preparation and commit. */
-    private fun canStartTtsAutoRead(): Boolean {
-        return !microphoneCaptureCoordinator.isHeld && ttsEngineRequiringConsent() == null
-    }
+    private fun canAutoRead(): Boolean = !microphoneCaptureCoordinator.isHeld && ttsEngineRequiringConsent() == null
 
     /**
      * History paging for the read-aloud transport. The backing conversation
