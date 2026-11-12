@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "Preview exclusion removal plan",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "val removals =",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
         "surface": "MediaPreviewContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
         "anchor": "fun MediaPreviewContent(",

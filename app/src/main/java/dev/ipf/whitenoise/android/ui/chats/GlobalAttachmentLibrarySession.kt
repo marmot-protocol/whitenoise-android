@@ -127,6 +127,9 @@ internal data class GlobalAttachmentLibraryContent(
     val kinds: Set<GlobalSearchContentKind>,
     val loading: Boolean,
     val pager: AccountAttachmentPager?,
+    /** Whether the chat scope failed to resolve, so the grid shows its failure state and [onRetryScope]. */
+    val scopeFailed: Boolean = false,
+    val onRetryScope: () -> Unit = {},
 )
 
 /** The search content kind a native category is filed under, or null for a rejected slot. */

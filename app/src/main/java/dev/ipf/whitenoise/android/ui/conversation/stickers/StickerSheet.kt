@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.stickers
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.stickerFailureDetail
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -189,6 +191,20 @@ internal fun StickerDisclosure(text: String) {
 internal fun StickerProgress() {
     Box(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.Section), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+    }
+}
+
+/** Sticker packs couldn't be read; [onRetry] tries again. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun StickerLoadFailed(onRetry: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.Section).testTag("sticker.load.failed"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    ) {
+        StickerDisclosure(stringResource(R.string.sticker_packs_load_failed))
+        WhiteNoiseOutlinedButton(onClick = onRetry) { Text(stringResource(R.string.sticker_packs_try_again)) }
     }
 }
 

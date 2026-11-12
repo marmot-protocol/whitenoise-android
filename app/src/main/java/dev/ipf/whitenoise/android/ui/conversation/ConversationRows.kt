@@ -44,7 +44,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Add
 import dev.ipf.whitenoise.android.ui.icons.filled.Group
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.FormatStyle
@@ -94,9 +93,9 @@ internal fun differentDay(
     a: ULong,
     b: ULong,
 ): Boolean {
+    // Received stamps are untrusted; an unrepresentable one is its own "unknown" day.
     val zone = ZoneId.systemDefault()
-    return Instant.ofEpochSecond(a.toLong()).atZone(zone).toLocalDate() !=
-        Instant.ofEpochSecond(b.toLong()).atZone(zone).toLocalDate()
+    return IdentityFormatter.localDate(a, zone) != IdentityFormatter.localDate(b, zone)
 }
 
 // Today/Yesterday, then weekday within a week, then a locale-medium date (or the
@@ -107,9 +106,9 @@ internal fun messageDayLabel(
     locale: Locale,
     dateFormat: DateFormatPreference = DateFormatPreference.Automatic,
 ): String {
-    if (epochSeconds == 0uL) return ""
     val zone = ZoneId.systemDefault()
-    val date = Instant.ofEpochSecond(epochSeconds.toLong()).atZone(zone).toLocalDate()
+    // Zero and stamps past 9999-12-31T23:59:59Z are unknown; the bound keeps the millisecond product in range.
+    val date = epochSeconds.takeIf { it != 0uL }?.let { IdentityFormatter.localDate(it, zone) } ?: return ""
     val days = ChronoUnit.DAYS.between(date, LocalDate.now(zone))
     return when {
         days <= 0L || days == 1L ->

@@ -65,17 +65,25 @@ internal class TextAttachmentNativeActions(
     }
 }
 
-/** Prevents a suspended native download from publishing after its reader owner has changed. */
+/**
+ * Prevents a suspended native download from publishing after its reader owner has changed. [publish] receives the
+ * same owner check to run at the platform finalize boundary, so a save already writing cannot complete after the
+ * owner changes.
+ */
 internal suspend fun <T> saveOwnedTextAttachment(
     isCurrent: () -> Boolean,
     materialize: suspend () -> T,
-    publish: suspend (T) -> Unit,
+    publish: suspend (source: T, beforePublish: () -> Unit) -> Unit,
 ) {
-    if (!isCurrent()) throw CancellationException("text reader owner changed")
+    val publishContext = currentCoroutineContext()
+    val requireOwner = {
+        publishContext.ensureActive()
+        if (!isCurrent()) throw CancellationException("text reader owner changed")
+    }
+    requireOwner()
     val source = materialize()
-    currentCoroutineContext().ensureActive()
-    if (!isCurrent()) throw CancellationException("text reader owner changed")
-    publish(source)
+    requireOwner()
+    publish(source, requireOwner)
 }
 
 /** Reuses the native Downloads publisher and cancellation-aware SAF fallback for this exact attachment index. */
@@ -161,7 +169,7 @@ internal fun rememberTextAttachmentNativeActions(
                                         retained = retained,
                                     )
                                 },
-                                publish = { file ->
+                                publish = { file, beforePublish ->
                                     val saved =
                                         saveDocumentWithFallback(
                                             context,
@@ -169,6 +177,7 @@ internal fun rememberTextAttachmentNativeActions(
                                             reference.fileName,
                                             reference.mediaType,
                                             fallback,
+                                            beforePublish = beforePublish,
                                         )
                                     check(saved) {
                                         "MediaStore save returned false"

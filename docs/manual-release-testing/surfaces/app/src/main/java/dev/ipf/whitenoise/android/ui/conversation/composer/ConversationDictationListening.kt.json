@@ -9,7 +9,8 @@
         "anchor": "fun ConversationDictationListeningSlot(",
         "test_ids": [
           "NAV-011",
-          "DIC-002"
+          "DIC-002",
+          "NAV-012"
         ]
       },
       {

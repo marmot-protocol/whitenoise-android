@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.rememberTransition
@@ -73,11 +72,11 @@ class ConversationRouteFrameStabilityTest {
     @Test
     fun rapidBackReversalDoesNotSnapReturningChatListLayerAt120Hz() {
         val progressBefore =
-            FastOutSlowInEasing.transform(
+            ConversationRouteEasing.transform(
                 EIGHT_FORWARD_120_HZ_FRAMES_MILLIS.toFloat() / CONVERSATION_ROUTE_TRANSITION_MILLIS,
             )
         val firstReverseFraction =
-            FastOutSlowInEasing.transform(
+            ConversationRouteEasing.transform(
                 FRAME_120_HZ_MILLIS.toFloat() / CONVERSATION_ROUTE_TRANSITION_MILLIS,
             )
         val progressAfter = progressBefore * (1f - firstReverseFraction)

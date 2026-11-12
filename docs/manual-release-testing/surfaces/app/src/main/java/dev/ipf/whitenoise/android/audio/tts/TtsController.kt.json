@@ -18,6 +18,14 @@
         "test_ids": [
           "MED-047"
         ]
+      },
+      {
+        "surface": "Read-aloud stays silent after focus loss during preparation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsController.kt",
+        "anchor": "private fun pauseForFocusLoss(",
+        "test_ids": [
+          "TTS-001"
+        ]
       }
     ]
   },

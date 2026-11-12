@@ -330,6 +330,35 @@ class GlobalSearchReturnStateTest {
         holder.close()
     }
 
+    /**
+     * A first page in flight at detach leaves no rows to recheck, so it is dropped and Back searches again from
+     * the start instead of waiting on a session that never shows results.
+     */
+    @Test
+    fun aFirstPageInFlightAtDetachSearchesAgainOnReturn() {
+        val store = StoreReader((0 until 3).map { record("g", "m$it", at = 100uL + it.toULong()) })
+        val (reader, gate) = GlobalSearchTestFixtures.holdingFirstRead(store)
+        val holder = GlobalSearchResultsHolder()
+        val query = GlobalSearchResultsQuery(needle = "hello")
+        val session = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        session.search(query)
+        idleMain()
+
+        holder.detach()
+        store.replace("m1") { it.copy(deleted = true) }
+        gate.complete(Unit)
+        idleMain()
+        assertEquals("the dropped page shows nothing", null, session.shownState(query))
+
+        val returned = holder.obtain(ACCOUNT_A) { scope -> controller(reader, scope) }
+        returned.search(query)
+        idleMain()
+
+        assertSame(session, returned)
+        assertEquals(listOf("g:m2", "g:m0"), requireNotNull(returned.shownState(query)).results.map { it.key })
+        holder.close()
+    }
+
     /** A failed recheck after Back shows a failure boundary with no rows, and Retry rechecks again. */
     @Test
     fun failedRecheckShowsNoUnverifiedRowsAndRetries() {

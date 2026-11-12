@@ -404,16 +404,8 @@ class ZapstoreIntegrationTests(unittest.TestCase):
         output = parent / 'output'
         summary.write_text('parent summary\n')
         output.write_text('parent=output\n')
-        saved = {key: os.environ.get(key) for key in ('GITHUB_STEP_SUMMARY', 'GITHUB_OUTPUT')}
-        os.environ.update(GITHUB_STEP_SUMMARY=str(summary), GITHUB_OUTPUT=str(output))
-        try:
+        with patch.dict(os.environ, GITHUB_STEP_SUMMARY=str(summary), GITHUB_OUTPUT=str(output)):
             result, _ = self.publication_fixture(root, readback_body=readback_body)(**overrides)
-        finally:
-            for key, value in saved.items():
-                if value is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = value
         return result, root, summary, output
 
     def assert_parent_runner_files_untouched(self, summary, output):

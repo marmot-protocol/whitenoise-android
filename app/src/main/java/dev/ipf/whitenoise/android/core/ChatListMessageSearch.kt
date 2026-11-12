@@ -233,8 +233,12 @@ data class MessageSearchConstraints(
                     messageSearchContentKinds(record.plaintext, record.mediaTypes).any { it in contentKinds }
             )
 
-    /** Whether a unix-second timeline stamp falls inside these millisecond bounds. */
+    /**
+     * Whether a unix-second timeline stamp falls inside these millisecond bounds. Stamps past 9999-12-31 match no
+     * date, and the bound keeps the millisecond product from wrapping into a selected range.
+     */
     private fun GlobalSearchEpochBounds.containsUnixSeconds(seconds: ULong): Boolean {
+        if (seconds > IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return false
         val millis = seconds.toLong() * MILLIS_PER_SECOND
         return millis >= startEpochMillisInclusive && millis < endEpochMillisExclusive
     }

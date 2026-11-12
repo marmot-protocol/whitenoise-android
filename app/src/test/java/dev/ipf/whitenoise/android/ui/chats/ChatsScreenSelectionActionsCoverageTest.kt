@@ -49,7 +49,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val source = chatsScreenSource().readText()
         assertTrue(
             "message results own their failure at the list boundary, never a full-screen error",
-            "messageResultsMode -> Unit" in source && "onRetry = { messageResults?.retry() }" in source,
+            "messageResultsMode -> Unit" in source &&
+                "onRetry = { if (scopeFailed) completeScopeState.retry() else messageResults?.retry() }" in source,
         )
         val list = File(chatsScreenSource().parentFile, "GlobalSearchResultsList.kt").readText()
         assertTrue(
@@ -59,7 +60,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         val library = File(chatsScreenSource().parentFile, "GlobalAttachmentLibraryHost.kt").readText()
         assertTrue(
             "attachment failures have recoverable presentation",
-            "failed = failure != null," in library && "onRetry = loadMore," in library,
+            "failed = failure != null || library.scopeFailed," in library &&
+                "onRetry = if (library.scopeFailed) library.onRetryScope else loadMore," in library,
         )
         val controller = File(chatsScreenSource().parentFile, "GlobalSearchResultsController.kt").readText()
         assertTrue(

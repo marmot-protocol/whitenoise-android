@@ -301,7 +301,7 @@ class ConversationDictationJumpClearanceCoverageTest {
         const val COMPOSER_DP = 64
         const val HANDOFF_FRAMES = 40
 
-        /** mdpi, so the 12dp stack gap is 12px; half a pixel absorbs rounding. */
-        const val GAP_PX = 12f
+        /** mdpi, so the 8dp stack gap is 8px; half a pixel absorbs rounding. */
+        const val GAP_PX = 8f
     }
 }

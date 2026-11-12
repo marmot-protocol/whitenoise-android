@@ -2,7 +2,7 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: presentation-modal-translation-composer
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
-- assertVisible: Translate as you type
+- assertVisible: "Offline Translator can write message text.*"
 - tapOn: Accept
 - assertVisible: Target language
 - tapOn: Arabic

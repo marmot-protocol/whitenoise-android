@@ -3338,11 +3338,14 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): MessageDraftMutationResult = composerDraftExpansionBridge.deleteBeforeGroupRemoval(accountRef, groupIdHex)
 
-    /** Refreshes draft summaries behind account, request, and local-fingerprint fences. */
-    internal fun refreshDraftSummaries(accountRef: String) {
+    /**
+     * Refreshes draft summaries behind account, request, and local-fingerprint fences. Returns the
+     * refresh job, so tests can wait for its fenced publication rather than only the native read.
+     */
+    internal fun refreshDraftSummaries(accountRef: String): Job {
         val refresh = draftSummaryRefreshLifetime.advance()
         val expected = draftStore.captureSummaryRefresh(accountRef)
-        mutationsScope.launch {
+        return mutationsScope.launch {
             messageDraftRepository
                 .summaries(accountRef)
                 .onSuccess { summaries ->
@@ -5294,7 +5297,7 @@ class WhiteNoiseAppState private constructor(
         // Resuming the backlog is a resume-everything signal, and it is the one
         // point where per-file cancel records can be dropped in bulk instead of
         // accumulating for attachments the user never opens again.
-        attachmentDownloadIntents.clearSuppressedAutomatic()
+        attachmentDownloadIntents.clearSuppressedAutomatic(accountRef)
         attachmentDownloadPolicyRevision += 1
     }
 
@@ -6435,11 +6438,20 @@ class WhiteNoiseAppState private constructor(
         unreadCount: ULong,
     ) = accountUnreadStore.updateCount(accountRef, unreadCount)
 
+    /**
+     * Publishes a chat-list row fold only while no complete native total exists for [accountRef]. The fold sees
+     * just the bounded loaded rows, so it must not replace a Ready total that also counts chats outside the
+     * window, such as an older unread chat or a manual reminder (#3729).
+     */
     internal fun updateAccountUnreadProjection(
         accountRef: String?,
         unreadCount: ULong,
         hasManualUnread: Boolean,
-    ) = accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    ) {
+        val accountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+        if (accountIdHex != null && runtimeMirrors.attention.latest?.hasReadyTotal(accountIdHex) == true) return
+        accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+    }
 
     /**
      * Accounts with at least one manually-marked-unread chat. A boolean

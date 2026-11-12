@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
@@ -20,11 +21,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -43,7 +46,10 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
-import kotlin.math.ceil
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** Visible layout obstacles owned by the current route or persistent shell chrome. */
@@ -123,6 +129,27 @@ internal class FloatingDictationAnchor {
             if (composerFabObstacles[token] == true && movingComposerFab != null) movingComposerFab.top else rect.top
         }
 
+    /** Top of the highest obstacle sharing the horizontal span [left]..[right], or null when none does. */
+    fun topInColumn(
+        left: Float,
+        right: Float,
+    ): Float? = bounds.values.filter { it.left < right && it.right > left }.minOfOrNull { it.top }
+
+    /**
+     * Changes whenever an in-route obstacle such as a notice or footer registers or leaves, but not when
+     * one merely moves. The capsule glides on the floating control clock only for these appear/leave
+     * steps; a moving obstacle such as the keyboard or a scrolling footer keeps carrying it frame by frame.
+     */
+    var obstacleGeneration: Int = 0
+        private set
+
+    /**
+     * Changes whenever a pen or composer registers or leaves. Those swap with the route, where the
+     * navigation handoff owns the capsule's path, so the capsule follows them without its own glide.
+     */
+    var routeChromeGeneration: Int = 0
+        private set
+
     /** Registers a visible obstacle and whether its painted edge follows the composer/FAB bridge. */
     fun report(
         token: Any,
@@ -130,6 +157,7 @@ internal class FloatingDictationAnchor {
         followsComposerFab: Boolean = false,
     ) {
         if (visibleBounds.width > 0f && visibleBounds.height > 0f) {
+            if (token !in bounds) bumpGeneration(followsComposerFab)
             bounds[token] = visibleBounds
             composerFabObstacles[token] = followsComposerFab
         } else {
@@ -152,11 +180,15 @@ internal class FloatingDictationAnchor {
     }
 
     fun remove(token: Any) {
-        bounds.remove(token)
-        composerFabObstacles.remove(token)
+        val followedComposerFab = composerFabObstacles.remove(token) == true
+        if (bounds.remove(token) != null) bumpGeneration(followedComposerFab)
         footerViewports.remove(token)
         capsuleSlots.remove(token)
         footerScrolls.remove(token)
+    }
+
+    private fun bumpGeneration(routeChrome: Boolean) {
+        if (routeChrome) routeChromeGeneration++ else obstacleGeneration++
     }
 }
 
@@ -193,22 +225,28 @@ internal fun Modifier.floatingDictationAnchor(
 }
 
 /**
- * Where the shell placed the dictation control. [motion] is read lazily by each reader, so a handoff
- * animating on the frame clock moves the published bounds without re-placing the shell.
+ * Where the shell placed the dictation control. [motion] and [settle] are read lazily by each reader, so
+ * a handoff or settling glide animating on the frame clock moves the published bounds without re-placing
+ * the shell, and overlays stacked above the capsule follow it on that same clock.
  */
 internal data class FloatingCapsulePlacement(
     val placed: Rect,
     val inline: Boolean,
     val motion: MeasuredControlHandoff?,
     val rtl: Boolean,
+    val settle: State<Float>? = null,
 ) {
-    /** The painted rectangle: the placed one shifted by an active handoff, or null for an inline control at rest. */
+    /**
+     * The painted rectangle: the placed one shifted by an active handoff and the settling glide, or null
+     * for an inline control at rest.
+     */
     fun painted(): Rect? {
         val shift = motion?.capsuleHandoffShift(rtl)
+        val glide = settle?.value ?: 0f
         return when {
-            shift != null -> placed.translate(shift)
+            shift != null -> placed.translate(shift.x, shift.y + glide)
             inline -> null
-            else -> placed
+            else -> placed.translate(0f, glide)
         }
     }
 }
@@ -225,57 +263,6 @@ internal fun MeasuredControlHandoff.capsuleHandoffShift(rtl: Boolean): Offset? {
         x = if (rtl) moving.left - target.left else moving.right - target.right,
         y = moving.center.y - target.center.y,
     )
-}
-
-/**
- * Lifts a bottom-aligned route overlay so it sits [gap] above the shell's placed floating capsule
- * whenever the two share horizontal space. The read is one-way — the overlay never registers as an
- * obstacle, so the capsule cannot chase the overlay it just moved. Without a capsule nothing moves.
- *
- * The lift never carries the overlay above its parent's top edge. When a tall capsule leaves too little
- * room — recovery text with the keyboard open, a short landscape window — the overlay rises only as far
- * as its parent allows and keeps the rest of its controls inside the transcript, rather than leaving
- * the screen.
- */
-@Composable
-internal fun Modifier.floatingDictationCapsuleClearance(gap: Dp = 12.dp): Modifier {
-    val anchor = LocalFloatingDictationAnchor.current ?: return this
-    return layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints)
-        layout(placeable.width, placeable.height) {
-            val capsule = anchor.floatingCapsuleBounds
-            val origin = coordinates?.positionInWindow()
-            val lift =
-                if (capsule == null || origin == null) {
-                    0
-                } else {
-                    floatingCapsuleClearancePx(
-                        overlay = Rect(origin.x, origin.y, origin.x + placeable.width, origin.y + placeable.height),
-                        capsule = capsule,
-                        gapPx = gap.toPx(),
-                        topLimit = coordinates?.parentLayoutCoordinates?.positionInWindow()?.y ?: origin.y,
-                    )
-                }
-            placeable.place(0, -lift)
-        }
-    }
-}
-
-/**
- * Upward shift that leaves [gapPx] between [overlay] and [capsule], or zero when they never meet. The
- * shift is capped so the overlay's top never rises above [topLimit].
- */
-internal fun floatingCapsuleClearancePx(
-    overlay: Rect,
-    capsule: Rect,
-    gapPx: Float,
-    topLimit: Float = Float.NEGATIVE_INFINITY,
-): Int {
-    val sharesColumn = overlay.width > 0f && overlay.left < capsule.right && overlay.right > capsule.left
-    if (!sharesColumn) return 0
-    val wanted = ceil(overlay.bottom + gapPx - capsule.top).toInt().coerceAtLeast(0)
-    val room = (overlay.top - topLimit).toInt().coerceAtLeast(0)
-    return minOf(wanted, room)
 }
 
 /** Insets are consumed outside the action viewport; a short viewport scrolls the capsule slot too. */
@@ -393,6 +380,7 @@ internal fun FloatingDictationLayout(
             }
         }
     val contentSlots = remember(content) { DictationContentSlots(content) }
+    val settle = rememberCapsuleSettle()
     SubcomposeLayout(
         modifier =
             Modifier.fillMaxSize().onPlaced {
@@ -426,7 +414,7 @@ internal fun FloatingDictationLayout(
         val footerSpace =
             bubble?.takeUnless { inlineControl }?.let {
                 val available = (constraints.maxHeight - fallbackInset - safeTop).coerceAtLeast(0)
-                val slot = it.height + 12.dp.roundToPx()
+                val slot = it.height + FloatingControlGap.roundToPx()
                 if (available < slot + 48.dp.roundToPx()) {
                     DictationFooterSpace(available.toDp(), slot.toDp())
                 } else {
@@ -449,7 +437,7 @@ internal fun FloatingDictationLayout(
                 val bottom =
                     anchor.topInWindow(movingObstacle)?.minus(rootTop)?.roundToInt()
                         ?: (constraints.maxHeight - fallbackInset)
-                val availableGap = (bottom - bubble.height - safeTop).coerceIn(0, 12.dp.roundToPx())
+                val availableGap = (bottom - bubble.height - safeTop).coerceIn(0, FloatingControlGap.roundToPx())
                 val scrolling = anchor.scrollingCapsule.takeIf { footerSpace?.capsuleSlot != 0.dp }
                 val x =
                     inlineBounds?.let { (it.right - rootLeft - bubble.width).roundToInt() }
@@ -461,6 +449,15 @@ internal fun FloatingDictationLayout(
                         inlineBounds?.let { (it.top - rootTop).roundToInt() }
                             ?: (bottom - bubble.height - availableGap).coerceAtLeast(safeTop)
                     }
+                // Only a pen, notice or footer arriving or leaving glides the capsule; keyboard frames,
+                // scrolling footers and handoffs keep carrying it directly.
+                val glide =
+                    settle.offsetFor(
+                        y = y,
+                        generation = anchor.obstacleGeneration,
+                        routeGeneration = anchor.routeChromeGeneration,
+                        follow = inlineControl || scrolling != null || controlMotion?.active == true,
+                    )
                 val owner =
                     if (inlineControl) {
                         ConversationDictationControlOwner.Composer
@@ -480,6 +477,7 @@ internal fun FloatingDictationLayout(
                             inline = inlineControl,
                             motion = controlMotion,
                             rtl = layoutDirection == LayoutDirection.Rtl,
+                            settle = settle.painted,
                         ),
                     )
                 }
@@ -487,9 +485,10 @@ internal fun FloatingDictationLayout(
                     scrolling?.takeUnless { inlineControl }?.second?.translate(-rootLeft - x, -rootTop - y)
                 bubble.placeWithLayer(x, y) {
                     // No command, session or editor is duplicated by the handoff.
+                    translationY = glide
                     controlMotion?.capsuleHandoffShift(layoutDirection == LayoutDirection.Rtl)?.let { shift ->
                         translationX = shift.x
-                        translationY = shift.y
+                        translationY = shift.y + glide
                     }
                     if (localClip != null) {
                         clip = true
@@ -501,4 +500,64 @@ internal fun FloatingDictationLayout(
             }
         }
     }
+}
+
+/**
+ * Glides the floating capsule from its previous slot when bottom chrome appears or leaves, on the floating
+ * control clock. The published capsule bounds include [painted], so overlays stacked above the capsule
+ * follow the glide frame by frame instead of running a clock of their own.
+ */
+private class CapsuleSettle(
+    private val scope: CoroutineScope,
+    private val motionEnabled: Boolean,
+) {
+    private val offset = Animatable(0f)
+
+    /** The current glide, read lazily by whoever paints or stacks against the capsule. */
+    val painted: State<Float> get() = offset.asState()
+    private var lastY: Int? = null
+    private var lastGeneration = 0
+    private var lastRouteGeneration = 0
+
+    /**
+     * Layer offset to paint at for a capsule placed at [y]. A route chrome change or [follow] drops any
+     * glide at once, so navigation and its handoff alone own the capsule's path.
+     */
+    fun offsetFor(
+        y: Int,
+        generation: Int,
+        routeGeneration: Int,
+        follow: Boolean,
+    ): Float {
+        val previous = lastY
+        val chromeChanged = generation != lastGeneration
+        val routeChanged = routeGeneration != lastRouteGeneration
+        lastY = y
+        lastGeneration = generation
+        lastRouteGeneration = routeGeneration
+        val glide = chromeChanged && !routeChanged && !follow && motionEnabled
+        return when {
+            // Rising clears new chrome in the same frame; only settling down glides.
+            glide && previous != null && y > previous -> {
+                val from = offset.value + (previous - y)
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    offset.snapTo(from)
+                    offset.animateTo(0f, floatingControlMotionSpec())
+                }
+                from
+            }
+            (routeChanged || follow || previous != y) && offset.value != 0f -> {
+                scope.launch(start = CoroutineStart.UNDISPATCHED) { offset.snapTo(0f) }
+                0f
+            }
+            else -> offset.value
+        }
+    }
+}
+
+@Composable
+private fun rememberCapsuleSettle(): CapsuleSettle {
+    val scope = rememberCoroutineScope()
+    val motionEnabled = rememberSystemAnimationsEnabled()
+    return remember(scope, motionEnabled) { CapsuleSettle(scope, motionEnabled) }
 }
