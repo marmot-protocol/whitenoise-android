@@ -94,6 +94,9 @@ internal const val SENSITIVE_CLIP_CLEAR_WORK = "sensitive_clipboard_clear"
 
 private const val COPIED_DIGEST_KEY = "copied_sha256"
 
+/** Keeps a new secret copy from landing between a deadline's clipboard check and its clear. */
+private val sensitiveClipLock = Any()
+
 /**
  * Copies a secret marked sensitive and removes it about [SENSITIVE_CLIP_LIFETIME_MS] later.
  *
@@ -112,7 +115,7 @@ internal fun copySensitiveToClipboard(
     val clipboard = appContext.getSystemService(ClipboardManager::class.java) ?: return
     val clip = ClipData.newPlainText(label, text)
     clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
-    clipboard.setPrimaryClip(clip)
+    synchronized(sensitiveClipLock) { clipboard.setPrimaryClip(clip) }
     val clear =
         OneTimeWorkRequestBuilder<SensitiveClipboardClearWorker>()
             .setInitialDelay(SENSITIVE_CLIP_LIFETIME_MS, TimeUnit.MILLISECONDS)
@@ -129,10 +132,12 @@ class SensitiveClipboardClearWorker(
     override fun doWork(): Result {
         val copied = inputData.getByteArray(COPIED_DIGEST_KEY)
         // Without the digest the clip's owner is unknown; clearing is safer than leaving a secret behind.
-        if (copied == null) {
-            clearSensitiveClipboard(applicationContext)
-        } else {
-            clearSensitiveClipIfUnchanged(applicationContext, copied)
+        synchronized(sensitiveClipLock) {
+            if (copied == null) {
+                clearSensitiveClipboard(applicationContext)
+            } else {
+                clearSensitiveClipIfUnchanged(applicationContext, copied)
+            }
         }
         return Result.success()
     }
