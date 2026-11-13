@@ -6,7 +6,7 @@ name: presentation-modal-translation-detection
     id: translation.menu
 - tapOn:
     id: translation.menu
-- assertVisible: "Translation unavailable[.] Tap Translate to retry or open the engine[.]"
+- assertVisible: "Translation unavailable[.] Tap Translate to try again[.]"
 - tapOn: Finish notice check
 - assertVisible:
     id: presentation.complete

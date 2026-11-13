@@ -187,6 +187,7 @@ internal class TranslationPreferences(
     private companion object {
         const val PRIVACY_NOTICE_VERSION = "privacy_notice_version"
         const val CURRENT_PRIVACY_NOTICE = 1
+
         // The stored name predates the message menu sharing this notice; renaming it would ask everyone again.
         const val PROVIDER_NOTICE_VERSION = "composer_privacy_notice_version"
         const val OUTGOING_SUFFIX = ":outgoing"

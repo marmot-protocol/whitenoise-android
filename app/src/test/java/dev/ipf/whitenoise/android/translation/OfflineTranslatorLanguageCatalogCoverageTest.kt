@@ -86,6 +86,7 @@ class OfflineTranslatorLanguageCatalogCoverageTest {
                 "zh-Hant-HK" to "zh_hant",
                 "zh-CN" to "zh",
                 "iw" to "he",
+                "fil-PH" to "tl",
                 "nb-NO" to "nb",
                 "pt-BR" to "pt",
                 "en-US" to "en",

@@ -116,12 +116,17 @@ internal object OfflineTranslatorLanguageCatalog {
     /**
      * The catalog target for [locale]'s language, or null when the engine cannot translate into it. Traditional
      * Chinese, by script or by a Traditional-script region, maps to `zh_hant`; legacy ISO codes such as `iw` read
-     * as their current form through the language tag.
+     * as their current form through the language tag, and Android's Filipino `fil` reads as the engine's `tl`.
      */
     fun targetFor(locale: Locale): String? {
         val language = locale.toLanguageTag().substringBefore('-').lowercase(Locale.ROOT)
         val traditional = locale.script == "Hant" || (locale.script.isEmpty() && locale.country in TRADITIONAL_REGIONS)
-        val code = if (language == "zh" && traditional) "zh_hant" else language
+        val code =
+            when {
+                language == "zh" && traditional -> "zh_hant"
+                language == "fil" -> "tl"
+                else -> language
+            }
         return code.takeIf(::supportsTarget)
     }
 

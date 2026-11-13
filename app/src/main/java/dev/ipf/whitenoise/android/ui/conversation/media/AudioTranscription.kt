@@ -193,7 +193,8 @@ internal fun AudioTranscriptionToggle(
     AudioTranscribeDisc(
         on = toggle.requested,
         working = toggle.requested && toggle.working,
-        enabled = toggle.enabled,
+        // A requested switch stays tappable so it can cancel a request whose recording became unavailable.
+        enabled = toggle.requested || toggle.enabled,
         onToggle = { toggle.requested = it },
         modifier = modifier,
     )
