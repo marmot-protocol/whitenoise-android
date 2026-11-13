@@ -681,10 +681,8 @@ private fun assertAdmissionAfterResumeFirstFrame(
         assertFalse(fixture.hasB)
         assertTrue(fixture.controller.pendingTimelineAtForeground()?.isCompleted == false)
         composeRule.onNode(hasSetTextAction()).performTouchInput { click() }.assertIsFocused()
-        composeRule
-            .onNode(hasSetTextAction())
-            .performTextInput(" editable")
-            .assertTextContains(" editable", substring = true)
+        composeRule.onNode(hasSetTextAction()).performTextInput(" editable")
+        composeRule.onNode(hasSetTextAction()).assertTextContains(" editable", substring = true)
         assertTrue(
             "the production composer accepts input before timeline preparation finishes",
             fixture.dispatcher.hasPending,
