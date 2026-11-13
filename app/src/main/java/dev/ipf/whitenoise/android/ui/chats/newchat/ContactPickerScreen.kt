@@ -23,10 +23,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -91,10 +94,19 @@ internal fun ContactPickerScreen(
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
     var showScanner by remember { mutableStateOf(false) }
-    // The selection itself is owned by the caller and is not saveable. Keep
-    // this transient navigation state in the same lifetime so process
-    // recreation cannot restore an empty review screen over a rebuilt picker.
-    var reviewingSelection by remember(appState.activeAccountRef, appState.runtimeGeneration, reviewGroup?.id) {
+    // An open review survives recreation only when the caller restored its
+    // selection too; a caller with transient selection gets the picker back
+    // instead of an empty review.
+    var reviewingSelection by rememberSaveable(
+        appState.activeAccountRef,
+        appState.runtimeGeneration,
+        reviewGroup?.id,
+        saver =
+            Saver<MutableState<Boolean>, Boolean>(
+                save = { it.value },
+                restore = { mutableStateOf(it && selected.isNotEmpty()) },
+            ),
+    ) {
         mutableStateOf(false)
     }
     var searchRetry by remember { mutableIntStateOf(0) }

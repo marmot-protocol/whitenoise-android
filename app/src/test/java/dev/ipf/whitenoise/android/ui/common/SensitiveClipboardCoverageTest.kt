@@ -31,13 +31,13 @@ class SensitiveClipboardCoverageTest {
         assertEquals(listOf(HELPER), writers)
     }
 
-    /** The helper replaces any pending clear and schedules a new one on the shared lifetime. */
+    /** The helper replaces any pending clear with durable work on the shared lifetime. */
     @Test
     fun helperSchedulesTheClear() {
         val body = appModuleSource(CLIPBOARD).functionBody("copySensitiveToClipboard")
         assertTrue("EXTRA_IS_SENSITIVE" in body)
-        assertTrue("removeCallbacksAndMessages(sensitiveClipToken)" in body)
-        assertTrue("postDelayed(" in body && "SENSITIVE_CLIP_LIFETIME_MS" in body)
+        assertTrue("setInitialDelay(SENSITIVE_CLIP_LIFETIME_MS" in body)
+        assertTrue("enqueueUniqueWork(SENSITIVE_CLIP_CLEAR_WORK, ExistingWorkPolicy.REPLACE" in body)
     }
 
     /** Both Profile Keys secrets go through the helper; the public key stays an ordinary copy. */

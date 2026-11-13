@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
@@ -38,7 +37,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.SENSITIVE_CLIP_LIFETIME_MS
+import dev.ipf.whitenoise.android.ui.common.reachSensitiveClipDeadline
+import dev.ipf.whitenoise.android.ui.common.useTestWorkManager
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -58,7 +58,6 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.lang.reflect.Proxy
-import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -183,6 +182,7 @@ class AccountKeysExportDeliveryTest {
     /** The copied backup outlives the closed preview only until the clipboard deadline. */
     @Test
     fun copiedBackupLeavesTheClipboardAfterThePreviewCloses() {
+        useTestWorkManager(context)
         render()
         openBackupPreview()
         dialogButton(R.string.copy).performClick()
@@ -197,7 +197,7 @@ class AccountKeysExportDeliveryTest {
                     ?.toString(),
             )
         }
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(SENSITIVE_CLIP_LIFETIME_MS))
+        reachSensitiveClipDeadline(context)
         assertFalse(clipboard.hasPrimaryClip())
     }
 

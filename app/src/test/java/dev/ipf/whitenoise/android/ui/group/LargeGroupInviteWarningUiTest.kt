@@ -1,9 +1,10 @@
 package dev.ipf.whitenoise.android.ui.group
 
-import androidx.compose.runtime.MutableState
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -210,14 +211,16 @@ class LargeGroupInviteWarningUiTest {
         composeRule.runOnIdle { assertEquals(1, confirms) }
     }
 
-    /** Restores the parent details route, staged recipients, warning, and open review as one navigation stack. */
+    /**
+     * Restores the parent details route, staged recipients, warning, and the picker's open review
+     * as one navigation stack.
+     */
     @Test
     fun detailsRouteAndStagedSelectionRestoreTogether() {
         val restoration = StateRestorationTester(composeRule)
         val reviewState = emptyAppState().withGroupReviewActorNpub()
         lateinit var surfaceState: ConversationSurfaceState
         lateinit var selection: SnapshotStateList<RecipientSearch.Candidate>
-        lateinit var reviewOpen: MutableState<Boolean>
         restoration.setContent {
             surfaceState = rememberConversationSurfaceState("controller-a", "account-a", "chat-a", 1)
             if (surfaceState.showDetails.value) {
@@ -225,7 +228,6 @@ class LargeGroupInviteWarningUiTest {
                     rememberSaveable("group-a", saver = AddMemberSelectionSaver) {
                         mutableStateListOf()
                     }
-                reviewOpen = rememberSaveable("group-a") { mutableStateOf(false) }
                 val projection =
                     largeGroupInviteProjection(
                         rosterReady = true,
@@ -234,18 +236,20 @@ class LargeGroupInviteWarningUiTest {
                         pendingInviteMemberIds = emptyList(),
                         stagedRecipientIds = selection.map { it.accountIdHex },
                     )
-                if (projection?.shouldWarn == true) LargeGroupInviteWarningBanner()
-                if (reviewOpen.value) {
-                    GroupMembersReviewDialog(
-                        appState = reviewState,
-                        groups = listOf(MemberReviewGroup("group-a", "Garden club")),
-                        members = selection,
-                        busy = false,
-                        onDismiss = {},
-                        onConfirm = {},
-                        confirmLabel = "Add member",
-                        description = if (projection?.shouldWarn == true) WARNING_TEXT else null,
-                    )
+                WhiteNoiseTheme {
+                    Column {
+                        if (projection?.shouldWarn == true) LargeGroupInviteWarningBanner()
+                        ContactPickerScreen(
+                            appState = reviewState,
+                            title = "Add member",
+                            selected = selection,
+                            onBack = {},
+                            onConfirm = {},
+                            confirmLabel = "Add member",
+                            reviewGroup = MemberReviewGroup("group-a", "Garden club"),
+                            reviewDescription = if (projection?.shouldWarn == true) WARNING_TEXT else null,
+                        )
+                    }
                 }
             }
         }
@@ -255,8 +259,8 @@ class LargeGroupInviteWarningUiTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             selection += RecipientSearch.Candidate(accountIdHex = "new-a", displayName = "Alice", npub = "npub1alice")
-            reviewOpen.value = true
         }
+        composeRule.onNodeWithContentDescription("Review selected members").performClick()
         assertBannerAndWarnedReviewShown()
 
         restoration.emulateSavedInstanceStateRestore()
@@ -266,9 +270,38 @@ class LargeGroupInviteWarningUiTest {
             assertEquals(listOf("new-a"), selection.map { it.accountIdHex })
             assertEquals("Alice", selection.single().displayName)
             assertEquals("npub1alice", selection.single().npub)
-            assertTrue(reviewOpen.value)
         }
         assertBannerAndWarnedReviewShown()
+    }
+
+    /** A caller whose selection does not survive recreation gets the picker back, not an empty review. */
+    @Test
+    fun openReviewIsDroppedWhenTheSelectionIsNotRestored() {
+        val restoration = StateRestorationTester(composeRule)
+        val state = emptyAppState().withGroupReviewActorNpub()
+        lateinit var selection: SnapshotStateList<RecipientSearch.Candidate>
+        restoration.setContent {
+            selection = remember { mutableStateListOf() }
+            WhiteNoiseTheme {
+                ContactPickerScreen(
+                    appState = state,
+                    title = "Choose people",
+                    selected = selection,
+                    onBack = {},
+                    onConfirm = {},
+                    confirmLabel = "Add member",
+                    reviewGroup = MemberReviewGroup("garden", "Garden club"),
+                )
+            }
+        }
+        composeRule.runOnIdle { selection += candidate("b", "Alice") }
+        composeRule.onNodeWithContentDescription("Review selected members").performClick()
+        composeRule.onNodeWithTag(REVIEW_TAG).assertIsDisplayed()
+
+        restoration.emulateSavedInstanceStateRestore()
+
+        composeRule.onNodeWithTag(REVIEW_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText("Choose people").assertIsDisplayed()
     }
 
     /** Renders the review dialog the way Group Details feeds it, with a live member list and optional warning. */

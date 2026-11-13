@@ -5,8 +5,6 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.os.PersistableBundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -16,9 +14,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.core.os.HandlerCompat
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.Worker
+import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import dev.ipf.whitenoise.android.core.ClipboardPasteAffordance
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 
 @Composable
 internal fun rememberClipboardCanOfferPaste(clipboardManager: android.content.ClipboardManager?): Boolean {
@@ -85,16 +89,19 @@ internal fun clearSensitiveClipboard(context: Context) {
 /** How long a copied secret may stay on the clipboard before the app removes it. */
 internal const val SENSITIVE_CLIP_LIFETIME_MS = 60_000L
 
-private val sensitiveClipHandler by lazy { Handler(Looper.getMainLooper()) }
-private val sensitiveClipToken = Any()
+/** Unique WorkManager name of the one pending sensitive-clip clear. */
+internal const val SENSITIVE_CLIP_CLEAR_WORK = "sensitive_clipboard_clear"
+
+private const val COPIED_DIGEST_KEY = "copied_sha256"
 
 /**
- * Copies a secret marked sensitive and removes it after [SENSITIVE_CLIP_LIFETIME_MS].
+ * Copies a secret marked sensitive and removes it about [SENSITIVE_CLIP_LIFETIME_MS] later.
  *
- * The clear is posted on the main looper with the application context, so leaving the screen or
- * backgrounding the app does not cancel it. A later secret copy replaces the pending clear. Only a
- * digest of the text is kept; at the deadline a readable clip that no longer matches belongs to
- * someone else and stays, while a clipboard the app cannot read is cleared anyway.
+ * WorkManager owns the deadline, so leaving the screen, a cached or killed process and a reboot do
+ * not cancel it; Android may run it somewhat late. A later secret copy replaces the pending clear.
+ * Only a SHA-256 digest of the text is stored with the work; at the deadline a readable clip that no
+ * longer matches belongs to someone else and stays, while a clipboard the app cannot read is cleared
+ * anyway.
  */
 internal fun copySensitiveToClipboard(
     context: Context,
@@ -106,14 +113,29 @@ internal fun copySensitiveToClipboard(
     val clip = ClipData.newPlainText(label, text)
     clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
     clipboard.setPrimaryClip(clip)
-    val copied = sensitiveClipDigest(text)
-    sensitiveClipHandler.removeCallbacksAndMessages(sensitiveClipToken)
-    HandlerCompat.postDelayed(
-        sensitiveClipHandler,
-        { clearSensitiveClipIfUnchanged(appContext, copied) },
-        sensitiveClipToken,
-        SENSITIVE_CLIP_LIFETIME_MS,
-    )
+    val clear =
+        OneTimeWorkRequestBuilder<SensitiveClipboardClearWorker>()
+            .setInitialDelay(SENSITIVE_CLIP_LIFETIME_MS, TimeUnit.MILLISECONDS)
+            .setInputData(workDataOf(COPIED_DIGEST_KEY to sensitiveClipDigest(text)))
+            .build()
+    WorkManager.getInstance(appContext).enqueueUniqueWork(SENSITIVE_CLIP_CLEAR_WORK, ExistingWorkPolicy.REPLACE, clear)
+}
+
+/** Removes a copied secret at its deadline; see [copySensitiveToClipboard]. */
+class SensitiveClipboardClearWorker(
+    context: Context,
+    params: WorkerParameters,
+) : Worker(context, params) {
+    override fun doWork(): Result {
+        val copied = inputData.getByteArray(COPIED_DIGEST_KEY)
+        // Without the digest the clip's owner is unknown; clearing is safer than leaving a secret behind.
+        if (copied == null) {
+            clearSensitiveClipboard(applicationContext)
+        } else {
+            clearSensitiveClipIfUnchanged(applicationContext, copied)
+        }
+        return Result.success()
+    }
 }
 
 private fun clearSensitiveClipIfUnchanged(

@@ -4,21 +4,22 @@ import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
-import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.Implementation
 import org.robolectric.annotation.Implements
 import org.robolectric.shadows.ShadowClipboardManager
-import java.time.Duration
 
 /** A copied secret leaves the clipboard on its own deadline without removing a clip the user copied later. */
 @RunWith(RobolectricTestRunner::class)
@@ -26,6 +27,11 @@ import java.time.Duration
 class SensitiveClipboardTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val clipboard = context.getSystemService(ClipboardManager::class.java)
+
+    @Before
+    fun useTestWork() {
+        useTestWorkManager(context)
+    }
 
     @After
     fun showClipboard() {
@@ -40,7 +46,8 @@ class SensitiveClipboardTest {
         assertEquals(SECRET, clip.getItemAt(0).text.toString())
         assertTrue(clip.description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true)
 
-        advance(SENSITIVE_CLIP_LIFETIME_MS - 1)
+        val pending = pendingClear()
+        assertEquals(SENSITIVE_CLIP_LIFETIME_MS, pending.initialDelayMillis)
         assertEquals(
             SECRET,
             clipboard.primaryClip
@@ -48,7 +55,7 @@ class SensitiveClipboardTest {
                 ?.text
                 ?.toString(),
         )
-        advance(1)
+        reachDeadline()
         assertFalse(clipboard.hasPrimaryClip())
     }
 
@@ -57,7 +64,7 @@ class SensitiveClipboardTest {
     fun laterClipSurvivesTheDeadline() {
         copySensitiveToClipboard(context, "Private key", SECRET)
         clipboard.setPrimaryClip(ClipData.newPlainText("Note", OTHER))
-        advance(SENSITIVE_CLIP_LIFETIME_MS)
+        reachDeadline()
         assertEquals(
             OTHER,
             clipboard.primaryClip
@@ -71,9 +78,18 @@ class SensitiveClipboardTest {
     @Test
     fun secondCopyRestartsTheDeadline() {
         copySensitiveToClipboard(context, "Private key", SECRET)
-        advance(SENSITIVE_CLIP_LIFETIME_MS / 2)
+        val first = pendingClear().id
         copySensitiveToClipboard(context, "Encrypted backup", SECOND_SECRET)
-        advance(SENSITIVE_CLIP_LIFETIME_MS / 2)
+        val replacement = pendingClear()
+        assertNotEquals(first, replacement.id)
+        assertEquals(SENSITIVE_CLIP_LIFETIME_MS, replacement.initialDelayMillis)
+        val firstState =
+            WorkManager
+                .getInstance(context)
+                .getWorkInfoById(first)
+                .get()
+                ?.state
+        assertTrue(firstState == null || firstState == WorkInfo.State.CANCELLED)
         assertEquals(
             SECOND_SECRET,
             clipboard.primaryClip
@@ -81,7 +97,7 @@ class SensitiveClipboardTest {
                 ?.text
                 ?.toString(),
         )
-        advance(SENSITIVE_CLIP_LIFETIME_MS / 2)
+        reachDeadline()
         assertFalse(clipboard.hasPrimaryClip())
     }
 
@@ -90,14 +106,14 @@ class SensitiveClipboardTest {
     fun unreadableClipboardIsClearedAnyway() {
         copySensitiveToClipboard(context, "Private key", SECRET)
         HidingClipboardShadow.hidden = true
-        advance(SENSITIVE_CLIP_LIFETIME_MS)
+        reachDeadline()
         HidingClipboardShadow.hidden = false
         assertFalse(clipboard.hasPrimaryClip())
     }
 
-    private fun advance(millis: Long) {
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis))
-    }
+    private fun pendingClear(): WorkInfo = pendingSensitiveClear(context)
+
+    private fun reachDeadline() = reachSensitiveClipDeadline(context)
 
     /** Models Android returning no clip to an app without input focus while a clip still exists. */
     @Implements(ClipboardManager::class)
