@@ -132,7 +132,6 @@ class AndroidCiGateTest(unittest.TestCase):
         # Compose compiler reports run on master, nightly and dispatch only.
         if event in {'pull_request', 'merge_group'}:
             outcomes['compose-compiler']['result'] = 'skipped'
-        outcomes['compile-tests']['result'] = 'skipped'
         return outcomes
 
     def test_aggregate_script_excludes_following_conditional_step(self):
@@ -394,7 +393,7 @@ class AndroidCiGateTest(unittest.TestCase):
         outcomes = self.successful_outcomes('merge_group')
         self.assertEqual(self.run_gate(outcomes, 'merge_group').returncode, 0)
         for dependency in self.dependencies:
-            if dependency in {'secondary-variant', 'compile-tests'}:
+            if dependency == 'secondary-variant':
                 continue  # The queue runs both full variants instead.
             if dependency == 'compose-compiler':
                 continue  # Compose reports run after merge, on master and nightly.
@@ -430,8 +429,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(len(gradle_setup_steps), 7)
         shared = "github.ref != 'refs/heads/master' }}"
         for step in gradle_setup_steps:
-            if step in self.coverage:
-                # Report tasks only; the shards own the cache entries.
+            if step in self.coverage or step in self.compile_tests:
+                # Report tasks and compile handoff only; the shards own the cache entries.
                 self.assertIn('cache-read-only: true\n', step)
             elif step in self.tests_job:
                 # One shard per flavor writes; the others would race for the same key.
@@ -446,6 +445,41 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn("matrix.flavor == 'Zapstore' && matrix.shard == 0", save_step)
         self.assertIn("github.ref == 'refs/heads/master'", save_step)
         self.assertIn("steps.marmotkit-cache.outputs.cache-hit != 'true'", save_step)
+
+    def test_gradle_cache_writers_outside_ci(self):
+        """Master keeps one Gradle home entry per lane that PR runs restore.
+
+        Each writer adds a few hundred MB per master push. Matrix duplicates and
+        master-only jobs read whichever entry is newest instead, so two pushes
+        fit in the repository cache quota.
+        """
+        master_only = "github.ref != 'refs/heads/master' }}"
+        expected = {
+            'android-instrumented.yml': [
+                "${{ matrix.distribution != 'Zapstore' || " + master_only,
+                '${{ matrix.shard != 0 || ' + master_only,
+                '${{ ' + master_only,
+                'true',
+            ],
+            'android-production-release.yml': ['true'],
+            'android-release-runtime.yml': ['true', 'true'],
+            'android-staging-apk.yml': ['true', 'true', 'true'],
+            'codeql.yml': ['true'],
+            'dependency-submission.yml': ['true'],
+            'fuzz-scheduled.yml': ['true'],
+        }
+        for filename, values in expected.items():
+            with self.subTest(filename=filename):
+                workflow = WORKFLOW.with_name(filename).read_text()
+                steps = re.findall(
+                    r'(?ms)uses: gradle/actions/(?:setup-gradle|dependency-submission)@.*?(?=^      - |^  [a-z]|\Z)',
+                    workflow,
+                )
+                found = [
+                    match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
+                    for step in steps
+                ]
+                self.assertEqual(found, values)
 
     def test_build_phases(self):
         """Packaging runs independently, with phase-specific diagnostics."""
@@ -710,7 +744,7 @@ class AndroidCiGateTest(unittest.TestCase):
         for name in ('offline-zsp', 'build-contracts', 'compose-compiler',
                      'compile-tests', 'static-analysis', 'tests', 'secondary-variant'):
             job = self.job_block(self.workflow, name)
-            self.assertIn('    needs: changes\n', job)
+            self.assertIn('    needs: [changes, compile-tests]\n' if name == 'tests' else '    needs: changes\n', job)
             self.assertIn("needs.changes.outputs.docs_only != 'true'", job)
             if name == 'compose-compiler':
                 self.assertIn("needs.changes.outputs.supplemental_campaigns != 'false'", job)
@@ -851,7 +885,6 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def precheck_outcomes(self, draft='false'):
         outcomes = self.successful_outcomes(draft=draft)
-        outcomes['compile-tests']['result'] = 'success'
         outcomes['changes']['outputs'].update(precheck='true', ci_mode='precheck', supplemental_campaigns='false')
         for job in ('tests', 'coverage', 'static-analysis', 'secondary-variant', 'compose-compiler'):
             outcomes[job]['result'] = 'skipped'
@@ -888,7 +921,7 @@ class AndroidCiGateTest(unittest.TestCase):
             outcomes = self.successful_outcomes('merge_group')
             self.assertEqual(self.run_gate(outcomes, 'pull_request', draft=draft).returncode, 0)
             for job in self.dependencies:
-                if job in {'secondary-variant', 'compile-tests', 'compose-compiler'}:
+                if job in {'secondary-variant', 'compose-compiler'}:
                     continue
                 bad = json.loads(json.dumps(outcomes))
                 bad[job]['result'] = 'skipped'
@@ -906,7 +939,7 @@ class AndroidCiGateTest(unittest.TestCase):
                 bad = json.loads(json.dumps(outcomes))
                 bad[job]['result'] = 'skipped'
                 self.assertNotEqual(self.run_gate(bad, event).returncode, 0, (event, job))
-            for result in ('failure', 'cancelled', 'success'):
+            for result in ('failure', 'cancelled', 'skipped'):
                 bad = json.loads(json.dumps(outcomes))
                 bad['compile-tests']['result'] = result
                 self.assertNotEqual(self.run_gate(bad, event).returncode, 0)
@@ -944,18 +977,50 @@ class AndroidCiGateTest(unittest.TestCase):
                 if 'if:' in line and 'github.event.pull_request.draft' in line:
                     self.assertIn("needs.changes.outputs.full_matrix == 'true'", line)
 
-    def test_test_compilation_is_isolated_by_flavor_only_in_precheck(self):
+    def test_test_compilation_is_isolated_by_flavor_and_shared_with_unit_shards(self):
         header = self.compile_tests.split('    steps:', 1)[0]
         self.assertIn('    needs: changes\n', header)
-        self.assertIn("    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck == 'true'\n", header)
+        self.assertIn("    if: needs.changes.outputs.docs_only != 'true'\n", header)
         self.assertNotIn('draft', header)
-        self.assertIn('        flavor: [Zapstore, Play]\n', header)
+        self.assertIn(self.tests_job.split('        flavor: ', 1)[1].split('\n', 1)[0]
+                      .replace("&& '[\"Zapstore\"]'", "&& needs.changes.outputs.precheck != 'true' && '[\"Zapstore\"]'"),
+                      header)
         self.assertIn('      fail-fast: false\n', header)
         self.assertIn('name: Compile test sources (${{ matrix.flavor }})', header)
         step = self.named_step(self.compile_tests, 'Compile main and test source sets')
         for source in ('', 'UnitTest', 'AndroidTest'):
             for language in ('Kotlin', 'JavaWithJavac'):
                 self.assertIn(':app:compileDev${{ matrix.flavor }}Debug' + source + language, step)
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        for precheck, android_test in (('true', True), ('false', False)):
+            with tempfile.TemporaryDirectory() as directory:
+                wrapper = Path(directory) / 'gradlew'
+                wrapper.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
+                wrapper.chmod(0o755)
+                result = subprocess.run(['bash', '-euo', 'pipefail', '-c', script.replace('${{ matrix.flavor }}', 'Play')],
+                    cwd=directory, capture_output=True, text=True,
+                    env={**os.environ, 'CI_PRECHECK': precheck, 'RUNNER_TEMP': directory})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                tasks = [line for line in result.stdout.splitlines() if line.startswith(':app:')]
+                self.assertEqual(len(tasks), 6 if android_test else 4, precheck)
+                self.assertEqual(any('AndroidTest' in task for task in tasks), android_test, precheck)
+        upload = self.named_step(self.compile_tests, 'Share compiled outputs with the unit shards')
+        self.assertIn("needs.changes.outputs.precheck != 'true'", upload)
+        self.assertIn('name: unit-compile-cache-${{ matrix.flavor }}', upload)
+        self.assertIn('retention-days: 1', upload)
+        self.assertIn('overwrite: true', upload)
+        self.assertIn('-newer "$RUNNER_TEMP/compile-started"',
+                      self.named_step(self.compile_tests, 'Package new build-cache entries'))
+        self.assertIn('    needs: [changes, compile-tests]\n', self.tests_job)
+        download = self.named_step(self.tests_job, 'Download compiled outputs')
+        self.assertIn('name: unit-compile-cache-${{ matrix.flavor }}', download)
+        # An expired artifact on a shard re-run falls back to compiling from source.
+        self.assertIn('continue-on-error: true', download)
+        self.assertIn("if: steps.compiled-outputs.outcome == 'success'",
+                      self.named_step(self.tests_job, 'Add compiled outputs to the build cache'))
+        steps = self.tests_job.split('    steps:', 1)[1]
+        self.assertLess(steps.index('- name: Set up Gradle'), steps.index('- name: Add compiled outputs to the build cache'))
+        self.assertLess(steps.index('- name: Add compiled outputs to the build cache'), steps.index('- name: Unit tests'))
         self.assertIn('--max-workers=1', step)
         self.assertIn('--no-daemon', step)
         self.assertNotIn('assemble', step)
