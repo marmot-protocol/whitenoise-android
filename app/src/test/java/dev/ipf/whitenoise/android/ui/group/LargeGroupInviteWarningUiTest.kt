@@ -158,6 +158,23 @@ class LargeGroupInviteWarningUiTest {
         composeRule.runOnIdle { assertEquals(0, confirms) }
     }
 
+    /** A destination that changes while the review is open was never reviewed, so confirm is refused. */
+    @Test
+    fun reviewRefusesConfirmAfterTheDestinationChanges() {
+        var destination by mutableStateOf(MemberReviewGroup("garden", "Garden club"))
+        var confirms = 0
+        showReview(
+            members = { listOf(candidate("b", "Alice")) },
+            groups = { listOf(destination) },
+            onConfirm = { confirms++ },
+        )
+
+        composeRule.runOnIdle { destination = MemberReviewGroup("chess", "Chess club") }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        composeRule.runOnIdle { assertEquals(0, confirms) }
+    }
+
     /** Admin choices made inside the review are the set that gets submitted. */
     @Test
     fun adminToggleInsideReviewIsSubmittedAsShown() {
@@ -265,6 +282,7 @@ class LargeGroupInviteWarningUiTest {
         members: () -> List<RecipientSearch.Candidate>,
         admins: SnapshotStateList<String> = mutableStateListOf(),
         description: () -> String? = { WARNING_TEXT },
+        groups: () -> List<MemberReviewGroup> = { listOf(MemberReviewGroup("garden", "Garden club")) },
         onConfirm: () -> Unit,
         onDismiss: () -> Unit = {},
     ) {
@@ -274,7 +292,7 @@ class LargeGroupInviteWarningUiTest {
                 val current = members()
                 GroupMembersReviewDialog(
                     appState = state,
-                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    groups = groups(),
                     members = current,
                     busy = false,
                     onDismiss = onDismiss,
