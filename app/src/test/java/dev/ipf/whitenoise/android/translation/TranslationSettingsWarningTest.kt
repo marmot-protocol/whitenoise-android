@@ -20,9 +20,11 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -202,6 +204,34 @@ class TranslationSettingsWarningTest {
             searchLanguages(sourceOnly)
             composeRule.onNode(languageRow(sourceOnly)).assertDoesNotExist()
         }
+        preferences.close()
+    }
+
+    /** The menu's Translate sends nothing until the shared provider notice is accepted, then never asks again. */
+    @Test
+    fun messageTranslateAsksForTheProviderNoticeOnce() {
+        val preferences = TranslationPreferences(context)
+        var translated = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageTranslationNotice(
+                    onAccept = {
+                        preferences.acceptProviderNotice()
+                        translated += 1
+                    },
+                    onDismiss = {},
+                )
+            }
+        }
+        assertFalse(preferences.providerNoticeAccepted())
+        composeRule.onNodeWithText(context.getString(R.string.translation_privacy_warning)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.accept)).performClick()
+        assertTrue(preferences.providerNoticeAccepted())
+        assertEquals(1, translated)
+        val bubble = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt")
+        val menuTranslate = bubble.substringAfter("onTranslate = {").substringBefore("},\n")
+        assertTrue(menuTranslate, "providerNoticeAccepted() == true" in menuTranslate)
+        assertTrue(menuTranslate, "translationNoticeOpen = true" in menuTranslate)
         preferences.close()
     }
 

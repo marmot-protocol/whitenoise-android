@@ -1,14 +1,13 @@
 appId: dev.ipf.whitenoise.android.maestrolab
-name: presentation-modal-translation-disabled
+name: presentation-modal-translation-fallback
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    id: translation.form
+    id: translation.menu
+- tapOn:
+    id: translation.menu
 - assertVisible:
-    id: translation.confirm
-- assertVisible:
-    id: translation.confirm
-    enabled: false
-- back
+    text: Translate
+    checked: true
 - assertVisible:
     id: presentation.complete

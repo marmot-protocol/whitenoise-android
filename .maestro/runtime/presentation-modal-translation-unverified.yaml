@@ -3,13 +3,10 @@ name: presentation-modal-translation-unverified
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    id: translation.form
-- assertVisible:
-    id: translation.confirm
-- assertVisible: "This engine is unverified or unsupported[.] No text was sent[.]"
-- assertVisible:
-    id: translation.engine
-- assertVisible: Install from GitHub
-- back
+    id: translation.menu
+- tapOn:
+    id: translation.menu
+- assertVisible: "Translation unavailable[.] Tap Translate to retry or open the engine[.]"
+- tapOn: Finish notice check
 - assertVisible:
     id: presentation.complete

@@ -2,7 +2,6 @@
     <string name="translation_title">翻譯</string>
     <string name="translation_automatic">自動翻譯訊息</string>
     <string name="translation_detect_language">偵測語言</string>
-    <string name="translation_source_language">來源語言</string>
     <string name="translation_target_language">目標語言</string>
     <string name="translation_loading">正在裝置上翻譯…</string>
     <string name="translation_open_engine">開啟翻譯引擎</string>
@@ -12,7 +11,7 @@
     <string name="translation_detection_failed">請選擇來源語言並重試。</string>
     <string name="translation_source_model_missing">請在引擎中安裝來源語言包。</string>
     <string name="translation_engine_failed">翻譯失敗。請檢查引擎中的語言包後重試。</string>
-    <string name="translation_recovery_notice">翻譯無法使用。點選翻譯以重試或開啟引擎。</string>
+    <string name="translation_recovery_notice">翻譯無法使用。點選翻譯以重試。</string>
     <string name="translation_inherit">使用全域設定</string>
     <string name="translation_on">開啟</string>
     <string name="translation_off">關閉</string>

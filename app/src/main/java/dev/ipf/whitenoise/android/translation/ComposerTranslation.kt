@@ -245,8 +245,8 @@ internal fun rememberComposerTranslation(
                 ownerCurrent = { appState.translationOwnerCurrent(account, runtime, lifecycle) },
                 initialTarget = preferences.outgoingTarget(account, group),
                 onTargetSaved = { preferences.setOutgoingTarget(account, group, it) },
-                noticeAccepted = preferences::composerNoticeAccepted,
-                onNoticeAccepted = preferences::acceptComposerNotice,
+                noticeAccepted = preferences::providerNoticeAccepted,
+                onNoticeAccepted = preferences::acceptProviderNotice,
             )
         }
     LaunchedEffect(state, appState.appLockScreenVisible) { state.invalidate() }

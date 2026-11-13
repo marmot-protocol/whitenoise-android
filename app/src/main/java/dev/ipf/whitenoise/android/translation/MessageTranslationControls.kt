@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -18,15 +17,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -38,13 +33,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /**
  * The message's translation identity for its current text and target, or null when it cannot be translated.
- * An unusable saved target leaves the target empty, so the manual sheet asks for a language and automatic
- * translation waits for an explicit choice instead of substituting one.
+ * An unusable saved target leaves the target empty, so automatic translation waits for an explicit choice instead
+ * of substituting one, while the menu's Translate falls back to the device language for that message.
  */
 @Composable
 internal fun rememberMessageTranslationSource(
@@ -205,44 +200,41 @@ private const val DISABLED_ALPHA = 0.38f
 internal const val MESSAGE_TRANSLATION_TOGGLE_TEST_TAG = "message-translation-toggle"
 internal const val MESSAGE_TRANSLATION_PENDING_TEST_TAG = "message-translation-pending"
 
-/** The manual sheet: submits only a catalog pair, then replaces any earlier work for this message and target. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The message menu's Translate action, which asks nothing: the engine detects the source language and translates
+ * into the chat's target, or into the device language when no usable target is saved. A translation already made
+ * for this message is shown again rather than requested twice. Returns the source the result is keyed under;
+ * failures surface as the conversation notice.
+ */
+internal fun ConversationTranslationSession.translateMessage(source: TranslationSource): TranslationSource {
+    val target = source.target.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
+    val request = source.copy(target = target ?: OfflineTranslatorLanguageCatalog.systemTarget())
+    val rendition = renditions[request]
+    if (rendition == null) {
+        retry()
+        request(request)
+    } else if (!rendition.showTranslation) {
+        toggle(request)
+    }
+    return request
+}
+
+/**
+ * The one-time notice before the menu's first Translate sends text to the engine, shared with the composer: once
+ * accepted on this install, Translate never asks again.
+ */
 @Composable
-internal fun MessageTranslationDialog(
-    source: TranslationSource?,
-    onTargetSelected: (String) -> Unit,
+internal fun MessageTranslationNotice(
+    onAccept: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val session = LocalConversationTranslation.current ?: return
-    if (!session.isCurrent()) {
-        LaunchedEffect(Unit) { onDismiss() }
-        return
-    }
-    val context = LocalContext.current
-    var target by remember(source) { mutableStateOf(source?.target.orEmpty()) }
-    var from by remember(source) { mutableStateOf("") }
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
-        MessageTranslationForm(
-            from = from,
-            target = target,
-            failure = session.failure,
-            enabled = source != null && OfflineTranslatorLanguageCatalog.supportsRequest(from, target),
-            onFromChange = { from = it },
-            onTargetChange = { target = it },
-            onTranslate = {
-                source?.let {
-                    onTargetSelected(target)
-                    session.retry()
-                    session.remove(it)
-                    session.remove(it.copy(target = target))
-                    session.request(it.copy(target = target), from)
-                }
-                onDismiss()
-            },
-            onDismiss = onDismiss,
-            onOpenEngine = { openOfflineTranslator(context) },
-        )
-    }
+    ConfirmDialog(
+        title = stringResource(R.string.translation_title),
+        message = stringResource(R.string.translation_privacy_warning),
+        confirmLabel = stringResource(R.string.accept),
+        onConfirm = onAccept,
+        onDismiss = onDismiss,
+    )
 }
 
 /** Sanitized, localized recovery copy for a failure; engine messages and languages are never shown. */
@@ -259,11 +251,13 @@ internal fun translationFailureResource(failure: TranslationFailure): Int {
 }
 
 /**
- * The conversation notice after the sheet has closed. An engine too old for the chosen language needs an
- * update, which retrying or opening the engine cannot fix, so it names that instead of the generic recovery.
+ * The conversation notice for a failed translation. A missing engine, a missing source pack and an engine too old
+ * for the language each name their own fix; anything else points to retrying or the engine in settings.
  */
 internal fun recoveryNotice(failure: TranslationFailure?): Int =
     when (failure) {
         TranslationFailure.ENGINE_UPDATE_REQUIRED -> R.string.translation_engine_update_required
+        TranslationFailure.MISSING_ENGINE -> R.string.translation_missing_engine
+        TranslationFailure.SOURCE_MODEL -> R.string.translation_source_model_missing
         else -> R.string.translation_recovery_notice
     }

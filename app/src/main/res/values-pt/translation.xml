@@ -2,7 +2,6 @@
     <string name="translation_title">Traduzir</string>
     <string name="translation_automatic">Traduzir mensagens automaticamente</string>
     <string name="translation_detect_language">Detectar idioma</string>
-    <string name="translation_source_language">Idioma de origem</string>
     <string name="translation_target_language">Idioma de destino</string>
     <string name="translation_loading">A traduzir no dispositivo…</string>
     <string name="translation_open_engine">Abrir motor</string>
@@ -12,7 +11,7 @@
     <string name="translation_detection_failed">Escolhe um idioma de origem e tenta novamente.</string>
     <string name="translation_source_model_missing">Instala o pacote do idioma de origem no motor.</string>
     <string name="translation_engine_failed">A tradução falhou. Verifica os pacotes de idiomas e tenta novamente.</string>
-    <string name="translation_recovery_notice">Tradução indisponível. Toca em Traduzir para tentar novamente ou abrir o motor.</string>
+    <string name="translation_recovery_notice">Tradução indisponível. Toca em Traduzir para tentar novamente.</string>
     <string name="translation_inherit">Usar definição global</string>
     <string name="translation_on">Ativado</string>
     <string name="translation_off">Desativado</string>

@@ -4,12 +4,21 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "MessageTranslationDialog",
+        "surface": "Menu Translate detects the source and uses the chat or device language",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "fun MessageTranslationDialog(",
+        "anchor": "fun ConversationTranslationSession.translateMessage(",
         "test_ids": [
           "SET-033",
           "SET-036"
+        ]
+      },
+      {
+        "surface": "MessageTranslationNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageTranslationNotice(",
+        "test_ids": [
+          "SET-033",
+          "CON-045"
         ]
       },
       {
@@ -78,9 +87,9 @@
         ]
       },
       {
-        "surface": "Explicit-source cold engine recovery",
+        "surface": "Menu Translate clears a failure before requesting",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "session.request(it.copy(target = target), from)",
+        "anchor": "retry()\n        request(request)",
         "test_ids": [
           "SET-033"
         ]

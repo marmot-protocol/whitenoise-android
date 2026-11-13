@@ -2,7 +2,6 @@
     <string name="translation_title">Перевести</string>
     <string name="translation_automatic">Автоматически переводить сообщения</string>
     <string name="translation_detect_language">Определить язык</string>
-    <string name="translation_source_language">Исходный язык</string>
     <string name="translation_target_language">Язык перевода</string>
     <string name="translation_loading">Перевод на устройстве…</string>
     <string name="translation_open_engine">Открыть переводчик</string>
@@ -12,7 +11,7 @@
     <string name="translation_detection_failed">Выберите исходный язык и повторите попытку.</string>
     <string name="translation_source_model_missing">Установите пакет исходного языка в переводчике.</string>
     <string name="translation_engine_failed">Перевод не удался. Проверьте языковые пакеты и повторите попытку.</string>
-    <string name="translation_recovery_notice">Перевод недоступен. Нажмите «Перевести», чтобы повторить попытку или открыть переводчик.</string>
+    <string name="translation_recovery_notice">Перевод недоступен. Нажмите «Перевести», чтобы повторить попытку.</string>
     <string name="translation_inherit">Использовать общую настройку</string>
     <string name="translation_on">Включено</string>
     <string name="translation_off">Выключено</string>

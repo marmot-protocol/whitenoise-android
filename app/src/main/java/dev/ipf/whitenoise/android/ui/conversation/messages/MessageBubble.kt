@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing
 import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
 import dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth
+import dev.ipf.whitenoise.android.translation.translateMessage
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -681,7 +682,6 @@ internal fun MessageBubble(
     // over the original projection. Keyed on editState so a fresh edit
     // recomposes the bubble in place.
     val editState = controller.editsByTarget[record.messageIdHex]
-    var translationDialogOpen by remember(controller, record.messageIdHex) { mutableStateOf(false) }
     var translationTarget by remember(controller, record.messageIdHex) { mutableStateOf<String?>(null) }
     // A received voice message's side transcribe disc drives every recording in this bubble.
     val audioTranscription =
@@ -710,19 +710,30 @@ internal fun MessageBubble(
                 listOf(record.sourceEpoch, editState?.count, editState?.versions?.lastOrNull()?.messageIdHex)
                     .joinToString(":"),
         )
+    val translationSession = dev.ipf.whitenoise.android.translation.LocalConversationTranslation.current
+    val translationPreferences = dev.ipf.whitenoise.android.translation.LocalTranslationPreferences.current
+    var translationNoticeOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    val translateMessage = {
+        if (translationSource != null && translationSession != null) {
+            translationTarget = translationSession.translateMessage(translationSource).target
+        }
+    }
+    if (translationNoticeOpen) {
+        dev.ipf.whitenoise.android.translation.MessageTranslationNotice(
+            onAccept = {
+                translationNoticeOpen = false
+                translationPreferences?.acceptProviderNotice()
+                translateMessage()
+            },
+            onDismiss = { translationNoticeOpen = false },
+        )
+    }
     val visibleTranslation =
-        dev.ipf.whitenoise.android.translation.LocalConversationTranslation.current
+        translationSession
             ?.renditions
             ?.get(translationSource)
             ?.takeIf { it.showTranslation }
             ?.text
-    if (translationDialogOpen && translationSource != null) {
-        dev.ipf.whitenoise.android.translation.MessageTranslationDialog(
-            source = translationSource,
-            onTargetSelected = { translationTarget = it },
-            onDismiss = { translationDialogOpen = false },
-        )
-    }
     val displayedBody =
         remember(item, deleted, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
             messageBubbleDisplayedBody(
@@ -2971,10 +2982,15 @@ internal fun MessageBubble(
                         onBeforeBodyCollapse()
                         explicitlyCollapsed = true
                     },
-                    canTranslate = translationSource != null,
+                    canTranslate =
+                        translationSource != null && translationSession != null && translationPreferences != null,
                     onTranslate = {
                         onActionMenuOpenChange(false)
-                        translationDialogOpen = true
+                        if (translationPreferences?.providerNoticeAccepted() == true) {
+                            translateMessage()
+                        } else {
+                            translationNoticeOpen = true
+                        }
                     },
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,

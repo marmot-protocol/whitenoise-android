@@ -3,11 +3,9 @@ name: presentation-modal-translation-toggle
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    id: translation.form
-- assertVisible:
-    id: translation.confirm
+    id: translation.menu
 - tapOn:
-    id: translation.confirm
+    id: translation.menu
 - assertVisible:
     text: Translate
     checked: true

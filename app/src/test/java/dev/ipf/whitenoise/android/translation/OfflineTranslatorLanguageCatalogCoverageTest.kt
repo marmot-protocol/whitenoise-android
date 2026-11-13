@@ -77,6 +77,40 @@ class OfflineTranslatorLanguageCatalogCoverageTest {
         assertEquals("Slovak", catalog.label("sk", Locale.ENGLISH))
     }
 
+    /** A device language becomes the engine code it names, or nothing when the engine cannot translate into it. */
+    @Test
+    fun deviceLanguageMapsToItsEngineTarget() {
+        val expected =
+            mapOf(
+                "zh-TW" to "zh_hant",
+                "zh-Hant-HK" to "zh_hant",
+                "zh-CN" to "zh",
+                "iw" to "he",
+                "nb-NO" to "nb",
+                "pt-BR" to "pt",
+                "en-US" to "en",
+                "mr" to null,
+                "tlh" to null,
+            )
+        for ((tag, target) in expected) {
+            assertEquals(tag, target, OfflineTranslatorLanguageCatalog.targetFor(Locale.forLanguageTag(tag)))
+        }
+    }
+
+    /** The default target follows the device language and falls back to English when the engine lacks it. */
+    @Test
+    fun systemTargetFollowsTheDeviceLanguage() {
+        val original = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("de-AT"))
+            assertEquals("de", OfflineTranslatorLanguageCatalog.systemTarget())
+            Locale.setDefault(Locale.forLanguageTag("mr-IN"))
+            assertEquals("en", OfflineTranslatorLanguageCatalog.systemTarget())
+        } finally {
+            Locale.setDefault(original)
+        }
+    }
+
     /** Pickers, preferences and both request checks read the catalog; no file keeps its own language list. */
     @Test
     fun pickersAndValidationShareTheCatalog() {
@@ -84,8 +118,6 @@ class OfflineTranslatorLanguageCatalogCoverageTest {
         val choices = settings.functionBody("rememberTranslationLanguageChoices")
         assertTrue("catalog.sources" in choices && "catalog.targets" in choices)
         assertTrue("rememberTranslationLanguageChoices(" in settings.functionBody("TranslationLanguagePicker"))
-        val form = source("MessageTranslationForm.kt").functionBody("TranslationLanguageRow")
-        assertTrue("rememberTranslationLanguageChoices(" in form && "choices.codes" in form)
         assertTrue(
             "OfflineTranslatorLanguageCatalog.requestFailure(" in
                 source("BoundTranslatorRequest.kt").functionBody("translateOnBoundTranslator"),
@@ -95,8 +127,9 @@ class OfflineTranslatorLanguageCatalogCoverageTest {
                 source("TranslationEngine.kt").functionBody("validateTranslationInput"),
         )
         val controls = source("MessageTranslationControls.kt")
-        val dialog = controls.functionBody("MessageTranslationDialog")
-        assertTrue("OfflineTranslatorLanguageCatalog.supportsRequest(" in dialog)
+        val manual = controls.functionBody("ConversationTranslationSession.translateMessage")
+        assertTrue("OfflineTranslatorLanguageCatalog::supportsTarget" in manual)
+        assertTrue("OfflineTranslatorLanguageCatalog.systemTarget()" in manual)
         val automatic = controls.functionBody("rememberMessageTranslationSource")
         assertTrue("OfflineTranslatorLanguageCatalog.supportsTarget(" in automatic)
         val preferences = source("TranslationPreferences.kt")
