@@ -33,13 +33,13 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
                         service.onStartCommand(startIntent(service, harness), 0, 1)
                         val first = if (finalChoice == ConversationDictationDeliveryMode.SendOnFinish) 1 else 2
                         service.onStartCommand(actionCommand(service, harness, notificationActions[first]), 0, 2)
-                        assertCompactButtonsEnabled(service, service.foreground.foregroundNotification())
+                        assertNativeNotificationActions(service, harness, service.foreground.foregroundNotification())
                         val last = if (finalChoice == ConversationDictationDeliveryMode.SendOnFinish) 2 else 1
                         val lastIntent = actionCommand(service, harness, notificationActions[last])
                         service.onStartCommand(lastIntent, 0, 3)
                         service.onStartCommand(lastIntent, 0, 4)
                         assertEquals(finalChoice, harness.conversationDictation.processingDeliveryMode)
-                        assertCompactButtonsEnabled(service, service.foreground.foregroundNotification())
+                        assertNativeNotificationActions(service, harness, service.foreground.foregroundNotification())
                         val listener = harness.platform.listener
                         listener.onResult("latest notification choice")
                         runCurrent()
@@ -59,7 +59,7 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
         }
 
     @Test
-    fun dispatchClaimDisablesAllNotificationActionsUntilDeliveryCompletes() =
+    fun dispatchClaimOmitsAllNotificationActionsUntilDeliveryCompletes() =
         runTest {
             val delivery = CompletableDeferred<Unit>()
             val harness = DictationForegroundTestHost(scope = this, onDispatchClaimed = { delivery.await() })
@@ -74,7 +74,12 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
                 runCurrent()
                 assertTrue(harness.conversationDictation.deliveryInProgress)
                 assertFalse(harness.conversationDictation.completionActionsEnabled)
-                assertCompactButtonsDisabled(service, service.foreground.foregroundNotification())
+                assertNativeNotificationActions(
+                    service,
+                    harness,
+                    service.foreground.foregroundNotification(),
+                    expectedCount = 0,
+                )
                 commands.forEachIndexed { index, command -> service.onStartCommand(command, 0, index + 3) }
                 runCurrent()
                 assertTrue(harness.conversationDictation.deliveryInProgress)

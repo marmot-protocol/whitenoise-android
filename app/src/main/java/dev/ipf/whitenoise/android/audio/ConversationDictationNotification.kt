@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.widget.RemoteViews
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 
@@ -48,8 +47,7 @@ internal fun buildConversationDictationNotification(
             if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
                 addRecoveryActions(context, controller, actionIntent)
             } else {
-                setStyle(Notification.DecoratedCustomViewStyle())
-                setCustomContentView(compactDictationControls(context, controller, actionIntent))
+                addActiveActions(context, controller, actionIntent)
             }
         }.build()
 
@@ -92,35 +90,30 @@ internal fun notifyConversationDictationRecoveryExpired(context: Context) {
     manager.notify(DICTATION_RECOVERY_NOTIFICATION_TAG, DICTATION_RECOVERY_NOTIFICATION_ID, notification)
 }
 
-private fun compactDictationControls(
+/** Shows only the actions currently available to this capture session. */
+private fun Notification.Builder.addActiveActions(
     context: Context,
     controller: ConversationDictationController,
     actionIntent: (String, String) -> PendingIntent,
-): RemoteViews {
+) {
+    if (controller.deliveryInProgress) return
     val token = requireNotNull(controller.notificationSessionToken)
-    return RemoteViews(context.packageName, R.layout.notification_dictation_compact).apply {
-        val cancelEnabled = !controller.deliveryInProgress
-        val completionEnabled = controller.completionActionsEnabled
-        setBoolean(R.id.dictation_notification_cancel, "setEnabled", cancelEnabled)
-        setBoolean(R.id.dictation_notification_paste, "setEnabled", completionEnabled)
-        setBoolean(R.id.dictation_notification_send, "setEnabled", completionEnabled)
-        if (cancelEnabled) {
-            setOnClickPendingIntent(
-                R.id.dictation_notification_cancel,
-                actionIntent(ConversationDictationForegroundService.ACTION_CANCEL, token),
-            )
-        }
-        if (completionEnabled) {
-            setOnClickPendingIntent(
-                R.id.dictation_notification_paste,
-                actionIntent(ConversationDictationForegroundService.ACTION_PASTE, token),
-            )
-            setOnClickPendingIntent(
-                R.id.dictation_notification_send,
-                actionIntent(ConversationDictationForegroundService.ACTION_SEND, token),
-            )
-        }
-    }
+    addAction(
+        0,
+        context.getString(R.string.cancel),
+        actionIntent(ConversationDictationForegroundService.ACTION_CANCEL, token),
+    )
+    if (!controller.completionActionsEnabled) return
+    addAction(
+        0,
+        context.getString(R.string.paste),
+        actionIntent(ConversationDictationForegroundService.ACTION_PASTE, token),
+    )
+    addAction(
+        0,
+        context.getString(R.string.send),
+        actionIntent(ConversationDictationForegroundService.ACTION_SEND, token),
+    )
 }
 
 private fun openDictationAppIntent(context: Context): PendingIntent =

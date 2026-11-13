@@ -7,14 +7,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.widget.Button
-import android.widget.FrameLayout
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService.Companion.EXTRA_ACTION_GENERATION
+import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService.Companion.EXTRA_SESSION_TOKEN
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.robolectric.Shadows.shadowOf
@@ -64,25 +64,32 @@ internal abstract class ConversationDictationForegroundTestCase {
         }
     }
 
-    /** Inflates the actual collapsed RemoteViews, including its enable-state actions. */
-    protected fun assertCompactButtonsEnabled(
+    /** Verifies the published Android actions use the current session's service intents. */
+    protected fun assertNativeNotificationActions(
         service: NotificationStreamForegroundService,
+        harness: DictationForegroundTestHost,
         notification: Notification,
+        expectedCount: Int = 3,
     ) {
-        val compact = notification.contentView.apply(service, FrameLayout(service))
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
-    }
-
-    protected fun assertCompactButtonsDisabled(
-        service: NotificationStreamForegroundService,
-        notification: Notification,
-    ) {
-        val compact = notification.contentView.apply(service, FrameLayout(service))
-        assertFalse(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
-        assertFalse(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
-        assertFalse(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
+        assertNull(notification.contentView)
+        assertNull(notification.bigContentView)
+        assertNull(notification.headsUpContentView)
+        val actions = notification.actions.orEmpty()
+        val labels = listOf(R.string.cancel, R.string.paste, R.string.send)
+        assertEquals(labels.take(expectedCount).map(service::getString), actions.map { it.title.toString() })
+        assertEquals(
+            notificationActions.take(expectedCount).map { actionCommand(service, harness, it).data },
+            actions.map { shadowOf(it.actionIntent).savedIntent.data },
+        )
+        actions.forEach { action ->
+            val intent = shadowOf(action.actionIntent).savedIntent
+            assertEquals(ComponentName(service, NotificationStreamForegroundService::class.java), intent.component)
+            assertEquals(harness.conversationDictation.notificationSessionToken, intent.getStringExtra(EXTRA_SESSION_TOKEN))
+            assertEquals(
+                harness.conversationDictation.notificationActionGeneration,
+                intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L),
+            )
+        }
     }
 
     protected fun actionCommand(
