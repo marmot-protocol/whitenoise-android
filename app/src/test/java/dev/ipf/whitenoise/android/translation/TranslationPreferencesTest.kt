@@ -31,6 +31,7 @@ class TranslationPreferencesTest {
     @Test fun defaultsAreOffAndInherit() {
         val preferences = TranslationPreferences(context)
         assertFalse(preferences.global().enabled)
+        assertEquals(OfflineTranslatorLanguageCatalog.systemTarget(), preferences.global().target)
         assertEquals(TranslationOverride.INHERIT, preferences.override("account", "group"))
         assertNull(preferences.targetOverride("account", "group"))
         preferences.close()
@@ -140,7 +141,7 @@ class TranslationPreferencesTest {
             assertThrows(IllegalArgumentException::class.java) { preferences.setGlobal(true, code) }
             assertThrows(IllegalArgumentException::class.java) { preferences.setTargetOverride("a", "group", code) }
         }
-        assertEquals(TranslationChoice(false, "en"), preferences.global())
+        assertEquals(TranslationChoice(false, OfflineTranslatorLanguageCatalog.systemTarget()), preferences.global())
         assertNull(preferences.targetOverride("a", "group"))
         preferences.close()
     }
@@ -193,7 +194,7 @@ class TranslationPreferencesTest {
     @Test fun composerChoicesLeaveIncomingTranslationsUntouched() {
         val preferences = TranslationPreferences(context)
         preferences.setOutgoingTarget("account", "group", "de")
-        preferences.acceptComposerNotice()
+        preferences.acceptProviderNotice()
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(0, preferences.changes.value)
         preferences.setOverride("account", "group", TranslationOverride.ON)

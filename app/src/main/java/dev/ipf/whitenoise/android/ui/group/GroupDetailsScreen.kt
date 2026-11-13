@@ -42,7 +42,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -322,6 +321,9 @@ internal fun GroupDetailsScreen(
         var showAddMember by rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) {
             mutableStateOf(false)
         }
+        // Saved with the staged selection so an open invite review survives recreation alongside it.
+        val addReviewOpen =
+            rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) { mutableStateOf(false) }
         val addSelection =
             rememberSaveable(
                 controller.group.groupIdHex,
@@ -342,14 +344,6 @@ internal fun GroupDetailsScreen(
             addAdminSelection.removeAll { admin ->
                 addSelection.none { it.accountIdHex.equals(admin, ignoreCase = true) }
             }
-        }
-        var showLargeGroupInviteConfirmation by
-            remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
-        var reviewedLargeInviteMembers by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateOf<List<RecipientSearch.Candidate>>(emptyList())
-        }
-        var reviewedLargeInviteAdmins by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateOf<Set<String>>(emptySet())
         }
         var addMemberAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenAddMember) }
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
@@ -434,7 +428,7 @@ internal fun GroupDetailsScreen(
         LaunchedEffect(canAdministerMembers) {
             if (!canAdministerMembers) {
                 showAddMember = false
-                showLargeGroupInviteConfirmation = false
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
             }
@@ -760,7 +754,7 @@ internal fun GroupDetailsScreen(
                 }
         LaunchedEffect(showAddMember, inviteSelectionApplied, controller.mutationInFlight) {
             if (showAddMember && inviteSelectionApplied && !controller.mutationInFlight) {
-                showLargeGroupInviteConfirmation = false
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
                 if (addMemberAutoOpened) onBack() else showAddMember = false
@@ -935,11 +929,6 @@ internal fun GroupDetailsScreen(
                 )
             }
 
-            LaunchedEffect(showLargeGroupInviteConfirmation, inviteProjection?.shouldWarn) {
-                if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == false) {
-                    showLargeGroupInviteConfirmation = false
-                }
-            }
             val reviewAvatar = rememberConversationGroupAvatar(appState, controller)
             detailsRoute {
                 ContactPickerScreen(
@@ -954,27 +943,25 @@ internal fun GroupDetailsScreen(
                     appState = appState,
                     title = stringResource(R.string.add_member),
                     selected = addSelection,
+                    reviewOpen = addReviewOpen,
                     onBack = {
                         // When auto-opened from the empty-group CTA, Back returns to the
                         // conversation (via the details onBack) rather than exposing the
                         // details body the user never intended to see.
                         if (!adding) {
-                            showLargeGroupInviteConfirmation = false
+                            addReviewOpen.value = false
                             addSelection.clear()
                             addAdminSelection.clear()
                             if (addMemberAutoOpened) onBack() else showAddMember = false
                         }
                     },
-                    onConfirm = confirm@{
-                        if (!canAdministerMembers || !rosterReady) return@confirm
+                    onConfirm = { submitSelectedInvites() },
+                    reviewDescription =
                         if (inviteProjection?.shouldWarn == true) {
-                            reviewedLargeInviteMembers = addSelection.toList()
-                            reviewedLargeInviteAdmins = addAdminSelection.toSet()
-                            showLargeGroupInviteConfirmation = true
+                            stringResource(R.string.large_group_invite_confirm_message)
                         } else {
-                            submitSelectedInvites()
-                        }
-                    },
+                            null
+                        },
                     confirmIcon = Icons.Default.Check,
                     initialAdminIds = addAdminSelection.toSet(),
                     onInitialAdminChange = { member, admin ->
@@ -1002,61 +989,6 @@ internal fun GroupDetailsScreen(
                     footer = {
                         if (inviteProjection?.shouldWarn == true) {
                             LargeGroupInviteWarningBanner()
-                        }
-                    },
-                )
-            }
-            if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == true) {
-                val warningTicket = remember { GroupInviteWarningTicket() }
-                val warningMembers = remember(warningTicket) { reviewedLargeInviteMembers.toList() }
-                val warningAdmins = remember(warningTicket) { reviewedLargeInviteAdmins.toSet() }
-                DisposableEffect(warningTicket) {
-                    onDispose { warningTicket.active = false }
-                }
-                LargeGroupInviteConfirmationDialog(
-                    onContinue = {
-                        if (warningTicket.active && showLargeGroupInviteConfirmation) {
-                            warningTicket.active = false
-                            showLargeGroupInviteConfirmation = false
-                            if (warningMembers.map { it.accountIdHex } ==
-                                addSelection.map { it.accountIdHex } &&
-                                warningAdmins == addAdminSelection.toSet()
-                            ) {
-                                submitSelectedInvites(warningMembers, warningAdmins)
-                            }
-                        }
-                    },
-                    onDismiss = {
-                        if (warningTicket.active) {
-                            warningTicket.active = false
-                            showLargeGroupInviteConfirmation = false
-                        }
-                    },
-                    identity = {
-                        GroupActingAccountIdentity(appState, controller.boundAccountRef)
-                        Text(
-                            pluralStringResource(
-                                R.plurals.selected_members_count,
-                                warningMembers.size,
-                                warningMembers.size,
-                            ),
-                        )
-                        warningMembers.forEach { member ->
-                            GroupMemberReviewPair(
-                                appState = appState,
-                                group =
-                                    MemberReviewGroup(
-                                        controller.group.groupIdHex,
-                                        conversationTitle,
-                                        reviewAvatar.pictureUrl,
-                                        reviewAvatar.image,
-                                        groupAnimation = reviewAvatar.groupAnimation,
-                                    ),
-                                member = member,
-                                busy = true,
-                                initialAdminIds = warningAdmins,
-                                onInitialAdminChange = { _, _ -> },
-                            )
                         }
                     },
                 )
@@ -2933,10 +2865,6 @@ private class DetailsReviewSlot {
         ticket = Any()
         value = next
     }
-}
-
-private class GroupInviteWarningTicket {
-    var active: Boolean = true
 }
 
 /** Re-read each authority fence when claiming an administration confirmation. */

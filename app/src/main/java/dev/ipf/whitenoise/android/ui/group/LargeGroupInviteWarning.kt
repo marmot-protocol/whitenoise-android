@@ -5,14 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.WarningAmber
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -33,7 +28,6 @@ import java.util.Locale
 
 internal const val LARGE_GROUP_INVITE_WARNING_THRESHOLD = 150
 internal const val LARGE_GROUP_INVITE_WARNING_TAG = "large-group-invite-warning"
-internal const val LARGE_GROUP_INVITE_CONFIRMATION_TAG = "large-group-invite-confirmation"
 
 internal data class LargeGroupInviteProjection(
     val memberCount: Int,
@@ -116,44 +110,4 @@ internal fun LargeGroupInviteWarningBanner(modifier: Modifier = Modifier) {
             }
         }
     }
-}
-
-/** Explicit, non-destructive confirmation required immediately before dispatching a large-group invite. */
-@Composable
-@Suppress("FunctionNaming")
-internal fun LargeGroupInviteConfirmationDialog(
-    onContinue: () -> Unit,
-    onDismiss: () -> Unit,
-    identity: (@Composable () -> Unit)? = null,
-) {
-    AlertDialog(
-        modifier = Modifier.testTag(LARGE_GROUP_INVITE_CONFIRMATION_TAG),
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.WarningAmber, contentDescription = null) },
-        title = {
-            Text(
-                text = stringResource(R.string.large_group_invite_confirm_title),
-                style = LocalTextStyle.current.copy(textDirection = TextDirection.ContentOrLtr),
-            )
-        },
-        text = {
-            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
-                Text(
-                    text = stringResource(R.string.large_group_invite_confirm_message),
-                    style = LocalTextStyle.current.copy(textDirection = TextDirection.ContentOrLtr),
-                )
-                identity?.invoke()
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onContinue) {
-                Text(stringResource(R.string.group_action_add_members))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
 }

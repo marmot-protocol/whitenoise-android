@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -69,13 +67,17 @@ internal fun TranslationLanguagePicker(
     val choices = rememberTranslationLanguageChoices(allowDetection)
     Box {
         TextButton(onClick = { expanded = true }) { Text("$title: ${choices.label(selected)}") }
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
-            choices.codes.forEach { code ->
-                DropdownMenuItem(text = { Text(choices.label(code)) }, onClick = {
-                    onSelected(code)
+        if (expanded) {
+            TranslationLanguagePickerSheet(
+                title = title,
+                choices = choices,
+                selected = selected,
+                onDismiss = { expanded = false },
+                onSelect = {
+                    onSelected(it)
                     expanded = false
-                })
-            }
+                },
+            )
         }
     }
 }
