@@ -82,6 +82,29 @@ internal fun rememberGroupAvatarPresentation(
             durableGroupPictureDomain(group, groupOwnsPicture, accountRef),
         )
     }
+    return rememberCompatibilityGroupAvatar(
+        appState,
+        group,
+        accountRef,
+        ownedFallback,
+        ownedSeed,
+        groupOwnsPicture,
+        compatibility,
+    )
+}
+
+/** Resolves and retains the displayed compatibility picture using the group's current source order. */
+@Composable
+@Suppress("LongParameterList")
+private fun rememberCompatibilityGroupAvatar(
+    appState: WhiteNoiseAppState,
+    group: AppGroupRecordFfi,
+    accountRef: String?,
+    ownedFallback: String?,
+    ownedSeed: ChatListAvatarSeed?,
+    groupOwnsPicture: Boolean,
+    compatibility: RetainedGroupCompatibilityPixels?,
+): GroupAvatarPresentation {
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedKey = encryptedGroupAvatarCacheKey(accountRef, group)
     val encryptedImage =
