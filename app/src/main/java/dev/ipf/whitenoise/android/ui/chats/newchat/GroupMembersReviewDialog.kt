@@ -99,7 +99,7 @@ internal fun GroupMembersReviewDialog(
             onDismiss()
         }
     }
-    val selectionCurrent = reviewedMembers == members.map { it.accountIdHex } && reviewedGroups == groups.map { it.id }
+    val selectionCurrent = sameReviewSelection(reviewedMembers, reviewedGroups, members, groups)
     LaunchedEffect(selectionCurrent) {
         if (!selectionCurrent) {
             ticket.invalidate()
@@ -122,8 +122,7 @@ internal fun GroupMembersReviewDialog(
                             ownerCurrent = { groupMembersReviewOwnerCurrent(appState, actingAccount, runtime) },
                             busy = { liveBusy.value },
                             selectionCurrent = {
-                                reviewedMembers == liveMembers.value.map { it.accountIdHex } &&
-                                    reviewedGroups == liveGroups.value.map { it.id }
+                                sameReviewSelection(reviewedMembers, reviewedGroups, liveMembers.value, liveGroups.value)
                             },
                         )
                     ) {
@@ -177,6 +176,14 @@ internal fun GroupMembersReviewDialog(
         },
     )
 }
+
+/** Whether the people and destinations still match the ones the review opened with. */
+private fun sameReviewSelection(
+    reviewedMembers: List<String>,
+    reviewedGroups: List<String>,
+    members: List<RecipientSearch.Candidate>,
+    groups: List<MemberReviewGroup>,
+): Boolean = reviewedMembers == members.map { it.accountIdHex } && reviewedGroups == groups.map { it.id }
 
 /** The action is singular only for one selected person, independent of locale plural categories. */
 internal fun groupReviewAddMembersLabel(memberCount: Int): Int {

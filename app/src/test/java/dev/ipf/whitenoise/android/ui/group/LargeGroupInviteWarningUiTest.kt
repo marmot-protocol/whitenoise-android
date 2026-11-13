@@ -297,14 +297,7 @@ class LargeGroupInviteWarningUiTest {
             surfaceState.showDetails.value = true
         }
         composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            selection +=
-                RecipientSearch.Candidate(
-                    accountIdHex = "new-a",
-                    displayName = "Alice",
-                    npub = "npub1alice",
-                )
-        }
+        composeRule.runOnIdle { selection += RecipientSearch.Candidate("new-a", "Alice", "npub1alice") }
         composeRule.onNodeWithContentDescription("Review selected members").performClick()
         composeRule.runOnIdle { assertTrue(reviewOpen.value) }
         assertWarningAndReviewDisplayed()
