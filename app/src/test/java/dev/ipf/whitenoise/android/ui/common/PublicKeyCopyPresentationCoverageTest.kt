@@ -140,6 +140,26 @@ class PublicKeyCopyPresentationCoverageTest {
         assertEquals(1, rowTaps)
     }
 
+    /** Where the row has no action of its own, a tap in the key's touch margin still copies the key. */
+    @Test
+    fun aKeyWithoutARowActionKeepsItsTouchMargin() {
+        composeRule.setContent {
+            Themed {
+                ContactRow(
+                    title = "Member",
+                    subtitle = SHORT_KEY,
+                    avatarSeed = "member",
+                    avatarUrl = null,
+                    publicKey = FIRST_KEY,
+                    modifier = Modifier.testTag(ROW),
+                )
+            }
+        }
+
+        tapJustAboveTheKey(ROW)
+        assertEquals(FIRST_KEY, clipText())
+    }
+
     /** Tapping another profile's name in the switcher selects that profile instead of copying its key (#3721). */
     @Test
     fun profileSwitcherNameTapSelectsTheProfile() {
@@ -540,7 +560,10 @@ class PublicKeyCopyPresentationCoverageTest {
     private fun tapJustAboveTheKey(tag: String) {
         val row = composeRule.onNodeWithTag(tag).getUnclippedBoundsInRoot()
         val key = keyText(tag).getUnclippedBoundsInRoot()
-        assertTrue("the key text is no shorter than a touch target", key.bottom - key.top < MIN_TOUCH_TARGET)
+        assertTrue(
+            "the tap must land inside the key's touch margin",
+            (MIN_TOUCH_TARGET - (key.bottom - key.top)) / 2 > ABOVE_THE_KEY,
+        )
         val x = (key.left + key.right) / 2 - row.left
         val y = key.top - ABOVE_THE_KEY - row.top
         composeRule.onNodeWithTag(tag).performTouchInput { click(Offset(x.toPx(), y.toPx())) }
