@@ -20,6 +20,22 @@
         "test_ids": [
           "AXY-002"
         ]
+      },
+      {
+        "surface": "Row numbers copy-link labels repeated across paragraphs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleAccessibility.kt",
+        "anchor": "label across paragraphs are numbered again here rather than dropped",
+        "test_ids": [
+          "AXY-002"
+        ]
+      },
+      {
+        "surface": "Row keeps one copy action for an address linked from several paragraphs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleAccessibility.kt",
+        "anchor": "Forwarded actions with the",
+        "test_ids": [
+          "AXY-002"
+        ]
       }
     ]
   },

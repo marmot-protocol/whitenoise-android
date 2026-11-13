@@ -180,6 +180,9 @@ private fun LazyListScope.storageChatActionItems(
                     enabled = enabled,
                     destructive = true,
                     modifier = Modifier.testTag("storage.chat.remove_all"),
+                    leading = {
+                        SettingsLeadingIcon(R.drawable.ic_delete_sweep, tint = MaterialTheme.colorScheme.error)
+                    },
                 )
             }
             row("older") { context ->
@@ -189,6 +192,7 @@ private fun LazyListScope.storageChatActionItems(
                     onClick = { dialogs.olderPicker.value = true },
                     enabled = enabled,
                     modifier = Modifier.testTag("storage.chat.remove_older"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }
         }
@@ -273,6 +277,7 @@ internal fun StorageListRetry(
                 onClick = onRetry,
                 enabled = enabled,
                 modifier = Modifier.testTag("storage.list.retry"),
+                leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
             )
         }
     }

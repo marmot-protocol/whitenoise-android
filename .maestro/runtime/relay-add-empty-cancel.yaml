@@ -8,4 +8,7 @@ name: relay-add-empty-cancel
 - assertVisible:
     id: relays.group
 - back
+- assertVisible:
+    id: settings.account.group
+- back
 - assertVisible: Settings

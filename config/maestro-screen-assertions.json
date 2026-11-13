@@ -1693,6 +1693,13 @@
       "symbol": "MessageActionMenu",
       "bindings": [
         {
+          "case": "reader-back",
+          "selector": {
+            "text": "Show less"
+          },
+          "scope": "Long-press the inline expanded bubble to collapse it back to Read More."
+        },
+        {
           "case": "actions-info-back",
           "selector": {
             "text": "Info"
@@ -1808,25 +1815,6 @@
           },
           "opened_by": {
             "text": "Info"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
-      "symbol": "MessageFullScreenView",
-      "bindings": [
-        {
-          "case": "reader-back",
-          "selector": {
-            "id": "message-full-screen"
-          },
-          "scope": "generated long-message reader opens from Read More and returns to timeline.",
-          "entry_assertion": {
-            "id": "message-full-screen"
-          },
-          "opened_by": {
-            "text": "Read More"
           }
         }
       ]

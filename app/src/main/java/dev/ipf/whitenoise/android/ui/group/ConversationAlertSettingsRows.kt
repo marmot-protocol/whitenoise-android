@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationAlertPreferences
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -106,6 +107,7 @@ internal fun ConversationAlertSettingsRows(
                                 R.string.notification_alerts_on_device
                             },
                         ),
+                    leading = { SettingsLeadingIcon(notificationChannelIcon(setting.channel)) },
                 )
             }
         }

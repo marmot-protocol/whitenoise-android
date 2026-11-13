@@ -4,6 +4,9 @@ name: keys-public-copy-account-switch
 - runFlow: ../fixtures/runtime-profile-keys-ready.yaml
 - runFlow: ../fixtures/copy-fixture-public-key.yaml
 - tapOn: Back
+- assertVisible:
+    id: settings.account.group
+- tapOn: Back
 - assertVisible: Settings
 - tapOn: Back
 - assertVisible: Maestro group
@@ -13,6 +16,9 @@ name: keys-public-copy-account-switch
 - assertVisible: Switch Profile, Maestro Bob
 - runFlow: ../fixtures/open-fixture-profile-keys.yaml
 - runFlow: ../fixtures/copy-fixture-public-key.yaml
+- tapOn: Back
+- assertVisible:
+    id: settings.account.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

@@ -12,6 +12,9 @@ name: accounts-wipe-empty-back
 - assertNotVisible: "What gets destroyed"
 - assertVisible: "Private key hidden"
 - back
+- assertVisible:
+    id: settings.account.group
+- back
 - assertVisible: "Settings"
 - back
 - assertVisible: "Maestro group"

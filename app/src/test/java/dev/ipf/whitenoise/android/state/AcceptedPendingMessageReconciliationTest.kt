@@ -137,9 +137,9 @@ class AcceptedPendingMessageReconciliationTest {
 
     private fun controllersSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-        ).firstOrNull(File::exists) ?: error("Missing Controllers.kt source file")
+            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing ConversationController.kt source file")
 
     /** Builds a sent message record from alice with the given id. */
     private fun message(id: String): AppMessageRecordFfi =

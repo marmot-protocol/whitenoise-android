@@ -166,7 +166,7 @@ class AttachmentDownloadProductionWiringTest {
     /** Guards foreground enqueueing, source single-flight, budgeted byte reads, and terminal durable cleanup wiring. */
     @Test
     fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
-        val controller = projectSource("state/Controllers.kt").normalized()
+        val controller = projectSource("state/ConversationController.kt").normalized()
         val presentation = projectSource("state/ConversationAttachmentPresentation.kt").normalized()
         val sourceController = projectSource("state/AttachmentControllerCache.kt").normalized()
         val appState = projectSource("state/AppState.kt").normalized()

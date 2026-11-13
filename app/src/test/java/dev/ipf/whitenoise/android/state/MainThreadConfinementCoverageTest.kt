@@ -212,8 +212,12 @@ class MainThreadConfinementCoverageTest {
 
     /** Reads every source file that contributes attachment-cache behavior to conversation controllers. */
     private fun controllerSources(): String =
-        listOf("Controllers.kt", "AttachmentControllerCache.kt", "ConversationAttachmentPresentation.kt")
-            .joinToString(separator = "\n") { sourceFile(it).readText() }
+        listOf(
+            "ChatsController.kt",
+            "ConversationController.kt",
+            "AttachmentControllerCache.kt",
+            "ConversationAttachmentPresentation.kt",
+        ).joinToString(separator = "\n") { sourceFile(it).readText() }
 
     private fun sourceFile(name: String): File =
         listOf(

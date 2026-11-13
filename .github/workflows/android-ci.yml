@@ -330,7 +330,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -609,7 +609,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -679,9 +679,12 @@ jobs:
           path: build/reports/dependency-security
           if-no-files-found: ignore
           retention-days: 14
+  # Prechecks compile every test source set here. Full runs compile main and unit-test
+  # sources once per flavor and hand the new build-cache entries to the four unit shards,
+  # which would otherwise each repeat the same 5-7 minute compilation.
   compile-tests:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck == 'true'
+    if: needs.changes.outputs.docs_only != 'true'
     name: Compile test sources (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -689,7 +692,7 @@ jobs:
       # Isolate each distribution's compiler lifetime and keep both diagnostics.
       fail-fast: false
       matrix:
-        flavor: [Zapstore, Play]
+        flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && needs.changes.outputs.precheck != 'true' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -708,11 +711,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Retain this flavor's compilation outputs in its own job cache.
+      # Shard 0 saves these outputs with its test results; a second writer would duplicate them.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: true
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -730,18 +733,48 @@ jobs:
 
       # Four heavy Kotlin test compilations previously shared one compiler JVM.
       # Each runner now owns one flavor and one active compiler task, using the
-      # existing configured heaps. Test execution remains in the full suites.
+      # existing configured heaps. Test execution remains in the full suites,
+      # where shard 0 still compiles androidTest sources.
       - name: Compile main and test source sets
         timeout-minutes: 25
-        run: >-
-          ./gradlew
-          :app:compileDev${{ matrix.flavor }}DebugKotlin
-          :app:compileDev${{ matrix.flavor }}DebugJavaWithJavac
-          :app:compileDev${{ matrix.flavor }}DebugUnitTestKotlin
-          :app:compileDev${{ matrix.flavor }}DebugUnitTestJavaWithJavac
-          :app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin
-          :app:compileDev${{ matrix.flavor }}DebugAndroidTestJavaWithJavac
-          --max-workers=1 --build-cache --profile --no-daemon --stacktrace
+        env:
+          CI_PRECHECK: ${{ needs.changes.outputs.precheck }}
+        run: |
+          tasks=(
+            :app:compileDev${{ matrix.flavor }}DebugKotlin
+            :app:compileDev${{ matrix.flavor }}DebugJavaWithJavac
+            :app:compileDev${{ matrix.flavor }}DebugUnitTestKotlin
+            :app:compileDev${{ matrix.flavor }}DebugUnitTestJavaWithJavac
+          )
+          if [[ "$CI_PRECHECK" == true ]]; then
+            tasks+=(
+              :app:compileDev${{ matrix.flavor }}DebugAndroidTestKotlin
+              :app:compileDev${{ matrix.flavor }}DebugAndroidTestJavaWithJavac
+            )
+          fi
+          touch "$RUNNER_TEMP/compile-started"
+          ./gradlew "${tasks[@]}" --max-workers=1 --build-cache --profile --no-daemon --stacktrace
+
+      # Only entries written by this compilation; the shards already restore the master cache.
+      - name: Package new build-cache entries
+        if: success() && needs.changes.outputs.precheck != 'true'
+        shell: bash
+        run: |
+          cd ~/.gradle/caches/build-cache-1
+          find . -type f -newer "$RUNNER_TEMP/compile-started" -print0 |
+            tar --null -T - -cf "$RUNNER_TEMP/unit-compile-cache.tar"
+          tar -tf "$RUNNER_TEMP/unit-compile-cache.tar" | wc -l
+
+      - name: Share compiled outputs with the unit shards
+        if: success() && needs.changes.outputs.precheck != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: unit-compile-cache-${{ matrix.flavor }}
+          path: ${{ runner.temp }}/unit-compile-cache.tar
+          if-no-files-found: error
+          # A re-run of this job replaces the previous attempt's artifact.
+          overwrite: true
+          retention-days: 1
 
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
@@ -820,7 +853,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -893,11 +926,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
   # The unit suite runs in four shards per flavor. Each shard runs the test classes whose
-  # top-level name hashes to its index (see ciTestShard in build.gradle.kts), so a shard
-  # compiles once and runs about a quarter of the suite. The coverage job below merges
-  # every shard's screenshot summary and Kover binary report.
+  # top-level name hashes to its index (see ciTestShard in build.gradle.kts) and takes
+  # its compiled sources from compile-tests' build-cache entries, so it runs about a
+  # quarter of the suite without recompiling. The coverage job below merges every
+  # shard's screenshot summary and Kover binary report.
   tests:
-    needs: changes
+    needs: [changes, compile-tests]
     if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.precheck != 'true'
     name: Unit tests and screenshots (${{ matrix.flavor }}, shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
@@ -944,7 +978,23 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ matrix.shard != 0 || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ matrix.shard != 0 || github.ref != 'refs/heads/master' }}
+
+      # A shard re-run after the one-day artifact expires compiles from source instead.
+      - name: Download compiled outputs
+        id: compiled-outputs
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: unit-compile-cache-${{ matrix.flavor }}
+          path: ${{ runner.temp }}/unit-compile-cache
+
+      - name: Add compiled outputs to the build cache
+        if: steps.compiled-outputs.outcome == 'success'
+        shell: bash
+        run: |
+          mkdir -p ~/.gradle/caches/build-cache-1
+          tar -xf "$RUNNER_TEMP/unit-compile-cache/unit-compile-cache.tar" -C ~/.gradle/caches/build-cache-1
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -1006,9 +1056,7 @@ jobs:
       - name: Save MarmotKit artifact
         if: >-
           ${{ success() && matrix.flavor == 'Zapstore' && matrix.shard == 0 &&
-              github.event_name != 'merge_group' &&
-              (github.event_name != 'pull_request' ||
-               github.event.pull_request.head.repo.full_name == github.repository) &&
+              github.ref == 'refs/heads/master' &&
               steps.marmotkit-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -1254,7 +1302,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -1384,7 +1432,6 @@ jobs:
                 else .value.result == "skipped" end)
             else all(to_entries[];
               if $precheck and (.key == "tests" or .key == "coverage" or .key == "static-analysis" or .key == "secondary-variant") then .value.result == "skipped"
-              elif .key == "compile-tests" then .value.result == (if $precheck then "success" else "skipped" end)
               elif .key == "compose-compiler" and ($campaigns == "false" or $is_draft or $event == "pull_request" or $event == "merge_group") then .value.result == "skipped"
               elif .key == "secondary-variant" then .value.result == (if $is_ready then "success" else "skipped" end)
               else .value.result == "success" end) end)

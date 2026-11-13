@@ -11,7 +11,6 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -36,8 +35,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.TimelineRowMessageBubble
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -80,7 +77,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                 record = record,
                 status = MessageStatus.Received,
             )
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         var textSelectionMode by mutableStateOf(false)
 
         composeRule.setContent {
@@ -90,7 +86,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     item = item,
                     controller = controller,
                     appState = appState,
-                    composerTextState = composerTextState,
                     highlighted = false,
                     selectionMode = false,
                     textSelectionMode = textSelectionMode,
@@ -111,10 +106,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
                     onReplyPreviewClick = {},
-                    composerGate = ComposerGate.COMPOSER,
-                    onBack = {},
-                    mentionCandidates = emptyList(),
-                    mentionPickerEnabled = false,
                     showSenderName = false,
                     showSenderAvatar = false,
                     collapseLongMessages = false,
@@ -182,7 +173,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                 record = record,
                 status = MessageStatus.Received,
             )
-        val composerTextState = ComposerTextState(TextFieldValue(""))
 
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -191,7 +181,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     item = item,
                     controller = controller,
                     appState = appState,
-                    composerTextState = composerTextState,
                     highlighted = false,
                     selectionMode = false,
                     textSelectionMode = false,
@@ -212,10 +201,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
                     onReplyPreviewClick = {},
-                    composerGate = ComposerGate.COMPOSER,
-                    onBack = {},
-                    mentionCandidates = emptyList(),
-                    mentionPickerEnabled = false,
                     showSenderName = false,
                     showSenderAvatar = false,
                     collapseLongMessages = false,

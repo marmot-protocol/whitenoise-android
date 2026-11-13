@@ -111,7 +111,9 @@ internal object BackgroundReceiptFixtureSupport {
         deadline: Long,
     ) {
         withTimeout(deadline - SystemClock.elapsedRealtime()) {
-            if (enabled) associateWifi(deadline)
+            if (enabled) {
+                traceBackgroundReceiptWifiAssociation(deadline) { associateWifi(deadline) }
+            }
             while (!wifiSnapshotMatches(state, account, enabled)) delay(50L)
             check(SystemClock.elapsedRealtime() < deadline) { "emulator Wi-Fi observation exceeded its deadline" }
         }

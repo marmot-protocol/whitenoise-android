@@ -785,22 +785,14 @@ internal fun ComposerPill(
         leadingToolbar?.shortcuts?.any { it != ComposerShortcut.VoiceNote } == true
     val leadingCount = leadingToolbar?.shortcuts?.size ?: 0
     val trailingCount = trailingToolbar?.shortcuts?.size ?: 0
+    // The end group hugs Send with exactly its own columns; the start group takes the spare width.
+    val expandedTrailingWidth = composerExpandedTrailingWidth(groupRoom.value, leadingCount, trailingCount).dp
     val expandedLeadingWidth =
-        if (leadingCount == 0) {
-            0.dp
-        } else if (trailingCount == 0) {
-            groupRoom
-        } else {
-            (groupRoom * (leadingCount.toFloat() / (leadingCount + trailingCount)))
-                .coerceIn(
-                    ComposerShortcutPitch,
-                    (groupRoom - ComposerShortcutPitch).coerceAtLeast(ComposerShortcutPitch),
-                )
-        }
+        if (leadingCount == 0) 0.dp else (groupRoom - expandedTrailingWidth).coerceAtLeast(ComposerShortcutPitch)
     val rightConfiguredWidth =
         when {
             configuredActionsSuppressed || trailingCount == 0 -> 0.dp
-            toolbarExpanded -> groupRoom - expandedLeadingWidth
+            toolbarExpanded -> expandedTrailingWidth
             multilineControlsSuppressed ->
                 composerToolbarCompactWidth(
                     navigationSurfaceWidth.value,
@@ -1993,6 +1985,7 @@ internal fun ComposerPill(
                                     rightConfiguredWidth,
                                     toolbarHeight,
                                     singleRowOverflow = multilineControlsSuppressed,
+                                    endAligned = true,
                                     defaultFocus = defaultActionFocus.takeUnless { defaultFocusOnLeadingToolbar },
                                 ) { shortcut, slotModifier ->
                                     ComposerConfiguredAction(

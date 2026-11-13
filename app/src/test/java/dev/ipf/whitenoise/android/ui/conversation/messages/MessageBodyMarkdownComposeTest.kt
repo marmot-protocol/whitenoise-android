@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -7,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -48,13 +50,7 @@ class MessageBodyMarkdownComposeTest {
                     parseMarkdown = { parsed },
                 )
             WhiteNoiseTheme {
-                MessageFullScreenBody(
-                    body = raw,
-                    markdownDocument = resolved,
-                    mentionDisplayName = null,
-                    onNostrProfileTap = null,
-                    onCopyMarkdownLink = {},
-                )
+                if (resolved == null) Text(raw) else MarkdownMessageBody(document = resolved)
             }
         }
 
@@ -64,6 +60,34 @@ class MessageBodyMarkdownComposeTest {
         composeRule.onNodeWithText("Release notes").assertIsDisplayed()
         composeRule.onNodeWithText("Important details").assertIsDisplayed()
         composeRule.onNodeWithText(raw).assertDoesNotExist()
+    }
+
+    /** A partial AST never conceals the tail of the retained message body. */
+    @Test
+    fun truncatedTokensKeepTheCompleteSourceVisible() {
+        val raw = "**Prefix**\nTail omitted by the parser"
+        val partial =
+            document(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("Prefix")))).copy(truncated = true)
+        composeRule.setContent {
+            val resolved =
+                rememberMessageMarkdownDocumentForDisplayedBody(
+                    messageIdHex = "capped-id",
+                    bodyText = raw,
+                    recordPlaintext = raw,
+                    storedDocument = partial,
+                    overrideDocument = null,
+                    deleted = false,
+                    persistedFailure = false,
+                    fallbackParsingEnabled = true,
+                    parseMarkdown = { error("The same input already hit the MDK parser cap") },
+                )
+            WhiteNoiseTheme {
+                if (resolved == null) Text(raw) else MarkdownMessageBody(document = resolved)
+            }
+        }
+
+        composeRule.onNodeWithText(raw).assertIsDisplayed()
+        composeRule.onNodeWithText("Prefix").assertDoesNotExist()
     }
 
     @Test
@@ -88,13 +112,7 @@ class MessageBodyMarkdownComposeTest {
                     },
                 )
             WhiteNoiseTheme {
-                MessageFullScreenBody(
-                    body = raw,
-                    markdownDocument = resolved,
-                    mentionDisplayName = null,
-                    onNostrProfileTap = null,
-                    onCopyMarkdownLink = {},
-                )
+                if (resolved == null) Text(raw) else MarkdownMessageBody(document = resolved)
             }
         }
 

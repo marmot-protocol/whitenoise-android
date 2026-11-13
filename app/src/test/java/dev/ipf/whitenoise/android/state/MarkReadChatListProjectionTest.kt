@@ -149,7 +149,7 @@ class MarkReadChatListProjectionTest {
 
     @Test
     fun markAllRead_foldsReturnedChatListRowIntoChatsController() {
-        val source = controllersSource().readText()
+        val source = controllersSource().resolveSibling("ChatsController.kt").readText()
         val body = source.kotlinFunctionBody("markAllRead")
         val fold = source.kotlinFunctionBody("applyChatListActionRow")
 
@@ -279,10 +279,10 @@ class MarkReadChatListProjectionTest {
 
     private fun controllersSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing Controllers.kt source file")
+            ?: error("Missing ConversationController.kt source file")
 
     private fun appStateSource(): File =
         listOf(

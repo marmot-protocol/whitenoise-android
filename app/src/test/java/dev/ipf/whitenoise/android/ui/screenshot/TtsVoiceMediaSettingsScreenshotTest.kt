@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsVoiceOption
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceUnavailableReason
 import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.settings.speechVoiceChoice
@@ -107,6 +108,7 @@ class TtsVoiceMediaSettingsScreenshotTest {
                         checked = true,
                         onCheckedChange = {},
                         subtitle = stringResource(R.string.tts_auto_read_default_global_subtitle),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_text_to_speech) },
                     )
                 }
                 row("media_mix") { context ->
@@ -116,6 +118,7 @@ class TtsVoiceMediaSettingsScreenshotTest {
                         checked = true,
                         onCheckedChange = {},
                         subtitle = stringResource(R.string.tts_media_mix_subtitle),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
                     )
                 }
                 row("mix_volume") { context ->
@@ -124,6 +127,7 @@ class TtsVoiceMediaSettingsScreenshotTest {
                         title = stringResource(R.string.tts_media_mix_volume_title),
                         onClick = {},
                         value = stringResource(R.string.tts_media_mix_volume_medium),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_volume_down) },
                     )
                 }
             }

@@ -590,7 +590,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun mediaKindResolveFanoutSwallowsUnexpectedProjectionFailures() {
-        val body = controllerFunctionBody("schedulePendingMediaKindResolves")
+        val body = controllerFunctionBody("schedulePendingMediaKindResolves", "ChatsController.kt")
 
         assertTrue(
             "media-kind resolve fanout must rethrow cancellation but swallow unexpected projection failures",
@@ -661,8 +661,11 @@ class AppStateSendLockCoverageTest {
         return if (includeDeclaration) source.substring(start, braceStart) + body else body
     }
 
-    internal fun controllerFunctionBody(functionName: String): String {
-        val source = controllersSource().readText()
+    internal fun controllerFunctionBody(
+        functionName: String,
+        controllerFileName: String = "ConversationController.kt",
+    ): String {
+        val source = controllersSource().resolveSibling(controllerFileName).readText()
         val start =
             Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
                 .find(source)
@@ -676,10 +679,10 @@ class AppStateSendLockCoverageTest {
 
     internal fun controllersSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing Controllers.kt source file")
+            ?: error("Missing ConversationController.kt source file")
 
     internal fun conversationScreenSource(): File =
         listOf(

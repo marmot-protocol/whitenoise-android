@@ -23,6 +23,9 @@ name: keys-public-copy-rotation-return
 - assertVisible: Private key hidden
 - runFlow: ../fixtures/copy-fixture-public-key.yaml
 - tapOn: Back
+- assertVisible:
+    id: settings.account.group
+- tapOn: Back
 - assertVisible: Settings
 - tapOn: Back
 - assertVisible: Maestro group

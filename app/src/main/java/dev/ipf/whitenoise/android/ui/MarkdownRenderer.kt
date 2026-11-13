@@ -460,9 +460,9 @@ private fun MarkdownBodyText(
         (speech.own + linkActions)
             .distinctBy(CustomAccessibilityAction::label)
             .take(MAX_ROW_CUSTOM_ACTIONS)
-    // Inside a merged message row this leaf is not focusable, so the row republishes its links and one
-    // chooser over the whole message's sentences.
-    ForwardTextActionsToMessageRow(speech.row + linkActions)
+    // Inside a merged message row this leaf is not focusable, so the row republishes its links, keyed by address,
+    // and one chooser over the whole message's sentences.
+    ForwardTextActionsToMessageRow(speech.row + linkActions, rowActionKeys(speech.row, linkDestinations, linkActions))
     val accessibilityModifier = Modifier.semantics { customActions = leafActions }
 
     MarkdownTimestampText(
@@ -486,6 +486,21 @@ private fun MarkdownBodyText(
         },
     )
 }
+
+/** Prefixes a copy-link action's destination to form its row key, apart from any read-aloud label. */
+private const val COPY_LINK_KEY_PREFIX = "copy-link:"
+
+/**
+ * One row key per forwarded action: each read-aloud action is keyed by its label and each copy-link action by its
+ * address, so the row keeps one action for an address that several paragraphs link.
+ */
+private fun rowActionKeys(
+    readAloud: List<CustomAccessibilityAction>,
+    destinations: List<String>,
+    linkActions: List<CustomAccessibilityAction>,
+): List<String> =
+    readAloud.map(CustomAccessibilityAction::label) +
+        destinations.take(linkActions.size).map { "$COPY_LINK_KEY_PREFIX$it" }
 
 /** Each layout consumer keeps its own lifetime; sentence progress must not clear hit testing. */
 @Composable

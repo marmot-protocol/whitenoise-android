@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
@@ -312,14 +313,46 @@ class AccountWideForwardTargetsTest {
             assertFalse(controller.hasMemberSnapshot(BEYOND))
         }
 
+    @Test
+    fun offWindowUnknownSelfOnlyRosterIsNotCachedAsComplete() =
+        runBlocking {
+            val row =
+                presentedRow(BEYOND).let {
+                    it.copy(row = it.row.copy(conversationKind = ChatConversationKindFfi.UNKNOWN, groupName = ""))
+                }
+            var reads = 0
+            val controller =
+                rosterController(row) { _, _ ->
+                    reads += 1
+                    if (reads == 1) {
+                        listOf(member(ACCOUNT_HEX, true))
+                    } else {
+                        listOf(member(ACCOUNT_HEX, true), member(PEER_B, false))
+                    }
+                }
+            try {
+                val snapshot = requireNotNull(controller.loadAccountWideForwardTargets())
+                snapshot.resolveMembers(setOf(BEYOND))
+                assertFalse(controller.hasMemberSnapshot(BEYOND))
+                snapshot.resolveMembers(setOf(BEYOND))
+                assertTrue(controller.hasMemberSnapshot(BEYOND))
+                assertEquals(2, reads)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** Uses a real controller lifetime with a scripted local roster reader and one off-window native row. */
-    private fun rosterController(roster: suspend (String, String) -> List<AppGroupMemberRecordFfi>): ChatsController {
+    private fun rosterController(
+        row: PresentedChatRowFfi = presentedRow(BEYOND),
+        roster: suspend (String, String) -> List<AppGroupMemberRecordFfi>,
+    ): ChatsController {
         val state = emptyAppState()
         state.liveSubscriptionOverrides.chatList =
             ChatListLiveSubscriptions(
                 openChatListWindow = { _, _ -> error("no live window") },
                 openChats = { _, _ -> error("no live feed") },
-                presentedChatList = { _, _ -> listOf(presentedRow(BEYOND)) },
+                presentedChatList = { _, _ -> listOf(row) },
             )
         return ChatsController(state, ACCOUNT_REF, memberSnapshotLoader = roster)
     }

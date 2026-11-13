@@ -147,6 +147,7 @@ internal fun AppearanceScreen(
                             subtitle = if (amoled) stringResource(R.string.appearance_amoled_detail) else null,
                             modifier = Modifier.testTag("appearance.theme.group"),
                             onClick = { themeOpen = true },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_palette) },
                         )
                     }
                     if (!amoled) {
@@ -155,6 +156,7 @@ internal fun AppearanceScreen(
                                 context = context,
                                 title = stringResource(R.string.action_color),
                                 onClick = onOpenActionColor,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_format_color_fill) },
                             )
                         }
                     }
@@ -163,6 +165,7 @@ internal fun AppearanceScreen(
                             context = context,
                             title = stringResource(R.string.chat_bubble_colors),
                             onClick = onOpenChatBubbleColors,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_chat_bubble_outline) },
                         )
                     }
                 }
@@ -176,6 +179,7 @@ internal fun AppearanceScreen(
                             title = stringResource(R.string.app_font),
                             value = familyLabels.getValue(appState.appFont),
                             onClick = { fontFamilyOpen = true },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_font_download) },
                         )
                     }
                     row("font_size") { context ->
@@ -184,6 +188,7 @@ internal fun AppearanceScreen(
                             title = stringResource(R.string.font_size),
                             value = fontLabels.getValue(appState.fontScale),
                             onClick = { fontSizeOpen = true },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_format_size) },
                         )
                     }
                     row("date_time_format") { context ->
@@ -193,6 +198,7 @@ internal fun AppearanceScreen(
                             value = dateTimeSample,
                             modifier = Modifier.testTag("appearance.date_time_format"),
                             onClick = { dateTimeOpen = true },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_schedule) },
                         )
                     }
                 }
