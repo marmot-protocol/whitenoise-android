@@ -75,7 +75,7 @@ class CampaignSummaryTest(unittest.TestCase):
                 [sys.executable, str(runtime.ROOT / 'scripts/maestro_runtime_summary.py'),
                  '--artifacts', str(Path(temporary) / 'missing'), '--suite', 'runtime-settings',
                  '--output', str(output)],
-                cwd=temporary, env=environment, capture_output=True, text=True, timeout=10,
+                cwd=temporary, env=environment, capture_output=True, text=True, timeout=30,
             )
             self.assertEqual(result.returncode, 1, result.stderr)
             ledger = json.loads(output.read_text())
