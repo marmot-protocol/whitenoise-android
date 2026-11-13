@@ -84,9 +84,9 @@ internal fun inviteReceivingAccount(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
 ): InviteReceivingAccount? {
-    val boundId = controller.boundAccountIdHex ?: return null
+    val boundId = controller.boundAccountIdHex
     val signedInIds = appState.accounts.signedInSigningAccountIds()
-    if (signedInIds.size < 2 || boundId !in signedInIds) return null
+    if (boundId == null || signedInIds.size < 2 || boundId !in signedInIds) return null
     return InviteReceivingAccount(boundId, appState.accountDisplayNameCached(boundId), appState.avatarUrl(boundId))
 }
 

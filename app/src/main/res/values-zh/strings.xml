@@ -262,6 +262,7 @@
     <string name="discard_failed_message">丢弃发送失败的消息</string>
     <string name="decline">拒绝</string>
     <string name="accept">接受</string>
+    <string name="invited_as_account">受邀账号：%1$s</string>
     <string name="invited_to_chat_by">%1$s 邀请你加入聊天</string>
     <string name="someone">某人</string>
     <string name="invitation_pending">邀请待处理</string>

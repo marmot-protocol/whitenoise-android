@@ -438,15 +438,16 @@ internal class NotificationFirstPostResolver(
         val recipientAccountIdHex = source.recipientAccountIdHex(update.accountRef)
         val signedInAccountIds = source.signedInAccountIds()
         if (recipientAccountIdHex == null || signedInAccountIds.size < 2) return null
-        if (update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
-            return identity.recipientName(update.accountRef, localOnly)?.takeIf { it.isNotBlank() }
-        }
         val relevantAccounts =
-            relevantSignedInRecipientCount(
-                recipientAccountIdHex = recipientAccountIdHex,
-                signedInAccountIds = signedInAccountIds,
-                groupMembers = source.groupMembers(update),
-            )
+            if (update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
+                signedInAccountIds.size
+            } else {
+                relevantSignedInRecipientCount(
+                    recipientAccountIdHex = recipientAccountIdHex,
+                    signedInAccountIds = signedInAccountIds,
+                    groupMembers = source.groupMembers(update),
+                )
+            }
         return LocalNotificationFormatter.recipientAccountSubtext(
             relevantSignedInAccountCount = relevantAccounts,
             recipientLabel =
