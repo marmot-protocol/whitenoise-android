@@ -92,8 +92,14 @@ class OfflineRecoveryLatencyDeviceTest {
                     OfflineReconnectEdge(
                         baseline,
                         // Every offline poll's observation is kept, even one that overlaps validation: a row
-                        // visible then fails the cycle rather than passing as a fast completion.
-                        restoreWifi { if (!backgroundCycle) observations += observe(expectedText, offline = true) },
+                        // visible then fails the cycle rather than passing as a fast completion. Online
+                        // observations continue while the edge callback is awaited, keeping their own times.
+                        restoreWifi(
+                            whileOffline = {
+                                if (!backgroundCycle) observations += observe(expectedText, offline = true)
+                            },
+                            whileAwaitingEdge = { if (!backgroundCycle) observations += observe(expectedText) },
+                        ),
                     )
 
                 if (backgroundCycle) {
@@ -151,11 +157,16 @@ class OfflineRecoveryLatencyDeviceTest {
      * The edge is the monotonic time the platform delivered validation to this process, recorded by a
      * network callback independently of polling, so neither the poll interval nor a slow [whileOffline]
      * observation is counted. The callback runs on its own thread, so the stamp does not wait behind the
-     * app's connectivity callbacks on the shared ConnectivityThread. The last poll that found the device
-     * offline is the fallback, used only if no callback arrives, and can only overstate latency.
-     * [whileOffline] runs on each poll that finds the device offline.
+     * app's connectivity callbacks on the shared ConnectivityThread. A poll can see validation before the
+     * callback is delivered, so the edge is never later than the end of that poll. The last poll that found the
+     * device offline is the fallback, used only if no callback arrives, and can only overstate latency.
+     * [whileOffline] runs on each poll that finds the device offline, and [whileAwaitingEdge] on each poll while
+     * the callback is awaited after validation, so a message shown then is observed at its own time.
      */
-    private fun restoreWifi(whileOffline: () -> Unit = {}): Long {
+    private fun restoreWifi(
+        whileOffline: () -> Unit = {},
+        whileAwaitingEdge: () -> Unit = {},
+    ): Long {
         val validatedAt = AtomicLong(0L)
         val callback =
             object : ConnectivityManager.NetworkCallback() {
@@ -169,6 +180,7 @@ class OfflineRecoveryLatencyDeviceTest {
                 }
             }
         var lastOfflineAt = SystemClock.elapsedRealtime()
+        var validatedPollAt = 0L
         val callbackThread = HandlerThread("offline-recovery-edge").apply { start() }
         connectivity.registerDefaultNetworkCallback(callback, Handler(callbackThread.looper))
         try {
@@ -177,20 +189,27 @@ class OfflineRecoveryLatencyDeviceTest {
                 waitUntil(NETWORK_TRANSITION_TIMEOUT_MILLIS) {
                     val now = SystemClock.elapsedRealtime()
                     hasValidatedInternet().also { online ->
-                        if (!online) {
+                        if (online) {
+                            validatedPollAt = SystemClock.elapsedRealtime()
+                        } else {
                             lastOfflineAt = now
                             whileOffline()
                         }
                     }
                 }
             assertTrue("Wi-Fi did not regain validated internet", validated)
-            // A poll can see validation just before the callback is delivered; give the callback a moment.
-            waitUntil(EDGE_CALLBACK_GRACE_MILLIS) { validatedAt.get() > 0L }
+            // A poll can see validation just before the callback is delivered; give the callback a moment,
+            // observing meanwhile so the wait never delays a message that is already visible.
+            waitUntil(EDGE_CALLBACK_GRACE_MILLIS) {
+                whileAwaitingEdge()
+                validatedAt.get() > 0L
+            }
         } finally {
             connectivity.unregisterNetworkCallback(callback)
             callbackThread.quitSafely()
         }
-        return validatedAt.get().takeIf { it > 0L } ?: lastOfflineAt
+        val callbackAt = validatedAt.get()
+        return if (callbackAt > 0L) minOf(callbackAt, validatedPollAt) else lastOfflineAt
     }
 
     /** Exercises a short failed restore before the final validated edge owns recovery. */
