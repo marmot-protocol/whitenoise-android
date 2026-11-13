@@ -22,6 +22,24 @@
         ]
       },
       {
+        "surface": "R.string.translation_privacy_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_privacy_warning",
+        "test_ids": [
+          "SET-033",
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "R.string.accept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.accept",
+        "test_ids": [
+          "SET-033",
+          "CON-045"
+        ]
+      },
+      {
         "surface": "MessageTranslationToggle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "fun MessageTranslationToggle(",

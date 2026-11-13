@@ -228,7 +228,8 @@ class TranslationSettingsWarningTest {
         composeRule.onNodeWithText(context.getString(R.string.accept)).performClick()
         assertTrue(preferences.providerNoticeAccepted())
         assertEquals(1, translated)
-        val bubble = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt")
+        val bubble =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt")
         val menuTranslate = bubble.substringAfter("onTranslate = {").substringBefore("},\n")
         assertTrue(menuTranslate, "providerNoticeAccepted() == true" in menuTranslate)
         assertTrue(menuTranslate, "translationNoticeOpen = true" in menuTranslate)
