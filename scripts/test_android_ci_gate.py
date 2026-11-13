@@ -1013,6 +1013,10 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('    needs: [changes, compile-tests]\n', self.tests_job)
         download = self.named_step(self.tests_job, 'Download compiled outputs')
         self.assertIn('name: unit-compile-cache-${{ matrix.flavor }}', download)
+        # An expired artifact on a shard re-run falls back to compiling from source.
+        self.assertIn('continue-on-error: true', download)
+        self.assertIn("if: steps.compiled-outputs.outcome == 'success'",
+                      self.named_step(self.tests_job, 'Add compiled outputs to the build cache'))
         steps = self.tests_job.split('    steps:', 1)[1]
         self.assertLess(steps.index('- name: Set up Gradle'), steps.index('- name: Add compiled outputs to the build cache'))
         self.assertLess(steps.index('- name: Add compiled outputs to the build cache'), steps.index('- name: Unit tests'))

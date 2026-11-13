@@ -978,13 +978,17 @@ jobs:
         with:
           cache-read-only: ${{ matrix.shard != 0 || github.ref != 'refs/heads/master' }}
 
+      # A shard re-run after the one-day artifact expires compiles from source instead.
       - name: Download compiled outputs
+        id: compiled-outputs
+        continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: unit-compile-cache-${{ matrix.flavor }}
           path: ${{ runner.temp }}/unit-compile-cache
 
       - name: Add compiled outputs to the build cache
+        if: steps.compiled-outputs.outcome == 'success'
         shell: bash
         run: |
           mkdir -p ~/.gradle/caches/build-cache-1
