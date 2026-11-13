@@ -1,22 +1,27 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
-import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
@@ -65,19 +70,33 @@ class ProfileKeyWipeConfirmationAndroidTest {
         }
         val confirm = composeRule.onNodeWithTag("profile_keys.wipe_confirm")
         val field = composeRule.onNodeWithText(context.getString(R.string.sign_out_and_wipe_confirm_field_label))
+        val instruction =
+            composeRule.onNodeWithText(context.getString(R.string.sign_out_and_wipe_confirm_instruction, keyword))
         confirm.assertIsNotEnabled()
+        instruction.performScrollTo().assertIsDisplayed()
+        assertInVisibleWindow(instruction)
+        field.performScrollTo().assertIsDisplayed()
+        assertInVisibleWindow(field)
         assertActionsInWindow(cancel)
         saveScreenshot(if (largeRtl) "amoled_200_percent_rtl_empty" else "light_normal_empty")
-        field.performTextReplacement(keyword + " wrong")
+        field.performClick()
+        awaitKeyboard()
+        field.performTextInput(keyword + " wrong")
         confirm.assertIsNotEnabled()
+        assertActionsInWindow(cancel)
         composeRule.onNodeWithText(cancel).performClick()
         composeRule.runOnIdle {
             assertEquals(1, dismissed)
             assertEquals(0, confirmed)
         }
         // Inert callbacks deliberately leave the same fixture open for the independent confirm action.
-        field.performTextReplacement("  " + keyword.lowercase(Locale.ROOT) + "  ")
+        field.performScrollTo().performClick()
+        awaitKeyboard()
+        field.performTextClearance()
+        field.performTextInput("  " + keyword.lowercase(Locale.ROOT) + "  ")
         confirm.assertIsEnabled()
+        field.performScrollTo()
+        assertInVisibleWindow(field)
         assertActionsInWindow(cancel)
         saveScreenshot(if (largeRtl) "amoled_200_percent_rtl_enabled" else "light_normal_enabled")
         confirm.performClick()
@@ -87,31 +106,60 @@ class ProfileKeyWipeConfirmationAndroidTest {
         }
     }
 
-    private fun assertActionsInWindow(cancel: String) {
-        val window =
-            composeRule.runOnIdle {
-                WindowInspector.getGlobalWindowViews().single { view ->
-                    view !== composeRule.activity.window.decorView && view.isShown && view.hasWindowFocus()
-                }
+    private fun dialogWindow() =
+        WindowInspector.getGlobalWindowViews().single { view ->
+            view !== composeRule.activity.window.decorView && view.isShown && view.hasWindowFocus()
+        }
+
+    private fun awaitKeyboard() {
+        composeRule.waitUntil(10_000) {
+            composeRule.runOnUiThread {
+                ViewCompat.getRootWindowInsets(dialogWindow())?.isVisible(WindowInsetsCompat.Type.ime()) == true
             }
-        val dialog = composeRule.onNode(isDialog()).getUnclippedBoundsInRoot()
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun assertActionsInWindow(cancel: String) {
+        assertInVisibleWindow(composeRule.onNodeWithTag("profile_keys.wipe_confirm"))
+        assertInVisibleWindow(composeRule.onNodeWithText(cancel))
+    }
+
+    /** Compare full semantics bounds with screen coordinates, excluding system bars and the real IME. */
+    private fun assertInVisibleWindow(node: SemanticsNodeInteraction) {
+        node.assertIsDisplayed()
+        val bounds = node.fetchSemanticsNode().boundsInWindow
+        val fullBounds = node.getUnclippedBoundsInRoot()
         val density = composeRule.density.density
-        assertTrue("Dialog exceeds actual window", (dialog.right - dialog.left).value * density <= window.width + 1)
-        assertTrue("Dialog exceeds actual window", (dialog.bottom - dialog.top).value * density <= window.height + 1)
-        val actions = listOf(composeRule.onNodeWithTag("profile_keys.wipe_confirm"), composeRule.onNodeWithText(cancel))
-        for (action in actions) {
-            val bounds = action.assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertTrue(
+            "Node is clipped: $bounds",
+            bounds.width + 1 >= (fullBounds.right - fullBounds.left).value * density,
+        )
+        assertTrue(
+            "Node is clipped: $bounds",
+            bounds.height + 1 >= (fullBounds.bottom - fullBounds.top).value * density,
+        )
+        composeRule.runOnUiThread {
+            val window = dialogWindow()
+            val visible = Rect()
+            window.getWindowVisibleDisplayFrame(visible)
+            val location = IntArray(2)
+            window.getLocationOnScreen(location)
             assertTrue(
-                "Action has no visible area: $bounds",
-                (bounds.right - bounds.left).value > 0 && (bounds.bottom - bounds.top).value > 0,
+                "Node outside visible screen: $bounds, $visible",
+                bounds.left + location[0] >= visible.left - 1,
             )
             assertTrue(
-                "Action outside actual dialog window: $bounds",
-                bounds.left >= dialog.left && bounds.top >= dialog.top,
+                "Node outside visible screen: $bounds, $visible",
+                bounds.top + location[1] >= visible.top - 1,
             )
             assertTrue(
-                "Action outside actual dialog window: $bounds",
-                bounds.right <= dialog.right && bounds.bottom <= dialog.bottom,
+                "Node outside visible screen: $bounds, $visible",
+                bounds.right + location[0] <= visible.right + 1,
+            )
+            assertTrue(
+                "Node behind keyboard/screen edge: $bounds",
+                bounds.bottom + location[1] <= visible.bottom + 1,
             )
         }
     }

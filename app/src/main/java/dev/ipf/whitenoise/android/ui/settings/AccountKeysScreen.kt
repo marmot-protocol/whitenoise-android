@@ -1202,7 +1202,10 @@ internal fun ProfileKeyWipeConfirmationDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.sign_out_and_wipe_confirm_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 Text(stringResource(R.string.sign_out_and_wipe_confirm_body))
                 Text(
                     stringResource(R.string.sign_out_and_wipe_confirm_instruction, confirmKeyword),
