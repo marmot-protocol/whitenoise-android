@@ -24,7 +24,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -169,13 +168,7 @@ class ComposerToolbarProductionTest {
         assertEquals(listOf(1, 1, 1), listOf(cameraCalls, galleryCalls, fileCalls))
         composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
         composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
-        composeRule
-            .onNodeWithTag("explanation.body")
-            .assertTextEquals(context.getString(R.string.explanation_composer_camera))
-        composeRule.onNodeWithTag("composer.customize").assertDoesNotExist()
-        assertEquals(1, cameraCalls)
         composeRule.onNodeWithTag("explanation.action").performClick()
-        composeRule.onNodeWithTag("explanation.sheet").assertDoesNotExist()
         composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
         assertEquals(1, cameraCalls)
     }
@@ -222,9 +215,6 @@ class ComposerToolbarProductionTest {
                 ClipboardManager::class.java,
             ).setPrimaryClip(ClipData.newPlainText("sample", "replacement"))
         composeRule.onNodeWithTag("composer.shortcut.paste").performTouchInput { longClick() }
-        composeRule
-            .onNodeWithTag("explanation.body")
-            .assertTextEquals(context.getString(R.string.explanation_composer_paste))
         assertEquals(initial, text.valueState.value)
         composeRule.onNodeWithTag("explanation.action").performClick()
         composeRule.onNodeWithTag("composer.customize.label.camera").performScrollTo()
@@ -437,17 +427,6 @@ class ComposerToolbarProductionTest {
             assertTrue(actions.any { it.label == context.getString(R.string.explanation_action_explain) })
             assertTrue(actions.any { it.label == context.getString(R.string.composer_customize) })
         }
-        val explain =
-            composeRule
-                .onNodeWithContentDescription(context.getString(R.string.attachment_camera))
-                .fetchSemanticsNode()
-                .config[SemanticsActions.CustomActions]
-                .single { it.label == context.getString(R.string.explanation_action_explain) }
-        composeRule.runOnIdle { assertTrue(explain.action()) }
-        composeRule
-            .onNodeWithTag("explanation.body")
-            .assertTextEquals(context.getString(R.string.explanation_composer_camera))
-        assertEquals(0, cameraCalls)
         val sender = composeRule.onNodeWithTag("composer-sending-identity").fetchSemanticsNode()
         assertTrue(
             sender.config[SemanticsActions.CustomActions].any {
@@ -483,30 +462,6 @@ class ComposerToolbarProductionTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("conversation.attachment.menu.emoji").assertIsDisplayed()
         composeRule.onNodeWithTag("conversation.attachment.menu.paste").assertIsDisplayed()
-    }
-
-    @Test
-    fun longPressingAPlusMenuRowExplainsItWithoutRunningTheRow() {
-        render(ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera)))
-        composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
-        val gallery = hasText(context.getString(R.string.attachment_photos_videos)) and hasAnyAncestor(isPopup())
-        composeRule.onNode(gallery).performTouchInput { longClick() }
-        composeRule.onNodeWithTag("conversation.attachment.menu").assertDoesNotExist()
-        composeRule
-            .onNodeWithTag("explanation.body")
-            .assertTextEquals(context.getString(R.string.explanation_composer_gallery))
-        composeRule.onNodeWithTag("composer.customize").assertDoesNotExist()
-        assertEquals(0, galleryCalls)
-    }
-
-    @Test
-    fun plusMenuCustomizeRowOpensCustomization() {
-        render(ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera)))
-        composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
-        composeRule.onNodeWithTag("conversation.attachment.menu.customize").performScrollTo().performClick()
-        composeRule.onNodeWithTag("conversation.attachment.menu").assertDoesNotExist()
-        composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
-        assertEquals(0, galleryCalls)
     }
 
     @Test

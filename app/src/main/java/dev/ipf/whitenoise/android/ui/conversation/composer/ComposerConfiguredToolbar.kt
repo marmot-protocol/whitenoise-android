@@ -190,19 +190,7 @@ internal fun ComposerConfiguredToolbar(
                                 } else {
                                     Modifier
                                 },
-                            ).explainOnLongPress(
-                                explanation = composerShortcutExplanation(shortcut, bindings.onCustomize),
-                                enabled =
-                                    bindings.enabled &&
-                                        !bindings.transactionActive &&
-                                        shortcut != ComposerShortcut.VoiceNote,
-                                additionalActions =
-                                    if (bindings.enabled && !bindings.transactionActive) {
-                                        composerCustomizeAccessibilityActions(bindings.onCustomize)
-                                    } else {
-                                        emptyList()
-                                    },
-                            )
+                            ).explainComposerShortcut(shortcut, bindings)
                     content(shortcut, actionModifier)
                 }
             }
@@ -240,3 +228,18 @@ private fun composerVoiceBoundsModifier(
     } else {
         Modifier
     }
+
+/** Holding a configured slot explains it; voice note keeps hold-to-record. */
+@Composable
+private fun Modifier.explainComposerShortcut(
+    shortcut: ComposerShortcut,
+    bindings: ComposerToolbarBindings,
+): Modifier {
+    val customizable = bindings.enabled && !bindings.transactionActive
+    return explainOnLongPress(
+        explanation = composerShortcutExplanation(shortcut, bindings.onCustomize),
+        enabled = customizable && shortcut != ComposerShortcut.VoiceNote,
+        additionalActions =
+            if (customizable) composerCustomizeAccessibilityActions(bindings.onCustomize) else emptyList(),
+    )
+}
