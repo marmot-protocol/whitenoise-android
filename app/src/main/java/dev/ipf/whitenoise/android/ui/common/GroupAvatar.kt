@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -17,6 +18,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
+import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -43,6 +45,7 @@ internal fun rememberGroupAvatarPresentation(
     fallbackPictureUrl: String? = null,
     firstFrameAvatar: ChatListAvatarSeed? = null,
     durableAvatarIsPersonPicture: Boolean = false,
+    compatibility: RetainedGroupCompatibilityPixels? = null,
 ): GroupAvatarPresentation {
     val ownedFallback =
         fallbackPictureUrl?.takeUnless { source ->
@@ -81,12 +84,36 @@ internal fun rememberGroupAvatarPresentation(
     }
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
     val encryptedKey = encryptedGroupAvatarCacheKey(accountRef, group)
-    val encryptedImage = rememberEncryptedGroupAvatar(appState, group, accountRef)
-    val remoteImage = rememberLegacyRemoteGroupAvatar(appState, accountRef, legacyUrl)
+    val encryptedImage =
+        rememberEncryptedGroupAvatar(
+            appState,
+            group,
+            accountRef,
+            encryptedKey?.let { compatibility?.imageFor(group.groupIdHex, ChatListAvatarSource.ENCRYPTED_GROUP, it) },
+        )
+    val remoteImage =
+        rememberLegacyRemoteGroupAvatar(
+            appState,
+            accountRef,
+            legacyUrl,
+            legacyUrl?.let { compatibility?.imageFor(group.groupIdHex, ChatListAvatarSource.LEGACY_URL, it) },
+        )
     val seededImage = ownedSeed?.legacyImageFor(legacyUrl, encryptedKey, encryptedImage, ownedFallback)
+    val image = seededImage ?: remoteImage ?: encryptedImage
+    if (compatibility != null && image != null) {
+        val (source, key) =
+            when {
+                seededImage != null && ownedSeed != null -> ownedSeed.source to ownedSeed.key
+                remoteImage != null -> ChatListAvatarSource.LEGACY_URL to legacyUrl
+                else -> ChatListAvatarSource.ENCRYPTED_GROUP to encryptedKey
+            }
+        if (!PrivateContactAvatarLoader.isPrivate(key)) {
+            SideEffect { compatibility.record(group.groupIdHex, source, key, image) }
+        }
+    }
     val originalReader = rememberLegacyGroupAvatarBytes(appState, group, accountRef, legacyUrl, encryptedKey)
     return GroupAvatarPresentation(
-        image = seededImage ?: remoteImage ?: encryptedImage,
+        image = image,
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
         pictureDomain = legacyGroupPictureDomain(legacyUrl, accountRef),
         readOriginalBytes = originalReader,
@@ -112,11 +139,12 @@ private fun rememberLegacyRemoteGroupAvatar(
     appState: WhiteNoiseAppState,
     accountRef: String?,
     legacyUrl: String?,
+    retained: ImageBitmap?,
 ): ImageBitmap? =
     AvatarImageLoader.currentCacheLifetime().let { lifetime ->
         key(appState, appState.runtimeGeneration, accountRef, legacyUrl, lifetime) {
             val image by rememberRecoverableAvatar(
-                initialImage = AvatarImageLoader.peek(legacyUrl),
+                initialImage = AvatarImageLoader.peek(legacyUrl) ?: retained,
                 enabled = legacyUrl != null,
                 awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(legacyUrl), lifetime) },
             ) {
@@ -294,11 +322,12 @@ internal fun rememberEncryptedGroupAvatar(
     appState: WhiteNoiseAppState,
     group: AppGroupRecordFfi,
     accountRef: String? = appState.activeAccountRef,
+    retained: ImageBitmap? = null,
 ): ImageBitmap? {
     val cacheKey = encryptedGroupAvatarCacheKey(accountRef, group)
-    val image by key(appState, appState.runtimeGeneration, cacheKey) {
+    val image by key(appState, appState.runtimeGeneration, AvatarImageLoader.currentCacheLifetime(), cacheKey) {
         rememberRecoverableAvatar(
-            initialImage = GroupAvatarImageLoader.peek(cacheKey),
+            initialImage = GroupAvatarImageLoader.peek(cacheKey) ?: retained,
             enabled = cacheKey != null && accountRef != null,
         ) {
             GroupAvatarImageLoader.load(checkNotNull(cacheKey)) {
@@ -332,7 +361,19 @@ internal fun GroupAvatar(
     accountRef: String? = appState.activeAccountRef,
     // True only when [durableAvatar] is a member's profile picture (a DM peer), never a group image.
     durableAvatarIsPersonPicture: Boolean = false,
+    retainCompatibility: Boolean = false,
 ) {
+    val compatibility =
+        if (retainCompatibility && durableAvatar == null) {
+            LocalPreparedGroupAvatarPixels.current
+                ?.takeIf {
+                    it.accountRef == accountRef && it.runtimeGeneration == appState.runtimeGeneration &&
+                        it.lifetime == AvatarImageLoader.currentCacheLifetime()
+                }?.compatibility
+                ?.takeIf { it.includes(group.groupIdHex) }
+        } else {
+            null
+        }
     val presentation =
         rememberGroupAvatarPresentation(
             appState,
@@ -342,15 +383,30 @@ internal fun GroupAvatar(
             fallbackPictureUrl,
             firstFrameAvatar,
             durableAvatarIsPersonPicture,
+            compatibility,
         )
+    val url = presentation.pictureUrl?.takeIf { presentation.image == null }
+    // Private contact pictures have their own acquisition and invalidation boundaries.
+    val publicUrl = url?.takeUnless(PrivateContactAvatarLoader::isPrivate)
+    val urlSource =
+        if (publicUrl != null && publicUrl == ProfileSanitizer.protocolImageUrl(group.avatarUrl)) {
+            ChatListAvatarSource.LEGACY_URL
+        } else {
+            ChatListAvatarSource.FALLBACK_URL
+        }
     Avatar(
         title = title,
         seed = seed,
         size = size,
-        pictureUrl = presentation.pictureUrl?.takeIf { presentation.image == null },
+        pictureUrl = url,
         picture = presentation.image,
         animationKey = presentation.animationKey,
         groupAnimation = presentation.groupAnimation,
         pictureDomain = presentation.pictureDomain,
+        initialUrlImage = publicUrl?.let { compatibility?.imageFor(group.groupIdHex, urlSource, it) },
+        onUrlImageDisplayed =
+            compatibility?.takeIf { presentation.image == null }?.let { retained ->
+                { image -> retained.record(group.groupIdHex, urlSource, publicUrl, image) }
+            },
     )
 }

@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -77,8 +78,13 @@ class ChatListAvatarReloadScreenshotTest {
 
             rule.mainClock.autoAdvance = false
             rule.onNodeWithContentDescription("Back").performClick()
+            val missingOnFirstFrame = missingFirstVisibleAvatars(fixture)
             rule.mainClock.advanceTimeBy(1_000L)
-            assertAvatars(fixture, "after Back while the image caches are empty")
+            assertAvatars(fixture, "after Back with empty caches")
+            assertTrue(
+                "missing avatar pixels on the first return frame: $missingOnFirstFrame",
+                missingOnFirstFrame.isEmpty(),
+            )
             rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_compatibility_avatars_return.png")
         } finally {
             rule.mainClock.autoAdvance = true
@@ -130,22 +136,74 @@ class ChatListAvatarReloadScreenshotTest {
 
     /** Checks all four actual rendered bitmaps, so an initials placeholder cannot satisfy the test. */
     private fun assertAvatars(fixture: ReturnFixture, phase: String) {
-        val expected =
-            listOf(
-                "chats.switchProfile" to Color.RED,
-                otherAccountAvatarTag(OTHER_ACCOUNT) to Color.BLUE,
-                "chat.row.${fixture.rows[0].groupIdHex}" to Color.GREEN,
-                "chat.row.${fixture.rows[1].groupIdHex}" to Color.MAGENTA,
-            )
-        val missing = expected.filterNot { (tag, color) -> containsAvatar(tag, color) }.map { it.first }
+        val missing = avatarColors(fixture).filterNot { (tag, color) -> containsAvatar(tag, color) }.map { it.first }
         assertTrue("missing avatar pixels $phase: $missing", missing.isEmpty())
     }
 
+    /** Samples each target as soon as the route draws it through the return animation. */
+    private fun missingFirstVisibleAvatars(fixture: ReturnFixture): List<String> {
+        val pending = avatarColors(fixture).toMap(mutableMapOf())
+        val missing = mutableListOf<String>()
+        repeat(75) {
+            rule.mainClock.advanceTimeByFrame()
+            val visible = pending.filterKeys { tag ->
+                if (tag.startsWith("chat.row.")) {
+                    hasPaintedRow(tag)
+                } else {
+                    rule.onNodeWithTag(tag, useUnmergedTree = true).isDisplayed()
+                }
+            }
+            visible.forEach { (tag, color) ->
+                if (!containsAvatar(tag, color, exact = false)) missing += tag
+                pending.remove(tag)
+            }
+            if (pending.isEmpty()) return missing
+        }
+        error("Return never drew the avatar targets ${pending.keys}")
+    }
+
+    /** Skips rows that are measured but still invisible behind the returning route's graphics layer. */
+    private fun hasPaintedRow(tag: String): Boolean {
+        val target = rule.onNodeWithTag(tag, useUnmergedTree = true)
+        return runCatching { target.captureToImage().toPixelMap() }.getOrNull()?.let { pixels ->
+            // Require the title to be visible. The background may already be opaque from the old route.
+            (0 until pixels.height).any { y ->
+                (pixels.width / 4 until pixels.width / 2).any { x ->
+                    val pixel = pixels[x, y]
+                    pixel.alpha > 0.5f && pixel.red < 0.25f && pixel.green < 0.25f && pixel.blue < 0.25f
+                }
+            }
+        } ?: false
+    }
+
+    /** All four expected identities have different synthetic colors. */
+    private fun avatarColors(fixture: ReturnFixture): List<Pair<String, Int>> =
+        listOf(
+            "chats.switchProfile" to Color.RED,
+            otherAccountAvatarTag(OTHER_ACCOUNT) to Color.BLUE,
+            "chat.row.${fixture.rows[0].groupIdHex}" to Color.GREEN,
+            "chat.row.${fixture.rows[1].groupIdHex}" to Color.MAGENTA,
+        )
+
     /** Samples interior pixels without depending on avatar corners, rings or text antialiasing. */
-    private fun containsAvatar(tag: String, color: Int): Boolean {
+    private fun containsAvatar(tag: String, color: Int, exact: Boolean = true): Boolean {
         val pixels = rule.onNodeWithTag(tag, useUnmergedTree = true).captureToImage().toPixelMap()
         return (0 until pixels.height step 2).any { y ->
-            (0 until pixels.width step 2).any { x -> pixels[x, y].toArgb() == color }
+            (0 until pixels.width step 2).any { x ->
+                val pixel = pixels[x, y]
+                if (exact) {
+                    pixel.toArgb() == color
+                } else if (pixel.alpha > 0f) {
+                    val channels = listOf(pixel.red, pixel.green, pixel.blue)
+                    val expected = listOf(Color.red(color), Color.green(color), Color.blue(color))
+                    val middle = (channels.min() + channels.max()) / 2f
+                    channels.max() - channels.min() > 0.4f && channels.zip(expected).all { (actual, channel) ->
+                        (actual > middle) == (channel == 255)
+                    }
+                } else {
+                    false
+                }
+            }
         }
     }
 

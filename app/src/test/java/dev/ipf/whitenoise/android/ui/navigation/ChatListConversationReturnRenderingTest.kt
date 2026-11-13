@@ -414,11 +414,14 @@ internal class ReturnWindow(
                 snapshot.rows.map { presented ->
                     val row = presented.row
                     val asset = avatarAssetForRow(row)
+                    val source = if (asset == null) PresentationSourceFfi.GROUP else presented.presentation.avatarSource
                     val avatar =
                         when {
                             asset != null -> SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", row.title)
-                            row.avatarUrl != null -> SelectedAvatarFfi.RemoteImage(checkNotNull(row.avatarUrl), row.title)
-                            row.avatar != null -> SelectedAvatarFfi.EncryptedGroupImage(checkNotNull(row.avatar), row.title)
+                            row.avatarUrl != null ->
+                                SelectedAvatarFfi.RemoteImage(checkNotNull(row.avatarUrl), row.title)
+                            row.avatar != null ->
+                                SelectedAvatarFfi.EncryptedGroupImage(checkNotNull(row.avatar), row.title)
                             else -> return@map presented
                         }
                     presented.copy(
@@ -426,7 +429,7 @@ internal class ReturnWindow(
                         presentation =
                             presented.presentation.copy(
                                 avatar = avatar,
-                                avatarSource = if (asset == null) PresentationSourceFfi.GROUP else presented.presentation.avatarSource,
+                                avatarSource = source,
                             ),
                     )
                 },

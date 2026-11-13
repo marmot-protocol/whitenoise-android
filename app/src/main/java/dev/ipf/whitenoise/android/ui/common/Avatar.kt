@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
@@ -60,6 +61,8 @@ internal fun Avatar(
     groupAnimation: GroupAvatarAnimation? = null,
     pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    initialUrlImage: ImageBitmap? = null,
+    onUrlImageDisplayed: ((ImageBitmap?) -> Unit)? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -74,7 +77,7 @@ internal fun Avatar(
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val loadedUrlImage by key(seed, pictureUrl, picture, lifetime) {
         rememberRecoverableAvatar(
-            initialImage = AvatarImageLoader.peek(pictureUrl),
+            initialImage = AvatarImageLoader.peek(pictureUrl) ?: initialUrlImage,
             enabled = pictureUrl != null && (picture == null || privateSource),
             awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(pictureUrl), lifetime) },
         ) {
@@ -91,6 +94,9 @@ internal fun Avatar(
             privateSource -> loadedUrlImage ?: picture
             else -> picture ?: loadedUrlImage
         }
+    if (onUrlImageDisplayed != null) {
+        SideEffect { onUrlImageDisplayed(loadedUrlImage.takeIf { image === loadedUrlImage }) }
+    }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,
