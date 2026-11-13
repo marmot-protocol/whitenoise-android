@@ -139,8 +139,9 @@ internal fun abbreviatesPublicKey(
  * label alone, so a surrounding row keeps its navigation, selection or account-switch action, and a long press is
  * left to the row. The label adds no semantics boundary: its short text stays in the row's spoken label, and the row
  * gains a Copy public key action whose label carries the full key. Without a canonical [npub], or while not
- * [enabled], it is plain text. With [keyboardFocusable] — for a disabled row that cannot hold focus itself — the
- * label becomes its own focus stop with the theme's focus highlight, and Enter, D-pad centre or Space copies the key.
+ * [enabled], it is plain text. With [keyboardFocusable] — for a row with no action of its own, or a disabled one —
+ * the label becomes its own focus stop with the theme's focus highlight, Enter, D-pad centre or Space copies the key,
+ * and its widened touch margin still copies, since no row action owns that margin.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -162,7 +163,7 @@ internal fun PublicKeyCopyText(
         modifier =
             if (enabled && isCanonicalNpub(npub)) {
                 modifier
-                    .pointerInput(npub) { copyOnShortTap(copy) }
+                    .pointerInput(npub, keyboardFocusable) { copyOnShortTap(copy, keepTouchMargin = keyboardFocusable) }
                     .then(
                         if (keyboardFocusable) {
                             Modifier
@@ -211,10 +212,20 @@ private fun Modifier.copyOnKeyActivation(
 /**
  * Runs [copy] for a tap released before the long-press timeout and consumes only that release, so the row's own tap
  * is skipped. A press held past the timeout is left unconsumed and reaches the row's long-press handler.
+ *
+ * Compose widens a target this small to the minimum touch size, and that margin reaches into the name above the key.
+ * A press that lands only in the margin belongs to the surrounding row, so it is left alone and the row still opens.
+ * With [keepTouchMargin], where no row action owns the margin, a press there copies like one on the key.
  */
-private suspend fun PointerInputScope.copyOnShortTap(copy: () -> Unit) {
+private suspend fun PointerInputScope.copyOnShortTap(
+    copy: () -> Unit,
+    keepTouchMargin: Boolean,
+) {
     awaitEachGesture {
-        awaitFirstDown(requireUnconsumed = false)
+        val down = awaitFirstDown(requireUnconsumed = false)
+        val onTheKey =
+            down.position.x in 0f..size.width.toFloat() && down.position.y in 0f..size.height.toFloat()
+        if (!onTheKey && !keepTouchMargin) return@awaitEachGesture
         val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) { waitForUpOrCancellation() }
         if (up != null) {
             up.consume()
