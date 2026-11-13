@@ -90,6 +90,7 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -311,6 +312,7 @@ private fun PhotoEditorTopBar(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val resetLabel = stringResource(R.string.photo_editor_reset)
+    val menuScrollState = rememberScrollState()
     TopAppBar(
         title = {
             Column {
@@ -333,7 +335,12 @@ private fun PhotoEditorTopBar(
                 IconButton(onClick = { expanded = true }, enabled = !saving) {
                     Icon(painterResource(R.drawable.ic_more_horiz), stringResource(R.string.more_options))
                 }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    scrollState = menuScrollState,
+                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+                ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.photo_editor_reset)) },
                         enabled = canReset && !saving,
