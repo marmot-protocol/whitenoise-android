@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">Пояснить</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">Показывает, какой из ваших аккаунтов отправляет сообщения в этом чате. Аккаунт не переключается.</string>
+    <string name="explanation_composer_more">Открывает действия, не закреплённые на панели инструментов, включая «Настроить поле сообщения».</string>
+    <string name="explanation_composer_emoji">Открывает выбор эмодзи, включая ваши собственные эмодзи.</string>
+    <string name="explanation_composer_paste">Вставляет в сообщение скопированное.</string>
+    <string name="explanation_composer_dictation">Вводит текст по вашей речи с помощью распознавания речи Android. White Noise запрашивает автономное распознавание, но устройство всё равно может использовать онлайн-сервис.</string>
+    <string name="explanation_composer_translate">Включает или выключает режим перевода. Пока он включён, «Отправить» отправляет перевод из строки «Будет отправлено», и ничего не отправляется, пока перевод не готов.</string>
+    <string name="explanation_composer_voice_note">Удерживайте, чтобы записать голосовое сообщение.</string>
+    <string name="explanation_composer_camera">Открывает камеру, чтобы вы могли прикрепить новое фото. Android запрашивает доступ к камере при первом использовании.</string>
+    <string name="explanation_composer_gallery">Открывает выбор фото Android. White Noise получает только те фото и видео, которые вы выберете.</string>
+    <string name="explanation_composer_files">Открывает выбор файлов Android, чтобы прикрепить любой файл.</string>
+    <string name="explanation_composer_location">Один раз отправляет ваше текущее местоположение в виде ссылки на карту. Не продолжает делиться местоположением.</string>
+    <string name="explanation_composer_person">Отправляет текстом открытый ключ пользователя White Noise, чтобы другие могли ему написать.</string>
+    <string name="explanation_composer_contact">Отправляет карточку контакта из контактов вашего телефона.</string>
+    <string name="explanation_composer_poll">Создаёт опрос, в котором могут голосовать участники группы.</string>
+    <string name="explanation_composer_sticker">Открывает ваши стикеры, чтобы вы могли отправить один.</string>
+    <string name="explanation_composer_customize">Выберите, какие ярлыки остаются на панели инструментов, с какой стороны они расположены и где находится кнопка голосового сообщения.</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">Ваш профиль, ключи, подтверждающие, кто вы, и релеи, которые передают ваши сообщения.</string>
+    <string name="explanation_settings_notifications">Звуки и вибрация, доставка в фоне и настройки уведомлений Android для White Noise.</string>
+    <string name="explanation_settings_chats">Папки, действия по свайпу, поле сообщения, клавиша Enter, собственные эмодзи и быстрое переключение аккаунтов.</string>
+    <string name="explanation_settings_appearance">Тема, цвета, шрифт, размер текста и формат отображения даты и времени.</string>
+    <string name="explanation_settings_voice_language">Язык приложения, «Читать вслух», диктовка и перевод сообщений.</string>
+    <string name="explanation_settings_privacy_security">Блокировка приложения, защита экрана, клавиатура инкогнито, заблокированные пользователи, исчезающие сообщения по умолчанию и отправка диагностики.</string>
+    <string name="explanation_settings_data_usage">Узнайте, что занимает память, и выберите, когда загружать медиа и в каком качестве их отправлять.</string>
+    <string name="explanation_settings_ai_agents">Подключайте ИИ-агентов, с которыми можно общаться в White Noise, или настройте одного вручную.</string>
+    <string name="explanation_settings_help_support">Статьи справки, чат с поддержкой, пожертвования и инструменты разработчика.</string>
+</resources>

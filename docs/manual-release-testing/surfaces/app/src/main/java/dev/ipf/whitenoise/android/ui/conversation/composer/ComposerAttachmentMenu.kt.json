@@ -13,19 +13,36 @@
         ]
       },
       {
-        "surface": "Group poll composer action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.poll_create",
+        "surface": "Group poll composer action",
+        "anchor": "ComposerShortcut.Poll, R.drawable.ic_description",
         "test_ids": [
           "MSG-021"
         ]
       },
       {
-        "surface": "Sticker copy stickers title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.stickers_title",
+        "surface": "Sticker copy stickers title",
+        "anchor": "ComposerShortcut.Sticker, R.drawable.ic_sticker",
         "test_ids": [
           "MSG-045"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "surface": "Plus menu Customize composer row",
+        "anchor": "fun composerCustomizeItem(",
+        "test_ids": [
+          "CON-042",
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "surface": "Holding a Plus menu row explains it",
+        "anchor": "Modifier.explainOnLongPress(composerShortcutExplanation(shortcut, onCustomize), beforeShow = onDismiss)",
+        "test_ids": [
+          "CON-048"
         ]
       }
     ],
@@ -33,7 +50,7 @@
       {
         "surface": "string:attach_contact",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.attach_contact",
+        "anchor": "ComposerShortcut.Person, R.drawable.ic_person",
         "test_ids": [
           "MED-001"
         ]
@@ -41,7 +58,7 @@
       {
         "surface": "string:attach_location",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.attach_location",
+        "anchor": "ComposerShortcut.Location, R.drawable.ic_location_on",
         "test_ids": [
           "MED-001"
         ]
@@ -49,7 +66,7 @@
       {
         "surface": "string:attachment_camera",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.attachment_camera",
+        "anchor": "ComposerShortcut.Camera, R.drawable.ic_camera",
         "test_ids": [
           "MED-001"
         ]
@@ -57,7 +74,7 @@
       {
         "surface": "string:attachment_device_contact",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.attachment_device_contact",
+        "anchor": "ComposerShortcut.Contact, R.drawable.ic_person",
         "test_ids": [
           "MED-001"
         ]
@@ -65,7 +82,7 @@
       {
         "surface": "string:attachment_photos_videos",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.attachment_photos_videos",
+        "anchor": "ComposerShortcut.Gallery, R.drawable.ic_image",
         "test_ids": [
           "MED-001"
         ]
@@ -73,9 +90,26 @@
       {
         "surface": "string:download_files",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
-        "anchor": "R.string.download_files",
+        "anchor": "ComposerShortcut.Files, R.drawable.ic_description",
         "test_ids": [
           "MED-001"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "surface": "Customize composer label",
+        "anchor": "R.string.composer_customize",
+        "test_ids": [
+          "CON-042",
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+        "surface": "Customize composer explanation",
+        "anchor": "R.string.explanation_composer_customize",
+        "test_ids": [
+          "CON-048"
         ]
       }
     ],

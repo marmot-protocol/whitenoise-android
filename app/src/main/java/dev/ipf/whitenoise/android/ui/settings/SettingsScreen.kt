@@ -105,7 +105,8 @@ internal enum class SettingsHomeSection(
 
 /**
  * Rows of the Settings home in display order, grouped under the [section] each one belongs to. Each row
- * carries its label, Material Symbols icon and test-tag suffix, and the [detail] it opens.
+ * carries its label, Material Symbols icon and test-tag suffix, the [detail] it opens, and the
+ * [explanationRes] shown when the row is held.
  */
 internal enum class SettingsHomeRow(
     @param:StringRes val titleRes: Int,
@@ -113,6 +114,7 @@ internal enum class SettingsHomeRow(
     val iconTag: String,
     val detail: SettingsDetail,
     val section: SettingsHomeSection,
+    @param:StringRes val explanationRes: Int,
 ) {
     Account(
         R.string.account,
@@ -120,6 +122,7 @@ internal enum class SettingsHomeRow(
         "account",
         SettingsDetail.Account,
         SettingsHomeSection.Profile,
+        R.string.explanation_settings_account,
     ),
     Notifications(
         R.string.notifications,
@@ -127,6 +130,7 @@ internal enum class SettingsHomeRow(
         "notifications",
         SettingsDetail.Notifications,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_notifications,
     ),
     Chats(
         R.string.chats,
@@ -134,6 +138,7 @@ internal enum class SettingsHomeRow(
         "chats",
         SettingsDetail.Chats,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_chats,
     ),
     Appearance(
         R.string.appearance,
@@ -141,6 +146,7 @@ internal enum class SettingsHomeRow(
         "appearance",
         SettingsDetail.Appearance,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_appearance,
     ),
     VoiceLanguage(
         R.string.settings_voice_language,
@@ -148,6 +154,7 @@ internal enum class SettingsHomeRow(
         "voice_language",
         SettingsDetail.VoiceLanguage,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_voice_language,
     ),
     PrivacySecurity(
         R.string.settings_privacy_security,
@@ -155,6 +162,7 @@ internal enum class SettingsHomeRow(
         "privacy_security",
         SettingsDetail.DevicePrivacy,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_privacy_security,
     ),
     DataUsage(
         R.string.settings_data_usage,
@@ -162,6 +170,7 @@ internal enum class SettingsHomeRow(
         "data_usage",
         SettingsDetail.Data,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_data_usage,
     ),
     AiAgents(
         R.string.ai_agents,
@@ -169,6 +178,7 @@ internal enum class SettingsHomeRow(
         "ai_agents",
         SettingsDetail.AiAgents,
         SettingsHomeSection.Assist,
+        R.string.explanation_settings_ai_agents,
     ),
     HelpSupport(
         R.string.settings_help_support,
@@ -176,6 +186,7 @@ internal enum class SettingsHomeRow(
         "help_support",
         SettingsDetail.HelpSupport,
         SettingsHomeSection.Assist,
+        R.string.explanation_settings_help_support,
     ),
 }
 
@@ -978,6 +989,7 @@ private fun SettingsProfileHeader(
                     context = context,
                     title = stringResource(SettingsHomeRow.Account.titleRes),
                     onClick = onOpenAccount,
+                    explanation = stringResource(SettingsHomeRow.Account.explanationRes),
                     leading = {
                         SettingsHubIcon(
                             SettingsHomeRow.Account.iconRes,
@@ -1127,6 +1139,7 @@ internal fun SettingsHubSection(
                         context = context,
                         title = stringResource(entry.titleRes),
                         onClick = { onOpenDetail(entry.detail) },
+                        explanation = stringResource(entry.explanationRes),
                         leading = {
                             SettingsHubIcon(entry.iconRes, entry.iconTag, MaterialTheme.colorScheme.onSurfaceVariant)
                         },

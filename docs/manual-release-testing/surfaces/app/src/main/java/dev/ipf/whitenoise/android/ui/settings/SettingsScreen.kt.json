@@ -365,6 +365,86 @@
         "test_ids": [
           "SET-046"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Holding a Settings home row explains it",
+        "anchor": "explanation = stringResource(entry.explanationRes)",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Account Settings row explanation",
+        "anchor": "R.string.explanation_settings_account",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Ai agents Settings row explanation",
+        "anchor": "R.string.explanation_settings_ai_agents",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Appearance Settings row explanation",
+        "anchor": "R.string.explanation_settings_appearance",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Chats Settings row explanation",
+        "anchor": "R.string.explanation_settings_chats",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Data usage Settings row explanation",
+        "anchor": "R.string.explanation_settings_data_usage",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Help support Settings row explanation",
+        "anchor": "R.string.explanation_settings_help_support",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Notifications Settings row explanation",
+        "anchor": "R.string.explanation_settings_notifications",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Privacy security Settings row explanation",
+        "anchor": "R.string.explanation_settings_privacy_security",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "surface": "Voice language Settings row explanation",
+        "anchor": "R.string.explanation_settings_voice_language",
+        "test_ids": [
+          "CON-048"
+        ]
       }
     ],
     "source_coverage": [

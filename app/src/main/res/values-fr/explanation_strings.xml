@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">Expliquer</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">Indique lequel de vos comptes envoie les messages dans cette discussion. Cela ne change pas de compte.</string>
+    <string name="explanation_composer_more">Ouvre les actions qui ne sont pas épinglées dans la barre d’outils, dont Personnaliser le champ de message.</string>
+    <string name="explanation_composer_emoji">Ouvre le sélecteur d’émojis, y compris vos émojis personnalisés.</string>
+    <string name="explanation_composer_paste">Colle dans le message ce que vous avez copié.</string>
+    <string name="explanation_composer_dictation">Saisit ce que vous dites grâce à la reconnaissance vocale d’Android. White Noise demande une reconnaissance hors ligne, mais votre appareil peut quand même utiliser un service en ligne.</string>
+    <string name="explanation_composer_translate">Active ou désactive le mode traduction. Tant qu’il est activé, Envoyer envoie la traduction affichée sur la ligne Sera envoyé, et rien n’est envoyé tant qu’une traduction n’est pas prête.</string>
+    <string name="explanation_composer_voice_note">Maintenez appuyé pour enregistrer un message vocal.</string>
+    <string name="explanation_composer_camera">Ouvre l’appareil photo pour joindre une nouvelle photo. Android demande l’accès à l’appareil photo la première fois.</string>
+    <string name="explanation_composer_gallery">Ouvre le sélecteur de photos d’Android. White Noise ne reçoit que les photos et vidéos que vous choisissez.</string>
+    <string name="explanation_composer_files">Ouvre le sélecteur de fichiers d’Android pour joindre n’importe quel fichier.</string>
+    <string name="explanation_composer_location">Envoie votre position actuelle une seule fois, sous forme de lien de carte. Votre position n’est pas partagée en continu.</string>
+    <string name="explanation_composer_person">Partage la clé publique d’un utilisateur de White Noise sous forme de texte, pour que d’autres puissent lui écrire.</string>
+    <string name="explanation_composer_contact">Partage une fiche de contact issue des contacts de votre téléphone.</string>
+    <string name="explanation_composer_poll">Crée un sondage auquel les membres du groupe peuvent voter.</string>
+    <string name="explanation_composer_sticker">Ouvre vos stickers pour en envoyer un.</string>
+    <string name="explanation_composer_customize">Choisissez quels raccourcis restent dans la barre d’outils, de quel côté ils se placent et où va le bouton de message vocal.</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">Votre profil, les clés qui prouvent qui vous êtes et les relais qui transportent vos messages.</string>
+    <string name="explanation_settings_notifications">Sons et vibrations, distribution en arrière-plan et réglages de notification d’Android pour White Noise.</string>
+    <string name="explanation_settings_chats">Dossiers, actions de balayage, le champ de message, la touche Entrée, émojis personnalisés et changement rapide de compte.</string>
+    <string name="explanation_settings_appearance">Thème, couleurs, police, taille du texte et affichage des dates et des heures.</string>
+    <string name="explanation_settings_voice_language">Langue de l’app, Lecture à voix haute, dictée et traduction des messages.</string>
+    <string name="explanation_settings_privacy_security">Verrouillage de l’app, sécurité de l’écran, clavier incognito, utilisateurs bloqués, messages éphémères par défaut et partage des diagnostics.</string>
+    <string name="explanation_settings_data_usage">Voyez ce qui utilise le stockage, et choisissez quand les médias se téléchargent et la qualité d’envoi.</string>
+    <string name="explanation_settings_ai_agents">Connectez des agents IA avec lesquels discuter dans White Noise, ou configurez-en un manuellement.</string>
+    <string name="explanation_settings_help_support">Articles d’aide, discussion avec l’assistance, dons et outils de développement.</string>
+</resources>

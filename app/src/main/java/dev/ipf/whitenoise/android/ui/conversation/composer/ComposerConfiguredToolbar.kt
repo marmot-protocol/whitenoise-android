@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -189,12 +190,18 @@ internal fun ComposerConfiguredToolbar(
                                 } else {
                                     Modifier
                                 },
-                            ).composerCustomizationEntry(
+                            ).explainOnLongPress(
+                                explanation = composerShortcutExplanation(shortcut, bindings.onCustomize),
                                 enabled =
                                     bindings.enabled &&
                                         !bindings.transactionActive &&
                                         shortcut != ComposerShortcut.VoiceNote,
-                                onCustomize = bindings.onCustomize,
+                                additionalActions =
+                                    if (bindings.enabled && !bindings.transactionActive) {
+                                        composerCustomizeAccessibilityActions(bindings.onCustomize)
+                                    } else {
+                                        emptyList()
+                                    },
                             )
                     content(shortcut, actionModifier)
                 }

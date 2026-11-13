@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -54,6 +55,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.settings.rememberComposerSettingsEditState
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
@@ -150,7 +152,7 @@ class ComposerToolbarProductionTest {
     }
 
     @Test
-    fun directMediaCommandsReuseCallbacksAndLongPressConsumesTheOrdinaryTap() {
+    fun directMediaCommandsReuseCallbacksAndLongPressExplainsInsteadOfTapping() {
         render(
             ComposerToolbarSettings(
                 listOf(
@@ -166,6 +168,14 @@ class ComposerToolbarProductionTest {
         composeRule.onNodeWithTag("composer.shortcut.files").performTouchInput { click() }
         assertEquals(listOf(1, 1, 1), listOf(cameraCalls, galleryCalls, fileCalls))
         composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
+        composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("explanation.body")
+            .assertTextEquals(context.getString(R.string.explanation_composer_camera))
+        composeRule.onNodeWithTag("composer.customize").assertDoesNotExist()
+        assertEquals(1, cameraCalls)
+        composeRule.onNodeWithTag("explanation.action").performClick()
+        composeRule.onNodeWithTag("explanation.sheet").assertDoesNotExist()
         composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
         assertEquals(1, cameraCalls)
     }
@@ -212,6 +222,11 @@ class ComposerToolbarProductionTest {
                 ClipboardManager::class.java,
             ).setPrimaryClip(ClipData.newPlainText("sample", "replacement"))
         composeRule.onNodeWithTag("composer.shortcut.paste").performTouchInput { longClick() }
+        composeRule
+            .onNodeWithTag("explanation.body")
+            .assertTextEquals(context.getString(R.string.explanation_composer_paste))
+        assertEquals(initial, text.valueState.value)
+        composeRule.onNodeWithTag("explanation.action").performClick()
         composeRule.onNodeWithTag("composer.customize.label.camera").performScrollTo()
         composeRule.onNodeWithTag("composer.customize.label.camera").assertExists()
         composeRule.onNodeWithText("Cancel").assertDoesNotExist()
@@ -313,6 +328,7 @@ class ComposerToolbarProductionTest {
         val before = text.valueState.value
         val hidesBefore = keyboardHides
         composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
+        composeRule.onNodeWithTag("explanation.action").performClick()
         composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
         assertTrue("customization clears the composing focus", !focused)
         assertTrue("customization hides the keyboard", keyboardHides > hidesBefore)
@@ -369,6 +385,7 @@ class ComposerToolbarProductionTest {
         val settings = ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera))
         render(settings, height = 180, fontScale = 1.5f)
         composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
+        composeRule.onNodeWithTag("explanation.action").performClick()
         val tray = composeRule.onNodeWithTag("composer.customize").fetchSemanticsNode().boundsInRoot
         assertTrue("tray respects the available viewport", tray.height in 48f..180f)
         composeRule.onNodeWithTag("composer.customize.label.gallery").performScrollTo()
@@ -402,7 +419,7 @@ class ComposerToolbarProductionTest {
     }
 
     @Test
-    fun describedActionsExposeCustomizeOnTheirActualMergedSemanticsNodes() {
+    fun describedActionsExposeExplainAndCustomizeOnTheirActualMergedSemanticsNodes() {
         identity = true
         render(
             ComposerToolbarSettings(
@@ -417,8 +434,20 @@ class ComposerToolbarProductionTest {
         listOf(R.string.attachment_camera, R.string.paste_from_clipboard).forEach { label ->
             val node = composeRule.onNodeWithContentDescription(context.getString(label)).fetchSemanticsNode()
             val actions = node.config[SemanticsActions.CustomActions]
+            assertTrue(actions.any { it.label == context.getString(R.string.explanation_action_explain) })
             assertTrue(actions.any { it.label == context.getString(R.string.composer_customize) })
         }
+        val explain =
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.attachment_camera))
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single { it.label == context.getString(R.string.explanation_action_explain) }
+        composeRule.runOnIdle { assertTrue(explain.action()) }
+        composeRule
+            .onNodeWithTag("explanation.body")
+            .assertTextEquals(context.getString(R.string.explanation_composer_camera))
+        assertEquals(0, cameraCalls)
         val sender = composeRule.onNodeWithTag("composer-sending-identity").fetchSemanticsNode()
         assertTrue(
             sender.config[SemanticsActions.CustomActions].any {
@@ -457,13 +486,26 @@ class ComposerToolbarProductionTest {
     }
 
     @Test
-    fun longPressingAPlusMenuRowOpensCustomizationWithoutRunningTheRow() {
+    fun longPressingAPlusMenuRowExplainsItWithoutRunningTheRow() {
         render(ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera)))
         composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
         val gallery = hasText(context.getString(R.string.attachment_photos_videos)) and hasAnyAncestor(isPopup())
         composeRule.onNode(gallery).performTouchInput { longClick() }
-        composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
         composeRule.onNodeWithTag("conversation.attachment.menu").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag("explanation.body")
+            .assertTextEquals(context.getString(R.string.explanation_composer_gallery))
+        composeRule.onNodeWithTag("composer.customize").assertDoesNotExist()
+        assertEquals(0, galleryCalls)
+    }
+
+    @Test
+    fun plusMenuCustomizeRowOpensCustomization() {
+        render(ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera)))
+        composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
+        composeRule.onNodeWithTag("conversation.attachment.menu.customize").performScrollTo().performClick()
+        composeRule.onNodeWithTag("conversation.attachment.menu").assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
         assertEquals(0, galleryCalls)
     }
 
@@ -622,46 +664,48 @@ class ComposerToolbarProductionTest {
                 LocalSoftwareKeyboardController provides keyboard,
             ) {
                 WhiteNoiseTheme(fontScale = fontScale) {
-                    Surface {
-                        Box(Modifier.width(360.dp).height(height.dp), contentAlignment = Alignment.BottomCenter) {
-                            if (customizing) {
-                                val preference = appState.composerToolbarPreference
-                                ComposerToolbarEditor(
-                                    rememberComposerSettingsEditState(preference.requestedValue),
-                                    preference.saving,
-                                    preference::save,
-                                    { customizing = false },
-                                    Modifier.fillMaxSize(),
+                    ExplanationHost {
+                        Surface {
+                            Box(Modifier.width(360.dp).height(height.dp), contentAlignment = Alignment.BottomCenter) {
+                                if (customizing) {
+                                    val preference = appState.composerToolbarPreference
+                                    ComposerToolbarEditor(
+                                        rememberComposerSettingsEditState(preference.requestedValue),
+                                        preference.saving,
+                                        preference::save,
+                                        { customizing = false },
+                                        Modifier.fillMaxSize(),
+                                        overlayBackRegistrar = registrar,
+                                        saveFailed = preference.failed,
+                                    )
+                                    return@Box
+                                }
+                                ComposerBar(
+                                    appState = appState,
+                                    onCustomizeToolbar = { customizing = true },
+                                    draftAccountRef = if (identity) "first" else null,
+                                    replyingTo = null,
+                                    messageTextCopy = MessageTextCopy.Default,
+                                    onCancelReply = {},
+                                    onSend = { _, _ -> },
+                                    hasPendingAttachments = attachmentSend != null,
+                                    onSendAttachments = attachmentSend,
+                                    softwareKeyboardController = keyboard,
+                                    onComposerFocusChanged = { focused = it },
                                     overlayBackRegistrar = registrar,
-                                    saveFailed = preference.failed,
+                                    onCaptureFromCamera = if (attachments) ({ cameraCalls++ }) else null,
+                                    onPickFromGallery = if (attachments) ({ galleryCalls++ }) else null,
+                                    onPickDocument = if (attachments) ({ fileCalls++ }) else null,
+                                    onShareLocation = if (extraInventory) ({ recordExtra("location") }) else null,
+                                    onShareUser = if (extraInventory) ({ recordExtra("person") }) else null,
+                                    onShareContact = if (extraInventory) ({ recordExtra("contact") }) else null,
+                                    onCreatePoll = if (extraInventory || pollOnly) ({ recordExtra("poll") }) else null,
+                                    onOpenStickers = if (extraInventory) ({ recordExtra("sticker") }) else null,
+                                    textState = text,
+                                    voiceRecordingController = voiceController,
+                                    modifier = Modifier.testTag("composer.toolbar.production"),
                                 )
-                                return@Box
                             }
-                            ComposerBar(
-                                appState = appState,
-                                onCustomizeToolbar = { customizing = true },
-                                draftAccountRef = if (identity) "first" else null,
-                                replyingTo = null,
-                                messageTextCopy = MessageTextCopy.Default,
-                                onCancelReply = {},
-                                onSend = { _, _ -> },
-                                hasPendingAttachments = attachmentSend != null,
-                                onSendAttachments = attachmentSend,
-                                softwareKeyboardController = keyboard,
-                                onComposerFocusChanged = { focused = it },
-                                overlayBackRegistrar = registrar,
-                                onCaptureFromCamera = if (attachments) ({ cameraCalls++ }) else null,
-                                onPickFromGallery = if (attachments) ({ galleryCalls++ }) else null,
-                                onPickDocument = if (attachments) ({ fileCalls++ }) else null,
-                                onShareLocation = if (extraInventory) ({ recordExtra("location") }) else null,
-                                onShareUser = if (extraInventory) ({ recordExtra("person") }) else null,
-                                onShareContact = if (extraInventory) ({ recordExtra("contact") }) else null,
-                                onCreatePoll = if (extraInventory || pollOnly) ({ recordExtra("poll") }) else null,
-                                onOpenStickers = if (extraInventory) ({ recordExtra("sticker") }) else null,
-                                textState = text,
-                                voiceRecordingController = voiceController,
-                                modifier = Modifier.testTag("composer.toolbar.production"),
-                            )
                         }
                     }
                 }
