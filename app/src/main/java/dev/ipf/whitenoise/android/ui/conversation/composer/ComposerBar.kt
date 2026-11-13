@@ -2159,10 +2159,7 @@ internal fun ComposerBar(
                                     modifier =
                                         Modifier.explainOnLongPress(
                                             explanation =
-                                                composerShortcutExplanation(
-                                                    ComposerShortcut.VoiceNote,
-                                                    beginCustomization,
-                                                ),
+                                                composerShortcutExplanation(ComposerShortcut.VoiceNote),
                                             enabled = voiceExplainable,
                                             holdToExplain = false,
                                             additionalActions =

@@ -143,7 +143,7 @@ internal fun ComposerAttachmentMenu(
 ) {
     // Holding any row closes the menu and explains it; Customize composer is the last row.
     val explain: @Composable (ComposerShortcut) -> Modifier = { shortcut ->
-        Modifier.explainOnLongPress(composerShortcutExplanation(shortcut, onCustomize), beforeShow = onDismiss)
+        Modifier.explainOnLongPress(composerShortcutExplanation(shortcut), beforeShow = onDismiss)
     }
     val items =
         listOfNotNull(
@@ -305,7 +305,7 @@ private fun composerCustomizeItem(
         Modifier
             .testTag("conversation.attachment.menu.customize")
             .explainOnLongPress(
-                composerExplanation(R.string.composer_customize, R.string.explanation_composer_customize, null),
+                composerExplanation(R.string.composer_customize, R.string.explanation_composer_customize),
                 beforeShow = onDismiss,
             ),
 )

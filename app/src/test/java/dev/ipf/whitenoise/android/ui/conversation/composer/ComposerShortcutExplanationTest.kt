@@ -19,6 +19,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
@@ -57,14 +58,12 @@ class ComposerShortcutExplanationTest {
     private var customizeCalls = 0
 
     @Test
-    fun holdingCameraExplainsItWithoutCapturingAndTheSheetActionOpensCustomization() {
+    fun holdingCameraExplainsItWithoutCapturingOrOfferingCustomization() {
         render()
         composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
         assertExplanation(R.string.explanation_composer_camera)
+        composeRule.onNodeWithText(context.getString(R.string.composer_customize)).assertDoesNotExist()
         assertEquals(listOf(0, 0), listOf(cameraCalls, customizeCalls))
-        composeRule.onNodeWithTag("explanation.action").performClick()
-        composeRule.onNodeWithTag("explanation.sheet").assertDoesNotExist()
-        assertEquals(listOf(0, 1), listOf(cameraCalls, customizeCalls))
     }
 
     @Test

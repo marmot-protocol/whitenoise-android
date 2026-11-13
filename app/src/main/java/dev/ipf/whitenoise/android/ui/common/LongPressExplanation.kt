@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -32,19 +31,11 @@ import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** A follow-up offered under an explanation, such as opening the related settings. */
-@Immutable
-internal data class ExplanationAction(
-    val label: String,
-    val onClick: () -> Unit,
-)
-
 /** What a held control does, in the words of its visible [title]. */
 @Immutable
 internal data class Explanation(
     val title: String,
     val body: String,
-    val action: ExplanationAction? = null,
 )
 
 /** Shows one explanation at a time; `null` outside an [ExplanationHost], which disables holding to explain. */
@@ -108,22 +99,6 @@ private fun ExplanationSheet(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        explanation.action?.let { action ->
-            WhiteNoiseFilledTonalButton(
-                onClick = {
-                    onDismiss()
-                    action.onClick()
-                },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = WhiteNoiseSpacing.Section)
-                        .padding(bottom = WhiteNoiseSpacing.Section)
-                        .testTag("explanation.action"),
-            ) {
-                Text(action.label)
-            }
-        }
     }
 }
 

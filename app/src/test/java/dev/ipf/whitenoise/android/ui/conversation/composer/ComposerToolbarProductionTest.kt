@@ -168,8 +168,7 @@ class ComposerToolbarProductionTest {
         assertEquals(listOf(1, 1, 1), listOf(cameraCalls, galleryCalls, fileCalls))
         composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
         composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
-        composeRule.onNodeWithTag("explanation.action").performClick()
-        composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.composer_customize)).assertDoesNotExist()
         assertEquals(1, cameraCalls)
     }
 
@@ -216,7 +215,8 @@ class ComposerToolbarProductionTest {
             ).setPrimaryClip(ClipData.newPlainText("sample", "replacement"))
         composeRule.onNodeWithTag("composer.shortcut.paste").performTouchInput { longClick() }
         assertEquals(initial, text.valueState.value)
-        composeRule.onNodeWithTag("explanation.action").performClick()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
+        openCustomizationFromPlusMenu()
         composeRule.onNodeWithTag("composer.customize.label.camera").performScrollTo()
         composeRule.onNodeWithTag("composer.customize.label.camera").assertExists()
         composeRule.onNodeWithText("Cancel").assertDoesNotExist()
@@ -317,8 +317,7 @@ class ComposerToolbarProductionTest {
         composeRule.onNode(hasSetTextAction()).performClick().assertIsFocused()
         val before = text.valueState.value
         val hidesBefore = keyboardHides
-        composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
-        composeRule.onNodeWithTag("explanation.action").performClick()
+        openCustomizationFromPlusMenu()
         composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
         assertTrue("customization clears the composing focus", !focused)
         assertTrue("customization hides the keyboard", keyboardHides > hidesBefore)
@@ -369,13 +368,17 @@ class ComposerToolbarProductionTest {
         }
     }
 
+    private fun openCustomizationFromPlusMenu() {
+        composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
+        composeRule.onNodeWithTag("conversation.attachment.menu.customize").performScrollTo().performClick()
+    }
+
     /** A short, large-text editor still scrolls to every command, and accessibility add and reorder actions save. */
     @Test
     fun shortHeightEditorRetainsScrollableCommandsAndAccessibilityReorder() {
         val settings = ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera))
         render(settings, height = 180, fontScale = 1.5f)
-        composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
-        composeRule.onNodeWithTag("explanation.action").performClick()
+        openCustomizationFromPlusMenu()
         val tray = composeRule.onNodeWithTag("composer.customize").fetchSemanticsNode().boundsInRoot
         assertTrue("tray respects the available viewport", tray.height in 48f..180f)
         composeRule.onNodeWithTag("composer.customize.label.gallery").performScrollTo()

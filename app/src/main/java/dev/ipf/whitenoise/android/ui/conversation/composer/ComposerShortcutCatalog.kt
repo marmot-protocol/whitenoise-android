@@ -10,7 +10,6 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.ui.common.Explanation
-import dev.ipf.whitenoise.android.ui.common.ExplanationAction
 
 internal val ComposerShortcut.labelRes: Int
     @StringRes get() =
@@ -73,26 +72,16 @@ internal val ComposerShortcut.explanationRes: Int
             ComposerShortcut.Sticker -> R.string.explanation_composer_sticker
         }
 
-/** The shortcut's explanation, offering Customize composer as its follow-up when the host allows it. */
+/** The shortcut's explanation; Customize composer lives only in the + menu and Settings. */
 @Composable
-internal fun composerShortcutExplanation(
-    shortcut: ComposerShortcut,
-    onCustomize: (() -> Unit)?,
-): Explanation = composerExplanation(shortcut.labelRes, shortcut.explanationRes, onCustomize)
+internal fun composerShortcutExplanation(shortcut: ComposerShortcut): Explanation =
+    composerExplanation(shortcut.labelRes, shortcut.explanationRes)
 
 @Composable
 internal fun composerExplanation(
     @StringRes titleRes: Int,
     @StringRes bodyRes: Int,
-    onCustomize: (() -> Unit)?,
-): Explanation {
-    val customizeLabel = stringResource(R.string.composer_customize)
-    return Explanation(
-        title = stringResource(titleRes),
-        body = stringResource(bodyRes),
-        action = onCustomize?.let { ExplanationAction(customizeLabel, it) },
-    )
-}
+): Explanation = Explanation(title = stringResource(titleRes), body = stringResource(bodyRes))
 
 /** TalkBack keeps a direct Customize composer action on toolbar buttons. */
 @Composable
