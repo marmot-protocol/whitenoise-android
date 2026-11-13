@@ -2139,6 +2139,30 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
             self.assertNotIn('Open settings.*', path.read_text(), path.name)
 
+    def test_settings_detail_returns_pass_through_their_parent_hub(self):
+        """Key, wipe and relay returns pop Account before Settings; speech reopens Read Aloud from its hub (#3721)."""
+        backs = ('back', {'tapOn': 'Back'})
+        account_hub = {'assertVisible': {'id': 'settings.account.group'}}
+        voice_hub = {'assertVisible': {'id': 'settings.voice_language.group'}}
+        returns = 0
+        for path in sorted((runtime.ROOT / '.maestro/runtime').glob('*.yaml')):
+            account = path.stem.startswith(('accounts-wipe-', 'keys-', 'relay-add-'))
+            speech = path.stem.startswith('speech-')
+            if not (account or speech):
+                continue
+            commands = list(yaml.safe_load_all(path.read_text()))[1]
+            for index, command in enumerate(commands):
+                if command == {'assertVisible': 'Settings'} and commands[index - 1] in backs:
+                    # The old shortcut asserted Settings straight after leaving the detail page.
+                    hub = voice_hub if speech else account_hub
+                    self.assertEqual(commands[index - 2], hub, f'{path.name}: Settings reached past its parent hub')
+                    returns += 1
+                if speech and command == {'tapOn': 'Read Aloud'}:
+                    self.assertEqual(commands[index - 2], voice_hub, f'{path.name}: Read Aloud reopened off its hub')
+                    returns += 1
+        # Every return leg of the 35 flows the Settings hubs left stale, account-switch flows' second legs included.
+        self.assertGreaterEqual(returns, 37)
+
     def test_camera_second_denial_uses_the_observed_permanent_denial_control(self):
         """The real API-34 second dialog exposes a different ID despite the same Don't allow label."""
         control = 'com.android.permissioncontroller:id/permission_deny_and_dont_ask_again_button'

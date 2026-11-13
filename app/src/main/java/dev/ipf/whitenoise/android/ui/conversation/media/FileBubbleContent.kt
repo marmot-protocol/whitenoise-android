@@ -164,14 +164,23 @@ internal fun FileBubbleContent(
             verticalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.weight(1f).heightIn(min = FileTransferControlSize),
         ) {
-            Text(
-                text = safeDocumentDisplayName(fileName),
-                style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.ContentOrLtr),
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // The trailing glyph shares the name's row, so the metadata row below spans the card and its
+            // status and time end at the card's bottom-end corner like every other bubble (#3768).
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(FileCardSlotSpacing),
+            ) {
+                Text(
+                    text = safeDocumentDisplayName(fileName),
+                    style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.ContentOrLtr),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                FileCardTrailingAffordance(transferState)
+            }
             FileMetadataRow(
                 metadataText = metadataText,
                 metadataIsError = metadataIsError,
@@ -181,7 +190,6 @@ internal fun FileBubbleContent(
                 footerWarningText = footerWarningText,
             )
         }
-        FileCardTrailingAffordance(transferState)
     }
 }
 
@@ -273,7 +281,10 @@ private fun FileTrailingMetadata(
                     if (status != null) FileTrailingMetadataWithStatusMaxWidth else FileTrailingMetadataMaxWidth,
             ),
     ) {
-        status?.let { OutgoingMessageStatusIcon(it, tint = color) }
+        // The cutout matches the card it sits on, not the page surface.
+        status?.let {
+            OutgoingMessageStatusIcon(it, tint = color, containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        }
         text?.let {
             Text(
                 text = it,
