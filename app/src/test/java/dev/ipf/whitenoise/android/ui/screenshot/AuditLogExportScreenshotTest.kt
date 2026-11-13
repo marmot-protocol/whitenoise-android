@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.ui.settings.AuditLogExportDestinationDialog
 import dev.ipf.whitenoise.android.ui.settings.AuditLogPickerDialog
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -164,6 +166,7 @@ class AuditLogExportScreenshotTest {
                                     title = stringResource(R.string.choose_audit_files),
                                     onClick = {},
                                     subtitle = stringResource(R.string.choose_audit_files_subtitle),
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_file_open) },
                                 )
                             }
                             row("export") { context ->
@@ -172,6 +175,7 @@ class AuditLogExportScreenshotTest {
                                     title = stringResource(R.string.export_audit_logs),
                                     onClick = {},
                                     subtitle = stringResource(R.string.export_audit_logs_subtitle),
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_upload_file) },
                                 )
                             }
                             row("delete") { context ->
@@ -181,6 +185,12 @@ class AuditLogExportScreenshotTest {
                                     onClick = {},
                                     subtitle = stringResource(R.string.delete_audit_logs_subtitle),
                                     destructive = true,
+                                    leading = {
+                                        SettingsLeadingIcon(
+                                            R.drawable.ic_delete,
+                                            tint = MaterialTheme.colorScheme.error,
+                                        )
+                                    },
                                 )
                             }
                         }

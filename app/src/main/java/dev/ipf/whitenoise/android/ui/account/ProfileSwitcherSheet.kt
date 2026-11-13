@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.settingsRowBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -184,7 +185,7 @@ internal fun ProfileSwitcherSheet(
                         onAddProfile,
                         modifier = Modifier.testTag("profile_switcher.add_profile"),
                         enabled = enabled,
-                        leading = { Icon(painterResource(R.drawable.ic_settings_person_add), null) },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_settings_person_add) },
                     )
                 }
                 row("settings") { context ->
@@ -194,7 +195,7 @@ internal fun ProfileSwitcherSheet(
                         onSettings,
                         modifier = Modifier.testTag("profile_switcher.settings"),
                         enabled = enabled,
-                        leading = { Icon(painterResource(R.drawable.ic_emoji_settings), null) },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_emoji_settings) },
                     )
                 }
             }

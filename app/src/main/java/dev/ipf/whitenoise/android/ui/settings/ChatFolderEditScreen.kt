@@ -589,6 +589,7 @@ internal fun ChatFolderEditContent(
                                 state.includeAll,
                                 onIncludeAllChange,
                                 modifier = Modifier.testTag("folder.includeAll"),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_forum) },
                             )
                         }
                     }
@@ -610,6 +611,7 @@ internal fun ChatFolderEditContent(
                             onClick = onOpenManualChats,
                             value = state.manualChatCount.toString(),
                             modifier = Modifier.testTag("folder.includedChats"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_playlist_add_check) },
                         )
                     }
                 }
@@ -627,6 +629,7 @@ internal fun ChatFolderEditContent(
                                 title = stringResource(R.string.chat_folder_people),
                                 onClick = onOpenPeople,
                                 value = state.peopleCount.toString(),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_person) },
                             )
                         }
                     }
@@ -646,7 +649,13 @@ internal fun ChatFolderEditContent(
                     SettingsGroup {
                         row("unread") { context ->
                             val title = stringResource(R.string.chat_folder_unread_only)
-                            SettingsSwitch(context, title, state.unreadOnly, onUnreadOnlyChange)
+                            SettingsSwitch(
+                                context,
+                                title,
+                                state.unreadOnly,
+                                onUnreadOnlyChange,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_mark_unread) },
+                            )
                         }
                         row("mentions") { context ->
                             val title = stringResource(R.string.chat_folder_unread_mentions_only)
@@ -655,11 +664,18 @@ internal fun ChatFolderEditContent(
                                 title,
                                 state.unreadMentionsOnly,
                                 onUnreadMentionsOnlyChange,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_alternate_email) },
                             )
                         }
                         row("pinned") { context ->
                             val title = stringResource(R.string.chat_folder_pinned_only)
-                            SettingsSwitch(context, title, state.pinnedOnly, onPinnedOnlyChange)
+                            SettingsSwitch(
+                                context,
+                                title,
+                                state.pinnedOnly,
+                                onPinnedOnlyChange,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_push_pin) },
+                            )
                         }
                     }
                 }
@@ -667,19 +683,43 @@ internal fun ChatFolderEditContent(
                     SettingsGroup {
                         row("groups") { context ->
                             val title = stringResource(R.string.chat_folder_groups_only)
-                            SettingsSwitch(context, title, state.groupsOnly, onGroupsOnlyChange)
+                            SettingsSwitch(
+                                context,
+                                title,
+                                state.groupsOnly,
+                                onGroupsOnlyChange,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group) },
+                            )
                         }
                         row("direct") { context ->
                             val title = stringResource(R.string.chat_folder_direct_chats_only)
-                            SettingsSwitch(context, title, state.directChatsOnly, onDirectChatsOnlyChange)
+                            SettingsSwitch(
+                                context,
+                                title,
+                                state.directChatsOnly,
+                                onDirectChatsOnlyChange,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_chat) },
+                            )
                         }
                         row("archived") { context ->
                             val title = stringResource(R.string.chat_folder_archived_only)
-                            SettingsSwitch(context, title, state.archivedOnly, onArchivedOnlyChange)
+                            SettingsSwitch(
+                                context,
+                                title,
+                                state.archivedOnly,
+                                onArchivedOnlyChange,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_archive) },
+                            )
                         }
                         row("muted") { context ->
                             val title = stringResource(R.string.chat_folder_include_muted)
-                            SettingsSwitch(context, title, state.includeMuted, onIncludeMutedChange)
+                            SettingsSwitch(
+                                context,
+                                title,
+                                state.includeMuted,
+                                onIncludeMutedChange,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
+                            )
                         }
                     }
                     SettingsExplainer(stringResource(R.string.folder_rule_hint))
@@ -705,6 +745,7 @@ internal fun ChatFolderEditContent(
                                         state.previewCount,
                                     )
                                 },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_visibility) },
                         )
                     }
                 }
@@ -723,6 +764,7 @@ internal fun ChatFolderEditContent(
                             checked = state.showWhenEmpty,
                             onCheckedChange = onShowWhenEmptyChange,
                             modifier = Modifier.testTag("folder.showWhenEmpty"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_folder_open) },
                         )
                     }
                 }
@@ -756,6 +798,9 @@ internal fun ChatFolderEditContent(
                                 modifier = Modifier.testTag("folder.delete"),
                                 enabled = state.canDelete,
                                 destructive = true,
+                                leading = {
+                                    SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
+                                },
                             )
                         }
                     }

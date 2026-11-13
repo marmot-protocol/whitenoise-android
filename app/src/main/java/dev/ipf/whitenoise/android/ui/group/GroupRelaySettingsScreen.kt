@@ -35,8 +35,10 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroupPanel
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
+import dev.ipf.whitenoise.android.ui.settings.SettingsRowDefaults
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -108,7 +110,10 @@ private fun GroupRelayRows(
     }
 }
 
-/** A configured relay: its ordinal label and the full URL, wrapped rather than truncated, with a copy action. */
+/**
+ * A configured relay: the relay glyph, its ordinal label and the full URL, wrapped rather than
+ * truncated, with a copy action.
+ */
 @Composable
 private fun GroupRelayRow(
     context: SettingsRowContext,
@@ -123,6 +128,7 @@ private fun GroupRelayRow(
             Modifier.fillMaxWidth().padding(start = WhiteNoiseSpacing.FormField, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            SettingsLeadingIcon(R.drawable.ic_dns, Modifier.padding(end = SettingsRowDefaults.LeadingContentGap))
             Column(
                 Modifier.weight(1f).padding(vertical = WhiteNoiseSpacing.Related + 4.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
