@@ -160,7 +160,9 @@ class QrScannerSheetScreenshotTest {
                 }
             }
         }
-        composeRule.mainClock.advanceTimeBy(APP_MOTION_OPEN_MILLIS.toLong() + 32)
+        // Only the error dialog enters through AppMotion. Keep the inline scanner's historical
+        // 250 ms sample so the independent permission spinner does not change phase with dialog timing.
+        composeRule.mainClock.advanceTimeBy(if (error != null) APP_MOTION_OPEN_MILLIS.toLong() + 32 else 250L)
         if (recoveryVisible) {
             composeRule.mainClock.autoAdvance = true
             composeRule.onNodeWithTag("qr_scanner.recovery").performScrollTo()

@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -529,7 +530,8 @@ class ConversationAcceptedSendRouteScreenshotTest {
     fun acceptedSendFromReadMoreReaderClosesItAndRevealsThePendingTail() {
         val conversation = createConversation(longHistoryMessage = true)
         val evidence = SendRouteEvidence()
-        mountHistoryConversation(conversation, evidence)
+        // Settlement takes a state-dependent number of frames; the focused caret must stay visible.
+        mountHistoryConversation(conversation, evidence, cursorBlinkEnabled = false)
         composeRule.waitForIdle()
         composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.ReadingHistory }
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -619,7 +621,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 startOnConstruction = true,
                 markdownParser = { text ->
                     if (deferMarkdownHydration && text == draftText) markdownHydrationGate.await()
-                    plainParagraphDocument(text)
+                    plainParagraphDocument(text, formattedHydration)
                 },
                 clockMillis = { 1_672_531_260_000L },
                 textPublisher = { _, _, _, _ ->
@@ -638,35 +640,6 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return conversation
     }
 
-    /**
-     * Parses text into a one-paragraph markdown document with soft breaks, or a bold run for the styled send when
-     * formatted hydration is on.
-     */
-    private fun plainParagraphDocument(text: String): MarkdownDocumentFfi =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blocks =
-                if (formattedHydration && text == "**Styled send**") {
-                    listOf(
-                        MarkdownBlockFfi.Paragraph(
-                            listOf(MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Styled send")))),
-                        ),
-                    )
-                } else {
-                    listOf(
-                        MarkdownBlockFfi.Paragraph(
-                            text.split('\n').flatMapIndexed { index, line ->
-                                buildList {
-                                    if (index > 0) add(MarkdownInlineFfi.SoftBreak)
-                                    add(MarkdownInlineFfi.Text(line))
-                                }
-                            },
-                        ),
-                    )
-                },
-            blankLinesBefore = ByteArray(0),
-        )
-
     /** Mounts the real route with a logical far-history bookmark and the actual production scroll writer. */
     private fun mountHistoryConversation(
         conversation: ConversationController,
@@ -675,10 +648,12 @@ class ConversationAcceptedSendRouteScreenshotTest {
         keyboardClearanceDp: Int = 0,
         onPaintedGeometry: ((ComposerSendFlightGeometry) -> Unit)? = null,
         onMotionOwner: ((ComposerSendMotion) -> Unit)? = null,
+        cursorBlinkEnabled: Boolean = true,
     ) {
         val historyId = (HISTORY_ANCHOR_INDEX + 1).toString(16).padStart(64, '0')
         composeRule.setContent {
             CompositionLocalProvider(
+                LocalCursorBlinkEnabled provides cursorBlinkEnabled,
                 LocalConversationScrollEvidenceSink provides evidence,
                 LocalComposerSendGeometryObserver provides onPaintedGeometry,
                 LocalComposerSendOwnerObserver provides onMotionOwner,
@@ -722,6 +697,38 @@ class ConversationAcceptedSendRouteScreenshotTest {
         const val LONG_MESSAGE_LINES = 70
     }
 }
+
+/**
+ * Parses text into a one-paragraph markdown document with soft breaks, or a bold run for the styled send when
+ * formatted hydration is on.
+ */
+private fun plainParagraphDocument(
+    text: String,
+    formattedHydration: Boolean,
+): MarkdownDocumentFfi =
+    MarkdownDocumentFfi(
+        truncated = false,
+        blocks =
+            if (formattedHydration && text == "**Styled send**") {
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Styled send")))),
+                    ),
+                )
+            } else {
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        text.split('\n').flatMapIndexed { index, line ->
+                            buildList {
+                                if (index > 0) add(MarkdownInlineFfi.SoftBreak)
+                                add(MarkdownInlineFfi.Text(line))
+                            }
+                        },
+                    ),
+                )
+            },
+        blankLinesBefore = ByteArray(0),
+    )
 
 private const val INCOMING_TEXT = "A received row while sending"
 

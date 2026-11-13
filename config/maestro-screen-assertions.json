@@ -251,15 +251,8 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
       "symbol": "ChatsScreen",
-      "bindings": [
-        {
-          "case": "navigation-account-empty",
-          "selector": {
-            "text": "No Chats"
-          },
-          "scope": "generated Carol account empty chat list after native account switch, then switch back."
-        }
-      ]
+      "bindings": [],
+      "remaining": "The navigation-account-empty flow verifies the generated Carol empty parent chat list and switches back. It does not open the inline measured playback modal; direct modal entry, reverse and dismissal assertions remain unproven."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
@@ -2440,7 +2433,13 @@
           "selector": {
             "text": "Next"
           },
-          "scope": "custom mute date/time stages cancel back to parent, with a fixed clock and no applied mute."
+          "scope": "custom mute date/time stages cancel back to parent, with a fixed clock and no applied mute.",
+          "entry_assertion": {
+            "text": "Next"
+          },
+          "opened_by": {
+            "text": "Custom time"
+          }
         }
       ]
     },
@@ -3059,7 +3058,13 @@
           "selector": {
             "text": "Start date"
           },
-          "scope": "custom start-date stage and Material civil-date picker cancelled without applying."
+          "scope": "custom start-date stage and Material civil-date picker cancelled without applying.",
+          "entry_assertion": {
+            "text": "Start date"
+          },
+          "opened_by": {
+            "text": "Custom Range"
+          }
         }
       ]
     },
@@ -6556,6 +6561,42 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
+      "symbol": "TimestampHoverTooltip",
+      "bindings": [],
+      "remaining": "Direct tooltip opening, timestamp selection and dismissal need a maintained runtime flow; source-render tests do not grant runtime execution credit."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedAlertDialog.kt",
+      "symbol": "AnimatedAlertDialog",
+      "bindings": [],
+      "remaining": "Shared alert wrapper needs direct runtime entry and exit assertions; caller-specific assertions do not qualify every wrapper state."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedAlertDialog.kt",
+      "symbol": "AnimatedBasicAlertDialog",
+      "bindings": [],
+      "remaining": "Shared basic alert wrapper needs direct runtime entry and exit assertions; caller-specific assertions do not qualify every wrapper state."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedDatePickerDialog.kt",
+      "symbol": "AnimatedDatePickerDialog",
+      "bindings": [],
+      "remaining": "Shared date picker wrapper needs direct runtime entry and exit assertions; existing mute/search cases qualify only their named caller surfaces."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MeasuredPlaybackDialog.kt",
+      "symbol": "MeasuredPlaybackDialog",
+      "bindings": [],
+      "remaining": "Measured playback wrapper needs direct runtime origin, reverse and dismissal assertions; source-render tests do not grant runtime execution credit."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AnimatedDropdownMenu.kt",
+      "symbol": "AnimatedDropdownMenu",
+      "bindings": [],
+      "remaining": "Shared dropdown wrapper needs direct runtime entry, positioning and dismissal assertions; named caller bindings do not qualify all wrapper states."
     }
   ]
 }
