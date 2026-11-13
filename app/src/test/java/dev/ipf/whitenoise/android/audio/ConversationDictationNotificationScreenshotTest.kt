@@ -62,8 +62,9 @@ class ConversationDictationNotificationScreenshotTest {
             val content = requireNotNull(expanded).apply(activity, parent)
             if (rtl) parent.layoutDirection = View.LAYOUT_DIRECTION_RTL
             parent.addView(content)
+            val width = activity.resources.displayMetrics.widthPixels
             parent.measure(
-                View.MeasureSpec.makeMeasureSpec(activity.resources.displayMetrics.widthPixels, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
             )
             parent.layout(0, 0, parent.measuredWidth, parent.measuredHeight)

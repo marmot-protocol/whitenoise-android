@@ -84,7 +84,10 @@ internal abstract class ConversationDictationForegroundTestCase {
         actions.forEach { action ->
             val intent = shadowOf(action.actionIntent).savedIntent
             assertEquals(ComponentName(service, NotificationStreamForegroundService::class.java), intent.component)
-            assertEquals(harness.conversationDictation.notificationSessionToken, intent.getStringExtra(EXTRA_SESSION_TOKEN))
+            assertEquals(
+                harness.conversationDictation.notificationSessionToken,
+                intent.getStringExtra(EXTRA_SESSION_TOKEN),
+            )
             assertEquals(
                 harness.conversationDictation.notificationActionGeneration,
                 intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L),
