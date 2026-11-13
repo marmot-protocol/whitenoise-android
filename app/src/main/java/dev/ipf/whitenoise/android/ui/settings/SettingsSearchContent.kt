@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
@@ -83,6 +84,7 @@ internal fun SettingsSearchResults(
                                 ).filter(String::isNotBlank).joinToString("\n"),
                             onClick = { onSelect(document.entry) },
                             modifier = Modifier.testTag("settings.search.result.${document.entry.id}"),
+                            leading = { SettingsLeadingIcon(document.entry.categoryIcon()) },
                         )
                     }
                 }
@@ -92,3 +94,9 @@ internal fun SettingsSearchResults(
 }
 
 private const val SETTINGS_SEARCH_MEMBERSHIP_MILLIS = 120
+
+/** A result borrows its hub category's glyph; categories outside the hub fall back to search. */
+@DrawableRes
+private fun SettingsSearchEntry.categoryIcon(): Int =
+    SettingsHomeRow.entries.firstOrNull { it.titleRes == categoryRes || it.detail == destination }?.iconRes
+        ?: R.drawable.ic_search

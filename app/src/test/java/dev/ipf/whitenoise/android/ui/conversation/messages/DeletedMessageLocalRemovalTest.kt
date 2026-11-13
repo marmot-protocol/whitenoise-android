@@ -22,7 +22,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -53,8 +52,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.TimelineRowMessageBubble
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -366,7 +363,6 @@ class DeletedMessageLocalRemovalTest {
                 timelineOrder = 1uL,
             )
         seedTimeline(controller, item)
-        val composerTextState = ComposerTextState(TextFieldValue(""))
 
         composeRule.setContent {
             var actionMenuOpen by remember { mutableStateOf(false) }
@@ -378,7 +374,6 @@ class DeletedMessageLocalRemovalTest {
                             item = current,
                             controller = controller,
                             appState = appState,
-                            composerTextState = composerTextState,
                             highlighted = false,
                             selectionMode = false,
                             textSelectionMode = false,
@@ -399,10 +394,6 @@ class DeletedMessageLocalRemovalTest {
                             onActionMenuOpenChange = { actionMenuOpen = it },
                             onQuickReactionsSave = {},
                             onReplyPreviewClick = {},
-                            composerGate = ComposerGate.COMPOSER,
-                            onBack = {},
-                            mentionCandidates = emptyList(),
-                            mentionPickerEnabled = false,
                             showSenderName = false,
                             showSenderAvatar = false,
                             collapseLongMessages = false,
@@ -437,7 +428,6 @@ class DeletedMessageLocalRemovalTest {
                 timelineOrder = 1uL,
             )
         seedTimeline(controller, item)
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         lateinit var markDeleted: () -> Unit
 
         composeRule.setContent {
@@ -458,7 +448,6 @@ class DeletedMessageLocalRemovalTest {
                         item = current,
                         controller = controller,
                         appState = appState,
-                        composerTextState = composerTextState,
                         highlighted = false,
                         selectionMode = false,
                         textSelectionMode = false,
@@ -479,10 +468,6 @@ class DeletedMessageLocalRemovalTest {
                         onActionMenuOpenChange = { actionMenuOpen = it },
                         onQuickReactionsSave = {},
                         onReplyPreviewClick = {},
-                        composerGate = ComposerGate.COMPOSER,
-                        onBack = {},
-                        mentionCandidates = emptyList(),
-                        mentionPickerEnabled = false,
                         showSenderName = false,
                         showSenderAvatar = false,
                         collapseLongMessages = collapseLongMessages,

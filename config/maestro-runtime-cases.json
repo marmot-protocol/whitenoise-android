@@ -718,7 +718,7 @@
         "MSG-002",
         "MSG-026"
       ],
-      "assertions": "Expanded Markdown reader opens its generated heading and returns to the source conversation.",
+      "assertions": "Read More expands the bubble in the conversation; long-press Show less restores its preview.",
       "postcondition": "none"
     },
     "reader-scroll-end": {
@@ -728,7 +728,7 @@
         "MSG-002",
         "MSG-026"
       ],
-      "assertions": "Reader scroll reaches the actual end of a long native message before returning.",
+      "assertions": "The conversation scroll reaches the actual end of the inline expanded message.",
       "postcondition": "none"
     },
     "reader-rotation": {
@@ -738,7 +738,7 @@
         "MSG-002",
         "MSG-026"
       ],
-      "assertions": "Expanded reader remains open through landscape and portrait configuration changes.",
+      "assertions": "The bubble stays expanded across configuration changes and Show less still restores its preview.",
       "postcondition": "none"
     },
     "reader-actions-cancel": {
@@ -748,7 +748,7 @@
         "MSG-002",
         "MSG-026"
       ],
-      "assertions": "Reader action menu cancels back to the same expanded message without copying.",
+      "assertions": "Back dismisses the long-press menu and keeps the message expanded in the conversation.",
       "postcondition": "none"
     },
     "reader-reply-cancel": {
@@ -758,7 +758,7 @@
         "MSG-002",
         "MSG-026"
       ],
-      "assertions": "Reply from the expanded message creates a reply target; cancel removes that target without sending.",
+      "assertions": "Reply on the expanded bubble uses the normal composer; cancel removes its target without sending.",
       "postcondition": "none"
     },
     "reader-links-library": {

@@ -34,7 +34,6 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -67,8 +66,6 @@ import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsHighlightPassage
 import dev.ipf.whitenoise.android.ui.conversation.timelineRowTtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -464,12 +461,12 @@ class MessageBubbleTextSelectionSpeakTest {
         assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
     }
 
-    /** Double tap seeks inside active truncated message projection. */
+    /** Double tap seeks past the stored Markdown prefix in the full body during active read-aloud. */
     @Test
     fun doubleTapSeeksInsideActiveTruncatedMessageProjection() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
-        val item = timelineMessage("First sentence. Second sentence.", contentTokensTruncated = true)
+        val item = timelineMessage("First sentence. Second sentence.", tokenizedPrefix = "First sentence.")
         val controller = conversationController(appState)
         var actionMenuOpen by mutableStateOf(false)
 
@@ -1307,14 +1304,12 @@ class MessageBubbleTextSelectionSpeakTest {
         onActionMenuOpenChange: (Boolean) -> Unit = {},
         readOnly: Boolean = false,
     ) {
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         val ttsState by appState.ttsController.state.collectAsState()
         CompositionLocalProvider(LocalTextContextMenuToolbarProvider provides nativeTextMenuProvider) {
             MessageBubble(
                 item = item,
                 controller = controller,
                 appState = appState,
-                composerTextState = composerTextState,
                 highlighted = false,
                 selectionMode = false,
                 textSelectionMode = textSelectionMode,
@@ -1335,12 +1330,6 @@ class MessageBubbleTextSelectionSpeakTest {
                 onActionMenuOpenChange = onActionMenuOpenChange,
                 onQuickReactionsSave = {},
                 onReplyPreviewClick = {},
-                composerGate = ComposerGate.COMPOSER,
-                inviteMutationInFlight = false,
-                onJoinInvite = {},
-                onDeclineInvite = {},
-                mentionCandidates = emptyList(),
-                mentionPickerEnabled = false,
                 ttsHighlightPassage = timelineRowTtsHighlightPassage(item.record.messageIdHex, ttsState),
                 ttsReadAloudProgress = timelineRowTtsReadAloudProgress(item.record.messageIdHex, ttsState),
                 readOnly = readOnly,
@@ -1398,7 +1387,7 @@ class MessageBubbleTextSelectionSpeakTest {
     /** Builds a received timeline message with the given body and optionally truncated content tokens. */
     private fun timelineMessage(
         body: String,
-        contentTokensTruncated: Boolean = false,
+        tokenizedPrefix: String? = null,
     ): TimelineMessage {
         val messageId = "05" + "00".repeat(31)
         return TimelineMessage(
@@ -1412,11 +1401,11 @@ class MessageBubbleTextSelectionSpeakTest {
                     plaintext = body,
                     contentTokens =
                         MarkdownDocumentFfi(
-                            truncated = contentTokensTruncated,
+                            truncated = tokenizedPrefix != null,
                             blocks =
                                 listOf(
                                     MarkdownBlockFfi.Paragraph(
-                                        inlines = listOf(MarkdownInlineFfi.Text(body)),
+                                        inlines = listOf(MarkdownInlineFfi.Text(tokenizedPrefix ?: body)),
                                     ),
                                 ),
                             blankLinesBefore = byteArrayOf(),
