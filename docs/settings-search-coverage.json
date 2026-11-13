@@ -94,6 +94,22 @@
         }
       ]
     },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayConnectionDetails.kt": {
+      "controls": [
+        {
+          "declaration": "\"connection_attempt\"",
+          "excluded": "Account-scoped relay state or transient reconnect action; searchable under Relays."
+        },
+        {
+          "declaration": "\"connection_status\"",
+          "excluded": "Account-scoped relay state or transient reconnect action; searchable under Relays."
+        },
+        {
+          "declaration": "\"reconnect\"",
+          "excluded": "Account-scoped relay state or transient reconnect action; searchable under Relays."
+        }
+      ]
+    },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt": {
       "controls": [
         {

@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.marmotkit.RelayLivenessFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.RelayListKind
@@ -138,11 +139,19 @@ internal data class RelayPublicationState(
     val failed: RelayPublicationOperation? = null,
 )
 
+/** One configured row's native state and whether MDK admits the endpoint for dialing. */
+internal data class RelayConnection(
+    val liveness: RelayLivenessFfi?,
+    val allowed: Boolean,
+)
+
 /** Everything the list screen renders from. */
 internal data class RelaysUiState(
     val lists: AccountRelayListsFfi?,
     val publication: RelayPublicationState = RelayPublicationState(),
     val busy: Boolean = false,
+    val connections: Map<String, RelayConnection> = emptyMap(),
+    val reconnecting: Boolean = false,
 )
 
 /** The user-facing name of a relay list kind the projection reports as missing. */
@@ -154,14 +163,61 @@ internal val MissingRelayListKindFfi.labelRes: Int
             MissingRelayListKindFfi.INBOX -> R.string.inbox
         }
 
+/** UI progress for one explicit reconnect request. */
+internal enum class RelayReconnectState {
+    Idle,
+    Requesting,
+    Failed,
+}
+
+/** One account runtime's latest reconnect request and the row it belongs to. */
+private data class RelayReconnectRequest(
+    val generation: Int,
+    val url: String,
+    val state: RelayReconnectState,
+)
+
 /**
  * One account's operation gate, shared by every visit to Relays. Claims synchronously before launching so
- * publication, edits and refreshes cannot overlap; the mutation itself survives leaving the screen.
+ * publication, edits, refreshes and reconnects cannot overlap. An admitted operation survives leaving the screen.
  * All callers run on the main thread, as does WhiteNoiseAppState.launchMutation.
  */
 internal class RelayOperationState {
     var busy by mutableStateOf(false)
         private set
+
+    private var reconnect by mutableStateOf<RelayReconnectRequest?>(null)
+
+    /** A reconnect may outlast a settings visit but does not write the published lists. */
+    val reconnecting: Boolean
+        get() = reconnect?.state == RelayReconnectState.Requesting
+
+    /** Show progress or failure only on the row and runtime that requested the connection. */
+    fun reconnectState(
+        generation: Int,
+        url: String,
+    ): RelayReconnectState {
+        val current = reconnect?.takeIf { it.generation == generation && it.url == url }
+        return current?.state ?: RelayReconnectState.Idle
+    }
+
+    /** Claim one reconnect across settings visits so a still-queued MDK command cannot be issued again. */
+    fun reconnect(
+        launcher: (suspend () -> Unit) -> Unit,
+        generation: Int,
+        url: String,
+        request: suspend () -> Boolean,
+    ) {
+        val pending = RelayReconnectRequest(generation, url, RelayReconnectState.Requesting)
+        launch(launcher) {
+            reconnect = pending
+            try {
+                reconnect = if (request()) null else pending.copy(state = RelayReconnectState.Failed)
+            } finally {
+                if (reconnect === pending) reconnect = null
+            }
+        }
+    }
 
     /** Starts an operation only when idle, releasing the gate even when the operation or launcher fails. */
     fun launch(

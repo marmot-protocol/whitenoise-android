@@ -29,7 +29,8 @@
         "test_ids": [
           "SYS-001",
           "SYS-002",
-          "SYS-003"
+          "SYS-003",
+          "SYS-016"
         ]
       },
       {
@@ -40,7 +41,8 @@
           "SYS-001",
           "SYS-002",
           "SYS-003",
-          "SYS-014"
+          "SYS-014",
+          "SYS-016"
         ]
       },
       {
@@ -50,7 +52,8 @@
         "test_ids": [
           "SYS-001",
           "SYS-002",
-          "SYS-003"
+          "SYS-003",
+          "SYS-016"
         ]
       }
     ],
@@ -388,6 +391,22 @@
           "SYS-001",
           "SYS-002",
           "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_editor_restriction_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_editor_restriction_detail",
+        "test_ids": [
+          "SYS-016"
+        ]
+      },
+      {
+        "surface": "string:relay_editor_restriction_note",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_editor_restriction_note",
+        "test_ids": [
+          "SYS-016"
         ]
       }
     ],

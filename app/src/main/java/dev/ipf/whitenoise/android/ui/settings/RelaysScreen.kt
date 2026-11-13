@@ -21,6 +21,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.marmotkit.RelayLivenessFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.RelayAddressAttention
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -42,6 +44,7 @@ import dev.ipf.whitenoise.android.state.canRemoveRelay
 import dev.ipf.whitenoise.android.state.publishMissingRelayLists
 import dev.ipf.whitenoise.android.state.relayAddressAttention
 import dev.ipf.whitenoise.android.state.restoreDefaultAccountRelays
+import dev.ipf.whitenoise.android.state.retryRelayConnection
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -73,8 +76,8 @@ internal fun RelaysScreen(
         val fresh = appState.toast?.takeIf { it !== previous }
         if (sameOwner && fresh != null) onFeedback(fresh)
     }
-    var lists by remember(account) { mutableStateOf<AccountRelayListsFfi?>(null) }
-    var publication by remember(account) { mutableStateOf(RelayPublicationState()) }
+    var lists by remember(account, feedbackRuntime) { mutableStateOf<AccountRelayListsFfi?>(null) }
+    var publication by remember(account, feedbackRuntime) { mutableStateOf(RelayPublicationState()) }
     val operations = remember(appState, account) { appState.relayOperationState(account) }
     val busy = operations.busy
     var selectedUrl by rememberSaveable(account) { mutableStateOf<String?>(null) }
@@ -113,23 +116,49 @@ internal fun RelaysScreen(
         }
     }
 
-    LaunchedEffect(account, operations) {
-        // Reopening this account during a mutation must load its result after the existing operation finishes.
-        snapshotFlow { operations.busy }.first { !it }
-        runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.loadAccountRelayLists(it) } }
+    LaunchedEffect(account, feedbackRuntime, operations) {
+        // List writes must finish before reading their projection. Reconnect does not edit that projection.
+        snapshotFlow { operations.busy && !operations.reconnecting }.first { !it }
+        if (operations.reconnecting) {
+            val projection = account?.let { appState.loadAccountRelayLists(it) }
+            val sameOwner = appState.activeAccountRef == account && appState.runtimeGeneration == feedbackRuntime
+            // This read can overlap a later refresh. Seed an empty projection without replacing a newer result.
+            if (sameOwner && lists == null) lists = projection
+        } else {
+            runPublication(RelayPublicationOperation.Refresh) { account?.let { appState.loadAccountRelayLists(it) } }
+        }
     }
 
-    val relays = lists?.let(::accountRelays).orEmpty()
+    val relays = remember(lists) { lists?.let(::accountRelays).orEmpty() }
+    val urls = remember(relays) { relays.map(AccountRelay::url) }
+    val connections =
+        key(appState, account, feedbackRuntime) {
+            if (account == null) emptyMap() else rememberRelayConnections(appState, account, feedbackRuntime, urls)
+        }
     selectedUrl?.let { url ->
         val relay = relays.firstOrNull { it.url == url }
         if (relay == null) {
             selectedUrl = null
         } else {
             BackHandler { selectedUrl = null }
+            val connection = connections[url]
+            val liveness = connection?.liveness
             RelayDetailsScreen(
                 relay = relay,
                 lists = lists,
                 busy = busy,
+                connection = liveness,
+                reconnectState = operations.reconnectState(feedbackRuntime, url),
+                onReconnect =
+                    if (account != null && connection?.allowed == true && liveness != null) {
+                        {
+                            operations.reconnect(appState::launchMutation, feedbackRuntime, url) {
+                                appState.retryRelayConnection(account, feedbackRuntime, liveness.url)
+                            }
+                        }
+                    } else {
+                        null
+                    },
                 onBack = { selectedUrl = null },
                 onSetRole = { role, enabled ->
                     runEdit {
@@ -156,7 +185,14 @@ internal fun RelaysScreen(
     }
 
     RelaysContent(
-        state = RelaysUiState(lists = lists, publication = publication, busy = busy),
+        state =
+            RelaysUiState(
+                lists = lists,
+                publication = publication,
+                busy = busy,
+                connections = connections,
+                reconnecting = operations.reconnecting,
+            ),
         onBack = onBack,
         onOpenRelay = { selectedUrl = it },
         onAdd = { addSheet = true },
@@ -228,13 +264,22 @@ internal fun RelaysContent(
     SettingsScaffold(title = stringResource(R.string.relays), onBack = onBack) {
         SettingsList {
             // One callout per kind of concern, so an onion relay is never described as an insecure connection.
-            relays.map(AccountRelay::attention).distinct().sorted().forEach { attention ->
+            relays.map { it.displayAttention(state.connections[it.url]) }.distinct().sorted().forEach { attention ->
                 val callout = attention.callout() ?: return@forEach
                 item {
                     SettingsCallout(
                         text = stringResource(callout.detailRes),
                         modifier = Modifier.testTag(callout.testTag),
                         title = stringResource(callout.titleRes),
+                        icon = R.drawable.ic_warning,
+                    )
+                }
+            }
+            if (relays.any { it.restrictedForEditing(state.connections[it.url]) }) {
+                item {
+                    SettingsCallout(
+                        text = stringResource(R.string.relay_editor_restriction_detail),
+                        modifier = Modifier.testTag("relays.imported.editor_restriction"),
                         icon = R.drawable.ic_warning,
                     )
                 }
@@ -255,9 +300,10 @@ internal fun RelaysContent(
                                 context = context,
                                 title = relay.name,
                                 onClick = { onOpenRelay(relay.url) },
-                                enabled = !busy,
+                                enabled = !busy || state.reconnecting,
                                 modifier = Modifier.testTag("relays.row.${relay.url}"),
-                                subtitle = relaySummary(relay),
+                                subtitle = relaySummary(relay, state.connections[relay.url]),
+                                value = stringResource(state.connections[relay.url]?.liveness.statusLabel),
                             )
                         }
                     }
@@ -384,8 +430,8 @@ private fun SettingsGroupScope.relayPublicationAction(
     }
 }
 
-/** One relay: its host, address and the lists it serves, with Use-for switches and Remove relay. */
-@Suppress("FunctionNaming", "LongMethod")
+/** One relay's address, live connection, role switches and removal action. */
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun RelayDetailsScreen(
     relay: AccountRelay,
@@ -394,6 +440,9 @@ internal fun RelayDetailsScreen(
     onBack: () -> Unit,
     onSetRole: (AccountRelayRole, Boolean) -> Unit,
     onRemove: () -> Unit,
+    connection: RelayLivenessFfi? = null,
+    onReconnect: (() -> Unit)? = null,
+    reconnectState: RelayReconnectState = RelayReconnectState.Idle,
 ) {
     var removeDialog by rememberSaveable(relay.url) { mutableStateOf(false) }
     val blockingRoles =
@@ -405,6 +454,9 @@ internal fun RelayDetailsScreen(
                     row("name") { context -> SettingsValue(context, stringResource(R.string.name), relay.name) }
                     row("url") { context -> SettingsValue(context, stringResource(R.string.url), relay.url) }
                 }
+            }
+            item(key = "relay.connection") {
+                RelayConnectionDetails(connection, busy, reconnectState, onReconnect)
             }
             item(key = "search.Relays.11") { SettingsSection(stringResource(R.string.use_for)) }
             item(key = "search.Relays.12") {
@@ -563,9 +615,27 @@ private fun addRelayErrorRes(
 
 /** Address and, when it is not a usable secure wss:// URL, the note naming its kind of concern. */
 @Composable
-private fun relaySummary(relay: AccountRelay): String {
-    val note = relay.attention.summaryNoteRes() ?: return relay.url
+private fun relaySummary(
+    relay: AccountRelay,
+    connection: RelayConnection?,
+): String {
+    val note =
+        if (relay.restrictedForEditing(connection)) {
+            R.string.relay_editor_restriction_note
+        } else {
+            relay.attention.summaryNoteRes() ?: return relay.url
+        }
     return "${relay.url} · ${stringResource(note)}"
+}
+
+/** An imported address that MDK admits can be live even when the Add editor would refuse it. */
+private fun AccountRelay.displayAttention(connection: RelayConnection?): RelayAddressAttention =
+    if (restrictedForEditing(connection)) RelayAddressAttention.None else attention
+
+/** An imported address allowed by MDK may still be dropped by the existing list editor. */
+private fun AccountRelay.restrictedForEditing(connection: RelayConnection?): Boolean {
+    val nativeAllowsConnection = connection?.allowed == true
+    return needsAttention && nativeAllowsConnection
 }
 
 private val RelayProgressSize = 20.dp

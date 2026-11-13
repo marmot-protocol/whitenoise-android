@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -9,6 +11,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -20,11 +23,17 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MissingRelayListKindFfi
+import dev.ipf.marmotkit.RelayEndpointClassificationFfi
+import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.marmotkit.RelayListFfi
+import dev.ipf.marmotkit.RelayLivenessFfi
+import dev.ipf.marmotkit.RelayStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
@@ -58,6 +67,177 @@ class RelaysContentTest {
         assertEquals(setOf(AccountRelayRole.Profile), relays[0].roles)
         assertEquals(setOf(AccountRelayRole.Profile, AccountRelayRole.Inbox), relays[1].roles)
         assertEquals("b.example.com", relays[1].name)
+    }
+
+    /** Different rows update from native status without changing the publication state. */
+    @Test
+    fun livenessUpdatesTheMatchingRow() {
+        val configured = "WSS://A.example.com:443/"
+        val nonDefaultPort = "$B:8443"
+        val lists = relayLists(nip65 = listOf(configured, nonDefaultPort), inbox = listOf(C))
+        val a = RelayLivenessFfi(A, RelayStatusFfi.CONNECTING, null, null)
+        val b = RelayLivenessFfi(nonDefaultPort, RelayStatusFfi.OFFLINE, 1_700_000_000uL, null)
+        val c = RelayLivenessFfi(C, RelayStatusFfi.UNKNOWN, null, null)
+        val endpoints =
+            mapOf(
+                configured to allowedEndpoint(configured, "$A/"),
+                nonDefaultPort to allowedEndpoint(nonDefaultPort, nonDefaultPort),
+            )
+        val urls = listOf(configured, nonDefaultPort, C)
+        val initialConnections = projectRelayConnections(urls, endpoints, listOf(a, b, c))
+        val state = mutableStateOf(RelaysUiState(lists, connections = initialConnections))
+        renderState { state.value }
+
+        assertConnection(configured, R.string.relay_connection_connecting)
+        assertConnection(nonDefaultPort, R.string.relay_connection_offline)
+        composeRule.onNodeWithTag("relays.imported.unusable").assertDoesNotExist()
+        composeRule.onNodeWithTag("relays.imported.editor_restriction").assertExists()
+        assertConnection(C, R.string.relay_connection_unknown)
+
+        composeRule.runOnIdle {
+            val connected = a.copy(status = RelayStatusFfi.CONNECTED)
+            val connections = projectRelayConnections(urls, endpoints, listOf(connected))
+            state.value = state.value.copy(connections = connections)
+        }
+        assertConnection(configured, R.string.relay_connection_connected)
+        assertConnection(nonDefaultPort, R.string.relay_list_status_unavailable)
+    }
+
+    /** Use native identities even when two spellings would collapse under a Java URL parser. */
+    @Test
+    fun livenessKeysPreserveDistinctNativeEndpoints() {
+        val dotPath = "$A/room/."
+        val trailingSlash = "$A/room/"
+        val offline = RelayLivenessFfi("$A/room", RelayStatusFfi.OFFLINE, null, null)
+        val connected = RelayLivenessFfi(trailingSlash, RelayStatusFfi.CONNECTED, null, null)
+        val endpoints =
+            mapOf(
+                dotPath to allowedEndpoint(dotPath, offline.url),
+                trailingSlash to allowedEndpoint(trailingSlash, connected.url),
+            )
+        val connections = projectRelayConnections(listOf(dotPath, trailingSlash), endpoints, listOf(offline, connected))
+        assertEquals(offline, connections[dotPath]?.liveness)
+        assertEquals(connected, connections[trailingSlash]?.liveness)
+    }
+
+    /** A retry shows request progress, allows retry after failure, and lets MDK decide when the row is connected. */
+    @Test
+    fun reconnectShowsProgressAndFailureUntilAnotherRequest() {
+        var response = CompletableDeferred<Boolean>()
+        val operations = RelayOperationState()
+        val showDetails = mutableStateOf(true)
+        var requests = 0
+        val connection = mutableStateOf(RelayLivenessFfi(A, RelayStatusFfi.OFFLINE, null, null))
+        renderReconnectVisit(operations, showDetails, connection) {
+            requests++
+            response.await()
+        }
+
+        val retry = composeRule.onNodeWithText(app.getString(R.string.relay_connection_retry))
+        val attempt = composeRule.onNodeWithText(app.getString(R.string.relay_connection_attempt))
+        attempt.assertDoesNotExist()
+        retry.performClick()
+        composeRule
+            .onNodeWithText(app.getString(R.string.relay_connection_retrying))
+            .assertIsNotEnabled()
+
+        composeRule.runOnIdle { showDetails.value = false }
+        retry.assertDoesNotExist()
+        composeRule
+            .onNodeWithTag("relays.row.$A")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
+        composeRule
+            .onNodeWithText(app.getString(R.string.relay_connection_retrying))
+            .assertIsNotEnabled()
+        composeRule.runOnIdle {
+            assertEquals(1, requests)
+            assertEquals(RelayReconnectState.Idle, operations.reconnectState(1, A))
+            response.complete(false)
+        }
+        composeRule.onNodeWithText(app.getString(R.string.relay_connection_retry_failed)).assertIsDisplayed()
+        composeRule.runOnIdle { response = CompletableDeferred() }
+        retry.assertIsEnabled().performClick()
+
+        composeRule.runOnIdle { response.complete(true) }
+        composeRule.onNodeWithText(app.getString(R.string.relay_connection_offline)).assertIsDisplayed()
+        retry.assertIsEnabled()
+        composeRule.runOnIdle {
+            connection.value =
+                connection.value.copy(
+                    status = RelayStatusFfi.CONNECTED,
+                    lastAttemptUnix = 1_700_000_000uL,
+                )
+        }
+        composeRule.onNodeWithText(app.getString(R.string.relay_connection_connected)).assertIsDisplayed()
+        attempt.assertIsDisplayed()
+        retry.assertDoesNotExist()
+    }
+
+    /** Allows real list-to-detail navigation while retaining the shared request owner. */
+    private fun renderReconnectVisit(
+        operations: RelayOperationState,
+        showDetails: MutableState<Boolean>,
+        connection: MutableState<RelayLivenessFfi>,
+        request: suspend () -> Boolean,
+    ) {
+        val lists = relayLists(nip65 = listOf(A), inbox = emptyList())
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                val scope = rememberCoroutineScope()
+                if (showDetails.value) {
+                    RelayDetailsScreen(
+                        relay = AccountRelay(A, setOf(AccountRelayRole.Profile)),
+                        lists = null,
+                        busy = operations.busy,
+                        onBack = {},
+                        onSetRole = { _, _ -> },
+                        onRemove = {},
+                        connection = connection.value,
+                        reconnectState = operations.reconnectState(0, A),
+                        onReconnect = {
+                            operations.reconnect({ block -> scope.launch { block() } }, 0, A, request)
+                        },
+                    )
+                } else {
+                    RelaysContent(
+                        state =
+                            RelaysUiState(
+                                lists = lists,
+                                busy = operations.busy,
+                                reconnecting = operations.reconnecting,
+                            ),
+                        onBack = {},
+                        onOpenRelay = { showDetails.value = true },
+                        onAdd = {},
+                        onRefresh = {},
+                        onPublishMissing = {},
+                        onRestore = {},
+                    )
+                }
+            }
+        }
+    }
+
+    /** Native fixture classification for an admitted address and its canonical spelling. */
+    private fun allowedEndpoint(
+        endpoint: String,
+        normalized: String,
+    ): RelayEndpointClassificationFfi {
+        val policy = RelayEndpointPolicyFfi.ALLOWED
+        return RelayEndpointClassificationFfi(endpoint, normalized, policy)
+    }
+
+    /** Check the status in the accessible row that owns the configured URL. */
+    private fun assertConnection(
+        url: String,
+        statusRes: Int,
+    ) {
+        composeRule
+            .onNodeWithTag("relays.row.$url")
+            .performScrollTo()
+            .assert(hasText(app.getString(statusRes), substring = true))
     }
 
     /** Both lists published: Published statuses, Refresh status only, and Restore enabled away from the defaults. */
@@ -131,7 +311,8 @@ class RelaysContentTest {
         render(relayLists(nip65 = listOf(POST, LEGACY), inbox = emptyList()))
         composeRule.onNodeWithTag("relays.imported.issue").assertExists()
         composeRule.onNodeWithText("legacy.example.com").performScrollTo().assertExists()
-        composeRule.onNodeWithText("$LEGACY · " + app.getString(R.string.relay_needs_attention)).assertExists()
+        val note = app.getString(R.string.relay_needs_attention)
+        composeRule.onNodeWithText("$LEGACY · $note", substring = true).assertExists()
     }
 
     /** A valid onion relay gets the Tor explanation, not the insecure-connection callout or note. */
@@ -143,11 +324,11 @@ class RelaysContentTest {
         composeRule.onNodeWithTag("relays.imported.issue").assertDoesNotExist()
         composeRule.onNodeWithText(app.getString(R.string.relay_imported_issue_detail)).assertDoesNotExist()
         composeRule
-            .onNodeWithText("$ONION · " + app.getString(R.string.relay_onion_needs_tor))
+            .onNodeWithText("$ONION · " + app.getString(R.string.relay_onion_needs_tor), substring = true)
             .performScrollTo()
             .assertExists()
         composeRule
-            .onNodeWithText("$ONION · " + app.getString(R.string.relay_needs_attention))
+            .onNodeWithText("$ONION · " + app.getString(R.string.relay_needs_attention), substring = true)
             .assertDoesNotExist()
     }
 
@@ -160,14 +341,14 @@ class RelaysContentTest {
         composeRule.onNodeWithTag("relays.imported.unusable").assertExists()
         composeRule.onNodeWithText(app.getString(R.string.relay_unusable_issue_title)).assertExists()
         composeRule
-            .onNodeWithText("$DECEPTIVE · " + app.getString(R.string.relay_needs_attention))
+            .onNodeWithText("$DECEPTIVE · " + app.getString(R.string.relay_needs_attention), substring = true)
             .performScrollTo()
             .assertExists()
         composeRule
-            .onNodeWithText("$UNUSABLE · " + app.getString(R.string.relay_unusable_address))
+            .onNodeWithText("$UNUSABLE · " + app.getString(R.string.relay_unusable_address), substring = true)
             .performScrollTo()
             .assertExists()
-        composeRule.onNodeWithText(POST).performScrollTo().assertExists()
+        composeRule.onNodeWithText(POST, substring = true).performScrollTo().assertExists()
     }
 
     /** Imported onion entries and their roles stay listed rather than being filtered from the projection. */
@@ -314,11 +495,14 @@ class RelaysContentTest {
         lists: AccountRelayListsFfi?,
         publication: RelayPublicationState = RelayPublicationState(),
         busy: Boolean = false,
-    ) {
+    ) = renderState { RelaysUiState(lists = lists, publication = publication, busy = busy) }
+
+    /** Renders a projection that can be replaced while the screen stays open. */
+    private fun renderState(state: () -> RelaysUiState) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
                 RelaysContent(
-                    state = RelaysUiState(lists = lists, publication = publication, busy = busy),
+                    state = state(),
                     onBack = {},
                     onOpenRelay = { opened = it },
                     onAdd = { adds++ },

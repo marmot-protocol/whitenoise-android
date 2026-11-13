@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="relay_editor_restriction_detail">标记的中继可以连接，但编辑包含它的列表时可能会将其移除。</string>
+    <string name="relay_editor_restriction_note">编辑时可能被移除</string>
+    <string name="relay_connection_status">连接状态</string>
+    <string name="relay_connection_connected">已连接</string>
+    <string name="relay_connection_connecting">正在连接</string>
+    <string name="relay_connection_offline">离线</string>
+    <string name="relay_connection_unknown">尚未检查</string>
+    <string name="relay_connection_attempt">上次连接尝试</string>
+    <string name="relay_connection_retry">重新连接</string>
+    <string name="relay_connection_retrying">正在请求重新连接…</string>
+    <string name="relay_connection_retry_failed">无法请求重新连接。请重试。</string>
+</resources>

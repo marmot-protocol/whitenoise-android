@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="relay_editor_restriction_detail">Un relay contrassegnato può connettersi, ma potrebbe essere rimosso modificando una lista che lo include.</string>
+    <string name="relay_editor_restriction_note">Può essere rimosso durante la modifica</string>
+    <string name="relay_connection_status">Stato della connessione</string>
+    <string name="relay_connection_connected">Connesso</string>
+    <string name="relay_connection_connecting">Connessione in corso</string>
+    <string name="relay_connection_offline">Non in linea</string>
+    <string name="relay_connection_unknown">Non ancora verificato</string>
+    <string name="relay_connection_attempt">Ultimo tentativo di connessione</string>
+    <string name="relay_connection_retry">Riconnetti</string>
+    <string name="relay_connection_retrying">Richiesta di riconnessione…</string>
+    <string name="relay_connection_retry_failed">Impossibile richiedere la riconnessione. Riprova.</string>
+</resources>

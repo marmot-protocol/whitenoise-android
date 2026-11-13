@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="relay_editor_restriction_detail">Un relais signalé peut se connecter, mais il risque d’être retiré si tu modifies une liste qui le contient.</string>
+    <string name="relay_editor_restriction_note">Peut être retiré lors d’une modification</string>
+    <string name="relay_connection_status">État de la connexion</string>
+    <string name="relay_connection_connected">Connecté</string>
+    <string name="relay_connection_connecting">Connexion en cours</string>
+    <string name="relay_connection_offline">Hors ligne</string>
+    <string name="relay_connection_unknown">Pas encore vérifié</string>
+    <string name="relay_connection_attempt">Dernière tentative de connexion</string>
+    <string name="relay_connection_retry">Reconnecter</string>
+    <string name="relay_connection_retrying">Demande de reconnexion…</string>
+    <string name="relay_connection_retry_failed">Impossible de demander la reconnexion. Réessaie.</string>
+</resources>
