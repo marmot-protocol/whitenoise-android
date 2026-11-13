@@ -47,7 +47,11 @@ internal data class PreparedGroupAvatarPixels(
 
 /** A compatibility image belongs to a selected row and the exact URL or encrypted image key. */
 internal class RetainedGroupCompatibilityPixels {
-    private data class Picture(val source: ChatListAvatarSource, val key: String, val image: ImageBitmap)
+    private data class Picture(
+        val source: ChatListAvatarSource,
+        val key: String,
+        val image: ImageBitmap,
+    )
 
     private var rows by mutableStateOf(emptySet<String>())
     private val pictures = mutableMapOf<String, Picture>()
@@ -62,11 +66,19 @@ internal class RetainedGroupCompatibilityPixels {
     fun includes(row: String): Boolean = row in rows
 
     /** A changed URL or image hash can never reuse the former picture. */
-    fun imageFor(row: String, source: ChatListAvatarSource, key: String): ImageBitmap? =
-        pictures[row]?.takeIf { it.source == source && it.key == key }?.image
+    fun imageFor(
+        row: String,
+        source: ChatListAvatarSource,
+        key: String,
+    ): ImageBitmap? = pictures[row]?.takeIf { it.source == source && it.key == key }?.image
 
     /** Records displayed compatibility pixels after layout selection. Private pictures retain their own owner. */
-    fun record(row: String, source: ChatListAvatarSource, key: String?, image: ImageBitmap?) {
+    fun record(
+        row: String,
+        source: ChatListAvatarSource,
+        key: String?,
+        image: ImageBitmap?,
+    ) {
         if (row !in rows || PrivateContactAvatarLoader.isPrivate(key)) return
         val previous = pictures[row]
         if (previous != null && (source != previous.source || key != previous.key)) pictures.remove(row)

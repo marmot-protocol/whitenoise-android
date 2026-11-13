@@ -11,16 +11,27 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 
 /** Holds the last drawn top-bar pixels for the shell's current signed-in accounts. */
 internal class RetainedAccountAvatarPixels {
-    private data class Picture(val url: String, val image: ImageBitmap)
+    private data class Picture(
+        val url: String,
+        val image: ImageBitmap,
+    )
 
     private val pictures = mutableMapOf<String, Picture>()
 
     /** An unresolved profile can use its last pixels. A resolved profile must match the exact URL. */
-    fun imageFor(accountId: String, url: String?, unresolved: Boolean): ImageBitmap? =
-        pictures[accountId]?.takeIf { it.url == url || (url == null && unresolved) }?.image
+    fun imageFor(
+        accountId: String,
+        url: String?,
+        unresolved: Boolean,
+    ): ImageBitmap? = pictures[accountId]?.takeIf { it.url == url || (url == null && unresolved) }?.image
 
     /** Drops pixels when the resolved picture changes, then records the new picture once it is drawn. */
-    fun record(accountId: String, url: String?, unresolved: Boolean, image: ImageBitmap?) {
+    fun record(
+        accountId: String,
+        url: String?,
+        unresolved: Boolean,
+        image: ImageBitmap?,
+    ) {
         if (url == null && unresolved) return
         if (url != pictures[accountId]?.url) pictures.remove(accountId)
         if (url != null && image != null) pictures[accountId] = Picture(url, image)
@@ -30,7 +41,11 @@ internal class RetainedAccountAvatarPixels {
 /** Retires last-drawn pixels after identity removal, runtime/cache reset, or profile publication. */
 @Composable
 internal fun rememberRetainedAccountAvatarPixels(appState: WhiteNoiseAppState): RetainedAccountAvatarPixels {
-    val accounts = appState.accounts.filterNot { it.signedOut }.map { it.accountIdHex }.toSet()
+    val accounts =
+        appState.accounts
+            .filterNot { it.signedOut }
+            .map { it.accountIdHex }
+            .toSet()
     return remember(
         appState,
         appState.runtimeGeneration,

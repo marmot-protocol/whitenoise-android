@@ -126,7 +126,10 @@ internal fun Avatar(
 /** Fits initials to the fixed-dp circle, including when the system font is enlarged. */
 @Composable
 @Suppress("FunctionNaming")
-private fun AvatarMonogram(title: String, size: Dp) {
+private fun AvatarMonogram(
+    title: String,
+    size: Dp,
+) {
     val fontScale = LocalDensity.current.fontScale
     val headlineSp = MaterialTheme.typography.headlineMedium.fontSize
     val fittedFontSize = minOf(size.value * MONOGRAM_DIAMETER_RATIO, headlineSp.value * fontScale).sp / fontScale

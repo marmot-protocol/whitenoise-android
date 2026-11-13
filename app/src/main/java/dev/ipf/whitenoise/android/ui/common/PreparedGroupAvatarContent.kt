@@ -50,9 +50,9 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
                 assets = visibleRows.mapNotNull(assetForRow),
                 hasVisibleRows = visibleRows.any { rowKey(it) in visibleKeys },
                 compatibilityRows =
-                    compatibilityId?.let { id ->
-                        visibleRows.filter { assetForRow(it) == null }.mapTo(mutableSetOf(), id)
-                    }.orEmpty(),
+                    compatibilityId
+                        ?.let { id -> visibleRows.filter { assetForRow(it) == null }.mapTo(mutableSetOf(), id) }
+                        .orEmpty(),
             )
         }
     }

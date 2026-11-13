@@ -388,7 +388,8 @@ internal fun GroupAvatar(
         if (retainCompatibility && durableAvatar == null) {
             LocalPreparedGroupAvatarPixels.current
                 ?.takeIf {
-                    it.accountRef == accountRef && it.runtimeGeneration == appState.runtimeGeneration &&
+                    it.accountRef == accountRef &&
+                        it.runtimeGeneration == appState.runtimeGeneration &&
                         it.lifetime == AvatarImageLoader.currentCacheLifetime()
                 }?.compatibility
                 ?.takeIf { it.includes(group.groupIdHex) }
