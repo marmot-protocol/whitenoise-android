@@ -83,25 +83,22 @@ class ComposerShortcutExplanationTest {
 
     @Test
     fun unavailableVoiceNoteSlotStillOffersTalkBackExplain() {
-        render(ComposerShortcut.VoiceNote)
-        explainViaTalkBack(composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_record)))
+        val voice = voiceController {}
+        try {
+            // Typed text hides the hold-to-record mic, leaving the unavailable slot in the toolbar.
+            render(ComposerShortcut.VoiceNote, voice, text = "Hi")
+            explainViaTalkBack(
+                composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_record)),
+            )
+        } finally {
+            voice.release()
+        }
     }
 
     @Test
     fun holdingTheMicStillRecordsWhileTalkBackCanExplainIt() {
         var permissionRequests = 0
-        val voice =
-            VoiceRecordingController(
-                context = context,
-                outputDirectory = context.cacheDir,
-                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
-                onPermissionRequest = {
-                    permissionRequests++
-                    false
-                },
-                onRecordingComplete = { _, _ -> },
-                onError = {},
-            )
+        val voice = voiceController { permissionRequests++ }
         try {
             render(ComposerShortcut.VoiceNote, voice)
             val mic = composeRule.onNodeWithTag("composer.voice.launcher")
@@ -143,6 +140,19 @@ class ComposerShortcutExplanationTest {
         assertEquals(0, customizeCalls)
     }
 
+    private fun voiceController(onPermissionRequest: () -> Unit) =
+        VoiceRecordingController(
+            context = context,
+            outputDirectory = context.cacheDir,
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            onPermissionRequest = {
+                onPermissionRequest()
+                false
+            },
+            onRecordingComplete = { _, _ -> },
+            onError = {},
+        )
+
     private fun assertExplanation(body: Int) {
         composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
         composeRule.onNodeWithTag("explanation.body").assertTextEquals(context.getString(body))
@@ -151,6 +161,7 @@ class ComposerShortcutExplanationTest {
     private fun render(
         extra: ComposerShortcut = ComposerShortcut.Camera,
         voice: VoiceRecordingController? = null,
+        text: String = "",
     ) {
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -174,7 +185,7 @@ class ComposerShortcutExplanationTest {
                                 messageTextCopy = MessageTextCopy.Default,
                                 onCancelReply = {},
                                 onSend = { _, _ -> },
-                                textState = ComposerTextState(TextFieldValue()),
+                                textState = ComposerTextState(TextFieldValue(text)),
                                 onCaptureFromCamera = { cameraCalls++ },
                                 onPickFromGallery = { galleryCalls++ },
                                 onPickDocument = {},

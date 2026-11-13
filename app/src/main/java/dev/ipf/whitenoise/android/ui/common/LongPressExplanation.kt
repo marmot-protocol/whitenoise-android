@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -163,8 +164,15 @@ internal fun Modifier.explainOnLongPress(
         semantics {
             customActions = listOf(CustomAccessibilityAction(explainLabel) { show().let { true } }) + additionalActions
         }
-    if (!holdToExplain) return described
-    return described.pointerInput(Unit) {
+    return if (holdToExplain) described.explainOnHold(haptics, show) else described
+}
+
+/** Observes the hold at Initial so the explanation replaces the child's click or long press. */
+private fun Modifier.explainOnHold(
+    haptics: HapticFeedback,
+    show: () -> Unit,
+): Modifier =
+    pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             val released =
@@ -189,4 +197,3 @@ internal fun Modifier.explainOnLongPress(
             }
         }
     }
-}
