@@ -132,11 +132,13 @@ private fun ExplanationSheet(
  * The press is observed at Initial so the hold cancels the child's normal click, including the
  * trusted-system Paste menu. [beforeShow] lets a transient surface, such as a menu, close first.
  * [additionalActions] stay available to accessibility services whether or not holding is enabled.
+ * [holdToExplain] = false keeps the Explain action but leaves the hold gesture to the element.
  */
 @Composable
 internal fun Modifier.explainOnLongPress(
     explanation: Explanation?,
     enabled: Boolean = true,
+    holdToExplain: Boolean = true,
     beforeShow: () -> Unit = {},
     additionalActions: List<CustomAccessibilityAction> = emptyList(),
 ): Modifier {
@@ -157,9 +159,12 @@ internal fun Modifier.explainOnLongPress(
     if (!enabled || host == null || explanation == null) {
         return if (additionalActions.isEmpty()) this else semantics { customActions = additionalActions }
     }
-    return semantics {
-        customActions = listOf(CustomAccessibilityAction(explainLabel) { show().let { true } }) + additionalActions
-    }.pointerInput(Unit) {
+    val described =
+        semantics {
+            customActions = listOf(CustomAccessibilityAction(explainLabel) { show().let { true } }) + additionalActions
+        }
+    if (!holdToExplain) return described
+    return described.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             val released =

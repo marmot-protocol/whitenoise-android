@@ -8,6 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
@@ -25,12 +26,16 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -77,6 +82,39 @@ class ComposerShortcutExplanationTest {
     }
 
     @Test
+    fun unavailableVoiceNoteSlotStillOffersTalkBackExplain() {
+        render(ComposerShortcut.VoiceNote)
+        explainViaTalkBack(composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_record)))
+    }
+
+    @Test
+    fun holdingTheMicStillRecordsWhileTalkBackCanExplainIt() {
+        var permissionRequests = 0
+        val voice =
+            VoiceRecordingController(
+                context = context,
+                outputDirectory = context.cacheDir,
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+                onPermissionRequest = {
+                    permissionRequests++
+                    false
+                },
+                onRecordingComplete = { _, _ -> },
+                onError = {},
+            )
+        try {
+            render(ComposerShortcut.VoiceNote, voice)
+            val mic = composeRule.onNodeWithTag("composer.voice.launcher")
+            mic.performTouchInput { longClick() }
+            composeRule.onNodeWithTag("explanation.sheet").assertDoesNotExist()
+            assertTrue("holding still tries to record", permissionRequests > 0)
+            explainViaTalkBack(mic)
+        } finally {
+            voice.release()
+        }
+    }
+
+    @Test
     fun holdingAPlusMenuRowClosesTheMenuAndExplainsItWithoutRunningTheRow() {
         render()
         composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
@@ -96,19 +134,31 @@ class ComposerShortcutExplanationTest {
         assertEquals(listOf(0, 1), listOf(galleryCalls, customizeCalls))
     }
 
+    private fun explainViaTalkBack(node: SemanticsNodeInteraction) {
+        val actions = node.fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertTrue(actions.any { it.label == context.getString(R.string.composer_customize) })
+        val explain = actions.single { it.label == context.getString(R.string.explanation_action_explain) }
+        composeRule.runOnIdle { assertTrue(explain.action()) }
+        assertExplanation(R.string.explanation_composer_voice_note)
+        assertEquals(0, customizeCalls)
+    }
+
     private fun assertExplanation(body: Int) {
         composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
         composeRule.onNodeWithTag("explanation.body").assertTextEquals(context.getString(body))
     }
 
-    private fun render() {
+    private fun render(
+        extra: ComposerShortcut = ComposerShortcut.Camera,
+        voice: VoiceRecordingController? = null,
+    ) {
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
             .edit()
             .clear()
             .putString(
                 "composer_toolbar_v1",
-                ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera)).encode(),
+                ComposerToolbarSettings(listOf(ComposerShortcut.More, extra)).encode(),
             ).commit()
         val appState = emptyAppState()
         composeRule.setContent {
@@ -128,6 +178,7 @@ class ComposerShortcutExplanationTest {
                                 onCaptureFromCamera = { cameraCalls++ },
                                 onPickFromGallery = { galleryCalls++ },
                                 onPickDocument = {},
+                                voiceRecordingController = voice,
                             )
                         }
                     }

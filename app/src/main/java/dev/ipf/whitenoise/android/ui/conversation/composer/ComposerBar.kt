@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.ConversationMorphAnchor
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
@@ -2148,11 +2149,27 @@ internal fun ComposerBar(
                         } else if (showPrimaryTrailingAction && showConfiguredMic) {
                             Box(contentAlignment = Alignment.BottomCenter) {
                                 LockHintAbove(controller = voiceRecordingController)
+                                val voiceExplainable = !isRecordingVoice && !transactionActive
                                 MicHoldButton(
                                     controller = voiceRecordingController,
                                     slotWidth = actionTargetWidth,
                                     onHoldStart = { heldVoiceBounds = voiceSlotBounds },
                                     canStart = canAcquireVoice,
+                                    // Holding records; TalkBack still gets Explain and Customize composer.
+                                    modifier =
+                                        Modifier.explainOnLongPress(
+                                            explanation =
+                                                composerShortcutExplanation(
+                                                    ComposerShortcut.VoiceNote,
+                                                    beginCustomization,
+                                                ),
+                                            enabled = voiceExplainable,
+                                            holdToExplain = false,
+                                            additionalActions =
+                                                composerCustomizeAccessibilityActions(
+                                                    if (voiceExplainable) beginCustomization else null,
+                                                ),
+                                        ),
                                 )
                             }
                         } else if (showPrimaryTrailingAction && !configuredVoiceUsesSlot) {
