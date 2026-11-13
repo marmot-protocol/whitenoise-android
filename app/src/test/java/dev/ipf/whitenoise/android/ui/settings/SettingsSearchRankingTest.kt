@@ -33,6 +33,7 @@ class SettingsSearchRankingTest {
                 "notification sound" to "Notifications.sound",
                 "block" to "DevicePrivacy.blocked_users",
                 "read aloud" to "home.ReadAloud",
+                "speaker shortcut" to "TextToSpeech.header_shortcut",
                 "gestures" to "home.Gestures",
             )
         expected.forEach { (query, id) ->

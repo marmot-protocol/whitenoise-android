@@ -1,0 +1,23 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationAutoReadAction.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationAutoReadAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationAutoReadAction.kt",
+        "anchor": "fun ConversationAutoReadAction(",
+        "test_ids": ["TTS-006"]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Conversation-only speaker OFF acknowledgement and fade-out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationAutoReadAction.kt",
+        "anchor": "exit = fadeOut(tween(durationMillis = 250, delayMillis = 350))",
+        "test_ids": ["TTS-006"]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

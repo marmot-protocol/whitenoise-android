@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
@@ -74,6 +75,27 @@ class TtsAutoReadScreenIntegrationTest {
     }
 
     @Test
+    fun headerShortcutIsAnIndependentOptInSetting() {
+        val appState = appState(activeAccountRef = accountA)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                TextToSpeechScreen(appState = appState, onBack = {})
+            }
+        }
+        val shortcut = composeRule.onNodeWithTag("speech.header_shortcut")
+        shortcut
+            .performScrollTo()
+            .assertIsOff()
+            .performClick()
+            .assertIsOn()
+        composeRule.runOnIdle {
+            assertTrue(TtsAutoReadPreferences(context).state.value.showHeaderShortcut)
+            assertFalse(appState.isConversationAutoRead(groupId))
+        }
+        shortcut.performClick().assertIsOff()
+    }
+
+    @Test
     fun groupDetailsStylePickerUsesActiveAccountForOverrides() {
         val appState = appState(activeAccountRef = accountA)
         composeRule.setContent {
@@ -99,6 +121,8 @@ class TtsAutoReadScreenIntegrationTest {
                 appState.ttsAutoReadPreferences.overrideFor(accountA, groupId),
             )
             assertNull(appState.ttsAutoReadPreferences.overrideFor(accountB, groupId))
+            assertTrue(appState.ttsAutoReadPreferences.isHeaderShortcutVisibleFor(accountA, groupId))
+            assertFalse(appState.ttsAutoReadPreferences.isHeaderShortcutVisibleFor(accountB, groupId))
         }
 
         composeRule.runOnIdle { runBlocking { appState.setActiveAccount(accountB) } }
@@ -118,6 +142,8 @@ class TtsAutoReadScreenIntegrationTest {
                 TtsAutoReadOverride.ON,
                 appState.ttsAutoReadPreferences.overrideFor(accountA, groupId),
             )
+            assertTrue(TtsAutoReadPreferences(context).isHeaderShortcutVisibleFor(accountA, groupId))
+            assertFalse(TtsAutoReadPreferences(context).isHeaderShortcutVisibleFor(accountB, groupId))
         }
     }
 

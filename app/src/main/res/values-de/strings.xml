@@ -1774,6 +1774,8 @@
     <string name="tts_bar_history_loading">Weitere Nachrichten werden geladen…</string>
     <string name="tts_bar_history_error">Weitere Nachrichten konnten nicht geladen werden. Zum Wiederholen erneut tippen.</string>
     <string name="tts_auto_read_title">Nachrichten vorlesen</string>
+    <string name="tts_header_shortcut_title">Lautsprecher-Kurzbefehl anzeigen</string>
+    <string name="tts_header_shortcut_subtitle">Vorlesen immer in der Kopfzeile anzeigen. Auch sichtbar, wenn automatisches Vorlesen global oder für diesen Chat aktiv ist.</string>
     <string name="tts_auto_read_default_global_title">Nachrichten standardmäßig vorlesen</string>
     <string name="tts_auto_read_default_global_subtitle">Liest ungelesene Nachrichten beim Öffnen eines Chats vor, sofern der Chat es nicht überschreibt</string>
     <string name="tts_auto_read_use_default_off">Standard verwenden (Aus)</string>

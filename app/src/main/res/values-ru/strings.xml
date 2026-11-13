@@ -1850,6 +1850,8 @@
     <string name="tts_bar_history_loading">Загрузка других сообщений…</string>
     <string name="tts_bar_history_error">Не удалось загрузить другие сообщения. Нажмите ещё раз, чтобы повторить.</string>
     <string name="tts_auto_read_title">Читать сообщения вслух</string>
+    <string name="tts_header_shortcut_title">Показывать кнопку динамика</string>
+    <string name="tts_header_shortcut_subtitle">Всегда показывать чтение вслух в заголовке. Кнопка также видна, когда авточтение включено глобально или для этого чата.</string>
     <string name="tts_auto_read_default_global_title">Читать сообщения вслух по умолчанию</string>
     <string name="tts_auto_read_default_global_subtitle">Читает непрочитанные сообщения при открытии чата, если чат не задаёт иное</string>
     <string name="tts_auto_read_use_default_off">Использовать по умолчанию (Выкл.)</string>

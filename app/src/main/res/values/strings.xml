@@ -2064,6 +2064,8 @@
     <string name="tts_bar_history_loading">Loading more messages…</string>
     <string name="tts_bar_history_error">Couldn\'t load more messages. Tap again to retry.</string>
     <string name="tts_auto_read_title">Read messages aloud</string>
+    <string name="tts_header_shortcut_title">Show speaker shortcut</string>
+    <string name="tts_header_shortcut_subtitle">Always show Read Aloud in the header. Also shown when auto-read is on globally or for this chat.</string>
     <string name="tts_auto_read_default_global_title">Read messages aloud by default</string>
     <string name="tts_auto_read_default_global_subtitle">Reads unread messages when a chat opens, unless the chat overrides it</string>
     <string name="tts_auto_read_use_default_off">Use default (Off)</string>

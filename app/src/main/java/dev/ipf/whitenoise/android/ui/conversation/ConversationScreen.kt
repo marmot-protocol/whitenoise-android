@@ -4103,6 +4103,7 @@ internal fun ConversationScreen(
                     header = {
                         CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
                             ConversationTopBar(
+                                showAutoReadShortcut = composerGate == ComposerGate.COMPOSER,
                                 selectionMode = selectionMode,
                                 selectedCount = batchSelectionUi.actionItems.size,
                                 onCloseSelection = {

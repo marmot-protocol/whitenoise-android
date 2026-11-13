@@ -74,6 +74,7 @@ import dev.ipf.whitenoise.android.audio.DictationDiagnosticLifecycle
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.MicrophoneCaptureCoordinator
 import dev.ipf.whitenoise.android.audio.tts.AndroidTtsSpeechEngine
+import dev.ipf.whitenoise.android.audio.tts.EngineTrust
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineHandle
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineResolver
 import dev.ipf.whitenoise.android.audio.tts.TtsEngineSelectionResult
@@ -87,6 +88,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.requiresTtsTrustWarning
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -1903,7 +1905,8 @@ class WhiteNoiseAppState private constructor(
         locale: java.util.Locale,
         startSentenceIndex: Int = 0,
     ): Boolean {
-        val owner = ttsAutoReadKey(activeAccountRef, groupIdHex) ?: return false
+        val owner =
+            ttsAutoReadKey(activeAccountRef, groupIdHex)?.takeIf { canAutoRead() } ?: return false
         val started = speakAloud(entries, locale, startSentenceIndex)
         if (started) {
             ttsAutoReadSessionKey = owner
@@ -1978,7 +1981,7 @@ class WhiteNoiseAppState private constructor(
         backgroundPreparation: Boolean,
         canCommit: () -> Boolean = { true },
     ): Boolean {
-        if (!canCommit()) return false
+        if (!canCommit() || !canAutoRead()) return false
         val ownerAccount = activeAccountRef
         return if (!backgroundPreparation) {
             speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
@@ -1989,7 +1992,7 @@ class WhiteNoiseAppState private constructor(
                     locale,
                     startSentenceIndex,
                     startRenderedHit,
-                    isCurrent = canCommit,
+                    isCurrent = { canCommit() && canAutoRead() },
                 ).also { started ->
                     if (started) {
                         ttsAutoReadSessionKey = owner
@@ -2000,6 +2003,24 @@ class WhiteNoiseAppState private constructor(
             } ?: false
         }
     }
+
+    internal val ttsPlaybackEnginePackage: String?
+        get() = ttsResolution?.let { it.handle?.enginePackage ?: it.defaultEnginePackage }
+
+    /** Uses runtime trust for the actual engine, not only the saved engine-selection preference. */
+    internal fun ttsEngineRequiringConsent(): String? {
+        val resolution = ttsResolution
+        val enginePackage = ttsPlaybackEnginePackage
+        if (resolution == null || enginePackage == null) return null
+        val trust =
+            resolution.handle?.trust
+                ?: resolution.engines.firstOrNull { it.packageName == enginePackage }?.trust
+                ?: EngineTrust.Unknown
+        return enginePackage.takeIf { requiresTtsTrustWarning(it, trust, ttsWarningPreferences) }
+    }
+
+    /** Recheck the effective engine's consent and microphone lease before preparation and commit. */
+    private fun canAutoRead(): Boolean = !microphoneCaptureCoordinator.isHeld && ttsEngineRequiringConsent() == null
 
     /**
      * History paging for the read-aloud transport. The backing conversation
@@ -2064,6 +2085,10 @@ class WhiteNoiseAppState private constructor(
     fun setTtsAutoReadGlobalDefault(enabled: Boolean) {
         ttsAutoReadPreferences.setGlobalDefaultEnabled(enabled)
         reconcileOwnedTtsAutoReadSession()
+    }
+
+    fun setTtsHeaderShortcutVisible(visible: Boolean) {
+        ttsAutoReadPreferences.setHeaderShortcutVisible(visible)
     }
 
     fun setConversationAutoReadOverride(

@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.rememberTtsTrustAction
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardEligibility
@@ -1138,6 +1139,8 @@ internal fun MessageBubble(
                 }
             }
 
+    val requestTtsTrust = rememberTtsTrustAction(appState)
+
     /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
         startRenderedHit: RenderedTextHit? = null,
@@ -1158,40 +1161,43 @@ internal fun MessageBubble(
         if (!canCommit()) return
         val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
         val locale = java.util.Locale.getDefault()
-        appState.launchMutation {
-            val entries = speakFromHereEntries(literalCode)
-            if (!canCommit() || !projectionStillCurrent()) {
-                return@launchMutation
-            }
-            if (entries.firstOrNull()?.messageIdHex != record.messageIdHex) {
-                appState.present(R.string.tts_bar_error)
-                return@launchMutation
-            }
-            val fallbackSentenceIndex =
-                if (fallbackVisibleText == null || fallbackVisibleOffset == null) {
-                    0
-                } else {
-                    speakableSentenceIndexAtVisibleOffset(
-                        visibleText = fallbackVisibleText,
-                        speakableText = entries.first().text,
-                        visibleOffset = fallbackVisibleOffset,
-                        locale = locale,
-                    )
+        requestTtsTrust {
+            appState.launchMutation {
+                if (!canCommit()) return@launchMutation
+                val entries = speakFromHereEntries(literalCode)
+                if (!canCommit() || !projectionStillCurrent()) {
+                    return@launchMutation
                 }
-            val started =
-                appState.speakAloudAutoRead(
-                    controller.group.groupIdHex,
-                    entries,
-                    locale,
-                    startSentenceIndex = fallbackSentenceIndex,
-                    startRenderedHit =
-                        startRenderedHit?.let {
-                            preparedHitFromRenderedHit(entries.first(), it)
-                        },
-                    backgroundPreparation = true,
-                    canCommit = canCommit,
-                )
-            if (!started && canCommit()) appState.present(appState.ttsStartFailureMessage())
+                if (entries.firstOrNull()?.messageIdHex != record.messageIdHex) {
+                    appState.present(R.string.tts_bar_error)
+                    return@launchMutation
+                }
+                val fallbackSentenceIndex =
+                    if (fallbackVisibleText == null || fallbackVisibleOffset == null) {
+                        0
+                    } else {
+                        speakableSentenceIndexAtVisibleOffset(
+                            visibleText = fallbackVisibleText,
+                            speakableText = entries.first().text,
+                            visibleOffset = fallbackVisibleOffset,
+                            locale = locale,
+                        )
+                    }
+                val started =
+                    appState.speakAloudAutoRead(
+                        controller.group.groupIdHex,
+                        entries,
+                        locale,
+                        startSentenceIndex = fallbackSentenceIndex,
+                        startRenderedHit =
+                            startRenderedHit?.let {
+                                preparedHitFromRenderedHit(entries.first(), it)
+                            },
+                        backgroundPreparation = true,
+                        canCommit = canCommit,
+                    )
+                if (!started && canCommit()) appState.present(appState.ttsStartFailureMessage())
+            }
         }
     }
 

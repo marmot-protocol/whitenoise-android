@@ -263,6 +263,17 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
+                "TextToSpeech.header_shortcut",
+                R.string.tts_header_shortcut_title,
+                R.string.settings_read_aloud,
+                SettingsDetail.TextToSpeech,
+                itemKey = "search.TextToSpeech.3",
+                rowKey = "header_shortcut",
+                summaryRes = R.string.tts_header_shortcut_subtitle,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
                 "TextToSpeech.media_mix",
                 R.string.tts_media_mix_title,
                 R.string.settings_read_aloud,

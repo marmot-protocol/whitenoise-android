@@ -321,6 +321,10 @@
           "represented_by": "TextToSpeech.auto_read"
         },
         {
+          "declaration": "\"header_shortcut\"",
+          "represented_by": "TextToSpeech.header_shortcut"
+        },
+        {
           "declaration": "\"engine\"",
           "represented_by": "TextToSpeech.engine"
         },

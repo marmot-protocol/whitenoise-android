@@ -113,6 +113,7 @@ internal fun ConversationTopBar(
     // height back to the transcript and composer while keeping Back, the
     // conversation identity and the details action reachable.
     compactHeight: Boolean = false,
+    showAutoReadShortcut: Boolean = true,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
 ) {
     // MDK 0.10.0 prepares the conversation title inside the live window; fall back to the app's own
@@ -390,6 +391,9 @@ internal fun ConversationTopBar(
                                 contentDescription = stringResource(R.string.back),
                             )
                         }
+                    },
+                    actions = {
+                        if (showAutoReadShortcut) ConversationAutoReadAction(appState, controller)
                     },
                     scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
                     colors =

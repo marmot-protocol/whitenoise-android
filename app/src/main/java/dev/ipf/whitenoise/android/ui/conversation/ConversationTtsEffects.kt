@@ -16,6 +16,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
@@ -124,6 +125,16 @@ internal fun ConversationTtsAutoReadEffects(
     entryFirstUnreadMessageId: String?,
     transcriptReadyToReveal: Boolean,
 ) {
+    val lifecycleOwner = LocalContext.current.lifecycleOwner()
+    // The shortcut changes future auto-read policy, not the backlog captured at chat entry.
+    val autoReadOnEntry =
+        remember(controller, chatId) {
+            controller.boundAccountRef?.let {
+                appState.conversationAutoReadFor(it, controller.group.groupIdHex)
+            } == true
+        }
+    var entryBacklogConsumed by remember(controller, chatId) { mutableStateOf(false) }
+
     suspend fun projectEntry(record: AppMessageRecordFfi) = projectConversationTtsEntry(appState, controller, record)
 
     suspend fun autoReadBacklogEntries(): List<TtsSpeakableEntry> {
@@ -157,15 +168,48 @@ internal fun ConversationTtsAutoReadEffects(
     // initially withheld for membership verification.
     LaunchedEffect(controller, chatId, transcriptReadyToReveal) {
         if (!transcriptReadyToReveal) return@LaunchedEffect
-        if (appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@LaunchedEffect
-        val entries = autoReadBacklogEntries()
-        if (entries.isNotEmpty()) {
-            appState.speakAloudAutoRead(
-                controller.group.groupIdHex,
-                entries,
-                Locale.getDefault(),
-                backgroundPreparation = true,
-            )
+        if (!autoReadOnEntry) return@LaunchedEffect
+        val account = controller.boundAccountRef ?: return@LaunchedEffect
+        val lifecycle = lifecycleOwner?.lifecycle ?: return@LaunchedEffect
+
+        fun canReadBacklog(): Boolean =
+            lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                appState.activeAccountRef == account &&
+                !appState.microphoneCaptureCoordinator.isHeld &&
+                appState.ttsEngineRequiringConsent() == null &&
+                appState.isConversationAutoRead(controller.group.groupIdHex)
+
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            if (entryBacklogConsumed) return@repeatOnLifecycle
+            if (!canReadBacklog()) {
+                entryBacklogConsumed = true
+                return@repeatOnLifecycle
+            }
+            if (appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) {
+                entryBacklogConsumed = true
+                return@repeatOnLifecycle
+            }
+            val entries = autoReadBacklogEntries()
+            if (entries.isEmpty()) {
+                entryBacklogConsumed = true
+                return@repeatOnLifecycle
+            }
+            // Projection can suspend; retain manual speech started while it was in flight.
+            val current = appState.ttsController.state.value
+            if (current is TtsState.Speaking || current is TtsState.Paused || current is TtsState.Preparing) {
+                entryBacklogConsumed = true
+                return@repeatOnLifecycle
+            }
+            val started =
+                appState.speakAloudAutoRead(
+                    controller.group.groupIdHex,
+                    entries,
+                    Locale.getDefault(),
+                    backgroundPreparation = true,
+                    canCommit = ::canReadBacklog,
+                )
+            // Only foreground loss may defer this entry attempt; a completed refusal must not replay on return.
+            entryBacklogConsumed = started || lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         }
     }
 
@@ -180,7 +224,6 @@ internal fun ConversationTtsAutoReadEffects(
         }
     var autoReadResumeGeneration by remember(controller, chatId) { mutableLongStateOf(0L) }
     var handledAutoReadResumeGeneration by remember(controller, chatId) { mutableLongStateOf(0L) }
-    val lifecycleOwner = LocalContext.current.lifecycleOwner()
     DisposableEffect(controller, chatId, lifecycleOwner) {
         if (lifecycleOwner == null) {
             onDispose { }
@@ -215,6 +258,14 @@ internal fun ConversationTtsAutoReadEffects(
         if (!transcriptReadyToReveal) return@LaunchedEffect
         if (!appState.ttsHasUsableEngine) return@LaunchedEffect
         if (!appState.isConversationAutoRead(controller.group.groupIdHex)) return@LaunchedEffect
+        val account = controller.boundAccountRef ?: return@LaunchedEffect
+
+        fun canReadResume(): Boolean =
+            lifecycleOwner?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true &&
+                appState.activeAccountRef == account &&
+                appState.isConversationAutoRead(controller.group.groupIdHex)
+
+        if (!canReadResume()) return@LaunchedEffect
         val cursor = autoReadResumeCursor
         val entries =
             withTimeoutOrNull(TTS_AUTO_READ_RESUME_SYNC_TIMEOUT_MS) {
@@ -238,6 +289,7 @@ internal fun ConversationTtsAutoReadEffects(
             entries,
             Locale.getDefault(),
             backgroundPreparation = true,
+            canCommit = ::canReadResume,
         )
     }
 }

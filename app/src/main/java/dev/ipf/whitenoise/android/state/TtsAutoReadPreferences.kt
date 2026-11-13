@@ -37,12 +37,32 @@ class TtsAutoReadPreferences(
         return _state.value.overrides[key]
     }
 
+    fun isHeaderShortcutVisibleFor(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean {
+        val key = compositeKeyOrNull(accountRef, groupIdHex) ?: return false
+        val snapshot = _state.value
+        return snapshot.showHeaderShortcut ||
+            snapshot.globalDefaultEnabled ||
+            resolveConversationAutoRead(snapshot.globalDefaultEnabled, snapshot.overrides[key])
+    }
+
     fun setGlobalDefaultEnabled(enabled: Boolean) {
         synchronized(mutationLock) {
             val current = _state.value
             if (current.globalDefaultEnabled == enabled) return
             publishLocked(current.copy(globalDefaultEnabled = enabled))
             preferences.edit().putBoolean(KEY_GLOBAL_DEFAULT, enabled).apply()
+        }
+    }
+
+    fun setHeaderShortcutVisible(visible: Boolean) {
+        synchronized(mutationLock) {
+            val current = _state.value
+            if (current.showHeaderShortcut == visible) return
+            publishLocked(current.copy(showHeaderShortcut = visible))
+            preferences.edit().putBoolean(KEY_HEADER_SHORTCUT, visible).apply()
         }
     }
 
@@ -82,7 +102,11 @@ class TtsAutoReadPreferences(
             migrateLegacyBinaryLockedIfNeeded()
             val globalDefault = preferences.getBoolean(KEY_GLOBAL_DEFAULT, false)
             val overrides = readOverridesLocked()
-            return TtsAutoReadPreferenceState(globalDefaultEnabled = globalDefault, overrides = overrides)
+            return TtsAutoReadPreferenceState(
+                globalDefaultEnabled = globalDefault,
+                overrides = overrides,
+                showHeaderShortcut = preferences.getBoolean(KEY_HEADER_SHORTCUT, false),
+            )
         }
     }
 
@@ -157,6 +181,7 @@ class TtsAutoReadPreferences(
         internal const val PREFERENCES_NAME = "whitenoise.tts_auto_read"
         internal const val KEY_LEGACY_ENABLED = "autoReadConversations"
         private const val KEY_GLOBAL_DEFAULT = "globalDefaultEnabled"
+        private const val KEY_HEADER_SHORTCUT = "showHeaderShortcut"
         private const val KEY_OVERRIDE_ON = "overrideOnConversations"
         private const val KEY_OVERRIDE_OFF = "overrideOffConversations"
         private const val KEY_LEGACY_MIGRATED = "legacyBinaryMigrated"

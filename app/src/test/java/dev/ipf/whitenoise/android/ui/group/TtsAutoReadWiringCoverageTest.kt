@@ -40,7 +40,8 @@ class TtsAutoReadWiringCoverageTest {
     @Test
     fun conversationTtsEffectsOpenIdleTriggerUsesRevealedBacklogAndAutoReadOwnership() {
         val body = source("ui/conversation/ConversationTtsEffects.kt")
-        val openEffectStart = body.indexOf("LaunchedEffect(controller, chatId, transcriptReadyToReveal)")
+        val openEffectStart =
+            body.indexOf("LaunchedEffect(controller, chatId, transcriptReadyToReveal)")
         val openEffectEnd = body.indexOf("// The process-owned continuation", openEffectStart)
         val openEffect = body.substring(openEffectStart, openEffectEnd)
 
@@ -138,8 +139,38 @@ class TtsAutoReadWiringCoverageTest {
         )
         assertTrue(
             "reveal must not replace an already owned background queue",
-            "if (appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) return@LaunchedEffect" in effects,
+            "if (appState.ownsTtsAutoReadSession(controller.group.groupIdHex)) {" in effects,
         )
+        assertTrue(
+            "toggling must not replay the entry backlog",
+            "autoReadOnEntry" in effects && "autoReadEnabled" !in effects,
+        )
+        assertTrue(
+            "new speech starts only in a resumed screen",
+            "repeatOnLifecycle(Lifecycle.State.RESUMED)" in effects,
+        )
+        assertTrue(
+            "late preparation rechecks the foreground owner",
+            "lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)" in effects,
+        )
+    }
+
+    /** The shortcut must not add an idle-arrival collector or bypass playback admission checks. */
+    @Test
+    fun headerShortcutRetainsOpenTimePolicyAndGuardsPrivatePlayback() {
+        val effects = source("ui/conversation/ConversationTtsEffects.kt")
+        assertFalse("Live-arrival behavior is a separate change", "val timelineFlow =" in effects)
+        assertTrue(
+            "Backlog commit must match its controller account",
+            "appState.activeAccountRef == account" in effects,
+        )
+        assertTrue("Backlog must recheck eligibility at commit", "canCommit = ::canReadBacklog" in effects)
+        val app = source("state/AppState.kt")
+        assertTrue("Automatic admission must protect the microphone", "microphoneCaptureCoordinator.isHeld" in app)
+        assertTrue("Automatic admission must honor engine consent", "requiresTtsTrustWarning(" in app)
+        assertTrue("Asynchronous commit must recheck the same guards", "canCommit() && canAutoRead()" in app)
+        val explicit = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
+        assertTrue("Explicit speech must offer consent before projection/playback", "requestTtsTrust {" in explicit)
     }
 
     @Test

@@ -1768,6 +1768,8 @@
     <string name="tts_bar_history_loading">Carregando mais mensagens…</string>
     <string name="tts_bar_history_error">Não foi possível carregar mais mensagens. Toque novamente para tentar de novo.</string>
     <string name="tts_auto_read_title">Ler mensagens em voz alta</string>
+    <string name="tts_header_shortcut_title">Mostrar atalho do alto-falante</string>
+    <string name="tts_header_shortcut_subtitle">Mostrar sempre a leitura em voz alta no cabeçalho. Também aparece quando a leitura automática está ativa globalmente ou nesta conversa.</string>
     <string name="tts_auto_read_default_global_title">Ler mensagens em voz alta por padrão</string>
     <string name="tts_auto_read_default_global_subtitle">Lê mensagens não lidas ao abrir uma conversa, a menos que a conversa tenha outra configuração</string>
     <string name="tts_auto_read_use_default_off">Usar padrão (Desativado)</string>

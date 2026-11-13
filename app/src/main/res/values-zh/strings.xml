@@ -1741,6 +1741,8 @@
     <string name="tts_bar_history_loading">正在加载更多消息…</string>
     <string name="tts_bar_history_error">无法加载更多消息。再次点按可重试。</string>
     <string name="tts_auto_read_title">朗读消息</string>
+    <string name="tts_header_shortcut_title">显示扬声器快捷按钮</string>
+    <string name="tts_header_shortcut_subtitle">始终在标题栏显示朗读开关。全局或此聊天启用自动朗读时也会显示。</string>
     <string name="tts_auto_read_default_global_title">默认朗读消息</string>
     <string name="tts_auto_read_default_global_subtitle">打开聊天时朗读未读消息，除非该聊天另有设置</string>
     <string name="tts_auto_read_use_default_off">使用默认（关）</string>

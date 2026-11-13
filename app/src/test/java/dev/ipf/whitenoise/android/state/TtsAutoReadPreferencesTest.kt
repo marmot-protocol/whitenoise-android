@@ -37,8 +37,122 @@ class TtsAutoReadPreferencesTest {
         val prefs = TtsAutoReadPreferences(context)
 
         assertFalse(prefs.state.value.globalDefaultEnabled)
+        assertFalse(prefs.state.value.showHeaderShortcut)
         assertEquals(emptyMap<String, TtsAutoReadOverride>(), prefs.state.value.overrides)
         assertFalse(prefs.isConversationAutoRead("account-a", "group-a"))
+    }
+
+    @Test
+    fun headerShortcutVisibilityPersistsWithoutChangingSpeechPolicy() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.setHeaderShortcutVisible(true)
+        assertTrue(prefs.state.value.showHeaderShortcut)
+        assertTrue(TtsAutoReadPreferences(context).state.value.showHeaderShortcut)
+
+        prefs.setHeaderShortcutVisible(false)
+        val reloaded = TtsAutoReadPreferences(context)
+        assertFalse(reloaded.state.value.showHeaderShortcut)
+        assertTrue(reloaded.isConversationAutoRead("account-a", "group-a"))
+        assertFalse(reloaded.state.value.globalDefaultEnabled)
+    }
+
+    @Test
+    fun enablingConversationRevealsShortcutOnlyForThatOwnerAndDisablingHidesIt() {
+        val prefs = TtsAutoReadPreferences(context)
+        assertFalse(prefs.isHeaderShortcutVisibleFor("account-a", "group-a"))
+
+        prefs.setConversationOverride("account-a", "GROUP-A", TtsAutoReadOverride.ON)
+        assertTrue(prefs.isHeaderShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(prefs.isHeaderShortcutVisibleFor("account-a", "group-b"))
+        assertFalse(prefs.isHeaderShortcutVisibleFor("account-b", "group-a"))
+        assertFalse(prefs.state.value.showHeaderShortcut)
+
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        val reloaded = TtsAutoReadPreferences(context)
+        assertFalse(reloaded.isHeaderShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(reloaded.isConversationAutoRead("account-a", "group-a"))
+    }
+
+    @Test
+    fun returningToDefaultHidesOnlyThatConversationsShortcutAndPersists() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        prefs.setConversationOverride("account-b", "group-a", TtsAutoReadOverride.ON)
+        prefs.setConversationOverride("account-a", "group-b", TtsAutoReadOverride.ON)
+
+        prefs.clearConversationOverride("account-a", "group-a")
+
+        val reloaded = TtsAutoReadPreferences(context)
+        assertFalse(reloaded.isHeaderShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(reloaded.isConversationAutoRead("account-a", "group-a"))
+        assertNull(reloaded.overrideFor("account-a", "group-a"))
+        assertTrue(reloaded.isHeaderShortcutVisibleFor("account-b", "group-a"))
+        assertTrue(reloaded.isHeaderShortcutVisibleFor("account-a", "group-b"))
+    }
+
+    @Test
+    fun returningToDefaultStillHonorsGlobalShortcutAndSpeechSettings() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setGlobalDefaultEnabled(true)
+        prefs.setHeaderShortcutVisible(true)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.clearConversationOverride("account-a", "group-a")
+        assertTrue(prefs.isHeaderShortcutVisibleFor("account-a", "group-a"))
+        assertTrue(prefs.isConversationAutoRead("account-a", "group-a"))
+
+        prefs.setHeaderShortcutVisible(false)
+        assertTrue(TtsAutoReadPreferences(context).isHeaderShortcutVisibleFor("account-a", "group-a"))
+        assertTrue(prefs.isConversationAutoRead("account-a", "group-a"))
+    }
+
+    @Test
+    fun disablingNeverEnabledConversationDoesNotRevealShortcut() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        assertFalse(TtsAutoReadPreferences(context).isHeaderShortcutVisibleFor("account-a", "group-a"))
+    }
+
+    @Test
+    fun existingEnabledConversationRevealsShortcutBeforeItIsDisabled() {
+        context
+            .getSharedPreferences(TtsAutoReadPreferences.PREFERENCES_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putStringSet("overrideOnConversations", setOf("account-a|group-a"))
+            .commit()
+
+        val prefs = TtsAutoReadPreferences(context)
+        assertTrue(prefs.isHeaderShortcutVisibleFor("account-a", "group-a"))
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        assertFalse(TtsAutoReadPreferences(context).isHeaderShortcutVisibleFor("account-a", "group-a"))
+    }
+
+    @Test
+    fun globalShortcutSettingKeepsOffConversationVisibleUntilGlobalSettingIsDisabled() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.ON)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        prefs.setHeaderShortcutVisible(true)
+        assertTrue(prefs.isHeaderShortcutVisibleFor("account-a", "group-b"))
+        prefs.setHeaderShortcutVisible(false)
+        assertFalse(prefs.isHeaderShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(prefs.isHeaderShortcutVisibleFor("account-a", "group-b"))
+        assertFalse(prefs.isHeaderShortcutVisibleFor("", "group-a"))
+    }
+
+    @Test
+    fun globalSpeechDefaultKeepsShortcutVisibleForConversationWithSpeechOff() {
+        val prefs = TtsAutoReadPreferences(context)
+        prefs.setGlobalDefaultEnabled(true)
+        prefs.setConversationOverride("account-a", "group-a", TtsAutoReadOverride.OFF)
+        val reloaded = TtsAutoReadPreferences(context)
+        assertTrue(reloaded.isHeaderShortcutVisibleFor("account-a", "group-a"))
+        assertFalse(reloaded.isConversationAutoRead("account-a", "group-a"))
+        assertTrue(reloaded.isHeaderShortcutVisibleFor("account-a", "group-b"))
+
+        prefs.setGlobalDefaultEnabled(false)
+        assertFalse(prefs.isHeaderShortcutVisibleFor("account-a", "group-a"))
     }
 
     @Test
@@ -60,6 +174,7 @@ class TtsAutoReadPreferencesTest {
         )
         assertTrue(prefs.isConversationAutoRead("account-a", "group-a"))
         assertFalse(prefs.isConversationAutoRead("account-a", "group-c"))
+        assertTrue(prefs.isHeaderShortcutVisibleFor("account-a", "group-a"))
 
         val reloaded = TtsAutoReadPreferences(context)
         assertEquals(prefs.state.value.overrides, reloaded.state.value.overrides)
