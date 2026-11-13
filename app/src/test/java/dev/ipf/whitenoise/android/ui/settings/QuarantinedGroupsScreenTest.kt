@@ -98,6 +98,42 @@ class QuarantinedGroupsScreenTest {
         assertEquals(listOf(id), actions)
     }
 
+    /** A failed rewind restore names the group and asks for a force stop or reboot, with no Retry that cannot help. */
+    @Test fun rewindRestoreFailureOffersRestartGuidanceInsteadOfRetry() {
+        val id = "c".repeat(64)
+        val actions = mutableListOf<String>()
+        content(
+            QuarantinedGroupsUiState(
+                loaded = true,
+                rows = listOf(QuarantinedGroupRow(id, AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED)),
+            ),
+            recover = actions::add,
+        )
+        compose.onNodeWithTag("quarantine.reopen").assertIsDisplayed()
+        compose.onNodeWithText("Group ${IdentityFormatter.short(id)}").assertIsDisplayed()
+        compose
+            .onNodeWithText("force stop White Noise in Android settings or restart your phone", substring = true)
+            .assertIsDisplayed()
+        compose.onNodeWithTag("quarantine.recover").assertDoesNotExist()
+        compose.onNodeWithText("Retry recovery").assertDoesNotExist()
+        assertEquals(emptyList<String>(), actions)
+    }
+
+    /** Retry stays for the five earlier reasons, a failed rewind restore withholds it. */
+    @Test fun onlyRewindRestoreFailureWithholdsRetry() {
+        val expected =
+            mapOf(
+                AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_GROUP_MISSING to true,
+                AppGroupHydrationQuarantineReasonFfi.MEMBER_VALIDATION_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.GROUP_RECORD_LOAD_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.PENDING_COMMIT_RECOVERY_FAILED to true,
+                AppGroupHydrationQuarantineReasonFfi.REWIND_RESTORE_FAILED to false,
+            )
+        assertEquals(AppGroupHydrationQuarantineReasonFfi.entries.toSet(), expected.keys)
+        expected.forEach { (reason, retryable) -> assertEquals(reason.name, retryable, quarantineRetryable(reason)) }
+    }
+
     @Test fun activeRecoveryDisablesBothRefreshAndAnotherRetry() {
         val row = QuarantinedGroupRow("a".repeat(64), AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED)
         content(QuarantinedGroupsUiState(loaded = true, rows = listOf(row), recoveringGroup = row.groupId))

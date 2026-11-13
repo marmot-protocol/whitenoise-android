@@ -23,6 +23,8 @@ internal class ConversationDictationDraftRecovery(
         val appendPayload: Boolean = false,
         val emptiedRevision: Long? = null,
         val recoveryUnavailable: Boolean = false,
+        // A transcript already handed to Send must never become part of another outgoing payload.
+        val submitted: Boolean = false,
     )
 
     private var receipt: Receipt? = null
@@ -101,6 +103,7 @@ internal class ConversationDictationDraftRecovery(
                 baseTranscript = transcript.trim(),
                 appendOnly = true,
                 recoveryUnavailable = current == null,
+                submitted = true,
             )
     }
 
@@ -252,6 +255,7 @@ internal class ConversationDictationDraftRecovery(
             written.insertion.baseTranscript,
             written.insertion.appendOnly,
             written.insertion.appendPayload,
+            submitted = previous?.submitted == true,
         )
     }
 
@@ -306,17 +310,29 @@ internal class ConversationDictationDraftRecovery(
         }
     }
 
-    /** A recovered draft is an admission fence, not a replacement for the immutable outgoing payload. */
+    /**
+     * A recovered draft is an admission fence. Retry Send requires the unedited draft this recovery wrote.
+     * A Send finishing the recording ([honorEdits]) instead takes the composer with every editor change
+     * made while speaking, unless part of this transcript was already submitted.
+     */
     fun sendTarget(
         session: Long,
         target: ConversationDictationTarget,
+        honorEdits: Boolean = false,
     ): ConversationDictationTarget? {
         val saved = receipt?.takeIf { it.session == session && it.target == target }
         return if (saved == null) {
             target
         } else {
             val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
-            if (saved.sendEligible && current != null && sameDictationRecoveryDraft(saved.draft, current)) {
+            val eligible =
+                if (honorEdits) {
+                    // An unrestored dispatch clear means the earlier payload's fate is still open.
+                    !saved.submitted && saved.emptiedRevision == null && !saved.recoveryUnavailable
+                } else {
+                    saved.sendEligible && current != null && sameDictationRecoveryDraft(saved.draft, current)
+                }
+            if (eligible && current != null) {
                 target.copy(capturedDraft = current.value, capturedDraftRevision = current.revision)
             } else {
                 null

@@ -22732,6 +22732,24 @@
         ]
       },
       {
+        "surface": "string:choose_audit_files",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.choose_audit_files",
+        "test_ids": ["SEC-009"]
+      },
+      {
+        "surface": "string:choose_audit_files_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.choose_audit_files_subtitle",
+        "test_ids": ["SEC-009"]
+      },
+      {
+        "surface": "string:export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+        "anchor": "R.string.export",
+        "test_ids": ["SEC-009"]
+      },
+      {
         "surface": "string:cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
         "anchor": "R.string.cancel",

@@ -706,6 +706,8 @@
     <string name="allow_chat_screenshots_subtitle">Blocks screenshots and Recents previews</string>
     <string name="audit_logs">Audit logs</string>
     <string name="audit_logs_settings_subtitle">Record and export diagnostic logs for your groups on this device</string>
+    <string name="choose_audit_files">Choose Audit Files</string>
+    <string name="choose_audit_files_subtitle">Save or share selected Marmot audit files</string>
     <string name="export_audit_logs">Export Diagnostic Logs</string>
     <string name="export_audit_logs_subtitle">Save or share this device’s diagnostic logs as one archive</string>
     <string name="export_audit_logs_confirm_title">Export diagnostic logs?</string>
@@ -2222,12 +2224,11 @@
     <string name="setup_acknowledge_single_device">I understand — continue</string>
     <string name="setup_continue_without_profile">Continue without a profile</string>
     <string name="setup_review_suggested_changes">Review suggested changes</string>
-    <string name="setup_one_phone_per_account">One phone per account</string>
-    <string name="setup_one_phone_per_account_help">Chats don’t sync between phones. Use this account on one phone at a time.</string>
+    <string name="setup_chats_on_this_device">Chats on this device</string>
+    <string name="setup_chats_on_this_device_help">Signing in alone does not restore your existing chats or messages. If you use another device, keep its app and data until you’ve checked your chats here.</string>
     <string name="setup_device_stage">Device use</string>
-    <string name="setup_device_discovery_none">No other installation was found on the checked relays.</string>
-    <string name="setup_other_device_possible">Another device may be using this account.</string>
-    <string name="setup_device_discovery_unknown">Couldn’t check for other devices.</string>
+    <string name="setup_other_sign_ins_found">Other sign-in records were found. They may belong to another installation or an earlier one.</string>
+    <string name="setup_other_sign_ins_unchecked">Other sign-ins could not be checked.</string>
     <string name="setup_approval_saved_pending">Your approval is saved. The change is still pending.</string>
     <string name="setup_profile_scope_help">This updates your profile in other Nostr apps.</string>
     <string name="setup_optional_profile_help">Optional. You can add a profile later.</string>
@@ -2327,7 +2328,6 @@
     <string name="setup_finding_interrupted">Setup was interrupted. You can resume the saved step.</string>
     <string name="setup_finding_too_many_relays">The list contains too many relays.</string>
     <string name="setup_finding_multi_device_unsupported">Conversations do not sync across devices.</string>
-    <string name="setup_finding_other_installation_possible">Another installation may be using this identity.</string>
     <string name="setup_finding_discovery_incomplete">Discovery could not finish. No replacement will be inferred from this result.</string>
     <string name="setup_profile_help">Optional. You can add a profile later.</string>
     <string name="setup_details">Details</string>
@@ -2593,6 +2593,9 @@
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
+    <string name="error_invite_welcome_too_large">This invitation is too large for a recipient’s inbox relays to accept. Ask them to add an inbox relay that accepts larger messages.</string>
+    <string name="error_update_too_large">This update is too large for your relays. Nothing was changed.</string>
+    <string name="error_group_change_too_large">A group change was too large for the group’s relays, so it wasn’t made.</string>
     <string name="notification_show_previews">Show notification previews</string>
     <string name="notification_show_previews_detail">When off, hides names and message content. Applies to all accounts.</string>
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>

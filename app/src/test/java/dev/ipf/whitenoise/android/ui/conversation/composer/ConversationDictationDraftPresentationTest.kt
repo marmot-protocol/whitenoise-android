@@ -367,7 +367,7 @@ class ConversationDictationDraftPresentationTest {
     }
 
     @Test
-    fun realEditsRevertedToTheCapturedTextStillFenceDictationSend() {
+    fun realEditsMadeWhileDictatingAreSentWithTheTranscript() {
         val fixture = Fixture(dispatchRecognized = true)
         composeRule.setContent { fixture.RenderComposer() }
         composeRule.runOnIdle {
@@ -382,7 +382,8 @@ class ConversationDictationDraftPresentationTest {
 
             fixture.controller.send()
             fixture.result("recognized")
-            assertTrue(fixture.dictationSends.isEmpty())
+            assertEquals(listOf("Draft recognized"), fixture.dictationSends)
+            assertEquals("", fixture.draft.text)
         }
     }
 

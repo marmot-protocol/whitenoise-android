@@ -1981,12 +1981,11 @@
     <string name="setup_acknowledge_single_device">我明白了 — 繼續</string>
     <string name="setup_continue_without_profile">不新增個人檔案，繼續</string>
     <string name="setup_review_suggested_changes">檢查建議的變更</string>
-    <string name="setup_one_phone_per_account">每個帳號僅限一部手機</string>
-    <string name="setup_one_phone_per_account_help">聊天不會在手機之間同步。請一次只在一部手機上使用此帳號。</string>
+    <string name="setup_chats_on_this_device">此裝置上的聊天</string>
+    <string name="setup_chats_on_this_device_help">僅登入不會還原你現有的聊天或訊息。如果你使用另一台裝置，請保留該裝置上的 App 和資料，直到你在這裡檢查過聊天。</string>
     <string name="setup_device_stage">裝置使用</string>
-    <string name="setup_device_discovery_none">在已檢查的中繼站上，未找到其他裝置的安裝紀錄。</string>
-    <string name="setup_other_device_possible">另一台裝置可能正在使用該帳號。</string>
-    <string name="setup_device_discovery_unknown">無法檢查其他裝置。</string>
+    <string name="setup_other_sign_ins_found">發現了其他登入記錄。它們可能屬於另一處安裝或較早的安裝。</string>
+    <string name="setup_other_sign_ins_unchecked">無法檢查其他登入。</string>
     <string name="setup_approval_saved_pending">你的核准已儲存。變更仍待處理。</string>
     <string name="setup_profile_scope_help">這會更新你在其他 Nostr 應用程式中的個人檔案。</string>
     <string name="setup_optional_profile_help">可選。你可以稍後新增個人檔案。</string>
@@ -2086,7 +2085,6 @@
     <string name="setup_finding_interrupted">設定已中斷。你可以繼續已儲存的步驟。</string>
     <string name="setup_finding_too_many_relays">清單中的中繼站過多。</string>
     <string name="setup_finding_multi_device_unsupported">對話不會在裝置之間同步。</string>
-    <string name="setup_finding_other_installation_possible">另一處安裝可能正在使用此身分。</string>
     <string name="setup_finding_discovery_incomplete">探索程序未能完成。不會根據此結果推斷替換方案。</string>
     <string name="setup_profile_help">新增名字，讓別人認出你。也可以稍後再設定。</string>
     <string name="setup_details">詳細資訊</string>
@@ -2335,6 +2333,8 @@
     <string name="diagnostics_clear_confirm_action">清除日誌</string>
     <string name="donate_open_failed">無法開啟捐款頁面。請重試。</string>
     <string name="export_audit_logs_confirm_body">日誌包含技術識別碼和活動詳情。僅分享給你信任的人。</string>
+    <string name="choose_audit_files">選擇稽核檔案</string>
+    <string name="choose_audit_files_subtitle">儲存或分享選取的 Marmot 稽核檔案</string>
     <string name="export_audit_logs">匯出診斷日誌</string>
     <string name="export_audit_logs_subtitle">將此裝置的診斷日誌儲存或分享為一個壓縮檔</string>
     <string name="export_audit_logs_confirm_title">匯出診斷日誌？</string>
@@ -2373,6 +2373,9 @@
     <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
     <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
+    <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請對方新增可接收較大訊息的收件匣中繼。</string>
+    <string name="error_update_too_large">此更新對你的中繼來說過大。未做任何變更。</string>
+    <string name="error_group_change_too_large">某項群組變更對該群組的中繼來說過大，因此未執行。</string>
     <string name="notification_show_previews">顯示通知預覽</string>
     <string name="notification_show_previews_detail">關閉後會隱藏姓名和訊息內容。適用於所有帳戶。</string>
     <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>

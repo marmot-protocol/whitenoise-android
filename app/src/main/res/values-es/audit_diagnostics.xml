@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Envío de registros de auditoría</string>
+    <string name="audit_delivery_last_success">Última comprobación correcta</string>
+    <string name="audit_delivery_waiting">Pendiente de envío</string>
+    <string name="audit_delivery_resume">Reanudar envío</string>
+    <string name="audit_delivery_resuming">Intentando enviar los registros de auditoría…</string>
+    <string name="audit_delivery_resume_failed">No se pudo reanudar el envío</string>
+    <string name="audit_delivery_active">Activo</string>
+    <string name="audit_delivery_retrying">Reintentando automáticamente</string>
+    <string name="audit_delivery_paused">En pausa</string>
+    <string name="audit_settings_loading">Cargando…</string>
+    <string name="audit_retention_title">Conservar registros de auditoría durante</string>
+    <string name="audit_retention_save_failed">No se pudo cambiar el periodo de conservación</string>
+    <string name="audit_retention_confirm_title">¿Eliminar los registros de auditoría antiguos?</string>
+    <string name="audit_retention_confirm_body">Si conservas los registros durante %1$s, se eliminarán los más antiguos de este dispositivo, incluidos los que aún estén pendientes de envío.</string>
+    <string name="audit_retention_confirm_action">Eliminar registros antiguos</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d día</item>
+        <item quantity="other">%d días</item>
+    </plurals>
+</resources>

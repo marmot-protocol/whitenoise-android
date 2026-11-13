@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,6 +68,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.editor.ActiveStrokeBuffer
 import dev.ipf.whitenoise.android.media.editor.EditorPoint
 import dev.ipf.whitenoise.android.media.editor.EditorViewTransform
 import dev.ipf.whitenoise.android.media.editor.NormalizedPoint
@@ -534,7 +536,7 @@ private fun PhotoEditorCanvas(
     sourceInfo: PhotoEditorSourceInfo,
     state: PhotoEditorUiState,
     onFreeCrop: (NormalizedRect) -> Unit,
-    onStroke: (List<NormalizedPoint>) -> Unit,
+    onStroke: (points: List<NormalizedPoint>, exceededPointBudget: Boolean) -> Unit,
     modifier: Modifier,
 ) {
     val density = LocalDensity.current
@@ -544,7 +546,10 @@ private fun PhotoEditorCanvas(
     // the move is measured from the press and not accumulated frame by frame.
     var cropDragOrigin by remember { mutableStateOf<Pair<NormalizedRect, NormalizedPoint>?>(null) }
     var transientCrop by remember { mutableStateOf<NormalizedRect?>(null) }
-    var transientStroke by remember { mutableStateOf<List<NormalizedPoint>>(emptyList()) }
+    // The live stroke is drawn straight from its bounded buffer; the revision invalidates the canvas per move
+    // without copying every point the gesture has made so far.
+    val activeStroke = remember(state.history.limits) { ActiveStrokeBuffer(state.history.limits) }
+    var activeStrokeRevision by remember { mutableIntStateOf(0) }
     val canvasDescription = stringResource(R.string.photo_editor_image_description)
 
     BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
@@ -576,7 +581,6 @@ private fun PhotoEditorCanvas(
                 Modifier
             } else {
                 Modifier.pointerInput(state.activeTool, geometry, viewTransform, state.recipe.crop) {
-                    val strokePoints = mutableListOf<NormalizedPoint>()
                     detectDragGestures(
                         onDragStart = { position ->
                             if (cropMode) {
@@ -595,9 +599,10 @@ private fun PhotoEditorCanvas(
                                         null
                                     }
                             } else {
-                                strokePoints.clear()
-                                strokePoints += geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform).clamped()
-                                transientStroke = strokePoints.toList()
+                                activeStroke.start(
+                                    geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform).clamped(),
+                                )
+                                activeStrokeRevision++
                             }
                         },
                         onDrag = { change, _ ->
@@ -617,25 +622,25 @@ private fun PhotoEditorCanvas(
                                     transientCrop = startCrop.translated(point.x - startPoint.x, point.y - startPoint.y)
                                 }
                             } else {
-                                strokePoints += point
-                                transientStroke = strokePoints.toList()
+                                activeStroke.add(point)
+                                activeStrokeRevision++
                             }
                         },
                         onDragEnd = {
                             transientCrop?.let(onFreeCrop)
-                            if (strokePoints.isNotEmpty()) onStroke(strokePoints)
+                            if (!activeStroke.isEmpty()) onStroke(activeStroke.toStroke(), activeStroke.exceededPointBudget)
                             activeCropCorner = null
                             cropDragOrigin = null
                             transientCrop = null
-                            transientStroke = emptyList()
-                            strokePoints.clear()
+                            activeStroke.clear()
+                            activeStrokeRevision++
                         },
                         onDragCancel = {
                             activeCropCorner = null
                             cropDragOrigin = null
                             transientCrop = null
-                            transientStroke = emptyList()
-                            strokePoints.clear()
+                            activeStroke.clear()
+                            activeStrokeRevision++
                         },
                     )
                 }
@@ -655,13 +660,16 @@ private fun PhotoEditorCanvas(
                         contentDescription = canvasDescription
                     },
         ) {
+            // Read so each stroke move redraws; the points themselves live in the buffer.
+            @Suppress("UNUSED_EXPRESSION")
+            activeStrokeRevision
             drawEditorPreview(
                 previewBitmap = previewBitmap,
                 geometry = geometry,
                 viewTransform = viewTransform,
                 committedRecipe = state.recipe,
                 transientCrop = transientCrop,
-                transientStroke = transientStroke,
+                transientStroke = activeStroke.points,
                 transientMode = if (state.activeTool == PhotoEditorTool.Erase) PhotoStrokeMode.Erase else PhotoStrokeMode.Draw,
                 transientColor = state.drawColorArgb,
                 transientWidth = state.strokeWidth.fraction,

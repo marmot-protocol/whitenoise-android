@@ -9,6 +9,7 @@ import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticFileStore
 import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
@@ -38,6 +39,8 @@ internal const val AUDIT_LOG_ARCHIVE_NAME = "white-noise-diagnostic-logs.zip"
 
 /** The archive's media type, so a recipient sees one archive rather than opaque attachments. */
 internal const val AUDIT_LOG_ARCHIVE_MIME_TYPE = "application/zip"
+internal const val AUDIT_LOG_JSONL_MIME_TYPE = "application/x-ndjson"
+private const val SELECTED_AUDIT_LOG_ARCHIVE_NAME = "white-noise-audit-logs.zip"
 
 /**
  * Stages engine-owned audit logs and immutable app-owned dictation and performance snapshots.
@@ -50,30 +53,54 @@ internal const val AUDIT_LOG_ARCHIVE_MIME_TYPE = "application/zip"
  * rather than yielding a partial one that looks complete. The staging directory is replaced on each
  * export so previously exported forensic data does not accumulate in cache.
  */
-@Suppress("TooGenericExceptionCaught") // Any failure must clear this export's partial archive before rethrowing.
 internal fun prepareAuditLogArchive(
     cacheDir: File,
     allowedSourceRoot: File,
     sourcePaths: List<String>,
     supplementalEntries: Map<String, ByteArray> = emptyMap(),
     performanceLogBytes: ByteArray? = null,
+): File = prepareDiagnosticArchive(cacheDir, allowedSourceRoot, sourcePaths, supplementalEntries, performanceLogBytes)
+
+/** Stages exactly the chosen engine files, preserving their bytes and excluding app diagnostics. */
+internal fun prepareSelectedAuditLogExport(
+    cacheDir: File,
+    allowedSourceRoot: File,
+    sourcePaths: List<String>,
+): File {
+    require(sourcePaths.isNotEmpty())
+    val onlyPath = sourcePaths.singleOrNull()
+    if (onlyPath == null) {
+        return prepareDiagnosticArchive(cacheDir, allowedSourceRoot, sourcePaths, auditOnly = true)
+    }
+    val source = File(onlyPath)
+    val root = allowedSourceRoot.toPath().toAbsolutePath().normalize()
+    val confined =
+        confinedRegularAuditFile(source, root, root.toRealPath())
+            ?: throw IOException("An audit log could not be included")
+    return stageAuditLogExport(cacheDir, safeAuditEntryName(source.name)) { output ->
+        copyAuditSnapshot(confined, output)
+    }
+}
+
+/** Writes a confined ZIP with stable file snapshots for selected audit exports. */
+@Suppress("LongParameterList") // Both exports use the same archive, path confinement and staging rules.
+private fun prepareDiagnosticArchive(
+    cacheDir: File,
+    allowedSourceRoot: File,
+    sourcePaths: List<String>,
+    supplementalEntries: Map<String, ByteArray> = emptyMap(),
+    performanceLogBytes: ByteArray? = null,
+    auditOnly: Boolean = false,
 ): File {
     require(sourcePaths.isNotEmpty() || supplementalEntries.isNotEmpty() || performanceLogBytes != null) {
         "At least one diagnostic log is required"
     }
-    val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
-    check(shareRoot.mkdirs() || shareRoot.isDirectory) { "Unable to prepare audit log export" }
-    pruneAuditLogShareSessions(shareRoot, RETAINED_AUDIT_EXPORT_SESSIONS - 1)
-    val shareDirectory = File(shareRoot, UUID.randomUUID().toString())
-    check(shareDirectory.mkdir()) { "Unable to prepare audit log export" }
-
     val allowedLexicalRoot = allowedSourceRoot.toPath().toAbsolutePath().normalize()
     val allowedRealRoot = if (sourcePaths.isEmpty()) null else allowedLexicalRoot.toRealPath()
-    val archive = File(shareDirectory, AUDIT_LOG_ARCHIVE_NAME)
-    val digest = MessageDigest.getInstance("SHA-256")
-    try {
+    val name = if (auditOnly) SELECTED_AUDIT_LOG_ARCHIVE_NAME else AUDIT_LOG_ARCHIVE_NAME
+    return stageAuditLogExport(cacheDir, name) { output ->
         val usedNames = mutableSetOf<String>()
-        ZipOutputStream(DigestOutputStream(archive.outputStream(), digest).buffered()).use { zip ->
+        ZipOutputStream(output).use { zip ->
             performanceLogBytes?.let { bytes ->
                 zip.putNextEntry(ZipEntry(PerformanceDiagnosticFileStore.FILE_NAME))
                 zip.write(bytes)
@@ -88,7 +115,11 @@ internal fun prepareAuditLogArchive(
                         allowedRealRoot = checkNotNull(allowedRealRoot),
                     ) ?: throw IOException("An audit log could not be included")
                 zip.putNextEntry(ZipEntry(uniqueAuditFileName(safeAuditEntryName(source.name), usedNames)))
-                source.inputStream().buffered().use { it.copyTo(zip) }
+                if (auditOnly) {
+                    copyAuditSnapshot(source, zip)
+                } else {
+                    source.inputStream().buffered().use { it.copyTo(zip) }
+                }
                 zip.closeEntry()
             }
             supplementalEntries.forEach { (name, bytes) ->
@@ -110,6 +141,26 @@ internal fun prepareAuditLogArchive(
                 zip.closeEntry()
             }
         }
+    }
+}
+
+/** Retains a completed snapshot for save/share and removes a failed export before it can be offered. */
+@Synchronized
+@Suppress("TooGenericExceptionCaught")
+private fun stageAuditLogExport(
+    cacheDir: File,
+    name: String,
+    write: (OutputStream) -> Unit,
+): File {
+    val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
+    check(shareRoot.mkdirs() || shareRoot.isDirectory) { "Unable to prepare audit log export" }
+    pruneAuditLogShareSessions(shareRoot, RETAINED_AUDIT_EXPORT_SESSIONS - 1)
+    val shareDirectory = File(shareRoot, UUID.randomUUID().toString())
+    check(shareDirectory.mkdir()) { "Unable to prepare audit log export" }
+    val archive = File(shareDirectory, name)
+    val digest = MessageDigest.getInstance("SHA-256")
+    try {
+        DigestOutputStream(archive.outputStream(), digest).buffered().use(write)
     } catch (failure: Throwable) {
         // A partial archive must never be presented as a complete export, so only this export's own
         // directory goes. The retained previous session stays: it may still back a share URI whose
@@ -182,6 +233,7 @@ private fun pruneAuditLogShareSessions(
 }
 
 /** Removes every staged export session and forgets them for self-share intake. */
+@Synchronized
 internal fun clearPreparedAuditLogShares(cacheDir: File): Boolean {
     StagedDiagnosticExports.clear()
     val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
@@ -230,7 +282,7 @@ internal fun auditLogShareIntent(
         }
 
     return Intent(Intent.ACTION_SEND).apply {
-        type = AUDIT_LOG_ARCHIVE_MIME_TYPE
+        type = auditLogExportMimeType(archive)
         putExtra(Intent.EXTRA_STREAM, uri)
         putExtra(ClipDescription.EXTRA_IS_SENSITIVE, true)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

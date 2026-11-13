@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Denetim günlüğü gönderimi</string>
+    <string name="audit_delivery_last_success">Son başarılı denetim</string>
+    <string name="audit_delivery_waiting">Gönderilmeyi bekliyor</string>
+    <string name="audit_delivery_resume">Gönderimi sürdür</string>
+    <string name="audit_delivery_resuming">Denetim günlükleri gönderilmeye çalışılıyor…</string>
+    <string name="audit_delivery_resume_failed">Gönderim sürdürülemedi</string>
+    <string name="audit_delivery_active">Etkin</string>
+    <string name="audit_delivery_retrying">Otomatik olarak yeniden deneniyor</string>
+    <string name="audit_delivery_paused">Duraklatıldı</string>
+    <string name="audit_settings_loading">Yükleniyor…</string>
+    <string name="audit_retention_title">Denetim günlüklerini saklama süresi</string>
+    <string name="audit_retention_save_failed">Günlük saklama süresi değiştirilemedi</string>
+    <string name="audit_retention_confirm_title">Eski denetim günlükleri silinsin mi?</string>
+    <string name="audit_retention_confirm_body">Günlükleri %1$s saklamak, henüz gönderilmemiş olanlar da dahil olmak üzere bu cihazdaki daha eski denetim günlüklerini siler.</string>
+    <string name="audit_retention_confirm_action">Eski günlükleri sil</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d gün</item>
+        <item quantity="other">%d gün</item>
+    </plurals>
+</resources>

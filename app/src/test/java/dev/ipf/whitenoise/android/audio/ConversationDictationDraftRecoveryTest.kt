@@ -101,6 +101,29 @@ internal class ConversationDictationDraftRecoveryTest {
         }
     }
 
+    /** Finishing Send takes the edited recovered composer; Retry still requires the unedited recovery. */
+    @Test
+    fun finishingSendHonorsComposerEditsButNeverASubmittedTranscript() {
+        val f = Fixture()
+        assertEquals(f.target, f.recovery.sendTarget(1, f.target, honorEdits = true))
+        assertTrue(f.recovery.recover(1, f.target, "first"))
+        f.edit("Pasted Draft first")
+        assertNull(f.recovery.sendTarget(1, f.target))
+        val admission = f.recovery.sendTarget(1, f.target, honorEdits = true)
+        assertEquals("Pasted Draft first", admission?.capturedDraft?.text)
+        assertEquals(f.draft.revision, admission?.capturedDraftRevision)
+
+        f.edit("")
+        f.recovery.updateDispatch(1, f.target, clearedRevision = f.draft.revision)
+        assertNull(f.recovery.sendTarget(1, f.target, honorEdits = true))
+        f.recovery.consumeSubmittedTranscript(1, f.target, "first")
+        f.edit("another message")
+        assertNull(f.recovery.sendTarget(1, f.target, honorEdits = true))
+        assertTrue(f.recovery.recover(1, f.target, "first tail"))
+        assertEquals("another message tail", f.draft.value.text)
+        assertNull(f.recovery.sendTarget(1, f.target, honorEdits = true))
+    }
+
     @Test
     fun repeatedFailureAndNewTailKeepOneTranscript() {
         val f = Fixture()

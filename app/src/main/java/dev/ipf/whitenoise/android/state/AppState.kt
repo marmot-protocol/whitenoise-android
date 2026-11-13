@@ -2395,6 +2395,9 @@ class WhiteNoiseAppState private constructor(
     var toast by mutableStateOf<ToastMessage?>(null)
         private set
 
+    /** Queued-change size refusals already shown, so a redelivered refusal is not shown twice. Main thread only. */
+    internal val shownQueuedSizeRefusals = ShownQueuedRefusals()
+
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set
 
@@ -8350,6 +8353,50 @@ class WhiteNoiseAppState private constructor(
     /** Retries the failed user choice, rather than discarding it with a passive settings read. */
     internal suspend fun retryUsageDiagnostics() = diagnostics.retry(marmot())
 
+    /** Gives the diagnostics screen a fresh controller bound to the runtime it opened with. */
+    internal fun auditDiagnosticsSettings(): AuditDiagnosticsSettings {
+        val generation = runtimeGeneration
+        return AuditDiagnosticsSettings(
+            loadRetention = { auditDiagnosticsIo(generation) { auditLogRetention() } },
+            saveRetention = { days, confirmedShortening ->
+                auditDiagnosticsIo(generation) {
+                    val current = auditLogRetention()
+                    check(days >= current.maxAgeDays || confirmedShortening) {
+                        "Audit retention shortening requires confirmation"
+                    }
+                    if (days == current.maxAgeDays) current else setAuditLogRetention(current.copy(maxAgeDays = days))
+                }
+            },
+            loadDelivery = {
+                auditDiagnosticsIo(generation) {
+                    if (auditUploadConsent.granted && auditLogSettings().enabled) {
+                        summarizeAuditDelivery(auditDeliveryStatusV5())
+                    } else {
+                        AuditDeliverySummary(AuditDeliveryState.OFF)
+                    }
+                }
+            },
+            retryDelivery = {
+                auditDiagnosticsIo(generation) {
+                    val sharingEnabled = auditUploadConsent.granted && auditLogSettings().enabled
+                    if (sharingEnabled && auditDeliveryStatusV5().any { it.destinationConfigured && it.paused }) {
+                        postAuditLogTrackerUpdateV5()
+                    }
+                }
+            },
+        )
+    }
+
+    /** Runs against the captured runtime generation so a replaced screen cannot act on its successor. */
+    private suspend fun <T> auditDiagnosticsIo(
+        generation: Int,
+        block: suspend MarmotInterface.() -> T,
+    ): T =
+        marmotIo {
+            if (generation != runtimeGeneration) throw CancellationException("Audit settings runtime changed")
+            block()
+        }
+
     /** Whether the current MDK policy has a confirmed explicit grant. */
     fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
 
@@ -13862,7 +13909,8 @@ class WhiteNoiseAppState private constructor(
      * fails, and a failed open, are retried with the capped backoff for as long as the listener runs. Lookups run
      * as supervised children of this loop, so they end with it, and a failing one is logged without cancelling the
      * loop or the notification listener above it. The same stream carries MDK's accepted deletions, so each event
-     * also retracts removed notification content, and each open reconciles the cards already shown (#3323).
+     * also retracts removed notification content, and each open reconciles the cards already shown (#3323). It also
+     * tells the active account when MDK drops a queued group change for size, which nothing else surfaces.
      */
     internal suspend fun runMutedChatReceiptLoop(
         marmot: MarmotInterface,
@@ -13898,6 +13946,10 @@ class WhiteNoiseAppState private constructor(
                         while (event != null) {
                             backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                             handleNotificationContentEvent(event, readReconciliations)
+                            // MDK drops an oversized queued group change without retrying it, so the user is told.
+                            queuedSizeRefusal(event)?.let { refusal ->
+                                launch(Dispatchers.Main) { presentQueuedSizeRefusal(refusal) }
+                            }
                             val received = (event as? MarmotEventFfi.MessageReceived)?.received
                             // Only the cheap kind and sender check runs here; the suppression reads run with the
                             // lookup, as a child of this loop, so they never delay the next event.

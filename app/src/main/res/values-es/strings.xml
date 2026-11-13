@@ -2020,12 +2020,11 @@
     <string name="setup_acknowledge_single_device">Entiendo — continuar</string>
     <string name="setup_continue_without_profile">Continuar sin perfil</string>
     <string name="setup_review_suggested_changes">Revisar los cambios sugeridos</string>
-    <string name="setup_one_phone_per_account">Un teléfono por cuenta</string>
-    <string name="setup_one_phone_per_account_help">Los chats no se sincronizan entre teléfonos. Usa esta cuenta en un solo teléfono a la vez.</string>
+    <string name="setup_chats_on_this_device">Chats en este dispositivo</string>
+    <string name="setup_chats_on_this_device_help">Iniciar sesión por sí solo no restaura tus chats ni mensajes existentes. Si usas otro dispositivo, conserva su app y sus datos hasta que hayas comprobado tus chats aquí.</string>
     <string name="setup_device_stage">Uso del dispositivo</string>
-    <string name="setup_device_discovery_none">No se encontró ninguna otra instalación en los relés verificados.</string>
-    <string name="setup_other_device_possible">Es posible que otro dispositivo esté usando esta cuenta.</string>
-    <string name="setup_device_discovery_unknown">No se pudieron buscar otros dispositivos.</string>
+    <string name="setup_other_sign_ins_found">Se encontraron otros registros de inicio de sesión. Pueden pertenecer a otra instalación o a una anterior.</string>
+    <string name="setup_other_sign_ins_unchecked">No se pudieron comprobar otros inicios de sesión.</string>
     <string name="setup_approval_saved_pending">Tu aprobación está guardada. El cambio sigue pendiente.</string>
     <string name="setup_profile_scope_help">Esto actualiza su perfil en otras aplicaciones de Nostr.</string>
     <string name="setup_optional_profile_help">Opcional. Puede agregar un perfil más tarde.</string>
@@ -2125,7 +2124,6 @@
     <string name="setup_finding_interrupted">La configuración se interrumpió. Puedes reanudar el paso guardado.</string>
     <string name="setup_finding_too_many_relays">La lista contiene demasiados relés.</string>
     <string name="setup_finding_multi_device_unsupported">Las conversaciones no se sincronizan entre dispositivos.</string>
-    <string name="setup_finding_other_installation_possible">Otra instalación podría estar usando esta identidad.</string>
     <string name="setup_finding_discovery_incomplete">El descubrimiento no pudo finalizar. No se deducirá ningún reemplazo de este resultado.</string>
     <string name="setup_profile_help">Añade un nombre para que te reconozcan. Puedes hacerlo más tarde.</string>
     <string name="setup_details">Detalles</string>
@@ -2377,6 +2375,8 @@
     <string name="diagnostics_clear_confirm_action">Borrar registros</string>
     <string name="donate_open_failed">No se pudo abrir la página de donaciones. Inténtalo de nuevo.</string>
     <string name="export_audit_logs_confirm_body">Los registros contienen identificadores técnicos y detalles de actividad. Compártelos solo con personas de confianza.</string>
+    <string name="choose_audit_files">Elegir archivos de auditoría</string>
+    <string name="choose_audit_files_subtitle">Guarda o comparte los archivos de auditoría de Marmot seleccionados</string>
     <string name="export_audit_logs">Exportar registros de diagnóstico</string>
     <string name="export_audit_logs_subtitle">Guarda o comparte los registros de diagnóstico de este dispositivo en un solo archivo</string>
     <string name="export_audit_logs_confirm_title">¿Exportar registros de diagnóstico?</string>
@@ -2415,6 +2415,9 @@
     <string name="error_invalid_key_package_for">No se pudo validar la clave de chat publicada de %1$s. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>
     <string name="error_missing_member_inbox">No hay un relay de entrada utilizable para esta persona. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
     <string name="error_missing_member_inbox_for">No hay un relay de entrada utilizable para %1$s. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
+    <string name="error_invite_welcome_too_large">Esta invitación es demasiado grande para los relays de entrada de un destinatario. Pídele que añada un relay de entrada que acepte mensajes más grandes.</string>
+    <string name="error_update_too_large">Esta actualización es demasiado grande para tus relays. No se cambió nada.</string>
+    <string name="error_group_change_too_large">Un cambio en el grupo era demasiado grande para los relays del grupo, así que no se aplicó.</string>
     <string name="notification_show_previews">Mostrar vistas previas de notificaciones</string>
     <string name="notification_show_previews_detail">Si está desactivado, se ocultan nombres y contenido de mensajes. Afecta a todas las cuentas.</string>
     <string name="notification_preview_update_failed">Los cambios pueden perderse al reiniciar.</string>

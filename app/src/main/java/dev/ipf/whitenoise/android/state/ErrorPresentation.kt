@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Build
 import androidx.annotation.StringRes
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
@@ -70,6 +72,25 @@ private fun startupReportFields(detail: String?): String {
 
 private const val MAX_STARTUP_COPY_FIELDS = 7
 
+/**
+ * The detail shown for [throwable]. An account update MDK withheld as too large for every relay's known limit (a
+ * profile, relay list or KeyPackage) replaces the generic retry copy, because retrying cannot help; a caller's
+ * specific detail is kept. Nothing was published, though a refused KeyPackage stays prepared locally.
+ */
+internal fun failureDetail(
+    throwable: Throwable,
+    detail: AppText,
+): AppText =
+    if (
+        detail == AppText.Resource(R.string.error_try_again) &&
+        throwable is MarmotKitException.EventTooLarge &&
+        throwable.artifact == OversizedArtifactFfi.OTHER
+    ) {
+        AppText.Resource(R.string.error_update_too_large)
+    } else {
+        detail
+    }
+
 fun WhiteNoiseAppState.presentFailure(
     @StringRes titleRes: Int,
     operationCode: String,
@@ -90,7 +111,7 @@ fun WhiteNoiseAppState.presentFailure(
 ) {
     // The user chose to wait for the group in the confirmation itself; there is no failure to report.
     if (throwable is GroupChangeDeclinedException) return
-    val presentation = privacySafeErrorPresentation(operationCode, throwable, detail)
+    val presentation = privacySafeErrorPresentation(operationCode, throwable, failureDetail(throwable, detail))
     presentText(
         title = title,
         detail = presentation.message,

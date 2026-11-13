@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="audit_delivery_title">Übermittlung von Auditprotokollen</string>
+    <string name="audit_delivery_last_success">Letzte erfolgreiche Prüfung</string>
+    <string name="audit_delivery_waiting">Wartet auf Upload</string>
+    <string name="audit_delivery_resume">Übermittlung fortsetzen</string>
+    <string name="audit_delivery_resuming">Auditprotokolle werden gesendet…</string>
+    <string name="audit_delivery_resume_failed">Übermittlung konnte nicht fortgesetzt werden</string>
+    <string name="audit_delivery_active">Aktiv</string>
+    <string name="audit_delivery_retrying">Automatischer Neuversuch</string>
+    <string name="audit_delivery_paused">Pausiert</string>
+    <string name="audit_settings_loading">Wird geladen…</string>
+    <string name="audit_retention_title">Auditprotokolle aufbewahren für</string>
+    <string name="audit_retention_save_failed">Aufbewahrungsdauer konnte nicht geändert werden</string>
+    <string name="audit_retention_confirm_title">Ältere Auditprotokolle löschen?</string>
+    <string name="audit_retention_confirm_body">Bei einer Aufbewahrung von %1$s werden ältere Auditprotokolle auf diesem Gerät gelöscht, auch solche, die noch nicht hochgeladen wurden.</string>
+    <string name="audit_retention_confirm_action">Ältere Protokolle löschen</string>
+    <plurals name="audit_retention_days">
+        <item quantity="one">%d Tag</item>
+        <item quantity="other">%d Tage</item>
+    </plurals>
+</resources>

@@ -4,7 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AuditDeliveryStatusV5Ffi
+import dev.ipf.marmotkit.AuditLogRetentionFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.AuditLogTrackerUpdateResultV5Ffi
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
@@ -24,6 +27,7 @@ internal fun privacyAppState(
     preferencesName: String = "device-privacy-screenshot-${decision.name}",
     seedPreferences: SharedPreferences.Editor.() -> Unit = {},
     auditRenewal: Boolean = false,
+    audit: PrivacyAuditFixture = PrivacyAuditFixture(),
     beforeSave: () -> Unit = {},
 ): WhiteNoiseAppState {
     val context = ApplicationProvider.getApplicationContext<Context>()
@@ -34,7 +38,7 @@ internal fun privacyAppState(
         .putBoolean("audit_upload_disclosure_pending", auditRenewal)
         .apply(seedPreferences)
         .commit()
-    val marmot = privacyMarmot(decision, beforeSave)
+    val marmot = privacyMarmot(decision, beforeSave, audit)
     return WhiteNoiseAppState(
         context = context,
         draftStore = DraftStore(EmptyDraftPersistence),
@@ -60,9 +64,9 @@ internal fun privacyAppState(
 internal fun privacyMarmot(
     initialDecision: UsageDiagnosticsDecisionFfi,
     beforeSave: () -> Unit,
+    audit: PrivacyAuditFixture = PrivacyAuditFixture(),
 ): MarmotInterface {
     var decision = initialDecision
-    var auditSettings = AuditLogSettingsFfi(enabled = false)
     return Proxy.newProxyInstance(
         MarmotInterface::class.java.classLoader,
         arrayOf(MarmotInterface::class.java),
@@ -106,19 +110,65 @@ internal fun privacyMarmot(
                     exportEnabled = false,
                     exportIntervalSeconds = 60uL,
                 )
+            "toString" -> "DevicePrivacyScreenshotMarmotFake"
+            "hashCode" -> System.identityHashCode(proxy)
+            "equals" -> proxy === arguments?.firstOrNull()
+            else -> audit.invoke(method.name, arguments, beforeSave)
+        }
+    } as MarmotInterface
+}
+
+/** Device-wide policy and delivery records used by the Android settings fixture. */
+internal class PrivacyAuditFixture(
+    val enabled: Boolean = false,
+    @Volatile var retention: AuditLogRetentionFfi = AuditLogRetentionFfi(30u, 256uL * 1024uL * 1024uL),
+    @Volatile var statuses: List<AuditDeliveryStatusV5Ffi> = emptyList(),
+    val clearPauseOnResume: Boolean = true,
+) {
+    @Volatile var retentionWrites = 0
+
+    @Volatile var deliveryReads = 0
+
+    @Volatile var resumeCalls = 0
+
+    private var auditSettings = AuditLogSettingsFfi(enabled = enabled)
+
+    /** Handles the audit subset of the fixture's Marmot interface. */
+    fun invoke(
+        method: String,
+        arguments: Array<out Any?>?,
+        beforeSave: () -> Unit,
+    ): Any? =
+        when (method) {
             "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments!!.first()
             "auditLogSettings" -> auditSettings
+            "auditLogRetention" -> retention
+            "setAuditLogRetention" -> {
+                retention = arguments!!.first() as AuditLogRetentionFfi
+                retentionWrites++
+                retention
+            }
+            "auditDeliveryStatusV5" -> {
+                deliveryReads++
+                statuses
+            }
+            "postAuditLogTrackerUpdateV5" -> {
+                resumeCalls++
+                if (clearPauseOnResume) {
+                    statuses =
+                        statuses.map {
+                            it.copy(paused = false, consecutiveFailures = 0uL, lastFailure = null)
+                        }
+                }
+                AuditLogTrackerUpdateResultV5Ffi(true, emptyList(), null, null)
+            }
             "setAuditLogSettings" -> {
                 beforeSave()
                 auditSettings = arguments!!.first() as AuditLogSettingsFfi
                 auditSettings
             }
-            "toString" -> "DevicePrivacyScreenshotMarmotFake"
-            "hashCode" -> System.identityHashCode(proxy)
-            "equals" -> proxy === arguments?.firstOrNull()
-            else -> error("Unexpected Marmot call: ${method.name}")
+            else -> error("Unexpected Marmot call: $method")
         }
-    } as MarmotInterface
 }
 
 /** Draft storage that never persists, so fixtures start clean. */

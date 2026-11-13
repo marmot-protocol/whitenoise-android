@@ -367,6 +367,37 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
+                "DiagnosticsImprovements.delivery",
+                R.string.audit_delivery_title,
+                R.string.diagnostics_improvements,
+                SettingsDetail.DiagnosticsImprovements,
+                itemKey = "search.DiagnosticsImprovements.delivery",
+                rowKey = "audit_delivery_status",
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "DiagnosticsImprovements.retention",
+                R.string.audit_retention_title,
+                R.string.diagnostics_improvements,
+                SettingsDetail.DiagnosticsImprovements,
+                itemKey = "search.DiagnosticsImprovements.4",
+                rowKey = "audit_retention",
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "DiagnosticsImprovements.choose_audit_files",
+                R.string.choose_audit_files,
+                R.string.diagnostics_improvements,
+                SettingsDetail.DiagnosticsImprovements,
+                itemKey = "search.DiagnosticsImprovements.4",
+                rowKey = "select_audit_files",
+                summaryRes = R.string.choose_audit_files_subtitle,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
                 "DiagnosticsImprovements.export",
                 R.string.export_audit_logs,
                 R.string.diagnostics_improvements,

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.OnboardingActionFfi
+import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayCapabilityFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
@@ -343,12 +344,15 @@ class AccountSetupContentScreenshotTest {
             theme = SetupScreenshotTheme.AMOLED,
         )
 
-    /** Expanded device diagnostics explain an inconclusive result without asserting another device is absent. */
+    /** Expanded device diagnostics add no note when no other sign-ins were found, since finding none proves nothing. */
     @Test fun deviceDiscoveryDetails() =
         capture(
             "device_discovery_details",
             AccountSetupState(
-                snapshot = setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)),
+                snapshot =
+                    setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)).also {
+                        it.singleDeviceNotice = setupDeviceNotice(OnboardingDeviceDiscoveryFfi.NONE_FOUND)
+                    },
                 detailsExpanded = true,
             ),
         )
@@ -394,7 +398,12 @@ class AccountSetupContentScreenshotTest {
                             OnboardingActionFfi.RETRY,
                             OnboardingActionFfi.CANCEL_ONBOARDING,
                         ),
-                    ),
+                    ).also { snapshot ->
+                        snapshot.singleDeviceNotice =
+                            setupDeviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE)
+                        snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.findings =
+                            listOf(setupFinding(OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE, null))
+                    },
             ),
         )
 

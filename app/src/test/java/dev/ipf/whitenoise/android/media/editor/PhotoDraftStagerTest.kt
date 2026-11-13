@@ -1,8 +1,14 @@
 package dev.ipf.whitenoise.android.media.editor
 
 import android.app.Application
+import android.content.ContentProvider
+import android.content.ContentValues
+import android.database.Cursor
+import android.database.MatrixCursor
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.CancellationSignal
+import android.provider.OpenableColumns
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
@@ -11,7 +17,12 @@ import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.restoredPhotosMissingFrom
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -28,6 +39,11 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowContentResolver
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.CRC32
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -349,10 +365,125 @@ class PhotoDraftStagerTest {
             }
         }
 
+    /** Issue #3706: a pick abandoned once its source is read must not keep the source's lease. */
+    @Test
+    fun abandonedPickAfterItsSourceIsReadReleasesTheSource() =
+        runTest {
+            val fixture = fixture()
+            val bytes = pngBytes()
+            val uri = Uri.parse("content://photo-editor/abandoned")
+            lateinit var pick: Job
+            ShadowContentResolver.reset()
+            shadowOf(app.contentResolver).registerInputStreamSupplier(uri) {
+                // The user dismisses the pick while its source is still being read.
+                pick.cancel()
+                ByteArrayInputStream(bytes)
+            }
+            pick = launch { fixture.stager.stage(uri, "slot-a", ACCOUNT, GROUP, MediaQuality.Standard) }
+            pick.join()
+
+            assertTrue(pick.isCancelled)
+            assertNull(fixture.sources.bytes("lease-0"))
+            assertNull(fixture.sources.lease("lease-0"))
+            assertNull(fixture.gateway.current)
+        }
+
+    /** Issue #3716: the provider's name query never runs on the picking thread and cannot hold the pick. */
+    @Test
+    fun stalledProviderNameFallsBackWithoutHoldingThePick() =
+        runBlocking {
+            val io = Executors.newFixedThreadPool(IO_THREADS)
+            val provider = DisplayNameProvider(name = "beach.png", gate = CountDownLatch(1))
+            try {
+                val fixture = fixture(ioDispatcher = io.asCoroutineDispatcher())
+                val uri = provider.register(app, "stalled", pngBytes())
+
+                val staged = fixture.stager.stage(uri, "slot-a", ACCOUNT, GROUP, MediaQuality.Original)
+
+                assertTrue(staged is PhotoDraftStageResult.Success)
+                assertEquals("image.png", (staged as PhotoDraftStageResult.Success).photo.attachment.fileName)
+                assertTrue(provider.entered.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                assertTrue(provider.cancelled.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                assertNotEquals(Thread.currentThread(), provider.queryThread)
+            } finally {
+                provider.gate?.countDown()
+                io.shutdownNow()
+                ShadowContentResolver.reset()
+            }
+        }
+
+    /** Stalled providers occupy at most two lookups; later picks use the fallback name without querying. */
+    @Test
+    fun stalledNameLookupsAreBoundedAndLaterPicksDoNotQueue() =
+        runBlocking {
+            val io = Executors.newFixedThreadPool(IO_THREADS)
+            val provider = DisplayNameProvider(name = "beach.png", gate = CountDownLatch(1))
+            try {
+                val fixture = fixture(ioDispatcher = io.asCoroutineDispatcher())
+                val bytes = pngBytes()
+                repeat(3) { index ->
+                    val uri = provider.register(app, "stalled-$index", bytes, reset = index == 0)
+                    val staged = fixture.stager.stage(uri, "slot-$index", ACCOUNT, GROUP, MediaQuality.Standard)
+                    assertTrue(staged is PhotoDraftStageResult.Success)
+                }
+                assertEquals(2, provider.queries.get())
+            } finally {
+                provider.gate?.countDown()
+                io.shutdownNow()
+                ShadowContentResolver.reset()
+            }
+        }
+
+    @Test
+    fun answeredProviderNameNamesThePhoto() =
+        runTest {
+            val fixture = fixture()
+            val provider = DisplayNameProvider(name = "beach.png")
+            try {
+                val uri = provider.register(app, "named", pngBytes())
+
+                val staged = fixture.stager.stage(uri, "slot-a", ACCOUNT, GROUP, MediaQuality.Standard)
+
+                assertTrue(staged is PhotoDraftStageResult.Success)
+                val fileName = (staged as PhotoDraftStageResult.Success).photo.attachment.fileName
+                assertTrue(fileName, fileName.startsWith("beach"))
+            } finally {
+                ShadowContentResolver.reset()
+            }
+        }
+
+    /** A provider without a name, or one whose query throws, keeps the default name and returns its lookup slot. */
+    @Test
+    fun missingOrFailingProviderNameKeepsTheDefaultName() =
+        runTest {
+            val fixture = fixture()
+            try {
+                listOf(
+                    DisplayNameProvider(name = null),
+                    DisplayNameProvider(name = "beach.png", failure = IllegalStateException("provider failed")),
+                ).forEachIndexed { round, provider ->
+                    val bytes = pngBytes()
+                    repeat(PICKS_PAST_LOOKUP_CAP) { index ->
+                        val uri = provider.register(app, "unnamed-$round-$index", bytes, reset = index == 0)
+                        val slot = "slot-$round-$index"
+                        val staged = fixture.stager.stage(uri, slot, ACCOUNT, GROUP, MediaQuality.Original)
+
+                        assertTrue(staged is PhotoDraftStageResult.Success)
+                        assertEquals("image.png", (staged as PhotoDraftStageResult.Success).photo.attachment.fileName)
+                    }
+                    // Every pick queried: no failed lookup kept its slot.
+                    assertEquals(PICKS_PAST_LOOKUP_CAP, provider.queries.get())
+                }
+            } finally {
+                ShadowContentResolver.reset()
+            }
+        }
+
     /** A stager over in-memory stores whose picks decode in [outgoingDomain], single-use unless a test names one. */
     private fun fixture(
         onEncode: () -> Unit = {},
         outgoingDomain: (String) -> MediaTrustDomain = { MediaTrustDomain.Unique },
+        ioDispatcher: CoroutineDispatcher? = null,
     ): Fixture {
         val payloads = StagerPayloadStore()
         val sources =
@@ -383,7 +514,8 @@ class PhotoDraftStagerTest {
                     renderer = renderer,
                     drafts = drafts,
                     outgoingDomain = outgoingDomain,
-                    ioDispatcher = dispatcher,
+                    ioDispatcher = ioDispatcher ?: dispatcher,
+                    nameLookupPermits = Semaphore(ProviderDisplayNames.MAX_NAME_LOOKUPS),
                 ),
         )
     }
@@ -451,6 +583,92 @@ class PhotoDraftStagerTest {
         private const val GROUP = "group"
         private const val PNG_IEND_CHUNK_BYTES = 12
         private const val SENSITIVE_METADATA = "private gps metadata"
+        private const val IO_THREADS = 4
+        private const val TIMEOUT_SECONDS = 5L
+        private const val PICKS_PAST_LOOKUP_CAP = ProviderDisplayNames.MAX_NAME_LOOKUPS + 1
+    }
+}
+
+/** Answers display-name queries, optionally stalling each one until [gate] opens or the caller gives up. */
+private class DisplayNameProvider(
+    private val name: String?,
+    val gate: CountDownLatch? = null,
+    private val failure: Exception? = null,
+) : ContentProvider() {
+    val queries = AtomicInteger()
+    val entered = CountDownLatch(1)
+    val cancelled = CountDownLatch(1)
+
+    @Volatile var queryThread: Thread? = null
+
+    fun register(
+        app: Application,
+        path: String,
+        bytes: ByteArray,
+        reset: Boolean = true,
+    ): Uri {
+        if (reset) {
+            ShadowContentResolver.reset()
+            ShadowContentResolver.registerProviderInternal(AUTHORITY, this)
+        }
+        val uri = Uri.parse("content://$AUTHORITY/$path")
+        // Robolectric serves openInputStream from registered suppliers, never from a provider's openFile.
+        shadowOf(app.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(bytes) }
+        return uri
+    }
+
+    override fun onCreate(): Boolean = true
+
+    override fun query(
+        uri: Uri,
+        projection: Array<out String>?,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+        sortOrder: String?,
+    ): Cursor? = query(uri, projection, selection, selectionArgs, sortOrder, null)
+
+    override fun query(
+        uri: Uri,
+        projection: Array<out String>?,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+        sortOrder: String?,
+        cancellationSignal: CancellationSignal?,
+    ): Cursor? {
+        queries.incrementAndGet()
+        queryThread = Thread.currentThread()
+        gate?.let { stall ->
+            cancellationSignal?.setOnCancelListener { cancelled.countDown() }
+            entered.countDown()
+            stall.await(STALL_SECONDS, TimeUnit.SECONDS)
+        }
+        failure?.let { throw it }
+        return MatrixCursor(arrayOf(OpenableColumns.DISPLAY_NAME)).apply { addRow(arrayOf(name)) }
+    }
+
+    override fun getType(uri: Uri): String? = null
+
+    override fun insert(
+        uri: Uri,
+        values: ContentValues?,
+    ): Uri? = null
+
+    override fun delete(
+        uri: Uri,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+    ): Int = 0
+
+    override fun update(
+        uri: Uri,
+        values: ContentValues?,
+        selection: String?,
+        selectionArgs: Array<out String>?,
+    ): Int = 0
+
+    private companion object {
+        const val AUTHORITY = "photo-draft-stager-test"
+        const val STALL_SECONDS = 10L
     }
 }
 

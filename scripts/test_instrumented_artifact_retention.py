@@ -28,12 +28,13 @@ def named_step(workflow, name):
     return marker + (remainder[:boundary.start()] if boundary else remainder)
 
 
-def expression_value(expression, event, selected, status, outcome='skipped'):
+def expression_value(expression, event, selected, status, outcome='skipped', shard=0):
     """Evaluate trusted workflow expressions against explicit GitHub status fixtures."""
     expression = expression.replace('&&', ' and ').replace('||', ' or ')
     expression = re.sub(r'!(?!=)', 'not ', expression)
     values = {
         'github': SimpleNamespace(event_name=event),
+        'matrix': SimpleNamespace(shard=shard),
         'inputs': SimpleNamespace(media_sandbox_only=selected),
         'job': SimpleNamespace(status=status),
         'steps': SimpleNamespace(instrumentation_apk_revision=SimpleNamespace(outcome=outcome)),

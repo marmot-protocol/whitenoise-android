@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.app.Activity
 import android.content.ContentResolver
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,13 +33,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.AUDIT_LOG_ARCHIVE_MIME_TYPE
-import dev.ipf.whitenoise.android.state.AUDIT_LOG_ARCHIVE_NAME
+import dev.ipf.whitenoise.android.state.AUDIT_LOG_JSONL_MIME_TYPE
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.auditLogExportMimeType
 import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import kotlinx.coroutines.launch
 import java.io.File
 
 /**
@@ -48,6 +54,8 @@ internal fun DiagnosticsImprovementsScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val auditDiagnostics = rememberAuditDiagnosticsSettings(appState)
     val clearLogsDescription =
         listOf(
             stringResource(R.string.delete_audit_logs),
@@ -58,6 +66,7 @@ internal fun DiagnosticsImprovementsScreen(
     var auditLogsBusy by remember { mutableStateOf(false) }
     var confirmAuditUpload by remember { mutableStateOf(false) }
     var exportConfirmOpen by rememberSaveable { mutableStateOf(false) }
+    var auditPickerOpen by rememberSaveable { mutableStateOf(false) }
     var deleteConfirmOpen by rememberSaveable { mutableStateOf(false) }
     // The archive staged by the acknowledged export, held until the reader picks a destination.
     // Saved as a path rather than a File so it survives the Activity recreation an open document
@@ -86,7 +95,10 @@ internal fun DiagnosticsImprovementsScreen(
             onDismiss = { confirmAuditUpload = false },
             onConfirm = {
                 confirmAuditUpload = false
-                runAuditMutation { appState.setAuditLogsEnabled(true) }
+                runAuditMutation {
+                    appState.setAuditLogsEnabled(true)
+                    auditDiagnostics.refreshDelivery()
+                }
             },
         )
     }
@@ -117,7 +129,10 @@ internal fun DiagnosticsImprovementsScreen(
                                 if (enabled) {
                                     confirmAuditUpload = true
                                 } else {
-                                    runAuditMutation { appState.setAuditLogsEnabled(false) }
+                                    runAuditMutation {
+                                        appState.setAuditLogsEnabled(false)
+                                        auditDiagnostics.refreshDelivery()
+                                    }
                                 }
                             },
                             subtitle = stringResource(R.string.audit_upload_subtitle),
@@ -128,11 +143,39 @@ internal fun DiagnosticsImprovementsScreen(
                 }
             }
             item(key = "search.DiagnosticsImprovements.2") { DiagnosticsDisclosure(appState) }
+            item(key = "search.DiagnosticsImprovements.delivery") {
+                AuditDeliverySection(
+                    settings = auditDiagnostics,
+                    consentBusy = auditLogsBusy,
+                    onRefresh = { scope.launch { auditDiagnostics.refreshDelivery() } },
+                    onResume = { scope.launch { auditDiagnostics.resumeDelivery() } },
+                )
+            }
             item(key = "search.DiagnosticsImprovements.3") {
                 SettingsSection(stringResource(R.string.stored_audit_logs))
             }
             item(key = "search.DiagnosticsImprovements.4") {
                 SettingsGroup(modifier = Modifier.testTag("diagnostics.stored.group")) {
+                    row("audit_retention") { rowContext ->
+                        AuditRetentionRow(
+                            context = rowContext,
+                            settings = auditDiagnostics,
+                            onRefresh = { scope.launch { auditDiagnostics.refreshRetention() } },
+                            onChoose = { days, confirmed ->
+                                scope.launch { auditDiagnostics.chooseRetention(days, confirmed) }
+                            },
+                        )
+                    }
+                    row("select_audit_files") { rowContext ->
+                        SettingsAction(
+                            context = rowContext,
+                            title = stringResource(R.string.choose_audit_files),
+                            modifier = Modifier.testTag("audit.files.open"),
+                            subtitle = stringResource(R.string.choose_audit_files_subtitle),
+                            onClick = { auditPickerOpen = true },
+                            enabled = !auditLogsBusy && !exportInFlight,
+                        )
+                    }
                     row("export") { rowContext ->
                         SettingsAction(
                             context = rowContext,
@@ -149,7 +192,7 @@ internal fun DiagnosticsImprovementsScreen(
                             modifier = Modifier.semantics { contentDescription = clearLogsDescription },
                             onClick = { deleteConfirmOpen = true },
                             subtitle = stringResource(R.string.diagnostics_storage_device),
-                            enabled = !auditLogsBusy,
+                            enabled = !auditLogsBusy && !exportInFlight,
                             destructive = true,
                         )
                     }
@@ -167,6 +210,17 @@ internal fun DiagnosticsImprovementsScreen(
                 )
             }
         }
+    }
+    if (auditPickerOpen) {
+        SelectAuditLogExportDialog(
+            appState = appState,
+            onDismiss = { auditPickerOpen = false },
+            onStaged = { export ->
+                auditPickerOpen = false
+                stagedArchivePath = export.absolutePath
+                exportInFlight = true
+            },
+        )
     }
     AuditLogExportFlow(
         appState = appState,
@@ -260,10 +314,9 @@ private fun AuditLogExportFlow(
 ) {
     val context = LocalContext.current
     val chooserTitle = stringResource(R.string.export_audit_logs)
+    val createDocument = remember { CreateAuditExportDocument() }
     val saveLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.CreateDocument(AUDIT_LOG_ARCHIVE_MIME_TYPE),
-        ) { uri ->
+        rememberLauncherForActivityResult(createDocument) { uri ->
             // The picker ran outside this composition; the archive it writes is whichever one this
             // export staged, read back from the retained path rather than from live state a
             // recreation or a later export could have moved on.
@@ -293,13 +346,15 @@ private fun AuditLogExportFlow(
         )
     }
     stagedArchivePath?.let { path ->
+        val file = File(path)
         AuditLogExportDestinationDialog(
+            singleFile = auditLogExportMimeType(file) == AUDIT_LOG_JSONL_MIME_TYPE,
             onDismiss = {
                 onStagedArchivePathChange(null)
                 onInFlightChange(false)
             },
             onSave = {
-                runCatching { saveLauncher.launch(AUDIT_LOG_ARCHIVE_NAME) }
+                runCatching { saveLauncher.launch(file) }
                     .onFailure {
                         onStagedArchivePathChange(null)
                         onInFlightChange(false)
@@ -310,11 +365,26 @@ private fun AuditLogExportFlow(
                 onStagedArchivePathChange(null)
                 onInFlightChange(false)
                 runCatching {
-                    context.startActivity(auditLogShareChooserIntent(context, File(path), chooserTitle))
+                    context.startActivity(auditLogShareChooserIntent(context, file, chooserTitle))
                 }.onFailure { appState.present(R.string.toast_couldnt_export_audit_logs) }
             },
         )
     }
+}
+
+/** Uses the staged file's type and basename for the system document picker. */
+private class CreateAuditExportDocument : ActivityResultContract<File, Uri?>() {
+    /** Suggests the actual file name and MIME type to the document provider. */
+    override fun createIntent(
+        context: Context,
+        input: File,
+    ): Intent = ActivityResultContracts.CreateDocument(auditLogExportMimeType(input)).createIntent(context, input.name)
+
+    /** Returns the destination only when the user completed the system picker. */
+    override fun parseResult(
+        resultCode: Int,
+        intent: Intent?,
+    ): Uri? = intent?.data?.takeIf { resultCode == Activity.RESULT_OK }
 }
 
 /**
@@ -364,11 +434,24 @@ internal fun AuditLogExportDestinationDialog(
     onDismiss: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
+    singleFile: Boolean = false,
 ) {
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.export_audit_logs_destination_title)) },
-        text = { Text(stringResource(R.string.export_audit_logs_destination_body)) },
+        title = {
+            Text(stringResource(if (singleFile) R.string.export else R.string.export_audit_logs_destination_title))
+        },
+        text = {
+            Text(
+                stringResource(
+                    if (singleFile) {
+                        R.string.export_audit_logs_confirm_body
+                    } else {
+                        R.string.export_audit_logs_destination_body
+                    },
+                ),
+            )
+        },
         confirmButton = {
             TextButton(onClick = onSave) { Text(stringResource(R.string.export_audit_logs_save)) }
         },

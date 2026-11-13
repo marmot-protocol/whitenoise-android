@@ -2032,12 +2032,11 @@
     <string name="setup_acknowledge_single_device">Ich verstehe – weiter</string>
     <string name="setup_continue_without_profile">Ohne Profil fortfahren</string>
     <string name="setup_review_suggested_changes">Vorgeschlagene Änderungen prüfen</string>
-    <string name="setup_one_phone_per_account">Ein Telefon pro Konto</string>
-    <string name="setup_one_phone_per_account_help">Chats werden nicht zwischen Telefonen synchronisiert. Verwende dieses Konto nur auf einem Telefon gleichzeitig.</string>
+    <string name="setup_chats_on_this_device">Chats auf diesem Gerät</string>
+    <string name="setup_chats_on_this_device_help">Die Anmeldung allein stellt deine bestehenden Chats und Nachrichten nicht wieder her. Wenn du ein anderes Gerät verwendest, behalte dort die App und ihre Daten, bis du deine Chats hier überprüft hast.</string>
     <string name="setup_device_stage">Gerätenutzung</string>
-    <string name="setup_device_discovery_none">Auf den überprüften Relays wurde keine andere Installation gefunden.</string>
-    <string name="setup_other_device_possible">Möglicherweise verwendet ein anderes Gerät dieses Konto.</string>
-    <string name="setup_device_discovery_unknown">Es konnte nicht nach anderen Geräten gesucht werden.</string>
+    <string name="setup_other_sign_ins_found">Es wurden weitere Anmeldeeinträge gefunden. Sie können zu einer anderen oder einer früheren Installation gehören.</string>
+    <string name="setup_other_sign_ins_unchecked">Weitere Anmeldungen konnten nicht geprüft werden.</string>
     <string name="setup_approval_saved_pending">Deine Zustimmung ist gespeichert. Die Änderung steht noch aus.</string>
     <string name="setup_profile_scope_help">Dadurch wird dein Profil in anderen Nostr-Apps aktualisiert.</string>
     <string name="setup_optional_profile_help">Optional. Du kannst später ein Profil hinzufügen.</string>
@@ -2137,7 +2136,6 @@
     <string name="setup_finding_interrupted">Die Einrichtung wurde unterbrochen. Du kannst den gespeicherten Schritt fortsetzen.</string>
     <string name="setup_finding_too_many_relays">Die Liste enthält zu viele Relays.</string>
     <string name="setup_finding_multi_device_unsupported">Unterhaltungen werden nicht zwischen Geräten synchronisiert.</string>
-    <string name="setup_finding_other_installation_possible">Eine andere Installation verwendet möglicherweise diese Identität.</string>
     <string name="setup_finding_discovery_incomplete">Die Suche konnte nicht abgeschlossen werden. Aus diesem Ergebnis wird keine Ersatzliste abgeleitet.</string>
     <string name="setup_profile_help">Füge einen Namen hinzu, damit andere dich erkennen. Das geht auch später.</string>
     <string name="setup_details">Details</string>
@@ -2389,6 +2387,8 @@
     <string name="diagnostics_clear_confirm_action">Protokolle löschen</string>
     <string name="donate_open_failed">Die Spendenseite ließ sich nicht öffnen. Versuche es erneut.</string>
     <string name="export_audit_logs_confirm_body">Protokolle enthalten technische Kennungen und Aktivitätsdetails. Teile sie nur mit Vertrauenspersonen.</string>
+    <string name="choose_audit_files">Auditdateien auswählen</string>
+    <string name="choose_audit_files_subtitle">Ausgewählte Marmot-Auditdateien speichern oder teilen</string>
     <string name="export_audit_logs">Diagnoseprotokolle exportieren</string>
     <string name="export_audit_logs_subtitle">Diagnoseprotokolle dieses Geräts als ein Archiv speichern oder teilen</string>
     <string name="export_audit_logs_confirm_title">Diagnoseprotokolle exportieren?</string>
@@ -2427,6 +2427,9 @@
     <string name="error_invalid_key_package_for">Der veröffentlichte Chat-Schlüssel für %1$s konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox">Für diese Person gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox_for">Für %1$s gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
+    <string name="error_invite_welcome_too_large">Diese Einladung ist zu groß für die Posteingangs-Relays einer eingeladenen Person. Bitten Sie die Person, ein Posteingangs-Relay hinzuzufügen, das größere Nachrichten annimmt.</string>
+    <string name="error_update_too_large">Diese Aktualisierung ist zu groß für Ihre Relays. Es wurde nichts geändert.</string>
+    <string name="error_group_change_too_large">Eine Gruppenänderung war zu groß für die Relays der Gruppe und wurde daher nicht vorgenommen.</string>
     <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
     <string name="notification_show_previews_detail">Wenn aus, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
     <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>

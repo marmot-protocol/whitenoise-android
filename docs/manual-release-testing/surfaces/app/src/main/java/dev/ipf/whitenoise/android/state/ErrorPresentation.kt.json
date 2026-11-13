@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ErrorPresentation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Account update refused for size replaces the generic retry detail (unit-tested; not reachable from the UI)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ErrorPresentation.kt",
+        "anchor": "R.string.error_update_too_large",
+        "test_ids": [
+          "INT-010"
+        ]
+      },
+      {
+        "surface": "Generic failure detail kept for other errors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ErrorPresentation.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "INT-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
