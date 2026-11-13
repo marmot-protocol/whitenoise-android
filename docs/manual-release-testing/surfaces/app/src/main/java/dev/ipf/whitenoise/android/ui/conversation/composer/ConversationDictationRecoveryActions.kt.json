@@ -79,6 +79,38 @@
         "test_ids": [
           "DIC-009"
         ]
+      },
+      {
+        "surface": "R.string.explanation_conversation_dictation_recovery_app_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.explanation_conversation_dictation_recovery_app_settings",
+        "test_ids": [
+          "CON-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_conversation_dictation_recovery_paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.explanation_conversation_dictation_recovery_paste",
+        "test_ids": [
+          "CON-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_conversation_dictation_recovery_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.explanation_conversation_dictation_recovery_retry",
+        "test_ids": [
+          "CON-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_conversation_dictation_recovery_speech",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.explanation_conversation_dictation_recovery_speech",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ]
   },

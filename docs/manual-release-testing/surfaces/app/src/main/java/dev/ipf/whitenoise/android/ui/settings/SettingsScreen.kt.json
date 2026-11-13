@@ -480,6 +480,22 @@
           "SET-042",
           "SET-044"
         ]
+      },
+      {
+        "surface": "R.string.explanation_settings_profile_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.explanation_settings_profile_picture",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_settings_profile_row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.explanation_settings_profile_row",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ]
   },

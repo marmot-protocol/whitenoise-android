@@ -110,6 +110,16 @@
           "MED-001"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_media_preview_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.explanation_media_preview_done",
+        "test_ids": [
+          "CON-049"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

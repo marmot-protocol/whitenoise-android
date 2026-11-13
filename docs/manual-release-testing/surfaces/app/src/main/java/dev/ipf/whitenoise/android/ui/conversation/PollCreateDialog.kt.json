@@ -275,6 +275,22 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_poll_multiple_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.explanation_poll_multiple_choice",
+        "test_ids": [
+          "CON-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_poll_single_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.explanation_poll_single_choice",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ]
   },

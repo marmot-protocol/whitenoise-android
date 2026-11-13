@@ -140,6 +140,126 @@
         "test_ids": [
           "MSG-048"
         ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_copy",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_delete",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_edit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_edit",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_forward",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_forward",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_info",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_info",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_keep_on_screen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_keep_on_screen",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_read_aloud",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_read_aloud",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_read_code_literally",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_read_code_literally",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_report",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_report",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_save",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_select",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_select",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_select_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_select_text",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_share",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_show_less",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_show_less",
+        "test_ids": [
+          "MSG-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_message_action_translate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "R.string.explanation_message_action_translate",
+        "test_ids": [
+          "MSG-049"
+        ]
       }
     ],
     "settings_controls": [

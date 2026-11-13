@@ -101,6 +101,16 @@
           "GRP-001"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_group_enable_disbanding",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "R.string.explanation_group_enable_disbanding",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

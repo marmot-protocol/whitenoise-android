@@ -67,6 +67,16 @@
           "MSG-005"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_emoji_configure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "R.string.explanation_emoji_configure",
+        "test_ids": [
+          "CON-049"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

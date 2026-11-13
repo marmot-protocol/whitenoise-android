@@ -90,6 +90,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_media_preview_add_more",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
+        "anchor": "R.string.explanation_media_preview_add_more",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ]
   },

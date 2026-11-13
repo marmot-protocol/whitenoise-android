@@ -1198,6 +1198,54 @@
         "test_ids": [
           "GRP-015"
         ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_copy_chat_link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.explanation_chat_info_copy_chat_link",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_disappearing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.explanation_chat_info_disappearing",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.explanation_chat_info_mute",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.explanation_chat_info_relays",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_step_down",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.explanation_chat_info_step_down",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_info_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.explanation_chat_info_unmute",
+        "test_ids": [
+          "GRP-042"
+        ]
       }
     ]
   },
