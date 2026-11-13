@@ -119,7 +119,10 @@ internal fun ReceivedAudioTranscription(file: File?) {
                 ui = null
             }
         },
-        onRetry = { ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING) },
+        onRetry = {
+            listingFailed = false
+            ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING)
+        },
         onGetProvider = { listingFailed = !openOfflineSpeechToTextListing(context) },
     )
 }
@@ -247,11 +250,11 @@ private fun AudioTranscriptResult(
             } else if (state.failure != AttachmentSpeechFailure.ANDROID_VERSION) {
                 TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
             }
+            if (listingError != null) {
+                Text(listingError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
         }
         AudioTranscriptPhase.WORKING -> Unit
-    }
-    if (listingError != null) {
-        Text(listingError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
 }
 

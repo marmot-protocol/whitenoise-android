@@ -90,7 +90,7 @@ internal fun TranslationLanguagePickerSheet(
     val listState =
         rememberLazyListState(
             initialFirstVisibleItemIndex =
-                (choices.codes.indexOf(selected) - ROWS_ABOVE_SELECTED).coerceAtLeast(0),
+                (visible.indexOf(selected) - ROWS_ABOVE_SELECTED).coerceAtLeast(0),
         )
     val windowHeightPx = LocalWindowInfo.current.containerSize.height
     val maxHeight = with(LocalDensity.current) { (windowHeightPx * SHEET_HEIGHT_SHARE).toDp() }
