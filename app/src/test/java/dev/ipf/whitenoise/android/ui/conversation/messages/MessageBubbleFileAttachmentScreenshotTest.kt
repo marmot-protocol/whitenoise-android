@@ -291,7 +291,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         composeRule.onRoot().captureRoboImage(UNCONFIRMED_FILE_SNAPSHOT_PATH)
     }
 
-    /** Covers the real MessageBubble footer contract across captioned, mixed, and failed files. */
+    /** Covers the real MessageBubble footer contract across captioned, mixed, failed and received files. */
     @Test
     fun realMessageBubbleFooterMatrixKeepsMetadataOnOneAccessibleFileCard() {
         val fixtures = footerMatrixFixtures()
@@ -310,7 +310,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertFooterMatrix(fixtures)
     }
 
-    /** Builds the three production rows whose footer owners differ by message shape and state. */
+    /** Builds the four production rows whose footer owners differ by message shape, state and direction. */
     private fun footerMatrixFixtures(): FooterMatrixFixtures =
         FooterMatrixFixtures(
             captionedUnconfirmed =
