@@ -9,6 +9,9 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -440,6 +443,18 @@ class DevicePrivacyScreenScreenshotTest {
 
         val diagnosticsSwitch = composeRule.onAllNodes(isToggleable())[0]
         if (expectedChecked) diagnosticsSwitch.assertIsOn() else diagnosticsSwitch.assertIsOff()
+        // Audit delivery loads separately from privacy consent on background IO.
+        val off =
+            ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .getString(R.string.usage_diagnostics_off)
+        waitForMutation {
+            composeRule
+                .onAllNodes(hasText(off) and hasAnyAncestor(hasTestTag("audit.delivery.group")))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.waitForIdle()
         val suffix = if (expectedChecked) "granted" else "declined"
         composeRule.onRoot().captureRoboImage("src/test/snapshots/diagnostics_improvements_$suffix.png")
     }
