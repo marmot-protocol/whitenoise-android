@@ -121,7 +121,9 @@ Failure reports and Gradle timing profiles use `android-ci-reports-<job>` and
 `compose-compiler`, `static-analysis-Zapstore`, `static-analysis-Play`,
 `compile-tests-Zapstore`, `compile-tests-Play`, `coverage`, or
 `<flavor>-<shard>` for the unit shards. Separate runners
-reduce the serial critical path but repeat some setup/compilation; compare both
+reduce the serial critical path but repeat some setup. The unit shards reuse
+`compile-tests` output through a one-day `unit-compile-cache-<flavor>` artifact
+instead of compiling again; compare both
 wall time and summed job durations when measuring CI performance. Each Gradle job
 retains its own task outputs on master pushes and same-repository PRs; fork PRs
 restore caches read-only. Assertions execute on every fresh runner. The separate

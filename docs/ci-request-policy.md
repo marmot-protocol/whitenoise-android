@@ -81,9 +81,12 @@ the loopback ZSP v2 publisher, ktlint/detekt and Kotlin/Java compilation of Zaps
 Play main, unit-test and Android-test sources. Separate per-flavor runners use
 one active Gradle worker and the existing configured heaps. Tooling owns benchmark
 source compilation in prechecks and benchmark assembly in full runs.
-The isolated compile matrix runs only in prechecks, including drafts. Legacy
-PR lanes retain Zapstore and Play Android-test Kotlin compilation; full suite
-runners compile Android-test Kotlin for their own flavor. PR prechecks defer
+In prechecks, including drafts, the isolated compile matrix compiles all three
+source sets. In full and legacy runs it compiles main and unit-test sources only
+and passes the new build-cache entries to that flavor's unit shards, which then
+reuse them instead of recompiling. Legacy PR lanes retain Zapstore and Play
+Android-test Kotlin compilation; full suite runners compile Android-test Kotlin
+for their own flavor. PR prechecks defer
 full unit/golden execution, Kover, Android lint, baseline packaging and the
 separate Play parity job to integration CI. Complete suites remain the unit of
 integration testing. Required source regressions and
