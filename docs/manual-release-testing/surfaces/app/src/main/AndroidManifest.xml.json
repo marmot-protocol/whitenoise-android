@@ -310,6 +310,14 @@
         ]
       },
       {
+        "surface": "permission:android.permission.POST_PROMOTED_NOTIFICATIONS",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.POST_PROMOTED_NOTIFICATIONS",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
         "surface": "permission:android.permission.RECEIVE_BOOT_COMPLETED",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.permission.RECEIVE_BOOT_COMPLETED",
