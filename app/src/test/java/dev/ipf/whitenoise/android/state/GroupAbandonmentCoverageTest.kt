@@ -115,12 +115,12 @@ class GroupAbandonmentCoverageTest {
     /** Both entry points use the shared journaled forget and none of the departure or receiving-delete paths. */
     @Test
     fun everyEntryPointUsesTheSharedForgetBoundary() {
-        val details = source("state/Controllers.kt").functionBody("forgetGroupLocal")
+        val details = source("state/ConversationController.kt").functionBody("forgetGroupLocal")
         assertTrue("Group Details abandonment uses the shared owner", "forgetGroupLocalWithClientCleanup" in details)
         val chatList = source("state/ChatListAbandonment.kt").extensionBody("abandonChatFromList")
         assertTrue("chat-list abandonment reuses the local-removal path", "deleteGroupLocalFromChatList" in chatList)
         assertTrue("chat-list abandonment must forget, not delete", "forgetProtocol = true" in chatList)
-        val localRemoval = source("state/Controllers.kt").functionBody("deleteGroupLocalFromChatList")
+        val localRemoval = source("state/ChatsController.kt").functionBody("deleteGroupLocalFromChatList")
         assertTrue(
             "a failed abandonment's retry notice must keep forgetting instead of deleting",
             "forgetProtocol = forgetProtocol" in localRemoval.substringAfter("localDeleteRetryNotice("),
