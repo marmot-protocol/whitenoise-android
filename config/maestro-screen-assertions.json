@@ -6116,14 +6116,14 @@
         {
           "case": "settings-translation",
           "selector": {
-            "text": "Arabic"
+            "text": "German"
           },
           "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
           "opened_by": {
             "text": "Target language: English"
           },
           "entry_assertion": {
-            "text": "Arabic"
+            "text": "Search languages"
           }
         }
       ]
