@@ -430,7 +430,7 @@ internal class NotificationFirstPostResolver(
     private val conversationTitle: NotificationConversationTitleResolver,
     private val source: NotificationContentSource,
 ) {
-    /** Resolves recipient subtext only when this conversation is relevant to multiple signed-in identities. */
+    /** Names the recipient when multiple accounts can receive invites or share this conversation. */
     suspend fun recipientAccountSubtext(
         update: NotificationUpdateFfi,
         localOnly: Boolean,
@@ -438,6 +438,9 @@ internal class NotificationFirstPostResolver(
         val recipientAccountIdHex = source.recipientAccountIdHex(update.accountRef)
         val signedInAccountIds = source.signedInAccountIds()
         if (recipientAccountIdHex == null || signedInAccountIds.size < 2) return null
+        if (update.trigger == NotificationTriggerFfi.GROUP_INVITE) {
+            return identity.recipientName(update.accountRef, localOnly)?.takeIf { it.isNotBlank() }
+        }
         val relevantAccounts =
             relevantSignedInRecipientCount(
                 recipientAccountIdHex = recipientAccountIdHex,

@@ -349,6 +349,7 @@
     <string name="discard_failed_message">Discard failed message</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
+    <string name="invited_as_account">Invited as %1$s</string>
     <string name="invited_to_chat_by">Invited to chat by %1$s</string>
     <string name="someone">Someone</string>
     <string name="invitation_pending">Invitation pending</string>

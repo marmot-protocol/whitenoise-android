@@ -25,14 +25,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.signedInSigningAccountIds
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
@@ -65,7 +72,25 @@ internal fun InvitePreviewPlaceholder(inviterName: String?) {
     }
 }
 
-/** Prototype invitation pane: who invited you, Decline beside Accept, on the low container above the nav bar. */
+/** Presentation for the account bound to the invitation. */
+internal data class InviteReceivingAccount(
+    val accountIdHex: String,
+    val name: String,
+    val pictureUrl: String?,
+)
+
+/** The conversation binding remains authoritative during notification-routed account switches. */
+internal fun inviteReceivingAccount(
+    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+): InviteReceivingAccount? {
+    val boundId = controller.boundAccountIdHex ?: return null
+    val signedInIds = appState.accounts.signedInSigningAccountIds()
+    if (signedInIds.size < 2 || boundId !in signedInIds) return null
+    return InviteReceivingAccount(boundId, appState.accountDisplayNameCached(boundId), appState.avatarUrl(boundId))
+}
+
+/** Shows the inviter, receiving account when needed, and the consent actions. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun InvitationActions(
@@ -74,6 +99,7 @@ internal fun InvitationActions(
     onAccept: () -> Unit,
     onDecline: () -> Unit,
     modifier: Modifier = Modifier,
+    receivingAccount: InviteReceivingAccount? = null,
 ) {
     val acceptLabel = stringResource(R.string.accept)
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -99,6 +125,9 @@ internal fun InvitationActions(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                if (receivingAccount != null) {
+                    InvitationReceivingAccountRow(receivingAccount)
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -121,6 +150,33 @@ internal fun InvitationActions(
                 }
             }
         }
+    }
+}
+
+/** The label and decorative avatar read as one row in accessibility navigation. */
+@Suppress("FunctionNaming")
+@Composable
+private fun InvitationReceivingAccountRow(account: InviteReceivingAccount) {
+    Row(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.clearAndSetSemantics {}) {
+            Avatar(
+                title = account.name,
+                seed = account.accountIdHex,
+                size = 24.dp,
+                pictureUrl = account.pictureUrl,
+                pictureDomain = AvatarImageLoader.publicProfiles(),
+            )
+        }
+        Text(
+            stringResource(R.string.invited_as_account, account.name),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
