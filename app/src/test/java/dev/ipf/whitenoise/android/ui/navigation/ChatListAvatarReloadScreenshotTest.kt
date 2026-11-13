@@ -216,17 +216,17 @@ class ChatListAvatarReloadScreenshotTest {
     }
 
     /** Names the same account, group and hash as the production encrypted avatar loader. */
-    private fun encryptedKey(fixture: ReturnFixture): String = encryptedGroupAvatarCacheKey(
-        ACCOUNT,
-        fixture.rows[1].groupIdHex,
-        ENCRYPTED_HASH,
-    )
+    private fun encryptedKey(fixture: ReturnFixture): String {
+        val groupId = fixture.rows[1].groupIdHex
+        return encryptedGroupAvatarCacheKey(ACCOUNT, groupId, ENCRYPTED_HASH)
+    }
 
     /** Builds a distinguishable synthetic decoded avatar. */
-    private fun solidAvatar(color: Int) = Bitmap
-        .createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-        .apply { eraseColor(color) }
-        .asImageBitmap()
+    private fun solidAvatar(color: Int) =
+        Bitmap
+            .createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+            .apply { eraseColor(color) }
+            .asImageBitmap()
 
     private companion object {
         const val ACCOUNT = ConversationTimelineTestIds.ACCOUNT_REF
