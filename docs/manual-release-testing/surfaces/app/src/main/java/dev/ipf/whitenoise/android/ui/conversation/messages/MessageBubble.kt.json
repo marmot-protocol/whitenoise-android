@@ -314,9 +314,9 @@
     ],
     "message_rendering_contracts": [
       {
-        "surface": "translation status follows the bubble-attached reaction summary",
+        "surface": "translation toggle sits beside the bubble",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": ".MessageTranslationRendition(translationSource)",
+        "anchor": "translation.MessageTranslationToggle(",
         "test_ids": [
           "SET-033"
         ]

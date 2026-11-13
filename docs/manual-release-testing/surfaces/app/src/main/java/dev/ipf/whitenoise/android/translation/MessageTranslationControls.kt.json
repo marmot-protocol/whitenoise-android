@@ -13,9 +13,9 @@
         ]
       },
       {
-        "surface": "MessageTranslationRendition",
+        "surface": "MessageTranslationToggle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "fun MessageTranslationRendition(",
+        "anchor": "fun MessageTranslationToggle(",
         "test_ids": [
           "SET-033"
         ]
@@ -48,22 +48,6 @@
         "surface": "R.string.translation_missing_engine",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "R.string.translation_missing_engine",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "R.string.translation_show_original",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_show_original",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "R.string.translation_show_result",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_show_result",
         "test_ids": [
           "SET-033"
         ]
@@ -103,8 +87,8 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "if (!pending && rendition == null) return",
-        "surface": "inactive translation contributes no width to message reaction alignment",
+        "anchor": "if (session == null || source == null) return",
+        "surface": "absent translation contributes no toggle slot",
         "test_ids": [
           "SET-033"
         ]
@@ -124,6 +108,22 @@
         "test_ids": [
           "SET-033",
           "SET-036"
+        ]
+      },
+      {
+        "surface": "Translate toggle label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "MessageTranslationPendingRing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "private fun MessageTranslationPendingRing(",
+        "test_ids": [
+          "SET-033"
         ]
       }
     ]

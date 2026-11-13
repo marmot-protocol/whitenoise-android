@@ -4,8 +4,6 @@
     <string name="translation_detect_language">检测语言</string>
     <string name="translation_source_language">源语言</string>
     <string name="translation_target_language">目标语言</string>
-    <string name="translation_show_original">显示原文</string>
-    <string name="translation_show_result">显示译文</string>
     <string name="translation_loading">正在设备上翻译…</string>
     <string name="translation_open_engine">打开翻译引擎</string>
     <string name="translation_engine_managed">推荐翻译引擎：Offline Translator。翻译在你的设备上运行；请在该应用中管理语言包。</string>

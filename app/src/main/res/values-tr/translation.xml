@@ -4,8 +4,6 @@
     <string name="translation_detect_language">Dili algıla</string>
     <string name="translation_source_language">Kaynak dil</string>
     <string name="translation_target_language">Hedef dil</string>
-    <string name="translation_show_original">Orijinali göster</string>
-    <string name="translation_show_result">Çeviriyi göster</string>
     <string name="translation_loading">Cihazda çevriliyor…</string>
     <string name="translation_open_engine">Çeviri uygulamasını aç</string>
     <string name="translation_engine_managed">Önerilen çeviri motoru: Offline Translator. Çeviri cihazınızda yapılır; dil paketlerini bu uygulamada yönetin.</string>

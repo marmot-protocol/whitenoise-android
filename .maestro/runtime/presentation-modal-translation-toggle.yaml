@@ -8,9 +8,15 @@ name: presentation-modal-translation-toggle
     id: translation.confirm
 - tapOn:
     id: translation.confirm
-- assertVisible: Show original
-- tapOn: Show original
-- assertVisible: Show translation
-- tapOn: Show translation
+- assertVisible:
+    text: Translate
+    checked: true
+- tapOn:
+    text: Translate
+- assertVisible:
+    text: Translate
+    checked: false
+- tapOn:
+    text: Translate
 - assertVisible:
     id: presentation.complete

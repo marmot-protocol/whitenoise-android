@@ -4,8 +4,6 @@
     <string name="translation_detect_language">Detect language</string>
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
-    <string name="translation_show_original">Show original</string>
-    <string name="translation_show_result">Show translation</string>
     <string name="translation_loading">Translating on device…</string>
     <string name="translation_open_engine">Open engine</string>
     <string name="translation_engine_managed">Recommended engine: Offline Translator. Translation runs on your device; manage language packs in that app.</string>

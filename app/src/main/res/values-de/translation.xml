@@ -4,8 +4,6 @@
     <string name="translation_detect_language">Sprache erkennen</string>
     <string name="translation_source_language">Ausgangssprache</string>
     <string name="translation_target_language">Zielsprache</string>
-    <string name="translation_show_original">Original anzeigen</string>
-    <string name="translation_show_result">Übersetzung anzeigen</string>
     <string name="translation_loading">Übersetzung auf dem Gerät…</string>
     <string name="translation_open_engine">Übersetzungs-App öffnen</string>
     <string name="translation_engine_managed">Empfohlene Übersetzungs-App: Offline Translator. Die Übersetzung erfolgt auf deinem Gerät; verwalte die Sprachpakete in dieser App.</string>

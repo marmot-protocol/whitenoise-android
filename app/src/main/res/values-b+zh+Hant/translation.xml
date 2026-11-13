@@ -4,8 +4,6 @@
     <string name="translation_detect_language">偵測語言</string>
     <string name="translation_source_language">來源語言</string>
     <string name="translation_target_language">目標語言</string>
-    <string name="translation_show_original">顯示原文</string>
-    <string name="translation_show_result">顯示譯文</string>
     <string name="translation_loading">正在裝置上翻譯…</string>
     <string name="translation_open_engine">開啟翻譯引擎</string>
     <string name="translation_engine_managed">推薦翻譯引擎：Offline Translator。翻譯在你的裝置上執行；請在該應用程式中管理語言套件。</string>

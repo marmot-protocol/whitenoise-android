@@ -4,8 +4,6 @@
     <string name="translation_detect_language">Определить язык</string>
     <string name="translation_source_language">Исходный язык</string>
     <string name="translation_target_language">Язык перевода</string>
-    <string name="translation_show_original">Показать оригинал</string>
-    <string name="translation_show_result">Показать перевод</string>
     <string name="translation_loading">Перевод на устройстве…</string>
     <string name="translation_open_engine">Открыть переводчик</string>
     <string name="translation_engine_managed">Рекомендуемый переводчик: Offline Translator. Перевод выполняется на вашем устройстве; языковые пакеты устанавливаются в этом приложении.</string>

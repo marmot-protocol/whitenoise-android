@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
@@ -944,6 +945,8 @@ internal fun MessageBubble(
         }
     reactionVisibilityState.targetState = showReactionSummary
     val reactionHostPresent = reactionVisibilityState.currentState || reactionVisibilityState.targetState
+    // A reaction summary hangs below the bubble surface, so row siblings align to the surface's bottom edge.
+    val bubbleColumnAlignsByBottom = reactionHostPresent && (reserveSenderAvatarSlot || !selectionMode)
     val messageShareScope = rememberCoroutineScope()
     val ttsLinkTapCoordinator =
         remember(record.messageIdHex, messageShareScope, appState, controller.group.groupIdHex) {
@@ -1974,6 +1977,26 @@ internal fun MessageBubble(
                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                 )
             }
+            // The translate toggle sits in the bubble's empty opposite gutter, bottom-aligned with the
+            // bubble surface, and follows the swipe offset so it moves with the bubble.
+            val translationToggle: @Composable () -> Unit = {
+                dev.ipf.whitenoise.android.translation.MessageTranslationToggle(
+                    source = translationSource,
+                    modifier =
+                        Modifier
+                            .width(dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth)
+                            .then(
+                                if (bubbleColumnAlignsByBottom) {
+                                    Modifier.alignBy { it.measuredHeight }
+                                } else {
+                                    Modifier.align(Alignment.Bottom)
+                                },
+                            ).absoluteOffset {
+                                IntOffset((replySwipe.displayedDistance * swipeDirection).roundToInt(), 0)
+                            },
+                )
+            }
+            if (mine && !selectionMode) translationToggle()
             Column(
                 // Swipe-to-reply translates this whole visual column — bubble or
                 // media surface plus its attached reaction summary — as one unit,
@@ -1988,7 +2011,7 @@ internal fun MessageBubble(
                         .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
                         .testTag(messageBubbleColumnTestTag(record.messageIdHex))
                         .then(
-                            if (reserveSenderAvatarSlot && reactionHostPresent) {
+                            if (bubbleColumnAlignsByBottom) {
                                 Modifier.alignBy(MessageBubbleBottomAlignmentLine)
                             } else {
                                 Modifier
@@ -3534,8 +3557,6 @@ internal fun MessageBubble(
                         }
                     },
                 )
-                dev.ipf.whitenoise.android.translation
-                    .MessageTranslationRendition(translationSource)
                 if (surfaces.reactionSheetOpen && !deleted) {
                     CompleteReactionDetailsSheet(
                         item = item,
@@ -3546,6 +3567,7 @@ internal fun MessageBubble(
                     )
                 }
             }
+            if (!mine && !selectionMode) translationToggle()
         }
         if (selectionMode) {
             // Keep the visual tint and indicator in layout, but retain the

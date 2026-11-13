@@ -1,18 +1,21 @@
 package dev.ipf.whitenoise.android.maestro
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
 import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
 import dev.ipf.whitenoise.android.translation.MessageTranslationDialog
-import dev.ipf.whitenoise.android.translation.MessageTranslationRendition
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth
 import dev.ipf.whitenoise.android.translation.TranslationChatSettingsDialog
 import dev.ipf.whitenoise.android.translation.TranslationEngine
 import dev.ipf.whitenoise.android.translation.TranslationEngineIdentity
@@ -51,7 +54,7 @@ private fun MaestroMessageTranslationPresentation(fixture: MaestroPresentationFi
                 onDismiss = state::dismiss,
             )
         } else {
-            MessageTranslationRendition(translatedSource)
+            MessageTranslationToggle(translatedSource, Modifier.size(MessageTranslationToggleSlotWidth))
         }
     }
 }

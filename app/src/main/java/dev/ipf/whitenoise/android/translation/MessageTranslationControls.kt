@@ -2,12 +2,17 @@
 
 package dev.ipf.whitenoise.android.translation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -17,15 +22,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /**
  * The message's translation identity for its current text and target, or null when it cannot be translated.
@@ -67,36 +79,91 @@ internal fun rememberMessageTranslationSource(
     return source
 }
 
-/** Renders only active translation status or result controls without widening the owning message. */
+/** Width of the toggle slot in the bubble's otherwise empty gutter; the slot is only as tall as the disc. */
+internal val MessageTranslationToggleSlotWidth = 48.dp
+private val MessageTranslationToggleDiscSize = 28.dp
+private val MessageTranslationToggleIconSize = 18.dp
+private val MessageTranslationPendingRingSize = 18.dp
+private val MessageTranslationPendingRingStroke = 2.dp
+
+/**
+ * The side control for a translated message: a progress ring while work is pending, otherwise a translate disc
+ * that switches between the translation and the original. It fills the slot its parent measures for it and
+ * emits nothing when the message has neither pending work nor a result.
+ */
 @Composable
-internal fun MessageTranslationRendition(source: TranslationSource?) {
+internal fun MessageTranslationToggle(
+    source: TranslationSource?,
+    modifier: Modifier = Modifier,
+) {
     val session = LocalConversationTranslation.current
     if (session == null || source == null) return
     val rendition = session.renditions[source]
     val pending = session.isPending(source)
-    if (!pending && rendition == null) return
-    Column(
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (pending) {
-            Text(stringResource(R.string.translation_loading), style = MaterialTheme.typography.labelSmall)
-        }
-        if (rendition != null) {
-            TextButton(onClick = { session.toggle(source) }) {
-                Text(
-                    stringResource(
-                        if (rendition.showTranslation) {
-                            R.string.translation_show_original
-                        } else {
-                            R.string.translation_show_result
-                        },
-                    ),
-                )
+    if (pending) {
+        MessageTranslationPendingRing(modifier)
+    } else if (rendition != null) {
+        val translated = rendition.showTranslation
+        val description = stringResource(R.string.translation_title)
+        val outline = amoledOutlineBorder()
+        val colors = MaterialTheme.colorScheme
+        Box(
+            modifier =
+                modifier
+                    .testTag(MESSAGE_TRANSLATION_TOGGLE_TEST_TAG)
+                    .toggleable(
+                        value = translated,
+                        role = Role.Switch,
+                        onValueChange = { session.toggle(source) },
+                    ).semantics { contentDescription = description },
+            contentAlignment = Alignment.Center,
+        ) {
+            Surface(
+                modifier = Modifier.size(MessageTranslationToggleDiscSize),
+                shape = CircleShape,
+                color =
+                    when {
+                        translated -> colors.primary
+                        outline != null -> colors.surface
+                        else -> Color.Transparent
+                    },
+                contentColor = if (translated) colors.onPrimary else colors.onSurfaceVariant,
+                border = if (translated) null else outline ?: BorderStroke(1.dp, colors.outline),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_translate),
+                        contentDescription = null,
+                        modifier = Modifier.size(MessageTranslationToggleIconSize),
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+private fun MessageTranslationPendingRing(modifier: Modifier) {
+    val loading = stringResource(R.string.translation_loading)
+    Box(
+        modifier =
+            modifier
+                .testTag(MESSAGE_TRANSLATION_PENDING_TEST_TAG)
+                .semantics {
+                    contentDescription = loading
+                    liveRegion = LiveRegionMode.Polite
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(MessageTranslationPendingRingSize),
+            strokeWidth = MessageTranslationPendingRingStroke,
+        )
+    }
+}
+
+internal const val MESSAGE_TRANSLATION_TOGGLE_TEST_TAG = "message-translation-toggle"
+internal const val MESSAGE_TRANSLATION_PENDING_TEST_TAG = "message-translation-pending"
 
 /** The manual sheet: submits only a catalog pair, then replaces any earlier work for this message and target. */
 @OptIn(ExperimentalMaterial3Api::class)

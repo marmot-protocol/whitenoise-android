@@ -4,8 +4,6 @@
     <string name="translation_detect_language">Rileva lingua</string>
     <string name="translation_source_language">Lingua di origine</string>
     <string name="translation_target_language">Lingua di destinazione</string>
-    <string name="translation_show_original">Mostra originale</string>
-    <string name="translation_show_result">Mostra traduzione</string>
     <string name="translation_loading">Traduzione sul dispositivo…</string>
     <string name="translation_open_engine">Apri motore</string>
     <string name="translation_engine_managed">Motore consigliato: Offline Translator. La traduzione avviene sul tuo dispositivo; gestisci i pacchetti lingua in quella app.</string>
