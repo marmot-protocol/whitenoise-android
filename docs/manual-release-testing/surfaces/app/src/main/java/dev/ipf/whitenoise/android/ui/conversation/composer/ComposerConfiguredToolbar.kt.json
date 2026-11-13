@@ -13,6 +13,15 @@
           "CON-040",
           "CON-048"
         ]
+      },
+      {
+        "surface": "Modifier.explainComposerShortcut",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerConfiguredToolbar.kt",
+        "anchor": "fun Modifier.explainComposerShortcut(",
+        "test_ids": [
+          "CON-042",
+          "CON-048"
+        ]
       }
     ],
     "source_coverage": [

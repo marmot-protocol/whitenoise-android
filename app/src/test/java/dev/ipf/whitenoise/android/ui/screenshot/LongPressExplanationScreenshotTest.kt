@@ -53,8 +53,13 @@ class LongPressExplanationScreenshotTest {
     fun composerExplanationAmoled() = captureExplanation(darkTheme = true, amoled = true, name = "amoled")
 
     @Test
-    fun composerExplanationLargeRtl() =
-        captureExplanation(darkTheme = false, amoled = false, name = "large_rtl", fontScale = 1.6f, rtl = true)
+    fun composerExplanationLargeRtl() = captureExplanation(
+        darkTheme = false,
+        amoled = false,
+        name = "large_rtl",
+        fontScale = 1.6f,
+        rtl = true,
+    )
 
     @Test
     fun plusMenuCustomizeRowLight() = capturePlusMenu(darkTheme = false, amoled = false, name = "light")
