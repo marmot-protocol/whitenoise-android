@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explanation_account_keys_copy_private">Copia la tua chiave privata negli appunti, contrassegnata come sensibile. Chi la possiede controlla il tuo profilo, quindi incollala solo dove ti fidi.</string>
+    <string name="explanation_account_keys_export_encrypted">Salva la tua chiave privata in un file a tua scelta, protetto da una password che imposti tu. Serve quella password per aprire il file.</string>
+    <string name="explanation_account_keys_export_raw">Condivide la tua chiave privata come testo in chiaro con un’app a tua scelta, dopo un avviso. L’esportazione cifrata è più sicura.</string>
+    <string name="explanation_account_keys_reveal">Mostra o nasconde la tua chiave privata in questa schermata. Non viene copiata né condivisa.</string>
+    <string name="explanation_account_keys_sign_out">Esce da questo profilo su questo dispositivo. Gruppi, cronologia e bozze restano, e puoi rientrare dal selettore degli account.</string>
+    <string name="explanation_account_keys_wipe">Rimuove definitivamente questo account da questo dispositivo, inclusi messaggi, dati di cifratura dei gruppi e chiave salvata. Puoi accedere di nuovo con la stessa chiave, ma i gruppi precedenti andranno persi.</string>
+    <string name="explanation_account_keys_signout_invitation_keys">Se attivo, le tue chiavi di invito pubblicate vengono rimosse dai relay all’uscita, così nessuno può invitarti in nuovi gruppi mentre sei disconnesso.</string>
+    <string name="explanation_settings_profile_row">Apre Condividi e connetti per questo profilo. Tocca la chiave breve per copiare invece la chiave pubblica completa.</string>
+    <string name="explanation_settings_profile_picture">Apre le opzioni per questa immagine del profilo.</string>
+    <string name="explanation_settings_relays">Mostra i relay usati da questo profilo e quali elenchi serve ciascuno.</string>
+    <string name="explanation_relays_role_profile">Aggiunge questo relay all’elenco del profilo che pubblichi, che indica agli altri dove trovare il tuo profilo e i dati di connessione.</string>
+    <string name="explanation_relays_role_inbox">Aggiunge questo relay all’elenco che gli altri usano per inviarti inviti a nuove chat e gruppi.</string>
+    <string name="explanation_relays_publish_missing">Pubblica gli elenchi di relay segnalati come mancanti, così gli altri sanno come raggiungerti.</string>
+    <string name="explanation_account_setup_remove_relay">Rimuove questo relay dai tuoi elenchi di relay in questo passaggio della configurazione. Puoi annullare subito dopo.</string>
+    <string name="explanation_developer_key_packages">Mostra i pacchetti di chiavi pubblicati per questo account, che permettono agli altri di invitarti nei gruppi, e ti consente di gestirli.</string>
+    <string name="explanation_developer_quarantined_groups">Elenca i gruppi che non è stato possibile caricare in sicurezza e ti permette di riprovare il ripristino. Non viene eliminato nulla.</string>
+    <string name="explanation_quarantine_refresh">Ricarica l’elenco dei gruppi in quarantena. Non riprova il ripristino.</string>
+    <string name="explanation_quarantine_retry">Riprova la convalida di questo gruppo da parte del motore condiviso. Non elimina la cronologia, non aggira i controlli e non rientra nel gruppo.</string>
+    <string name="explanation_notifications_push">Usa Google Firebase Cloud Messaging per riattivare brevemente White Noise, che poi controlla in modo sicuro la presenza di messaggi. Le notifiche locali mantengono invece una connessione aperta.</string>
+    <string name="explanation_notifications_local">Mantiene una connessione persistente finché le notifiche sono attive e le crea su questo dispositivo, invece di usare il push.</string>
+    <string name="explanation_diagnostics_usage">Condivide l’uso delle funzioni e le prestazioni dell’app per tutti i profili su questo dispositivo, con un ID di sessione temporaneo e un ID di installazione reimpostabile. Non include mai ID di account o gruppi.</string>
+    <string name="explanation_diagnostics_logs">Condivide con White Noise registri tecnici ripuliti sui gruppi di tutti i profili su questo dispositivo, separatamente dalla condivisione dell’uso. Disattivandolo si fermano nuove registrazioni e caricamenti.</string>
+    <string name="explanation_gestures_pull_unread">Trascinando verso il basso l’elenco delle chat si mostrano solo quelle non lette. Mostra tutte ripristina l’elenco completo.</string>
+    <string name="explanation_data_usage_download_switch">Consente i download automatici su questo tipo di rete. Ogni regola di rete corrispondente deve consentirli e i download manuali funzionano sempre.</string>
+</resources>

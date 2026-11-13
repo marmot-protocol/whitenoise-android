@@ -73,6 +73,7 @@ internal fun AccountHubGroup(
             SettingsLink(
                 context = context,
                 title = stringResource(R.string.relays),
+                explanation = stringResource(R.string.explanation_settings_relays),
                 onClick = { onOpenDetail(SettingsDetail.Relays) },
             )
         }

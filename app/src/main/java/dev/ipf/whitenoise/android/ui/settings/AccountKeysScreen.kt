@@ -93,9 +93,11 @@ import dev.ipf.whitenoise.android.state.WipeReport
 import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
 import dev.ipf.whitenoise.android.state.wipeReport
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
@@ -575,6 +577,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.copy_private_key),
+                            explanation = stringResource(R.string.explanation_account_keys_copy_private),
                             onClick = onCopyPrivate,
                             leading = {
                                 Icon(
@@ -596,6 +599,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.export_encrypted_private_key),
+                            explanation = stringResource(R.string.explanation_account_keys_export_encrypted),
                             onClick = onExportEncrypted,
                             enabled = exportsEnabled,
                             leading = { Icon(painterResource(R.drawable.ic_lock), contentDescription = null) },
@@ -605,6 +609,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.export_nsec),
+                            explanation = stringResource(R.string.explanation_account_keys_export_raw),
                             onClick = onExportRaw,
                             modifier = Modifier.testTag("profile_keys.export_raw"),
                             enabled = exportsEnabled,
@@ -621,6 +626,7 @@ private fun ProfileKeysList(
                     SettingsAction(
                         context = context,
                         title = stringResource(R.string.sign_out),
+                        explanation = stringResource(R.string.explanation_account_keys_sign_out),
                         onClick = onSignOut,
                         modifier = Modifier.testTag("profile_keys.sign_out"),
                     )
@@ -634,6 +640,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.sign_out_and_wipe),
+                            explanation = stringResource(R.string.explanation_account_keys_wipe),
                             onClick = onWipe,
                             modifier = Modifier.testTag(WIPE_ACTION_TAG),
                             destructive = true,
@@ -672,11 +679,17 @@ private fun PrivateKeyValueRow(
                 .testTag("profile_keys.private_key_value")
                 .clearAndSetSemantics { contentDescription = stateDescription },
     ) {
-        IconButton(onClick = onToggleReveal) {
+        val revealLabel = stringResource(if (revealed) R.string.hide_private_key else R.string.show_private_key)
+        IconButton(
+            onClick = onToggleReveal,
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(revealLabel, stringResource(R.string.explanation_account_keys_reveal)),
+                ),
+        ) {
             Icon(
                 painter = painterResource(if (revealed) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
-                contentDescription =
-                    stringResource(if (revealed) R.string.hide_private_key else R.string.show_private_key),
+                contentDescription = revealLabel,
             )
         }
     }
@@ -1318,7 +1331,12 @@ internal fun SignOutSheet(
                 Modifier
                     .fillMaxWidth()
                     .testTag("profile_keys.signout_invitation_keys")
-                    .toggleable(
+                    .explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.sign_out_delete_key_packages_label),
+                            stringResource(R.string.explanation_account_keys_signout_invitation_keys),
+                        ),
+                    ).toggleable(
                         value = deleteKeyPackages,
                         role = Role.Switch,
                         onValueChange = { deleteKeyPackages = it },

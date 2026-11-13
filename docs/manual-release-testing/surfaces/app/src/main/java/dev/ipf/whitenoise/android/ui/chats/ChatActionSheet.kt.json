@@ -90,6 +90,14 @@
         "test_ids": [
           "CHL-026"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "surface": "Holding chat action Leave and delete, Delete from device or Abandon explains it",
+        "anchor": "R.string.explanation_chat_actions_leave_and_delete,",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ],
     "source_coverage": [

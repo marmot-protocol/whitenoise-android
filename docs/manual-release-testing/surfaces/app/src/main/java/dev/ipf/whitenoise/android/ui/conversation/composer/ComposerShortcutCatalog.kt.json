@@ -118,14 +118,14 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
         "surface": "Composer shortcut explanations",
-        "anchor": "fun composerShortcutExplanation(",
+        "anchor": "fun ComposerShortcut.explanation(): Explanation",
         "test_ids": [
           "CON-048"
         ]
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
-        "surface": "Customize composer follow-up under an explanation",
+        "surface": "Composer explanation title and body",
         "anchor": "fun composerExplanation(",
         "test_ids": [
           "CON-042",
@@ -148,6 +148,14 @@
         "anchor": "R.string.stickers_title",
         "test_ids": [
           "MSG-045"
+        ]
+      },
+      {
+        "surface": "ComposerShortcut.explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "anchor": "fun ComposerShortcut.explanation()",
+        "test_ids": [
+          "CON-048"
         ]
       }
     ],

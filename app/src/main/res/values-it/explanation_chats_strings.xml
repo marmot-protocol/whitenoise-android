@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
+    <string name="explanation_chat_actions_leave_and_delete">Esci da questa chat e la rimuove da questo dispositivo. Gli altri membri restano nella chat e puoi tornare solo se qualcuno ti aggiunge di nuovo.</string>
+    <string name="explanation_chat_actions_delete">Rimuove questa chat e i suoi messaggi da questo dispositivo. Non ti fa uscire dal gruppo per gli altri membri.</string>
+    <string name="explanation_chat_actions_abandon_dm">Abbandona questo messaggio diretto e lo rimuove da questo dispositivo. L\'altra persona non viene avvisata.</string>
+    <string name="explanation_chat_actions_abandon_group">Abbandona questo gruppo e lo rimuove da questo dispositivo. Gli altri membri restano nel gruppo.</string>
+    <string name="explanation_chat_info_mute">Interrompe le notifiche di questa chat. Continui a ricevere i messaggi e puoi riattivarle.</string>
+    <string name="explanation_chat_info_unmute">Riattiva le notifiche di questa chat.</string>
+    <string name="explanation_chat_info_disappearing">Imposta se i nuovi messaggi di questa chat scompaiono dopo un tempo scelto. I messaggi già inviati non cambiano.</string>
+    <string name="explanation_chat_info_copy_chat_link">Copia un link a questa chat che puoi condividere perché altri chiedano di unirsi.</string>
+    <string name="explanation_chat_info_relays">Mostra e modifica i relay che questo gruppo usa per inviare e ricevere messaggi. Le modifiche valgono per tutto il gruppo.</string>
+    <string name="explanation_chat_info_transfer_admin">Passa il ruolo di amministratore a un altro membro. Resti nel gruppo, ma il nuovo amministratore potrà gestirlo.</string>
+    <string name="explanation_chat_info_step_down">Rinuncia al tuo ruolo di amministratore e ti lascia nel gruppo come membro. Un altro amministratore può nominarti di nuovo.</string>
+    <string name="explanation_group_enable_disbanding">Permette a un amministratore di sciogliere questo gruppo in seguito. Attivarlo non scioglie il gruppo.</string>
+    <string name="explanation_group_disband">Chiude definitivamente questo gruppo per tutti i membri. Non si può annullare.</string>
+    <string name="explanation_chat_list_avatar_switch">Apre il selettore di profilo per cambiare l\'account in uso. Gli altri account restano connessi.</string>
+    <string name="explanation_chat_list_avatar_settings">Apre le impostazioni del tuo account e dell\'app. Hai un account connesso.</string>
+    <string name="explanation_new_message_talk_to_agent">Apre le impostazioni degli agenti IA, dove configuri un agente a cui puoi scrivere come a un contatto.</string>
+    <string name="explanation_chats_fab_check_relays">La configurazione dei relay richiede attenzione, quindi i messaggi potrebbero non arrivare. Apre i relay per controllarli.</string>
+    <string name="explanation_new_message_admin">Rende questo membro un amministratore, che può gestire il gruppo. Puoi cambiarlo in seguito.</string>
+    <string name="explanation_chat_list_manage_folders">Apre la gestione delle cartelle, dove crei, rinomini, riordini ed elimini le cartelle delle chat.</string>
+    <string name="explanation_app_update_icon">Un aggiornamento dell\'app è disponibile o in corso. Apre le impostazioni con il suo stato.</string>
+    <string name="explanation_search_filters_active">I filtri di ricerca sono attivi, quindi i risultati sono limitati. Apre i filtri per modificarli o rimuoverli.</string>
+</resources>

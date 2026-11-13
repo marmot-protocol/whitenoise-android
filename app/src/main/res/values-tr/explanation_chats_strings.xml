@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
+    <string name="explanation_chat_actions_leave_and_delete">Bu sohbetten ayrılır ve onu bu cihazdan kaldırır. Diğer üyeler sohbette kalır; yalnızca biri seni yeniden eklerse dönebilirsin.</string>
+    <string name="explanation_chat_actions_delete">Bu sohbeti ve mesajlarını bu cihazdan kaldırır. Diğer üyeler için gruptan ayrılmış olmazsın.</string>
+    <string name="explanation_chat_actions_abandon_dm">Bu doğrudan mesajdan vazgeçer ve onu bu cihazdan kaldırır. Karşı taraf bilgilendirilmez.</string>
+    <string name="explanation_chat_actions_abandon_group">Bu gruptan vazgeçer ve onu bu cihazdan kaldırır. Diğer üyeler grupta kalır.</string>
+    <string name="explanation_chat_info_mute">Bu sohbetin bildirimlerini durdurur. Mesajları almaya devam edersin ve bunu tekrar açabilirsin.</string>
+    <string name="explanation_chat_info_unmute">Bu sohbetin bildirimlerini yeniden açar.</string>
+    <string name="explanation_chat_info_disappearing">Bu sohbetteki yeni mesajların seçilen süre sonunda kaybolup kaybolmayacağını belirler. Gönderilmiş mesajlar değişmez.</string>
+    <string name="explanation_chat_info_copy_chat_link">Bu sohbetin bağlantısını kopyalar; başkalarının katılma isteği göndermesi için paylaşabilirsin.</string>
+    <string name="explanation_chat_info_relays">Bu grubun mesaj göndermek ve almak için kullandığı röleleri gösterir ve düzenler. Değişiklikler tüm gruba uygulanır.</string>
+    <string name="explanation_chat_info_transfer_admin">Yönetici rolünü başka bir üyeye verir. Grupta kalırsın, ancak yeni yönetici grubu yönetebilir.</string>
+    <string name="explanation_chat_info_step_down">Yönetici rolünden vazgeçer ve seni grupta normal üye olarak tutar. Başka bir yönetici seni yeniden yönetici yapabilir.</string>
+    <string name="explanation_group_enable_disbanding">Bir yöneticinin bu grubu daha sonra dağıtmasına izin verir. Bunu açmak grubu dağıtmaz.</string>
+    <string name="explanation_group_disband">Bu grubu tüm üyeler için kalıcı olarak sona erdirir. Geri alınamaz.</string>
+    <string name="explanation_chat_list_avatar_switch">Kullandığın hesabı değiştirmen için profil seçiciyi açar. Diğer hesapların oturumu açık kalır.</string>
+    <string name="explanation_chat_list_avatar_settings">Hesabını ve uygulamayı yönettiğin ayarları açar. Bir hesabın oturumu açık.</string>
+    <string name="explanation_new_message_talk_to_agent">Kişi gibi yazabileceğin bir ajanı kurduğun yapay zeka ajanı ayarlarını açar.</string>
+    <string name="explanation_chats_fab_check_relays">Röle kurulumun ilgi gerektiriyor, bu yüzden mesajlar ulaşmayabilir. Kontrol etmen için rölelerini açar.</string>
+    <string name="explanation_new_message_admin">Bu üyeyi grubu yönetebilen bir yönetici yapar. Bunu daha sonra değiştirebilirsin.</string>
+    <string name="explanation_chat_list_manage_folders">Sohbet klasörlerini oluşturduğun, yeniden adlandırdığın, sıraladığın ve sildiğin klasör yönetimini açar.</string>
+    <string name="explanation_app_update_icon">Bir uygulama güncellemesi mevcut veya işleniyor. Durumunu gösteren ayarları açar.</string>
+    <string name="explanation_search_filters_active">Arama filtreleri açık, bu yüzden sonuçlar sınırlı. Değiştirmen veya temizlemen için filtreleri açar.</string>
+</resources>

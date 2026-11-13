@@ -60,6 +60,14 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "Account setup hold-to-explain: remove relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.explanation_account_setup_remove_relay",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "source_coverage": [

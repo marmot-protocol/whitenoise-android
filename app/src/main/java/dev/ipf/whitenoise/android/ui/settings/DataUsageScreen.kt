@@ -36,7 +36,9 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -281,6 +283,7 @@ internal fun DownloadNetworkOptions(
             checked = network in networks,
             tag = "download.network.${network.name}",
             enabled = enabled,
+            explanation = stringResource(R.string.explanation_data_usage_download_switch),
             onChange = { onChange(network, it) },
         )
     }
@@ -293,12 +296,14 @@ internal fun DownloadSwitch(
     checked: Boolean,
     tag: String,
     enabled: Boolean = true,
+    explanation: String? = null,
     onChange: (Boolean) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .whiteNoiseDialogSelection(checked && enabled)
+            .explainOnLongPress(explanation?.let { Explanation(title, it) })
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .testTag(tag)
             .heightIn(min = DownloadSwitchMinHeight)

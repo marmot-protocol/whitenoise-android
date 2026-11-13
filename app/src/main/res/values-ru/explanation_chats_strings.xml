@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
+    <string name="explanation_chat_actions_leave_and_delete">Вы выйдете из этого чата, и он будет удалён с этого устройства. Остальные участники останутся в чате, а вернуться можно только если вас добавят снова.</string>
+    <string name="explanation_chat_actions_delete">Удаляет этот чат и его сообщения с этого устройства. Для других участников вы из группы не выходите.</string>
+    <string name="explanation_chat_actions_abandon_dm">Отказывается от этого личного чата и удаляет его с этого устройства. Собеседник не получает уведомления.</string>
+    <string name="explanation_chat_actions_abandon_group">Отказывается от этой группы и удаляет её с этого устройства. Остальные участники остаются в группе.</string>
+    <string name="explanation_chat_info_mute">Отключает уведомления из этого чата. Сообщения по-прежнему приходят, и уведомления можно включить снова.</string>
+    <string name="explanation_chat_info_unmute">Снова включает уведомления из этого чата.</string>
+    <string name="explanation_chat_info_disappearing">Задаёт, исчезают ли новые сообщения в этом чате через выбранное время. Уже отправленные сообщения не меняются.</string>
+    <string name="explanation_chat_info_copy_chat_link">Копирует ссылку на этот чат, которой можно поделиться, чтобы другие могли попросить о вступлении.</string>
+    <string name="explanation_chat_info_relays">Показывает и изменяет релеи, через которые эта группа отправляет и получает сообщения. Изменения действуют для всей группы.</string>
+    <string name="explanation_chat_info_transfer_admin">Передаёт роль администратора другому участнику. Вы остаётесь в группе, но управлять ею сможет новый администратор.</string>
+    <string name="explanation_chat_info_step_down">Отказывается от вашей роли администратора, и вы остаётесь в группе обычным участником. Другой администратор может снова назначить вас.</string>
+    <string name="explanation_group_enable_disbanding">Позволяет администратору позже распустить эту группу. Включение не распускает группу.</string>
+    <string name="explanation_group_disband">Навсегда завершает эту группу для всех участников. Это нельзя отменить.</string>
+    <string name="explanation_chat_list_avatar_switch">Открывает выбор профиля, чтобы сменить используемую учётную запись. Остальные учётные записи остаются в системе.</string>
+    <string name="explanation_chat_list_avatar_settings">Открывает настройки вашей учётной записи и приложения. В системе одна учётная запись.</string>
+    <string name="explanation_new_message_talk_to_agent">Открывает настройки ИИ-агентов, где можно подключить агента, которому можно писать как контакту.</string>
+    <string name="explanation_chats_fab_check_relays">Настройка релеев требует внимания, поэтому сообщения могут не доходить. Открывает релеи для проверки.</string>
+    <string name="explanation_new_message_admin">Делает этого участника администратором, который может управлять группой. Это можно изменить позже.</string>
+    <string name="explanation_chat_list_manage_folders">Открывает управление папками, где можно создавать, переименовывать, переупорядочивать и удалять папки чатов.</string>
+    <string name="explanation_app_update_icon">Доступно обновление приложения или оно обрабатывается. Открывает настройки со статусом.</string>
+    <string name="explanation_search_filters_active">Фильтры поиска включены, поэтому результаты ограничены. Открывает фильтры, чтобы изменить или сбросить их.</string>
+</resources>

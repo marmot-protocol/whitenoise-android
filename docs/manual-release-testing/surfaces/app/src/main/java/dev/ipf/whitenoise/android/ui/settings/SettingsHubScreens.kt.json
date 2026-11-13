@@ -260,6 +260,14 @@
         "test_ids": [
           "SET-046"
         ]
+      },
+      {
+        "surface": "Settings hub hold-to-explain: relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.explanation_settings_relays",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ]
   },

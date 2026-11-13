@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.settleControlMorph
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -272,11 +273,21 @@ private fun ConversationDictationActiveActions(
     actionColors: AccountActionColors,
 ) {
     val sendLabel = stringResource(R.string.send)
+    val sendExplanation = composerExplanation(R.string.send, R.string.explanation_conversation_dictation_send)
     ConversationDictationListeningSlot(facts.captureInProgress)
     IconButton(
         onClick = settleControlMorph(controller::cancel),
         enabled = !facts.deliveryInProgress,
-        modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
+        modifier =
+            Modifier
+                .width(ComposerShortcutPitch)
+                .height(ComposerShortcutTarget)
+                .explainOnLongPress(
+                    composerExplanation(
+                        R.string.cancel,
+                        R.string.explanation_conversation_dictation_cancel,
+                    ),
+                ),
     ) {
         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
     }
@@ -286,11 +297,15 @@ private fun ConversationDictationActiveActions(
             onClick = settleControlMorph(controller::send),
             enabled = facts.completionActionsEnabled,
             modifier =
-                Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget).semantics {
-                    contentDescription = sendLabel
-                    selected = true
-                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
-                },
+                Modifier
+                    .width(ComposerShortcutPitch)
+                    .height(ComposerShortcutTarget)
+                    .explainOnLongPress(sendExplanation)
+                    .semantics {
+                        contentDescription = sendLabel
+                        selected = true
+                        progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                    },
         ) {
             CircularProgressIndicator(
                 modifier =
@@ -311,7 +326,7 @@ private fun ConversationDictationActiveActions(
             description = sendLabel,
             icon = R.drawable.ic_arrow_upward,
             enabled = facts.completionActionsEnabled,
-            modifier = Modifier.semantics { selected = false },
+            modifier = Modifier.explainOnLongPress(sendExplanation).semantics { selected = false },
             // Keep commands adjacent while retaining Material minimum touch expansion.
             width = ComposerShortcutPitch,
         )
@@ -329,13 +344,21 @@ private fun ConversationDictationPasteAction(
         onClick = settleControlMorph(controller::paste),
         enabled = facts.completionActionsEnabled,
         modifier =
-            Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget).semantics {
-                contentDescription = pasteLabel
-                selected = facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
-                if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
-                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
-                }
-            },
+            Modifier
+                .width(ComposerShortcutPitch)
+                .height(ComposerShortcutTarget)
+                .explainOnLongPress(
+                    composerExplanation(
+                        R.string.paste_dictation_transcript,
+                        R.string.explanation_conversation_dictation_paste,
+                    ),
+                ).semantics {
+                    contentDescription = pasteLabel
+                    selected = facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
+                    if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+                        progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                    }
+                },
     ) {
         if (facts.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
             CircularProgressIndicator(

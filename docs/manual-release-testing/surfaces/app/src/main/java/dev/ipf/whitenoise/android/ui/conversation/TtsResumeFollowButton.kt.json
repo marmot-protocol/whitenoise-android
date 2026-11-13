@@ -11,6 +11,14 @@
           "TTS-001",
           "TTS-004"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsResumeFollowButton.kt",
+        "surface": "Holding Resume following explains it",
+        "anchor": "R.string.explanation_conversation_tts_resume_follow",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ]
   },

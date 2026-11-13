@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+  "legacy_sha256": "a99beacc7cc615344aeac463b3f125611046627d48dcdd8497edee6b0ac93b5a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "VoiceReviewComposer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "fun VoiceReviewComposer(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "VoiceReviewComposerContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "fun VoiceReviewComposerContent(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "surface": "Holding a voice review button explains it",
+        "anchor": "R.string.explanation_conversation_voice_discard",
+        "test_ids": [
+          "CON-049"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "R.string.discard",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "R.string.send",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "R.string.sending",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:voice_message_pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "R.string.voice_message_pause",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:voice_message_play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "R.string.voice_message_play",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:voice_record_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "R.string.voice_record_again",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:voice_review_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceReviewComposer.kt",
+        "anchor": "R.string.voice_review_title",
+        "test_ids": [
+          "MED-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

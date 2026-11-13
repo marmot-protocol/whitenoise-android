@@ -47,6 +47,14 @@
           "FIND-001",
           "FIND-016"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "surface": "Holding the chat list avatar explains it",
+        "anchor": ".explainOnLongPress(avatarExplanation)",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ],
     "settings_controls": [

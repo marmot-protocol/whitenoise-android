@@ -1,0 +1,74 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+  "legacy_sha256": "fb7a9bb5072f52b6252483ff8d14f20d6f4c4e70118a4c0c41dd2f1c9992898a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatInfoMemberCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "fun ChatInfoMemberCard(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-004"
+        ]
+      },
+      {
+        "surface": "ChatInfoRowChevron",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "fun ChatInfoRowChevron(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-004"
+        ]
+      },
+      {
+        "surface": "QuickInfoAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "fun QuickInfoAction(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-015",
+          "GRP-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "surface": "Quick info actions can carry a hold explanation",
+        "anchor": ".explainOnLongPress(explanation)",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.admin",
+        "test_ids": [
+          "GRP-001",
+          "GRP-004"
+        ]
+      },
+      {
+        "surface": "string:group_member_updating",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.group_member_updating",
+        "test_ids": [
+          "GRP-001",
+          "GRP-004"
+        ]
+      },
+      {
+        "surface": "string:member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ChatInfoOverview.kt",
+        "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-001",
+          "GRP-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

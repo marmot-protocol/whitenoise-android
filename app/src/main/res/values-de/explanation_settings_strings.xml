@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explanation_account_keys_copy_private">Kopiert deinen privaten Schlüssel als sensibel markiert in die Zwischenablage. Wer ihn hat, kontrolliert dein Profil – füge ihn nur dort ein, wo du vertraust.</string>
+    <string name="explanation_account_keys_export_encrypted">Speichert deinen privaten Schlüssel in einer Datei deiner Wahl, geschützt durch ein Passwort, das du festlegst. Ohne dieses Passwort lässt sich die Datei nicht öffnen.</string>
+    <string name="explanation_account_keys_export_raw">Teilt deinen privaten Schlüssel nach einer Warnung als Klartext mit einer App deiner Wahl. Der verschlüsselte Export ist sicherer.</string>
+    <string name="explanation_account_keys_reveal">Zeigt deinen privaten Schlüssel auf diesem Bildschirm an oder blendet ihn aus. Er wird weder kopiert noch geteilt.</string>
+    <string name="explanation_account_keys_sign_out">Meldet dieses Profil auf diesem Gerät ab. Gruppen, Verlauf und Entwürfe bleiben erhalten, und du kannst dich über die Kontoauswahl wieder anmelden.</string>
+    <string name="explanation_account_keys_wipe">Entfernt dieses Konto dauerhaft von diesem Gerät, einschließlich Nachrichten, Gruppenverschlüsselungsdaten und gespeichertem Schlüssel. Du kannst dich mit demselben Schlüssel erneut anmelden, aber frühere Gruppen sind weg.</string>
+    <string name="explanation_account_keys_signout_invitation_keys">Wenn aktiviert, werden deine veröffentlichten Einladungsschlüssel beim Abmelden von den Relays entfernt, sodass dich niemand in neue Gruppen einladen kann, solange du abgemeldet bist.</string>
+    <string name="explanation_settings_profile_row">Öffnet „Teilen &amp; Verbinden“ für dieses Profil. Tippe stattdessen auf den kurzen Schlüssel, um den vollständigen öffentlichen Schlüssel zu kopieren.</string>
+    <string name="explanation_settings_profile_picture">Öffnet die Optionen für dieses Profilbild.</string>
+    <string name="explanation_settings_relays">Zeigt die Relays, die dieses Profil nutzt, und welche Listen jedes davon bedient.</string>
+    <string name="explanation_relays_role_profile">Fügt dieses Relay der von dir veröffentlichten Profilliste hinzu, die anderen zeigt, wo sie dein Profil und deine Verbindungsdaten finden.</string>
+    <string name="explanation_relays_role_inbox">Fügt dieses Relay der Liste hinzu, über die andere dir Einladungen zu neuen Chats und Gruppen senden.</string>
+    <string name="explanation_relays_publish_missing">Veröffentlicht die als fehlend markierten Relay-Listen, damit andere erfahren, wie sie dich erreichen.</string>
+    <string name="explanation_account_setup_remove_relay">Entfernt dieses Relay in diesem Einrichtungsschritt aus deinen Relay-Listen. Du kannst es direkt danach rückgängig machen.</string>
+    <string name="explanation_developer_key_packages">Zeigt die für dieses Konto veröffentlichten Schlüsselpakete, mit denen andere dich in Gruppen einladen können, und lässt dich sie verwalten.</string>
+    <string name="explanation_developer_quarantined_groups">Listet Gruppen auf, die nicht sicher geladen werden konnten, und lässt dich die Wiederherstellung erneut versuchen. Es wird nichts gelöscht.</string>
+    <string name="explanation_quarantine_refresh">Lädt die Liste der Quarantänegruppen neu. Die Wiederherstellung wird dabei nicht erneut versucht.</string>
+    <string name="explanation_quarantine_retry">Wiederholt die Validierung dieser Gruppe durch die gemeinsame Engine. Verlauf wird nicht gelöscht, Prüfungen werden nicht umgangen und die Gruppe wird nicht neu betreten.</string>
+    <string name="explanation_notifications_push">Nutzt Google Firebase Cloud Messaging, um White Noise kurz zu wecken; die App prüft dann sicher auf Nachrichten. Lokale Benachrichtigungen halten stattdessen eine Verbindung offen.</string>
+    <string name="explanation_notifications_local">Hält bei aktivierten Benachrichtigungen eine dauerhafte Verbindung offen und erstellt sie auf diesem Gerät, statt Push zu nutzen.</string>
+    <string name="explanation_diagnostics_usage">Teilt die Nutzung von Funktionen und die App-Leistung für alle Profile auf diesem Gerät, mit einer temporären Sitzungs-ID und einer zurücksetzbaren Installations-ID. Konto- oder Gruppen-IDs sind nie enthalten.</string>
+    <string name="explanation_diagnostics_logs">Teilt bereinigte technische Protokolle zu Gruppen aller Profile auf diesem Gerät mit White Noise, getrennt von der Nutzungsfreigabe. Beim Ausschalten werden neue Aufzeichnungen und Uploads gestoppt.</string>
+    <string name="explanation_gestures_pull_unread">Wenn du die Chatliste nach unten ziehst, werden nur ungelesene Chats angezeigt. „Alle anzeigen“ bringt die vollständige Liste zurück.</string>
+    <string name="explanation_data_usage_download_switch">Erlaubt automatische Downloads in dieser Art von Netzwerk. Jede passende Netzwerkregel muss es erlauben; manuelle Downloads funktionieren immer.</string>
+</resources>

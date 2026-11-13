@@ -142,6 +142,7 @@ import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.plainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
@@ -1315,7 +1316,17 @@ internal fun ComposerPill(
                     readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
                     editorScrollJob = editorScrollScope.launch { composerScrollState.scrollTo(0) }
                 },
-                modifier = Modifier.width(draftTopWidth).height(48.dp).testTag(COMPOSER_DRAFT_TOP_TAG),
+                modifier =
+                    Modifier
+                        .width(draftTopWidth)
+                        .height(48.dp)
+                        .testTag(COMPOSER_DRAFT_TOP_TAG)
+                        .explainOnLongPress(
+                            composerExplanation(
+                                R.string.scroll_to_top,
+                                R.string.explanation_composer_draft_top,
+                            ),
+                        ),
             ) {
                 Icon(
                     painterResource(R.drawable.ic_jump_to_edge),

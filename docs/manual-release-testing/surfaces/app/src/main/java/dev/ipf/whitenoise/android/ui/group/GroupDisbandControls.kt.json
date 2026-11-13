@@ -1,0 +1,107 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+  "legacy_sha256": "423680ad0d1b71fb010086a8413cc81a228a33283b336f129f8689a0660ff23c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DisbandCaptionText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "fun DisbandCaptionText(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "DisbandFailureRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "fun DisbandFailureRows(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "DisbandLeading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "fun DisbandLeading(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "GroupDisbandConfirmDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "fun GroupDisbandConfirmDialog(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "GroupDisbandStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "fun GroupDisbandStatus(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "surface": "Holding Disband group explains it",
+        "anchor": "R.string.explanation_group_disband",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:group_disband_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "R.string.group_disband_action",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_disband_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "R.string.group_disband_confirm",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_disband_dialog_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "R.string.group_disband_dialog_message",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_disband_dialog_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "R.string.group_disband_dialog_title",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_disband_enable_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "R.string.group_disband_enable_action",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_disband_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDisbandControls.kt",
+        "anchor": "R.string.group_disband_pending",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

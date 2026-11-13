@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Read Aloud bar explanations, shown when a transport button is held. -->
+    <string name="explanation_conversation_tts_previous_message">将朗读跳回上一条消息的开头。消息本身不会改变。</string>
+    <string name="explanation_conversation_tts_previous_sentence">将朗读跳回当前句子的开头；如果已在句首，则跳到上一句。</string>
+    <string name="explanation_conversation_tts_next_sentence">跳到正在朗读的消息的下一句。</string>
+    <string name="explanation_conversation_tts_next_message">跳到下一条消息的开头，朗读从那里继续。</string>
+    <string name="explanation_conversation_tts_resume_follow">将聊天滚动到正在朗读的消息。不会暂停或重新开始音频。</string>
+
+    <!-- Dictation explanations, shown when a dictation control is held. -->
+    <string name="explanation_conversation_dictation_cancel">放弃你说的内容。不会发送任何内容，也不会添加到消息中，且无法撤销。</string>
+    <string name="explanation_conversation_dictation_send">停止收听，并将识别出的文字作为消息发送。若想在发送前检查，请使用“粘贴转写”。</string>
+    <string name="explanation_conversation_dictation_paste">将识别出的文字放入消息框而不发送，你可以先进行编辑。</string>
+    <string name="explanation_conversation_dictation_recovery_paste">将识别出的文字放入消息框，不会发送。</string>
+    <string name="explanation_conversation_dictation_recovery_retry_send">重新尝试将识别出的文字作为消息发送。</string>
+    <string name="explanation_conversation_dictation_recovery_app_settings">打开 White Noise 的 Android 设置，你可以在那里允许使用麦克风。</string>
+    <string name="explanation_conversation_dictation_recovery_speech">打开 Android 语音识别设置，你可以在那里选择或安装识别服务。</string>
+    <string name="explanation_conversation_dictation_recovery_retry">重新开始收听。之前识别出的内容不会被添加。</string>
+
+    <!-- Voice message explanations, shown when a recording or review control is held. -->
+    <string name="explanation_conversation_voice_discard">删除这段录音且不发送。无法撤销。</string>
+    <string name="explanation_conversation_voice_record_again">删除这段录音并开始新的录音。不会发送任何内容。</string>
+    <string name="explanation_conversation_voice_delete">停止并删除录音，不发送。无法撤销。</string>
+    <string name="explanation_conversation_voice_stop">停止录音，让你可以先试听。在你发送之前不会发送任何内容。</string>
+
+    <!-- Media preview explanations, shown when a preview control is held. -->
+    <string name="explanation_media_preview_send">将此处显示的附件连同你的说明发送到此聊天。点“完成”则会把它们保留在消息框中。</string>
+    <string name="explanation_media_preview_done">保存你的更改并返回消息框。不会发送任何内容，取消勾选的项目会从草稿中移除。</string>
+    <string name="explanation_media_preview_cancel">关闭预览且不发送任何内容。你正在准备的附件会被丢弃。</string>
+    <string name="explanation_media_preview_add_more">打开菜单，向此消息添加更多照片或文件。</string>
+
+    <!-- Conversation header and navigation explanations. -->
+    <string name="explanation_conversation_header_details">打开此聊天的详情，例如成员和设置。</string>
+    <string name="explanation_conversation_jump_to_mention">滚动到下一条提到你的未读消息。</string>
+    <string name="explanation_composer_draft_top">将草稿滚动到第一行。文字不会改变。</string>
+    <string name="explanation_emoji_search">按名称搜索表情符号。</string>
+    <string name="explanation_emoji_configure">打开设置，在那里选择你的快速回应表情符号。</string>
+
+    <!-- Poll creation explanations. -->
+    <string name="explanation_poll_add_option">在允许的上限内为投票再添加一个选项。</string>
+    <string name="explanation_poll_single_choice">成员只能投一个选项。</string>
+    <string name="explanation_poll_multiple_choice">成员可以投多个选项。</string>
+
+    <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_reply">在输入框中引用这条消息，让你的回复与之关联。</string>
+    <string name="explanation_message_action_edit">在输入框中打开你的消息，以便你修改。</string>
+    <string name="explanation_message_action_select">开启选择模式，一次选中多条消息。</string>
+    <string name="explanation_message_action_select_text">让你选择这条消息中的一部分文字。</string>
+    <string name="explanation_message_action_copy">将消息文字复制到手机剪贴板。</string>
+    <string name="explanation_message_action_translate">打开显示译文的面板。翻译通过 Offline Translator 应用在你的设备上进行。</string>
+    <string name="explanation_message_action_read_aloud">朗读这条消息，然后继续朗读后面的消息。</string>
+    <string name="explanation_message_action_read_code_literally">朗读这条消息，并按原样逐字读出代码，然后继续朗读后面的消息。</string>
+    <string name="explanation_message_action_forward">打开聊天选择器。所选聊天会收到这条消息的新副本。</string>
+    <string name="explanation_message_action_keep_on_screen">将这条消息保留在聊天上方的小卡片中。你可以随时移除该卡片。</string>
+    <string name="explanation_message_action_show_less">将这条长消息折叠为较短的预览。</string>
+    <string name="explanation_message_action_share">用这条消息打开 Android 分享菜单。所选应用会收到它，且位于 White Noise 之外。</string>
+    <string name="explanation_message_action_save">将这条消息的附件保存到你的设备。</string>
+    <string name="explanation_message_action_info">显示这条消息的发送和接收时间、发送者、ID 和状态。</string>
+    <string name="explanation_message_action_report">打开面向群管理员的举报表单。在你确认之前不会发送任何内容，管理员可以看到是谁举报的。</string>
+    <string name="explanation_message_action_delete">让你选择只在此设备上删除这条消息，或为所有人删除。为所有人删除无法撤销。在你选择之前不会删除任何内容。</string>
+</resources>

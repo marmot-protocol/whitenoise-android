@@ -41,6 +41,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
@@ -141,10 +143,30 @@ internal fun TtsTransportBarContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    IconButton(onClick = onPreviousMessage, enabled = navigationEnabled) {
+                    IconButton(
+                        onClick = onPreviousMessage,
+                        enabled = navigationEnabled,
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                composerExplanation(
+                                    R.string.tts_bar_previous_message,
+                                    R.string.explanation_conversation_tts_previous_message,
+                                ),
+                            ),
+                    ) {
                         Icon(Icons.Default.SkipPrevious, stringResource(R.string.tts_bar_previous_message))
                     }
-                    IconButton(onClick = onPreviousSentence, enabled = navigationEnabled) {
+                    IconButton(
+                        onClick = onPreviousSentence,
+                        enabled = navigationEnabled,
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                composerExplanation(
+                                    R.string.tts_bar_skip_previous,
+                                    R.string.explanation_conversation_tts_previous_sentence,
+                                ),
+                            ),
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.tts_bar_skip_previous),
@@ -162,13 +184,33 @@ internal fun TtsTransportBarContent(
                         // Native terminal/error states have no resumable queue.
                         else -> Unit
                     }
-                    IconButton(onClick = onNextSentence, enabled = navigationEnabled) {
+                    IconButton(
+                        onClick = onNextSentence,
+                        enabled = navigationEnabled,
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                composerExplanation(
+                                    R.string.tts_bar_skip_next,
+                                    R.string.explanation_conversation_tts_next_sentence,
+                                ),
+                            ),
+                    ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = stringResource(R.string.tts_bar_skip_next),
                         )
                     }
-                    IconButton(onClick = onNextMessage, enabled = navigationEnabled) {
+                    IconButton(
+                        onClick = onNextMessage,
+                        enabled = navigationEnabled,
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                composerExplanation(
+                                    R.string.tts_bar_next_message,
+                                    R.string.explanation_conversation_tts_next_message,
+                                ),
+                            ),
+                    ) {
                         Icon(Icons.Default.SkipNext, stringResource(R.string.tts_bar_next_message))
                     }
                     if (!isError) {

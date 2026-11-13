@@ -92,6 +92,22 @@
         "test_ids": [
           "NTF-047"
         ]
+      },
+      {
+        "surface": "Notifications hold-to-explain: push",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_notifications_push",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Notifications hold-to-explain: local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_notifications_local",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "settings_controls": [

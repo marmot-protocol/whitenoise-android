@@ -60,9 +60,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.SearchCollapse
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
@@ -1032,7 +1034,7 @@ private fun SettingsProfileHeader(
 /** The active profile as one tappable row: avatar, name, short key that copies the full key, QR glyph and chevron. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 private fun SettingsProfileRow(
     context: SettingsRowContext,
     account: SettingsHomeAccount,
@@ -1041,6 +1043,8 @@ private fun SettingsProfileRow(
 ) {
     val shareDescription = stringResource(R.string.settings_open_share_connect_for, account.title)
     val editPictureDescription = stringResource(R.string.profile_picture_edit)
+    val avatarExplanation = stringResource(R.string.explanation_settings_profile_picture)
+    val profileExplanation = stringResource(R.string.explanation_settings_profile_row)
     Surface(
         color = context.containerColor,
         shape = context.shapes.shape,
@@ -1069,6 +1073,7 @@ private fun SettingsProfileRow(
                     modifier =
                         Modifier
                             .size(SettingsHomeDefaults.ProfileAvatarSize)
+                            .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
                             .clickable(role = Role.Button, onClick = onAvatarClick)
                             .testTag("settings.active_profile_avatar")
                             .semantics {
@@ -1090,6 +1095,7 @@ private fun SettingsProfileRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .explainOnLongPress(Explanation(account.title, profileExplanation))
                     .clickable(onClick = onClick)
                     .testTag("settings.active_profile")
                     .semantics {
@@ -1222,6 +1228,7 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
             SettingsLink(
                 context = context,
                 title = stringResource(R.string.sign_out),
+                explanation = stringResource(R.string.explanation_account_keys_sign_out),
                 onClick = onSignOut,
                 destructive = true,
                 leading = {

@@ -115,6 +115,7 @@ internal fun DiagnosticsImprovementsScreen(
                                 appState.launchMutation { appState.setTelemetryEnabled(enabled) }
                             },
                             subtitle = stringResource(R.string.usage_diagnostics_subtitle),
+                            explanation = stringResource(R.string.explanation_diagnostics_usage),
                             enabled = state.snapshot != null && !state.failed,
                             busy = state.busy,
                         )
@@ -136,6 +137,7 @@ internal fun DiagnosticsImprovementsScreen(
                                 }
                             },
                             subtitle = stringResource(R.string.audit_upload_subtitle),
+                            explanation = stringResource(R.string.explanation_diagnostics_logs),
                             enabled = appState.auditLogSettings != null && !auditLogsBusy,
                             busy = auditLogsBusy,
                         )

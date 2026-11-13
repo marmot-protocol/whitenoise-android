@@ -143,6 +143,14 @@
         "test_ids": [
           "CON-037"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "surface": "Holding group details controls explains them",
+        "anchor": "R.string.explanation_chat_info_transfer_admin",
+        "test_ids": [
+          "GRP-042"
+        ]
       }
     ],
     "settings_controls": [

@@ -376,6 +376,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                         onClick = onPublishMissing,
                         modifier = Modifier.testTag("relay.publication.publish"),
                         subtitle = stringResource(R.string.relay_list_publish_help),
+                        explanation = stringResource(R.string.explanation_relays_publish_missing),
                         enabled = !state.busy,
                     )
                 }
@@ -417,6 +418,7 @@ internal fun RelayDetailsScreen(
                                 checked = role in relay.roles,
                                 onCheckedChange = { onSetRole(role, it) },
                                 subtitle = stringResource(role.helpRes),
+                                explanation = stringResource(role.explanationRes()),
                                 enabled = !busy && role !in blockingRoles,
                             )
                         }
@@ -519,6 +521,7 @@ internal fun AddRelaySheet(
                                 checked = role in roles,
                                 onCheckedChange = { selected -> roles = if (selected) roles + role else roles - role },
                                 subtitle = stringResource(role.helpRes),
+                                explanation = stringResource(role.explanationRes()),
                             )
                         }
                     }
@@ -569,3 +572,10 @@ private fun relaySummary(relay: AccountRelay): String {
 }
 
 private val RelayProgressSize = 20.dp
+
+@StringRes
+private fun AccountRelayRole.explanationRes(): Int =
+    when (this) {
+        AccountRelayRole.Profile -> R.string.explanation_relays_role_profile
+        AccountRelayRole.Inbox -> R.string.explanation_relays_role_inbox
+    }

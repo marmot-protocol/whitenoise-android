@@ -2129,7 +2129,13 @@ internal fun ComposerBar(
                                         Modifier
                                             .width(
                                                 actionTargetWidth,
-                                            ).height(ComposerActionRowHeight),
+                                            ).height(ComposerActionRowHeight)
+                                            .explainOnLongPress(
+                                                composerExplanation(
+                                                    R.string.voice_message_cancel,
+                                                    R.string.explanation_conversation_voice_delete,
+                                                ),
+                                            ),
                                 ) {
                                     Icon(
                                         Icons.Default.Delete,
@@ -2145,6 +2151,13 @@ internal fun ComposerBar(
                                 contentColor = actionColors.content,
                                 description = stringResource(R.string.voice_recording_stop),
                                 icon = R.drawable.ic_stop,
+                                modifier =
+                                    Modifier.explainOnLongPress(
+                                        composerExplanation(
+                                            R.string.voice_recording_stop,
+                                            R.string.explanation_conversation_voice_stop,
+                                        ),
+                                    ),
                             )
                         } else if (showPrimaryTrailingAction && showConfiguredMic) {
                             Box(contentAlignment = Alignment.BottomCenter) {
@@ -2159,7 +2172,7 @@ internal fun ComposerBar(
                                     modifier =
                                         Modifier.explainOnLongPress(
                                             explanation =
-                                                composerShortcutExplanation(ComposerShortcut.VoiceNote),
+                                                ComposerShortcut.VoiceNote.explanation(),
                                             enabled = voiceExplainable,
                                             holdToExplain = false,
                                             additionalActions =

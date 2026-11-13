@@ -33,6 +33,14 @@
           "SET-011",
           "MED-005"
         ]
+      },
+      {
+        "surface": "Data usage hold-to-explain: download switch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_data_usage_download_switch",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "settings_controls": [

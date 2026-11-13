@@ -74,8 +74,7 @@ internal val ComposerShortcut.explanationRes: Int
 
 /** The shortcut's explanation; Customize composer lives only in the + menu and Settings. */
 @Composable
-internal fun composerShortcutExplanation(shortcut: ComposerShortcut): Explanation =
-    composerExplanation(shortcut.labelRes, shortcut.explanationRes)
+internal fun ComposerShortcut.explanation(): Explanation = composerExplanation(labelRes, explanationRes)
 
 @Composable
 internal fun composerExplanation(

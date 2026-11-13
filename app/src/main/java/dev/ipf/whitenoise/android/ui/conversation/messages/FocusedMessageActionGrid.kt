@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 private val FocusedActionCellHorizontalPadding = 12.dp
@@ -177,7 +178,7 @@ private fun FocusedActionCell(
     TextButton(
         onClick = action.onClick,
         enabled = action.enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = minimumHeight),
+        modifier = modifier.fillMaxWidth().heightIn(min = minimumHeight).explainOnLongPress(action.explanation),
         contentPadding =
             PaddingValues(
                 horizontal = FocusedActionCellHorizontalPadding,

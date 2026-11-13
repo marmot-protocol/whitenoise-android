@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explanation_account_keys_copy_private">將您的私鑰複製到剪貼簿，並標記為敏感內容。擁有私鑰的人可以控制您的個人檔案，請只貼到您信任的地方。</string>
+    <string name="explanation_account_keys_export_encrypted">將您的私鑰儲存到您選擇的檔案中，並用您設定的密碼加密。開啟該檔案需要此密碼。</string>
+    <string name="explanation_account_keys_export_raw">在顯示警告後，將您的私鑰以純文字形式分享給您選擇的應用程式。加密匯出更安全。</string>
+    <string name="explanation_account_keys_reveal">在此畫面上顯示或隱藏您的私鑰，不會複製或分享。</string>
+    <string name="explanation_account_keys_sign_out">在此裝置上登出該個人檔案。群組、歷史記錄和草稿會保留，您可以從帳號選擇器重新登入。</string>
+    <string name="explanation_account_keys_wipe">從此裝置永久移除該帳號，包括訊息、群組加密資料和已儲存的金鑰。您可以用同一金鑰重新登入，但之前的群組將會遺失。</string>
+    <string name="explanation_account_keys_signout_invitation_keys">開啟後，登出時會從中繼站移除您已發布的邀請金鑰，因此在您登出期間，沒有人能邀請您加入新群組。</string>
+    <string name="explanation_settings_profile_row">開啟此個人檔案的「分享與連線」。點按簡短金鑰可複製完整公開金鑰。</string>
+    <string name="explanation_settings_profile_picture">開啟此大頭貼的選項。</string>
+    <string name="explanation_settings_relays">顯示此個人檔案使用的中繼站，以及每個中繼站所服務的清單。</string>
+    <string name="explanation_relays_role_profile">將此中繼站加入您發布的個人檔案清單，讓其他人知道去哪裡找到您的個人檔案和連線資訊。</string>
+    <string name="explanation_relays_role_inbox">將此中繼站加入他人用來向您傳送新聊天和群組邀請的清單中。</string>
+    <string name="explanation_relays_publish_missing">發布被標記為缺少的中繼站清單，讓其他人知道如何聯絡到您。</string>
+    <string name="explanation_account_setup_remove_relay">在此設定步驟中，將此中繼站從您的中繼站清單中移除。移除後可立即復原。</string>
+    <string name="explanation_developer_key_packages">顯示為此帳號發布的金鑰套件（他人可藉此邀請您加入群組），並可對其進行管理。</string>
+    <string name="explanation_developer_quarantined_groups">列出無法安全載入的群組，並可重試復原。不會刪除任何內容。</string>
+    <string name="explanation_quarantine_refresh">重新載入被隔離的群組清單，不會重試復原。</string>
+    <string name="explanation_quarantine_retry">讓共用引擎重新驗證此群組。不會刪除歷史記錄、繞過檢查或重新加入群組。</string>
+    <string name="explanation_notifications_push">使用 Google Firebase Cloud Messaging 短暫喚醒 White Noise，應用程式隨後會安全地檢查訊息。本機通知則改為保持連線。</string>
+    <string name="explanation_notifications_local">開啟通知期間保持持續連線，並在此裝置上產生通知，而不使用推播。</string>
+    <string name="explanation_diagnostics_usage">分享此裝置上所有個人檔案的功能使用情況和應用程式效能，附帶臨時工作階段 ID 和可重設的安裝 ID，絕不包含帳號或群組 ID。</string>
+    <string name="explanation_diagnostics_logs">將此裝置上所有個人檔案的群組技術日誌（已清理）分享給 White Noise，與使用情況分享相互獨立。關閉後將停止新的記錄和上傳。</string>
+    <string name="explanation_gestures_pull_unread">下拉聊天清單時僅顯示未讀聊天。選擇「顯示全部」可恢復完整清單。</string>
+    <string name="explanation_data_usage_download_switch">允許在此類網路上自動下載。所有符合的網路規則都必須允許，手動下載一律可用。</string>
+</resources>

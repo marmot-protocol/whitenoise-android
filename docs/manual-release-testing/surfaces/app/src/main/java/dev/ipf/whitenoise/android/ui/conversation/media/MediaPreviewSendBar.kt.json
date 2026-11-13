@@ -19,6 +19,14 @@
           "MED-001",
           "PRO-010"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
+        "surface": "Holding a media send bar button explains it",
+        "anchor": "R.string.explanation_media_preview_send",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "settings_controls": [

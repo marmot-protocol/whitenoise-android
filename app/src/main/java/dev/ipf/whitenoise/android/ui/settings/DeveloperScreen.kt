@@ -244,6 +244,7 @@ internal fun DeveloperContent(
                             onClick = onOpenKeyPackages,
                             modifier = Modifier.testTag("developer.key_packages.row"),
                             subtitle = stringResource(R.string.key_packages_settings_subtitle),
+                            explanation = stringResource(R.string.explanation_developer_key_packages),
                         )
                     }
                 }
@@ -257,6 +258,7 @@ internal fun DeveloperContent(
                                 title = stringResource(R.string.quarantined_groups),
                                 onClick = onOpenQuarantinedGroups,
                                 subtitle = quarantineSummary,
+                                explanation = stringResource(R.string.explanation_developer_quarantined_groups),
                                 modifier = Modifier.testTag("developer.quarantined_groups"),
                             )
                         }
@@ -271,6 +273,7 @@ internal fun DeveloperContent(
                                 title = stringResource(R.string.streaming_debug),
                                 checked = streamingDebug,
                                 onCheckedChange = onStreamingDebugChange,
+                                explanation = stringResource(R.string.explanation_developer_streaming_debug),
                                 modifier = Modifier.testTag("developer.streaming_debug"),
                             )
                         }

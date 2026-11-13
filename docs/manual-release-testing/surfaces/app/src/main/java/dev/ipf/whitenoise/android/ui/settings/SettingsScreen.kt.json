@@ -140,6 +140,30 @@
           "SET-042",
           "SET-044"
         ]
+      },
+      {
+        "surface": "Settings home hold-to-explain: profile row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "explanation_settings_profile_row",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Settings home hold-to-explain: profile picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "explanation_settings_profile_picture",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Settings home hold-to-explain: sign out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.explanation_account_keys_sign_out",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "settings_controls": [

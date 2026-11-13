@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConsentSwitchRow.kt",
+  "legacy_sha256": "4028a39ec134fbc78f4a714c94d5a387e98d0d664f713f1988977b27f35192c1",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConsentSwitchRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConsentSwitchRow.kt",
+        "anchor": "fun ConsentSwitchRow(",
+        "test_ids": [
+          "SEC-007",
+          "SEC-011",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "Consent switch row hold-to-explain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConsentSwitchRow.kt",
+        "anchor": ".explainOnLongPress(",
+        "test_ids": [
+          "SET-053"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

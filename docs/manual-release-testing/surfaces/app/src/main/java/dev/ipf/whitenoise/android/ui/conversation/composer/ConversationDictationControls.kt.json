@@ -97,6 +97,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "surface": "Holding a dictation control explains it",
+        "anchor": "R.string.explanation_conversation_dictation_cancel",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "settings_controls": [

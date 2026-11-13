@@ -237,7 +237,7 @@ private fun Modifier.explainComposerShortcut(
 ): Modifier {
     val customizable = bindings.enabled && !bindings.transactionActive
     return explainOnLongPress(
-        explanation = composerShortcutExplanation(shortcut),
+        explanation = shortcut.explanation(),
         enabled = customizable,
         holdToExplain = shortcut != ComposerShortcut.VoiceNote,
         additionalActions =

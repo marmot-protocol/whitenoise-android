@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
@@ -39,7 +40,15 @@ internal fun ConversationDictationFailureAction(
                 recoveredSendAvailable ||
                 settingsRecoveryAvailable,
         onClick = dictationFailureAction(state, controller, recovery, context),
-        modifier = Modifier.size(48.dp),
+        modifier =
+            Modifier
+                .size(48.dp)
+                .explainOnLongPress(
+                    composerExplanation(
+                        dictationFailureActionLabel(retrySend, state.recognitionIncomplete, recovery),
+                        dictationFailureActionExplanation(retrySend, state.recognitionIncomplete, recovery),
+                    ),
+                ),
     ) {
         Icon(
             imageVector =
@@ -81,4 +90,20 @@ private fun dictationFailureActionLabel(
         recovery == ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
         recovery == ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
         else -> R.string.retry
+    }
+
+/** Describes what the one recovery button does right now, matching [dictationFailureActionLabel]. */
+private fun dictationFailureActionExplanation(
+    retrySend: Boolean,
+    recognitionIncomplete: Boolean,
+    recovery: ConversationDictationRecovery,
+): Int =
+    when {
+        retrySend && recognitionIncomplete -> R.string.explanation_conversation_dictation_recovery_paste
+        retrySend -> R.string.explanation_conversation_dictation_recovery_retry_send
+        recovery == ConversationDictationRecovery.AppSettings ->
+            R.string.explanation_conversation_dictation_recovery_app_settings
+        recovery == ConversationDictationRecovery.SpeechProviderSetup ->
+            R.string.explanation_conversation_dictation_recovery_speech
+        else -> R.string.explanation_conversation_dictation_recovery_retry
     }

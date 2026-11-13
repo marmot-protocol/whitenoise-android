@@ -26,6 +26,22 @@
         "test_ids": [
           "SET-031"
         ]
+      },
+      {
+        "surface": "Quarantine hold-to-explain: refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.explanation_quarantine_refresh",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Quarantine hold-to-explain: retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.explanation_quarantine_retry",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "source_coverage": [

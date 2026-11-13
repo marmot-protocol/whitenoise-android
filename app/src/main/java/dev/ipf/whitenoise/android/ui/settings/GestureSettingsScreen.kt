@@ -93,6 +93,7 @@ internal fun GestureSettingsContent(
                             state.pullUnread,
                             onPullUnreadChange,
                             modifier = Modifier.testTag("gestures.pull_unread"),
+                            explanation = stringResource(R.string.explanation_gestures_pull_unread),
                         )
                     }
                 }

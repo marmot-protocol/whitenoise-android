@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explanation_account_keys_copy_private">Copie votre clé privée dans le presse-papiers, marquée comme sensible. Toute personne qui la détient contrôle votre profil : ne la collez que là où vous avez confiance.</string>
+    <string name="explanation_account_keys_export_encrypted">Enregistre votre clé privée dans un fichier de votre choix, protégé par un mot de passe que vous définissez. Ce mot de passe est nécessaire pour ouvrir le fichier.</string>
+    <string name="explanation_account_keys_export_raw">Partage votre clé privée en texte brut avec une application de votre choix, après un avertissement. L’export chiffré est plus sûr.</string>
+    <string name="explanation_account_keys_reveal">Affiche ou masque votre clé privée sur cet écran. Elle n’est ni copiée ni partagée.</string>
+    <string name="explanation_account_keys_sign_out">Déconnecte ce profil sur cet appareil. Les groupes, l’historique et les brouillons restent, et vous pouvez vous reconnecter depuis le sélecteur de compte.</string>
+    <string name="explanation_account_keys_wipe">Supprime définitivement ce compte de cet appareil, y compris les messages, les données de chiffrement des groupes et la clé enregistrée. Vous pouvez vous reconnecter avec la même clé, mais les anciens groupes sont perdus.</string>
+    <string name="explanation_account_keys_signout_invitation_keys">Si cette option est activée, vos clés d’invitation publiées sont retirées des relais à la déconnexion, et personne ne peut vous inviter dans de nouveaux groupes tant que vous êtes déconnecté.</string>
+    <string name="explanation_settings_profile_row">Ouvre Partager et connecter pour ce profil. Touchez la clé courte pour copier la clé publique complète.</string>
+    <string name="explanation_settings_profile_picture">Ouvre les options de cette photo de profil.</string>
+    <string name="explanation_settings_relays">Affiche les relais utilisés par ce profil et les listes que chacun dessert.</string>
+    <string name="explanation_relays_role_profile">Ajoute ce relais à la liste de profil que vous publiez, qui indique aux autres où trouver votre profil et vos informations de connexion.</string>
+    <string name="explanation_relays_role_inbox">Ajoute ce relais à la liste que les autres utilisent pour vous envoyer des invitations à de nouvelles discussions et de nouveaux groupes.</string>
+    <string name="explanation_relays_publish_missing">Publie les listes de relais marquées comme manquantes, afin que les autres sachent comment vous joindre.</string>
+    <string name="explanation_account_setup_remove_relay">Retire ce relais de vos listes de relais dans cette étape de configuration. Vous pouvez annuler juste après.</string>
+    <string name="explanation_developer_key_packages">Affiche les paquets de clés publiés pour ce compte, qui permettent aux autres de vous inviter dans des groupes, et vous permet de les gérer.</string>
+    <string name="explanation_developer_quarantined_groups">Liste les groupes qui n’ont pas pu être chargés en toute sécurité et vous permet de relancer la récupération. Rien n’est supprimé.</string>
+    <string name="explanation_quarantine_refresh">Recharge la liste des groupes en quarantaine. Cela ne relance pas la récupération.</string>
+    <string name="explanation_quarantine_retry">Relance la validation de ce groupe par le moteur partagé. Cela ne supprime pas l’historique, ne contourne aucun contrôle et ne fait pas rejoindre le groupe.</string>
+    <string name="explanation_notifications_push">Utilise Google Firebase Cloud Messaging pour réveiller brièvement White Noise, qui vérifie ensuite en toute sécurité la présence de messages. Les notifications locales gardent une connexion ouverte à la place.</string>
+    <string name="explanation_notifications_local">Garde une connexion permanente tant que les notifications sont activées et les crée sur cet appareil, au lieu d’utiliser le push.</string>
+    <string name="explanation_diagnostics_usage">Partage l’utilisation des fonctionnalités et les performances de l’app pour tous les profils de cet appareil, avec un ID de session temporaire et un ID d’installation réinitialisable. Jamais d’ID de compte ou de groupe.</string>
+    <string name="explanation_diagnostics_logs">Partage avec White Noise des journaux techniques assainis sur les groupes de tous les profils de cet appareil, séparément du partage d’usage. La désactivation arrête les nouveaux enregistrements et envois.</string>
+    <string name="explanation_gestures_pull_unread">Tirer la liste des discussions vers le bas n’affiche que les discussions non lues. Tout afficher rétablit la liste complète.</string>
+    <string name="explanation_data_usage_download_switch">Autorise les téléchargements automatiques sur ce type de réseau. Chaque règle réseau applicable doit l’autoriser, et les téléchargements manuels fonctionnent toujours.</string>
+</resources>

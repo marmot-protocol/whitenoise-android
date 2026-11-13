@@ -34,8 +34,10 @@ import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
 import dev.ipf.whitenoise.android.search.labelRes
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.search.globalSearchDateFilterLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -105,7 +107,14 @@ internal fun GlobalSearchFilterIconButton(
         Icon(painterResource(R.drawable.ic_filter_list), contentDescription = null)
     }
     if (activeCount > 0) {
-        FilledIconButton(onClick = onClick, modifier = semantics, content = icon)
+        val explained =
+            semantics.explainOnLongPress(
+                Explanation(
+                    description,
+                    stringResource(R.string.explanation_search_filters_active),
+                ),
+            )
+        FilledIconButton(onClick = onClick, modifier = explained, content = icon)
     } else {
         IconButton(onClick = onClick, modifier = semantics, content = icon)
     }

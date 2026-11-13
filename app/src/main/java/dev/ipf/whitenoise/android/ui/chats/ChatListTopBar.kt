@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.controlHandoffEndpoint
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
@@ -215,6 +216,18 @@ internal fun ChatListTopBar(
                             }
                         else -> {
                             val active = appState.activeAccount
+                            val avatarExplanation =
+                                if (appState.chatsAvatarOpensSelector()) {
+                                    chatsExplanation(
+                                        R.string.switch_profile,
+                                        R.string.explanation_chat_list_avatar_switch,
+                                    )
+                                } else {
+                                    chatsExplanation(
+                                        R.string.open_settings,
+                                        R.string.explanation_chat_list_avatar_settings,
+                                    )
+                                }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 AccountAvatarButton(
                                     title =
@@ -241,7 +254,11 @@ internal fun ChatListTopBar(
                                             }
                                         }
                                     },
-                                    modifier = Modifier.padding(start = 8.dp).testTag("chats.switchProfile"),
+                                    modifier =
+                                        Modifier
+                                            .padding(start = 8.dp)
+                                            .testTag("chats.switchProfile")
+                                            .explainOnLongPress(avatarExplanation),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other
                                     // avatars use — not "some other account has unread" (#805).

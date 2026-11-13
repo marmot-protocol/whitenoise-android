@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.audio.AudioWaveformExtractor
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.media.VoiceWaveform
 import dev.ipf.whitenoise.android.ui.conversation.media.formatVoiceTime
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -110,12 +111,35 @@ internal fun VoiceReviewComposerContent(
         }
     }
     val discardAction: @Composable () -> Unit = {
-        IconButton(onClick = onDiscard, modifier = Modifier.size(48.dp)) {
+        IconButton(
+            onClick = onDiscard,
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .explainOnLongPress(
+                        composerExplanation(
+                            R.string.discard,
+                            R.string.explanation_conversation_voice_discard,
+                        ),
+                    ),
+        ) {
             Icon(painterResource(R.drawable.ic_close), discardLabel, modifier = Modifier.size(24.dp))
         }
     }
     val recordAgainAction: @Composable () -> Unit = {
-        IconButton(onClick = onRecordAgain, enabled = !sending, modifier = Modifier.size(48.dp)) {
+        IconButton(
+            onClick = onRecordAgain,
+            enabled = !sending,
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .explainOnLongPress(
+                        composerExplanation(
+                            R.string.voice_record_again,
+                            R.string.explanation_conversation_voice_record_again,
+                        ),
+                    ),
+        ) {
             Icon(
                 painterResource(R.drawable.ic_mic),
                 stringResource(R.string.voice_record_again),

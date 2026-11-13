@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explanation_account_keys_copy_private">将您的私钥复制到剪贴板，并标记为敏感内容。拥有私钥的人可以控制您的个人资料，请只粘贴到您信任的地方。</string>
+    <string name="explanation_account_keys_export_encrypted">将您的私钥保存到您选择的文件中，并用您设置的密码加密。打开该文件需要此密码。</string>
+    <string name="explanation_account_keys_export_raw">在显示警告后，将您的私钥以明文形式分享给您选择的应用。加密导出更安全。</string>
+    <string name="explanation_account_keys_reveal">在此屏幕上显示或隐藏您的私钥，不会复制或分享。</string>
+    <string name="explanation_account_keys_sign_out">在此设备上退出该个人资料。群组、历史记录和草稿会保留，您可以从账户选择器重新登录。</string>
+    <string name="explanation_account_keys_wipe">从此设备永久移除该账户，包括消息、群组加密数据和已存储的密钥。您可以用同一密钥重新登录，但之前的群组将丢失。</string>
+    <string name="explanation_account_keys_signout_invitation_keys">开启后，退出登录时会从中继移除您已发布的邀请密钥，因此在您退出登录期间，没有人能邀请您加入新群组。</string>
+    <string name="explanation_settings_profile_row">打开此个人资料的“分享与连接”。点按简短密钥可复制完整公钥。</string>
+    <string name="explanation_settings_profile_picture">打开此头像的选项。</string>
+    <string name="explanation_settings_relays">显示此个人资料使用的中继，以及每个中继所服务的列表。</string>
+    <string name="explanation_relays_role_profile">将此中继添加到您发布的个人资料列表中，让其他人知道去哪里找到您的个人资料和连接信息。</string>
+    <string name="explanation_relays_role_inbox">将此中继添加到他人用来向您发送新聊天和群组邀请的列表中。</string>
+    <string name="explanation_relays_publish_missing">发布被标记为缺失的中继列表，让其他人知道如何联系到您。</string>
+    <string name="explanation_account_setup_remove_relay">在此设置步骤中，将此中继从您的中继列表中移除。移除后可立即撤销。</string>
+    <string name="explanation_developer_key_packages">显示为此账户发布的密钥包（他人可借此邀请您加入群组），并可对其进行管理。</string>
+    <string name="explanation_developer_quarantined_groups">列出无法安全加载的群组，并可重试恢复。不会删除任何内容。</string>
+    <string name="explanation_quarantine_refresh">重新加载被隔离的群组列表，不会重试恢复。</string>
+    <string name="explanation_quarantine_retry">让共享引擎重新验证此群组。不会删除历史记录、绕过检查或重新加入群组。</string>
+    <string name="explanation_notifications_push">使用 Google Firebase Cloud Messaging 短暂唤醒 White Noise，应用随后会安全地检查消息。本地通知则改为保持连接。</string>
+    <string name="explanation_notifications_local">开启通知期间保持持久连接，并在此设备上生成通知，而不使用推送。</string>
+    <string name="explanation_diagnostics_usage">分享此设备上所有个人资料的功能使用情况和应用性能，附带临时会话 ID 和可重置的安装 ID，绝不包含账户或群组 ID。</string>
+    <string name="explanation_diagnostics_logs">将此设备上所有个人资料的群组技术日志（已清理）分享给 White Noise，与使用情况分享相互独立。关闭后将停止新的记录和上传。</string>
+    <string name="explanation_gestures_pull_unread">下拉聊天列表时仅显示未读聊天。选择“显示全部”可恢复完整列表。</string>
+    <string name="explanation_data_usage_download_switch">允许在此类网络上自动下载。所有匹配的网络规则都必须允许，手动下载始终可用。</string>
+</resources>

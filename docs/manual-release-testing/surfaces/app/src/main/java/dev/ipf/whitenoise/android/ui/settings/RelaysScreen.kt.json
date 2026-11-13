@@ -52,6 +52,38 @@
           "SYS-002",
           "SYS-003"
         ]
+      },
+      {
+        "surface": "Relays hold-to-explain: role switches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "private fun AccountRelayRole.explanationRes()",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Relays hold-to-explain: profile role",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_role_profile",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Relays hold-to-explain: inbox role",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_role_inbox",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Relays hold-to-explain: publish missing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_publish_missing",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "settings_controls": [

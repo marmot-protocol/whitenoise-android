@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain bodies for settings controls; titles reuse each control's own label. -->
+    <string name="explanation_account_keys_copy_private">Copies your private key to the clipboard, marked as sensitive. Anyone who has it controls your profile, so paste it only where you trust.</string>
+    <string name="explanation_account_keys_export_encrypted">Saves your private key to a file you choose, locked with a password you set. You need that password to open the file.</string>
+    <string name="explanation_account_keys_export_raw">Shares your private key as plain text with an app you choose, after a warning. The encrypted export is safer.</string>
+    <string name="explanation_account_keys_reveal">Shows or hides your private key on this screen. It does not copy or share it.</string>
+    <string name="explanation_account_keys_sign_out">Signs out of this profile on this device. Groups, history and drafts stay, and you can sign back in from the account picker.</string>
+    <string name="explanation_account_keys_wipe">Permanently removes this account from this device, including messages, group encryption data and the stored key. You can sign in again with the same key, but past groups are gone.</string>
+    <string name="explanation_account_keys_signout_invitation_keys">When on, your published invitation keys are removed from relays as you sign out, so nobody can invite you to new groups while you are signed out.</string>
+    <string name="explanation_settings_profile_row">Opens Share &amp; Connect for this profile. Tap the short key to copy the full public key instead.</string>
+    <string name="explanation_settings_profile_picture">Opens the options for this profile picture.</string>
+    <string name="explanation_settings_relays">Shows the relays this profile uses and which lists each one serves.</string>
+    <string name="explanation_relays_role_profile">Adds this relay to the profile list you publish, which tells others where to find your profile and connection info.</string>
+    <string name="explanation_relays_role_inbox">Adds this relay to the list others use to send you invitations to new chats and groups.</string>
+    <string name="explanation_relays_publish_missing">Publishes the relay lists that are marked missing, so others can find where to reach you.</string>
+    <string name="explanation_account_setup_remove_relay">Removes this relay from your relay lists in this setup step. You can undo it right after.</string>
+    <string name="explanation_developer_key_packages">Shows the key packages published for this account, which let others invite you to groups, and lets you manage them.</string>
+    <string name="explanation_developer_quarantined_groups">Lists groups that could not be safely loaded and lets you retry recovery. Nothing is deleted.</string>
+    <string name="explanation_developer_streaming_debug" translatable="false">Shows agent-stream and MLS signaling events inline in conversations. Meant for debugging.</string>
+    <string name="explanation_quarantine_refresh">Reloads the list of quarantined groups. It does not retry recovery.</string>
+    <string name="explanation_quarantine_retry">Retries the shared engine validation for this group. It does not delete history, bypass checks or rejoin the group.</string>
+    <string name="explanation_notifications_push">Uses Google Firebase Cloud Messaging to briefly wake White Noise, which then checks securely for messages. Local notifications keep a connection open instead.</string>
+    <string name="explanation_notifications_local">Keeps a persistent connection while notifications are on and creates them on this device, instead of using push.</string>
+    <string name="explanation_diagnostics_usage">Shares feature use and app performance for all profiles on this device, with a temporary session ID and a resettable installation ID. It never includes account or group IDs.</string>
+    <string name="explanation_diagnostics_logs">Shares sanitized technical logs about groups from all profiles on this device with White Noise, separate from usage sharing. Turning it off stops new recording and uploads.</string>
+    <string name="explanation_gestures_pull_unread">Pulling down on the chat list shows only unread chats. Show all brings the full list back.</string>
+    <string name="explanation_data_usage_download_switch">Allows automatic downloads on this kind of network. Every matching network rule must allow it, and manual downloads always work.</string>
+</resources>

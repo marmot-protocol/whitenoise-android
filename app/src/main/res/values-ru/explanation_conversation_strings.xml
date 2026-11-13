@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Read Aloud bar explanations, shown when a transport button is held. -->
+    <string name="explanation_conversation_tts_previous_message">Возвращает озвучивание к началу предыдущего сообщения. Само сообщение не меняется.</string>
+    <string name="explanation_conversation_tts_previous_sentence">Возвращает озвучивание к началу текущего предложения или, если вы уже в начале, к предыдущему предложению.</string>
+    <string name="explanation_conversation_tts_next_sentence">Переходит к следующему предложению озвучиваемого сообщения.</string>
+    <string name="explanation_conversation_tts_next_message">Переходит к началу следующего сообщения. Озвучивание продолжается оттуда.</string>
+    <string name="explanation_conversation_tts_resume_follow">Прокручивает чат к сообщению, которое сейчас озвучивается. Звук не ставится на паузу и не перезапускается.</string>
+
+    <!-- Dictation explanations, shown when a dictation control is held. -->
+    <string name="explanation_conversation_dictation_cancel">Отбрасывает сказанное. Ничего не отправляется и не добавляется в сообщение, отменить это нельзя.</string>
+    <string name="explanation_conversation_dictation_send">Прекращает прослушивание и отправляет распознанный текст сообщением. Чтобы проверить текст перед отправкой, используйте «Вставить расшифровку».</string>
+    <string name="explanation_conversation_dictation_paste">Вставляет распознанный текст в поле сообщения без отправки, чтобы вы могли сначала его изменить.</string>
+    <string name="explanation_conversation_dictation_recovery_paste">Вставляет распознанный текст в поле сообщения без отправки.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_send">Повторяет отправку распознанного текста сообщением.</string>
+    <string name="explanation_conversation_dictation_recovery_app_settings">Открывает настройки Android для White Noise, где можно разрешить доступ к микрофону.</string>
+    <string name="explanation_conversation_dictation_recovery_speech">Открывает настройки распознавания речи Android, где можно выбрать или установить службу распознавания.</string>
+    <string name="explanation_conversation_dictation_recovery_retry">Снова начинает слушать. Ранее распознанное не добавляется.</string>
+
+    <!-- Voice message explanations, shown when a recording or review control is held. -->
+    <string name="explanation_conversation_voice_discard">Удаляет эту запись без отправки. Отменить это нельзя.</string>
+    <string name="explanation_conversation_voice_record_again">Удаляет эту запись и начинает новую. Ничего не отправляется.</string>
+    <string name="explanation_conversation_voice_delete">Останавливает и удаляет запись без отправки. Отменить это нельзя.</string>
+    <string name="explanation_conversation_voice_stop">Останавливает запись и позволяет её прослушать. Ничего не отправляется, пока вы сами не отправите.</string>
+
+    <!-- Media preview explanations, shown when a preview control is held. -->
+    <string name="explanation_media_preview_send">Отправляет показанные здесь вложения с вашей подписью в этот чат. Кнопка «Готово» оставляет их в поле сообщения.</string>
+    <string name="explanation_media_preview_done">Сохраняет изменения и возвращает в поле сообщения. Ничего не отправляется, а снятые отметки элементы убираются из черновика.</string>
+    <string name="explanation_media_preview_cancel">Закрывает просмотр, ничего не отправляя. Готовящиеся вложения отбрасываются.</string>
+    <string name="explanation_media_preview_add_more">Открывает меню, чтобы добавить в это сообщение ещё фото или файлы.</string>
+
+    <!-- Conversation header and navigation explanations. -->
+    <string name="explanation_conversation_header_details">Открывает сведения об этом чате, например участников и настройки.</string>
+    <string name="explanation_conversation_jump_to_mention">Прокручивает к следующему непрочитанному сообщению, где вас упомянули.</string>
+    <string name="explanation_composer_draft_top">Прокручивает черновик к первой строке. Текст не меняется.</string>
+    <string name="explanation_emoji_search">Ищет эмодзи по названию.</string>
+    <string name="explanation_emoji_configure">Открывает настройки, где выбираются эмодзи для быстрых реакций.</string>
+
+    <!-- Poll creation explanations. -->
+    <string name="explanation_poll_add_option">Добавляет ещё один вариант ответа в опрос, в пределах допустимого максимума.</string>
+    <string name="explanation_poll_single_choice">Участники могут проголосовать только за один вариант.</string>
+    <string name="explanation_poll_multiple_choice">Участники могут проголосовать за несколько вариантов.</string>
+
+    <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_reply">Цитирует это сообщение в поле ввода, чтобы ваш ответ был связан с ним.</string>
+    <string name="explanation_message_action_edit">Открывает ваше сообщение в поле ввода, чтобы вы могли его изменить.</string>
+    <string name="explanation_message_action_select">Включает режим выбора, чтобы отметить сразу несколько сообщений.</string>
+    <string name="explanation_message_action_select_text">Позволяет выделить часть текста этого сообщения.</string>
+    <string name="explanation_message_action_copy">Копирует текст сообщения в буфер обмена телефона.</string>
+    <string name="explanation_message_action_translate">Открывает панель с переводом. Перевод выполняется на вашем устройстве через приложение Offline Translator.</string>
+    <string name="explanation_message_action_read_aloud">Озвучивает это сообщение, а затем продолжает со следующими.</string>
+    <string name="explanation_message_action_read_code_literally">Озвучивает это сообщение, произнося код ровно так, как он написан, а затем продолжает со следующими.</string>
+    <string name="explanation_message_action_forward">Открывает выбор чатов. Выбранные чаты получают новую копию этого сообщения.</string>
+    <string name="explanation_message_action_keep_on_screen">Оставляет это сообщение в небольшой карточке над чатом. Карточку можно убрать в любой момент.</string>
+    <string name="explanation_message_action_show_less">Сворачивает это длинное сообщение до короткого превью.</string>
+    <string name="explanation_message_action_share">Открывает системное меню «Поделиться» Android с этим сообщением. Выбранное приложение получает его и находится вне White Noise.</string>
+    <string name="explanation_message_action_save">Сохраняет вложения этого сообщения на вашем устройстве.</string>
+    <string name="explanation_message_action_info">Показывает, когда сообщение отправлено и получено, кто его отправил, его ID и статус.</string>
+    <string name="explanation_message_action_report">Открывает форму жалобы для администраторов группы. Ничего не отправляется, пока вы не подтвердите, и администраторы видят, кто пожаловался.</string>
+    <string name="explanation_message_action_delete">Позволяет удалить это сообщение только на этом устройстве или для всех. Удаление для всех отменить нельзя. Ничего не удаляется, пока вы не выберете.</string>
+</resources>

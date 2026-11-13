@@ -40,7 +40,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
         "surface": "Holding a Plus menu row explains it",
-        "anchor": "Modifier.explainOnLongPress(composerShortcutExplanation(shortcut), beforeShow = onDismiss)",
+        "anchor": "Modifier.explainOnLongPress(shortcut.explanation(), beforeShow = onDismiss)",
         "test_ids": [
           "CON-048"
         ]

@@ -44,6 +44,14 @@
           "FIND-012",
           "FIND-016"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "surface": "Holding the active search filter icon explains it",
+        "anchor": "R.string.explanation_search_filters_active",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ],
     "settings_controls": [
