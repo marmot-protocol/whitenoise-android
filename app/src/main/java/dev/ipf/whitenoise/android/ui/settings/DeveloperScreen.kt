@@ -314,13 +314,28 @@ internal fun DeveloperContent(
             item(key = "search.Developer.13") {
                 SettingsGroup(modifier = Modifier.testTag("developer.build")) {
                     row("version") { context ->
-                        SettingsValue(context, stringResource(R.string.about_version), build.versionName)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_version),
+                            build.versionName,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_info) },
+                        )
                     }
                     row("build") { context ->
-                        SettingsValue(context, stringResource(R.string.about_build), build.buildNumber)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_build),
+                            build.buildNumber,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_package_2) },
+                        )
                     }
                     row("mdk") { context ->
-                        SettingsValue(context, stringResource(R.string.about_mdk), build.mdkShortSha)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_mdk),
+                            build.mdkShortSha,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_data_object) },
+                        )
                     }
                 }
             }

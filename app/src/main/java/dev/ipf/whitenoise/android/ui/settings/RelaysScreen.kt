@@ -308,6 +308,7 @@ private fun SettingsGroupScope.relayPublicationRows(
             title = stringResource(R.string.nip_65),
             value = stringResource(relayListStatusRes(lists, MissingRelayListKindFfi.NIP65)),
             modifier = Modifier.testTag("relay.publication.posting"),
+            leading = { SettingsLeadingIcon(R.drawable.ic_send) },
         )
     }
     row("receiving") { context ->
@@ -316,6 +317,7 @@ private fun SettingsGroupScope.relayPublicationRows(
             title = stringResource(R.string.inbox),
             value = stringResource(relayListStatusRes(lists, MissingRelayListKindFfi.INBOX)),
             modifier = Modifier.testTag("relay.publication.receiving"),
+            leading = { SettingsLeadingIcon(R.drawable.ic_inbox) },
         )
     }
     relayPublicationAction(state, onRefresh, onPublishMissing)
@@ -404,8 +406,22 @@ internal fun RelayDetailsScreen(
         SettingsList {
             item(key = "search.Relays.10") {
                 SettingsGroup(modifier = Modifier.testTag("relay.details.metadata")) {
-                    row("name") { context -> SettingsValue(context, stringResource(R.string.name), relay.name) }
-                    row("url") { context -> SettingsValue(context, stringResource(R.string.url), relay.url) }
+                    row("name") { context ->
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.name),
+                            relay.name,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_dns) },
+                        )
+                    }
+                    row("url") { context ->
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.url),
+                            relay.url,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_link) },
+                        )
+                    }
                 }
             }
             item(key = "search.Relays.11") { SettingsSection(stringResource(R.string.use_for)) }

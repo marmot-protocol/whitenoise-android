@@ -110,10 +110,10 @@ internal fun BugReportContent(
                 SettingsGroup(modifier = Modifier.testTag("help.bug.destination")) {
                     row("destination") { context ->
                         SettingsValue(
-                            context = context,
-                            title = stringResource(R.string.report_bug_destination),
-                            value = stringResource(R.string.report_bug_destination_detail),
-                        )
+                            context,
+                            stringResource(R.string.report_bug_destination),
+                            stringResource(R.string.report_bug_destination_detail),
+                        ) { SettingsLeadingIcon(R.drawable.ic_bug_report) }
                     }
                 }
             }
@@ -232,13 +232,24 @@ internal fun AboutContent(
                                     onEnableDeveloper()
                                 }
                             },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_info) },
                         )
                     }
                     row("build") { context ->
-                        SettingsValue(context, stringResource(R.string.about_build), buildNumber)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_build),
+                            buildNumber,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_package_2) },
+                        )
                     }
                     row("mdk") { context ->
-                        SettingsValue(context, stringResource(R.string.about_mdk), mdkShortSha)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_mdk),
+                            mdkShortSha,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_data_object) },
+                        )
                     }
                 }
             }

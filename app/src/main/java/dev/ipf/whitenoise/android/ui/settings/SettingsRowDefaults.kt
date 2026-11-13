@@ -34,6 +34,9 @@ internal object SettingsRowDefaults {
     /** One leading slot for every row type, matching the trailing control and the Material icon box. */
     val LeadingIconSize = 24.dp
 
+    /** The expressive list item's gap after its leading slot, which rows laid out by hand repeat to stay aligned. */
+    val LeadingContentGap = 12.dp
+
     /** AMOLED has no tonal surfaces, so a selected choice uses a faint content-colour wash instead. */
     const val AmoledSelectionAlpha = 0.16f
 }

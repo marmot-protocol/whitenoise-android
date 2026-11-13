@@ -1151,9 +1151,14 @@ private fun AppUpdateGroup(
                 title = stringResource(R.string.app_updates),
                 subtitle = appUpdateSubtitle(info),
                 onClick = onClick,
-                // The emblem announces something to do. Without an update it would be announcing
-                // that there is nothing to announce.
-                leading = if (prominent) ({ AppUpdateEmblem() }) else null,
+                // The filled emblem announces something to do; without an update the row keeps the plain
+                // glyph every other row leads with.
+                leading =
+                    if (prominent) {
+                        { AppUpdateEmblem() }
+                    } else {
+                        { SettingsLeadingIcon(R.drawable.ic_system_update) }
+                    },
             )
         }
     }

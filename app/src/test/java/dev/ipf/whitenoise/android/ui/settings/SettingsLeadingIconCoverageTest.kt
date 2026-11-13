@@ -36,11 +36,11 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Every switch, link and action row on a settings subpage leads with its own glyph (#3799).
+ * Every switch, link, action and value row on a settings subpage leads with its own glyph (#3799).
  *
  * The screens render tall enough that their lazy lists compose every group, so the checks see each
  * row a user can reach: Appearance with its readability preview expanded, both conversation
- * notification pages and the per-person override.
+ * notification pages, the per-person override, Help, About and Developer.
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -59,6 +59,9 @@ class SettingsLeadingIconCoverageTest(
         GROUP_NOTIFICATIONS,
         DIRECT_NOTIFICATIONS,
         PROFILE_OVERRIDE,
+        HELP,
+        ABOUT,
+        DEVELOPER,
     }
 
     /** Every row in a settings group carries a leading glyph. */
@@ -132,25 +135,42 @@ class SettingsLeadingIconCoverageTest(
                         ProfileNotificationOverrideScreen(ProfileNotificationOverrideState(), {}, {}, {}, {})
                     }
                 }
+            Screen.HELP -> composeRule.setContent { WhiteNoiseTheme { HelpScreen({}, {}, {}) } }
+            Screen.ABOUT -> {
+                val appState = freshAppState()
+                composeRule.setContent {
+                    WhiteNoiseTheme {
+                        AboutScreen(appState, {}, versionName = "1.0", buildNumber = "1", mdkShortSha = "abc1234") {}
+                    }
+                }
+            }
+            Screen.DEVELOPER -> {
+                val appState = freshAppState()
+                composeRule.setContent { WhiteNoiseTheme { DeveloperScreen(appState, {}, {}, {}, {}) } }
+            }
         }
         composeRule.waitForIdle()
     }
 
-    /** Appearance with the readability preview expanded, so its RTL and large-text rows are included. */
-    private fun renderAppearance() {
+    /** App state over cleared preferences and no signed-in account. */
+    private fun freshAppState(): WhiteNoiseAppState {
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
             .edit()
             .clear()
             .commit()
-        val appState =
-            WhiteNoiseAppState(
-                context = context,
-                draftStore = DraftStore.forContext(context),
-                accountIdHexResolver = { null },
-                accounts = emptyList(),
-                activeAccountRef = "missing-account",
-            )
+        return WhiteNoiseAppState(
+            context = context,
+            draftStore = DraftStore.forContext(context),
+            accountIdHexResolver = { null },
+            accounts = emptyList(),
+            activeAccountRef = "missing-account",
+        )
+    }
+
+    /** Appearance with the readability preview expanded, so its RTL and large-text rows are included. */
+    private fun renderAppearance() {
+        val appState = freshAppState()
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false, fontScale = appState.fontScale.factor, appFont = appState.appFont) {
                 AppearanceScreen(appState = appState, onBack = {}, onOpenActionColor = {}, onOpenChatBubbleColors = {})

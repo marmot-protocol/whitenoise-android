@@ -63,10 +63,10 @@ internal val SettingsGroupKey = SemanticsPropertyKey<Unit>("SettingsGroup")
 
 private var SemanticsPropertyReceiver.settingsGroup by SettingsGroupKey
 
-/** Marks a switch, link or action row, so tests tell rows apart from controls nested in a row's end slot. */
+/** Marks a switch, link, action or value row, so tests tell rows apart from controls nested in a row's end slot. */
 internal val SettingsRowKey = SemanticsPropertyKey<Unit>("SettingsRow")
 
-private var SemanticsPropertyReceiver.settingsRow by SettingsRowKey
+internal var SemanticsPropertyReceiver.settingsRow by SettingsRowKey
 
 /**
  * Material list group with positions computed from the complete visible row set.
