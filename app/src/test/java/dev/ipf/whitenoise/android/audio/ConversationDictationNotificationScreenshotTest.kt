@@ -40,7 +40,11 @@ class ConversationDictationNotificationScreenshotTest {
         capture("dictation_notification_native_rtl", rtl = true)
     }
 
-    private fun capture(name: String, rtl: Boolean = false) {
+    /** Renders the expanded platform template with the requested layout direction. */
+    private fun capture(
+        name: String,
+        rtl: Boolean = false,
+    ) {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->
             val activity = controller.get()
             val parent = FrameLayout(activity)
