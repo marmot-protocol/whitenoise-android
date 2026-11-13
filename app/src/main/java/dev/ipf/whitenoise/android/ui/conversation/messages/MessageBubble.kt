@@ -123,6 +123,9 @@ import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -156,6 +159,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggle
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
@@ -1991,8 +1995,7 @@ internal fun MessageBubble(
             // surface, and follow the swipe offset so they move with the bubble. A received voice message
             // stacks its transcribe disc above the translate disc; the column is empty when neither applies.
             val translationToggle: @Composable () -> Unit = {
-                val slot =
-                    Modifier.width(dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth)
+                val slot = Modifier.width(MessageTranslationToggleSlotWidth)
                 Column(
                     modifier =
                         Modifier
@@ -2005,12 +2008,10 @@ internal fun MessageBubble(
                             ).absoluteOffset {
                                 IntOffset((replySwipe.displayedDistance * swipeDirection).roundToInt(), 0)
                             },
-                    verticalArrangement =
-                        Arrangement.spacedBy(dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing),
+                    verticalArrangement = Arrangement.spacedBy(MessageSideDiscSpacing),
                 ) {
-                    dev.ipf.whitenoise.android.ui.conversation.media
-                        .AudioTranscriptionToggle(audioTranscription, slot)
-                    dev.ipf.whitenoise.android.translation.MessageTranslationToggle(translationSource, slot)
+                    AudioTranscriptionToggle(audioTranscription, slot)
+                    MessageTranslationToggle(translationSource, slot)
                 }
             }
             if (mine && !selectionMode) translationToggle()
