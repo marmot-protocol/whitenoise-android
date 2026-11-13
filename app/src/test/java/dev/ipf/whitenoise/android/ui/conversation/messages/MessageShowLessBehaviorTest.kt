@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -13,6 +14,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.MarkdownBlockFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -80,6 +84,39 @@ class MessageShowLessBehaviorTest {
         }
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
+    }
+
+    /**
+     * Read More shows the whole stored body when its Markdown tokens hit MDK's parse cap. The capped document covers
+     * only a prefix, so the expanded bubble falls back to the complete source instead of that prefix.
+     */
+    @Test
+    fun readMoreShowsTheWholeBodyWhenStoredMarkdownIsCapped() {
+        val fixture =
+            swipeTestSurface(ApplicationProvider.getApplicationContext(), reacted = false, mine = false, media = false)
+        val longBody = "**Bold start**\n" + (1..90).joinToString("\n") { "Message line $it" } + "\n$CAPPED_TAIL"
+        val cappedPrefix =
+            MarkdownDocumentFfi(
+                blocks = listOf(MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("Bold start")))),
+                truncated = true,
+                blankLinesBefore = byteArrayOf(0),
+            )
+        val item =
+            fixture.item.copy(
+                record = fixture.item.record.copy(plaintext = longBody, contentTokens = cappedPrefix),
+                projected = null,
+            )
+        composeRule.setContent {
+            SwipeTestBubbleHost(surface = fixture.copy(item = item), collapseLongMessages = true)
+        }
+
+        val tail = composeRule.onNodeWithText(CAPPED_TAIL, substring = true, useUnmergedTree = true)
+        // The capped prefix would end before the tail and leave nothing to expand.
+        tail.assertExists()
+        val readMore = visibleReadMore()
+        readMore.performClick()
+        readMore.assertDoesNotExist()
+        tail.assertIsDisplayed()
     }
 
     /** Finds the real footer action while ignoring the zero-size measurement copy. */
@@ -152,5 +189,9 @@ class MessageShowLessBehaviorTest {
         }
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).assertExists()
         composeRule.onNodeWithText("Show less").assertDoesNotExist()
+    }
+
+    private companion object {
+        const val CAPPED_TAIL = "Final line after the Markdown cap"
     }
 }
