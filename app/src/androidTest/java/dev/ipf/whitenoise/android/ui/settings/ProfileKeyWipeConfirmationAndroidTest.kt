@@ -2,6 +2,11 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.graphics.RectF
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
+import android.view.WindowManager
 import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
@@ -81,10 +86,11 @@ class ProfileKeyWipeConfirmationAndroidTest {
         saveScreenshot(if (largeRtl) "amoled_200_percent_rtl_empty" else "light_normal_empty")
         field.performClick()
         awaitKeyboard()
+        field.performScrollTo()
         field.performTextInput(keyword + " wrong")
         confirm.assertIsNotEnabled()
         assertActionsInWindow(cancel)
-        composeRule.onNodeWithText(cancel).performClick()
+        tapOnScreen(composeRule.onNodeWithText(cancel))
         composeRule.runOnIdle {
             assertEquals(1, dismissed)
             assertEquals(0, confirmed)
@@ -99,7 +105,7 @@ class ProfileKeyWipeConfirmationAndroidTest {
         assertInVisibleWindow(field)
         assertActionsInWindow(cancel)
         saveScreenshot(if (largeRtl) "amoled_200_percent_rtl_enabled" else "light_normal_enabled")
-        confirm.performClick()
+        tapOnScreen(confirm)
         composeRule.runOnIdle {
             assertEquals(1, confirmed)
             assertEquals(1, dismissed)
@@ -111,13 +117,78 @@ class ProfileKeyWipeConfirmationAndroidTest {
             view !== composeRule.activity.window.decorView && view.isShown && view.hasWindowFocus()
         }
 
+    /** Require the actual IME and unchanged dialog/inset geometry throughout its settling interval. */
     private fun awaitKeyboard() {
+        awaitSettledGeometry(requireIme = true)
+    }
+
+    private fun awaitSettledGeometry(requireIme: Boolean = false) {
+        var previous = ""
+        var unchangedSince = SystemClock.uptimeMillis()
         composeRule.waitUntil(10_000) {
             composeRule.runOnUiThread {
-                ViewCompat.getRootWindowInsets(dialogWindow())?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                val window = dialogWindow()
+                val insets = checkNotNull(ViewCompat.getRootWindowInsets(window))
+                val geometry = windowGeometry()
+                if (geometry != previous) {
+                    previous = geometry
+                    unchangedSince = SystemClock.uptimeMillis()
+                }
+                (!requireIme || insets.isVisible(WindowInsetsCompat.Type.ime())) &&
+                    SystemClock.uptimeMillis() - unchangedSince >= 500
             }
         }
         composeRule.waitForIdle()
+    }
+
+    private fun windowGeometry(): String {
+        val window = dialogWindow()
+        val screen = IntArray(2)
+        val local = IntArray(2)
+        window.getLocationOnScreen(screen)
+        window.getLocationInWindow(local)
+        val insets = checkNotNull(ViewCompat.getRootWindowInsets(window))
+        val visible = Rect()
+        window.getWindowVisibleDisplayFrame(visible)
+        val params = window.layoutParams as WindowManager.LayoutParams
+        return "screen=${screen.toList()} window=${local.toList()} size=${window.width}x${window.height} " +
+            "visible=$visible ime=${insets.getInsets(WindowInsetsCompat.Type.ime())} " +
+            "bars=${insets.getInsets(WindowInsetsCompat.Type.systemBars())} " +
+            "softInputMode=${params.softInputMode} flags=${params.flags}"
+    }
+
+    /** Semantics clicks bypass hit testing; inject through the platform at the verified screen center. */
+    private fun tapOnScreen(node: SemanticsNodeInteraction) {
+        awaitSettledGeometry(requireIme = true)
+        assertInVisibleWindow(node)
+        val bounds = screenBounds(node)
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val time = SystemClock.uptimeMillis()
+        listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP).forEach { action ->
+            val event =
+                MotionEvent.obtain(time, SystemClock.uptimeMillis(), action, bounds.centerX(), bounds.centerY(), 0)
+            event.source = InputDevice.SOURCE_TOUCHSCREEN
+            try {
+                assertTrue("Physical touch injection rejected", automation.injectInputEvent(event, true))
+            } finally {
+                event.recycle()
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun screenBounds(node: SemanticsNodeInteraction): RectF {
+        val bounds = node.fetchSemanticsNode().boundsInWindow
+        return composeRule.runOnUiThread {
+            val window = dialogWindow()
+            val screen = IntArray(2)
+            val local = IntArray(2)
+            window.getLocationOnScreen(screen)
+            window.getLocationInWindow(local)
+            RectF(bounds.left, bounds.top, bounds.right, bounds.bottom).apply {
+                offset((screen[0] - local[0]).toFloat(), (screen[1] - local[1]).toFloat())
+            }
+        }
     }
 
     private fun assertActionsInWindow(cancel: String) {
@@ -139,33 +210,37 @@ class ProfileKeyWipeConfirmationAndroidTest {
             "Node is clipped: $bounds",
             bounds.height + 1 >= (fullBounds.bottom - fullBounds.top).value * density,
         )
+        val screen = screenBounds(node)
         composeRule.runOnUiThread {
             val window = dialogWindow()
-            val visible = Rect()
-            window.getWindowVisibleDisplayFrame(visible)
-            val location = IntArray(2)
-            window.getLocationOnScreen(location)
+            val insets = checkNotNull(ViewCompat.getRootWindowInsets(window))
+            val metrics =
+                window.context
+                    .getSystemService(WindowManager::class.java)
+                    .currentWindowMetrics.bounds
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val visible =
+                Rect(metrics).apply {
+                    left += bars.left
+                    top += bars.top
+                    right -= bars.right
+                    bottom -= maxOf(bars.bottom, ime.bottom)
+                }
             assertTrue(
-                "Node outside visible screen: $bounds, $visible",
-                bounds.left + location[0] >= visible.left - 1,
-            )
-            assertTrue(
-                "Node outside visible screen: $bounds, $visible",
-                bounds.top + location[1] >= visible.top - 1,
-            )
-            assertTrue(
-                "Node outside visible screen: $bounds, $visible",
-                bounds.right + location[0] <= visible.right + 1,
-            )
-            assertTrue(
-                "Node behind keyboard/screen edge: $bounds",
-                bounds.bottom + location[1] <= visible.bottom + 1,
+                "Node outside unobscured screen: $screen available=$visible ${windowGeometry()}",
+                screen.left >= visible.left - 1 &&
+                    screen.top >= visible.top - 1 &&
+                    screen.right <= visible.right + 1 &&
+                    screen.bottom <= visible.bottom + 1,
             )
         }
     }
 
     /** AGP pulls additionalTestOutputDir into the workflow's instrumented reports artifact. */
     private fun saveScreenshot(name: String) {
+        awaitSettledGeometry()
+        assertActionsInWindow(composeRule.activity.getString(R.string.cancel))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val output = InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")
         val root = output ?: checkNotNull(instrumentation.targetContext.getExternalFilesDir(null)).path
@@ -174,6 +249,22 @@ class ProfileKeyWipeConfirmationAndroidTest {
         val bitmap =
             checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Actual window screenshot unavailable" }
         try {
+            val geometry = composeRule.runOnUiThread { windowGeometry() }
+            val nodes =
+                listOf(
+                    "field" to
+                        composeRule.onNodeWithText(
+                            composeRule.activity.getString(R.string.sign_out_and_wipe_confirm_field_label),
+                        ),
+                    "confirm" to composeRule.onNodeWithTag("profile_keys.wipe_confirm"),
+                    "cancel" to composeRule.onNodeWithText(composeRule.activity.getString(R.string.cancel)),
+                ).joinToString("\n") { (label, node) ->
+                    val semantics = node.fetchSemanticsNode()
+                    "$label root=${semantics.boundsInRoot} window=${semantics.boundsInWindow} screen=${screenBounds(node)}"
+                }
+            File(directory, "$name-geometry.txt").writeText(
+                "screenshot=${bitmap.width}x${bitmap.height} $geometry\n$nodes",
+            )
             File(directory, "$name.png").outputStream().use { stream ->
                 check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream))
             }

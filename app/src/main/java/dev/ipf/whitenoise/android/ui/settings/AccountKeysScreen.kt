@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -1200,6 +1202,8 @@ internal fun ProfileKeyWipeConfirmationDialog(
     val wipeConfirmed = input.trim().equals(confirmKeyword, ignoreCase = true)
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogProperties(decorFitsSystemWindows = false),
+        modifier = Modifier.systemBarsPadding().imePadding(),
         title = { Text(stringResource(R.string.sign_out_and_wipe_confirm_title)) },
         text = {
             Column(
