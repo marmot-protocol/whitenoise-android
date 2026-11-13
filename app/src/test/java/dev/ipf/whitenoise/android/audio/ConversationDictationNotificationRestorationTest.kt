@@ -232,6 +232,7 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
                         .activeNotifications
                         .single { it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID }
                         .notification
+                assertFalse(notice.extras.containsKey(Notification.EXTRA_REQUEST_PROMOTED_ONGOING))
                 val retry = notice.actions.single { it.title == service.getString(R.string.retry) }.actionIntent
                 val command = shadowOf(retry).savedIntent
                 val sessions = harness.platform.sessionsCreated

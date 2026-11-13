@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.app.Notification
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -8,6 +10,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,6 +71,15 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
             try {
                 val service = lifecycle.get()
                 service.onStartCommand(startIntent(service, harness), 0, 1)
+                val active = service.foreground.foregroundNotification()
+                assertTrue(active.extras.getBoolean(Notification.EXTRA_REQUEST_PROMOTED_ONGOING))
+                assertTrue(active.flags and Notification.FLAG_ONGOING_EVENT != 0)
+                assertEquals(
+                    service.getString(R.string.dictation_notification_title),
+                    active.extras.getCharSequence(Notification.EXTRA_TITLE),
+                )
+                assertNull(active.contentView)
+                assertFalse(active.extras.getBoolean(Notification.EXTRA_COLORIZED))
                 val commands = notificationActions.map { actionCommand(service, harness, it) }
                 service.onStartCommand(commands.last(), 0, 2)
                 harness.platform.listener.onResult("claimed dispatch")

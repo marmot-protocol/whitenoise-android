@@ -11,18 +11,19 @@ import dev.ipf.whitenoise.android.R
 internal const val DICTATION_RECOVERY_NOTIFICATION_TAG = "dictation-recovery"
 internal const val DICTATION_RECOVERY_NOTIFICATION_ID = 1002
 
-/** Metadata-free rendering reads only the current controller; it never owns capture or a service lease. */
+/** Renders metadata-free dictation status and requests live promotion during the active session. */
 internal fun buildConversationDictationNotification(
     context: Context,
     controller: ConversationDictationController,
     actionIntent: (String, String) -> PendingIntent,
-): Notification =
-    Notification
+): Notification {
+    val recovery = controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer
+    return Notification
         .Builder(context, ConversationDictationForegroundService.CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
         .setContentTitle(
             context.getString(
-                if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
+                if (recovery) {
                     R.string.dictation_recovery_title
                 } else {
                     R.string.dictation_notification_title
@@ -30,7 +31,7 @@ internal fun buildConversationDictationNotification(
             ),
         ).setContentText(
             context.getString(
-                if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
+                if (recovery) {
                     R.string.dictation_recovery_text
                 } else {
                     dictationNotificationStatus(controller)
@@ -44,12 +45,14 @@ internal fun buildConversationDictationNotification(
         .setOnlyAlertOnce(true)
         .setShowWhen(false)
         .apply {
-            if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
+            if (recovery) {
                 addRecoveryActions(context, controller, actionIntent)
             } else {
+                extras.putBoolean(Notification.EXTRA_REQUEST_PROMOTED_ONGOING, true)
                 addActiveActions(context, controller, actionIntent)
             }
         }.build()
+}
 
 /** Optional audio recovery uses the existing drawer surface without taking composer controls. */
 private fun Notification.Builder.addRecoveryActions(
