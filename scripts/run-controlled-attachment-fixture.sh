@@ -22,15 +22,30 @@ case "$serial" in emulator-*) ;; *) echo 'Disposable emulator required' >&2; exi
 case "$distribution" in Play|Zapstore) ;; *) echo 'Invalid distribution' >&2; exit 2 ;; esac
 [[ "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r\n')" == 1 ]] || exit 2
 
-app_apks=(app/build/outputs/apk/dev"$distribution"/debug/*-universal-debug.apk)
-test_apks=(app/build/outputs/apk/androidTest/dev"$distribution"/debug/*.apk)
+# Build only the emulator's ABI: the native media decoder compiles per ABI, so a
+# four-ABI build spends most of a cold fixture build on codecs the device never loads.
+device_abi="$(adb -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\r\n')"
+case "$device_abi" in arm64-v8a|armeabi-v7a|x86|x86_64) ;; *) echo 'Unsupported emulator ABI' >&2; exit 2 ;; esac
+# Single-ABI (IDE-style) assembly may write to intermediates; take the newest match.
+newest_apk() {
+  local pattern="$1" dir; shift
+  for dir in "$@"; do
+    if [[ -d "$dir" ]]; then find "$dir" -maxdepth 1 -type f -name "$pattern" -printf '%T@ %p\n'; fi
+  done | sort -rn | head -n 1 | cut -d' ' -f2-
+}
+find_apks() {
+  app_apks=("$(newest_apk "*${device_abi}*.apk" app/build/{outputs,intermediates}/apk/dev"$distribution"/debug)")
+  test_apks=("$(newest_apk '*.apk' app/build/{outputs,intermediates}/apk/androidTest/dev"$distribution"/debug)")
+}
+find_apks
 # CI sets WN_FIXTURE_REUSE_APKS=1 so later scenarios in one job reinstall the pair the
 # first scenario built, while the emulator was already up. Unset, every run builds.
 if [[ "${WN_FIXTURE_REUSE_APKS:-0}" != 1 || ! -f "${app_apks[0]}" || ! -f "${test_apks[0]}" ]]; then
+  # The ABI injection alone marks the manifest testOnly; keep the plain debug install contract.
   ./gradlew --init-script scripts/media-latency.init.gradle \
+    -Pandroid.injected.build.abi="$device_abi" -Pandroid.injected.testOnly=false \
     ":app:assembleDev${distribution}Debug" ":app:assembleDev${distribution}DebugAndroidTest" --build-cache --no-daemon
-  app_apks=(app/build/outputs/apk/dev"$distribution"/debug/*-universal-debug.apk)
-  test_apks=(app/build/outputs/apk/androidTest/dev"$distribution"/debug/*.apk)
+  find_apks
 fi
 [[ ${#app_apks[@]} == 1 && ${#test_apks[@]} == 1 ]] || exit 2
 [[ -f "${app_apks[0]}" && -f "${test_apks[0]}" ]] || exit 2
