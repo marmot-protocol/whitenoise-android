@@ -656,7 +656,7 @@ private fun assertAdmissionAfterResumeFirstFrame(
             fixture.recording.set(true)
         }
         val pausedPreDraws = fixture.preDraws.get()
-        composeRule.runOnUiThread { fixture.composition.invalidate() }
+        composeRule.runOnUiThread { checkNotNull(fixture.composition).invalidate() }
         composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
             fixture.preDraws.get() > pausedPreDraws && fixture.firstBlockedAt != null
         }
