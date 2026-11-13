@@ -1584,7 +1584,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         build = workflow['jobs']['maestro-runtime-build']
         setup = next(step for step in build['steps'] if step.get('uses', '').startswith('gradle/actions/setup-gradle@'))
         self.assertTrue(setup['with']['gradle-home-cache-strict-match'])
-        self.assertFalse(setup['with']['cache-read-only'])
+        self.assertEqual(setup['with']['cache-read-only'], "${{ github.ref != 'refs/heads/master' }}")
         self.assertTrue(setup['with'].get('validate-wrappers', True))
         self.assertEqual(build['timeout-minutes'], 30)
         self.assertFalse(build.get('continue-on-error', False))
