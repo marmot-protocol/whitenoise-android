@@ -411,6 +411,10 @@ jobs:
         env:
           # A PR whose fixture inputs are only the video-metadata scenario's runs that scenario alone.
           FIXTURE_SCOPE: ${{ needs.changes.outputs.attachment_fixture_scope }}
+          # The first scenario builds the APK pair with the emulator already booted;
+          # the rest reinstall it. Background receipt keeps its Gradle pass: without
+          # that pause Wi-Fi did not become the default network in two of three runs.
+          WN_FIXTURE_REUSE_APKS: '1'
         with:
           api-level: 34
           target: google_apis
@@ -428,7 +432,7 @@ jobs:
             [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
             [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-media
             [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-tile-transfer
-            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background-receipt
+            [ "$FIXTURE_SCOPE" = video-metadata ] || WN_FIXTURE_REUSE_APKS=0 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background-receipt
             [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
             [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
             [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk-recreation

@@ -92,7 +92,7 @@ jobs:
         with:
           # Same-repository PR iterations can reuse their own ref-scoped outputs.
           # Fork jobs retain the default read-only behavior.
-          cache-read-only: ${{ github.event_name == 'merge_group' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       # Activate the task-output cache restored by setup-gradle.
       - name: Lint, compile, and replay fuzz regression corpus

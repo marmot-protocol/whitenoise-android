@@ -22,10 +22,16 @@ case "$serial" in emulator-*) ;; *) echo 'Disposable emulator required' >&2; exi
 case "$distribution" in Play|Zapstore) ;; *) echo 'Invalid distribution' >&2; exit 2 ;; esac
 [[ "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r\n')" == 1 ]] || exit 2
 
-./gradlew --init-script scripts/media-latency.init.gradle \
-  ":app:assembleDev${distribution}Debug" ":app:assembleDev${distribution}DebugAndroidTest" --no-daemon
 app_apks=(app/build/outputs/apk/dev"$distribution"/debug/*-universal-debug.apk)
 test_apks=(app/build/outputs/apk/androidTest/dev"$distribution"/debug/*.apk)
+# CI sets WN_FIXTURE_REUSE_APKS=1 so later scenarios in one job reinstall the pair the
+# first scenario built, while the emulator was already up. Unset, every run builds.
+if [[ "${WN_FIXTURE_REUSE_APKS:-0}" != 1 || ! -f "${app_apks[0]}" || ! -f "${test_apks[0]}" ]]; then
+  ./gradlew --init-script scripts/media-latency.init.gradle \
+    ":app:assembleDev${distribution}Debug" ":app:assembleDev${distribution}DebugAndroidTest" --build-cache --no-daemon
+  app_apks=(app/build/outputs/apk/dev"$distribution"/debug/*-universal-debug.apk)
+  test_apks=(app/build/outputs/apk/androidTest/dev"$distribution"/debug/*.apk)
+fi
 [[ ${#app_apks[@]} == 1 && ${#test_apks[@]} == 1 ]] || exit 2
 [[ -f "${app_apks[0]}" && -f "${test_apks[0]}" ]] || exit 2
 adb -s "$serial" install -r "${app_apks[0]}"
