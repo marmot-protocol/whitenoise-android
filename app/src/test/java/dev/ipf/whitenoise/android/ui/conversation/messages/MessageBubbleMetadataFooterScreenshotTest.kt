@@ -35,7 +35,6 @@ import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -374,7 +373,6 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
             item = item,
             controller = controller,
             appState = appState,
-            composerTextState = composer,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -395,12 +393,6 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            inviteMutationInFlight = false,
-            onJoinInvite = {},
-            onDeclineInvite = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderAvatar = false,
             parseMarkdown = { source -> if (hydrateMarkdown) markdown(source) else markdown("") },
         )

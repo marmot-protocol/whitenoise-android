@@ -1931,11 +1931,8 @@ internal fun ConversationScreen(
         exitConversationRoute()
     }
 
-    // Row callbacks read the latest projections through stable holders. Capturing them directly makes every
-    // visible row's callback new whenever the timeline changes, so one send would re-run every unchanged row.
+    // Read the latest projections without changing every visible row callback when the timeline changes.
     val currentSelectableMessages by rememberUpdatedState(selectableMessages)
-    val currentExitConversation by rememberUpdatedState(exitConversation)
-    val rowExitConversation: () -> Unit = remember { { currentExitConversation() } }
 
     /** Restores and persists the imported-share shelf and stages newly shared items into this chat's draft. */
     @Composable
@@ -2387,6 +2384,61 @@ internal fun ConversationScreen(
         )
     }
     ttsFollowEffects()
+
+    /**
+     * Keeps the former preview near the viewport when its row grows in the reversed list.
+     * The height increase would otherwise leave the reader at the newest end of a tall message.
+     * Expanding is the reader's own choice of position, so a reply or search jump still loading is
+     * cancelled and cannot move the viewport away when it completes.
+     */
+    fun preserveReadingPositionOnExpansion(item: TimelineMessage) {
+        val beforeLayout = timelineViewport.readingLayoutInfo()
+        val preview = beforeLayout.visibleItemsInfo.firstOrNull { it.key == item.presentationId } ?: return
+        val maxLayoutFrames = 3
+        val continuationPx = beforeLayout.viewportSize.height / 5
+        navigationState.targetNavigation.cancel()
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        val wasFollowingTail = scrollCoordinator.isFollowingTail
+        scrollCoordinator.settleReadingAt(currentScrollAnchor())
+        val expansionRevision = scrollCoordinator.intentToken.revision
+
+        scope.launch {
+            if (scrollCoordinator.intentToken.revision != expansionRevision) return@launch
+            val completed =
+                scrollCoordinator.programmaticJump(
+                    targetMessageId = item.record.messageIdHex,
+                    reason = ConversationScrollReason.MessageExpansion,
+                ) {
+                    repeat(maxLayoutFrames) {
+                        withFrameNanos { }
+                        val expanded =
+                            timelineViewport
+                                .readingLayoutInfo()
+                                .visibleItemsInfo
+                                .firstOrNull { it.key == item.presentationId }
+                                ?: return@programmaticJump
+                        val growth = expanded.size - preview.size
+                        if (growth > 0) {
+                            // Reveal some new text while retaining the last lines of the preview.
+                            val reveal = growth.coerceAtMost(continuationPx)
+                            scrollToItem(expanded.index, growth - preview.offset - reveal)
+                            return@programmaticJump
+                        }
+                    }
+                }
+            if (completed) {
+                scrollCoordinator.settleLandingAt(
+                    currentScrollAnchor(),
+                    atNewestEdge =
+                        wasFollowingTail &&
+                            conversationLandingAtNewestEdge(
+                                atNaturalTail = timelineViewport.isAtNaturalTail,
+                                hasMoreAfter = controller.hasMoreAfterTimeline,
+                            ),
+                )
+            }
+        }
+    }
 
     /**
      * Heights of the message bubbles currently on screen, used to estimate the
@@ -4812,7 +4864,6 @@ internal fun ConversationScreen(
                                                 },
                                                 eventCardResolver = eventCardResolver,
                                                 documentSaveFallback = documentSaveFallback,
-                                                composerTextState = composerTextState,
                                                 highlighted =
                                                     messageId == navigationState.targetHighlight.highlightedMessageId,
                                                 selectionMode = selectionMode,
@@ -4891,8 +4942,6 @@ internal fun ConversationScreen(
                                                 onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                                 onReplyPreviewClick = { navigateToReplyTarget(it) },
                                                 composerGate = composerGate,
-                                                blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                                                onUnblockBlockedDm = ::unblockBlockedDm,
                                                 onWave =
                                                     if (composerGate == ComposerGate.COMPOSER && canWave()) {
                                                         wave@{ accountIdHex, onAccepted ->
@@ -4913,13 +4962,9 @@ internal fun ConversationScreen(
                                                     } else {
                                                         null
                                                     },
-                                                onReaderSendAccepted = {
-                                                    acceptedSendRevealedTranscript = true
-                                                    revealSentMessage()
+                                                onBeforeBodyExpand = {
+                                                    preserveReadingPositionOnExpansion(item)
                                                 },
-                                                onBack = rowExitConversation,
-                                                mentionCandidates = mentionPicker.candidates,
-                                                mentionPickerEnabled = mentionPicker.enabled,
                                                 onBeforeBodyCollapse = {
                                                     scrollCoordinator.cancelForegroundRestoreForUserIntent()
                                                     // Collapse cancels deferred movement while preserving

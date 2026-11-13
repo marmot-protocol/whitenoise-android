@@ -44,24 +44,20 @@ class ConversationInviteAcceptanceIntegrationTest {
     @After
     fun releaseControllers() = owners.release()
 
-    /** Both rendered Join surfaces pass their exact group and Welcome generation into the controller. */
+    /** The conversation Join action passes its rendered group and Welcome generation to the controller. */
     @Test
-    fun bothProductionJoinEntriesFenceTheirRenderedWelcomeGeneration() {
-        listOf(
-            source("ui/conversation/ConversationBottomBar.kt"),
-            source("ui/conversation/TimelineRowTtsHighlight.kt"),
-        ).forEach { source ->
-            assertTrue("Join entry must capture the rendered group", "renderedInviteGroupIdHex" in source)
-            assertTrue("Join entry must capture the rendered Welcome", "renderedInviteWelcomeMessageIdHex" in source)
-            assertTrue(
-                "Join entry must pass the group fence",
-                "renderedGroupIdHex = renderedInviteGroupIdHex" in source,
-            )
-            assertTrue(
-                "Join entry must pass the Welcome fence",
-                "renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex" in source,
-            )
-        }
+    fun conversationJoinFencesItsRenderedWelcomeGeneration() {
+        val source = source("ui/conversation/ConversationBottomBar.kt")
+        assertTrue("Join entry must capture the rendered group", "renderedInviteGroupIdHex" in source)
+        assertTrue("Join entry must capture the rendered Welcome", "renderedInviteWelcomeMessageIdHex" in source)
+        assertTrue(
+            "Join entry must pass the group fence",
+            "renderedGroupIdHex = renderedInviteGroupIdHex" in source,
+        )
+        assertTrue(
+            "Join entry must pass the Welcome fence",
+            "renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex" in source,
+        )
     }
 
     /** A queued click from an old composition never reaches native acceptance for the new Welcome. */

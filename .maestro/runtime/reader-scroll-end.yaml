@@ -10,14 +10,14 @@ name: reader-scroll-end
     direction: UP
 - tapOn: "Read More"
 - assertVisible:
-    id: "message-full-screen"
+    id: "composer-pill-surface"
+- scrollUntilVisible:
+    element:
+      text: "Maestro reader heading"
+    direction: UP
 - assertVisible: "Maestro reader heading"
 - scrollUntilVisible:
     element:
       text: "Maestro reader ending"
     direction: DOWN
 - assertVisible: "Maestro reader ending"
-- back
-- assertNotVisible:
-    id: "message-full-screen"
-- assertVisible: "Read More"

@@ -10,6 +10,14 @@
         "test_ids": [
           "CON-011"
         ]
+      },
+      {
+        "surface": "Read-aloud projection for a message with truncated Markdown tokens",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsMessageProjection.kt",
+        "anchor": "fun speakableProjectionFromDocument(",
+        "test_ids": [
+          "TTS-004"
+        ]
       }
     ]
   },
