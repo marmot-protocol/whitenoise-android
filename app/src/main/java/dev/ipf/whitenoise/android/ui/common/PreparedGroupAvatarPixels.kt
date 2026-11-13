@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.isRenderable
 
@@ -64,9 +65,9 @@ internal class RetainedGroupCompatibilityPixels {
     fun imageFor(row: String, source: ChatListAvatarSource, key: String): ImageBitmap? =
         pictures[row]?.takeIf { it.source == source && it.key == key }?.image
 
-    /** Records displayed compatibility pixels after layout has selected their row. */
+    /** Records displayed compatibility pixels after layout selection. Private pictures retain their own owner. */
     fun record(row: String, source: ChatListAvatarSource, key: String?, image: ImageBitmap?) {
-        if (row !in rows) return
+        if (row !in rows || PrivateContactAvatarLoader.isPrivate(key)) return
         val previous = pictures[row]
         if (previous != null && (source != previous.source || key != previous.key)) pictures.remove(row)
         if (key != null && image != null) pictures[row] = Picture(source, key, image)

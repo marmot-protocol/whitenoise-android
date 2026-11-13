@@ -130,9 +130,7 @@ private fun rememberCompatibilityGroupAvatar(
                 remoteImage != null -> ChatListAvatarSource.LEGACY_URL to legacyUrl
                 else -> ChatListAvatarSource.ENCRYPTED_GROUP to encryptedKey
             }
-        if (!PrivateContactAvatarLoader.isPrivate(key)) {
-            SideEffect { compatibility.record(group.groupIdHex, source, key, image) }
-        }
+        SideEffect { compatibility.record(group.groupIdHex, source, key, image) }
     }
     val originalReader = rememberLegacyGroupAvatarBytes(appState, group, accountRef, legacyUrl, encryptedKey)
     return GroupAvatarPresentation(
