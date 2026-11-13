@@ -657,7 +657,7 @@ private fun PhotoEditorCanvas(
     modifier: Modifier,
 ) {
     val density = LocalDensity.current
-    val handleRadiusPx = with(density) { 24.dp.toPx() }
+    val handleRadiusPx = with(density) { 40.dp.toPx() }
     var activeCropCorner by remember { mutableStateOf<Int?>(null) }
     // A drag that took hold of the rectangle's inside rather than a corner, with where it began, so
     // the move is measured from the press and not accumulated frame by frame.
@@ -699,8 +699,11 @@ private fun PhotoEditorCanvas(
             } else {
                 Modifier.pointerInput(state.activeTool, geometry, viewTransform, state.recipe.crop) {
                     detectDragGestures(
-                        onDragStart = { position ->
+                        orientationLock = null,
+                        onDragStart = { down, slopTrigger, _ ->
+                            // Select from the original press, before touch slop can move it away.
                             if (cropMode) {
+                                val position = down.position
                                 activeCropCorner =
                                     nearestCropCorner(position, state.recipe.crop, geometry, viewTransform, handleRadiusPx)
                                 // Missing a corner used to leave the drag doing nothing at all. A press
@@ -716,6 +719,7 @@ private fun PhotoEditorCanvas(
                                         null
                                     }
                             } else {
+                                val position = slopTrigger.position
                                 activeStroke.start(
                                     geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform).clamped(),
                                 )
@@ -743,7 +747,7 @@ private fun PhotoEditorCanvas(
                                 activeStrokeRevision++
                             }
                         },
-                        onDragEnd = {
+                        onDragEnd = { _ ->
                             transientCrop?.let(onFreeCrop)
                             if (!activeStroke.isEmpty()) onStroke(activeStroke.toStroke(), activeStroke.exceededPointBudget)
                             activeCropCorner = null
@@ -885,23 +889,39 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEditorPreview(
             androidx.compose.ui.geometry
                 .Size((size.width - right).coerceAtLeast(0f), (bottom - top).coerceAtLeast(0f)),
         )
-        drawRect(
-            Color.White,
-            Offset(left, top),
+        val cropOutline =
             androidx.compose.ui.geometry
-                .Size(right - left, bottom - top),
+                .Rect(left, top, right, bottom)
+        // Dark underlay stays visible on light photos; white dashes stay visible on dark ones.
+        drawRect(
+            Color.Black,
+            cropOutline.topLeft,
+            cropOutline.size,
             style =
                 androidx.compose.ui.graphics.drawscope
-                    .Stroke(2.dp.toPx()),
+                    .Stroke(4.dp.toPx()),
         )
-        val handleLength = minOf(16.dp.toPx(), (right - left) / 4, (bottom - top) / 4)
+        drawRect(
+            Color.White,
+            cropOutline.topLeft,
+            cropOutline.size,
+            style =
+                androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 2.dp.toPx(),
+                    pathEffect =
+                        androidx.compose.ui.graphics.PathEffect
+                            .dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
+                ),
+        )
+        val handleLength = minOf(24.dp.toPx(), (right - left) / 4, (bottom - top) / 4)
         corners.forEach { point ->
-            val x = point.x
-            val y = point.y
-            val horizontal = if (x == left) handleLength else -handleLength
-            val vertical = if (y == top) handleLength else -handleLength
-            drawLine(Color.White, Offset(x, y), Offset(x + horizontal, y), strokeWidth = 3.dp.toPx())
-            drawLine(Color.White, Offset(x, y), Offset(x, y + vertical), strokeWidth = 3.dp.toPx())
+            val origin = Offset(point.x, point.y)
+            val horizontal = if (point.x == left) handleLength else -handleLength
+            val vertical = if (point.y == top) handleLength else -handleLength
+            for ((color, width) in listOf(Color.Black to 7.dp.toPx(), Color.White to 3.dp.toPx())) {
+                drawLine(color, origin, origin + Offset(horizontal, 0f), strokeWidth = width)
+                drawLine(color, origin, origin + Offset(0f, vertical), strokeWidth = width)
+            }
         }
         if (transientCrop != null) {
             for (fraction in listOf(1f / 3, 2f / 3)) {
@@ -964,13 +984,28 @@ private fun nearestCropCorner(
     geometry: PhotoEditGeometry,
     viewTransform: EditorViewTransform,
     thresholdPx: Float,
-): Int? =
-    cropCorners(crop)
-        .map { geometry.orientedToOutput(it).let(viewTransform::outputToView) }
-        .mapIndexed { index, point -> index to hypot(position.x - point.x, position.y - point.y) }
-        .minByOrNull { it.second }
-        ?.takeIf { it.second <= thresholdPx }
-        ?.first
+): Int? {
+    val nearest =
+        cropCorners(crop)
+            .map { geometry.orientedToOutput(it).let(viewTransform::outputToView) }
+            .mapIndexed { index, point -> index to hypot(position.x - point.x, position.y - point.y) }
+            .minByOrNull { it.second }
+            ?.takeIf { it.second <= thresholdPx }
+            ?: return null
+    val point = geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform)
+    val centerOwnsPress =
+        if (crop.contains(point)) {
+            val center =
+                geometry
+                    .orientedToOutput(NormalizedPoint((crop.left + crop.right) / 2f, (crop.top + crop.bottom) / 2f))
+                    .let(viewTransform::outputToView)
+            // Keep a move region even when enlarged corner targets overlap in a small crop.
+            hypot(position.x - center.x, position.y - center.y) <= nearest.second
+        } else {
+            false
+        }
+    return nearest.first.takeUnless { centerOwnsPress }
+}
 
 private fun movedCropCorner(
     crop: NormalizedRect,
