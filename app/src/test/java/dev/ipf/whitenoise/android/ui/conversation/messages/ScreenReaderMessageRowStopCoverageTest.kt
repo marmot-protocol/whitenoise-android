@@ -41,6 +41,7 @@ class ScreenReaderMessageRowStopCoverageTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** The row offers its available actions in menu order, then the actions its text forwards. */
     @Test
     fun rowActionsKeepMenuOrderDropUnavailableEntriesAndEndWithForwardedTextActions() {
         val performed = mutableListOf<String>()
@@ -52,7 +53,8 @@ class ScreenReaderMessageRowStopCoverageTest {
                     MessageRowAction("React", available = false) { performed += "react" },
                     MessageRowAction("Info", available = true) { performed += "info" },
                 ),
-                listOf(forwarded),
+                listOf(forwarded).keyedByLabel(),
+                leading = emptySet(),
             )
 
         assertEquals(listOf("Reply", "Info", "Read aloud from here"), actions.map { it.label })
@@ -71,7 +73,7 @@ class ScreenReaderMessageRowStopCoverageTest {
         val sentences = List(40) { CustomAccessibilityAction("Choose sentence to read") { true } }
         val links = (1..40).map { CustomAccessibilityAction("Copy link: https://example.com/$it") { true } }
 
-        val actions = messageRowCustomActions(own, sentences + links, setOf("Choose sentence to read"))
+        val actions = messageRowCustomActions(own, (sentences + links).keyedByLabel(), setOf("Choose sentence to read"))
 
         assertTrue("got ${actions.size} actions", actions.size <= MAX_ROW_CUSTOM_ACTIONS)
         assertTrue(MAX_ROW_CUSTOM_ACTIONS < 32)
@@ -90,7 +92,7 @@ class ScreenReaderMessageRowStopCoverageTest {
         val links = (1..30).map { CustomAccessibilityAction("Copy link: https://example.com/$it") { true } }
         val chooser = CustomAccessibilityAction("Choose sentence to read") { true }
 
-        val actions = messageRowCustomActions(own, links + chooser, setOf(chooser.label))
+        val actions = messageRowCustomActions(own, (links + chooser).keyedByLabel(), setOf(chooser.label))
 
         assertEquals(MAX_ROW_CUSTOM_ACTIONS, actions.size)
         assertEquals(chooser.label, actions[own.size].label)
@@ -98,7 +100,7 @@ class ScreenReaderMessageRowStopCoverageTest {
 
     /**
      * Paragraphs number repeated copy-link labels only among themselves, so two paragraphs can each forward the
-     * same label for different links. The row keeps both, numbering the second, instead of dropping one.
+     * same label for different addresses. The row keeps both, numbering the second, instead of dropping one.
      */
     @Test
     fun copyLinkLabelsRepeatedAcrossParagraphsStayReachable() {
@@ -119,7 +121,16 @@ class ScreenReaderMessageRowStopCoverageTest {
                 true
             }
 
-        val actions = messageRowCustomActions(emptyList(), listOf(first, numbered, second))
+        val actions =
+            messageRowCustomActions(
+                emptyList(),
+                listOf(
+                    ForwardedTextAction(first, "copy-link:https://a.example"),
+                    ForwardedTextAction(numbered, "copy-link:https://b.example"),
+                    ForwardedTextAction(second, "copy-link:https://c.example"),
+                ),
+                leading = emptySet(),
+            )
 
         assertEquals(
             listOf("Copy link: shared", "Copy link: shared (2)", "Copy link: shared (3)"),
@@ -127,6 +138,33 @@ class ScreenReaderMessageRowStopCoverageTest {
         )
         actions.forEach { it.action?.invoke() }
         assertEquals(listOf("first", "numbered", "second"), copied)
+    }
+
+    /**
+     * The same address linked from two paragraphs is one copy action on the row, not a numbered duplicate, and the
+     * registry keeps each label's key so the row can tell repeated addresses from different ones.
+     */
+    @Test
+    fun oneAddressLinkedFromTwoParagraphsKeepsOneCopyAction() {
+        val copied = mutableListOf<String>()
+        val registry = MessageRowTextActions()
+        val label = "Copy link: https://example.com"
+        val key = "copy-link:https://example.com"
+        registry.update(Any(), listOf(label), listOf(key)) {
+            copied += "first"
+            true
+        }
+        registry.update(Any(), listOf(label), listOf(key)) {
+            copied += "second"
+            true
+        }
+
+        val actions = messageRowCustomActions(emptyList(), registry.forwarded, leading = emptySet())
+
+        assertEquals(listOf(key, key), registry.forwarded.map { it.key })
+        assertEquals(listOf(label), actions.map { it.label })
+        actions.single().action?.invoke()
+        assertEquals(listOf("first"), copied)
     }
 
     @Test
@@ -232,10 +270,24 @@ class ScreenReaderMessageRowStopCoverageTest {
         val markdown = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt")
         // Markdown paragraphs forward their links and one chooser over the whole message's sentences.
         assertTrue(markdown.contains("ttsSentenceLeafAndRowActions(leafId, text.text, sentenceOwner)"))
-        assertTrue(markdown.contains("ForwardTextActionsToMessageRow(speech.row + linkActions)"))
+        // Links are keyed by address, so the row keeps one action for an address several paragraphs link.
+        val compactMarkdown = markdown.replace(Regex("""\s+"""), "")
+        assertTrue(
+            compactMarkdown.contains(
+                "ForwardTextActionsToMessageRow(speech.row+linkActions," +
+                    "rowActionKeys(speech.row,linkDestinations,linkActions))",
+            ),
+        )
+        assertTrue(compactMarkdown.contains("destinations.take(linkActions.size).map{\"\$COPY_LINK_KEY_PREFIX\$it\"}"))
+        // The row forwards keyed actions and the read-aloud labels, so the chooser ranks first and survives the cap.
+        val compactBubble = appModuleSource("$MESSAGES/MessageBubble.kt").replace(Regex("""\s+"""), "")
+        assertTrue(compactBubble.contains("rowTextActions?.forwarded.orEmpty(),readAloudLabels,"))
         val plain = appModuleSource("$MESSAGES/BubbleContentBlocks.kt")
         assertTrue(plain.contains("ForwardTextActionsToMessageRow(sentenceActions)"))
     }
+
+    /** Forwards each action keyed by its own label, as a renderer does for actions that are not links. */
+    private fun List<CustomAccessibilityAction>.keyedByLabel() = map { ForwardedTextAction(it, it.label) }
 
     /** A merged row shaped like a message bubble: sender, quote, body text and edited label. */
     private fun setMergedRow(
@@ -251,7 +303,8 @@ class ScreenReaderMessageRowStopCoverageTest {
                         customActions =
                             messageRowCustomActions(
                                 listOf(MessageRowAction("Open profile", true, onOpenProfile)),
-                                registry.actions,
+                                registry.forwarded,
+                                leading = emptySet(),
                             )
                     },
                 ) {

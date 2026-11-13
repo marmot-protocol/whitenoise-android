@@ -1925,7 +1925,7 @@ internal fun MessageBubble(
                                 customActions =
                                     messageRowCustomActions(
                                         rowActions,
-                                        rowTextActions?.actions.orEmpty(),
+                                        rowTextActions?.forwarded.orEmpty(),
                                         readAloudLabels,
                                     )
                             }
