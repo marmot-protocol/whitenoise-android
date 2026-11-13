@@ -63,8 +63,9 @@ class InvitationActionsScreenshotTest {
 
     /** Renders the receiving account's monogram and full label in dark theme. */
     @Test
-    fun receivingAccountDark() =
+    fun receivingAccountDark() {
         capture("receiving_account_dark", InviteReceivingAccount("work", "Work", null), dark = true)
+    }
 
     /** Long account labels keep both consent buttons visible in a narrow AMOLED pane. */
     @Test
