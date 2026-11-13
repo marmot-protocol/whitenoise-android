@@ -418,14 +418,17 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotEqual(self.run_gate(outcomes, 'push').returncode, 0)
 
     def test_job_caches(self):
-        """Every workload retains its own task cache; forks remain read-only."""
+        """Every workload restores its own task cache; only master writes.
+
+        Branch-scoped PR entries cannot be shared yet still count toward the
+        repository quota, where they evicted the master entries every PR restores.
+        """
         gradle_setup_steps = re.findall(
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
         self.assertEqual(len(gradle_setup_steps), 7)
-        shared = ("github.event_name == 'merge_group' || (github.event_name == 'pull_request' && "
-                  "github.event.pull_request.head.repo.full_name != github.repository) }}")
+        shared = "github.ref != 'refs/heads/master' }}"
         for step in gradle_setup_steps:
             if step in self.coverage:
                 # Report tasks only; the shards own the cache entries.
@@ -441,12 +444,7 @@ class AndroidCiGateTest(unittest.TestCase):
         save_step = self.named_step(self.tests_job, 'Save MarmotKit artifact')
         # Zapstore is the only flavor every event runs.
         self.assertIn("matrix.flavor == 'Zapstore' && matrix.shard == 0", save_step)
-        self.assertIn("github.event_name != 'merge_group'", save_step)
-        self.assertIn("github.event_name != 'pull_request'", save_step)
-        self.assertIn(
-            'github.event.pull_request.head.repo.full_name == github.repository',
-            save_step,
-        )
+        self.assertIn("github.ref == 'refs/heads/master'", save_step)
         self.assertIn("steps.marmotkit-cache.outputs.cache-hit != 'true'", save_step)
 
     def test_build_phases(self):

@@ -87,7 +87,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -97,15 +97,9 @@ jobs:
           [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
+      # Only master saves this cache; PR and queue runs restore its entry.
       - name: Restore MarmotKit artifact
-        if: github.event_name != 'merge_group'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/marmotkit-cache
-          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
-
-      - name: Restore MarmotKit artifact for queue
-        if: github.event_name == 'merge_group'
+        id: marmotkit-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
@@ -142,6 +136,13 @@ jobs:
           -Pandroid.injected.testOnly=false
           ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '-x :app:lintVitalProductionZapstoreRelease' || '' }}
           --build-cache --no-daemon --stacktrace
+
+      - name: Save MarmotKit artifact
+        if: ${{ github.ref == 'refs/heads/master' && steps.marmotkit-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Locate release APK
         id: apk
@@ -245,7 +246,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
-          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -255,15 +256,9 @@ jobs:
           [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
+      # Only master saves this cache; PR and queue runs restore its entry.
       - name: Restore MarmotKit artifact
-        if: github.event_name != 'merge_group'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/marmotkit-cache
-          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
-
-      - name: Restore MarmotKit artifact for queue
-        if: github.event_name == 'merge_group'
+        id: marmotkit-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
@@ -298,6 +293,13 @@ jobs:
           -Pandroid.injected.testOnly=false
           ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
           --refresh-dependencies --build-cache --no-daemon --stacktrace
+
+      - name: Save MarmotKit artifact
+        if: ${{ github.ref == 'refs/heads/master' && steps.marmotkit-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       - name: Locate ARM64 and x86_64 staging APKs
         id: apks
