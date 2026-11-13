@@ -1960,8 +1960,6 @@
     <string name="composer_expand_full_screen">Expandir campo de mensagem</string>
     <string name="composer_collapse">Recolher campo de mensagem</string>
     <string name="transcribe_audio">Transcrever</string>
-    <string name="audio_transcription_title">Transcrição do áudio</string>
-    <string name="audio_transcription_disclosure">O Offline Speech to Text vai processar esta gravação no seu dispositivo usando o modelo de voz instalado nele. O White Noise não grava o microfone nem envia uma mensagem. O texto gerado pode conter erros e é apagado quando você o fecha ou sai desta tela.</string>
     <string name="audio_transcription_working">Transcrevendo a gravação neste dispositivo…</string>
     <string name="audio_transcription_generated">Transcrição gerada · não é o texto do remetente</string>
     <string name="audio_transcription_android_version">A transcrição de gravações requer Android 13 ou posterior.</string>

@@ -1301,8 +1301,6 @@
     <string name="voice_message_recording_failed">Sprachnachricht konnte nicht aufgenommen werden</string>
     <string name="voice_message_microphone_busy">Das Mikrofon wird von einer anderen App verwendet. Schließen Sie diese App und versuchen Sie es erneut.</string>
     <string name="transcribe_audio">Transkribieren</string>
-    <string name="audio_transcription_title">Audiotranskript</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text verarbeitet diese Aufnahme auf Ihrem Gerät mit dem dort installierten Spracherkennungsmodell. White Noise nimmt weder über das Mikrofon auf noch sendet es eine Nachricht. Der erzeugte Text kann fehlerhaft sein und wird gelöscht, wenn Sie ihn schließen oder diesen Bildschirm verlassen.</string>
     <string name="audio_transcription_working">Die Aufnahme wird auf diesem Gerät transkribiert…</string>
     <string name="audio_transcription_generated">Erzeugtes Transkript · nicht der Text des Absenders</string>
     <string name="audio_transcription_android_version">Zum Transkribieren von Aufnahmen ist Android 13 oder neuer erforderlich.</string>

@@ -1953,8 +1953,6 @@
     <string name="composer_expand_full_screen">Mesaj alanını genişlet</string>
     <string name="composer_collapse">Mesaj alanını daralt</string>
     <string name="transcribe_audio">Metne dönüştür</string>
-    <string name="audio_transcription_title">Ses kaydının dökümü</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text, yüklü konuşma modelini kullanarak bu kaydı cihazınızda işleyecek. White Noise mikrofondan ses kaydetmez veya mesaj göndermez. Oluşturulan metin hatalı olabilir ve metni kapattığınızda ya da bu ekrandan ayrıldığınızda silinir.</string>
     <string name="audio_transcription_working">Kayıt bu cihazda metne dönüştürülüyor…</string>
     <string name="audio_transcription_generated">Oluşturulan döküm · gönderenin yazdığı metin değildir</string>
     <string name="audio_transcription_android_version">Kayıtları metne dönüştürmek için Android 13 veya üzeri gerekir.</string>

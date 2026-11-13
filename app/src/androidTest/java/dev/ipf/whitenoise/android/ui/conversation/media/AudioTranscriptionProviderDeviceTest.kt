@@ -2,9 +2,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -39,7 +36,6 @@ class AudioTranscriptionProviderDeviceTest {
             WhiteNoiseTheme { ReceivedAudioTranscription(absent) }
         }
         composeRule.onNodeWithTag("audio.transcribe").performClick()
-        composeRule.onNode(hasText("Transcribe") and hasAnyAncestor(isDialog())).performClick()
         val explanation = context.getString(R.string.audio_transcription_provider_outdated)
         composeRule.waitUntil(timeoutMillis = 5_000) {
             composeRule.onAllNodesWithText(explanation).fetchSemanticsNodes().size == 1

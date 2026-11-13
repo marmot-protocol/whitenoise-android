@@ -4,9 +4,7 @@ import androidx.compose.runtime.Composable
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
 import dev.ipf.whitenoise.android.ui.ChatLinkAccountChoice
 import dev.ipf.whitenoise.android.ui.ChatLinkAccountChooserDialog
-import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptDialog
-import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
-import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptInline
 import dev.ipf.whitenoise.android.ui.group.LargeGroupInviteConfirmationDialog
 import dev.ipf.whitenoise.android.ui.navigation.TtsReturnTransitionScreen
 import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateDialog
@@ -16,12 +14,16 @@ import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateDialog
 @Suppress("FunctionNaming")
 internal fun MaestroBoundaryPresentation(fixture: MaestroPresentationFixture) {
     when (fixture.scenario) {
-        "audio-transcript-cancel" ->
-            AudioTranscriptDialog(
-                state = AudioTranscriptUi(AudioTranscriptPhase.CONFIRM),
-                onStart = { error("Cancel fixture must not request transcription") },
-                onDismiss = { fixture.finish("dismiss") },
-                onGetProvider = { error("Confirmation must not request provider listing") },
+        "audio-transcript-toggle" ->
+            AudioTranscriptInline(
+                state = null,
+                enabled = true,
+                onToggle = { show ->
+                    check(show)
+                    fixture.finish("show")
+                },
+                onRetry = { error("Toggle fixture must not retry transcription") },
+                onGetProvider = { error("Toggle fixture must not request provider listing") },
             )
         "tts-trust-cancel", "tts-trust-proceed" ->
             TtsTrustWarningDialog(
