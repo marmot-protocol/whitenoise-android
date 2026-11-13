@@ -1304,8 +1304,6 @@
     <string name="voice_message_recording_failed">Impossible d’enregistrer le message vocal</string>
     <string name="voice_message_microphone_busy">Le microphone est utilisé par une autre application. Fermez-la, puis réessayez.</string>
     <string name="transcribe_audio">Transcrire</string>
-    <string name="audio_transcription_title">Transcription audio</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text traitera cet enregistrement sur votre appareil à l’aide de son modèle de reconnaissance vocale installé. White Noise n’enregistre pas le microphone et n’envoie aucun message. Le texte généré peut être inexact et sera effacé lorsque vous le fermerez ou quitterez cet écran.</string>
     <string name="audio_transcription_working">Transcription de l’enregistrement sur cet appareil…</string>
     <string name="audio_transcription_generated">Transcription générée · ce n’est pas le texte de l’expéditeur</string>
     <string name="audio_transcription_android_version">La transcription d’enregistrements nécessite Android 13 ou une version ultérieure.</string>

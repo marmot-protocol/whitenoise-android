@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.translation.ConversationTranslationSession
 import dev.ipf.whitenoise.android.translation.OFFLINE_TRANSLATOR_PACKAGE
+import dev.ipf.whitenoise.android.translation.OfflineTranslatorLanguageCatalog
 import dev.ipf.whitenoise.android.translation.OfflineTranslatorRoute
 import dev.ipf.whitenoise.android.translation.TranslationEngine
 import dev.ipf.whitenoise.android.translation.TranslationEngineIdentity
@@ -17,17 +18,22 @@ import dev.ipf.whitenoise.android.translation.TranslationRendition
 import dev.ipf.whitenoise.android.translation.TranslationSource
 import dev.ipf.whitenoise.android.translation.TranslationTrust
 import dev.ipf.whitenoise.android.translation.offlineTranslatorRoute
+import dev.ipf.whitenoise.android.translation.translateMessage
 import kotlinx.coroutines.CoroutineScope
 
 internal class MaestroMessageTranslationState(
     private val fixture: MaestroPresentationFixture,
     scope: CoroutineScope,
 ) {
-    val source = TranslationSource("fixture-message", "Fixture source text", "en")
-    var selected by mutableStateOf<String?>(null)
+    private val fallback = fixture.scenario == "modal-translation-fallback"
+
+    /** The fallback scenario starts from an unsupported chat target so the request must use the device language. */
+    val source = TranslationSource("fixture-message", "Fixture source text", if (fallback) "xx" else "en")
+    var translated by mutableStateOf<TranslationSource?>(null)
         private set
-    var showing by mutableStateOf(true)
+    var noticeOpen by mutableStateOf(false)
         private set
+    private var noticeAccepted = false
     private var originalShown = false
     private val attempts = mutableListOf<Pair<String, String>>()
     val failure =
@@ -87,27 +93,38 @@ internal class MaestroMessageTranslationState(
         }
     }
 
-    fun targetSelected(target: String) {
-        check(selected == null)
-        selected = target
-        fixture.record("target-selected")
+    /** Only the default scenario starts from a fresh install, so only it asks for the notice first. */
+    fun requestTranslate() {
+        if (fixture.scenario.endsWith("default") && !noticeAccepted) noticeOpen = true else translate()
     }
 
-    fun dismiss() {
-        if (selected == null) {
-            check(attempts.isEmpty()) { "Cancellation reached the engine" }
-            fixture.finish("dismiss")
-        } else {
-            fixture.record("dialog-dismiss")
-            showing = false
-        }
+    fun acceptNotice() {
+        check(attempts.isEmpty())
+        noticeOpen = false
+        noticeAccepted = true
+        fixture.record("notice-accepted")
+        translate()
+    }
+
+    fun dismissNotice() {
+        noticeOpen = false
+    }
+
+    private fun translate() {
+        check(translated == null)
+        translated = session.translateMessage(source)
+        fixture.record("translate-tapped")
+    }
+
+    fun finishNotice() {
+        check(failure != null && session.failure == failure && attempts.isEmpty())
+        fixture.finish("notice-shown")
     }
 
     fun verifyRendition(rendition: TranslationRendition?) {
-        if (showing || rendition == null) return
-        val target = if (fixture.scenario.endsWith("target")) "ar" else "en"
-        val from = if (fixture.scenario.endsWith("source")) "ar" else ""
-        check(selected == target && attempts == listOf(from to target))
+        if (rendition == null) return
+        val target = if (fallback) OfflineTranslatorLanguageCatalog.systemTarget() else "en"
+        check(translated?.target == target && attempts == listOf("" to target))
         check(rendition.text == "Fixture translated text")
         if (fixture.scenario.endsWith("toggle")) {
             if (!rendition.showTranslation) {

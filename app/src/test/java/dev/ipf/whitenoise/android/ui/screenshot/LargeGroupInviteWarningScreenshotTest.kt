@@ -9,12 +9,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
@@ -69,9 +69,9 @@ class LargeGroupInviteWarningScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/large_group_invite_warning_amoled_large_rtl.png")
     }
 
-    /** Verifies the single review dialog keeps the large-group warning readable with large text in RTL AMOLED mode. */
+    /** Verifies the member review carries the large-group warning with large fallback text in RTL AMOLED mode. */
     @Test
-    fun reviewWithWarningAmoledLargeRtl() {
+    fun confirmationAmoledLargeRtl() {
         val state = emptyAppState().withGroupReviewActorNpub()
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -93,15 +93,15 @@ class LargeGroupInviteWarningScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithTag("group.members.review.dialog").assertIsDisplayed()
+        composeRule.onNodeWithText("Garden club", substring = true).assertExists()
+        composeRule.onNodeWithContentDescription("Group ID, garden").assertDoesNotExist()
         composeRule
             .onNodeWithContentDescription("Admin, Unknown")
             .performScrollTo()
             .assertIsOn()
-            .assertIsEnabled()
         composeRule
-            .onNodeWithTag("group.members.review.dialog")
-            .captureRoboImage("src/test/snapshots/large_group_invite_review_amoled_large_rtl.png")
+            .onNode(isDialog())
+            .captureRoboImage("src/test/snapshots/large_group_invite_confirmation_amoled_large_rtl.png")
     }
 
     /** Renders a bounded warning fixture with the requested theme for deterministic baseline capture. */

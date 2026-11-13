@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
@@ -115,6 +116,10 @@ import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth
+import dev.ipf.whitenoise.android.translation.translateMessage
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -137,6 +142,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerPurpose
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.currentPollCopyText
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggle
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
@@ -645,8 +651,17 @@ internal fun MessageBubble(
     // over the original projection. Keyed on editState so a fresh edit
     // recomposes the bubble in place.
     val editState = controller.editsByTarget[record.messageIdHex]
-    var translationDialogOpen by remember(controller, record.messageIdHex) { mutableStateOf(false) }
     var translationTarget by remember(controller, record.messageIdHex) { mutableStateOf<String?>(null) }
+    // A received voice message's side transcribe disc drives every recording in this bubble.
+    val audioTranscription =
+        if (mine) {
+            null
+        } else {
+            remember(record.messageIdHex) {
+                dev.ipf.whitenoise.android.ui.conversation.media
+                    .AudioTranscriptionToggleState()
+            }
+        }
     val translationSource =
         dev.ipf.whitenoise.android.translation.rememberMessageTranslationSource(
             messageId = record.messageIdHex,
@@ -664,19 +679,30 @@ internal fun MessageBubble(
                 listOf(record.sourceEpoch, editState?.count, editState?.versions?.lastOrNull()?.messageIdHex)
                     .joinToString(":"),
         )
+    val translationSession = dev.ipf.whitenoise.android.translation.LocalConversationTranslation.current
+    val translationPreferences = dev.ipf.whitenoise.android.translation.LocalTranslationPreferences.current
+    var translationNoticeOpen by remember(record.messageIdHex) { mutableStateOf(false) }
+    val translateMessage = {
+        if (translationSource != null && translationSession != null) {
+            translationTarget = translationSession.translateMessage(translationSource).target
+        }
+    }
+    if (translationNoticeOpen) {
+        dev.ipf.whitenoise.android.translation.MessageTranslationNotice(
+            onAccept = {
+                translationNoticeOpen = false
+                translationPreferences?.acceptProviderNotice()
+                translateMessage()
+            },
+            onDismiss = { translationNoticeOpen = false },
+        )
+    }
     val visibleTranslation =
-        dev.ipf.whitenoise.android.translation.LocalConversationTranslation.current
+        translationSession
             ?.renditions
             ?.get(translationSource)
             ?.takeIf { it.showTranslation }
             ?.text
-    if (translationDialogOpen && translationSource != null) {
-        dev.ipf.whitenoise.android.translation.MessageTranslationDialog(
-            source = translationSource,
-            onTargetSelected = { translationTarget = it },
-            onDismiss = { translationDialogOpen = false },
-        )
-    }
     val displayedBody =
         remember(item, deleted, messageTextCopy, deletedBodyText, invalidatedBodyText, editState) {
             messageBubbleDisplayedBody(
@@ -913,6 +939,8 @@ internal fun MessageBubble(
         }
     reactionVisibilityState.targetState = showReactionSummary
     val reactionHostPresent = reactionVisibilityState.currentState || reactionVisibilityState.targetState
+    // A reaction summary hangs below the bubble surface, so row siblings align to the surface's bottom edge.
+    val bubbleColumnAlignsByBottom = reactionHostPresent && (reserveSenderAvatarSlot || !selectionMode)
     val messageShareScope = rememberCoroutineScope()
     val ttsLinkTapCoordinator =
         remember(record.messageIdHex, messageShareScope, appState, controller.group.groupIdHex) {
@@ -1942,6 +1970,30 @@ internal fun MessageBubble(
                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                 )
             }
+            // The side discs sit in the bubble's empty opposite gutter, bottom-aligned with the bubble
+            // surface, and follow the swipe offset so they move with the bubble. A received voice message
+            // stacks its transcribe disc above the translate disc; the column is empty when neither applies.
+            val translationToggle: @Composable () -> Unit = {
+                val slot = Modifier.width(MessageTranslationToggleSlotWidth)
+                Column(
+                    modifier =
+                        Modifier
+                            .then(
+                                if (bubbleColumnAlignsByBottom) {
+                                    Modifier.alignBy { it.measuredHeight }
+                                } else {
+                                    Modifier.align(Alignment.Bottom)
+                                },
+                            ).absoluteOffset {
+                                IntOffset((replySwipe.displayedDistance * swipeDirection).roundToInt(), 0)
+                            },
+                    verticalArrangement = Arrangement.spacedBy(MessageSideDiscSpacing),
+                ) {
+                    AudioTranscriptionToggle(audioTranscription, slot)
+                    MessageTranslationToggle(translationSource, slot)
+                }
+            }
+            if (mine && !selectionMode) translationToggle()
             Column(
                 // Swipe-to-reply translates this whole visual column — bubble or
                 // media surface plus its attached reaction summary — as one unit,
@@ -1956,7 +2008,7 @@ internal fun MessageBubble(
                         .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
                         .testTag(messageBubbleColumnTestTag(record.messageIdHex))
                         .then(
-                            if (reserveSenderAvatarSlot && reactionHostPresent) {
+                            if (bubbleColumnAlignsByBottom) {
                                 Modifier.alignBy(MessageBubbleBottomAlignmentLine)
                             } else {
                                 Modifier
@@ -2625,6 +2677,7 @@ internal fun MessageBubble(
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
                                                 expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
+                                                audioTranscription = audioTranscription,
                                             )
                                         }
                                     }
@@ -2713,6 +2766,7 @@ internal fun MessageBubble(
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
                                                 expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
+                                                audioTranscription = audioTranscription,
                                             )
                                         }
                                     }
@@ -2898,10 +2952,15 @@ internal fun MessageBubble(
                         onBeforeBodyCollapse()
                         collapseOverride = true
                     },
-                    canTranslate = translationSource != null,
+                    canTranslate =
+                        translationSource != null && translationSession != null && translationPreferences != null,
                     onTranslate = {
                         onActionMenuOpenChange(false)
-                        translationDialogOpen = true
+                        if (translationPreferences?.providerNoticeAccepted() == true) {
+                            translateMessage()
+                        } else {
+                            translationNoticeOpen = true
+                        }
                     },
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
@@ -3330,8 +3389,6 @@ internal fun MessageBubble(
                         }
                     },
                 )
-                dev.ipf.whitenoise.android.translation
-                    .MessageTranslationRendition(translationSource)
                 if (surfaces.reactionSheetOpen && !deleted) {
                     CompleteReactionDetailsSheet(
                         item = item,
@@ -3342,6 +3399,7 @@ internal fun MessageBubble(
                     )
                 }
             }
+            if (!mine && !selectionMode) translationToggle()
         }
         if (selectionMode) {
             // Keep the visual tint and indicator in layout, but retain the

@@ -321,6 +321,9 @@ internal fun GroupDetailsScreen(
         var showAddMember by rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) {
             mutableStateOf(false)
         }
+        // Saved with the staged selection so an open invite review survives recreation alongside it.
+        val addReviewOpen =
+            rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) { mutableStateOf(false) }
         val addSelection =
             rememberSaveable(
                 controller.group.groupIdHex,
@@ -425,6 +428,7 @@ internal fun GroupDetailsScreen(
         LaunchedEffect(canAdministerMembers) {
             if (!canAdministerMembers) {
                 showAddMember = false
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
             }
@@ -750,6 +754,7 @@ internal fun GroupDetailsScreen(
                 }
         LaunchedEffect(showAddMember, inviteSelectionApplied, controller.mutationInFlight) {
             if (showAddMember && inviteSelectionApplied && !controller.mutationInFlight) {
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
                 if (addMemberAutoOpened) onBack() else showAddMember = false
@@ -911,10 +916,13 @@ internal fun GroupDetailsScreen(
                 )
 
             /** Submits the currently staged, normalized recipients and closes the picker only after native success. */
-            fun submitSelectedInvites() {
+            fun submitSelectedInvites(
+                selected: List<RecipientSearch.Candidate> = addSelection.toList(),
+                selectedAdmins: Set<String> = addAdminSelection.toSet(),
+            ) {
                 if (!canAdministerMembers || !rosterReady) return
-                val refs = addSelection.map { it.accountIdHex }
-                val admins = refs.filter { id -> addAdminSelection.any { it.equals(id, ignoreCase = true) } }
+                val refs = selected.map { it.accountIdHex }
+                val admins = refs.filter { id -> selectedAdmins.any { it.equals(id, ignoreCase = true) } }
                 runGroupMutation(
                     action = GroupMutationAction.InviteMember,
                     mutation = { controller.inviteMembers(refs, initialAdminRefs = admins) },
@@ -924,12 +932,6 @@ internal fun GroupDetailsScreen(
             val reviewAvatar = rememberConversationGroupAvatar(appState, controller)
             detailsRoute {
                 ContactPickerScreen(
-                    reviewDescription =
-                        if (inviteProjection?.shouldWarn == true) {
-                            stringResource(R.string.large_group_invite_confirm_message)
-                        } else {
-                            null
-                        },
                     reviewGroup =
                         MemberReviewGroup(
                             controller.group.groupIdHex,
@@ -941,17 +943,25 @@ internal fun GroupDetailsScreen(
                     appState = appState,
                     title = stringResource(R.string.add_member),
                     selected = addSelection,
+                    reviewOpen = addReviewOpen,
                     onBack = {
                         // When auto-opened from the empty-group CTA, Back returns to the
                         // conversation (via the details onBack) rather than exposing the
                         // details body the user never intended to see.
                         if (!adding) {
+                            addReviewOpen.value = false
                             addSelection.clear()
                             addAdminSelection.clear()
                             if (addMemberAutoOpened) onBack() else showAddMember = false
                         }
                     },
                     onConfirm = { submitSelectedInvites() },
+                    reviewDescription =
+                        if (inviteProjection?.shouldWarn == true) {
+                            stringResource(R.string.large_group_invite_confirm_message)
+                        } else {
+                            null
+                        },
                     confirmIcon = Icons.Default.Check,
                     initialAdminIds = addAdminSelection.toSet(),
                     onInitialAdminChange = { member, admin ->

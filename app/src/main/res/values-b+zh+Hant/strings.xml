@@ -1279,8 +1279,6 @@
     <string name="voice_message_recording_failed">無法錄製語音訊息</string>
     <string name="voice_message_microphone_busy">麥克風正由其他應用程式使用。請關閉該應用程式，然後重試。</string>
     <string name="transcribe_audio">轉寫</string>
-    <string name="audio_transcription_title">音訊轉寫文字</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text 將使用已安裝的語音模型，在你的裝置上處理這段錄音。White Noise 不會透過麥克風錄音，也不會傳送訊息。產生的文字可能不準確，關閉文字或離開此畫面時會將其清除。</string>
     <string name="audio_transcription_working">正在此裝置上轉寫錄音…</string>
     <string name="audio_transcription_generated">自動產生的轉寫文字 · 並非傳送者撰寫的文字</string>
     <string name="audio_transcription_android_version">轉寫錄音需要 Android 13 或更新版本。</string>

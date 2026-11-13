@@ -3,10 +3,13 @@ name: presentation-modal-translation-default
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    id: translation.form
-- assertVisible:
-    id: translation.confirm
+    id: translation.menu
 - tapOn:
-    id: translation.confirm
+    id: translation.menu
+- assertVisible: "Offline Translator can write message text.*"
+- tapOn: Accept
+- assertVisible:
+    text: Translate
+    checked: true
 - assertVisible:
     id: presentation.complete

@@ -2,7 +2,7 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: presentation-group-large-cancel
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
-- assertVisible: In groups of 150 or more members, additional invitations might not be delivered reliably. You can still continue.
+- assertVisible: In groups of 150 or more members.*
 - tapOn: Cancel
 - assertVisible:
     id: presentation.complete

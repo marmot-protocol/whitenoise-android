@@ -28,8 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
@@ -90,25 +88,18 @@ internal fun ContactPickerScreen(
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
     reviewGroup: MemberReviewGroup? = null,
     reviewDescription: String? = null,
+    // Callers whose selection survives recreation pass saveable review state so an open review survives with it.
+    reviewOpen: MutableState<Boolean>? = null,
 ) {
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
     var showScanner by remember { mutableStateOf(false) }
-    // An open review survives recreation only when the caller restored its
-    // selection too; a caller with transient selection gets the picker back
-    // instead of an empty review.
-    var reviewingSelection by rememberSaveable(
-        appState.activeAccountRef,
-        appState.runtimeGeneration,
-        reviewGroup?.id,
-        saver =
-            Saver<MutableState<Boolean>, Boolean>(
-                save = { it.value },
-                restore = { mutableStateOf(it && selected.isNotEmpty()) },
-            ),
-    ) {
-        mutableStateOf(false)
-    }
+    // The selection is owned by the caller. Without caller-owned review state,
+    // keep this navigation state in the same lifetime as a non-saveable
+    // selection so recreation cannot restore an empty review over a rebuilt picker.
+    val ownReview =
+        remember(appState.activeAccountRef, appState.runtimeGeneration, reviewGroup?.id) { mutableStateOf(false) }
+    var reviewingSelection by (reviewOpen ?: ownReview)
     var searchRetry by remember { mutableIntStateOf(0) }
     val resolution = rememberRecipientResolution(query, appState, searchRetry)
     val addressQuery = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05

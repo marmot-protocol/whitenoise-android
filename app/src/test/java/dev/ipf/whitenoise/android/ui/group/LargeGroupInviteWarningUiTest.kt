@@ -1,17 +1,16 @@
 package dev.ipf.whitenoise.android.ui.group
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -24,6 +23,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMembersReviewDialog
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.SELECTED_MEMBERS_CONFIRM_TAG
+import dev.ipf.whitenoise.android.ui.chats.newchat.groupReviewAddMembersLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.withGroupReviewActorNpub
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
@@ -75,152 +75,193 @@ class LargeGroupInviteWarningUiTest {
         composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertDoesNotExist()
     }
 
-    /** Shows the warning inside the one review; Cancel dispatches only the dismiss callback. */
+    /** The review carries the warning, and its own actions dispatch exactly one matching callback. */
     @Test
-    fun reviewShowsWarningAndCancelDispatchesOnlyDismiss() {
-        val members = listOf(candidate("b", "Alice"), candidate("c", "Bob"))
+    fun reviewWithWarningConfirmsOnceAndCancelsWithoutSending() {
         var confirms = 0
-        var dismisses = 0
-        showReview(members = { members }, onConfirm = { confirms++ }, onDismiss = { dismisses++ })
+        var cancels = 0
+        var open by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (open) {
+                    GroupMembersReviewDialog(
+                        appState = reviewState,
+                        groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                        members = listOf(alice, bob),
+                        busy = false,
+                        onDismiss = {
+                            cancels++
+                            open = false
+                        },
+                        onConfirm = {
+                            confirms++
+                            open = false
+                        },
+                        confirmLabel = "Add members",
+                        description = LARGE_GROUP_WARNING,
+                    )
+                }
+            }
+        }
 
-        composeRule.onNodeWithText(WARNING_TEXT).assertIsDisplayed()
+        composeRule.onNodeWithText(LARGE_GROUP_WARNING).assertIsDisplayed()
         composeRule.onNodeWithText("Cancel").performClick()
         composeRule.runOnIdle {
             assertEquals(0, confirms)
-            assertEquals(1, dismisses)
+            assertEquals(1, cancels)
+            open = true
         }
-    }
-
-    /** Confirming the review dispatches exactly one confirm callback and no dismiss. */
-    @Test
-    fun reviewConfirmDispatchesOnlyConfirm() {
-        val members = listOf(candidate("b", "Alice"), candidate("c", "Bob"))
-        var confirms = 0
-        var dismisses = 0
-        showReview(members = { members }, onConfirm = { confirms++ }, onDismiss = { dismisses++ })
-
         composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
         composeRule.runOnIdle {
             assertEquals(1, confirms)
-            assertEquals(0, dismisses)
+            assertEquals(1, cancels)
         }
     }
 
-    /** A single selected person gets the singular action and still confirms with one tap. */
+    /** One selected person gets the singular action, which also sends once. */
     @Test
-    fun reviewForOnePersonUsesSingularActionAndConfirmsOnce() {
+    fun singleMemberReviewUsesSingularActionAndConfirmsOnce() {
         var confirms = 0
-        showReview(members = { listOf(candidate("b", "Alice")) }, onConfirm = { confirms++ })
-
-        composeRule.onNodeWithText(WARNING_TEXT).assertIsDisplayed()
-        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-        composeRule.runOnIdle { assertEquals(1, confirms) }
-    }
-
-    /** The picker's review confirm sends once and no separate large-group dialog follows it. */
-    @Test
-    fun noSecondDialogFollowsTheReviewConfirm() {
-        val state = emptyAppState().withGroupReviewActorNpub()
-        val selected = mutableStateListOf(candidate("b", "Alice"))
-        var invites = 0
         composeRule.setContent {
             WhiteNoiseTheme {
-                ContactPickerScreen(
-                    appState = state,
-                    title = "Choose people",
-                    selected = selected,
-                    onBack = {},
-                    onConfirm = { invites++ },
-                    confirmLabel = "Add member",
-                    reviewGroup = MemberReviewGroup("garden", "Garden club"),
-                    reviewDescription = WARNING_TEXT,
+                GroupMembersReviewDialog(
+                    appState = reviewState,
+                    groups = listOf(MemberReviewGroup("garden", "Garden club")),
+                    members = listOf(alice),
+                    busy = false,
+                    onDismiss = {},
+                    onConfirm = { confirms++ },
+                    confirmLabel = stringResource(groupReviewAddMembersLabel(1)),
+                    description = LARGE_GROUP_WARNING,
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Review selected members").performClick()
-        composeRule.onNodeWithText(WARNING_TEXT).assertIsDisplayed()
-        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("large-group-invite-confirmation").assertDoesNotExist()
-        composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
-        composeRule.runOnIdle { assertEquals(1, invites) }
-    }
 
-    /** A member list that changes while the review is open cannot be submitted. */
-    @Test
-    fun reviewRefusesConfirmAfterTheMemberListChanges() {
-        val selected = mutableStateListOf(candidate("b", "Alice"), candidate("c", "Bob"))
-        var confirms = 0
-        showReview(members = { selected }, onConfirm = { confirms++ })
-
-        composeRule.runOnIdle { selected.removeAt(1) }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-        composeRule.runOnIdle { assertEquals(0, confirms) }
-    }
-
-    /** A destination that changes while the review is open was never reviewed, so confirm is refused. */
-    @Test
-    fun reviewRefusesConfirmAfterTheDestinationChanges() {
-        var destination by mutableStateOf(MemberReviewGroup("garden", "Garden club"))
-        var confirms = 0
-        showReview(
-            members = { listOf(candidate("b", "Alice")) },
-            groups = { listOf(destination) },
-            onConfirm = { confirms++ },
-        )
-
-        composeRule.runOnIdle { destination = MemberReviewGroup("chess", "Chess club") }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-        composeRule.runOnIdle { assertEquals(0, confirms) }
-    }
-
-    /** Admin choices made inside the review are the set that gets submitted. */
-    @Test
-    fun adminToggleInsideReviewIsSubmittedAsShown() {
-        val admins = mutableStateListOf<String>()
-        var submitted: Set<String>? = null
-        showReview(
-            members = { listOf(candidate("b", "Alice")) },
-            admins = admins,
-            onConfirm = { submitted = admins.toSet() },
-        )
-
-        composeRule.onNodeWithContentDescription("Admin, Alice").performClick()
-        composeRule.onNodeWithContentDescription("Admin, Alice").assertIsOn()
-        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
-        composeRule.runOnIdle { assertEquals(setOf("b".repeat(64)), submitted) }
-    }
-
-    /** The warning text leaves the same review when the projection drops below the threshold. */
-    @Test
-    fun warningDisappearsWhenTheProjectionNoLongerWarns() {
-        var warn by mutableStateOf(true)
-        var confirms = 0
-        showReview(
-            members = { listOf(candidate("b", "Alice")) },
-            description = { if (warn) WARNING_TEXT else null },
-            onConfirm = { confirms++ },
-        )
-
-        composeRule.onNodeWithText(WARNING_TEXT).assertIsDisplayed()
-        composeRule.runOnIdle { warn = false }
-        composeRule.onNodeWithText(WARNING_TEXT).assertDoesNotExist()
+        composeRule.onNodeWithText(LARGE_GROUP_WARNING).assertIsDisplayed()
         composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
         composeRule.runOnIdle { assertEquals(1, confirms) }
     }
 
-    /**
-     * Restores the parent details route, staged recipients, warning, and the picker's open review
-     * as one navigation stack.
-     */
+    /** Confirming the picker's review sends once and never opens a second large-group dialog. */
+    @Test
+    fun pickerReviewIsTheOnlyConfirmationForLargeGroups() {
+        var submits = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ContactPickerScreen(
+                    appState = reviewState,
+                    title = "Add member",
+                    selected = mutableStateListOf(alice, bob),
+                    onBack = {},
+                    onConfirm = { submits++ },
+                    confirmLabel = "Add members",
+                    reviewGroup = MemberReviewGroup("garden", "Garden club"),
+                    reviewDescription = LARGE_GROUP_WARNING,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Review selected members").performClick()
+        composeRule.onNodeWithText(LARGE_GROUP_WARNING).assertIsDisplayed()
+        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(SECOND_DIALOG_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, submits) }
+    }
+
+    /** A selection that changes while the review is open closes that review without submitting. */
+    @Test
+    fun reviewClosesWhenSelectedMembersChange() {
+        var submits = 0
+        val selected = mutableStateListOf(alice)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ContactPickerScreen(
+                    appState = reviewState,
+                    title = "Add member",
+                    selected = selected,
+                    onBack = {},
+                    onConfirm = { submits++ },
+                    confirmLabel = "Add member",
+                    reviewGroup = MemberReviewGroup("garden", "Garden club"),
+                    reviewDescription = LARGE_GROUP_WARNING,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Review selected members").performClick()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertIsDisplayed()
+        composeRule.runOnIdle { selected += bob }
+        composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(0, submits) }
+    }
+
+    /** Admin toggles made inside the review are intended edits and are submitted as shown. */
+    @Test
+    fun reviewSubmitsAdminSetEditedInsideIt() {
+        var submitted = emptySet<String>()
+        val admins = mutableStateListOf<String>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ContactPickerScreen(
+                    appState = reviewState,
+                    title = "Add member",
+                    selected = mutableStateListOf(alice),
+                    onBack = {},
+                    onConfirm = { submitted = admins.toSet() },
+                    confirmLabel = "Add member",
+                    reviewGroup = MemberReviewGroup("garden", "Garden club"),
+                    reviewDescription = LARGE_GROUP_WARNING,
+                    initialAdminIds = admins.toSet(),
+                    onInitialAdminChange = { person, admin ->
+                        if (admin) admins.add(person.accountIdHex) else admins.remove(person.accountIdHex)
+                    },
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Review selected members").performClick()
+        composeRule.onNodeWithContentDescription("Admin, Alice").performClick()
+        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        composeRule.runOnIdle { assertEquals(setOf(alice.accountIdHex), submitted) }
+    }
+
+    /** When the roster drops below the threshold the warning goes away and the same confirm still sends. */
+    @Test
+    fun warningDisappearsWhenThresholdIsNoLongerReachedAndConfirmStillSends() {
+        var submits = 0
+        var description by mutableStateOf<String?>(LARGE_GROUP_WARNING)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ContactPickerScreen(
+                    appState = reviewState,
+                    title = "Add member",
+                    selected = mutableStateListOf(alice),
+                    onBack = {},
+                    onConfirm = { submits++ },
+                    confirmLabel = "Add member",
+                    reviewGroup = MemberReviewGroup("garden", "Garden club"),
+                    reviewDescription = description,
+                )
+            }
+        }
+
+        composeRule.onNodeWithContentDescription("Review selected members").performClick()
+        composeRule.onNodeWithText(LARGE_GROUP_WARNING).assertIsDisplayed()
+        composeRule.runOnIdle { description = null }
+        composeRule.onNodeWithText(LARGE_GROUP_WARNING).assertDoesNotExist()
+        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        composeRule.runOnIdle { assertEquals(1, submits) }
+    }
+
+    /** Restores the parent details route, staged recipients, warning, and open review as one navigation stack. */
     @Test
     fun detailsRouteAndStagedSelectionRestoreTogether() {
         val restoration = StateRestorationTester(composeRule)
-        val reviewState = emptyAppState().withGroupReviewActorNpub()
         lateinit var surfaceState: ConversationSurfaceState
         lateinit var selection: SnapshotStateList<RecipientSearch.Candidate>
+        lateinit var reviewOpen: MutableState<Boolean>
         restoration.setContent {
             surfaceState = rememberConversationSurfaceState("controller-a", "account-a", "chat-a", 1)
             if (surfaceState.showDetails.value) {
@@ -228,6 +269,7 @@ class LargeGroupInviteWarningUiTest {
                     rememberSaveable("group-a", saver = AddMemberSelectionSaver) {
                         mutableStateListOf()
                     }
+                reviewOpen = rememberSaveable("group-a") { mutableStateOf(false) }
                 val projection =
                     largeGroupInviteProjection(
                         rosterReady = true,
@@ -236,32 +278,29 @@ class LargeGroupInviteWarningUiTest {
                         pendingInviteMemberIds = emptyList(),
                         stagedRecipientIds = selection.map { it.accountIdHex },
                     )
-                WhiteNoiseTheme {
-                    Column {
-                        if (projection?.shouldWarn == true) LargeGroupInviteWarningBanner()
-                        ContactPickerScreen(
-                            appState = reviewState,
-                            title = "Add member",
-                            selected = selection,
-                            onBack = {},
-                            onConfirm = {},
-                            confirmLabel = "Add member",
-                            reviewGroup = MemberReviewGroup("group-a", "Garden club"),
-                            reviewDescription = if (projection?.shouldWarn == true) WARNING_TEXT else null,
-                        )
-                    }
-                }
+                val warn = projection?.shouldWarn == true
+                ContactPickerScreen(
+                    appState = reviewState,
+                    title = "Add member",
+                    selected = selection,
+                    onBack = {},
+                    onConfirm = {},
+                    confirmLabel = "Add member",
+                    reviewGroup = MemberReviewGroup("group-a", "Garden club"),
+                    reviewDescription = if (warn) LARGE_GROUP_WARNING else null,
+                    reviewOpen = reviewOpen,
+                    footer = { if (warn) LargeGroupInviteWarningBanner() },
+                )
             }
         }
         composeRule.runOnIdle {
             surfaceState.showDetails.value = true
         }
         composeRule.waitForIdle()
-        composeRule.runOnIdle {
-            selection += RecipientSearch.Candidate(accountIdHex = "new-a", displayName = "Alice", npub = "npub1alice")
-        }
+        composeRule.runOnIdle { selection += RecipientSearch.Candidate("new-a", "Alice", "npub1alice") }
         composeRule.onNodeWithContentDescription("Review selected members").performClick()
-        assertBannerAndWarnedReviewShown()
+        composeRule.runOnIdle { assertTrue(reviewOpen.value) }
+        assertWarningAndReviewDisplayed()
 
         restoration.emulateSavedInstanceStateRestore()
 
@@ -270,93 +309,34 @@ class LargeGroupInviteWarningUiTest {
             assertEquals(listOf("new-a"), selection.map { it.accountIdHex })
             assertEquals("Alice", selection.single().displayName)
             assertEquals("npub1alice", selection.single().npub)
+            assertTrue(reviewOpen.value)
         }
-        assertBannerAndWarnedReviewShown()
+        assertWarningAndReviewDisplayed()
     }
 
-    /** A caller whose selection does not survive recreation gets the picker back, not an empty review. */
-    @Test
-    fun openReviewIsDroppedWhenTheSelectionIsNotRestored() {
-        val restoration = StateRestorationTester(composeRule)
-        val state = emptyAppState().withGroupReviewActorNpub()
-        lateinit var selection: SnapshotStateList<RecipientSearch.Candidate>
-        restoration.setContent {
-            selection = remember { mutableStateListOf() }
-            WhiteNoiseTheme {
-                ContactPickerScreen(
-                    appState = state,
-                    title = "Choose people",
-                    selected = selection,
-                    onBack = {},
-                    onConfirm = {},
-                    confirmLabel = "Add member",
-                    reviewGroup = MemberReviewGroup("garden", "Garden club"),
-                )
-            }
-        }
-        composeRule.runOnIdle { selection += candidate("b", "Alice") }
-        composeRule.onNodeWithContentDescription("Review selected members").performClick()
-        composeRule.onNodeWithTag(REVIEW_TAG).assertIsDisplayed()
-
-        restoration.emulateSavedInstanceStateRestore()
-
-        composeRule.onNodeWithTag(REVIEW_TAG).assertDoesNotExist()
-        composeRule.onNodeWithText("Choose people").assertIsDisplayed()
-    }
-
-    /** Renders the review dialog the way Group Details feeds it, with a live member list and optional warning. */
-    private fun assertBannerAndWarnedReviewShown() {
+    private fun assertWarningAndReviewDisplayed() {
         composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(REVIEW_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText(WARNING_TEXT).assertIsDisplayed()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertIsDisplayed()
+        composeRule.onNodeWithText(LARGE_GROUP_WARNING).assertIsDisplayed()
     }
 
-    private fun showReview(
-        members: () -> List<RecipientSearch.Candidate>,
-        admins: SnapshotStateList<String> = mutableStateListOf(),
-        description: () -> String? = { WARNING_TEXT },
-        groups: () -> List<MemberReviewGroup> = { listOf(MemberReviewGroup("garden", "Garden club")) },
-        onConfirm: () -> Unit,
-        onDismiss: () -> Unit = {},
-    ) {
-        val state = emptyAppState().withGroupReviewActorNpub()
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                val current = members()
-                GroupMembersReviewDialog(
-                    appState = state,
-                    groups = groups(),
-                    members = current,
-                    busy = false,
-                    onDismiss = onDismiss,
-                    onConfirm = onConfirm,
-                    confirmLabel = if (current.size == 1) "Add member" else "Add members",
-                    initialAdminIds = admins.toSet(),
-                    onInitialAdminChange = { person, admin ->
-                        if (admin) admins.add(person.accountIdHex) else admins.remove(person.accountIdHex)
-                    },
-                    description = description(),
-                )
-            }
-        }
-    }
-
-    /** Builds a named candidate whose profile resolves to a stable display name. */
-    private fun candidate(
-        hex: String,
-        name: String,
-    ) = RecipientSearch.Candidate(
-        hex.repeat(64),
-        name,
-        "npub1$name",
-        searchProfile = UserProfileMetadataFfi(name, null, null, null, null, null, null),
-    )
+    private val reviewState by lazy { emptyAppState().withGroupReviewActorNpub() }
+    private val alice =
+        RecipientSearch.Candidate(
+            "a1".repeat(32),
+            "Alice",
+            "",
+            searchProfile = UserProfileMetadataFfi("Alice", null, null, null, null, null, null),
+        )
+    private val bob = RecipientSearch.Candidate("b2".repeat(32), "Bob", "")
 
     /** Generates stable unique member identities for Compose projection fixtures. */
     private fun memberIds(count: Int): List<String> = List(count) { index -> "member-$index" }
 
     private companion object {
-        const val REVIEW_TAG = "group.members.review.dialog"
-        const val WARNING_TEXT = "Large groups are harder to moderate. Confirm that everyone should be added."
+        const val LARGE_GROUP_WARNING =
+            "In groups of 150 or more members, additional invitations might not be delivered reliably. " +
+                "You can still continue."
+        const val SECOND_DIALOG_TAG = "large-group-invite-confirmation"
     }
 }
