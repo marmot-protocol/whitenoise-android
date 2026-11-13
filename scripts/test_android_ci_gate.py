@@ -446,6 +446,41 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/master'", save_step)
         self.assertIn("steps.marmotkit-cache.outputs.cache-hit != 'true'", save_step)
 
+    def test_gradle_cache_writers_outside_ci(self):
+        """Master keeps one Gradle home entry per lane that PR runs restore.
+
+        Each writer adds a few hundred MB per master push. Matrix duplicates and
+        master-only jobs read whichever entry is newest instead, so two pushes
+        fit in the repository cache quota.
+        """
+        master_only = "github.ref != 'refs/heads/master' }}"
+        expected = {
+            'android-instrumented.yml': [
+                "${{ matrix.distribution != 'Zapstore' || " + master_only,
+                '${{ matrix.shard != 0 || ' + master_only,
+                '${{ ' + master_only,
+                'true',
+            ],
+            'android-production-release.yml': ['true'],
+            'android-release-runtime.yml': ['true', 'true'],
+            'android-staging-apk.yml': ['true', 'true', 'true'],
+            'codeql.yml': ['true'],
+            'dependency-submission.yml': ['true'],
+            'fuzz-scheduled.yml': ['true'],
+        }
+        for filename, values in expected.items():
+            with self.subTest(filename=filename):
+                workflow = WORKFLOW.with_name(filename).read_text()
+                steps = re.findall(
+                    r'(?ms)uses: gradle/actions/(?:setup-gradle|dependency-submission)@.*?(?=^      - |^  [a-z]|\Z)',
+                    workflow,
+                )
+                found = [
+                    match.group(1) if (match := re.search(r'cache-read-only: (.+)\n', step)) else None
+                    for step in steps
+                ]
+                self.assertEqual(found, values)
+
     def test_build_phases(self):
         """Packaging runs independently, with phase-specific diagnostics."""
         self.assertIn(
