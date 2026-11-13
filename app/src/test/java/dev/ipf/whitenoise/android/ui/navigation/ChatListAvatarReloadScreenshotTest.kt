@@ -135,7 +135,10 @@ class ChatListAvatarReloadScreenshotTest {
     }
 
     /** Checks all four actual rendered bitmaps, so an initials placeholder cannot satisfy the test. */
-    private fun assertAvatars(fixture: ReturnFixture, phase: String) {
+    private fun assertAvatars(
+        fixture: ReturnFixture,
+        phase: String,
+    ) {
         val missing = avatarColors(fixture).filterNot { (tag, color) -> containsAvatar(tag, color) }.map { it.first }
         assertTrue("missing avatar pixels $phase: $missing", missing.isEmpty())
     }
@@ -146,13 +149,14 @@ class ChatListAvatarReloadScreenshotTest {
         val missing = mutableListOf<String>()
         repeat(75) {
             rule.mainClock.advanceTimeByFrame()
-            val visible = pending.filterKeys { tag ->
-                if (tag.startsWith("chat.row.")) {
-                    hasPaintedRow(tag)
-                } else {
-                    rule.onNodeWithTag(tag, useUnmergedTree = true).isDisplayed()
+            val visible =
+                pending.filterKeys { tag ->
+                    if (tag.startsWith("chat.row.")) {
+                        hasPaintedRow(tag)
+                    } else {
+                        rule.onNodeWithTag(tag, useUnmergedTree = true).isDisplayed()
+                    }
                 }
-            }
             visible.forEach { (tag, color) ->
                 if (!containsAvatar(tag, color, exact = false)) missing += tag
                 pending.remove(tag)
@@ -186,7 +190,11 @@ class ChatListAvatarReloadScreenshotTest {
         )
 
     /** Samples interior pixels without depending on avatar corners, rings or text antialiasing. */
-    private fun containsAvatar(tag: String, color: Int, exact: Boolean = true): Boolean {
+    private fun containsAvatar(
+        tag: String,
+        color: Int,
+        exact: Boolean = true,
+    ): Boolean {
         val pixels = rule.onNodeWithTag(tag, useUnmergedTree = true).captureToImage().toPixelMap()
         return (0 until pixels.height step 2).any { y ->
             (0 until pixels.width step 2).any { x ->
@@ -197,9 +205,9 @@ class ChatListAvatarReloadScreenshotTest {
                     val channels = listOf(pixel.red, pixel.green, pixel.blue)
                     val expected = listOf(Color.red(color), Color.green(color), Color.blue(color))
                     val middle = (channels.min() + channels.max()) / 2f
-                    channels.max() - channels.min() > 0.4f && channels.zip(expected).all { (actual, channel) ->
-                        (actual > middle) == (channel == 255)
-                    }
+                    val sameHue =
+                        channels.zip(expected).all { (actual, channel) -> (actual > middle) == (channel == 255) }
+                    channels.max() - channels.min() > 0.4f && sameHue
                 } else {
                     false
                 }
@@ -208,12 +216,17 @@ class ChatListAvatarReloadScreenshotTest {
     }
 
     /** Names the same account, group and hash as the production encrypted avatar loader. */
-    private fun encryptedKey(fixture: ReturnFixture): String =
-        encryptedGroupAvatarCacheKey(ACCOUNT, fixture.rows[1].groupIdHex, ENCRYPTED_HASH)
+    private fun encryptedKey(fixture: ReturnFixture): String = encryptedGroupAvatarCacheKey(
+        ACCOUNT,
+        fixture.rows[1].groupIdHex,
+        ENCRYPTED_HASH,
+    )
 
     /** Builds a distinguishable synthetic decoded avatar. */
-    private fun solidAvatar(color: Int) =
-        Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }.asImageBitmap()
+    private fun solidAvatar(color: Int) = Bitmap
+        .createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        .apply { eraseColor(color) }
+        .asImageBitmap()
 
     private companion object {
         const val ACCOUNT = ConversationTimelineTestIds.ACCOUNT_REF
