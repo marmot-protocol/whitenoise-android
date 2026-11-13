@@ -11,6 +11,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.SavedStateHandle
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -67,7 +68,7 @@ class ChatListAvatarReloadScreenshotTest {
                 controller.items.size == fixture.rows.size && !controller.isLoading
             }
             rule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
-            assertAvatars(fixture)
+            assertAvatars(fixture, "before opening the chat")
             rule.onNodeWithTag("chat.row.${fixture.target.groupIdHex}").performClick()
             rule.waitUntil(10_000) { holder.selectedChat.value?.id == fixture.target.groupIdHex }
             rule.mainClock.advanceTimeBy(1_000L)
@@ -77,8 +78,8 @@ class ChatListAvatarReloadScreenshotTest {
             rule.mainClock.autoAdvance = false
             rule.onNodeWithContentDescription("Back").performClick()
             rule.mainClock.advanceTimeBy(1_000L)
-            assertAvatars(fixture)
-            rule.onNodeWithTag("chats.list").captureRoboImage("src/test/snapshots/chat_list_compatibility_avatars_return.png")
+            assertAvatars(fixture, "after Back while the image caches are empty")
+            rule.onRoot().captureRoboImage("src/test/snapshots/chat_list_compatibility_avatars_return.png")
         } finally {
             rule.mainClock.autoAdvance = true
             rule.runOnIdle {
@@ -110,7 +111,9 @@ class ChatListAvatarReloadScreenshotTest {
         fixture.appState.applyAccountSwitchProfileSeed(
             AccountSwitchProfileSeed(ConversationTimelineTestIds.ACCOUNT_ID, null, "First account", ACTIVE_URL),
         )
-        fixture.appState.applyAccountSwitchProfileSeed(AccountSwitchProfileSeed(OTHER_ID, null, "Second account", OTHER_URL))
+        fixture.appState.applyAccountSwitchProfileSeed(
+            AccountSwitchProfileSeed(OTHER_ID, null, "Second account", OTHER_URL),
+        )
         AvatarImageLoader.putCached(ACTIVE_URL, solidAvatar(Color.RED))
         AvatarImageLoader.putCached(OTHER_URL, solidAvatar(Color.BLUE))
         AvatarImageLoader.putCached(LEGACY_URL, solidAvatar(Color.GREEN))
@@ -126,7 +129,7 @@ class ChatListAvatarReloadScreenshotTest {
     }
 
     /** Checks all four actual rendered bitmaps, so an initials placeholder cannot satisfy the test. */
-    private fun assertAvatars(fixture: ReturnFixture) {
+    private fun assertAvatars(fixture: ReturnFixture, phase: String) {
         val expected =
             listOf(
                 "chats.switchProfile" to Color.RED,
@@ -135,7 +138,7 @@ class ChatListAvatarReloadScreenshotTest {
                 "chat.row.${fixture.rows[1].groupIdHex}" to Color.MAGENTA,
             )
         val missing = expected.filterNot { (tag, color) -> containsAvatar(tag, color) }.map { it.first }
-        assertTrue("missing avatar pixels: $missing", missing.isEmpty())
+        assertTrue("missing avatar pixels $phase: $missing", missing.isEmpty())
     }
 
     /** Samples interior pixels without depending on avatar corners, rings or text antialiasing. */

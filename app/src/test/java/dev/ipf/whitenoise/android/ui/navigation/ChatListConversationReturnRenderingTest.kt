@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
@@ -294,7 +295,10 @@ internal class ReturnFixture(
             conversationTimelineTestGroup(),
         )
     val appState: WhiteNoiseAppState =
-        conversationTimelineTestAppState(timelines.subscriptions, additionalAccounts = additionalAccounts).also { state ->
+        conversationTimelineTestAppState(
+            timelines.subscriptions,
+            additionalAccounts = additionalAccounts,
+        ).also { state ->
             WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }.set(
                 state,
                 AppMarmotRuntime(rootPath = "test", marmot = runtime()),
@@ -408,16 +412,21 @@ internal class ReturnWindow(
         return snapshot.copy(
             rows =
                 snapshot.rows.map { presented ->
-                    val asset = avatarAssetForRow(presented.row) ?: return@map presented
+                    val row = presented.row
+                    val asset = avatarAssetForRow(row)
+                    val avatar =
+                        when {
+                            asset != null -> SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", row.title)
+                            row.avatarUrl != null -> SelectedAvatarFfi.RemoteImage(checkNotNull(row.avatarUrl), row.title)
+                            row.avatar != null -> SelectedAvatarFfi.EncryptedGroupImage(checkNotNull(row.avatar), row.title)
+                            else -> return@map presented
+                        }
                     presented.copy(
                         avatarAsset = asset,
                         presentation =
                             presented.presentation.copy(
-                                avatar =
-                                    SelectedAvatarFfi.RemoteImage(
-                                        "https://example.invalid/avatar",
-                                        presented.row.title,
-                                    ),
+                                avatar = avatar,
+                                avatarSource = if (asset == null) PresentationSourceFfi.GROUP else presented.presentation.avatarSource,
                             ),
                     )
                 },
