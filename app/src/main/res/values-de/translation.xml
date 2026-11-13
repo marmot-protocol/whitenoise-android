@@ -32,4 +32,5 @@
     <string name="translation_composer_dictation_off">Übersetzen ist während des Diktierens aus</string>
     <string name="translation_composer_placeholder">Hier erscheint die Übersetzung</string>
     <string name="translation_composer_detection_failed">Sprache nicht erkannt. Schreib etwas mehr.</string>
+    <string name="translation_search_languages">Sprachen suchen</string>
 </resources>

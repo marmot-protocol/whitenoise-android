@@ -32,4 +32,5 @@
     <string name="translation_composer_dictation_off">听写时翻译已关闭</string>
     <string name="translation_composer_placeholder">译文显示在这里</string>
     <string name="translation_composer_detection_failed">无法识别语言，请再多输入一些。</string>
+    <string name="translation_search_languages">搜索语言</string>
 </resources>

@@ -32,4 +32,5 @@
     <string name="translation_composer_dictation_off">La traduzione è disattivata durante la dettatura</string>
     <string name="translation_composer_placeholder">La traduzione appare qui</string>
     <string name="translation_composer_detection_failed">Lingua non rilevata. Scrivi ancora un po\'.</string>
+    <string name="translation_search_languages">Cerca lingue</string>
 </resources>

@@ -32,4 +32,5 @@
     <string name="translation_composer_dictation_off">Dikte sırasında çeviri kapalı</string>
     <string name="translation_composer_placeholder">Çeviri burada görünür</string>
     <string name="translation_composer_detection_failed">Dil algılanamadı. Biraz daha yazın.</string>
+    <string name="translation_search_languages">Dil ara</string>
 </resources>

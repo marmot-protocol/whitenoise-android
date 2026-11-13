@@ -32,4 +32,5 @@
     <string name="translation_composer_dictation_off">Translation is off while dictating</string>
     <string name="translation_composer_placeholder">Translation appears here</string>
     <string name="translation_composer_detection_failed">Couldn\'t detect the language. Type a bit more.</string>
+    <string name="translation_search_languages">Search languages</string>
 </resources>

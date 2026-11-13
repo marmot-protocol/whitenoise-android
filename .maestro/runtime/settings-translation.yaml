@@ -21,6 +21,11 @@ name: settings-translation
 - assertVisible: "Automatically translate messages"
 - tapOn: "Target language: English"
 - assertVisible: Arabic
+- assertVisible: "Search languages"
+- tapOn: "Search languages"
+- inputText: "ger"
+- assertVisible: German
+- assertNotVisible: Arabic
 - back
 - assertNotVisible: Arabic
 - tapOn: "Back"

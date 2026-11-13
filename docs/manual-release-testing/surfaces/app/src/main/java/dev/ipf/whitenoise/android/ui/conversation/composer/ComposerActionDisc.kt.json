@@ -13,6 +13,14 @@
         ]
       },
       {
+        "surface": "ComposerTranslationSendSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+        "anchor": "internal fun ComposerTranslationSendSlot(",
+        "test_ids": [
+          "CON-045"
+        ]
+      },
+      {
         "surface": "Compact primary action target",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
         "anchor": "internal fun ComposerActionDisc(",
@@ -27,6 +35,14 @@
         "anchor": "val outline = amoledOutlineBorder(enabled)",
         "test_ids": [
           "CON-030"
+        ]
+      },
+      {
+        "surface": "Pending translation in place of Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+        "anchor": "R.string.translation_loading",
+        "test_ids": [
+          "CON-045"
         ]
       }
     ]

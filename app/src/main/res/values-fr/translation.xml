@@ -32,4 +32,5 @@
     <string name="translation_composer_dictation_off">La traduction est désactivée pendant la dictée</string>
     <string name="translation_composer_placeholder">La traduction s\'affiche ici</string>
     <string name="translation_composer_detection_failed">Langue non détectée. Écrivez un peu plus.</string>
+    <string name="translation_search_languages">Rechercher une langue</string>
 </resources>

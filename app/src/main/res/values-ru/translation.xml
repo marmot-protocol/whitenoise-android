@@ -32,4 +32,5 @@
     <string name="translation_composer_dictation_off">Перевод отключён на время диктовки</string>
     <string name="translation_composer_placeholder">Здесь появится перевод</string>
     <string name="translation_composer_detection_failed">Не удалось определить язык. Напишите чуть больше.</string>
+    <string name="translation_search_languages">Поиск языков</string>
 </resources>
