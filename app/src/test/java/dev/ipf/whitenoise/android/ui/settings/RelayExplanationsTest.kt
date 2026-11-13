@@ -50,7 +50,7 @@ class RelayExplanationsTest {
         render(body) { explanation ->
             SettingsGroup {
                 row("posting") { rowContext ->
-                    SettingsValue(rowContext, TITLE, "Published", Modifier.testTag(TAG), explanation)
+                    SettingsValue(rowContext, TITLE, "Published", Modifier.testTag(TAG), explanation, leading = null)
                 }
             }
         }
@@ -63,7 +63,14 @@ class RelayExplanationsTest {
         assertHoldThenClick(R.string.explanation_relays_refresh) { explanation ->
             SettingsGroup {
                 row("refresh") { rowContext ->
-                    SettingsAction(rowContext, TITLE, { clicks++ }, Modifier.testTag(TAG), explanation = explanation)
+                    SettingsAction(
+                        rowContext,
+                        TITLE,
+                        { clicks++ },
+                        Modifier.testTag(TAG),
+                        explanation = explanation,
+                        leading = null,
+                    )
                 }
             }
         }
@@ -73,7 +80,14 @@ class RelayExplanationsTest {
         assertHoldThenClick(R.string.explanation_relays_relay_row) { explanation ->
             SettingsGroup {
                 row("relay") { rowContext ->
-                    SettingsLink(rowContext, TITLE, { clicks++ }, Modifier.testTag(TAG), explanation = explanation)
+                    SettingsLink(
+                        rowContext,
+                        TITLE,
+                        { clicks++ },
+                        Modifier.testTag(TAG),
+                        explanation = explanation,
+                        leading = null,
+                    )
                 }
             }
         }
@@ -83,7 +97,14 @@ class RelayExplanationsTest {
         assertHoldThenClick(R.string.explanation_relays_remove) { explanation ->
             SettingsGroup {
                 row("remove") { rowContext ->
-                    SettingsAction(rowContext, TITLE, { clicks++ }, Modifier.testTag(TAG), explanation = explanation)
+                    SettingsAction(
+                        rowContext,
+                        TITLE,
+                        { clicks++ },
+                        Modifier.testTag(TAG),
+                        explanation = explanation,
+                        leading = null,
+                    )
                 }
             }
         }

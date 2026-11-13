@@ -16,14 +16,16 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "fun MessageBubble(",
         "test_ids": [
+          "CON-017",
           "MED-009",
           "MSG-001",
           "MSG-005",
+          "MSG-006",
           "MSG-013",
           "MSG-015",
           "MSG-019",
-          "CON-017",
-          "MSG-006",
+          "MSG-026",
+          "MSG-039",
           "MSG-040"
         ]
       },
@@ -184,14 +186,6 @@
         ]
       },
       {
-        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "onDraftChange = { value, textChanged ->",
-        "test_ids": [
-          "DIC-011"
-        ]
-      },
-      {
         "surface": "Forward picker opens on a payload snapshot",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "surfaces.forwardSnapshot = forwardPayload",
@@ -314,9 +308,9 @@
     ],
     "message_rendering_contracts": [
       {
-        "surface": "translation status follows the bubble-attached reaction summary",
+        "surface": "translation toggle sits beside the bubble",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": ".MessageTranslationRendition(translationSource)",
+        "anchor": "MessageTranslationToggle(translationSource",
         "test_ids": [
           "SET-033"
         ]

@@ -49,7 +49,14 @@ class OrganizeExplanationsTest {
         assertHoldThenClick(R.string.explanation_organize_hub_chat_folders) { explanation ->
             SettingsGroup {
                 row("link") { rowContext ->
-                    SettingsLink(rowContext, TITLE, { clicks++ }, Modifier.testTag(TAG), explanation = explanation)
+                    SettingsLink(
+                        rowContext,
+                        TITLE,
+                        { clicks++ },
+                        Modifier.testTag(TAG),
+                        explanation = explanation,
+                        leading = null,
+                    )
                 }
             }
         }
@@ -66,6 +73,7 @@ class OrganizeExplanationsTest {
                         { clicks++ },
                         Modifier.testTag(TAG),
                         explanation = explanation,
+                        leading = null,
                     )
                 }
             }
@@ -76,7 +84,14 @@ class OrganizeExplanationsTest {
         assertHoldThenClick(R.string.explanation_organize_emoji_check_update) { explanation ->
             SettingsGroup {
                 row("action") { rowContext ->
-                    SettingsAction(rowContext, TITLE, { clicks++ }, Modifier.testTag(TAG), explanation = explanation)
+                    SettingsAction(
+                        rowContext,
+                        TITLE,
+                        { clicks++ },
+                        Modifier.testTag(TAG),
+                        explanation = explanation,
+                        leading = null,
+                    )
                 }
             }
         }

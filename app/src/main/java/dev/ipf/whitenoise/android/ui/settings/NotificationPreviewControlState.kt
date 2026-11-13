@@ -28,6 +28,7 @@ internal fun NotificationPreviewControl(
                 checked = state.enabled,
                 busy = state.busy,
                 onCheckedChange = onChange,
+                leading = { SettingsLeadingIcon(R.drawable.ic_visibility) },
             )
         }
         if (state.failed) {
@@ -39,6 +40,7 @@ internal fun NotificationPreviewControl(
                     enabled = !state.busy,
                     explanation = stringResource(R.string.explanation_privacy_notif_preview_retry),
                     onClick = onRetry,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
                 )
             }
         }

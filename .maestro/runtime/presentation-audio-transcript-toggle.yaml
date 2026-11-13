@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-audio-transcript-toggle
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Transcribe
+- assertNotVisible: Audio transcript
+- tapOn:
+    id: audio.transcribe
+- assertVisible:
+    id: presentation.complete

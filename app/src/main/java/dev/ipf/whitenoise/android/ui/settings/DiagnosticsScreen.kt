@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,6 +90,21 @@ internal enum class DiagnosticValueKey {
     Accounts,
     BootstrapRelays,
 }
+
+/** Each relay-health and runtime value keeps its own glyph, so the two value groups never repeat one. */
+@DrawableRes
+internal fun diagnosticValueIcon(key: DiagnosticValueKey): Int =
+    when (key) {
+        DiagnosticValueKey.Total -> R.drawable.ic_dns
+        DiagnosticValueKey.Connected -> R.drawable.ic_cable
+        DiagnosticValueKey.Connecting -> R.drawable.ic_pending
+        DiagnosticValueKey.Disconnected -> R.drawable.ic_block
+        DiagnosticValueKey.Attempts -> R.drawable.ic_replay
+        DiagnosticValueKey.Successes -> R.drawable.ic_check
+        DiagnosticValueKey.ActiveAccount -> R.drawable.ic_person
+        DiagnosticValueKey.Accounts -> R.drawable.ic_manage_accounts
+        DiagnosticValueKey.BootstrapRelays -> R.drawable.ic_settings_cell_tower
+    }
 
 internal enum class DiagnosticsStreamStatus {
     Live,
@@ -517,6 +533,7 @@ private fun DiagnosticsHealthSheet(
                         onRefresh,
                         Modifier.testTag("diagnostics.health.refresh"),
                         explanation = stringResource(R.string.explanation_privacy_diagnostics_refresh),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                     )
                 }
                 row("send") { context ->
@@ -527,6 +544,7 @@ private fun DiagnosticsHealthSheet(
                         modifier = Modifier.testTag("diagnostics.health.test"),
                         enabled = state.sendToSelfEnabled,
                         explanation = stringResource(R.string.explanation_privacy_diagnostics_send_to_self),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_send) },
                     )
                 }
             }
@@ -544,7 +562,12 @@ private fun DiagnosticsHealthSheet(
                 SettingsGroup {
                     state.relayHealthValues.forEach { value ->
                         row(value.key.name) { context ->
-                            SettingsValue(context, diagnosticValueLabel(value.key), value.value.orEmpty())
+                            SettingsValue(
+                                context,
+                                diagnosticValueLabel(value.key),
+                                value.value.orEmpty(),
+                                leading = { SettingsLeadingIcon(diagnosticValueIcon(value.key)) },
+                            )
                         }
                     }
                 }
@@ -557,6 +580,7 @@ private fun DiagnosticsHealthSheet(
                             context,
                             diagnosticValueLabel(value.key),
                             value.value ?: stringResource(R.string.none),
+                            leading = { SettingsLeadingIcon(diagnosticValueIcon(value.key)) },
                         )
                     }
                 }
@@ -590,6 +614,7 @@ private fun PerformanceDiagnosticsGroup(
                     } else {
                         stringResource(R.string.performance_logs_inactive)
                     },
+                leading = { SettingsLeadingIcon(R.drawable.ic_speed) },
             )
         }
         if (status.emittedCount > 0) {
@@ -601,6 +626,7 @@ private fun PerformanceDiagnosticsGroup(
                     onClick = onCopy,
                     modifier = Modifier.testTag("diagnostics.performance.copy"),
                     explanation = stringResource(R.string.explanation_privacy_diagnostics_perf_copy),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_content_copy) },
                 )
             }
         }

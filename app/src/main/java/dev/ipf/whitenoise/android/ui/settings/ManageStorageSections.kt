@@ -52,6 +52,7 @@ internal fun LazyListScope.storageUsageItems(
                         enabled = state.available && !state.busy,
                         modifier = Modifier.testTag("storage.retry"),
                         explanation = stringResource(R.string.explanation_privacy_storage_retry),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
                     )
                 }
             }
@@ -101,6 +102,7 @@ internal fun LazyListScope.storageFreeUpItems(
                     enabled = ready && hasAttachments,
                     modifier = Modifier.testTag("storage.largest"),
                     explanation = stringResource(R.string.explanation_privacy_storage_largest),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_sort) },
                 )
             }
             row("older") { context ->
@@ -112,6 +114,7 @@ internal fun LazyListScope.storageFreeUpItems(
                     busy = state.action is StorageAction.RemoveOlder,
                     modifier = Modifier.testTag("storage.remove_older"),
                     explanation = stringResource(R.string.explanation_privacy_storage_remove_older),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }
             row("cache") { context ->
@@ -131,6 +134,7 @@ internal fun LazyListScope.storageFreeUpItems(
                     },
                     modifier = Modifier.testTag("storage.clear_cache"),
                     explanation = stringResource(R.string.explanation_privacy_storage_clear_cache),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_cleaning_services) },
                 )
             }
         }
@@ -158,6 +162,7 @@ internal fun LazyListScope.storageKeepMediaItems(
                     busy = state.action is StorageAction.SetKeepMedia,
                     modifier = Modifier.testTag("storage.keep_media.action"),
                     explanation = stringResource(R.string.explanation_privacy_storage_keep_media),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_history) },
                 )
             }
         }

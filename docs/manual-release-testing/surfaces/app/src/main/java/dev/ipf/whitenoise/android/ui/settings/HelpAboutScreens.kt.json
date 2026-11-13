@@ -40,15 +40,6 @@
         ]
       },
       {
-        "surface": "HelpLeadingIcon",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
-        "anchor": "fun HelpLeadingIcon(",
-        "test_ids": [
-          "SET-018",
-          "SET-019"
-        ]
-      },
-      {
         "surface": "HelpOpenFailureDialog",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
         "anchor": "fun HelpOpenFailureDialog(",

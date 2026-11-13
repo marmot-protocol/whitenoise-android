@@ -14,7 +14,6 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -268,6 +266,7 @@ internal fun RelaysContent(
                                 modifier = Modifier.testTag("relays.row.${relay.url}"),
                                 subtitle = relaySummary(relay),
                                 explanation = stringResource(R.string.explanation_relays_relay_row),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_dns) },
                             )
                         }
                     }
@@ -277,7 +276,7 @@ internal fun RelaysContent(
                             title = stringResource(R.string.add_relay),
                             onClick = onAdd,
                             enabled = lists != null && !busy,
-                            leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_add) },
                             explanation = stringResource(R.string.explanation_relays_add),
                         )
                     }
@@ -327,6 +326,7 @@ private fun SettingsGroupScope.relayPublicationRows(
             value = stringResource(relayListStatusRes(lists, MissingRelayListKindFfi.NIP65)),
             modifier = Modifier.testTag("relay.publication.posting"),
             explanation = stringResource(R.string.explanation_relays_posting),
+            leading = { SettingsLeadingIcon(R.drawable.ic_send) },
         )
     }
     row("receiving") { context ->
@@ -336,12 +336,14 @@ private fun SettingsGroupScope.relayPublicationRows(
             value = stringResource(relayListStatusRes(lists, MissingRelayListKindFfi.INBOX)),
             modifier = Modifier.testTag("relay.publication.receiving"),
             explanation = stringResource(R.string.explanation_relays_receiving),
+            leading = { SettingsLeadingIcon(R.drawable.ic_inbox) },
         )
     }
     relayPublicationAction(state, onRefresh, onPublishMissing)
 }
 
 /** The single action the current publication state allows: progress, Retry, Refresh, or Publish missing. */
+@Suppress("LongMethod")
 private fun SettingsGroupScope.relayPublicationAction(
     state: RelaysUiState,
     onRefresh: () -> Unit,
@@ -376,6 +378,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                     subtitle = stringResource(failed.failureRes),
                     explanation = stringResource(R.string.explanation_relays_retry),
                     enabled = !state.busy,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
                 )
             }
         else -> {
@@ -387,6 +390,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                     modifier = Modifier.testTag("relay.publication.refresh"),
                     explanation = stringResource(R.string.explanation_relays_refresh),
                     enabled = !state.busy,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                 )
             }
             if (lists != null && lists.missing.isNotEmpty()) {
@@ -399,6 +403,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                         subtitle = stringResource(R.string.relay_list_publish_help),
                         explanation = stringResource(R.string.explanation_relays_publish_missing),
                         enabled = !state.busy,
+                        leading = { SettingsLeadingIcon(R.drawable.ic_publish) },
                     )
                 }
             }
@@ -424,8 +429,22 @@ internal fun RelayDetailsScreen(
         SettingsList {
             item(key = "search.Relays.10") {
                 SettingsGroup(modifier = Modifier.testTag("relay.details.metadata")) {
-                    row("name") { context -> SettingsValue(context, stringResource(R.string.name), relay.name) }
-                    row("url") { context -> SettingsValue(context, stringResource(R.string.url), relay.url) }
+                    row("name") { context ->
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.name),
+                            relay.name,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_dns) },
+                        )
+                    }
+                    row("url") { context ->
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.url),
+                            relay.url,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_link) },
+                        )
+                    }
                 }
             }
             item(key = "search.Relays.11") { SettingsSection(stringResource(R.string.use_for)) }
@@ -441,6 +460,7 @@ internal fun RelayDetailsScreen(
                                 subtitle = stringResource(role.helpRes),
                                 explanation = stringResource(role.explanationRes()),
                                 enabled = !busy && role !in blockingRoles,
+                                leading = { SettingsLeadingIcon(role.iconRes) },
                             )
                         }
                     }
@@ -466,6 +486,9 @@ internal fun RelayDetailsScreen(
                             enabled = !busy && blockingRoles.isEmpty(),
                             destructive = true,
                             explanation = stringResource(R.string.explanation_relays_remove),
+                            leading = {
+                                SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
+                            },
                         )
                     }
                 }
@@ -551,6 +574,7 @@ internal fun AddRelaySheet(
                                 onCheckedChange = { selected -> roles = if (selected) roles + role else roles - role },
                                 subtitle = stringResource(role.helpRes),
                                 explanation = stringResource(role.explanationRes()),
+                                leading = { SettingsLeadingIcon(role.iconRes) },
                             )
                         }
                     }

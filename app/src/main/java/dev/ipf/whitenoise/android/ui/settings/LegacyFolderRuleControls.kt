@@ -51,6 +51,7 @@ internal fun LegacyFolderRuleControls(
                 onPeople,
                 explanation = stringResource(R.string.explanation_organize_folder_people),
                 value = peopleCount.toString(),
+                leading = { SettingsLeadingIcon(R.drawable.ic_person) },
             )
         }
         row("unread") {
@@ -60,6 +61,7 @@ internal fun LegacyFolderRuleControls(
                 unread,
                 onUnread,
                 explanation = stringResource(R.string.explanation_organize_folder_unread_only),
+                leading = { SettingsLeadingIcon(R.drawable.ic_mark_unread) },
             )
         }
         row("mentions") {
@@ -69,6 +71,7 @@ internal fun LegacyFolderRuleControls(
                 mentions,
                 onMentions,
                 explanation = stringResource(R.string.explanation_organize_folder_mentions_only),
+                leading = { SettingsLeadingIcon(R.drawable.ic_alternate_email) },
             )
         }
         row("pinned") {
@@ -78,6 +81,7 @@ internal fun LegacyFolderRuleControls(
                 pinned,
                 onPinned,
                 explanation = stringResource(R.string.explanation_organize_folder_pinned_only),
+                leading = { SettingsLeadingIcon(R.drawable.ic_push_pin) },
             )
         }
         row("groups") {
@@ -87,6 +91,7 @@ internal fun LegacyFolderRuleControls(
                 groups,
                 onGroups,
                 explanation = stringResource(R.string.explanation_organize_folder_groups_only),
+                leading = { SettingsLeadingIcon(R.drawable.ic_group) },
             )
         }
         row("direct") {
@@ -96,6 +101,7 @@ internal fun LegacyFolderRuleControls(
                 direct,
                 onDirect,
                 explanation = stringResource(R.string.explanation_organize_folder_direct_only),
+                leading = { SettingsLeadingIcon(R.drawable.ic_chat) },
             )
         }
         row("archive") {
@@ -105,6 +111,7 @@ internal fun LegacyFolderRuleControls(
                 archived,
                 onArchived,
                 explanation = stringResource(R.string.explanation_organize_folder_archived_only),
+                leading = { SettingsLeadingIcon(R.drawable.ic_archive) },
             )
         }
         row("muted") {
@@ -114,6 +121,7 @@ internal fun LegacyFolderRuleControls(
                 muted,
                 onMuted,
                 explanation = stringResource(R.string.explanation_organize_folder_include_muted),
+                leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
             )
         }
     }

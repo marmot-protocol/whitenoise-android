@@ -2210,7 +2210,8 @@ internal fun ChatsScreen(
                                 ChatAbandonMenuAction(item.isDm()) {
                                     pendingAbandonment =
                                         PendingChatAbandonment.capture(item, controller, appState, groupTitleCopy)
-                                }.takeIf { item.offersLocalAbandonment() },
+                                }.takeIf { item.isDm() && item.offersLocalAbandonment() },
+                            historyDeleteBlocked = item.offersLocalAbandonment(),
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null

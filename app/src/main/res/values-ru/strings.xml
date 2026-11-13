@@ -370,7 +370,6 @@
     <string name="add_member_already_in_group">%1$s уже в этой группе</string>
     <string name="large_group_invite_warning_title">Большая группа</string>
     <string name="large_group_invite_warning_message">В группах из 150 и более участников дополнительные приглашения могут доставляться ненадёжно.</string>
-    <string name="large_group_invite_confirm_title">Пригласить в большую группу?</string>
     <string name="large_group_invite_confirm_message">В группах из 150 и более участников дополнительные приглашения могут доставляться ненадёжно. Вы всё равно можете продолжить.</string>
     <string name="invite_pending">Приглашение ожидает: %1$s</string>
     <string name="member_removal_pending">Ожидается удаление: %1$s</string>
@@ -1353,8 +1352,6 @@
     <string name="voice_message_recording_failed">Не удалось записать голосовое сообщение</string>
     <string name="voice_message_microphone_busy">Микрофон используется другим приложением. Закройте его и повторите попытку.</string>
     <string name="transcribe_audio">Расшифровать</string>
-    <string name="audio_transcription_title">Расшифровка аудио</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text обработает эту запись на вашем устройстве с помощью установленной модели распознавания речи. White Noise не записывает звук с микрофона и не отправляет сообщение. Созданный текст может содержать ошибки и удаляется, когда вы закрываете его или покидаете этот экран.</string>
     <string name="audio_transcription_working">Расшифровка записи на этом устройстве…</string>
     <string name="audio_transcription_generated">Автоматическая расшифровка · не текст отправителя</string>
     <string name="audio_transcription_android_version">Для расшифровки записей требуется Android 13 или новее.</string>

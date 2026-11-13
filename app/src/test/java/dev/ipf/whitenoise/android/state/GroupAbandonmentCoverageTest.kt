@@ -143,7 +143,14 @@ class GroupAbandonmentCoverageTest {
     @Test
     fun receivingChatsAreForgottenNotHistoryDeleted() {
         val menu = source("ui/chats/ChatActionSheet.kt").substringAfter("internal fun ChatContextMenu(")
-        assertTrue("row Delete must yield to the forget", "onAbandon == null && actions?.canDeleteLocal" in menu)
+        assertTrue(
+            "row Delete must yield to the receiving gate",
+            "onAbandon == null && !historyDeleteBlocked && actions?.canDeleteLocal" in menu,
+        )
+        assertTrue(
+            "the chat list blocks Delete for every receiving chat",
+            "historyDeleteBlocked = item.offersLocalAbandonment()" in source("ui/chats/ChatsScreen.kt"),
+        )
         val screen = source("ui/chats/ChatsScreen.kt")
         val forgetGate = screen.substringAfter("val abandonableSelection =").substringBefore("?.map")
         assertTrue("the bulk forget is for selections with a group", "!item.isDm()" in forgetGate)
@@ -220,7 +227,10 @@ class GroupAbandonmentCoverageTest {
         val screen = source("ui/chats/ChatsScreen.kt")
         val menu = screen.substringAfter("onAbandon =").substringBefore("onDismiss =")
         assertTrue("the menu captures its row and owner", "PendingChatAbandonment.capture(item" in menu)
-        assertTrue("the menu offers the action only where it applies", "item.offersLocalAbandonment()" in menu)
+        assertTrue(
+            "the menu offers the action only where it applies",
+            "item.isDm() && item.offersLocalAbandonment()" in menu,
+        )
         assertTrue("the host shares the departure busy set", "busyChats = leavingAndDeleting" in screen)
     }
 

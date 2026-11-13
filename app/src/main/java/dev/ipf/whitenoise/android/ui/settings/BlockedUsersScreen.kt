@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,8 +13,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BlockOutcome
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.setUserBlocked
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.outlined.Block
 
 internal const val BLOCKED_USERS_CONTENT_TAG = "blocked-users-content"
 
@@ -77,8 +74,8 @@ private fun BlockedUsersGroup(
                     subtitle = stringResource(R.string.profile_unblock),
                     onClick = { onUnblock(user) },
                     enabled = busyUser == null,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_block) },
                     explanation = stringResource(R.string.explanation_privacy_blocked_unblock),
-                    leading = { Icon(Icons.Outlined.Block, contentDescription = null) },
                 )
             }
         }

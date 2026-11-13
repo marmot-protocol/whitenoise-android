@@ -36,7 +36,6 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenBody
 import dev.ipf.whitenoise.android.ui.conversation.messages.SwipeTestBubbleHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.swipeTestSurface
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -69,26 +68,6 @@ class MarkdownTableColumnSizingCoverageTest {
         val record = fixture.item.record.copy(plaintext = ID_DESCRIPTION_SOURCE, contentTokens = idDescriptionDoc())
         val surface = fixture.copy(item = fixture.item.copy(record = record, projected = null))
         composeRule.setContent { SwipeTestBubbleHost(surface = surface, collapseLongMessages = false) }
-        composeRule.waitForIdle()
-
-        assertShortColumnYieldsToTheLongColumn()
-    }
-
-    /** The full-screen reader shares the same allocation as the bubble. */
-    @Test
-    fun fullScreenReaderGivesTheShortColumnItsTextWidthAndTheLongColumnTheRest() {
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                MessageFullScreenBody(
-                    body = ID_DESCRIPTION_SOURCE,
-                    markdownDocument = idDescriptionDoc(),
-                    mentionDisplayName = null,
-                    onNostrProfileTap = null,
-                    onCopyMarkdownLink = {},
-                    modifier = Modifier.width(300.dp),
-                )
-            }
-        }
         composeRule.waitForIdle()
 
         assertShortColumnYieldsToTheLongColumn()

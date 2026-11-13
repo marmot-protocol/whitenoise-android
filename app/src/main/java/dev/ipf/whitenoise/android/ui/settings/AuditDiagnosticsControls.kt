@@ -66,6 +66,7 @@ internal fun AuditDeliverySection(
                 title = stringResource(R.string.audit_delivery_title),
                 value = listOfNotNull(status, delivery?.httpStatus?.let { "HTTP $it" }).joinToString(" · "),
                 explanation = stringResource(R.string.explanation_privacy_audit_status),
+                leading = { SettingsLeadingIcon(R.drawable.ic_monitor_heart) },
             )
         }
         auditDeliveryMetadata(delivery)
@@ -83,6 +84,7 @@ internal fun AuditDeliverySection(
                             settings.deliveryResumeFailed -> stringResource(R.string.audit_delivery_resume_failed)
                             else -> null
                         },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_play_arrow) },
                 )
             }
         }
@@ -93,6 +95,7 @@ internal fun AuditDeliverySection(
                     stringResource(R.string.refresh),
                     onRefresh,
                     enabled = enabled,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                     explanation = stringResource(R.string.explanation_privacy_audit_refresh),
                 )
             }
@@ -117,6 +120,7 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                 rowContext,
                 stringResource(R.string.audit_delivery_last_success),
                 lastCheck,
+                leading = { SettingsLeadingIcon(R.drawable.ic_history) },
                 explanation = stringResource(R.string.explanation_privacy_audit_last_success),
             )
         }
@@ -128,6 +132,7 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                 stringResource(R.string.audit_delivery_waiting),
                 Formatter.formatShortFileSize(LocalContext.current, delivery.waitingBytes),
                 explanation = stringResource(R.string.explanation_privacy_audit_waiting),
+                leading = { SettingsLeadingIcon(R.drawable.ic_pending) },
             )
         }
     }
@@ -175,6 +180,7 @@ internal fun AuditRetentionRow(
                 else -> null
             },
         busy = settings.retention == null || settings.savingRetention,
+        leading = { SettingsLeadingIcon(R.drawable.ic_history) },
     )
     if (pickerOpen && current != null) {
         val values = auditRetentionChoices(current)

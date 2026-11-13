@@ -12,7 +12,6 @@ import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineRowKind
@@ -24,7 +23,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
@@ -52,7 +50,6 @@ internal fun TimelineRow(
     onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit = {},
     eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
-    composerTextState: ComposerTextState,
     highlighted: Boolean,
     selectionMode: Boolean,
     textSelectionMode: Boolean,
@@ -74,18 +71,12 @@ internal fun TimelineRow(
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     composerGate: ComposerGate,
-    blockedDmUnblockInFlight: Boolean = false,
-    onUnblockBlockedDm: () -> Unit = {},
-    onBack: () -> Unit,
-    mentionCandidates: List<MentionComposer.Candidate>,
-    mentionPickerEnabled: Boolean,
     collapseLongMessages: Boolean,
     ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
     onWave: (suspend (String, () -> Unit) -> Unit)? = null,
-    // Reveals a send accepted from a long message's Read more reader (#3268).
-    onReaderSendAccepted: () -> Unit = {},
+    onBeforeBodyExpand: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
     reactionViewport: () -> Rect? = { null },
     modifier: Modifier = Modifier,
@@ -235,7 +226,6 @@ internal fun TimelineRow(
                     onOpenConversationMedia = onOpenConversationMedia,
                     eventCardResolver = eventCardResolver,
                     documentSaveFallback = documentSaveFallback,
-                    composerTextState = composerTextState,
                     highlighted = highlighted,
                     selectionMode = selectionMode,
                     textSelectionMode = textSelectionMode,
@@ -256,13 +246,7 @@ internal fun TimelineRow(
                     onActionMenuOpenChange = onActionMenuOpenChange,
                     onQuickReactionsSave = onQuickReactionsSave,
                     onReplyPreviewClick = onReplyPreviewClick,
-                    composerGate = composerGate,
-                    blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                    onUnblockBlockedDm = onUnblockBlockedDm,
-                    onBack = onBack,
-                    mentionCandidates = mentionCandidates,
-                    mentionPickerEnabled = mentionPickerEnabled,
-                    onReaderSendAccepted = onReaderSendAccepted,
+                    onBeforeBodyExpand = onBeforeBodyExpand,
                     onBeforeBodyCollapse = onBeforeBodyCollapse,
                     showSenderName = senderDecoration.showName,
                     showSenderAvatar = senderDecoration.showAvatar,

@@ -61,6 +61,7 @@ internal fun AccountHubGroup(
                 explanation = stringResource(R.string.explanation_organize_hub_profile),
                 subtitle = stringResource(readiness.summary),
                 onClick = { onOpenDetail(SettingsDetail.Profile) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_person) },
             )
         }
         row("profile_keys") { context ->
@@ -69,6 +70,7 @@ internal fun AccountHubGroup(
                 title = stringResource(R.string.settings_profile_keys),
                 explanation = stringResource(R.string.explanation_organize_hub_profile_keys),
                 onClick = { onOpenDetail(SettingsDetail.AccountKeys) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_settings_key) },
             )
         }
         row("relays") { context ->
@@ -77,6 +79,7 @@ internal fun AccountHubGroup(
                 title = stringResource(R.string.relays),
                 explanation = stringResource(R.string.explanation_settings_relays),
                 onClick = { onOpenDetail(SettingsDetail.Relays) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_settings_cell_tower) },
             )
         }
     }
@@ -116,6 +119,7 @@ internal fun ChatsScreen(
                             title = stringResource(R.string.chat_folders_title),
                             explanation = stringResource(R.string.explanation_organize_hub_chat_folders),
                             onClick = { onOpenDetail(SettingsDetail.ChatFolders) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_folder) },
                         )
                     }
                     row("gestures") { context ->
@@ -124,6 +128,7 @@ internal fun ChatsScreen(
                             title = stringResource(R.string.gestures_title),
                             explanation = stringResource(R.string.explanation_organize_hub_gestures),
                             onClick = { onOpenDetail(SettingsDetail.Gestures) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_swipe) },
                         )
                     }
                     row("composer") { context ->
@@ -133,6 +138,7 @@ internal fun ChatsScreen(
                             explanation = stringResource(R.string.explanation_organize_hub_composer),
                             subtitle = stringResource(R.string.composer_settings_detail),
                             onClick = { onOpenDetail(SettingsDetail.Composer) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_edit_note) },
                         )
                     }
                     row("enter_behavior") { context ->
@@ -142,6 +148,7 @@ internal fun ChatsScreen(
                             explanation = stringResource(R.string.explanation_organize_hub_enter_behavior),
                             value = enterLabels.getValue(appState.enterKeyBehavior),
                             onClick = { enterOpen = true },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_keyboard_return) },
                         )
                     }
                     row("custom_emoji") { context ->
@@ -151,6 +158,7 @@ internal fun ChatsScreen(
                             explanation = stringResource(R.string.explanation_organize_hub_custom_emoji),
                             modifier = Modifier.testTag("appearance.custom_emoji.group"),
                             onClick = { onOpenDetail(SettingsDetail.CustomEmoji) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_mood) },
                         )
                     }
                     row("quick_account_switching") { context ->
@@ -162,6 +170,7 @@ internal fun ChatsScreen(
                             subtitle = stringResource(R.string.quick_account_switching_detail),
                             modifier = Modifier.testTag("appearance.quick_account_switching"),
                             onCheckedChange = appState::updateQuickAccountSwitching,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_switch_account) },
                         )
                     }
                 }
@@ -191,6 +200,7 @@ internal fun VoiceLanguageScreen(
                             value = stringResource(language.labelRes),
                             modifier = Modifier.testTag("appearance.language.group"),
                             onClick = { onOpenDetail(SettingsDetail.Language) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_language) },
                         )
                     }
                     row("read_aloud") { context ->
@@ -199,6 +209,7 @@ internal fun VoiceLanguageScreen(
                             title = stringResource(R.string.settings_read_aloud),
                             explanation = stringResource(R.string.explanation_organize_hub_read_aloud),
                             onClick = { onOpenDetail(SettingsDetail.TextToSpeech) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
                         )
                     }
                     row("dictation") { context ->
@@ -207,6 +218,7 @@ internal fun VoiceLanguageScreen(
                             title = stringResource(R.string.dictation_settings_title),
                             explanation = stringResource(R.string.explanation_organize_hub_dictation),
                             onClick = { onOpenDetail(SettingsDetail.Dictation) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_mic) },
                         )
                     }
                     row("translation") { context ->
@@ -215,6 +227,7 @@ internal fun VoiceLanguageScreen(
                             title = stringResource(R.string.translation_title),
                             explanation = stringResource(R.string.explanation_organize_hub_translation),
                             onClick = { onOpenDetail(SettingsDetail.Translation) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_translate) },
                         )
                     }
                 }
@@ -241,6 +254,7 @@ internal fun HelpSupportScreen(
                             title = stringResource(R.string.help),
                             explanation = stringResource(R.string.explanation_organize_hub_help),
                             onClick = { onOpenDetail(SettingsDetail.Help) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_help) },
                         )
                     }
                     if (appState.activeAccount != null) {
@@ -250,6 +264,7 @@ internal fun HelpSupportScreen(
                                 title = stringResource(R.string.chat_with_support),
                                 explanation = stringResource(R.string.explanation_organize_hub_support),
                                 onClick = { onOpenDetail(SettingsDetail.Support) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_support_agent) },
                             )
                         }
                     }
@@ -259,6 +274,7 @@ internal fun HelpSupportScreen(
                             title = stringResource(R.string.settings_donate),
                             explanation = stringResource(R.string.explanation_organize_hub_donate),
                             onClick = { onOpenDetail(SettingsDetail.Donate) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_favorite_border) },
                         )
                     }
                     row("developer_tools") { context ->
@@ -267,6 +283,7 @@ internal fun HelpSupportScreen(
                             title = stringResource(R.string.settings_developer_tools),
                             explanation = stringResource(R.string.explanation_organize_hub_developer),
                             onClick = { onOpenDetail(SettingsDetail.Developer) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_handyman) },
                         )
                     }
                 }

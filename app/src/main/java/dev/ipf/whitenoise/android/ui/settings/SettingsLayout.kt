@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -320,8 +321,10 @@ internal fun SettingsPanel(
 }
 
 /**
- * A read-only row: the title over its value in the quiet supporting style, on the group's shape and fill.
- * Holding a row with [explanation] explains [title].
+ * A read-only row: its glyph, then the title over its value in the quiet supporting style, on the
+ * group's shape and fill. The glyph shares the switch, link and action rows' column so mixed groups
+ * stay aligned, and the row reads as one node for TalkBack and the icon audit. Holding a row with
+ * [explanation] explains [title].
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -331,16 +334,32 @@ internal fun SettingsValue(
     value: String,
     modifier: Modifier = Modifier,
     explanation: String? = null,
+    leading: (@Composable () -> Unit)?,
 ) {
-    SettingsGroupPanel(context, modifier.explainOnLongPress(explanation?.let { Explanation(title, it) })) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = WhiteNoiseSpacing.FormField, vertical = WhiteNoiseSpacing.Related + 4.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+    SettingsGroupPanel(
+        context,
+        modifier
+            .explainOnLongPress(explanation?.let { Explanation(title, it) })
+            .semantics(mergeDescendants = true) { settingsRow = Unit },
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.FormField),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            settingsLeadingSlot(leading, editable = true)?.let { slot ->
+                Box(Modifier.padding(end = SettingsRowDefaults.LeadingContentGap)) { slot() }
+            }
+            Column(
+                Modifier.weight(1f).padding(vertical = WhiteNoiseSpacing.Related + 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

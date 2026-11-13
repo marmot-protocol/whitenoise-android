@@ -45,6 +45,7 @@ class AppearanceExplanationsTest {
             SettingsGroup {
                 row("app-font") { rowContext ->
                     SettingsLink(
+                        leading = null,
                         context = rowContext,
                         title = "App font",
                         onClick = { clicks++ },
@@ -61,6 +62,7 @@ class AppearanceExplanationsTest {
             SettingsGroup {
                 row("font-size") { rowContext ->
                     SettingsLink(
+                        leading = null,
                         context = rowContext,
                         title = "Font size",
                         onClick = { clicks++ },

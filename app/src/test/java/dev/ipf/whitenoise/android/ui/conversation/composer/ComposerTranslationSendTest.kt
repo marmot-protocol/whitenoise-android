@@ -6,10 +6,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -62,21 +62,47 @@ class ComposerTranslationSendTest {
         scope.cancel()
     }
 
-    /** Send stays disabled while the translation is pending, then delivers the translation, never the source. */
+    /** Send is absent while the translation is pending (a ring holds its place), then delivers the translation. */
     @Test
     fun plainTextSendWaitsForAndDeliversTheTranslation() {
         val gate = CompletableDeferred<Unit>()
-        val translation = translateMode { gate.await() }
+        val translation = translateMode(beforeResult = { gate.await() })
         render(translation)
         val send = composeRule.onNodeWithContentDescription(context.getString(R.string.send))
         composeRule.waitUntil { translation.pending }
-        send.assertIsNotEnabled().performClick()
+        send.assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.send.progress").assertExists()
+        composeRule.onNodeWithTag("composer.send.slot").assertExists()
         assertTrue(sent.isEmpty())
 
         gate.complete(Unit)
         awaitMain { !translation.pending }
+        composeRule.onNodeWithTag("composer.send.progress").assertDoesNotExist()
         send.assertIsEnabled().performClick()
         composeRule.runOnIdle { assertEquals(listOf("de:Hello"), sent) }
+    }
+
+    /** A failed translation leaves neither Send nor a ring; the slot stays reserved. */
+    @Test
+    fun failedTranslationKeepsSendHidden() {
+        val translation = translateMode(beforeResult = { error("offline") })
+        render(translation)
+        awaitMain { translation.failure != null }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send)).assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.send.progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.send.slot").assertExists()
+        assertTrue(sent.isEmpty())
+    }
+
+    /** Translate mode without a target shows no Send and no ring. */
+    @Test
+    fun noTargetKeepsSendHiddenWithoutRing() {
+        val translation = translateMode(initialTarget = null)
+        render(translation)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send)).assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.send.progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.send.slot").assertExists()
     }
 
     /** A reply goes through the same gate and carries the translation. */
@@ -103,7 +129,7 @@ class ComposerTranslationSendTest {
     @Test
     fun imeSendWaitsForAndDeliversTheTranslation() {
         val gate = CompletableDeferred<Unit>()
-        val translation = translateMode { gate.await() }
+        val translation = translateMode(beforeResult = { gate.await() })
         render(translation)
         val editor = composeRule.onNode(hasSetTextAction())
         composeRule.waitUntil { translation.pending }
@@ -148,12 +174,15 @@ class ComposerTranslationSendTest {
     }
 
     /** Opens translate mode into German with an engine that waits on [beforeResult] and then prefixes the target. */
-    private fun translateMode(beforeResult: suspend () -> Unit = {}): ComposerTranslationState =
+    private fun translateMode(
+        initialTarget: String? = "de",
+        beforeResult: suspend () -> Unit = {},
+    ): ComposerTranslationState =
         ComposerTranslationState(
             scope = scope,
             engine = { engine(beforeResult) },
             ownerCurrent = { true },
-            initialTarget = "de",
+            initialTarget = initialTarget,
             settleMillis = 0L,
         ).also { it.toggle() }
 

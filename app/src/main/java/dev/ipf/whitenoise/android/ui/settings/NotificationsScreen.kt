@@ -11,8 +11,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -37,6 +34,7 @@ import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.group.notificationChannelIcon
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Refreshes Android permission, battery policy and local settings now and whenever the screen resumes. */
@@ -94,7 +92,7 @@ private fun NotificationPermissionPrompt(appState: WhiteNoiseAppState) {
  * Notifications overview: the preview switch and links to the sound, delivery and Android settings pages.
  * Detailed controls live on the child pages so this screen stays short.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun NotificationsScreen(
     appState: WhiteNoiseAppState,
@@ -134,6 +132,7 @@ internal fun NotificationsScreen(
                             onClick = onOpenSounds,
                             modifier = Modifier.testTag("notifications.sounds"),
                             explanation = stringResource(R.string.explanation_privacy_notif_sounds),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_music_note) },
                         )
                     }
                     row("delivery") { rowContext ->
@@ -144,6 +143,7 @@ internal fun NotificationsScreen(
                             onClick = onOpenDelivery,
                             modifier = Modifier.testTag("notifications.delivery"),
                             explanation = stringResource(R.string.explanation_privacy_notif_delivery),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_battery_full) },
                         )
                     }
                     row("android_settings") { rowContext ->
@@ -153,6 +153,7 @@ internal fun NotificationsScreen(
                             onClick = { openAppNotificationSettings(context) },
                             modifier = Modifier.testTag("notifications.android-settings"),
                             explanation = stringResource(R.string.explanation_privacy_notif_android_settings),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                         )
                     }
                 }
@@ -333,6 +334,7 @@ private fun NotificationDevicePolicyGroup(
                     ),
                 onClick = onOpenNotificationSettings,
                 explanation = stringResource(R.string.explanation_privacy_notif_permission),
+                leading = { SettingsLeadingIcon(R.drawable.ic_notifications_active) },
             )
         }
         row("battery") { context ->
@@ -343,6 +345,7 @@ private fun NotificationDevicePolicyGroup(
                 onClick = onOpenBatterySettings,
                 modifier = Modifier.testTag("notification-battery.settings"),
                 explanation = stringResource(R.string.explanation_privacy_notif_battery),
+                leading = { SettingsLeadingIcon(R.drawable.ic_battery_saver) },
             )
         }
     }
@@ -374,8 +377,8 @@ private fun NotificationPermissionGroup(
                     title = stringResource(R.string.notifications_are_off),
                     subtitle = stringResource(R.string.notifications_are_off_detail),
                     onClick = onOpenSettings,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
                     explanation = stringResource(R.string.explanation_privacy_notif_off),
-                    leading = { NotificationPermissionIcon(R.drawable.ic_notifications_off) },
                 )
             }
         } else {
@@ -385,23 +388,12 @@ private fun NotificationPermissionGroup(
                     title = stringResource(R.string.allow_notifications),
                     subtitle = stringResource(R.string.allow_notifications_detail),
                     onClick = onRequest,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                     explanation = stringResource(R.string.explanation_privacy_notif_allow),
-                    leading = { NotificationPermissionIcon(R.drawable.ic_settings_notifications) },
                 )
             }
         }
     }
-}
-
-/** Leading glyph of the permission rows, tinted like the hub icons. */
-@Suppress("FunctionNaming")
-@Composable
-private fun NotificationPermissionIcon(drawable: Int) {
-    Icon(
-        painter = painterResource(drawable),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 /** Maps each native-push capability outcome to localized settings copy. */
@@ -431,6 +423,7 @@ internal fun GlobalNotificationCategories(
                     onClick = { onOpenChannel(channel) },
                     modifier = Modifier.testTag("global-notification-category-${channel.id}"),
                     explanation = stringResource(R.string.explanation_privacy_notif_category),
+                    leading = { SettingsLeadingIcon(notificationChannelIcon(channel)) },
                 )
             }
         }

@@ -47,7 +47,14 @@ class SettingsExplanationsTest {
         assertHoldThenClick(R.string.explanation_quarantine_retry) { explanation ->
             SettingsGroup {
                 row("retry") { rowContext ->
-                    SettingsAction(rowContext, TITLE, { clicks++ }, Modifier.testTag(TAG), explanation = explanation)
+                    SettingsAction(
+                        rowContext,
+                        TITLE,
+                        { clicks++ },
+                        Modifier.testTag(TAG),
+                        explanation = explanation,
+                        leading = null,
+                    )
                 }
             }
         }
@@ -64,6 +71,7 @@ class SettingsExplanationsTest {
                         { clicks++ },
                         Modifier.testTag(TAG),
                         explanation = explanation,
+                        leading = null,
                     )
                 }
             }
@@ -112,7 +120,14 @@ class SettingsExplanationsTest {
         render(body) { explanation ->
             SettingsGroup {
                 row("retry") { rowContext ->
-                    SettingsAction(rowContext, TITLE, { clicks++ }, Modifier.testTag(TAG), explanation = explanation)
+                    SettingsAction(
+                        rowContext,
+                        TITLE,
+                        { clicks++ },
+                        Modifier.testTag(TAG),
+                        explanation = explanation,
+                        leading = null,
+                    )
                 }
             }
         }

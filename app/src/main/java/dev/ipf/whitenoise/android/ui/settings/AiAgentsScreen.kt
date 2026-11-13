@@ -108,6 +108,7 @@ internal fun AiAgentsContent(
                                 subtitle = stringResource(connector.subtitleRes),
                                 enabled = npub != null,
                                 explanation = stringResource(R.string.explanation_organize_ai_connector),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_cable) },
                             )
                         }
                     }
@@ -134,7 +135,7 @@ internal fun AiAgentsContent(
                             enabled = npub != null,
                             explanation = stringResource(R.string.explanation_organize_ai_copy_public_key),
                             leading = {
-                                Icon(painterResource(R.drawable.ic_content_copy), contentDescription = null)
+                                SettingsLeadingIcon(R.drawable.ic_content_copy)
                             },
                         )
                     }
@@ -146,6 +147,7 @@ internal fun AiAgentsContent(
                             modifier = Modifier.testTag("ai_agents.docs"),
                             subtitle = stringResource(R.string.ai_agents_connector_docs_subtitle),
                             explanation = stringResource(R.string.explanation_organize_ai_docs),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_menu_book) },
                         )
                     }
                 }

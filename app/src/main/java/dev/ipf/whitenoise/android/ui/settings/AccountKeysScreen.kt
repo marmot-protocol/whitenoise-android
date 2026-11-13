@@ -590,10 +590,7 @@ private fun ProfileKeysList(
                             explanation = stringResource(R.string.explanation_account_keys_copy_private),
                             onClick = onCopyPrivate,
                             leading = {
-                                Icon(
-                                    painter = painterResource(copyGlyph(copied)),
-                                    contentDescription = null,
-                                )
+                                SettingsLeadingIcon(copyGlyph(copied))
                             },
                         )
                     }
@@ -612,7 +609,7 @@ private fun ProfileKeysList(
                             explanation = stringResource(R.string.explanation_account_keys_export_encrypted),
                             onClick = onExportEncrypted,
                             enabled = exportsEnabled,
-                            leading = { Icon(painterResource(R.drawable.ic_lock), contentDescription = null) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_lock) },
                         )
                     }
                     row("export_raw") { context ->
@@ -623,7 +620,7 @@ private fun ProfileKeysList(
                             onClick = onExportRaw,
                             modifier = Modifier.testTag("profile_keys.export_raw"),
                             enabled = exportsEnabled,
-                            leading = { Icon(painterResource(R.drawable.ic_download), contentDescription = null) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_download) },
                         )
                     }
                 }
@@ -639,6 +636,9 @@ private fun ProfileKeysList(
                         explanation = stringResource(R.string.explanation_account_keys_sign_out),
                         onClick = onSignOut,
                         modifier = Modifier.testTag("profile_keys.sign_out"),
+                        leading = {
+                            SettingsLeadingIcon(R.drawable.ic_settings_logout, tint = MaterialTheme.colorScheme.error)
+                        },
                     )
                 }
             }
@@ -655,11 +655,7 @@ private fun ProfileKeysList(
                             modifier = Modifier.testTag(WIPE_ACTION_TAG),
                             destructive = true,
                             leading = {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_delete),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
+                                SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
                             },
                         )
                     }

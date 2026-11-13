@@ -216,6 +216,7 @@ private fun EmojiSetBrowser(
                         explanation = stringResource(R.string.explanation_organize_emoji_set),
                         enabled = !state.busy,
                         onClick = { onShow(set) },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_category) },
                     )
                 }
             }

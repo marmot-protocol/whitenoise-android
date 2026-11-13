@@ -49,6 +49,7 @@ internal fun ChatContextMenu(
     onLeaveAndDelete: (() -> Unit)? = null,
     onExcludeFromFolder: (() -> Unit)? = null,
     onAbandon: ChatAbandonMenuAction? = null,
+    historyDeleteBlocked: Boolean = false,
 ) {
     val items =
         buildList {
@@ -118,9 +119,10 @@ internal fun ChatContextMenu(
                     },
                 )
             }
-            // A chat the account still receives offers the forget below instead: a history-only delete there
-            // returns with the next message, so it is offered only once nothing more can arrive.
-            if (onAbandon == null && actions?.canDeleteLocal != false) {
+            // A chat the account still receives never offers a history-only delete: it returns with the next
+            // message, so it is offered only once nothing more can arrive. [historyDeleteBlocked] says so even where
+            // no forget is offered (groups), and a passed [onAbandon] blocks it on its own.
+            if (onAbandon == null && !historyDeleteBlocked && actions?.canDeleteLocal != false) {
                 add(
                     chatMenuItem(
                         R.string.delete_from_device,
@@ -138,7 +140,8 @@ internal fun ChatContextMenu(
                     },
                 )
             }
-            // #3310: local abandonment stays distinct from leaving.
+            // #3310: local abandonment stays distinct from leaving. The chat list passes it for direct chats only;
+            // a group is reset from Group Details.
             if (onAbandon != null) {
                 add(
                     chatMenuItem(

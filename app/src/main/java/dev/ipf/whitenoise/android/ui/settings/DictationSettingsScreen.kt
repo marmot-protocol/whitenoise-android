@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -19,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -98,7 +96,7 @@ internal fun DictationSettingsScreen(
                                     osttOpenFailed = !openOfflineSpeechToTextListing(context)
                                 },
                                 leading = {
-                                    Icon(painterResource(R.drawable.ic_download), contentDescription = null)
+                                    SettingsLeadingIcon(R.drawable.ic_download)
                                 },
                                 explanation = stringResource(R.string.explanation_appearance_dictation_ostt),
                             )
@@ -126,6 +124,7 @@ internal fun DictationSettingsScreen(
                             value =
                                 preferences.providerSelection?.let { "${it.appName} — ${it.engineName}" }
                                     ?: stringResource(R.string.dictation_provider_automatic),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_graphic_eq) },
                         )
                     }
                     row("pause_other_audio") { context ->
@@ -137,6 +136,7 @@ internal fun DictationSettingsScreen(
                             modifier = Modifier.testTag("dictation.pause_other_audio"),
                             subtitle = stringResource(R.string.dictation_pause_other_audio_subtitle),
                             explanation = stringResource(R.string.explanation_appearance_dictation_pause_other_audio),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_pause) },
                         )
                     }
                     row("finish") { context ->
@@ -146,6 +146,7 @@ internal fun DictationSettingsScreen(
                             onClick = { picker = DictationSetting.Finish },
                             explanation = stringResource(R.string.explanation_appearance_dictation_finish),
                             value = dictationFinishLabel(preferences.finishAfterSilenceMillis),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_timer_off) },
                         )
                     }
                     // Only automatic completion consults this, so it has nothing to say while
@@ -158,6 +159,7 @@ internal fun DictationSettingsScreen(
                                 onClick = { picker = DictationSetting.Result },
                                 explanation = stringResource(R.string.explanation_appearance_dictation_result),
                                 value = stringResource(dictationDeliveryLabel(preferences.silenceDeliveryMode)),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_input) },
                             )
                         }
                     }
@@ -177,7 +179,7 @@ internal fun DictationSettingsScreen(
                             context = rowContext,
                             title = stringResource(R.string.speech_android_settings),
                             onClick = { settingsFailed = !openVoiceInputSettings(context) },
-                            leading = { Icon(painterResource(R.drawable.ic_mic), contentDescription = null) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                             explanation = stringResource(R.string.explanation_appearance_dictation_android_settings),
                         )
                     }

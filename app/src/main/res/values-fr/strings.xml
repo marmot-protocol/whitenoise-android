@@ -346,7 +346,6 @@
     <string name="add_member_already_in_group">%1$s est déjà dans ce groupe</string>
     <string name="large_group_invite_warning_title">Grand groupe</string>
     <string name="large_group_invite_warning_message">Dans les groupes de 150 membres ou plus, les invitations supplémentaires risquent de ne pas être distribuées de manière fiable.</string>
-    <string name="large_group_invite_confirm_title">Inviter dans un grand groupe ?</string>
     <string name="large_group_invite_confirm_message">Dans les groupes de 150 membres ou plus, les invitations supplémentaires risquent de ne pas être distribuées de manière fiable. Vous pouvez tout de même continuer.</string>
     <string name="invite_pending">Invitation en attente : %1$s</string>
     <string name="member_removal_pending">Retrait en attente : %1$s</string>
@@ -1305,8 +1304,6 @@
     <string name="voice_message_recording_failed">Impossible d’enregistrer le message vocal</string>
     <string name="voice_message_microphone_busy">Le microphone est utilisé par une autre application. Fermez-la, puis réessayez.</string>
     <string name="transcribe_audio">Transcrire</string>
-    <string name="audio_transcription_title">Transcription audio</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text traitera cet enregistrement sur votre appareil à l’aide de son modèle de reconnaissance vocale installé. White Noise n’enregistre pas le microphone et n’envoie aucun message. Le texte généré peut être inexact et sera effacé lorsque vous le fermerez ou quitterez cet écran.</string>
     <string name="audio_transcription_working">Transcription de l’enregistrement sur cet appareil…</string>
     <string name="audio_transcription_generated">Transcription générée · ce n’est pas le texte de l’expéditeur</string>
     <string name="audio_transcription_android_version">La transcription d’enregistrements nécessite Android 13 ou une version ultérieure.</string>

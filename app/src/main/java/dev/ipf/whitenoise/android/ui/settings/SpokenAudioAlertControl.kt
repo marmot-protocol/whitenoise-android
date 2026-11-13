@@ -44,6 +44,7 @@ internal fun SpokenAudioAlertSwitch(
                 onCheckedChange = onCheckedChange,
                 modifier = Modifier.testTag("notification-quiet-spoken-audio"),
                 explanation = stringResource(R.string.explanation_appearance_spoken_audio_alert),
+                leading = { SettingsLeadingIcon(R.drawable.ic_podcasts) },
             )
         }
     }

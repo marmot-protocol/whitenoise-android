@@ -95,6 +95,7 @@ internal fun NotificationToneControl() {
                             }.onFailure { previewErrors = previewErrors + tone }
                         }
                     },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_play_arrow) },
                 )
             }
         }
@@ -126,6 +127,7 @@ internal fun NotificationToneControl() {
                         }
                     }
                 },
+                leading = { SettingsLeadingIcon(R.drawable.ic_playlist_add) },
             )
         }
     }

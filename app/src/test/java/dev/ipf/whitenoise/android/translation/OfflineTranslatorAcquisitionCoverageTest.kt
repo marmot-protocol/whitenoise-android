@@ -52,7 +52,7 @@ class OfflineTranslatorAcquisitionCoverageTest {
         assertEquals(OFFLINE_TRANSLATOR_SIGNER, offlineTranslatorZapstoreRelease.signer)
     }
 
-    /** Settings, chat settings and message recovery all hand off through the shared action and helper. */
+    /** Settings and chat settings both hand off through the shared action and helper. */
     @Test
     fun everyEntryPointUsesTheSharedAcquisitionRoute() {
         val settings = source("TranslationSettings.kt")
@@ -61,10 +61,6 @@ class OfflineTranslatorAcquisitionCoverageTest {
             val call = "OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })"
             assertTrue(entry, body.mentions(call))
         }
-        val form = source("MessageTranslationForm.kt").functionBody("MessageTranslationForm")
-        assertTrue(form.mentions("OfflineTranslatorEngineAction(onOpen = onOpenEngine)"))
-        val dialog = source("MessageTranslationControls.kt").functionBody("MessageTranslationDialog")
-        assertTrue(dialog.mentions("onOpenEngine = { openOfflineTranslator(context) }"))
         for (file in translationSources().filter { it.name != "OfflineTranslatorAcquisition.kt" }) {
             val text = file.readText()
             assertFalse("${file.name} opens its own route", "ACTION_VIEW" in text || "startActivity(" in text)

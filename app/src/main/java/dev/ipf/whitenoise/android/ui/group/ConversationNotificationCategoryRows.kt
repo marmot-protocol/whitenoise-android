@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.group
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Icon
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategory
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -85,11 +87,27 @@ internal fun ConversationNotificationCategoriesList(
                             Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null)
                         }
                     },
+                    leading = { SettingsLeadingIcon(notificationChannelIcon(setting.channel)) },
                 )
             }
         }
     }
 }
+
+/** One glyph per channel, shared by the global and per-conversation category lists. */
+@DrawableRes
+internal fun notificationChannelIcon(channel: NotificationChannelSpec): Int =
+    when (channel) {
+        NotificationChannelSpec.DIRECT_MESSAGES -> R.drawable.ic_person
+        NotificationChannelSpec.GROUP_MESSAGES -> R.drawable.ic_group
+        NotificationChannelSpec.MENTIONS -> R.drawable.ic_alternate_email
+        NotificationChannelSpec.REACTIONS -> R.drawable.ic_add_reaction
+        NotificationChannelSpec.INVITES -> R.drawable.ic_group_add
+        NotificationChannelSpec.GROUP_MEMBERSHIP -> R.drawable.ic_supervisor_account
+        NotificationChannelSpec.AGENT_ACTIVITY -> R.drawable.ic_ai_agents
+        NotificationChannelSpec.APP_UPDATES -> R.drawable.ic_system_update
+        NotificationChannelSpec.USER_EVENT_SUMMARY -> R.drawable.ic_summarize
+    }
 
 @Composable
 internal fun notificationChannelTitle(parent: NotificationChannelSpec): String =

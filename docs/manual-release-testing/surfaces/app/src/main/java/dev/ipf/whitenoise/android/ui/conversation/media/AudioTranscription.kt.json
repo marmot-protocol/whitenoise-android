@@ -12,9 +12,17 @@
         ]
       },
       {
-        "surface": "AudioTranscriptDialog",
+        "surface": "AudioTranscriptionToggle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "fun AudioTranscriptDialog(",
+        "anchor": "fun AudioTranscriptionToggle(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "AudioTranscribeDisc",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun AudioTranscribeDisc(",
         "test_ids": [
           "MED-038"
         ]
@@ -28,9 +36,9 @@
         ]
       },
       {
-        "surface": "AudioTranscriptConfirm",
+        "surface": "AudioTranscriptResult",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "fun AudioTranscriptConfirm(",
+        "anchor": "fun AudioTranscriptResult(",
         "test_ids": [
           "MED-038"
         ]
@@ -38,25 +46,9 @@
     ],
     "settings_controls": [
       {
-        "surface": "Transcribe audio action",
+        "surface": "Side Transcribe disc",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "R.string.transcribe_audio",
-        "test_ids": [
-          "MED-038"
-        ]
-      },
-      {
-        "surface": "Transcript heading",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "R.string.audio_transcription_title",
-        "test_ids": [
-          "MED-038"
-        ]
-      },
-      {
-        "surface": "Provider disclosure",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "R.string.audio_transcription_disclosure",
         "test_ids": [
           "MED-038"
         ]
@@ -166,17 +158,9 @@
         ]
       },
       {
-        "surface": "Cancel or close transcription",
+        "surface": "Transcribe icon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "R.string.cancel",
-        "test_ids": [
-          "MED-038"
-        ]
-      },
-      {
-        "surface": "Close transcript",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "R.string.close",
+        "anchor": "R.drawable.ic_subtitles",
         "test_ids": [
           "MED-038"
         ]

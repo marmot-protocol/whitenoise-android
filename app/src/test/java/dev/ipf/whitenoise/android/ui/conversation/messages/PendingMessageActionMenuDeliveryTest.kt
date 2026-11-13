@@ -18,7 +18,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -26,7 +25,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.reconcileSuccessfulTextSend
 import dev.ipf.whitenoise.android.ui.conversation.TimelineRow
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -284,7 +282,6 @@ private fun PendingMenuTimelineRowHost(
                 onMeasured = { _, _ -> },
                 appState = surface.appState,
                 controller = surface.controller,
-                composerTextState = ComposerTextState(TextFieldValue("")),
                 highlighted = false,
                 selectionMode = false,
                 textSelectionMode = false,
@@ -306,9 +303,6 @@ private fun PendingMenuTimelineRowHost(
                 onQuickReactionsSave = {},
                 onReplyPreviewClick = {},
                 composerGate = ComposerGate.COMPOSER,
-                onBack = {},
-                mentionCandidates = emptyList(),
-                mentionPickerEnabled = false,
                 collapseLongMessages = false,
             )
         }

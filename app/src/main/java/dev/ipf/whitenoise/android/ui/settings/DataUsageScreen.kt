@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -73,6 +74,15 @@ private val DownloadMediaOrder =
         MediaAutoDownloadType.Document,
     )
 
+private val MediaAutoDownloadType.iconRes: Int
+    @DrawableRes get() =
+        when (this) {
+            MediaAutoDownloadType.Image -> R.drawable.ic_image
+            MediaAutoDownloadType.Audio -> R.drawable.ic_headphones
+            MediaAutoDownloadType.Video -> R.drawable.ic_videocam
+            MediaAutoDownloadType.Document -> R.drawable.ic_draft
+        }
+
 /**
  * Data Usage: the Manage storage entry, one row per media type listing the networks that may download it (a dialog
  * of switches that write the account's matrix immediately, M105), Reset download settings, the automatic download
@@ -111,6 +121,7 @@ internal fun DataUsageScreen(
                             onClick = onOpenManageStorage,
                             modifier = Modifier.testTag("data_usage.manage_storage"),
                             explanation = stringResource(R.string.explanation_privacy_data_manage_storage),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_hard_drive) },
                         )
                     }
                 }
@@ -131,6 +142,7 @@ internal fun DataUsageScreen(
                                         .joinToString()
                                         .ifEmpty { stringResource(R.string.download_never) },
                                 explanation = stringResource(R.string.explanation_privacy_data_media_type),
+                                leading = { SettingsLeadingIcon(type.iconRes) },
                             )
                         }
                     }
@@ -142,6 +154,7 @@ internal fun DataUsageScreen(
                             subtitle = stringResource(R.string.download_reset_help),
                             enabled = matrix != MediaAutoDownloadMatrix.DEFAULT,
                             explanation = stringResource(R.string.explanation_privacy_data_reset),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
                         )
                     }
                 }
@@ -168,6 +181,7 @@ internal fun DataUsageScreen(
                                         R.string.explanation_privacy_data_queue_stop
                                     },
                                 ),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_restart_alt) },
                         )
                     }
                 }
@@ -182,6 +196,7 @@ internal fun DataUsageScreen(
                             onClick = { qualityPicker = true },
                             value = qualityLabels.getValue(appState.mediaQuality),
                             explanation = stringResource(R.string.explanation_privacy_data_quality),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_high_quality) },
                         )
                     }
                 }
@@ -220,6 +235,7 @@ internal fun DataUsageScreen(
                                     }
                                 }
                             },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_imagesmode) },
                         )
                     }
                 }
