@@ -12,17 +12,25 @@
         ]
       },
       {
-        "surface": "AudioTranscriptInline",
+        "surface": "AudioTranscriptionToggle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "fun AudioTranscriptInline(",
+        "anchor": "fun AudioTranscriptionToggle(",
         "test_ids": [
           "MED-038"
         ]
       },
       {
-        "surface": "AudioTranscribeToggle",
+        "surface": "AudioTranscribeDisc",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-        "anchor": "fun AudioTranscribeToggle(",
+        "anchor": "fun AudioTranscribeDisc(",
+        "test_ids": [
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "AudioTranscriptBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+        "anchor": "fun AudioTranscriptBody(",
         "test_ids": [
           "MED-038"
         ]
@@ -38,7 +46,7 @@
     ],
     "settings_controls": [
       {
-        "surface": "Inline Transcribe toggle",
+        "surface": "Side Transcribe disc",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
         "anchor": "R.string.transcribe_audio",
         "test_ids": [

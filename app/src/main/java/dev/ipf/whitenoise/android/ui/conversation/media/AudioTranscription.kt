@@ -3,38 +3,29 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -48,6 +39,10 @@ import dev.ipf.whitenoise.android.audio.AttachmentSpeechFailure
 import dev.ipf.whitenoise.android.audio.transcribeAttachment
 import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
+import dev.ipf.whitenoise.android.translation.MessageSideDisc
+import dev.ipf.whitenoise.android.translation.MessageSideDiscIcon
+import dev.ipf.whitenoise.android.translation.MessageSideDiscProgress
+import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.settings.openOfflineSpeechToTextListing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -67,19 +62,68 @@ internal data class AudioTranscriptUi(
     val failure: AttachmentSpeechFailure = AttachmentSpeechFailure.RECOGNITION_FAILED,
 )
 
+/** One attachment's contribution to its message's transcribe disc. */
+private data class AudioTranscriptSlot(
+    val ready: Boolean,
+    val working: Boolean,
+)
+
 /**
- * One tap transcribes the received recording on this device and shows the text inline beneath the
- * voice row; a second tap hides it and cancels pending work. Transcripts belong to the mounted
- * attachment and never enter the message store or composer.
+ * The per-message switch behind the side transcribe disc. Each received recording registers whether its file is
+ * ready and whether work is in flight; the disc shows when any recording is registered and drives them all.
+ */
+@Stable
+internal class AudioTranscriptionToggleState {
+    var requested by mutableStateOf(false)
+    private val slots = mutableStateMapOf<Any, AudioTranscriptSlot>()
+
+    val present: Boolean get() = slots.isNotEmpty()
+    val enabled: Boolean get() = slots.values.any { it.ready }
+    val working: Boolean get() = slots.values.any { it.working }
+
+    fun register(
+        key: Any,
+        ready: Boolean,
+        working: Boolean,
+    ) {
+        slots[key] = AudioTranscriptSlot(ready, working)
+    }
+
+    fun unregister(key: Any) {
+        slots.remove(key)
+    }
+}
+
+/**
+ * Transcribes the received recording on this device while the message's side disc is on, and shows the text
+ * directly beneath the voice row; turning the disc off hides it and cancels pending work. Transcripts belong to
+ * the mounted attachment and never enter the message store or composer.
  */
 @Composable
-internal fun ReceivedAudioTranscription(file: File?) {
+internal fun ReceivedAudioTranscription(
+    file: File?,
+    toggle: AudioTranscriptionToggleState,
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val slotKey = remember { Any() }
     var ui by remember(file) { mutableStateOf<AudioTranscriptUi?>(null) }
     var request by remember(file) { mutableStateOf<Job?>(null) }
     var listingFailed by remember { mutableStateOf(false) }
     val working = ui?.phase == AudioTranscriptPhase.WORKING
+
+    LaunchedEffect(toggle, file != null, working) { toggle.register(slotKey, file != null, working) }
+    DisposableEffect(toggle) { onDispose { toggle.unregister(slotKey) } }
+
+    LaunchedEffect(toggle.requested, file) {
+        listingFailed = false
+        if (!toggle.requested) {
+            request?.cancel()
+            ui = null
+        } else if (file != null && ui == null) {
+            ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING)
+        }
+    }
 
     DisposableEffect(lifecycle, file) {
         val observer =
@@ -87,6 +131,7 @@ internal fun ReceivedAudioTranscription(file: File?) {
                 if (event == Lifecycle.Event.ON_STOP) {
                     request?.cancel()
                     ui = null
+                    toggle.requested = false
                 }
             }
         lifecycle.addObserver(observer)
@@ -106,19 +151,9 @@ internal fun ReceivedAudioTranscription(file: File?) {
         ui = result
     }
 
-    AudioTranscriptInline(
+    AudioTranscriptBody(
         state = ui,
-        enabled = file != null,
         listingError = if (listingFailed) stringResource(R.string.dictation_ostt_recommendation_open_failed) else null,
-        onToggle = { show ->
-            listingFailed = false
-            if (show) {
-                ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING)
-            } else {
-                request?.cancel()
-                ui = null
-            }
-        },
         onRetry = {
             listingFailed = false
             ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING)
@@ -148,72 +183,72 @@ private suspend fun loadAudioTranscript(
     }
 }
 
-/**
- * Stateless inline presentation: a compact Transcribe toggle (spinner while working) and, when on,
- * the generated transcript or failure guidance directly beneath it inside the bubble.
- */
+/** The message's side transcribe disc; it emits nothing until a received recording registers with [toggle]. */
 @Composable
-internal fun AudioTranscriptInline(
-    state: AudioTranscriptUi?,
+internal fun AudioTranscriptionToggle(
+    toggle: AudioTranscriptionToggleState?,
+    modifier: Modifier = Modifier,
+) {
+    if (toggle == null || !toggle.present) return
+    AudioTranscribeDisc(
+        on = toggle.requested,
+        working = toggle.requested && toggle.working,
+        enabled = toggle.enabled,
+        onToggle = { toggle.requested = it },
+        modifier = modifier,
+    )
+}
+
+/** Stateless transcribe disc: the translate disc's shape and colors, with a spinner while work is in flight. */
+@Composable
+internal fun AudioTranscribeDisc(
+    on: Boolean,
+    working: Boolean,
     enabled: Boolean,
     onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    MessageSideDisc(
+        on = on,
+        description = stringResource(R.string.transcribe_audio),
+        onToggle = onToggle,
+        enabled = enabled,
+        stateDescription = if (working) stringResource(R.string.audio_transcription_working) else null,
+        modifier = modifier.testTag(AUDIO_TRANSCRIBE_TEST_TAG),
+    ) {
+        if (working) MessageSideDiscProgress() else MessageSideDiscIcon(R.drawable.ic_subtitles)
+    }
+}
+
+/**
+ * Stateless in-bubble result: the transcript as plain body text, or compact failure guidance. Nothing renders
+ * while the disc is off or work is in flight, so the voice row stays as tight as before.
+ */
+@Composable
+internal fun AudioTranscriptBody(
+    state: AudioTranscriptUi?,
     onRetry: () -> Unit,
     onGetProvider: () -> Unit,
     modifier: Modifier = Modifier,
     listingError: String? = null,
 ) {
-    Column(modifier = modifier) {
-        AudioTranscribeToggle(state, enabled, onToggle)
-        if (state != null && state.phase != AudioTranscriptPhase.WORKING) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier =
-                    Modifier
-                        .padding(start = 4.dp, end = 4.dp, bottom = 4.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite }
-                        .testTag(AUDIO_TRANSCRIPT_TEST_TAG),
-            ) {
-                AudioTranscriptResult(state, listingError, onRetry, onGetProvider)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AudioTranscribeToggle(
-    state: AudioTranscriptUi?,
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    val on = state != null
-    val working = state?.phase == AudioTranscriptPhase.WORKING
-    val accent = if (on) MaterialTheme.colorScheme.primary else LocalContentColor.current
-    val workingDescription = stringResource(R.string.audio_transcription_working)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    if (state == null || state.phase == AudioTranscriptPhase.WORKING) return
+    val generated = stringResource(R.string.audio_transcription_generated)
+    Column(
         modifier =
-            Modifier
-                .minimumInteractiveComponentSize()
-                .clip(CircleShape)
-                .toggleable(value = on, enabled = enabled, role = Role.Switch, onValueChange = onToggle)
-                .semantics { if (working) stateDescription = workingDescription }
-                .heightIn(min = 32.dp)
-                .padding(horizontal = 8.dp)
-                .testTag(AUDIO_TRANSCRIBE_TEST_TAG),
+            modifier
+                .widthIn(max = ConversationMessageMetrics.RichContentCanvasWidth)
+                .padding(
+                    start = ConversationMessageMetrics.RichTextHorizontalAdjustment,
+                    end = ConversationMessageMetrics.RichTextHorizontalAdjustment,
+                    top = ConversationMessageMetrics.RichContentSpacing,
+                    bottom = ConversationMessageMetrics.RichTextBottomAdjustment,
+                ).semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    if (state.phase == AudioTranscriptPhase.COMPLETE) stateDescription = generated
+                }.testTag(AUDIO_TRANSCRIPT_TEST_TAG),
     ) {
-        val tint = if (enabled) accent else accent.copy(alpha = 0.38f)
-        if (working) {
-            CircularProgressIndicator(strokeWidth = 2.dp, color = tint, modifier = Modifier.size(16.dp))
-        } else {
-            Icon(
-                painterResource(R.drawable.ic_subtitles),
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-        Text(stringResource(R.string.transcribe_audio), style = MaterialTheme.typography.labelLarge, color = tint)
+        AudioTranscriptResult(state, listingError, onRetry, onGetProvider)
     }
 }
 
@@ -224,31 +259,32 @@ private fun AudioTranscriptResult(
     onRetry: () -> Unit,
     onGetProvider: () -> Unit,
 ) {
-    val secondary = LocalContentColor.current.copy(alpha = 0.7f)
     when (state.phase) {
-        AudioTranscriptPhase.COMPLETE -> {
-            SelectionContainer { Text(state.text, style = MaterialTheme.typography.bodyMedium) }
-            Text(
-                stringResource(R.string.audio_transcription_generated),
-                style = MaterialTheme.typography.labelSmall,
-                color = secondary,
-            )
-        }
+        AudioTranscriptPhase.COMPLETE ->
+            SelectionContainer { Text(state.text, style = MaterialTheme.typography.bodyLarge) }
         AudioTranscriptPhase.FAILED -> {
             Text(
                 stringResource(transcriptionFailureText(state.failure)),
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
             val needsProvider =
                 state.failure == AttachmentSpeechFailure.PROVIDER_MISSING ||
                     state.failure == AttachmentSpeechFailure.PROVIDER_OUTDATED
-            if (needsProvider) {
-                TextButton(onClick = onGetProvider) {
-                    Text(stringResource(R.string.dictation_ostt_recommendation_title))
+            val action =
+                when {
+                    needsProvider -> R.string.dictation_ostt_recommendation_title to onGetProvider
+                    state.failure != AttachmentSpeechFailure.ANDROID_VERSION -> R.string.retry to onRetry
+                    else -> null
                 }
-            } else if (state.failure != AttachmentSpeechFailure.ANDROID_VERSION) {
-                TextButton(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            action?.let { (label, onClick) ->
+                TextButton(
+                    onClick = onClick,
+                    contentPadding = PaddingValues(horizontal = 0.dp),
+                    // A pill clips wrapped labels that start flush with the transcript text.
+                    shape = MaterialTheme.shapes.extraSmall,
+                    modifier = Modifier.heightIn(min = 40.dp),
+                ) { Text(stringResource(label)) }
             }
             if (listingError != null) {
                 Text(listingError, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)

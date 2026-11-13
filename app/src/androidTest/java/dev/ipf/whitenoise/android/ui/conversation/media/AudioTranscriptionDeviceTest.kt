@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -33,7 +35,13 @@ class AudioTranscriptionDeviceTest {
                 file.outputStream().use { output -> input.copyTo(output) }
             }
             composeRule.setContent {
-                WhiteNoiseTheme { ReceivedAudioTranscription(file) }
+                WhiteNoiseTheme {
+                    val toggle = remember { AudioTranscriptionToggleState() }
+                    Column {
+                        AudioTranscriptionToggle(toggle)
+                        ReceivedAudioTranscription(file, toggle)
+                    }
+                }
             }
             // One tap starts recognition inline; no confirmation dialog intervenes.
             composeRule.onNodeWithTag("audio.transcribe").performClick()

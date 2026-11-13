@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -33,7 +35,13 @@ class AudioTranscriptionProviderDeviceTest {
         assertTrue("This fixture requires OSTT older than 0.21.0", provider.longVersionCode < 58L)
         val absent = File(context.cacheDir, "absent-audio-${System.nanoTime()}.ogg")
         composeRule.setContent {
-            WhiteNoiseTheme { ReceivedAudioTranscription(absent) }
+            WhiteNoiseTheme {
+                val toggle = remember { AudioTranscriptionToggleState() }
+                Column {
+                    AudioTranscriptionToggle(toggle)
+                    ReceivedAudioTranscription(absent, toggle)
+                }
+            }
         }
         composeRule.onNodeWithTag("audio.transcribe").performClick()
         val explanation = context.getString(R.string.audio_transcription_provider_outdated)

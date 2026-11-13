@@ -9,7 +9,7 @@ import dev.ipf.whitenoise.android.ui.ChatLinkAccountChoice
 import dev.ipf.whitenoise.android.ui.ChatLinkAccountChooserDialog
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMembersReviewDialog
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
-import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptInline
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscribeDisc
 import dev.ipf.whitenoise.android.ui.navigation.TtsReturnTransitionScreen
 import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateDialog
 
@@ -19,15 +19,14 @@ import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateDialog
 internal fun MaestroBoundaryPresentation(fixture: MaestroPresentationFixture) {
     when (fixture.scenario) {
         "audio-transcript-toggle" ->
-            AudioTranscriptInline(
-                state = null,
+            AudioTranscribeDisc(
+                on = false,
+                working = false,
                 enabled = true,
                 onToggle = { show ->
                     check(show)
                     fixture.finish("show")
                 },
-                onRetry = { error("Toggle fixture must not retry transcription") },
-                onGetProvider = { error("Toggle fixture must not request provider listing") },
             )
         "tts-trust-cancel", "tts-trust-proceed" ->
             TtsTrustWarningDialog(

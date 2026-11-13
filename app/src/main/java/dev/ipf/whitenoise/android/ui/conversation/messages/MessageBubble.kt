@@ -679,6 +679,16 @@ internal fun MessageBubble(
     val editState = controller.editsByTarget[record.messageIdHex]
     var translationDialogOpen by remember(controller, record.messageIdHex) { mutableStateOf(false) }
     var translationTarget by remember(controller, record.messageIdHex) { mutableStateOf<String?>(null) }
+    // A received voice message's side transcribe disc drives every recording in this bubble.
+    val audioTranscription =
+        if (mine) {
+            null
+        } else {
+            remember(record.messageIdHex) {
+                dev.ipf.whitenoise.android.ui.conversation.media
+                    .AudioTranscriptionToggleState()
+            }
+        }
     val translationSource =
         dev.ipf.whitenoise.android.translation.rememberMessageTranslationSource(
             messageId = record.messageIdHex,
@@ -1977,14 +1987,15 @@ internal fun MessageBubble(
                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                 )
             }
-            // The translate toggle sits in the bubble's empty opposite gutter, bottom-aligned with the
-            // bubble surface, and follows the swipe offset so it moves with the bubble.
+            // The side discs sit in the bubble's empty opposite gutter, bottom-aligned with the bubble
+            // surface, and follow the swipe offset so they move with the bubble. A received voice message
+            // stacks its transcribe disc above the translate disc; the column is empty when neither applies.
             val translationToggle: @Composable () -> Unit = {
-                dev.ipf.whitenoise.android.translation.MessageTranslationToggle(
-                    source = translationSource,
+                val slot =
+                    Modifier.width(dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth)
+                Column(
                     modifier =
                         Modifier
-                            .width(dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth)
                             .then(
                                 if (bubbleColumnAlignsByBottom) {
                                     Modifier.alignBy { it.measuredHeight }
@@ -1994,7 +2005,13 @@ internal fun MessageBubble(
                             ).absoluteOffset {
                                 IntOffset((replySwipe.displayedDistance * swipeDirection).roundToInt(), 0)
                             },
-                )
+                    verticalArrangement =
+                        Arrangement.spacedBy(dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing),
+                ) {
+                    dev.ipf.whitenoise.android.ui.conversation.media
+                        .AudioTranscriptionToggle(audioTranscription, slot)
+                    dev.ipf.whitenoise.android.translation.MessageTranslationToggle(translationSource, slot)
+                }
             }
             if (mine && !selectionMode) translationToggle()
             Column(
@@ -2678,6 +2695,7 @@ internal fun MessageBubble(
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
                                                 expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
+                                                audioTranscription = audioTranscription,
                                             )
                                         }
                                     }
@@ -2766,6 +2784,7 @@ internal fun MessageBubble(
                                                 focusedPreview = isActionMenuOpen,
                                                 hasCaption = mediaCaption != null,
                                                 expandNarrowVisualToStandardWidth = expandCaptionedNarrowVisual,
+                                                audioTranscription = audioTranscription,
                                             )
                                         }
                                     }

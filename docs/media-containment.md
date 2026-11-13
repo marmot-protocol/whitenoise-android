@@ -60,7 +60,7 @@ decoder preparation. Closing the writer after successful decoder EOF completes
 the utterance. Decode/feed errors and unrecognized audio cannot
 produce a successful partial transcript. The provider owns its downloaded model;
 White Noise neither captures microphone audio nor falls back to another recognizer.
-Transcripts remain transient inline bubble state and are cleared when toggled off, on background,
+Transcripts remain transient in-bubble state toggled from the side Transcribe disc and are cleared when toggled off, on background,
 source disposal or account/chat replacement. This path does not add MDK persistence
 or claim isolation of the external recognition provider. Run `MED-038` against the exact provider
 and candidate APK; source contracts alone do not prove recognition compatibility.

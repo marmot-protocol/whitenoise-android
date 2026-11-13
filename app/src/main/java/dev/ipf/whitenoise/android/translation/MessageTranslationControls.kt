@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -34,6 +35,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
@@ -81,10 +83,13 @@ internal fun rememberMessageTranslationSource(
 
 /** Width of the toggle slot in the bubble's otherwise empty gutter; the slot is only as tall as the disc. */
 internal val MessageTranslationToggleSlotWidth = 48.dp
-private val MessageTranslationToggleDiscSize = 28.dp
-private val MessageTranslationToggleIconSize = 18.dp
-private val MessageTranslationPendingRingSize = 18.dp
-private val MessageTranslationPendingRingStroke = 2.dp
+
+/** Vertical gap between stacked side discs, such as transcribe above translate. */
+internal val MessageSideDiscSpacing = 4.dp
+private val MessageSideDiscSize = 28.dp
+private val MessageSideDiscIconSize = 18.dp
+private val MessageSidePendingRingSize = 18.dp
+private val MessageSidePendingRingStroke = 2.dp
 
 /**
  * The side control for a translated message: a progress ring while work is pending, otherwise a translate disc
@@ -99,68 +104,103 @@ internal fun MessageTranslationToggle(
     val session = LocalConversationTranslation.current
     if (session == null || source == null) return
     val rendition = session.renditions[source]
-    val pending = session.isPending(source)
-    if (pending) {
-        MessageTranslationPendingRing(modifier)
+    if (session.isPending(source)) {
+        MessageSidePendingRing(
+            description = stringResource(R.string.translation_loading),
+            modifier = modifier.testTag(MESSAGE_TRANSLATION_PENDING_TEST_TAG),
+        )
     } else if (rendition != null) {
-        val translated = rendition.showTranslation
-        val description = stringResource(R.string.translation_title)
-        val outline = amoledOutlineBorder()
-        val colors = MaterialTheme.colorScheme
-        Box(
-            modifier =
-                modifier
-                    .testTag(MESSAGE_TRANSLATION_TOGGLE_TEST_TAG)
-                    .toggleable(
-                        value = translated,
-                        role = Role.Switch,
-                        onValueChange = { session.toggle(source) },
-                    ).semantics { contentDescription = description },
-            contentAlignment = Alignment.Center,
+        MessageSideDisc(
+            on = rendition.showTranslation,
+            description = stringResource(R.string.translation_title),
+            onToggle = { session.toggle(source) },
+            modifier = modifier.testTag(MESSAGE_TRANSLATION_TOGGLE_TEST_TAG),
         ) {
-            Surface(
-                modifier = Modifier.size(MessageTranslationToggleDiscSize),
-                shape = CircleShape,
-                color =
-                    when {
-                        translated -> colors.primary
-                        outline != null -> colors.surface
-                        else -> Color.Transparent
-                    },
-                contentColor = if (translated) colors.onPrimary else colors.onSurfaceVariant,
-                border = if (translated) null else outline ?: BorderStroke(1.dp, colors.outline),
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_translate),
-                        contentDescription = null,
-                        modifier = Modifier.size(MessageTranslationToggleIconSize),
-                    )
-                }
-            }
+            MessageSideDiscIcon(R.drawable.ic_translate)
+        }
+    }
+}
+
+/**
+ * One gutter switch shared by translation and transcription: a filled disc when on, an outlined disc when off.
+ * [stateDescription] lets a disc announce in-flight work while staying tappable to cancel it.
+ */
+@Composable
+internal fun MessageSideDisc(
+    on: Boolean,
+    description: String,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    stateDescription: String? = null,
+    content: @Composable () -> Unit,
+) {
+    val outline = amoledOutlineBorder()
+    val colors = MaterialTheme.colorScheme
+    val contentColor = if (on) colors.onPrimary else colors.onSurfaceVariant
+    Box(
+        modifier =
+            modifier
+                .toggleable(value = on, enabled = enabled, role = Role.Switch, onValueChange = onToggle)
+                .semantics {
+                    contentDescription = description
+                    stateDescription?.let { this.stateDescription = it }
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.size(MessageSideDiscSize),
+            shape = CircleShape,
+            color =
+                when {
+                    on -> colors.primary
+                    outline != null -> colors.surface
+                    else -> Color.Transparent
+                },
+            contentColor = if (enabled) contentColor else contentColor.copy(alpha = DISABLED_ALPHA),
+            border = if (on) null else outline ?: BorderStroke(1.dp, colors.outline),
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
         }
     }
 }
 
 @Composable
-private fun MessageTranslationPendingRing(modifier: Modifier) {
-    val loading = stringResource(R.string.translation_loading)
+internal fun MessageSideDiscIcon(icon: Int) {
+    Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(MessageSideDiscIconSize))
+}
+
+/** The in-disc spinner for work that the same disc can still cancel. */
+@Composable
+internal fun MessageSideDiscProgress() {
+    CircularProgressIndicator(
+        modifier = Modifier.size(MessageSidePendingRingSize),
+        strokeWidth = MessageSidePendingRingStroke,
+        color = LocalContentColor.current,
+    )
+}
+
+@Composable
+private fun MessageSidePendingRing(
+    description: String,
+    modifier: Modifier,
+) {
     Box(
         modifier =
-            modifier
-                .testTag(MESSAGE_TRANSLATION_PENDING_TEST_TAG)
-                .semantics {
-                    contentDescription = loading
-                    liveRegion = LiveRegionMode.Polite
-                },
+            modifier.semantics {
+                contentDescription = description
+                liveRegion = LiveRegionMode.Polite
+            },
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(MessageTranslationPendingRingSize),
-            strokeWidth = MessageTranslationPendingRingStroke,
+            modifier = Modifier.size(MessageSidePendingRingSize),
+            strokeWidth = MessageSidePendingRingStroke,
         )
     }
 }
+
+private const val DISABLED_ALPHA = 0.38f
 
 internal const val MESSAGE_TRANSLATION_TOGGLE_TEST_TAG = "message-translation-toggle"
 internal const val MESSAGE_TRANSLATION_PENDING_TEST_TAG = "message-translation-pending"

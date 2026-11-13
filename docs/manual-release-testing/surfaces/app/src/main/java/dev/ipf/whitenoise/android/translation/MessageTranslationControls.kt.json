@@ -119,11 +119,38 @@
         ]
       },
       {
-        "surface": "MessageTranslationPendingRing",
+        "surface": "MessageSidePendingRing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "private fun MessageTranslationPendingRing(",
+        "anchor": "private fun MessageSidePendingRing(",
         "test_ids": [
           "SET-033"
+        ]
+      },
+      {
+        "surface": "MessageSideDisc",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageSideDisc(",
+        "test_ids": [
+          "SET-033",
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "MessageSideDiscIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageSideDiscIcon(",
+        "test_ids": [
+          "SET-033",
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "MessageSideDiscProgress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageSideDiscProgress(",
+        "test_ids": [
+          "SET-033",
+          "MED-038"
         ]
       }
     ]
