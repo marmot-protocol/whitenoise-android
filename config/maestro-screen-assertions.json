@@ -6556,6 +6556,27 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+      "symbol": "ExplanationSheet",
+      "bindings": [
+        {
+          "case": "nested-diagnostics",
+          "selector": {
+            "text": "App lock, screen security, incognito keyboard, blocked users, default disappearing messages and diagnostics sharing."
+          },
+          "scope": "Holding the Privacy & Security Settings row shows its explanation sheet without opening the page; Back dismisses it.",
+          "entry_assertion": {
+            "text": "App lock, screen security, incognito keyboard, blocked users, default disappearing messages and diagnostics sharing."
+          },
+          "opened_by": {
+            "longPressOn": {
+              "text": "Privacy & Security"
+            }
+          }
+        }
+      ]
     }
   ]
 }
