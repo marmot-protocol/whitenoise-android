@@ -2387,12 +2387,15 @@ internal fun ConversationScreen(
     /**
      * Keeps the former preview near the viewport when its row grows in the reversed list.
      * The height increase would otherwise leave the reader at the newest end of a tall message.
+     * Expanding is the reader's own choice of position, so a reply or search jump still loading is
+     * cancelled and cannot move the viewport away when it completes.
      */
     fun preserveReadingPositionOnExpansion(item: TimelineMessage) {
         val beforeLayout = timelineViewport.readingLayoutInfo()
         val preview = beforeLayout.visibleItemsInfo.firstOrNull { it.key == item.presentationId } ?: return
         val maxLayoutFrames = 3
         val continuationPx = beforeLayout.viewportSize.height / 5
+        navigationState.targetNavigation.cancel()
         scrollCoordinator.cancelForegroundRestoreForUserIntent()
         val wasFollowingTail = scrollCoordinator.isFollowingTail
         scrollCoordinator.settleReadingAt(currentScrollAnchor())
