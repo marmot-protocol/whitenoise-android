@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -9,9 +10,15 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
@@ -69,25 +76,49 @@ internal fun SettingsRowTrailing(
     }
 }
 
+/** Whether the row hosting a leading slot accepts activation; each settings row provides its own state. */
+internal val LocalSettingsRowEditable = compositionLocalOf { true }
+
+/** The drawable a settings row's leading glyph draws, so tests can compare glyphs within a group. */
+internal val SettingsLeadingIconKey = SemanticsPropertyKey<Int>("SettingsLeadingIcon")
+
+private var SemanticsPropertyReceiver.settingsLeadingIcon by SettingsLeadingIconKey
+
 /**
- * The decorative glyph in a row's leading slot, at one size and the row's own disabled treatment.
+ * The decorative glyph in a row's leading slot, at one size and the hosting row's disabled treatment.
  *
  * The title already names the action, so the icon carries no content description and adds nothing for
- * a screen reader to repeat. Direction-dependent glyphs keep whatever mirroring their [icon] declares.
+ * a screen reader to repeat. Direction-dependent drawables declare `autoMirrored` themselves. [tint]
+ * defaults to the row's supporting colour; destructive rows pass the error role.
  */
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsLeadingIcon(
-    icon: ImageVector,
-    editable: Boolean = true,
+    @DrawableRes icon: Int,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    testTag: String? = null,
 ) {
     Icon(
-        imageVector = icon,
+        painter = painterResource(icon),
         contentDescription = null,
-        modifier = Modifier.size(SettingsRowDefaults.LeadingIconSize),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant.dimmedUnless(editable),
+        modifier =
+            modifier
+                .size(SettingsRowDefaults.LeadingIconSize)
+                .semantics { settingsLeadingIcon = icon }
+                .then(if (testTag == null) Modifier else Modifier.testTag(testTag)),
+        tint = tint.dimmedUnless(LocalSettingsRowEditable.current),
     )
 }
+
+/** Wraps a row's [leading] slot so its glyph dims with the row; `null` keeps the slot empty. */
+internal fun settingsLeadingSlot(
+    leading: (@Composable () -> Unit)?,
+    editable: Boolean,
+): (@Composable () -> Unit)? =
+    leading?.let { content ->
+        { CompositionLocalProvider(LocalSettingsRowEditable provides editable, content = content) }
+    }
 
 /** Blocked rows scale the token's own alpha by the disabled alpha, enabled rows keep the token untouched. */
 internal fun Color.dimmedUnless(editable: Boolean): Color =

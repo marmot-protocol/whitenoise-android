@@ -81,12 +81,19 @@ internal fun AuditDeliverySection(
                             settings.deliveryResumeFailed -> stringResource(R.string.audit_delivery_resume_failed)
                             else -> null
                         },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_play_arrow) },
                 )
             }
         }
         if (settings.delivery != null && delivery?.state != AuditDeliveryState.OFF) {
             row("audit_refresh_delivery") { rowContext ->
-                SettingsAction(rowContext, stringResource(R.string.refresh), onRefresh, enabled = enabled)
+                SettingsAction(
+                    rowContext,
+                    stringResource(R.string.refresh),
+                    onRefresh,
+                    enabled = enabled,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
+                )
             }
         }
     }
@@ -160,6 +167,7 @@ internal fun AuditRetentionRow(
                 else -> null
             },
         busy = settings.retention == null || settings.savingRetention,
+        leading = { SettingsLeadingIcon(R.drawable.ic_history) },
     )
     if (pickerOpen && current != null) {
         val values = auditRetentionChoices(current)

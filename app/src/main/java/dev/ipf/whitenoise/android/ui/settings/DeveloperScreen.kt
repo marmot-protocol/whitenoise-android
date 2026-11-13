@@ -168,6 +168,7 @@ internal fun DeveloperContent(
                             checked = developerMode,
                             onCheckedChange = onDeveloperModeChange,
                             modifier = Modifier.testTag("developer.mode.switch"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_code) },
                         )
                     }
                 }
@@ -217,6 +218,7 @@ internal fun DeveloperContent(
                                     ),
                             busy = demoStatus is ReviewDemoStatus.Running,
                             modifier = Modifier.testTag("developer.demo.action"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_science) },
                         )
                     }
                     if (demoHasSavedSetup && demoStatus !is ReviewDemoStatus.Running) {
@@ -227,6 +229,9 @@ internal fun DeveloperContent(
                                 onClick = { confirmClear = true },
                                 destructive = true,
                                 modifier = Modifier.testTag("developer.demo.clear"),
+                                leading = {
+                                    SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
+                                },
                             )
                         }
                     }
@@ -244,6 +249,7 @@ internal fun DeveloperContent(
                             onClick = onOpenKeyPackages,
                             modifier = Modifier.testTag("developer.key_packages.row"),
                             subtitle = stringResource(R.string.key_packages_settings_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_package_2) },
                         )
                     }
                 }
@@ -258,6 +264,7 @@ internal fun DeveloperContent(
                                 onClick = onOpenQuarantinedGroups,
                                 subtitle = quarantineSummary,
                                 modifier = Modifier.testTag("developer.quarantined_groups"),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_gpp_maybe) },
                             )
                         }
                     }
@@ -272,6 +279,7 @@ internal fun DeveloperContent(
                                 checked = streamingDebug,
                                 onCheckedChange = onStreamingDebugChange,
                                 modifier = Modifier.testTag("developer.streaming_debug"),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_stream) },
                             )
                         }
                         row("diagnostics") { context ->
@@ -281,6 +289,7 @@ internal fun DeveloperContent(
                                 onClick = onOpenDiagnostics,
                                 modifier = Modifier.testTag("developer.diagnostics"),
                                 subtitle = stringResource(R.string.diagnostics_settings_subtitle),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_monitor_heart) },
                             )
                         }
                         if (onSeedConversationFixture != null) {
@@ -291,6 +300,7 @@ internal fun DeveloperContent(
                                     onClick = onSeedConversationFixture,
                                     modifier = Modifier.testTag("developer.seed_fixture"),
                                     subtitle = stringResource(R.string.developer_seed_fixture_subtitle),
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_data_object) },
                                 )
                             }
                         }

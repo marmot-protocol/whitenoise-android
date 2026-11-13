@@ -19,9 +19,11 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsChoice
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -155,6 +157,7 @@ class SettingsComponentsScreenshotTest {
                         subtitle = "Show message previews",
                         checked = true,
                         onCheckedChange = {},
+                        leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                     )
                 }
             }
@@ -164,6 +167,7 @@ class SettingsComponentsScreenshotTest {
                     title = "Language",
                     value = "Follow the language selected in your device settings",
                     onClick = {},
+                    leading = { SettingsLeadingIcon(R.drawable.ic_language) },
                 )
             }
             if (expanded) {
@@ -175,6 +179,7 @@ class SettingsComponentsScreenshotTest {
                         checked = false,
                         onCheckedChange = {},
                         busy = true,
+                        leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                     )
                 }
             }
@@ -187,6 +192,7 @@ class SettingsComponentsScreenshotTest {
                     subtitle = "Unavailable while switching accounts",
                     busy = true,
                     onClick = {},
+                    leading = { SettingsLeadingIcon(R.drawable.ic_person) },
                 )
             }
         }
@@ -207,10 +213,17 @@ class SettingsComponentsScreenshotTest {
                     subtitle = "Every member is already an admin",
                     enabled = false,
                     onClick = {},
+                    leading = { SettingsLeadingIcon(R.drawable.ic_swap_vert) },
                 )
             }
             row("enabled_link") { context ->
-                SettingsLink(context = context, title = "Members", value = "6", onClick = {})
+                SettingsLink(
+                    context = context,
+                    title = "Members",
+                    value = "6",
+                    onClick = {},
+                    leading = { SettingsLeadingIcon(R.drawable.ic_group) },
+                )
             }
             row("busy_switch") { context ->
                 SettingsSwitch(
@@ -220,6 +233,7 @@ class SettingsComponentsScreenshotTest {
                     checked = false,
                     onCheckedChange = {},
                     busy = true,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                 )
             }
             row("disabled_choice") { context ->
@@ -243,10 +257,17 @@ class SettingsComponentsScreenshotTest {
                     checked = true,
                     onCheckedChange = {},
                     enabled = false,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                 )
             }
             row("disabled_link") { context ->
-                SettingsLink(context = context, title = "Account details", enabled = false, onClick = {})
+                SettingsLink(
+                    context = context,
+                    title = "Account details",
+                    enabled = false,
+                    onClick = {},
+                    leading = { SettingsLeadingIcon(R.drawable.ic_person) },
+                )
             }
         }
     }

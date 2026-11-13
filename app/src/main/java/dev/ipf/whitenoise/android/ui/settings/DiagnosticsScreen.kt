@@ -505,6 +505,7 @@ private fun DiagnosticsHealthSheet(
                         stringResource(R.string.refresh),
                         onRefresh,
                         Modifier.testTag("diagnostics.health.refresh"),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                     )
                 }
                 row("send") { context ->
@@ -514,6 +515,7 @@ private fun DiagnosticsHealthSheet(
                         onSendToSelf,
                         modifier = Modifier.testTag("diagnostics.health.test"),
                         enabled = state.sendToSelfEnabled,
+                        leading = { SettingsLeadingIcon(R.drawable.ic_send) },
                     )
                 }
             }
@@ -576,6 +578,7 @@ private fun PerformanceDiagnosticsGroup(
                     } else {
                         stringResource(R.string.performance_logs_inactive)
                     },
+                leading = { SettingsLeadingIcon(R.drawable.ic_speed) },
             )
         }
         if (status.emittedCount > 0) {
@@ -586,6 +589,7 @@ private fun PerformanceDiagnosticsGroup(
                     subtitle = stringResource(R.string.copy_performance_logs_detail),
                     onClick = onCopy,
                     modifier = Modifier.testTag("diagnostics.performance.copy"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_content_copy) },
                 )
             }
         }

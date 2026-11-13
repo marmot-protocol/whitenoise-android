@@ -159,6 +159,7 @@ internal fun QuarantinedGroupsContent(
                                 enabled = state.available && !state.busy,
                                 busy = state.loading,
                                 modifier = Modifier.testTag("quarantine.refresh"),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                             )
                         }
                     }

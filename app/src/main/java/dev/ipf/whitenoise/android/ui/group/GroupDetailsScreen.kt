@@ -134,7 +134,6 @@ import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.WrapText
 import dev.ipf.whitenoise.android.ui.icons.filled.Archive
 import dev.ipf.whitenoise.android.ui.icons.filled.Check
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
@@ -142,8 +141,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
-import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
-import dev.ipf.whitenoise.android.ui.icons.filled.Palette
 import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.medialibrary.MediaLibraryRoute
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
@@ -1588,7 +1585,7 @@ internal fun GroupDetailsScreen(
                                         title = stringResource(R.string.see_all_members),
                                         onClick = { membersExpanded = true },
                                         leading = {
-                                            Icon(painterResource(R.drawable.ic_group), contentDescription = null)
+                                            SettingsLeadingIcon(R.drawable.ic_group)
                                         },
                                     )
                                 }
@@ -1827,7 +1824,7 @@ internal fun GroupDetailsScreen(
                                         ),
                                     )
                                 },
-                                leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                 modifier = Modifier.testTag("chat_info.start_group"),
                             )
                         }
@@ -1836,7 +1833,7 @@ internal fun GroupDetailsScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.person_groups_in_common),
                                 onClick = { appState.presentProfile(dmPeerNpub, groupsInCommon = true) },
-                                leading = { Icon(painterResource(R.drawable.ic_group), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group) },
                                 modifier = Modifier.testTag("chat_info.groups_in_common"),
                             )
                         }
@@ -1846,7 +1843,7 @@ internal fun GroupDetailsScreen(
                                 title = stringResource(R.string.person_add_to_group),
                                 onClick = { showDmAddToGroups = true },
                                 enabled = !addingDmPeerToGroups,
-                                leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                 modifier = Modifier.testTag("chat_info.add_to_group"),
                             )
                         }
@@ -1874,7 +1871,7 @@ internal fun GroupDetailsScreen(
                                 title = stringResource(R.string.edit_group_info_title),
                                 onClick = { showEditGroup = true },
                                 enabled = activeMutation == null && !controller.mutationInFlight,
-                                leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_edit) },
                             )
                         }
                         row("add_member") { rowContext ->
@@ -1892,7 +1889,7 @@ internal fun GroupDetailsScreen(
                                         controller.seededSelfMember,
                                     ) &&
                                         !mutationsBlocked,
-                                leading = { Icon(painterResource(R.drawable.ic_group_add), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                             )
                         }
                     }
@@ -1980,7 +1977,7 @@ internal fun GroupDetailsScreen(
                                     clipboard.setText(AnnotatedString(ChatLink.uri(controller.group.groupIdHex)))
                                     appState.present(R.string.copied)
                                 },
-                                leading = { Icon(painterResource(R.drawable.ic_link), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_link) },
                             )
                         }
                     }
@@ -1993,7 +1990,7 @@ internal fun GroupDetailsScreen(
                                 appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
                             },
                             subtitle = stringResource(R.string.collapse_long_messages_subtitle),
-                            leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.WrapText) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_wrap_text) },
                         )
                     }
                     if (appState.ttsHasUsableEngine) {
@@ -2012,11 +2009,7 @@ internal fun GroupDetailsScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.translation_automatic),
                                 leading = {
-                                    Icon(
-                                        painterResource(R.drawable.ic_translate),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                    SettingsLeadingIcon(R.drawable.ic_translate)
                                 },
                                 onClick = { showTranslationPicker = true },
                             )
@@ -2034,7 +2027,7 @@ internal fun GroupDetailsScreen(
                                     controller.group.groupIdHex,
                                     conversationNotifyMode,
                                 ),
-                            leading = { SettingsLeadingIcon(Icons.Filled.Notifications) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                         )
                     }
                     row("bubble_colors") { rowContext ->
@@ -2042,7 +2035,7 @@ internal fun GroupDetailsScreen(
                             context = rowContext,
                             title = stringResource(R.string.chat_bubble_colors),
                             onClick = { showBubbleColors = true },
-                            leading = { SettingsLeadingIcon(Icons.Filled.Palette) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_palette) },
                         )
                     }
                 }
@@ -2126,7 +2119,7 @@ internal fun GroupDetailsScreen(
                             title = stringResource(R.string.chat_add_folder),
                             onClick = { showFolderPicker = true },
                             modifier = Modifier.testTag("chat_info.folders"),
-                            leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_add) },
                         )
                     }
                 }
@@ -2261,7 +2254,7 @@ internal fun GroupDetailsScreen(
                             onClick = { showChatRelays = true },
                             modifier = Modifier.testTag("chat_info.relays"),
                             subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
-                            leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_tune) },
                         )
                     }
                     if (isDm) {
@@ -2272,7 +2265,7 @@ internal fun GroupDetailsScreen(
                                 onClick = { showGroupInfo = true },
                                 modifier = Modifier.testTag("chat_info.developer_tools"),
                                 leading = {
-                                    Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null)
+                                    SettingsLeadingIcon(R.drawable.ic_bug_report)
                                 },
                             )
                         }
@@ -2306,7 +2299,7 @@ internal fun GroupDetailsScreen(
                                         enabled =
                                             !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
                                         leading = {
-                                            Icon(painterResource(R.drawable.ic_swap_vert), contentDescription = null)
+                                            SettingsLeadingIcon(R.drawable.ic_swap_vert)
                                         },
                                     )
                                 }
@@ -2438,7 +2431,7 @@ internal fun GroupDetailsScreen(
                                 onClick = { showGroupInfo = true },
                                 modifier = Modifier.testTag("chat_info.developer_tools"),
                                 leading = {
-                                    Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null)
+                                    SettingsLeadingIcon(R.drawable.ic_bug_report)
                                 },
                             )
                         }
@@ -2696,7 +2689,7 @@ private fun DangerLeading(
     if (inProgress) {
         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
     } else {
-        Icon(painterResource(icon), contentDescription = null, tint = tint)
+        SettingsLeadingIcon(icon, tint = tint)
     }
 }
 

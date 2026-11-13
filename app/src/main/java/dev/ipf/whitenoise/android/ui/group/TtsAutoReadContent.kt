@@ -11,8 +11,6 @@ import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.VolumeUp
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
@@ -43,7 +41,7 @@ internal fun TtsAutoReadGroupActionRow(
                 .testTag(TTS_AUTO_READ_GROUP_ROW_TAG)
                 .semantics(mergeDescendants = true) { contentDescription = "$title. $provenanceLabel" },
         value = provenanceLabel,
-        leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.VolumeUp) },
+        leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
     )
 }
 

@@ -14,7 +14,6 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -258,6 +256,7 @@ internal fun RelaysContent(
                                 enabled = !busy,
                                 modifier = Modifier.testTag("relays.row.${relay.url}"),
                                 subtitle = relaySummary(relay),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_dns) },
                             )
                         }
                     }
@@ -267,7 +266,7 @@ internal fun RelaysContent(
                             title = stringResource(R.string.add_relay),
                             onClick = onAdd,
                             enabled = lists != null && !busy,
-                            leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_add) },
                         )
                     }
                 }
@@ -356,6 +355,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                     modifier = Modifier.testTag("relay.publication.retry"),
                     subtitle = stringResource(failed.failureRes),
                     enabled = !state.busy,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
                 )
             }
         else -> {
@@ -366,6 +366,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                     onClick = onRefresh,
                     modifier = Modifier.testTag("relay.publication.refresh"),
                     enabled = !state.busy,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                 )
             }
             if (lists != null && lists.missing.isNotEmpty()) {
@@ -377,6 +378,7 @@ private fun SettingsGroupScope.relayPublicationAction(
                         modifier = Modifier.testTag("relay.publication.publish"),
                         subtitle = stringResource(R.string.relay_list_publish_help),
                         enabled = !state.busy,
+                        leading = { SettingsLeadingIcon(R.drawable.ic_publish) },
                     )
                 }
             }
@@ -418,6 +420,7 @@ internal fun RelayDetailsScreen(
                                 onCheckedChange = { onSetRole(role, it) },
                                 subtitle = stringResource(role.helpRes),
                                 enabled = !busy && role !in blockingRoles,
+                                leading = { SettingsLeadingIcon(role.iconRes) },
                             )
                         }
                     }
@@ -442,6 +445,9 @@ internal fun RelayDetailsScreen(
                             onClick = { removeDialog = true },
                             enabled = !busy && blockingRoles.isEmpty(),
                             destructive = true,
+                            leading = {
+                                SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
+                            },
                         )
                     }
                 }
@@ -519,6 +525,7 @@ internal fun AddRelaySheet(
                                 checked = role in roles,
                                 onCheckedChange = { selected -> roles = if (selected) roles + role else roles - role },
                                 subtitle = stringResource(role.helpRes),
+                                leading = { SettingsLeadingIcon(role.iconRes) },
                             )
                         }
                     }

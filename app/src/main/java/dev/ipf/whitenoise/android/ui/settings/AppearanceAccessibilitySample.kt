@@ -50,6 +50,7 @@ internal fun AppearanceAccessibilitySample(
                         title = stringResource(R.string.appearance_preview_rtl),
                         checked = state.rtl,
                         onCheckedChange = { state.rtl = it },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_format_textdirection_r_to_l) },
                     )
                 }
                 row("preview_large") { context ->
@@ -58,6 +59,7 @@ internal fun AppearanceAccessibilitySample(
                         title = stringResource(R.string.appearance_preview_large_text),
                         checked = state.largeText,
                         onCheckedChange = { state.largeText = it },
+                        leading = { SettingsLeadingIcon(R.drawable.ic_text_increase) },
                     )
                 }
                 row("preview_sample") { context ->
@@ -89,6 +91,7 @@ private fun AppearancePreviewDisclosure(
                 Modifier.rotate(if (state.expanded) EXPANDED_DISCLOSURE_ROTATION else 0f),
             )
         },
+        leading = { SettingsLeadingIcon(R.drawable.ic_visibility) },
     )
 }
 

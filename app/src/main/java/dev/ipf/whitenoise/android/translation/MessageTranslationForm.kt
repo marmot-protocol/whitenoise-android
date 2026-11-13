@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.translation
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -61,6 +63,7 @@ internal fun MessageTranslationForm(
                         title = stringResource(R.string.translation_source_language),
                         selected = from,
                         onSelected = onFromChange,
+                        icon = R.drawable.ic_language,
                         allowDetection = true,
                     )
                 }
@@ -70,6 +73,7 @@ internal fun MessageTranslationForm(
                         title = stringResource(R.string.translation_target_language),
                         selected = target,
                         onSelected = onTargetChange,
+                        icon = R.drawable.ic_translate,
                     )
                 }
             }
@@ -120,11 +124,18 @@ private fun TranslationLanguageRow(
     title: String,
     selected: String,
     onSelected: (String) -> Unit,
+    @DrawableRes icon: Int,
     allowDetection: Boolean = false,
 ) {
     var open by remember { mutableStateOf(false) }
     val choices = rememberTranslationLanguageChoices(allowDetection)
-    SettingsLink(context, title, onClick = { open = true }, value = choices.label(selected))
+    SettingsLink(
+        context,
+        title,
+        onClick = { open = true },
+        value = choices.label(selected),
+        leading = { SettingsLeadingIcon(icon) },
+    )
     if (open) {
         ChoiceDialog(
             title = title,

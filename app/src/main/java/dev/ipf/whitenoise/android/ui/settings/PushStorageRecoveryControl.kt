@@ -23,6 +23,7 @@ internal fun PushStorageRecoveryControl(
                 subtitle = stringResource(detail),
                 enabled = !busy,
                 onClick = onRetry,
+                leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
             )
         }
     }
