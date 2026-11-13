@@ -6163,8 +6163,8 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
-      "symbol": "ComposerTranslationPreview",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+      "symbol": "TranslationLanguagePickerSheet",
       "bindings": [
         {
           "case": "presentation-modal-translation-composer",
