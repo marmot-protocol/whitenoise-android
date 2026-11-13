@@ -35,7 +35,7 @@ class ViewerSvgIsolationDeviceTest {
                         """ect x="12" y="12" width="0.001" height="0.02" fill="red"/></svg>"""
                 ).toByteArray()
             assertEquals(ImageInspection(24, 24, "image/svg+xml", 1), transport.svgInspect(source))
-            assertFalse(context.isEndpointAlive(1))
+            assertInputWorkerRetired(context, 1)
             val pixels = requireNotNull(transport.svgRegion(source, ViewerSvgRegion(12.0, 12.0, 12.023, 12.023), 512))
             try {
                 assertEquals(512, pixels.width)
@@ -49,7 +49,7 @@ class ViewerSvgIsolationDeviceTest {
                 assertFalse(worker.runtimeInitialized)
                 assertTrue(worker.privateCanaryDenied)
                 assertEquals(android.system.OsConstants.EBADF, worker.inputWriteErrno)
-                assertFalse(context.isEndpointAlive(2))
+                assertInputWorkerRetired(context, 2)
             } finally {
                 pixels.recycle()
             }
@@ -59,15 +59,28 @@ class ViewerSvgIsolationDeviceTest {
                         """http://www.w3.org/2000/svg">&x;</svg>"""
                 ).toByteArray()
             assertNull(transport.svgInspect(hostile))
-            assertFalse(context.isEndpointAlive(3))
+            assertInputWorkerRetired(context, 3)
             requireNotNull(transport.decode(healthyPng(), 2, false, MediaDecodePolicy.DECODE)).recycle()
-            assertFalse(context.isEndpointAlive(4))
+            assertInputWorkerRetired(context, 4)
             assertTrue(canary.isFile)
         } finally {
             transport.close()
             context.closeObservers()
             check(canary.delete())
         }
+    }
+
+    /** Checks the actual input worker; speculative spare bindings can connect in a different order. */
+    private fun assertInputWorkerRetired(
+        context: MediaWorkerBaselineBinding,
+        expectedInputs: Int,
+    ) {
+        val inputs = context.inputEndpoints()
+        val diagnostic = context.snapshot().toString()
+        assertEquals(diagnostic, expectedInputs, inputs.size)
+        val producer = inputs.last()
+        assertEquals(diagnostic, 1, producer.getInt("decodes"))
+        assertFalse(diagnostic, context.isEndpointAlive(producer.getInt("generation")))
     }
 
     /** Creates a small known-good PNG to check decoder recovery after hostile SVG input. */
