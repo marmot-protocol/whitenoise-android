@@ -87,10 +87,9 @@ internal fun GroupMembersReviewDialog(
     val liveBusy = rememberUpdatedState(busy)
     val liveMembers = rememberUpdatedState(members)
     val liveGroups = rememberUpdatedState(groups)
-    val liveAdmins = rememberUpdatedState(initialAdminIds)
-    val reviewedAdmins = initialAdminIds.toSet()
-    val reviewedMembers = members.map { it.accountIdHex }
-    val reviewedGroups = groups.map { it.id }
+    // Identities are captured once when the review opens; Admin toggles made inside it are intended edits.
+    val reviewedMembers = remember { members.map { it.accountIdHex } }
+    val reviewedGroups = remember { groups.map { it.id } }
     DisposableEffect(ticket) { onDispose { ticket.invalidate() } }
     val current = groupMembersReviewOwnerCurrent(appState, actingAccount, runtime)
 
@@ -117,8 +116,7 @@ internal fun GroupMembersReviewDialog(
                             busy = { liveBusy.value },
                             selectionCurrent = {
                                 reviewedMembers == liveMembers.value.map { it.accountIdHex } &&
-                                    reviewedGroups == liveGroups.value.map { it.id } &&
-                                    reviewedAdmins == liveAdmins.value
+                                    reviewedGroups == liveGroups.value.map { it.id }
                             },
                         )
                     ) {
