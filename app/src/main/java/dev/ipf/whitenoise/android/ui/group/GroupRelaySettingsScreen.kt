@@ -31,6 +31,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.settings.SettingsCallout
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -124,7 +126,14 @@ private fun GroupRelayRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
-                Modifier.weight(1f).padding(vertical = WhiteNoiseSpacing.Related + 4.dp),
+                Modifier
+                    .weight(1f)
+                    .explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.relay_number, number),
+                            stringResource(R.string.explanation_relays_group_relay_row),
+                        ),
+                    ).padding(vertical = WhiteNoiseSpacing.Related + 4.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
@@ -139,7 +148,12 @@ private fun GroupRelayRow(
                 modifier =
                     Modifier
                         .testTag("$GROUP_RELAYS_COPY_TAG_PREFIX$url")
-                        .semantics { if (copied) stateDescription = copiedLabel },
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.group_relay_copy, number),
+                                stringResource(R.string.explanation_relays_group_relay_copy),
+                            ),
+                        ).semantics { if (copied) stateDescription = copiedLabel },
             ) {
                 Icon(
                     painterResource(groupRelayCopyGlyph(copied)),

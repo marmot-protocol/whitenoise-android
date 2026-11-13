@@ -38,6 +38,8 @@ import dev.ipf.whitenoise.android.state.HsvColor
 import dev.ipf.whitenoise.android.state.opaqueArgbToHsv
 import dev.ipf.whitenoise.android.state.parseOpaqueColorHex
 import dev.ipf.whitenoise.android.state.tonalBubbleColorPresets
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import java.util.Locale
 
@@ -99,6 +101,7 @@ internal fun FullSpectrumColorPicker(
             value = hue,
             valueRange = 0f..ColorPickerDefaults.HUE_MAX,
             testTag = "color.hue",
+            explanation = stringResource(R.string.explanation_appearance_color_hue),
             onValueChange = {
                 hue = it
                 updateFromSliders(h = it)
@@ -109,6 +112,7 @@ internal fun FullSpectrumColorPicker(
             value = saturation,
             valueRange = 0f..1f,
             testTag = "color.saturation",
+            explanation = stringResource(R.string.explanation_appearance_color_saturation),
             onValueChange = {
                 saturation = it
                 updateFromSliders(s = it)
@@ -119,6 +123,7 @@ internal fun FullSpectrumColorPicker(
             value = brightness,
             valueRange = 0f..1f,
             testTag = "color.brightness",
+            explanation = stringResource(R.string.explanation_appearance_color_brightness),
             onValueChange = {
                 brightness = it
                 updateFromSliders(v = it)
@@ -170,7 +175,9 @@ private fun ColorPresetRow(
                 selected = selectedArgb == argb,
                 modifier =
                     Modifier
-                        .clickable { onSelect(argb) }
+                        .explainOnLongPress(
+                            Explanation(description, stringResource(R.string.explanation_appearance_color_swatch)),
+                        ).clickable { onSelect(argb) }
                         .semantics {
                             role = Role.RadioButton
                             selected = selectedArgb == argb
@@ -210,9 +217,14 @@ private fun ColorSlider(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     testTag: String,
+    explanation: String,
     onValueChange: (Float) -> Unit,
 ) {
-    Text(label, style = MaterialTheme.typography.labelLarge)
+    Text(
+        label,
+        modifier = Modifier.explainOnLongPress(Explanation(label, explanation)),
+        style = MaterialTheme.typography.labelLarge,
+    )
     Slider(
         value = value,
         onValueChange = onValueChange,

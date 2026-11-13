@@ -65,6 +65,7 @@ internal fun ConversationNotificationCategoriesList(
                             alertDetails[setting.channel]?.takeIf { it.isNotBlank() },
                         ).joinToString(" · "),
                     busy = pendingChannel == setting.channel,
+                    explanation = stringResource(R.string.explanation_privacy_conversation_category),
                     trailing = {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),

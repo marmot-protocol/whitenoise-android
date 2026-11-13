@@ -9,10 +9,10 @@
     <string name="explanation_account_keys_signout_invitation_keys">開啟後，登出時會從中繼站移除您已發布的邀請金鑰，因此在您登出期間，沒有人能邀請您加入新群組。</string>
     <string name="explanation_settings_profile_row">開啟此個人檔案的「分享與連線」。點按簡短金鑰可複製完整公開金鑰。</string>
     <string name="explanation_settings_profile_picture">開啟此大頭貼的選項。</string>
-    <string name="explanation_settings_relays">顯示此個人檔案使用的中繼站，以及每個中繼站所服務的清單。</string>
-    <string name="explanation_relays_role_profile">將此中繼站加入您發布的個人檔案清單，讓其他人知道去哪裡找到您的個人檔案和連線資訊。</string>
-    <string name="explanation_relays_role_inbox">將此中繼站加入他人用來向您傳送新聊天和群組邀請的清單中。</string>
-    <string name="explanation_relays_publish_missing">發布被標記為缺少的中繼站清單，讓其他人知道如何聯絡到您。</string>
+    <string name="explanation_settings_relays">開啟此個人檔案使用的中繼站。中繼站是儲存並轉送加密訊息和公開事件（例如你的個人檔案）的伺服器。你可以在這裡選擇向哪些中繼站發布、從哪些中繼站接收邀請，並新增或移除中繼站。中繼站可以看到公開事件，但看不到你的加密訊息內容。</string>
+    <string name="explanation_relays_role_profile">在「我發布到哪裡」中開啟或關閉此中繼站。該清單中的中繼站會保存你的個人檔案和連線資訊，方便他人找到你。你的個人檔案是公開的，因此保存它的中繼站都能讀取。清單中至少要保留一個中繼站。</string>
+    <string name="explanation_relays_role_inbox">在「我在哪裡接收」中開啟或關閉此中繼站。他人會把新聊天和群組的邀請傳送到該清單的中繼站。邀請是加密的，中繼站無法讀取。如果清單為空，邀請可能無法送達你，因此至少要保持開啟一個中繼站。</string>
+    <string name="explanation_relays_publish_missing">發布標記為缺少的中繼站清單，即「我發布到哪裡」和「我在哪裡接收」。他人會查看這些清單來找到你的個人檔案，並知道把邀請傳到哪裡。在發布之前，他人可能無法聯絡到你。只會發布缺少的清單。</string>
     <string name="explanation_account_setup_remove_relay">在此設定步驟中，將此中繼站從您的中繼站清單中移除。移除後可立即復原。</string>
     <string name="explanation_developer_key_packages">顯示為此帳號發布的金鑰套件（他人可藉此邀請您加入群組），並可對其進行管理。</string>
     <string name="explanation_developer_quarantined_groups">列出無法安全載入的群組，並可重試復原。不會刪除任何內容。</string>

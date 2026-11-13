@@ -106,6 +106,7 @@ internal fun ConversationAlertSettingsRows(
                                 R.string.notification_alerts_on_device
                             },
                         ),
+                    explanation = stringResource(R.string.explanation_privacy_conversation_alert),
                 )
             }
         }

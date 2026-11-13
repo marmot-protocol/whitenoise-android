@@ -149,7 +149,88 @@
         ]
       }
     ],
-    "source_coverage": []
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_action_color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_action_color",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_app_font",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_app_font",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_chat_bubble_colors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_chat_bubble_colors",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_date_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_date_time",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_font_size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_font_size",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_font_size_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_font_size_default",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_font_size_extra_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_font_size_extra_large",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_font_size_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_font_size_large",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_font_size_small",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_font_size_small",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_theme",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.explanation_appearance_theme",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
+    ]
   },
   "discovery_exceptions": []
 }

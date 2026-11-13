@@ -109,11 +109,23 @@ internal fun SetupRelayEditorRows(
     }
     val saved = undo
     if (saved != null && saved.afterReads == current.reads && saved.afterWrites == current.writes) {
-        TextButton(onClick = {
-            fields.reads.setTextAndPlaceCursorAtEnd(saved.beforeReads)
-            fields.writes.setTextAndPlaceCursorAtEnd(saved.beforeWrites)
-            undo = null
-        }, enabled = !busy, modifier = Modifier.testTag("setup.relay.undo")) {
+        TextButton(
+            onClick = {
+                fields.reads.setTextAndPlaceCursorAtEnd(saved.beforeReads)
+                fields.writes.setTextAndPlaceCursorAtEnd(saved.beforeWrites)
+                undo = null
+            },
+            enabled = !busy,
+            modifier =
+                Modifier
+                    .testTag("setup.relay.undo")
+                    .explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.setup_undo_removal),
+                            stringResource(R.string.explanation_relays_setup_undo),
+                        ),
+                    ),
+        ) {
             Text(stringResource(R.string.setup_undo_removal))
         }
     }

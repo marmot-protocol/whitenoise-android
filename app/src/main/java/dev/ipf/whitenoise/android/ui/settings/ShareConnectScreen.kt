@@ -60,11 +60,13 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.profile.ProfileQrGallerySave
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
@@ -343,6 +345,9 @@ private fun ShareConnectShareAction(
 ) {
     val shareLabel = stringResource(R.string.share_profile)
     val savingLabel = stringResource(R.string.photo_editor_saving_action)
+    val urlLabel = stringResource(R.string.share_profile_url)
+    val cardLabel = stringResource(R.string.share_profile_picture)
+    val galleryLabel = stringResource(R.string.share_connect_save_to_gallery)
     val exporting = pictureShareInProgress || gallerySaveInProgress
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -355,10 +360,17 @@ private fun ShareConnectShareAction(
                 onClick = { menuExpanded = true },
                 enabled = !exporting,
                 modifier =
-                    Modifier.testTag("share_connect.share").semantics {
-                        if (exporting) contentDescription = shareLabel
-                        if (gallerySaveInProgress) stateDescription = savingLabel
-                    },
+                    Modifier
+                        .testTag("share_connect.share")
+                        .explainOnLongPress(
+                            Explanation(
+                                shareLabel,
+                                stringResource(R.string.explanation_organize_share_menu),
+                            ),
+                        ).semantics {
+                            if (exporting) contentDescription = shareLabel
+                            if (gallerySaveInProgress) stateDescription = savingLabel
+                        },
             ) {
                 if (exporting) {
                     CircularProgressIndicator(
@@ -379,22 +391,44 @@ private fun ShareConnectShareAction(
             items =
                 listOf(
                     WhiteNoiseMenuItem(
-                        stringResource(R.string.share_profile_url),
+                        urlLabel,
                         onShareUrl,
                         R.drawable.ic_link,
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    urlLabel,
+                                    stringResource(R.string.explanation_organize_share_url),
+                                ),
+                            ),
                     ),
                     WhiteNoiseMenuItem(
-                        stringResource(R.string.share_profile_picture),
+                        cardLabel,
                         onSharePicture,
                         R.drawable.ic_image,
                         enabled = !exporting,
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    cardLabel,
+                                    stringResource(R.string.explanation_organize_share_card),
+                                ),
+                            ),
                     ),
                     WhiteNoiseMenuItem(
-                        stringResource(R.string.share_connect_save_to_gallery),
+                        galleryLabel,
                         onSaveToGallery,
                         R.drawable.ic_download,
                         enabled = canSaveToGallery && !exporting,
-                        modifier = Modifier.testTag("share_connect.save_to_gallery"),
+                        modifier =
+                            Modifier
+                                .testTag("share_connect.save_to_gallery")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        galleryLabel,
+                                        stringResource(R.string.explanation_organize_share_gallery),
+                                    ),
+                                ),
                     ),
                 ),
         )
@@ -510,6 +544,7 @@ private fun ShareProfileContent(
 @Suppress("FunctionNaming")
 @Composable
 private fun ShareConnectBottomAction(onClick: () -> Unit) {
+    val scanLabel = stringResource(R.string.scan_qr_code)
     Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
         AdaptiveContent {
             Box(
@@ -523,7 +558,16 @@ private fun ShareConnectBottomAction(onClick: () -> Unit) {
                 SettingsSearchRowReveal("scan_qr_code", modifier = Modifier.fillMaxWidth()) {
                     WhiteNoiseButton(
                         onClick = onClick,
-                        modifier = Modifier.fillMaxWidth().testTag("share_connect.open_scanner"),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag("share_connect.open_scanner")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        scanLabel,
+                                        stringResource(R.string.explanation_organize_share_scan),
+                                    ),
+                                ),
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_qr_code_scanner),
@@ -531,7 +575,7 @@ private fun ShareConnectBottomAction(onClick: () -> Unit) {
                             modifier = Modifier.size(ShareConnectDefaults.IconSize),
                         )
                         Spacer(Modifier.width(WhiteNoiseSpacing.Related))
-                        Text(stringResource(R.string.scan_qr_code))
+                        Text(scanLabel)
                     }
                 }
             }

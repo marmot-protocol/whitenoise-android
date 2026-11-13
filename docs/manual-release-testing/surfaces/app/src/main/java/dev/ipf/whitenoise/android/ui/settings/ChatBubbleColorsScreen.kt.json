@@ -145,6 +145,24 @@
           "SET-005"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_bubble_colors_menu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.explanation_appearance_bubble_colors_menu",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_bubble_colors_save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+        "anchor": "R.string.explanation_appearance_bubble_colors_save",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

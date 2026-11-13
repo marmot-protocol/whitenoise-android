@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -40,6 +41,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.QrCodeEncoder
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** Black-on-white QR code on a large-corner white card sized from the available width. */
 @Suppress("FunctionNaming")
@@ -125,7 +128,12 @@ internal fun IdentifierCopyCapsule(
             modifier
                 .widthIn(max = IdentityCodeDefaults.CapsuleMaxWidth)
                 .heightIn(min = IdentityCodeDefaults.CapsuleMinHeight)
-                .clickable(
+                .explainOnLongPress(
+                    Explanation(
+                        copyContentDescription,
+                        stringResource(R.string.explanation_organize_copy_public_key),
+                    ),
+                ).clickable(
                     interactionSource = interactionSource,
                     indication = null,
                     role = Role.Button,

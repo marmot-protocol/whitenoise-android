@@ -45,6 +45,16 @@
           "SEC-017"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_privacy_notif_push_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/PushStorageRecoveryControl.kt",
+        "anchor": "R.string.explanation_privacy_notif_push_retry",
+        "test_ids": [
+          "SET-055"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

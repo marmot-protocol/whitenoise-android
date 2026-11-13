@@ -123,6 +123,32 @@
           "SET-007"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_font_bundled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.explanation_appearance_font_bundled",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_font_size_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.explanation_appearance_font_size_reset",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_font_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FontSizeDialog.kt",
+        "anchor": "R.string.explanation_appearance_font_system",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

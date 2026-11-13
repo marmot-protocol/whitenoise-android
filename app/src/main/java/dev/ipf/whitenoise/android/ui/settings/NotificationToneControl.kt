@@ -75,6 +75,7 @@ internal fun NotificationToneControl() {
                             },
                         ),
                     modifier = Modifier.testTag("notification-tone-${tone.token}"),
+                    explanation = stringResource(R.string.explanation_privacy_notif_tone_play),
                     onClick = {
                         if (playing == tone) {
                             preview.stop()
@@ -104,6 +105,7 @@ internal fun NotificationToneControl() {
                 subtitle = stringResource(importResult ?: R.string.notification_tone_add_detail),
                 busy = importing,
                 modifier = Modifier.testTag("notification-tone-import"),
+                explanation = stringResource(R.string.explanation_privacy_notif_tone_add),
                 onClick = {
                     if (!importing) {
                         importing = true

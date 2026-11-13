@@ -43,6 +43,7 @@ internal fun SpokenAudioAlertSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 modifier = Modifier.testTag("notification-quiet-spoken-audio"),
+                explanation = stringResource(R.string.explanation_appearance_spoken_audio_alert),
             )
         }
     }

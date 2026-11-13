@@ -541,7 +541,17 @@ private fun ProfileKeysList(
                         fullPublicKey = true,
                     ) {
                         val copied = ui.copiedKey == CopiedProfileKey.Public
-                        IconButton(onClick = onCopyPublic) {
+                        val copyPublicLabel = stringResource(R.string.copy_public_key)
+                        IconButton(
+                            onClick = onCopyPublic,
+                            modifier =
+                                Modifier.explainOnLongPress(
+                                    Explanation(
+                                        copyPublicLabel,
+                                        stringResource(R.string.explanation_organize_keys_copy_public),
+                                    ),
+                                ),
+                        ) {
                             Icon(
                                 painter = painterResource(copyGlyph(copied)),
                                 contentDescription =
@@ -785,11 +795,33 @@ private fun ProfileKeysDialogs(
             },
             confirmButton = {
                 FlowRow(horizontalArrangement = Arrangement.End) {
-                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.Share) }) {
-                        Text(stringResource(R.string.share), color = MaterialTheme.colorScheme.error)
+                    val shareLabel = stringResource(R.string.share)
+                    val fileLabel = stringResource(R.string.export_nsec)
+                    TextButton(
+                        enabled = !ui.exportBusy,
+                        onClick = { onExport(false, KeyExportDestination.Share) },
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    shareLabel,
+                                    stringResource(R.string.explanation_organize_keys_raw_share),
+                                ),
+                            ),
+                    ) {
+                        Text(shareLabel, color = MaterialTheme.colorScheme.error)
                     }
-                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.File) }) {
-                        Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
+                    TextButton(
+                        enabled = !ui.exportBusy,
+                        onClick = { onExport(false, KeyExportDestination.File) },
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    fileLabel,
+                                    stringResource(R.string.explanation_organize_keys_raw_file),
+                                ),
+                            ),
+                    ) {
+                        Text(fileLabel, color = MaterialTheme.colorScheme.error)
                     }
                 }
             },
@@ -934,17 +966,35 @@ private fun ExportPasswordDialog(
             }
         },
         confirmButton = {
+            val viewLabel = stringResource(R.string.key_export_view_backup)
+            val exportLabel = stringResource(R.string.export)
             FlowRow(horizontalArrangement = Arrangement.End) {
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onViewBackup,
-                    modifier = Modifier.testTag("profile_keys.view_backup"),
-                ) { Text(stringResource(R.string.key_export_view_backup)) }
+                    modifier =
+                        Modifier
+                            .testTag("profile_keys.view_backup")
+                            .explainOnLongPress(
+                                Explanation(
+                                    viewLabel,
+                                    stringResource(R.string.explanation_organize_keys_view_backup),
+                                ),
+                            ),
+                ) { Text(viewLabel) }
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onConfirm,
-                    modifier = Modifier.testTag("profile_keys.export_file"),
-                ) { Text(stringResource(R.string.export)) }
+                    modifier =
+                        Modifier
+                            .testTag("profile_keys.export_file")
+                            .explainOnLongPress(
+                                Explanation(
+                                    exportLabel,
+                                    stringResource(R.string.explanation_organize_keys_backup_export),
+                                ),
+                            ),
+                ) { Text(exportLabel) }
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
@@ -980,8 +1030,28 @@ internal fun EncryptedBackupResultDialog(
         },
         confirmButton = {
             FlowRow(horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onCopy) { Text(stringResource(if (copied) R.string.copied else R.string.copy)) }
-                TextButton(onClick = onExport) { Text(stringResource(R.string.export)) }
+                val copyLabel = stringResource(R.string.copy)
+                val exportLabel = stringResource(R.string.export)
+                TextButton(
+                    onClick = onCopy,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                copyLabel,
+                                stringResource(R.string.explanation_organize_keys_result_copy),
+                            ),
+                        ),
+                ) { Text(stringResource(if (copied) R.string.copied else R.string.copy)) }
+                TextButton(
+                    onClick = onExport,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                exportLabel,
+                                stringResource(R.string.explanation_organize_keys_result_export),
+                            ),
+                        ),
+                ) { Text(exportLabel) }
             }
         },
         dismissButton = { TextButton(onClick = onHide) { Text(stringResource(R.string.hide)) } },

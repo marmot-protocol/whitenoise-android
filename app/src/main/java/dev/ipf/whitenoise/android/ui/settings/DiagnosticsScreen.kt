@@ -52,12 +52,14 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -344,7 +346,16 @@ internal fun DiagnosticsContent(
         modifier = Modifier.testTag(DIAGNOSTICS_CONTENT_TAG),
         topBarActions = {
             Box {
-                IconButton(onClick = { showActions = true }, modifier = Modifier.testTag("diagnostics.actions")) {
+                IconButton(
+                    onClick = { showActions = true },
+                    modifier =
+                        Modifier.testTag("diagnostics.actions").explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.actions),
+                                stringResource(R.string.explanation_privacy_diagnostics_actions),
+                            ),
+                        ),
+                ) {
                     Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.actions))
                 }
                 WhiteNoiseDropdownMenu(
@@ -505,6 +516,7 @@ private fun DiagnosticsHealthSheet(
                         stringResource(R.string.refresh),
                         onRefresh,
                         Modifier.testTag("diagnostics.health.refresh"),
+                        explanation = stringResource(R.string.explanation_privacy_diagnostics_refresh),
                     )
                 }
                 row("send") { context ->
@@ -514,6 +526,7 @@ private fun DiagnosticsHealthSheet(
                         onSendToSelf,
                         modifier = Modifier.testTag("diagnostics.health.test"),
                         enabled = state.sendToSelfEnabled,
+                        explanation = stringResource(R.string.explanation_privacy_diagnostics_send_to_self),
                     )
                 }
             }
@@ -569,6 +582,7 @@ private fun PerformanceDiagnosticsGroup(
                 checked = status.active,
                 onCheckedChange = onEnabledChange,
                 modifier = Modifier.testTag("diagnostics.performance"),
+                explanation = stringResource(R.string.explanation_privacy_diagnostics_perf_logs),
                 subtitle =
                     if (status.active) {
                         val remainingMinutes = ((status.remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
@@ -586,6 +600,7 @@ private fun PerformanceDiagnosticsGroup(
                     subtitle = stringResource(R.string.copy_performance_logs_detail),
                     onClick = onCopy,
                     modifier = Modifier.testTag("diagnostics.performance.copy"),
+                    explanation = stringResource(R.string.explanation_privacy_diagnostics_perf_copy),
                 )
             }
         }

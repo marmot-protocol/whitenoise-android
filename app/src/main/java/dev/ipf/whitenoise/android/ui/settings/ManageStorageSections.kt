@@ -51,6 +51,7 @@ internal fun LazyListScope.storageUsageItems(
                         onClick = onRefresh,
                         enabled = state.available && !state.busy,
                         modifier = Modifier.testTag("storage.retry"),
+                        explanation = stringResource(R.string.explanation_privacy_storage_retry),
                     )
                 }
             }
@@ -99,6 +100,7 @@ internal fun LazyListScope.storageFreeUpItems(
                     onClick = { onOpenList(LARGEST_ATTACHMENTS_LIST) },
                     enabled = ready && hasAttachments,
                     modifier = Modifier.testTag("storage.largest"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_largest),
                 )
             }
             row("older") { context ->
@@ -109,6 +111,7 @@ internal fun LazyListScope.storageFreeUpItems(
                     enabled = ready && hasAttachments,
                     busy = state.action is StorageAction.RemoveOlder,
                     modifier = Modifier.testTag("storage.remove_older"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_remove_older),
                 )
             }
             row("cache") { context ->
@@ -127,6 +130,7 @@ internal fun LazyListScope.storageFreeUpItems(
                         )
                     },
                     modifier = Modifier.testTag("storage.clear_cache"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_clear_cache),
                 )
             }
         }
@@ -153,6 +157,7 @@ internal fun LazyListScope.storageKeepMediaItems(
                     enabled = state.available && !state.busy && state.keepMedia != null,
                     busy = state.action is StorageAction.SetKeepMedia,
                     modifier = Modifier.testTag("storage.keep_media.action"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_keep_media),
                 )
             }
         }
@@ -224,6 +229,7 @@ private fun StorageChatRow(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.testTag("storage.chat"),
+        explanation = stringResource(R.string.explanation_privacy_storage_chat),
         leading =
             item?.let {
                 {

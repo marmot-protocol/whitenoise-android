@@ -42,7 +42,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.emojiSetsBackend
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.decodeEmojiImage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
@@ -175,8 +177,19 @@ private fun EmojiSetBrowser(
                     label = { Text(stringResource(R.string.emoji_sets_query)) },
                     lineLimits = TextFieldLineLimits.SingleLine,
                 )
-                Button(onClick = { onSearch(field.text.toString().trim()) }, enabled = !state.busy) {
-                    Text(stringResource(R.string.emoji_sets_find))
+                val findLabel = stringResource(R.string.emoji_sets_find)
+                Button(
+                    onClick = { onSearch(field.text.toString().trim()) },
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                findLabel,
+                                stringResource(R.string.explanation_organize_emoji_find),
+                            ),
+                        ),
+                    enabled = !state.busy,
+                ) {
+                    Text(findLabel)
                 }
             }
         }
@@ -200,6 +213,7 @@ private fun EmojiSetBrowser(
                                     pluralStringResource(R.plurals.emoji_sets_item_count, count, count)
                                 }
                             },
+                        explanation = stringResource(R.string.explanation_organize_emoji_set),
                         enabled = !state.busy,
                         onClick = { onShow(set) },
                     )
@@ -276,15 +290,26 @@ private fun EmojiSetPreviewHeader(
                 }
             }
         } else if (imageUrl != null) {
-            TextButton(onClick = onLoadArtwork, enabled = !state.busy) {
-                Text(stringResource(R.string.emoji_sets_load_image))
+            val label = stringResource(R.string.emoji_sets_load_image)
+            TextButton(
+                onClick = onLoadArtwork,
+                modifier =
+                    Modifier.explainOnLongPress(
+                        Explanation(
+                            label,
+                            stringResource(R.string.explanation_organize_emoji_load_image),
+                        ),
+                    ),
+                enabled = !state.busy,
+            ) {
+                Text(label)
             }
         }
     }
 }
 
 /** Displays only MDK's progress and keeps cancellation available until the install finishes. */
-@Suppress("LongParameterList")
+@Suppress("LongMethod", "LongParameterList")
 @Composable
 private fun EmojiSetActions(
     state: EmojiSetsState,
@@ -311,25 +336,72 @@ private fun EmojiSetActions(
                     ),
                 )
             }
-            TextButton(onClick = onCancel, enabled = !state.cancelling) {
-                Text(stringResource(R.string.cancel))
+            val cancelLabel = stringResource(R.string.cancel)
+            TextButton(
+                onClick = onCancel,
+                modifier =
+                    Modifier.explainOnLongPress(
+                        Explanation(
+                            cancelLabel,
+                            stringResource(R.string.explanation_organize_emoji_cancel),
+                        ),
+                    ),
+                enabled = !state.cancelling,
+            ) {
+                Text(cancelLabel)
             }
         } else {
             val installed = set.installed
             if (installed == null || installed.updateAvailable) {
-                Button(onClick = onInstall, enabled = !state.busy) {
-                    val label = if (installed == null) R.string.emoji_sets_install else R.string.emoji_sets_update
-                    Text(stringResource(label))
+                val isInstall = installed == null
+                val label =
+                    stringResource(if (isInstall) R.string.emoji_sets_install else R.string.emoji_sets_update)
+                val body =
+                    stringResource(
+                        if (isInstall) {
+                            R.string.explanation_organize_emoji_install
+                        } else {
+                            R.string.explanation_organize_emoji_update
+                        },
+                    )
+                Button(
+                    onClick = onInstall,
+                    modifier = Modifier.explainOnLongPress(Explanation(label, body)),
+                    enabled = !state.busy,
+                ) {
+                    Text(label)
                 }
             }
             if (installed != null && !installed.updateAvailable) {
-                TextButton(onClick = onCheckUpdate, enabled = !state.busy) {
-                    Text(stringResource(R.string.emoji_sets_check_update))
+                val checkLabel = stringResource(R.string.emoji_sets_check_update)
+                TextButton(
+                    onClick = onCheckUpdate,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                checkLabel,
+                                stringResource(R.string.explanation_organize_emoji_check_update),
+                            ),
+                        ),
+                    enabled = !state.busy,
+                ) {
+                    Text(checkLabel)
                 }
             }
             if (installed != null) {
-                TextButton(onClick = onRemove, enabled = !state.busy) {
-                    Text(stringResource(R.string.remove))
+                val removeLabel = stringResource(R.string.remove)
+                TextButton(
+                    onClick = onRemove,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                removeLabel,
+                                stringResource(R.string.explanation_organize_emoji_remove),
+                            ),
+                        ),
+                    enabled = !state.busy,
+                ) {
+                    Text(removeLabel)
                 }
             }
         }

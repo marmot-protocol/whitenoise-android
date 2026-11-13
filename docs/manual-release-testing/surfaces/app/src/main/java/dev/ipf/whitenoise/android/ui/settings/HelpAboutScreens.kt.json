@@ -367,6 +367,54 @@
         "test_ids": [
           "SET-019"
         ]
+      },
+      {
+        "surface": "R.string.explanation_organize_help_about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.explanation_organize_help_about",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_help_bug_report",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.explanation_organize_help_bug_report",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_help_developer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.explanation_organize_help_developer",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_help_licenses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.explanation_organize_help_licenses",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_help_open_github",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.explanation_organize_help_open_github",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_help_privacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+        "anchor": "R.string.explanation_organize_help_privacy",
+        "test_ids": [
+          "SET-057"
+        ]
       }
     ]
   },

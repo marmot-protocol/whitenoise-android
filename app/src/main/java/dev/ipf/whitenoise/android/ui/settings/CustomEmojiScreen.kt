@@ -161,6 +161,7 @@ internal fun CustomEmojiContent(
                                         stringResource(
                                             if (entry.sendable) R.string.remove else R.string.custom_emoji_unsendable,
                                         ),
+                                    explanation = stringResource(R.string.explanation_organize_custom_emoji_entry),
                                     onClick = { onRemove(entry) },
                                     leading = {
                                         EmojiArtImage(
@@ -192,6 +193,7 @@ private fun CustomEmojiAddActions(
             SettingsAction(
                 context = context,
                 title = stringResource(R.string.choose_photos),
+                explanation = stringResource(R.string.explanation_organize_custom_emoji_photos),
                 onClick = onChoosePhoto,
                 leading = { Icon(painterResource(R.drawable.ic_image), contentDescription = null) },
             )
@@ -201,6 +203,7 @@ private fun CustomEmojiAddActions(
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.emoji_sets_title),
+                    explanation = stringResource(R.string.explanation_organize_custom_emoji_sets),
                     onClick = onOpenSets,
                 )
             }
@@ -209,6 +212,7 @@ private fun CustomEmojiAddActions(
             SettingsAction(
                 context = context,
                 title = stringResource(R.string.choose_files),
+                explanation = stringResource(R.string.explanation_organize_custom_emoji_files),
                 onClick = onChooseFile,
                 leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
             )

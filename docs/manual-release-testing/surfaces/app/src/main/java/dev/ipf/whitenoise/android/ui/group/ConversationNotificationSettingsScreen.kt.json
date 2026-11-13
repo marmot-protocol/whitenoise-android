@@ -153,6 +153,24 @@
           "SET-040"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_privacy_conversation_mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.explanation_privacy_conversation_mute",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_conversation_vibration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.explanation_privacy_conversation_vibration",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

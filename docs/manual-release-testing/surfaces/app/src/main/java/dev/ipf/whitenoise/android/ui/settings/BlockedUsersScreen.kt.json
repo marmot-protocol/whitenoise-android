@@ -86,6 +86,14 @@
         "test_ids": [
           "SEC-014"
         ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_blocked_unblock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+        "anchor": "R.string.explanation_privacy_blocked_unblock",
+        "test_ids": [
+          "SET-055"
+        ]
       }
     ]
   },

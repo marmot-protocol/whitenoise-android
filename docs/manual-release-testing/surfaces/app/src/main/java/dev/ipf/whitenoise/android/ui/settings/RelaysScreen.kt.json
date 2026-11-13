@@ -434,6 +434,94 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_relays_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_add",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_add_submit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_add_submit",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_posting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_posting",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_receiving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_receiving",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_refresh",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_relay_row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_relay_row",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_remove",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_remove_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_remove_confirm",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_restore",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_restore",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_restore_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_restore_confirm",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.explanation_relays_retry",
+        "test_ids": [
+          "SET-056"
+        ]
       }
     ]
   },

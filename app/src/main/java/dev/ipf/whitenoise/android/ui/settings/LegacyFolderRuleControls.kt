@@ -49,6 +49,7 @@ internal fun LegacyFolderRuleControls(
                 it,
                 stringResource(R.string.chat_folder_people),
                 onPeople,
+                explanation = stringResource(R.string.explanation_organize_folder_people),
                 value = peopleCount.toString(),
             )
         }
@@ -58,6 +59,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_unread_only),
                 unread,
                 onUnread,
+                explanation = stringResource(R.string.explanation_organize_folder_unread_only),
             )
         }
         row("mentions") {
@@ -66,6 +68,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_unread_mentions_only),
                 mentions,
                 onMentions,
+                explanation = stringResource(R.string.explanation_organize_folder_mentions_only),
             )
         }
         row("pinned") {
@@ -74,6 +77,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_pinned_only),
                 pinned,
                 onPinned,
+                explanation = stringResource(R.string.explanation_organize_folder_pinned_only),
             )
         }
         row("groups") {
@@ -82,6 +86,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_groups_only),
                 groups,
                 onGroups,
+                explanation = stringResource(R.string.explanation_organize_folder_groups_only),
             )
         }
         row("direct") {
@@ -90,6 +95,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_direct_chats_only),
                 direct,
                 onDirect,
+                explanation = stringResource(R.string.explanation_organize_folder_direct_only),
             )
         }
         row("archive") {
@@ -98,6 +104,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_archived_only),
                 archived,
                 onArchived,
+                explanation = stringResource(R.string.explanation_organize_folder_archived_only),
             )
         }
         row("muted") {
@@ -106,6 +113,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_include_muted),
                 muted,
                 onMuted,
+                explanation = stringResource(R.string.explanation_organize_folder_include_muted),
             )
         }
     }

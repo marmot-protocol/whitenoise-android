@@ -1,0 +1,150 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+  "legacy_sha256": "9c4312ce563765281006851404db3b8645ae5a066947963dc960b9538d27ea2f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DictationProviderChooser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "fun DictationProviderChooser(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002",
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "DictationProviderSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "fun DictationProviderSheet(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002",
+          "DIC-003"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "dictation_provider_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_automatic",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_empty",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_explanation",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_in_app",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_in_app",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_keyboard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_keyboard",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_loading",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_precedence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_precedence",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_title",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_unknown",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      },
+      {
+        "surface": "dictation_provider_window",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.dictation_provider_window",
+        "test_ids": [
+          "DIC-001",
+          "DIC-006"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: DictationProviderSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_dictation_provider_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.explanation_appearance_dictation_provider_automatic",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_dictation_provider_engine",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+        "anchor": "R.string.explanation_appearance_dictation_provider_engine",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

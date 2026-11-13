@@ -58,6 +58,7 @@ internal fun AccountHubGroup(
             SettingsLink(
                 context = context,
                 title = stringResource(R.string.profile),
+                explanation = stringResource(R.string.explanation_organize_hub_profile),
                 subtitle = stringResource(readiness.summary),
                 onClick = { onOpenDetail(SettingsDetail.Profile) },
             )
@@ -66,6 +67,7 @@ internal fun AccountHubGroup(
             SettingsLink(
                 context = context,
                 title = stringResource(R.string.settings_profile_keys),
+                explanation = stringResource(R.string.explanation_organize_hub_profile_keys),
                 onClick = { onOpenDetail(SettingsDetail.AccountKeys) },
             )
         }
@@ -112,6 +114,7 @@ internal fun ChatsScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.chat_folders_title),
+                            explanation = stringResource(R.string.explanation_organize_hub_chat_folders),
                             onClick = { onOpenDetail(SettingsDetail.ChatFolders) },
                         )
                     }
@@ -119,6 +122,7 @@ internal fun ChatsScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.gestures_title),
+                            explanation = stringResource(R.string.explanation_organize_hub_gestures),
                             onClick = { onOpenDetail(SettingsDetail.Gestures) },
                         )
                     }
@@ -126,6 +130,7 @@ internal fun ChatsScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.composer_settings),
+                            explanation = stringResource(R.string.explanation_organize_hub_composer),
                             subtitle = stringResource(R.string.composer_settings_detail),
                             onClick = { onOpenDetail(SettingsDetail.Composer) },
                         )
@@ -134,6 +139,7 @@ internal fun ChatsScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.enter_key_behavior_title),
+                            explanation = stringResource(R.string.explanation_organize_hub_enter_behavior),
                             value = enterLabels.getValue(appState.enterKeyBehavior),
                             onClick = { enterOpen = true },
                         )
@@ -142,6 +148,7 @@ internal fun ChatsScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.custom_emoji),
+                            explanation = stringResource(R.string.explanation_organize_hub_custom_emoji),
                             modifier = Modifier.testTag("appearance.custom_emoji.group"),
                             onClick = { onOpenDetail(SettingsDetail.CustomEmoji) },
                         )
@@ -150,6 +157,7 @@ internal fun ChatsScreen(
                         SettingsSwitch(
                             context = context,
                             title = stringResource(R.string.quick_account_switching),
+                            explanation = stringResource(R.string.explanation_organize_hub_quick_switching),
                             checked = appState.quickAccountSwitching,
                             subtitle = stringResource(R.string.quick_account_switching_detail),
                             modifier = Modifier.testTag("appearance.quick_account_switching"),
@@ -179,6 +187,7 @@ internal fun VoiceLanguageScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.language),
+                            explanation = stringResource(R.string.explanation_organize_hub_language),
                             value = stringResource(language.labelRes),
                             modifier = Modifier.testTag("appearance.language.group"),
                             onClick = { onOpenDetail(SettingsDetail.Language) },
@@ -188,6 +197,7 @@ internal fun VoiceLanguageScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.settings_read_aloud),
+                            explanation = stringResource(R.string.explanation_organize_hub_read_aloud),
                             onClick = { onOpenDetail(SettingsDetail.TextToSpeech) },
                         )
                     }
@@ -195,6 +205,7 @@ internal fun VoiceLanguageScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.dictation_settings_title),
+                            explanation = stringResource(R.string.explanation_organize_hub_dictation),
                             onClick = { onOpenDetail(SettingsDetail.Dictation) },
                         )
                     }
@@ -202,6 +213,7 @@ internal fun VoiceLanguageScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.translation_title),
+                            explanation = stringResource(R.string.explanation_organize_hub_translation),
                             onClick = { onOpenDetail(SettingsDetail.Translation) },
                         )
                     }
@@ -227,6 +239,7 @@ internal fun HelpSupportScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.help),
+                            explanation = stringResource(R.string.explanation_organize_hub_help),
                             onClick = { onOpenDetail(SettingsDetail.Help) },
                         )
                     }
@@ -235,6 +248,7 @@ internal fun HelpSupportScreen(
                             SettingsLink(
                                 context = context,
                                 title = stringResource(R.string.chat_with_support),
+                                explanation = stringResource(R.string.explanation_organize_hub_support),
                                 onClick = { onOpenDetail(SettingsDetail.Support) },
                             )
                         }
@@ -243,6 +257,7 @@ internal fun HelpSupportScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.settings_donate),
+                            explanation = stringResource(R.string.explanation_organize_hub_donate),
                             onClick = { onOpenDetail(SettingsDetail.Donate) },
                         )
                     }
@@ -250,6 +265,7 @@ internal fun HelpSupportScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.settings_developer_tools),
+                            explanation = stringResource(R.string.explanation_organize_hub_developer),
                             onClick = { onOpenDetail(SettingsDetail.Developer) },
                         )
                     }

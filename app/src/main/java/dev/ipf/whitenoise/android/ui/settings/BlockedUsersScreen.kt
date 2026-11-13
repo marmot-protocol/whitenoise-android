@@ -77,6 +77,7 @@ private fun BlockedUsersGroup(
                     subtitle = stringResource(R.string.profile_unblock),
                     onClick = { onUnblock(user) },
                     enabled = busyUser == null,
+                    explanation = stringResource(R.string.explanation_privacy_blocked_unblock),
                     leading = { Icon(Icons.Outlined.Block, contentDescription = null) },
                 )
             }

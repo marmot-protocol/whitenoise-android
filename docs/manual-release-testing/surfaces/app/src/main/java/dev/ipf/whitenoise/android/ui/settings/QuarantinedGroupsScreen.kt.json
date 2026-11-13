@@ -204,6 +204,14 @@
         "test_ids": [
           "SET-031"
         ]
+      },
+      {
+        "surface": "R.string.explanation_relays_quarantine_reopen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.explanation_relays_quarantine_reopen",
+        "test_ids": [
+          "SET-056"
+        ]
       }
     ]
   },

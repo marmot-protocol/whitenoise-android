@@ -37,9 +37,11 @@ import androidx.core.net.toUri
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -105,6 +107,7 @@ internal fun AiAgentsContent(
                                 modifier = Modifier.testTag("ai_agents.connector.${connector.id}"),
                                 subtitle = stringResource(connector.subtitleRes),
                                 enabled = npub != null,
+                                explanation = stringResource(R.string.explanation_organize_ai_connector),
                             )
                         }
                     }
@@ -129,6 +132,7 @@ internal fun AiAgentsContent(
                             modifier = Modifier.testTag("ai_agents.copy_public_key"),
                             subtitle = npub?.let(::abbreviatedNpub),
                             enabled = npub != null,
+                            explanation = stringResource(R.string.explanation_organize_ai_copy_public_key),
                             leading = {
                                 Icon(painterResource(R.drawable.ic_content_copy), contentDescription = null)
                             },
@@ -141,6 +145,7 @@ internal fun AiAgentsContent(
                             onClick = { feedback = documentationOutcome(onOpenDocs()) },
                             modifier = Modifier.testTag("ai_agents.docs"),
                             subtitle = stringResource(R.string.ai_agents_connector_docs_subtitle),
+                            explanation = stringResource(R.string.explanation_organize_ai_docs),
                         )
                     }
                 }
@@ -215,7 +220,12 @@ private fun AgentSetupSheet(
                             .fillMaxWidth()
                             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
                             .clip(MaterialTheme.shapes.large)
-                            .clickable(onClickLabel = copyLabel, role = Role.Button, onClick = copyPrompt)
+                            .explainOnLongPress(
+                                Explanation(
+                                    copyLabel,
+                                    stringResource(R.string.explanation_organize_ai_copy_prompt),
+                                ),
+                            ).clickable(onClickLabel = copyLabel, role = Role.Button, onClick = copyPrompt)
                             .testTag("ai_agents.prompt.${connector.id}"),
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -245,7 +255,16 @@ private fun AgentSetupSheet(
                 }
                 WhiteNoiseButton(
                     onClick = copyPrompt,
-                    modifier = Modifier.fillMaxWidth().testTag("ai_agents.copy.${connector.id}"),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .testTag("ai_agents.copy.${connector.id}")
+                            .explainOnLongPress(
+                                Explanation(
+                                    copyLabel,
+                                    stringResource(R.string.explanation_organize_ai_copy_prompt),
+                                ),
+                            ),
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_content_copy),
@@ -253,7 +272,7 @@ private fun AgentSetupSheet(
                         modifier = Modifier.size(SetupCopyIconSize),
                     )
                     Text(
-                        text = stringResource(R.string.ai_agents_copy_prompt),
+                        text = copyLabel,
                         modifier = Modifier.padding(start = WhiteNoiseSpacing.Related),
                     )
                 }

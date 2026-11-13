@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain bodies for relays controls; titles reuse each control's own label. -->
+    <string name="explanation_relays_posting">Shows whether your Where I post list is published. This list tells other people which relays carry your profile and public events. Relays are servers that store and pass along events, and they cannot read your encrypted messages. If it is missing, others may not find your profile. Use Publish missing lists to fix that.</string>
+    <string name="explanation_relays_receiving">Shows whether your Where I receive list is published. People send invitations to new chats and groups to these relays, and the invitations are encrypted so a relay cannot read them. If the list is missing, others may not know where to send you an invitation, and invitations may not reach you.</string>
+    <string name="explanation_relays_retry">Tries the failed relay list action again, either checking the status or publishing the missing lists. Nothing changes on your relays until it succeeds.</string>
+    <string name="explanation_relays_refresh">Checks your relays again to see whether your Where I post and Where I receive lists are published. It only reads; it does not publish or change anything.</string>
+    <string name="explanation_relays_relay_row">Opens this relay’s details, where you can see its address, choose whether it is used for posting, receiving or both, or remove it. A relay is a server that stores and passes along encrypted messages and public events. Existing chats keep their own relays.</string>
+    <string name="explanation_relays_add">Adds a relay to this profile. A relay is a server that stores and passes along encrypted messages and public events. You choose whether it is used for posting, receiving or both, and your relay lists are updated so other people can see the change.</string>
+    <string name="explanation_relays_restore">Replaces this profile’s relays and their roles with the app defaults. Custom relays you added are removed from your lists. Existing chats keep their relays. This is unavailable while you already use the defaults.</string>
+    <string name="explanation_relays_restore_confirm">Confirms replacing this profile’s relays and roles with the defaults. Custom relays are removed from your lists, and you can add them again later. Existing chats keep their relays.</string>
+    <string name="explanation_relays_remove">Stops this profile from using this relay and removes it from your lists. Existing chats keep their relays, and you can add the relay again later. It is unavailable when this relay is the last one in a list, so you always have somewhere to post and receive.</string>
+    <string name="explanation_relays_remove_confirm">Confirms removing this relay from this profile. You can add it again later. Existing chats keep their relays.</string>
+    <string name="explanation_relays_add_submit">Adds the relay with the roles you switched on and updates your relay lists. Choose at least one role first, posting or receiving, so the relay has a purpose.</string>
+    <string name="explanation_relays_key_packages_refresh">Reloads the key packages published for this account from relays. It only reads; it does not publish or delete anything.</string>
+    <string name="explanation_relays_key_packages_republish">Publishes your current local key packages to relays again without creating new ones. A key package is a public invitation key that lets other people add you to an encrypted group. Use it if others cannot invite you.</string>
+    <string name="explanation_relays_key_packages_publish_new">Creates a new key package and publishes it to relays for future invitations. Existing key packages are kept. A key package is a public invitation key that lets other people add you to an encrypted group.</string>
+    <string name="explanation_relays_key_package_delete">Opens a confirmation to delete this key package from the relays that hold it. Others can no longer use it to invite you. You can publish a new one later.</string>
+    <string name="explanation_relays_key_package_delete_confirm">Deletes this key package from the relays that hold it. It cannot be restored, but you can publish a new key package later.</string>
+    <string name="explanation_relays_key_package_id">The identifier of this key package. Tap to copy the full value to the clipboard, or hold to read this note.</string>
+    <string name="explanation_relays_key_package_event">The identifier of the relay event that carries this key package. Tap to copy the full value to the clipboard, or hold to read this note.</string>
+    <string name="explanation_relays_key_package_ref">The reference used to identify this key package. Tap to copy the full value to the clipboard, or hold to read this note.</string>
+    <string name="explanation_relays_key_package_local_state">Shows whether this device holds the private keys that match this key package, and whether it is the current one or kept for older invitations.</string>
+    <string name="explanation_relays_key_package_seen_on">The relays where this key package was found. Deleting it asks these relays to remove it.</string>
+    <string name="explanation_relays_quarantine_reopen">A group that could not be safely loaded. The text below explains how to recover it. Nothing is deleted.</string>
+    <string name="explanation_relays_group_relay_row">One of the relays configured for this chat. The chat’s encrypted messages travel through these relays to every member. This shows the configuration only, not whether the relay is connected right now.</string>
+    <string name="explanation_relays_group_relay_copy">Copies this relay’s address to the clipboard.</string>
+    <string name="explanation_relays_setup_undo">Puts back the relay you just removed in this setup step, exactly as it was.</string>
+</resources>

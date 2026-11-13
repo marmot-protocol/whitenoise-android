@@ -39,11 +39,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -317,7 +319,10 @@ internal fun SettingsPanel(
     }
 }
 
-/** A read-only row: the title over its value in the quiet supporting style, on the group's shape and fill. */
+/**
+ * A read-only row: the title over its value in the quiet supporting style, on the group's shape and fill.
+ * Holding a row with [explanation] explains [title].
+ */
 @Suppress("FunctionNaming")
 @Composable
 internal fun SettingsValue(
@@ -325,8 +330,9 @@ internal fun SettingsValue(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
+    explanation: String? = null,
 ) {
-    SettingsGroupPanel(context, modifier) {
+    SettingsGroupPanel(context, modifier.explainOnLongPress(explanation?.let { Explanation(title, it) })) {
         Column(
             Modifier
                 .fillMaxWidth()

@@ -133,6 +133,7 @@ internal fun NotificationsScreen(
                             title = stringResource(R.string.notification_sounds_vibration),
                             onClick = onOpenSounds,
                             modifier = Modifier.testTag("notifications.sounds"),
+                            explanation = stringResource(R.string.explanation_privacy_notif_sounds),
                         )
                     }
                     row("delivery") { rowContext ->
@@ -142,6 +143,7 @@ internal fun NotificationsScreen(
                             value = deliveryValue,
                             onClick = onOpenDelivery,
                             modifier = Modifier.testTag("notifications.delivery"),
+                            explanation = stringResource(R.string.explanation_privacy_notif_delivery),
                         )
                     }
                     row("android_settings") { rowContext ->
@@ -150,6 +152,7 @@ internal fun NotificationsScreen(
                             title = stringResource(R.string.android_notification_settings),
                             onClick = { openAppNotificationSettings(context) },
                             modifier = Modifier.testTag("notifications.android-settings"),
+                            explanation = stringResource(R.string.explanation_privacy_notif_android_settings),
                         )
                     }
                 }
@@ -329,6 +332,7 @@ private fun NotificationDevicePolicyGroup(
                         },
                     ),
                 onClick = onOpenNotificationSettings,
+                explanation = stringResource(R.string.explanation_privacy_notif_permission),
             )
         }
         row("battery") { context ->
@@ -338,6 +342,7 @@ private fun NotificationDevicePolicyGroup(
                 subtitle = stringResource(batteryPolicy.subtitleResource()),
                 onClick = onOpenBatterySettings,
                 modifier = Modifier.testTag("notification-battery.settings"),
+                explanation = stringResource(R.string.explanation_privacy_notif_battery),
             )
         }
     }
@@ -369,6 +374,7 @@ private fun NotificationPermissionGroup(
                     title = stringResource(R.string.notifications_are_off),
                     subtitle = stringResource(R.string.notifications_are_off_detail),
                     onClick = onOpenSettings,
+                    explanation = stringResource(R.string.explanation_privacy_notif_off),
                     leading = { NotificationPermissionIcon(R.drawable.ic_notifications_off) },
                 )
             }
@@ -379,6 +385,7 @@ private fun NotificationPermissionGroup(
                     title = stringResource(R.string.allow_notifications),
                     subtitle = stringResource(R.string.allow_notifications_detail),
                     onClick = onRequest,
+                    explanation = stringResource(R.string.explanation_privacy_notif_allow),
                     leading = { NotificationPermissionIcon(R.drawable.ic_settings_notifications) },
                 )
             }
@@ -423,6 +430,7 @@ internal fun GlobalNotificationCategories(
                     value = soundLabels[channel],
                     onClick = { onOpenChannel(channel) },
                     modifier = Modifier.testTag("global-notification-category-${channel.id}"),
+                    explanation = stringResource(R.string.explanation_privacy_notif_category),
                 )
             }
         }

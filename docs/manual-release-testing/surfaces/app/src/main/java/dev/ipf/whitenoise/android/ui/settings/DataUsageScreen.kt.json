@@ -414,6 +414,62 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_data_jpeg_previews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_privacy_data_jpeg_previews",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_data_manage_storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_privacy_data_manage_storage",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_data_media_type",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_privacy_data_media_type",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_data_quality",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_privacy_data_quality",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_data_queue_restart",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_privacy_data_queue_restart",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_data_queue_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_privacy_data_queue_stop",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_data_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+        "anchor": "R.string.explanation_privacy_data_reset",
+        "test_ids": [
+          "SET-055"
+        ]
       }
     ],
     "string_resources": [

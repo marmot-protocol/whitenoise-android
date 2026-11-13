@@ -51,11 +51,13 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
@@ -233,7 +235,7 @@ internal fun ChatFolderDeleteDialog(
 
 /** The list without any state ownership, so tests can render every folder arrangement. */
 @Composable
-@Suppress("FunctionNaming", "LongParameterList")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun ChatFoldersContent(
     state: ChatFoldersState,
     onBack: () -> Unit,
@@ -251,8 +253,18 @@ internal fun ChatFoldersContent(
         onBack = onBack,
         topBarActions = {
             SettingsSearchRowReveal("create", modifier = Modifier) {
-                IconButton(onClick = onCreate) {
-                    Icon(painterResource(R.drawable.ic_add), stringResource(R.string.folder_new_title))
+                val createLabel = stringResource(R.string.folder_new_title)
+                IconButton(
+                    onClick = onCreate,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                createLabel,
+                                stringResource(R.string.explanation_organize_folder_create),
+                            ),
+                        ),
+                ) {
+                    Icon(painterResource(R.drawable.ic_add), createLabel)
                 }
             }
         },
@@ -308,6 +320,7 @@ private fun ChatFolderRestoreDefaults(
                 context = context,
                 title = stringResource(R.string.folder_restore_defaults),
                 onClick = onRestoreDefaults,
+                explanation = stringResource(R.string.explanation_organize_folder_restore_defaults),
                 enabled = defaultsMissing,
             )
         }
@@ -390,8 +403,18 @@ private fun FolderManageRow(
                     )
                 }
                 Box {
-                    IconButton(onClick = { menu = true }) {
-                        Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.actions_for, name))
+                    val actionsLabel = stringResource(R.string.actions_for, name)
+                    IconButton(
+                        onClick = { menu = true },
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    actionsLabel,
+                                    stringResource(R.string.explanation_organize_folder_actions),
+                                ),
+                            ),
+                    ) {
+                        Icon(painterResource(R.drawable.ic_more_vert), actionsLabel)
                     }
                     WhiteNoiseDropdownMenu(
                         expanded = menu,

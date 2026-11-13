@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
 
 /** Characters per display group of a public key (#3321). An npub holds letters as well as digits. */
@@ -110,7 +112,13 @@ internal fun CopyableFullPublicKey(
                 .clip(MaterialTheme.shapes.medium)
                 .let { base ->
                     if (copyable) {
-                        base.clickable(role = Role.Button, onClickLabel = copyLabel, onClick = onCopy)
+                        base
+                            .explainOnLongPress(
+                                Explanation(
+                                    copyLabel,
+                                    stringResource(R.string.explanation_organize_copy_public_key),
+                                ),
+                            ).clickable(role = Role.Button, onClickLabel = copyLabel, onClick = onCopy)
                     } else {
                         base
                     }

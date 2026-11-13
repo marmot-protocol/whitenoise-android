@@ -208,7 +208,13 @@ private fun LazyListScope.quarantineRows(
             SettingsGroup {
                 if (!quarantineRetryable(entry.reason)) {
                     row("reopen") { context ->
-                        SettingsValue(context, group, guidance, Modifier.testTag("quarantine.reopen"))
+                        SettingsValue(
+                            context,
+                            group,
+                            guidance,
+                            Modifier.testTag("quarantine.reopen"),
+                            explanation = stringResource(R.string.explanation_relays_quarantine_reopen),
+                        )
                     }
                 } else {
                     row("recovery") { context ->

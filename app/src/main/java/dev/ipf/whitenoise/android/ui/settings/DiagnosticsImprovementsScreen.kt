@@ -176,6 +176,7 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.choose_audit_files_subtitle),
                             onClick = { auditPickerOpen = true },
                             enabled = !auditLogsBusy && !exportInFlight,
+                            explanation = stringResource(R.string.explanation_privacy_audit_choose),
                         )
                     }
                     row("export") { rowContext ->
@@ -185,6 +186,7 @@ internal fun DiagnosticsImprovementsScreen(
                             onClick = { if (!exportInFlight) exportConfirmOpen = true },
                             subtitle = stringResource(R.string.export_audit_logs_subtitle),
                             enabled = !auditLogsBusy && !exportInFlight,
+                            explanation = stringResource(R.string.explanation_privacy_audit_export),
                         )
                     }
                     row("delete") { rowContext ->
@@ -196,6 +198,7 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.diagnostics_storage_device),
                             enabled = !auditLogsBusy && !exportInFlight,
                             destructive = true,
+                            explanation = stringResource(R.string.explanation_privacy_audit_clear),
                         )
                     }
                 }

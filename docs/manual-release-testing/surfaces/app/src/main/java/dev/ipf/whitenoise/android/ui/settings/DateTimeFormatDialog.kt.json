@@ -109,6 +109,56 @@
           "SET-045"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_date_time_date_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.explanation_appearance_date_time_date_automatic",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_date_time_date_order",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.explanation_appearance_date_time_date_order",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_date_time_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.explanation_appearance_date_time_reset",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_date_time_time_12",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.explanation_appearance_date_time_time_12",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_date_time_time_24",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.explanation_appearance_date_time_time_24",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_date_time_time_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.explanation_appearance_date_time_time_automatic",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
     ]
   }
 }

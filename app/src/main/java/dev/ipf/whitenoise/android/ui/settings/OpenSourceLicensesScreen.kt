@@ -111,6 +111,7 @@ private fun OpenSourceLicensesList(
             SettingsLink(
                 settingsRowContext(index, notices.size),
                 title = notice.name,
+                explanation = stringResource(R.string.explanation_organize_license_notice),
                 onClick = { onSelect(notice) },
                 modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
             )

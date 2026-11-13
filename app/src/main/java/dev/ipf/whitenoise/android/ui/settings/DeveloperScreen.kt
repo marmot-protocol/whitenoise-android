@@ -168,6 +168,7 @@ internal fun DeveloperContent(
                             checked = developerMode,
                             onCheckedChange = onDeveloperModeChange,
                             modifier = Modifier.testTag("developer.mode.switch"),
+                            explanation = stringResource(R.string.explanation_organize_dev_mode),
                         )
                     }
                 }
@@ -217,6 +218,7 @@ internal fun DeveloperContent(
                                     ),
                             busy = demoStatus is ReviewDemoStatus.Running,
                             modifier = Modifier.testTag("developer.demo.action"),
+                            explanation = stringResource(R.string.explanation_organize_dev_demo),
                         )
                     }
                     if (demoHasSavedSetup && demoStatus !is ReviewDemoStatus.Running) {
@@ -227,6 +229,7 @@ internal fun DeveloperContent(
                                 onClick = { confirmClear = true },
                                 destructive = true,
                                 modifier = Modifier.testTag("developer.demo.clear"),
+                                explanation = stringResource(R.string.explanation_organize_dev_demo_clear),
                             )
                         }
                     }
@@ -284,6 +287,7 @@ internal fun DeveloperContent(
                                 onClick = onOpenDiagnostics,
                                 modifier = Modifier.testTag("developer.diagnostics"),
                                 subtitle = stringResource(R.string.diagnostics_settings_subtitle),
+                                explanation = stringResource(R.string.explanation_organize_dev_diagnostics),
                             )
                         }
                         if (onSeedConversationFixture != null) {
@@ -294,6 +298,7 @@ internal fun DeveloperContent(
                                     onClick = onSeedConversationFixture,
                                     modifier = Modifier.testTag("developer.seed_fixture"),
                                     subtitle = stringResource(R.string.developer_seed_fixture_subtitle),
+                                    explanation = stringResource(R.string.explanation_organize_dev_seed_fixture),
                                 )
                             }
                         }

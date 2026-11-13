@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain bodies for relays controls; titles reuse each control's own label. -->
+    <string name="explanation_relays_posting">显示你的“我发布到哪里”列表是否已发布。该列表告诉他人哪些中继保存你的个人资料和公开事件。中继是存储并转发事件的服务器，无法读取你的加密消息。如果缺失，他人可能找不到你的个人资料。使用“发布缺失的列表”即可解决。</string>
+    <string name="explanation_relays_receiving">显示你的“我在哪里接收”列表是否已发布。新聊天和群组的邀请会以加密形式发送到这些中继，中继无法读取。如果列表缺失，他人可能不知道把邀请发到哪里，邀请也可能无法送达你。</string>
+    <string name="explanation_relays_retry">重试失败的中继列表操作，即检查状态或发布缺失的列表。在成功之前，你的中继不会有任何变化。</string>
+    <string name="explanation_relays_refresh">重新检查你的中继，查看“我发布到哪里”和“我在哪里接收”列表是否已发布。只读取，不会发布或更改任何内容。</string>
+    <string name="explanation_relays_relay_row">打开此中继的详情，你可以查看其地址，选择它用于发布、接收还是两者兼有，或将其移除。中继是存储并转发加密消息和公开事件的服务器。已有聊天保留各自的中继。</string>
+    <string name="explanation_relays_add">为此个人资料添加一个中继。中继是存储并转发加密消息和公开事件的服务器。你可以选择它用于发布、接收还是两者兼有，你的中继列表会随之更新，让他人看到这项更改。</string>
+    <string name="explanation_relays_restore">将此个人资料的中继及其用途替换为应用默认设置。你添加的自定义中继会从列表中移除。已有聊天保留各自的中继。如果你已在使用默认设置，则不可用。</string>
+    <string name="explanation_relays_restore_confirm">确认将此个人资料的中继和用途替换为默认设置。自定义中继会从列表中移除，之后可以重新添加。已有聊天保留各自的中继。</string>
+    <string name="explanation_relays_remove">此个人资料不再使用该中继，并将其从你的列表中移除。已有聊天保留各自的中继，之后可以重新添加该中继。如果它是列表中的最后一个中继则不可用，这样你始终有地方发布和接收。</string>
+    <string name="explanation_relays_remove_confirm">确认从此个人资料中移除该中继。之后可以重新添加。已有聊天保留各自的中继。</string>
+    <string name="explanation_relays_add_submit">按你开启的用途添加该中继，并更新你的中继列表。请先至少选择一种用途（发布或接收），让该中继有明确作用。</string>
+    <string name="explanation_relays_key_packages_refresh">从中继重新加载为此账户发布的密钥包。只读取，不会发布或删除任何内容。</string>
+    <string name="explanation_relays_key_packages_republish">将你当前的本地密钥包重新发布到中继，不会创建新的。密钥包是公开的邀请密钥，他人可以用它把你加入加密群组。如果他人无法邀请你，请使用此操作。</string>
+    <string name="explanation_relays_key_packages_publish_new">创建新的密钥包并发布到中继，用于今后的邀请。现有密钥包会保留。密钥包是公开的邀请密钥，他人可以用它把你加入加密群组。</string>
+    <string name="explanation_relays_key_package_delete">打开确认窗口，从保存此密钥包的中继上删除它。他人将无法再用它邀请你。你之后可以发布新的密钥包。</string>
+    <string name="explanation_relays_key_package_delete_confirm">从保存此密钥包的中继上删除它。删除后无法恢复，但你之后可以发布新的密钥包。</string>
+    <string name="explanation_relays_key_package_id">此密钥包的标识符。点按可将完整值复制到剪贴板，长按可阅读本说明。</string>
+    <string name="explanation_relays_key_package_event">包含此密钥包的中继事件的标识符。点按可将完整值复制到剪贴板，长按可阅读本说明。</string>
+    <string name="explanation_relays_key_package_ref">用于识别此密钥包的引用。点按可将完整值复制到剪贴板，长按可阅读本说明。</string>
+    <string name="explanation_relays_key_package_local_state">显示此设备是否持有与该密钥包对应的私钥，以及它是当前使用的，还是为较早的邀请而保留的。</string>
+    <string name="explanation_relays_key_package_seen_on">发现此密钥包的中继。删除它时会请这些中继将其移除。</string>
+    <string name="explanation_relays_quarantine_reopen">一个无法安全加载的群组。下方文字说明了如何恢复它。不会删除任何内容。</string>
+    <string name="explanation_relays_group_relay_row">为此聊天配置的中继之一。聊天的加密消息通过这些中继送达每位成员。这里只显示配置，不显示该中继当前是否已连接。</string>
+    <string name="explanation_relays_group_relay_copy">将此中继的地址复制到剪贴板。</string>
+    <string name="explanation_relays_setup_undo">将你在此设置步骤中刚移除的中继原样恢复。</string>
+</resources>

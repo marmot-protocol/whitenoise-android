@@ -9,10 +9,10 @@
     <string name="explanation_account_keys_signout_invitation_keys">开启后，退出登录时会从中继移除您已发布的邀请密钥，因此在您退出登录期间，没有人能邀请您加入新群组。</string>
     <string name="explanation_settings_profile_row">打开此个人资料的“分享与连接”。点按简短密钥可复制完整公钥。</string>
     <string name="explanation_settings_profile_picture">打开此头像的选项。</string>
-    <string name="explanation_settings_relays">显示此个人资料使用的中继，以及每个中继所服务的列表。</string>
-    <string name="explanation_relays_role_profile">将此中继添加到您发布的个人资料列表中，让其他人知道去哪里找到您的个人资料和连接信息。</string>
-    <string name="explanation_relays_role_inbox">将此中继添加到他人用来向您发送新聊天和群组邀请的列表中。</string>
-    <string name="explanation_relays_publish_missing">发布被标记为缺失的中继列表，让其他人知道如何联系到您。</string>
+    <string name="explanation_settings_relays">打开此个人资料使用的中继。中继是存储并转发加密消息和公开事件（例如你的个人资料）的服务器。你可以在这里选择向哪些中继发布、从哪些中继接收邀请，并添加或移除中继。中继可以看到公开事件，但看不到你的加密消息内容。</string>
+    <string name="explanation_relays_role_profile">在“我发布到哪里”中开启或关闭此中继。该列表中的中继会保存你的个人资料和连接信息，方便他人找到你。你的个人资料是公开的，因此保存它的中继都能读取。列表中至少要保留一个中继。</string>
+    <string name="explanation_relays_role_inbox">在“我在哪里接收”中开启或关闭此中继。他人会把新聊天和群组的邀请发送到该列表的中继。邀请是加密的，中继无法读取。如果列表为空，邀请可能无法送达你，因此至少要保持开启一个中继。</string>
+    <string name="explanation_relays_publish_missing">发布标记为缺失的中继列表，即“我发布到哪里”和“我在哪里接收”。他人会查看这些列表来找到你的个人资料，并知道把邀请发到哪里。在发布之前，他人可能无法联系到你。只会发布缺失的列表。</string>
     <string name="explanation_account_setup_remove_relay">在此设置步骤中，将此中继从您的中继列表中移除。移除后可立即撤销。</string>
     <string name="explanation_developer_key_packages">显示为此账户发布的密钥包（他人可借此邀请您加入群组），并可对其进行管理。</string>
     <string name="explanation_developer_quarantined_groups">列出无法安全加载的群组，并可重试恢复。不会删除任何内容。</string>

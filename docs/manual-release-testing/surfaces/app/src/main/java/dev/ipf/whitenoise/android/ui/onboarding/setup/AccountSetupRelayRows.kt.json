@@ -86,6 +86,14 @@
         "test_ids": [
           "ONB-017"
         ]
+      },
+      {
+        "surface": "R.string.explanation_relays_setup_undo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupRelayRows.kt",
+        "anchor": "R.string.explanation_relays_setup_undo",
+        "test_ids": [
+          "SET-056"
+        ]
       }
     ]
   }

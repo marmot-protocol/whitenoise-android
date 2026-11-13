@@ -65,6 +65,7 @@ internal fun AuditDeliverySection(
                 context = rowContext,
                 title = stringResource(R.string.audit_delivery_title),
                 value = listOfNotNull(status, delivery?.httpStatus?.let { "HTTP $it" }).joinToString(" · "),
+                explanation = stringResource(R.string.explanation_privacy_audit_status),
             )
         }
         auditDeliveryMetadata(delivery)
@@ -75,6 +76,7 @@ internal fun AuditDeliverySection(
                     title = stringResource(R.string.audit_delivery_resume),
                     onClick = onResume,
                     enabled = enabled,
+                    explanation = stringResource(R.string.explanation_privacy_audit_resume),
                     subtitle =
                         when {
                             settings.resumingDelivery -> stringResource(R.string.audit_delivery_resuming)
@@ -86,7 +88,13 @@ internal fun AuditDeliverySection(
         }
         if (settings.delivery != null && delivery?.state != AuditDeliveryState.OFF) {
             row("audit_refresh_delivery") { rowContext ->
-                SettingsAction(rowContext, stringResource(R.string.refresh), onRefresh, enabled = enabled)
+                SettingsAction(
+                    rowContext,
+                    stringResource(R.string.refresh),
+                    onRefresh,
+                    enabled = enabled,
+                    explanation = stringResource(R.string.explanation_privacy_audit_refresh),
+                )
             }
         }
     }
@@ -105,7 +113,12 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                         DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME,
                     )
                 } ?: stringResource(R.string.download_never)
-            SettingsValue(rowContext, stringResource(R.string.audit_delivery_last_success), lastCheck)
+            SettingsValue(
+                rowContext,
+                stringResource(R.string.audit_delivery_last_success),
+                lastCheck,
+                explanation = stringResource(R.string.explanation_privacy_audit_last_success),
+            )
         }
     }
     if (delivery.waitingBytes > 0L) {
@@ -114,6 +127,7 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                 rowContext,
                 stringResource(R.string.audit_delivery_waiting),
                 Formatter.formatShortFileSize(LocalContext.current, delivery.waitingBytes),
+                explanation = stringResource(R.string.explanation_privacy_audit_waiting),
             )
         }
     }
@@ -151,6 +165,7 @@ internal fun AuditRetentionRow(
         context = context,
         title = label,
         modifier = Modifier.testTag("audit.retention"),
+        explanation = stringResource(R.string.explanation_privacy_audit_retention),
         onClick = { if (current == null) onRefresh() else pickerOpen = true },
         value = current?.let { auditRetentionDays(it) },
         subtitle =
