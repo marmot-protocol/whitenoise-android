@@ -122,7 +122,12 @@ internal fun GroupMembersReviewDialog(
                             ownerCurrent = { groupMembersReviewOwnerCurrent(appState, actingAccount, runtime) },
                             busy = { liveBusy.value },
                             selectionCurrent = {
-                                sameReviewSelection(reviewedMembers, reviewedGroups, liveMembers.value, liveGroups.value)
+                                sameReviewSelection(
+                                    reviewedMembers,
+                                    reviewedGroups,
+                                    liveMembers.value,
+                                    liveGroups.value,
+                                )
                             },
                         )
                     ) {
