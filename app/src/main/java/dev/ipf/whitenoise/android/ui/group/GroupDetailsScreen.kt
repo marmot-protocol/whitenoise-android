@@ -324,6 +324,9 @@ internal fun GroupDetailsScreen(
         var showAddMember by rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) {
             mutableStateOf(false)
         }
+        // Saved with the staged selection so an open invite review survives recreation alongside it.
+        val addReviewOpen =
+            rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) { mutableStateOf(false) }
         val addSelection =
             rememberSaveable(
                 controller.group.groupIdHex,
@@ -428,6 +431,7 @@ internal fun GroupDetailsScreen(
         LaunchedEffect(canAdministerMembers) {
             if (!canAdministerMembers) {
                 showAddMember = false
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
             }
@@ -753,6 +757,7 @@ internal fun GroupDetailsScreen(
                 }
         LaunchedEffect(showAddMember, inviteSelectionApplied, controller.mutationInFlight) {
             if (showAddMember && inviteSelectionApplied && !controller.mutationInFlight) {
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
                 if (addMemberAutoOpened) onBack() else showAddMember = false
@@ -941,11 +946,13 @@ internal fun GroupDetailsScreen(
                     appState = appState,
                     title = stringResource(R.string.add_member),
                     selected = addSelection,
+                    reviewOpen = addReviewOpen,
                     onBack = {
                         // When auto-opened from the empty-group CTA, Back returns to the
                         // conversation (via the details onBack) rather than exposing the
                         // details body the user never intended to see.
                         if (!adding) {
+                            addReviewOpen.value = false
                             addSelection.clear()
                             addAdminSelection.clear()
                             if (addMemberAutoOpened) onBack() else showAddMember = false

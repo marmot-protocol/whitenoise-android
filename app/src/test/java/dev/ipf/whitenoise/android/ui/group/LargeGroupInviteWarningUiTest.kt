@@ -170,9 +170,9 @@ class LargeGroupInviteWarningUiTest {
         composeRule.runOnIdle { assertEquals(1, submits) }
     }
 
-    /** A selection that changes while the review is open cannot be submitted from that review. */
+    /** A selection that changes while the review is open closes that review without submitting. */
     @Test
-    fun reviewRefusesConfirmAfterSelectedMembersChange() {
+    fun reviewClosesWhenSelectedMembersChange() {
         var submits = 0
         val selected = mutableStateListOf(alice)
         composeRule.setContent {
@@ -191,8 +191,9 @@ class LargeGroupInviteWarningUiTest {
         }
 
         composeRule.onNodeWithContentDescription("Review selected members").performClick()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertIsDisplayed()
         composeRule.runOnIdle { selected += bob }
-        composeRule.onNodeWithTag(SELECTED_MEMBERS_CONFIRM_TAG).performClick()
+        composeRule.onNodeWithTag("group.members.review.dialog").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(0, submits) }
     }
 
@@ -277,19 +278,19 @@ class LargeGroupInviteWarningUiTest {
                         pendingInviteMemberIds = emptyList(),
                         stagedRecipientIds = selection.map { it.accountIdHex },
                     )
-                if (projection?.shouldWarn == true) LargeGroupInviteWarningBanner()
-                if (reviewOpen.value) {
-                    GroupMembersReviewDialog(
-                        appState = reviewState,
-                        groups = listOf(MemberReviewGroup("group-a", "Garden club")),
-                        members = selection.toList(),
-                        busy = false,
-                        onDismiss = {},
-                        onConfirm = {},
-                        confirmLabel = "Add member",
-                        description = if (projection?.shouldWarn == true) LARGE_GROUP_WARNING else null,
-                    )
-                }
+                val warn = projection?.shouldWarn == true
+                ContactPickerScreen(
+                    appState = reviewState,
+                    title = "Add member",
+                    selected = selection,
+                    onBack = {},
+                    onConfirm = {},
+                    confirmLabel = "Add member",
+                    reviewGroup = MemberReviewGroup("group-a", "Garden club"),
+                    reviewDescription = if (warn) LARGE_GROUP_WARNING else null,
+                    reviewOpen = reviewOpen,
+                    footer = { if (warn) LargeGroupInviteWarningBanner() },
+                )
             }
         }
         composeRule.runOnIdle {
@@ -303,8 +304,9 @@ class LargeGroupInviteWarningUiTest {
                     displayName = "Alice",
                     npub = "npub1alice",
                 )
-            reviewOpen.value = true
         }
+        composeRule.onNodeWithContentDescription("Review selected members").performClick()
+        composeRule.runOnIdle { assertTrue(reviewOpen.value) }
         assertWarningAndReviewDisplayed()
 
         restoration.emulateSavedInstanceStateRestore()

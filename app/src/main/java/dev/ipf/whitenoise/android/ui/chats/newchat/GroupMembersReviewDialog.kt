@@ -99,6 +99,13 @@ internal fun GroupMembersReviewDialog(
             onDismiss()
         }
     }
+    val selectionCurrent = reviewedMembers == members.map { it.accountIdHex } && reviewedGroups == groups.map { it.id }
+    LaunchedEffect(selectionCurrent) {
+        if (!selectionCurrent) {
+            ticket.invalidate()
+            onDismiss()
+        }
+    }
     WhiteNoiseAlertDialog(
         modifier = Modifier.testTag("group.members.review.dialog"),
         onDismissRequest = {
