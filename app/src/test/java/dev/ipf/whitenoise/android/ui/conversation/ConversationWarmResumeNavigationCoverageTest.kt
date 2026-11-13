@@ -149,6 +149,13 @@ class ConversationWarmResumeNavigationCoverageTest {
         assertTrue(binding.contains("owner.releaseForegroundRestoreGate(token)"))
         assertTrue(resume.contains("if (!currentCanPresentRetainedFrame())"))
         assertTrue(resume.contains("awaitConversationForegroundAdmission("))
+        val preDraw = source.substringAfter("onPreDraw = {").substringBefore("val resumeRestoration:")
+        assertTrue(preDraw.contains("foregroundRestore?.releaseMeasuredFrame("))
+        assertTrue(source.contains("resumed = lifecycleOwner?.lifecycle?.currentState == Lifecycle.State.RESUMED"))
+        assertTrue(preDraw.contains("ConversationForegroundRestoreBinding.canPresentRetainedFrame("))
+        assertTrue(preDraw.contains("currentCanPresentRetainedFrame()"))
+        assertTrue(preDraw.contains("currentForegroundSettleStateProvider().timelineMeasured"))
+        assertTrue(preDraw.indexOf("releaseMeasuredFrame(") < preDraw.indexOf("foregroundPreDrawSignals.trySend(Unit)"))
     }
 
     private class RecordingWriter : ConversationScrollWriter {
