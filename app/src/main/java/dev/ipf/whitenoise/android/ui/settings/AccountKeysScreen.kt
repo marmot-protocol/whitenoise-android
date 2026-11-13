@@ -96,6 +96,7 @@ import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
@@ -410,7 +411,7 @@ internal fun AccountKeysScreen(
                     load = { ui.privateKey ?: appState.exportActiveAccountNsec() },
                     onResult = { secret ->
                         if (secret != null) {
-                            copyToClipboard(context, privateKeyLabel, secret, sensitive = true)
+                            copySensitiveToClipboard(context, privateKeyLabel, secret)
                             ui.copiedKey = CopiedProfileKey.Private
                         }
                     },
@@ -429,7 +430,7 @@ internal fun AccountKeysScreen(
         onCopyBackup = {
             val backup = ui.encryptedBackup
             if (backup != null && !backup.isExpired() && canDeliverSecret()) {
-                copyToClipboard(context, encryptedBackupLabel, backup.content, sensitive = true)
+                copySensitiveToClipboard(context, encryptedBackupLabel, backup.content)
                 ui.copiedKey = CopiedProfileKey.Encrypted
             } else {
                 ui.encryptedBackup = null
@@ -1031,18 +1032,14 @@ private fun sharePrivateKey(
         context.startActivity(Intent.createChooser(intent, title))
     }.isSuccess
 
-/** Copies [text] to the clipboard; sensitive clips stay out of the clipboard preview and history. */
+/** Copies public [text]; secrets use [copySensitiveToClipboard], which marks them and clears them later. */
 private fun copyToClipboard(
     context: Context,
     label: String,
     text: String,
-    sensitive: Boolean = false,
 ) {
-    val clip = ClipData.newPlainText(label, text)
-    if (sensitive) {
-        clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
-    }
-    (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(clip)
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
 }
 
 /** Sign out and wipe: teardown spinner, explanatory sheet and the typed confirmation, unchanged from before. */

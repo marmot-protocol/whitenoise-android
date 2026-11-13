@@ -89,8 +89,10 @@ internal fun GroupMembersReviewDialog(
     val liveGroups = rememberUpdatedState(groups)
     val liveAdmins = rememberUpdatedState(initialAdminIds)
     val reviewedAdmins = initialAdminIds.toSet()
-    val reviewedMembers = members.map { it.accountIdHex }
-    val reviewedGroups = groups.map { it.id }
+    // Member and destination ids are fixed when the review opens, so a roster or selection that
+    // changes underneath it cannot be submitted. Admin choices are edited inside the review.
+    val reviewedMembers = remember(ticket) { members.map { it.accountIdHex } }
+    val reviewedGroups = remember(ticket) { groups.map { it.id } }
     DisposableEffect(ticket) { onDispose { ticket.invalidate() } }
     val current = groupMembersReviewOwnerCurrent(appState, actingAccount, runtime)
 

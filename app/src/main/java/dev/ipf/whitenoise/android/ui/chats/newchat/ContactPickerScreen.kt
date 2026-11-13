@@ -86,6 +86,7 @@ internal fun ContactPickerScreen(
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
     reviewGroup: MemberReviewGroup? = null,
+    reviewDescription: String? = null,
 ) {
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
@@ -142,6 +143,7 @@ internal fun ContactPickerScreen(
             confirmLabel = stringResource(groupReviewAddMembersLabel(selected.size)),
             initialAdminIds = initialAdminIds,
             onInitialAdminChange = onInitialAdminChange,
+            description = reviewDescription,
         )
     }
 

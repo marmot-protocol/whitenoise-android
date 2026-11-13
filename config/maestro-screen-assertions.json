@@ -2403,23 +2403,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
-      "symbol": "LargeGroupInviteConfirmationDialog",
-      "bindings": [
-        {
-          "case": "presentation-group-large-cancel",
-          "selector": {
-            "text": "Invite to a large group?"
-          },
-          "scope": "large-group warning cancellation; no native invite.",
-          "entry_assertion": {
-            "text": "Invite to a large group?"
-          },
-          "visible_on_entry": true
-        }
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
       "symbol": "CustomMuteDateDialog",
       "bindings": [
@@ -5594,6 +5577,17 @@
           "entry_assertion": {
             "id": "group.members.review.dialog"
           }
+        },
+        {
+          "case": "presentation-group-large-cancel",
+          "selector": {
+            "text": "In groups of 150 or more members, additional invitations might not be delivered reliably. You can still continue."
+          },
+          "scope": "add-member review with large-group warning cancellation; no native invite.",
+          "entry_assertion": {
+            "text": "In groups of 150 or more members, additional invitations might not be delivered reliably. You can still continue."
+          },
+          "visible_on_entry": true
         }
       ]
     },

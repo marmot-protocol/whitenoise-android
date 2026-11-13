@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.ActivityResultRegistry
@@ -37,9 +38,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.SENSITIVE_CLIP_LIFETIME_MS
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
@@ -55,6 +58,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.lang.reflect.Proxy
+import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -174,6 +178,27 @@ class AccountKeysExportDeliveryTest {
         dialogButton(R.string.hide).performClick()
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
         assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** The copied backup outlives the closed preview only until the clipboard deadline. */
+    @Test
+    fun copiedBackupLeavesTheClipboardAfterThePreviewCloses() {
+        render()
+        openBackupPreview()
+        dialogButton(R.string.copy).performClick()
+        dialogButton(R.string.hide).performClick()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        composeRule.runOnIdle {
+            assertEquals(
+                ENCRYPTED_KEY,
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString(),
+            )
+        }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(SENSITIVE_CLIP_LIFETIME_MS))
+        assertFalse(clipboard.hasPrimaryClip())
     }
 
     /** The optional file action reuses the confirmed preview bytes, without requesting native encryption again. */
