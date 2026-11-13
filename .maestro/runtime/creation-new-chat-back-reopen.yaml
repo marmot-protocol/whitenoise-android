@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: creation-new-chat-back-reopen
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- assertNotVisible:
+    id: "new_message.screen"
+- tapOn: "New Message"
+- assertVisible:
+    id: "new_message.screen"
+- back
+- assertNotVisible:
+    id: "new_message.screen"
+- assertVisible: "Maestro group"
+- tapOn: "New Message"
+- assertVisible:
+    id: "new_message.screen"
+- back
+- assertNotVisible:
+    id: "new_message.screen"
+- assertVisible: "Maestro group"

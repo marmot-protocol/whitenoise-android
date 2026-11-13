@@ -251,8 +251,22 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
       "symbol": "ChatsScreen",
-      "bindings": [],
-      "remaining": "The navigation-account-empty flow verifies the generated Carol empty parent chat list and switches back. It does not open the inline measured playback modal; direct modal entry, reverse and dismissal assertions remain unproven."
+      "bindings": [
+        {
+          "case": "creation-new-chat-back-reopen",
+          "selector": {
+            "id": "new_message.screen"
+          },
+          "scope": "Native runtime chat list opens its inline measured new-chat dialog, returns with Android Back and reopens it.",
+          "entry_assertion": {
+            "id": "new_message.screen"
+          },
+          "opened_by": {
+            "text": "New Message"
+          }
+        }
+      ],
+      "remaining": "Static assertions do not establish runtime success, reverse geometry, account-change safety or motion qualification."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
@@ -6565,38 +6579,118 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownTimestamps.kt",
       "symbol": "TimestampHoverTooltip",
-      "bindings": [],
-      "remaining": "Direct tooltip opening, timestamp selection and dismissal need a maintained runtime flow; source-render tests do not grant runtime execution credit."
+      "bindings": [
+        {
+          "case": "presentation-modal-timestamp-hover",
+          "selector": {
+            "id": "timestamp.hover"
+          },
+          "scope": "Production timestamp tooltip opens and ends through the presentation hover controls.",
+          "entry_assertion": {
+            "id": "timestamp.hover"
+          },
+          "opened_by": {
+            "text": "Hover timestamp"
+          }
+        }
+      ],
+      "remaining": "Timestamp selection, pointer geometry, all formats and motion remain unqualified."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedAlertDialog.kt",
       "symbol": "AnimatedAlertDialog",
-      "bindings": [],
-      "remaining": "Shared alert wrapper needs direct runtime entry and exit assertions; caller-specific assertions do not qualify every wrapper state."
+      "bindings": [
+        {
+          "case": "search-date-cancel",
+          "selector": {
+            "id": "global-search-date-dialog"
+          },
+          "scope": "Production search date alert opens, selects Today and cancels without a date chip.",
+          "entry_assertion": {
+            "id": "global-search-date-dialog"
+          },
+          "opened_by": {
+            "text": "Date"
+          }
+        }
+      ],
+      "remaining": "Other alert callers, interrupted transitions and animation geometry remain unqualified."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedAlertDialog.kt",
       "symbol": "AnimatedBasicAlertDialog",
-      "bindings": [],
-      "remaining": "Shared basic alert wrapper needs direct runtime entry and exit assertions; caller-specific assertions do not qualify every wrapper state."
+      "bindings": [
+        {
+          "case": "actions-delete-cancel",
+          "selector": {
+            "text": "Delete message\\?"
+          },
+          "scope": "Production message delete basic alert shows both delete actions and cancels back to the conversation.",
+          "entry_assertion": {
+            "text": "Delete message\\?"
+          },
+          "opened_by": {
+            "text": "Delete"
+          }
+        }
+      ],
+      "remaining": "Other basic alert callers, deletion and animation geometry remain unqualified."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedDatePickerDialog.kt",
       "symbol": "AnimatedDatePickerDialog",
-      "bindings": [],
-      "remaining": "Shared date picker wrapper needs direct runtime entry and exit assertions; existing mute/search cases qualify only their named caller surfaces."
+      "bindings": [
+        {
+          "case": "search-custom-start-cancel",
+          "selector": {
+            "text": "Start date"
+          },
+          "scope": "Production search custom start date picker opens and cancels to its date alert.",
+          "entry_assertion": {
+            "text": "Start date"
+          },
+          "opened_by": {
+            "text": "Custom Range"
+          }
+        }
+      ],
+      "remaining": "End-date selection, other callers and animation geometry remain unqualified."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MeasuredPlaybackDialog.kt",
       "symbol": "MeasuredPlaybackDialog",
-      "bindings": [],
-      "remaining": "Measured playback wrapper needs direct runtime origin, reverse and dismissal assertions; source-render tests do not grant runtime execution credit."
+      "bindings": [
+        {
+          "case": "presentation-text-dialog-ready",
+          "selector": {
+            "text": "Fixture decoded.txt"
+          },
+          "scope": "Production text attachment reader renders inside the measured playback dialog and dismisses with Back.",
+          "entry_assertion": {
+            "text": "Fixture decoded.txt"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Origin geometry, reverse interpolation, playback coordination and other callers remain unqualified."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AnimatedDropdownMenu.kt",
       "symbol": "AnimatedDropdownMenu",
-      "bindings": [],
-      "remaining": "Shared dropdown wrapper needs direct runtime entry, positioning and dismissal assertions; named caller bindings do not qualify all wrapper states."
+      "bindings": [
+        {
+          "case": "presentation-selection-photo-files",
+          "selector": {
+            "text": "Choose from Files"
+          },
+          "scope": "Production new-group photo dropdown renders its Files item and dispatches it after dismissal.",
+          "entry_assertion": {
+            "text": "Choose from Files"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Other menu callers, positioning, focus and animation geometry remain unqualified."
     }
   ]
 }
