@@ -93,10 +93,13 @@ integration testing. Required source regressions and
 baseline review remain unchanged. Drafts have the same precheck cost but retain
 the distinct draft aggregate context and require readiness before queue admission.
 
-Only master writes Gradle home cache entries. Matrix jobs save one entry per
-lane: unit shard 0 per flavor, the Zapstore attachment fixture and connected
-shard 0. CodeQL, dependency submission, release verification, staging APK, fuzz
-and release preparation jobs restore the newest master entry without saving.
+Only master writes Gradle home cache entries. The writers are unit shard 0 per
+flavor, each build-contracts phase, each static-analysis flavor, the Compose
+compiler report, the secondary variant, the Zapstore attachment fixture,
+connected shard 0 and the Maestro runtime build. `compile-tests`, the other unit
+shards, coverage, CodeQL, dependency submission, release verification, staging
+APK, fuzz and release preparation jobs restore the newest master entry without
+saving.
 Each writer adds a few hundred MB per push; fewer writers keep about two master
 generations within the repository's 10 GB cache, so PR runs still find them.
 

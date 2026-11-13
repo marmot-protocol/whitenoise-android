@@ -429,8 +429,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(len(gradle_setup_steps), 7)
         shared = "github.ref != 'refs/heads/master' }}"
         for step in gradle_setup_steps:
-            if step in self.coverage:
-                # Report tasks only; the shards own the cache entries.
+            if step in self.coverage or step in self.compile_tests:
+                # Report tasks and compile handoff only; the shards own the cache entries.
                 self.assertIn('cache-read-only: true\n', step)
             elif step in self.tests_job:
                 # One shard per flavor writes; the others would race for the same key.
@@ -1008,6 +1008,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn("needs.changes.outputs.precheck != 'true'", upload)
         self.assertIn('name: unit-compile-cache-${{ matrix.flavor }}', upload)
         self.assertIn('retention-days: 1', upload)
+        self.assertIn('overwrite: true', upload)
         self.assertIn('-newer "$RUNNER_TEMP/compile-started"',
                       self.named_step(self.compile_tests, 'Package new build-cache entries'))
         self.assertIn('    needs: [changes, compile-tests]\n', self.tests_job)
