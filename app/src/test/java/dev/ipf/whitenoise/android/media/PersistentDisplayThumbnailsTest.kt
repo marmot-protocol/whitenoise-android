@@ -108,9 +108,10 @@ class PersistentDisplayThumbnailsTest {
         val cleaner = CompletableFuture.runAsync { cache.clear() }
         try {
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-            while (cache.isCurrent(before) && System.nanoTime() < deadline) Thread.yield()
-            assertTrue(!cache.isCurrent(before))
+            while (cache.captureGeneration() == before && System.nanoTime() < deadline) Thread.yield()
             val during = cache.captureGeneration()
+            assertTrue(during != before)
+            assertTrue(!cache.isCurrent(during))
             assertNull(cache.read(source, 128, during))
             release.countDown()
             writer.get(10, TimeUnit.SECONDS)

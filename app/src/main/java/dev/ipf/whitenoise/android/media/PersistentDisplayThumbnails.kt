@@ -168,7 +168,10 @@ internal fun displayThumbnailEncodingFormat(bitmap: Bitmap): Bitmap.CompressForm
     val row = IntArray(bitmap.width)
     for (y in 0 until bitmap.height) {
         bitmap.getPixels(row, 0, bitmap.width, 0, y, bitmap.width, 1)
-        if (row.any { it ushr 24 != 255 }) return Bitmap.CompressFormat.WEBP_LOSSLESS
+        if (row.any { it ushr DISPLAY_ALPHA_SHIFT != DISPLAY_OPAQUE_ALPHA }) return Bitmap.CompressFormat.WEBP_LOSSLESS
     }
     return Bitmap.CompressFormat.JPEG
 }
+
+private const val DISPLAY_ALPHA_SHIFT = 24
+private const val DISPLAY_OPAQUE_ALPHA = 255

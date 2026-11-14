@@ -905,7 +905,8 @@ internal fun rememberImageLoadState(
     LaunchedEffect(*keys, materializationIntent, reloadToken, requestedMaxEdgePx) {
         if (requestedMaxEdgePx == 0) return@LaunchedEffect
         val fulfillOriginalDownload =
-            materializationIntent.readerRequested && controller.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)
+            materializationIntent.readerRequested &&
+                controller.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)
         if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx && !fulfillOriginalDownload) {
             return@LaunchedEffect
         }
@@ -989,7 +990,8 @@ internal fun rememberImageLoadState(
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     decodeRequest.onDecodedSize(decoded.bitmap.width, decoded.bitmap.height)
                     val persistStatic =
-                        !decoded.animationDeferred && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
+                        !decoded.animationDeferred &&
+                            MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
                     if (persistStatic) {
                         appState.persistDisplayThumbnail(thumbnailRequest, decoded.bitmap, requestedMaxEdgePx)
                     }
