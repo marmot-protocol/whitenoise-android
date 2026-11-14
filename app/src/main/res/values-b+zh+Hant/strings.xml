@@ -2607,4 +2607,5 @@
     <string name="android_notification_settings">Android 通知設定</string>
     <string name="settings_help_support">說明與支援</string>
     <string name="settings_voice_language">語音與語言</string>
+    <string name="photo_editor_rotate">旋轉</string>
 </resources>

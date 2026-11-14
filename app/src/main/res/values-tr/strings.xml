@@ -2646,4 +2646,5 @@
     <string name="android_notification_settings">Android bildirim ayarları</string>
     <string name="settings_help_support">Yardım ve destek</string>
     <string name="settings_voice_language">Ses ve dil</string>
+    <string name="photo_editor_rotate">Döndür</string>
 </resources>

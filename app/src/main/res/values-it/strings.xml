@@ -2653,4 +2653,5 @@
     <string name="android_notification_settings">Impostazioni di notifica Android</string>
     <string name="settings_help_support">Aiuto e supporto</string>
     <string name="settings_voice_language">Voce e lingua</string>
+    <string name="photo_editor_rotate">Ruota</string>
 </resources>

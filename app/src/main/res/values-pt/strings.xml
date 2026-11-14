@@ -2653,4 +2653,5 @@
     <string name="android_notification_settings">Configurações de notificação do Android</string>
     <string name="settings_help_support">Ajuda e suporte</string>
     <string name="settings_voice_language">Voz e idioma</string>
+    <string name="photo_editor_rotate">Girar</string>
 </resources>

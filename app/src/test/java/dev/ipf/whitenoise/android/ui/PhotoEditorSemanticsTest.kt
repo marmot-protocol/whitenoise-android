@@ -13,7 +13,9 @@ import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -118,6 +120,7 @@ class PhotoEditorSemanticsTest {
         composeRule.onNodeWithContentDescription(string(R.string.photo_editor_draw)).performClick()
         assertEquals(cropped, holder.state.recipe)
 
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
         composeRule
             .onNodeWithContentDescription(string(R.string.photo_editor_reset))
             .performClick()
@@ -140,6 +143,32 @@ class PhotoEditorSemanticsTest {
             .onNodeWithContentDescription(string(R.string.photo_editor_rotate_clockwise))
             .assertWidthIsAtLeast(48.dp)
             .assertHeightIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun photoKeepsSixtyPercentOfPhoneWithEveryTool() {
+        render()
+        PhotoEditorTool.entries.forEach { tool ->
+            composeRule.runOnIdle { holder.selectTool(tool) }
+            val canvas =
+                composeRule
+                    .onNodeWithContentDescription(string(R.string.photo_editor_image_description))
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+            assertTrue("Canvas share for $tool: ${canvas.height / root.height}", canvas.height >= root.height * .6f)
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w240dp-h320dp-mdpi")
+    fun shortWindowHelpScrollsToAllInstructions() {
+        render(fontScale = 2f)
+        composeRule.onNodeWithContentDescription(string(R.string.more_options)).performClick()
+        composeRule.onNodeWithText(string(R.string.help)).performClick()
+        composeRule.onNodeWithText(string(R.string.photo_editor_original_edited)).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.done)).assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.save)).assertIsDisplayed()
     }
 
     @Test

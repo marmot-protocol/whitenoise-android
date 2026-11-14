@@ -2665,4 +2665,5 @@
     <string name="android_notification_settings">Android-Benachrichtigungseinstellungen</string>
     <string name="settings_help_support">Hilfe &amp; Support</string>
     <string name="settings_voice_language">Sprache &amp; Stimme</string>
+    <string name="photo_editor_rotate">Drehen</string>
 </resources>

@@ -2831,4 +2831,5 @@
     <string name="time_format_24_hour">24-hour</string>
     <string name="date_time_format_help">Automatic follows the app language and your region.</string>
     <string name="settings_search_alias_date_time_format">time format|date format|clock|12-hour|24-hour|AM/PM</string>
+    <string name="photo_editor_rotate">Rotate</string>
 </resources>

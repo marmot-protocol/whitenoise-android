@@ -2734,4 +2734,5 @@
     <string name="android_notification_settings">Настройки уведомлений Android</string>
     <string name="settings_help_support">Помощь и поддержка</string>
     <string name="settings_voice_language">Голос и язык</string>
+    <string name="photo_editor_rotate">Поворот</string>
 </resources>
