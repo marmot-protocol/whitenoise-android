@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaThumbnail
+import dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -1553,12 +1554,11 @@ class WhiteNoiseAppState private constructor(
 
     /** Derivatives have their own encrypted namespace and never satisfy original-availability probes. */
     internal val displayThumbnails =
-        dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails(
+        PersistentDisplayThumbnails(
             DiskByteCache(
                 cacheDir = java.io.File(appContext.cacheDir, "display-thumbnails-v1"),
-                maxBytes = dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails.MAX_BYTES,
-                maxEntryBytes = dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails.MAX_ENTRY_BYTES
-                        .toLong(),
+                maxBytes = PersistentDisplayThumbnails.MAX_BYTES,
+                maxEntryBytes = PersistentDisplayThumbnails.MAX_ENTRY_BYTES.toLong(),
                 keyProvider = AndroidKeystoreDiskByteCacheKeyProvider("whitenoise.display_thumbnails.aes_gcm.v1"),
             ),
         )

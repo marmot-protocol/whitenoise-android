@@ -38,9 +38,25 @@ a complete reveal reliably. A method trace overflowed; no original-read or nativ
 request counts are claimed. One cold-run memory sample was 402,708 KiB PSS and
 610,424 KiB RSS; it is not a peak measurement.
 
-Natural scroll eviction and albums remain unqualified: the transfer did not finish
-populating the intended corpus. An attempted explicit background trim was rejected
-by Android's foreground-process check and provides no eviction evidence.
+The replacement batch subsequently completed: 48 distinct image messages and a
+three-photo album were received by the second test profile and rendered while
+scrolling through the corpus. Three further offline cold opens on the same
+installed APK used verified chat-list readiness and the completed fixture:
+
+| Trial | Last sample without all real pixels | First sample matching all three regions |
+| --- | ---: | ---: |
+| 1 | 2.653 s | 3.886 s |
+| 2 | 4.048 s | 5.277 s |
+| 3 | 7.215 s | 8.639 s |
+
+These remain end-to-end observation bounds, not decode timings. Twelve memory
+samples during this sequence had a maximum observed 399,481 KiB PSS and 616,500
+KiB RSS; sampling does not establish the true peak. Both network settings were
+restored. An offline return-scroll trace parsed fully without overflow, but its
+window covered recently viewed images and does not prove natural cache eviction.
+Precise tracing delayed cold chat navigation beyond the capture window, so it
+cannot support cold original-read counts or a latency comparison. An explicit
+background trim was rejected by Android and provides no eviction evidence.
 
 ## Codec component experiment
 
@@ -89,7 +105,7 @@ more space and evict sooner. The fixed cap is a conservative starting policy,
 not a device-derived optimal working-set size. Account/chat/message/attachment,
 size, source epoch and ciphertext identity are checked before reuse.
 
-Before readiness, finish the received-photo/album fixture, measure natural memory
+Before readiness, measure natural memory
 eviction and repeated offline cold opens on the exact candidate, collect reliable
 original-read/transfer counts and peak memory, inspect real-photo quality, and
 exercise clear/removal/expiry/account races and original Open/Save/Share. Compare
