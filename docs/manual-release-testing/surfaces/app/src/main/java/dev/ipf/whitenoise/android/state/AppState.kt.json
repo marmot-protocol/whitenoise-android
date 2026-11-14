@@ -4,6 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "account_relay_edit_addresses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun loadRelayEditAddresses(",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
         "surface": "private_contact_policy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "fun contactAvatarSource(",

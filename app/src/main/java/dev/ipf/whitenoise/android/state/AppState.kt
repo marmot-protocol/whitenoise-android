@@ -672,9 +672,20 @@ internal enum class RelayUrlValidationResult {
     Invalid,
 }
 
+/**
+ * One relay-list replacement. [readOnlyRelays] are canonical NIP-65 entries MarmotKit keeps read-only,
+ * so at least one allowed relay outside them must survive for the account to keep a posting relay.
+ */
 internal data class RelayListEditPlan(
     val relays: List<String>,
     val requiredRelay: String? = null,
+    val readOnlyRelays: Set<String> = emptySet(),
+)
+
+/** The declared addresses one relay edit starts from, with the canonical NIP-65 entries kept read-only. */
+internal class RelayEditAddresses(
+    val relays: List<String>,
+    val readOnly: Set<String> = emptySet(),
 )
 
 private enum class RelayPublishValidationError {
@@ -757,7 +768,10 @@ internal fun canRemoveRelay(
     relay: String,
 ): Boolean = normalizeRelayUrls(currentRelays.filterNot { it.trim() == relay.trim() }).isNotEmpty()
 
-/** Keeps MarmotKit-approved endpoints while requiring a requested addition to survive classification. */
+/**
+ * Keeps MarmotKit-approved endpoints while requiring a requested addition to survive classification,
+ * and refuses a list whose only approved entries are read-only, which would leave no posting relay.
+ */
 internal fun allowedRelayUrlsForPublish(
     plan: RelayListEditPlan,
     classified: List<RelayEndpointClassificationFfi>,
@@ -773,7 +787,7 @@ internal fun allowedRelayUrlsForPublish(
             .mapNotNull(RelayEndpointClassificationFfi::normalizedEndpoint)
             .mapNotNull(::canonicalRelayUrl)
             .distinct()
-    return allowedRelays.takeIf { it.isNotEmpty() && requiredRelayAllowed }
+    return allowedRelays.takeIf { relays -> requiredRelayAllowed && relays.any { it !in plan.readOnlyRelays } }
 }
 
 internal enum class RelayResolveTimeCheckResult {
@@ -7928,6 +7942,7 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun accountRelayLists(): AccountRelayListsFfi? = activeAccountRef?.let { loadAccountRelayLists(it) }
 
+    /** Adds a relay while preserving the other declared addresses for this list. */
     suspend fun addAccountRelay(
         account: String?,
         kind: RelayListKind,
@@ -7938,8 +7953,8 @@ class WhiteNoiseAppState private constructor(
                 RelayUrlValidationResult.Acceptable -> null
                 RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
             }
-        val current = account?.takeIf { validationError == null }?.let { loadAccountRelayLists(it) }
-        val plan = current?.let { relayListAfterAddition(it.relaysFor(kind), relay) }
+        val current = account?.takeIf { validationError == null }?.let { loadRelayEditAddresses(it, kind) }
+        val plan = current?.let { relayListAfterAddition(it.relays, relay)?.copy(readOnlyRelays = it.readOnly) }
         return when {
             validationError != null -> {
                 present(R.string.toast_relay_update_failed, validationError)
@@ -7961,12 +7976,13 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Removes a relay without truncating the list to its routing projection. */
     suspend fun removeAccountRelay(
         account: String?,
         kind: RelayListKind,
         relay: String,
     ): AccountRelayListsFfi? {
-        val current = account?.let { loadAccountRelayLists(it) }
+        val current = account?.let { loadRelayEditAddresses(it, kind) }
         return when {
             account == null -> {
                 present(R.string.toast_relay_update_failed, R.string.no_active_account_period)
@@ -7976,7 +7992,12 @@ class WhiteNoiseAppState private constructor(
                 present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
                 null
             }
-            else -> publishAccountRelays(account, kind, relayListAfterRemoval(current.relaysFor(kind), relay))
+            else ->
+                publishAccountRelays(
+                    account,
+                    kind,
+                    relayListAfterRemoval(current.relays, relay).copy(readOnlyRelays = current.readOnly),
+                )
         }
     }
 
@@ -8051,10 +8072,27 @@ class WhiteNoiseAppState private constructor(
             }
         }
 
-    private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
+    /**
+     * Reads the addresses an edit starts from: the full NIP-65 list, so the native setter can preserve
+     * read-only roles, or the Inbox list. A NIP-65 read also marks entries outside the posting projection
+     * as read-only, and fails when either list is unavailable.
+     */
+    private suspend fun loadRelayEditAddresses(
+        account: String,
+        kind: RelayListKind,
+    ): RelayEditAddresses? =
         when (kind) {
-            RelayListKind.Nip65 -> nip65.relays
-            RelayListKind.Inbox -> inbox.relays
+            RelayListKind.Nip65 -> {
+                val declared = runCatchingCancellable { marmotIo { accountNip65Relays(account) } }.getOrNull()
+                val posting = loadAccountRelayLists(account)?.nip65?.relays
+                if (declared == null || posting == null) {
+                    null
+                } else {
+                    val readOnly = normalizeRelayUrls(declared).toSet() - normalizeRelayUrls(posting).toSet()
+                    RelayEditAddresses(declared, readOnly)
+                }
+            }
+            RelayListKind.Inbox -> loadAccountRelayLists(account)?.inbox?.relays?.let { RelayEditAddresses(it) }
         }
 
     fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
