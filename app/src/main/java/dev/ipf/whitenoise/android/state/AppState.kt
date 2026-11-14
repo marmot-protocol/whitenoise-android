@@ -7928,6 +7928,7 @@ class WhiteNoiseAppState private constructor(
 
     suspend fun accountRelayLists(): AccountRelayListsFfi? = activeAccountRef?.let { loadAccountRelayLists(it) }
 
+    /** Adds a relay while preserving the other declared addresses for this list. */
     suspend fun addAccountRelay(
         account: String?,
         kind: RelayListKind,
@@ -7938,8 +7939,8 @@ class WhiteNoiseAppState private constructor(
                 RelayUrlValidationResult.Acceptable -> null
                 RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
             }
-        val current = account?.takeIf { validationError == null }?.let { loadAccountRelayLists(it) }
-        val plan = current?.let { relayListAfterAddition(it.relaysFor(kind), relay) }
+        val current = account?.takeIf { validationError == null }?.let { loadRelayEditAddresses(it, kind) }
+        val plan = current?.let { relayListAfterAddition(it, relay) }
         return when {
             validationError != null -> {
                 present(R.string.toast_relay_update_failed, validationError)
@@ -7961,12 +7962,13 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Removes a relay without truncating the list to its routing projection. */
     suspend fun removeAccountRelay(
         account: String?,
         kind: RelayListKind,
         relay: String,
     ): AccountRelayListsFfi? {
-        val current = account?.let { loadAccountRelayLists(it) }
+        val current = account?.let { loadRelayEditAddresses(it, kind) }
         return when {
             account == null -> {
                 present(R.string.toast_relay_update_failed, R.string.no_active_account_period)
@@ -7976,7 +7978,7 @@ class WhiteNoiseAppState private constructor(
                 present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
                 null
             }
-            else -> publishAccountRelays(account, kind, relayListAfterRemoval(current.relaysFor(kind), relay))
+            else -> publishAccountRelays(account, kind, relayListAfterRemoval(current, relay))
         }
     }
 
@@ -8051,10 +8053,14 @@ class WhiteNoiseAppState private constructor(
             }
         }
 
-    private fun AccountRelayListsFfi.relaysFor(kind: RelayListKind): List<String> =
+    /** Reads the full NIP-65 list so the native setter can preserve read-only relay roles. */
+    private suspend fun loadRelayEditAddresses(
+        account: String,
+        kind: RelayListKind,
+    ): List<String>? =
         when (kind) {
-            RelayListKind.Nip65 -> nip65.relays
-            RelayListKind.Inbox -> inbox.relays
+            RelayListKind.Nip65 -> runCatchingCancellable { marmotIo { accountNip65Relays(account) } }.getOrNull()
+            RelayListKind.Inbox -> loadAccountRelayLists(account)?.inbox?.relays
         }
 
     fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
