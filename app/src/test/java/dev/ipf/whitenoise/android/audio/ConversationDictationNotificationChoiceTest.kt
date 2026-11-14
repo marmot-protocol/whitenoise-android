@@ -23,6 +23,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ConversationDictationNotificationChoiceTest : ConversationDictationForegroundTestCase() {
+    /** The last Paste or Send tap before delivery decides the outcome, whichever silence choice is stored. */
     @Test
     fun latestNotificationChoiceWinsBeforeDeliveryForEitherStoredPreference() =
         runTest {
@@ -61,6 +62,7 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
             }
         }
 
+    /** Once delivery is claimed the card drops every action, and replayed taps change nothing until it finishes. */
     @Test
     fun dispatchClaimOmitsAllNotificationActionsUntilDeliveryCompletes() =
         runTest {

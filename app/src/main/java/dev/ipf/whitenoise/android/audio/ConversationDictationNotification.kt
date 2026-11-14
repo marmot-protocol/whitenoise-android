@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
+import android.os.Build
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 
@@ -93,7 +95,10 @@ internal fun notifyConversationDictationRecoveryExpired(context: Context) {
     manager.notify(DICTATION_RECOVERY_NOTIFICATION_TAG, DICTATION_RECOVERY_NOTIFICATION_ID, notification)
 }
 
-/** Shows only the actions currently available to this capture session. */
+/**
+ * Shows only the actions currently available to this capture session. Cancel stays usable on the lock
+ * screen so the microphone can be stopped, while Paste and Send act on the dictated text and need an unlock.
+ */
 private fun Notification.Builder.addActiveActions(
     context: Context,
     controller: ConversationDictationController,
@@ -107,16 +112,24 @@ private fun Notification.Builder.addActiveActions(
         actionIntent(ConversationDictationForegroundService.ACTION_CANCEL, token),
     )
     if (!controller.completionActionsEnabled) return
-    addAction(
-        0,
+    addUnlockedAction(
         context.getString(R.string.paste),
         actionIntent(ConversationDictationForegroundService.ACTION_PASTE, token),
     )
-    addAction(
-        0,
+    addUnlockedAction(
         context.getString(R.string.send),
         actionIntent(ConversationDictationForegroundService.ACTION_SEND, token),
     )
+}
+
+/** Adds an action that, on Android 12 and later, asks to unlock a locked device before it runs. */
+private fun Notification.Builder.addUnlockedAction(
+    title: String,
+    intent: PendingIntent,
+) {
+    val action = Notification.Action.Builder(null as Icon?, title, intent)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) action.setAuthenticationRequired(true)
+    addAction(action.build())
 }
 
 private fun openDictationAppIntent(context: Context): PendingIntent =

@@ -64,7 +64,10 @@ internal abstract class ConversationDictationForegroundTestCase {
         }
     }
 
-    /** Verifies the published Android actions use the current session's service intents. */
+    /**
+     * Verifies the published Android actions use the current session's service intents, and that Paste and
+     * Send ask to unlock a locked device while Cancel does not.
+     */
     protected fun assertNativeNotificationActions(
         service: NotificationStreamForegroundService,
         harness: DictationForegroundTestHost,
@@ -77,6 +80,10 @@ internal abstract class ConversationDictationForegroundTestCase {
         val actions = notification.actions.orEmpty()
         val labels = listOf(R.string.cancel, R.string.paste, R.string.send)
         assertEquals(labels.take(expectedCount).map(service::getString), actions.map { it.title.toString() })
+        assertEquals(
+            listOf(false, true, true).take(expectedCount),
+            actions.map { it.isAuthenticationRequired },
+        )
         assertEquals(
             notificationActions.take(expectedCount).map { actionCommand(service, harness, it).data },
             actions.map { shadowOf(it.actionIntent).savedIntent.data },

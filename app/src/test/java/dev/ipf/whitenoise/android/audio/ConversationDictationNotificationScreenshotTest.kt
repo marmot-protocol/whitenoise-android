@@ -23,17 +23,20 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class ConversationDictationNotificationScreenshotTest {
+    /** Records the expanded card with Cancel, Paste and Send in the light theme. */
     @Test
     fun nativeActionsLight() {
         capture("dictation_notification_native_light")
     }
 
+    /** Records the same expanded card in the dark theme. */
     @Test
     @Config(qualifiers = "en-rUS-w360dp-h780dp-night-mdpi")
     fun nativeActionsDark() {
         capture("dictation_notification_native_dark")
     }
 
+    /** Records the expanded card in Arabic with a right-to-left layout. */
     @Test
     @Config(qualifiers = "ar-rEG-w360dp-h780dp-mdpi")
     fun nativeActionsRtl() {
