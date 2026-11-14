@@ -600,7 +600,12 @@ private fun SettingsDetailRoute(
                 onOpenSupportChat = onOpenSupportChat,
                 onRelays = { onDetailChange(SettingsDetail.SupportRelays) },
             )
-        SettingsDetail.SupportRelays -> RelaysScreen(appState, onBack = onBack)
+        SettingsDetail.SupportRelays ->
+            RelaysScreen(
+                appState,
+                onBack = onBack,
+                destination = SettingsDetail.SupportRelays,
+            )
         SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = onBack)
         SettingsDetail.QuarantinedGroups -> {
             if (appState.developerMode) {
@@ -968,7 +973,7 @@ private fun SettingsProfileHeader(
     onSwitchProfile: () -> Unit,
     onOpenAccount: () -> Unit,
 ) {
-    Column(Modifier.padding(vertical = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
+    Column(Modifier.padding(bottom = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
         SettingsGroup {
             row("profile") { context ->
                 SettingsProfileRow(context, account, onOpenShareConnect, onOpenProfilePictureActions)
@@ -977,6 +982,7 @@ private fun SettingsProfileHeader(
                 SettingsLink(
                     context = context,
                     title = stringResource(SettingsHomeRow.Account.titleRes),
+                    routeKey = SettingsDetail.Account,
                     onClick = onOpenAccount,
                     leading = {
                         SettingsLeadingIcon(
@@ -1125,6 +1131,7 @@ internal fun SettingsHubSection(
                     SettingsLink(
                         context = context,
                         title = stringResource(entry.titleRes),
+                        routeKey = entry.detail,
                         onClick = { onOpenDetail(entry.detail) },
                         leading = {
                             SettingsLeadingIcon(entry.iconRes, testTag = "settings.icon.${entry.iconTag}")

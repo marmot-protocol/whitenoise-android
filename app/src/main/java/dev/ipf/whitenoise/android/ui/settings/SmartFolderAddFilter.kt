@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -27,6 +28,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 
 /** Picking and configuring a new filter never changes the draft until the user saves it. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,8 +44,11 @@ internal fun SmartFolderAddFilter(
     if (selected == null) {
         val common = listOf(FolderField.PARTICIPANTS, FolderField.UNREAD, FolderField.MENTIONS, FolderField.TYPE)
         val choices = common + FolderField.entries.filterNot { it in common }
-        WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
-            WhiteNoiseSheetHeader(stringResource(R.string.smart_folder_add), onClose = onDismiss)
+        val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val terminal = rememberSheetTerminalMotion(sheet)
+        val close = { terminal.close(onDismiss) }
+        WhiteNoiseModalBottomSheet(onDismissRequest = close, sheetState = sheet) {
+            WhiteNoiseSheetHeader(stringResource(R.string.smart_folder_add), onClose = close)
             // Natural row heights keep every choice close together. The sheet wraps
             // short content and scrolls when text or the window needs more room.
             Column(
@@ -54,7 +59,7 @@ internal fun SmartFolderAddFilter(
                     .padding(horizontal = 12.dp, vertical = 8.dp)
                     .testTag("folder.filterChoices"),
             ) {
-                choices.forEach { choice -> FilterChoice(choice) { field = choice } }
+                choices.forEach { choice -> FilterChoice(choice) { terminal.close(choice) { field = it } } }
             }
         }
     } else {

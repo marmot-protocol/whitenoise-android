@@ -98,11 +98,13 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -172,14 +174,19 @@ private class ProfileKeysUiState {
         privateKey = null
     }
 
-    /** Cancels a dismissed confirmation before its suspended native export can open the file picker. */
-    fun cancelExport() {
+    /** Invalidates native work immediately while the inert confirmation finishes its exit. */
+    fun cancelExportPreparation() {
         exportOperation.cancel()
         exportBusy = false
+        clearPasswords()
+    }
+
+    /** Removes the confirmation after exit, or immediately when its sensitive owner is lost. */
+    fun cancelExport() {
+        cancelExportPreparation()
         rawExportDialog = false
         passwordDialog = false
         encryptedBackup = null
-        clearPasswords()
     }
 
     /** True when no export is being prepared, picked or written. */
@@ -531,7 +538,7 @@ private fun ProfileKeysList(
         item(key = "search.AccountKeys.2") { AccountKeysIdentityHeader(identity) }
         item(key = "search.AccountKeys.3") { SettingsSection(stringResource(R.string.public_key)) }
         item(key = "search.AccountKeys.4") {
-            SettingsGroup {
+            SettingsGroup(destination = SettingsDetail.AccountKeys, surface = "account-public-key") {
                 row("public_key") { context ->
                     ProfileKeyValueRow(
                         context = context,
@@ -760,6 +767,7 @@ private fun ProfileKeysDialogs(
     if (ui.rawExportDialog && canExport) {
         WhiteNoiseAlertDialog(
             onDismissRequest = ui::cancelExport,
+            onDismissStart = ui::cancelExportPreparation,
             title = { Text(stringResource(R.string.keep_your_private_key_safe)) },
             text = {
                 Text(
@@ -769,16 +777,22 @@ private fun ProfileKeysDialogs(
             },
             confirmButton = {
                 FlowRow(horizontalArrangement = Arrangement.End) {
-                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.Share) }) {
+                    TextButton(
+                        enabled = !ui.exportBusy,
+                        onClick = { if (acceptsInput) onExport(false, KeyExportDestination.Share) },
+                    ) {
                         Text(stringResource(R.string.share), color = MaterialTheme.colorScheme.error)
                     }
-                    TextButton(enabled = !ui.exportBusy, onClick = { onExport(false, KeyExportDestination.File) }) {
+                    TextButton(
+                        enabled = !ui.exportBusy,
+                        onClick = { if (acceptsInput) onExport(false, KeyExportDestination.File) },
+                    ) {
                         Text(stringResource(R.string.export_nsec), color = MaterialTheme.colorScheme.error)
                     }
                 }
             },
             dismissButton = {
-                TextButton(onClick = ui::cancelExport) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -790,6 +804,7 @@ private fun ProfileKeysDialogs(
             onConfirm = { onExport(true, KeyExportDestination.File) },
             onViewBackup = { onExport(true, KeyExportDestination.Preview) },
             onDismiss = ui::cancelExport,
+            onDismissStart = ui::cancelExportPreparation,
         )
     }
     ui.encryptedBackup?.let { backup ->
@@ -831,7 +846,7 @@ internal fun ProfileKeyFeedbackDialogs(
             onDismissRequest = onNativeErrorDismiss,
             title = { Text(stringResource(title)) },
             confirmButton = {
-                TextButton(onClick = onNativeErrorDismiss) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) }
             },
         )
     }
@@ -840,7 +855,7 @@ internal fun ProfileKeyFeedbackDialogs(
             onDismissRequest = onShareErrorDismiss,
             title = { Text(stringResource(R.string.outbound_share_failed)) },
             confirmButton = {
-                TextButton(onClick = onShareErrorDismiss) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) }
             },
         )
     }
@@ -850,7 +865,7 @@ internal fun ProfileKeyFeedbackDialogs(
             title = { Text(stringResource(R.string.couldnt_save_file)) },
             text = { Text(stringResource(R.string.choose_another_location_and_try_again)) },
             confirmButton = {
-                TextButton(onClick = onSaveErrorDismiss) { Text(stringResource(R.string.ok)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.ok)) }
             },
         )
     }
@@ -860,7 +875,7 @@ internal fun ProfileKeyFeedbackDialogs(
             title = { Text(stringResource(R.string.key_export_expired_title)) },
             text = { Text(stringResource(R.string.key_export_expired_body)) },
             confirmButton = {
-                TextButton(onClick = onExpiryDismiss) { Text(stringResource(R.string.close)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.close)) }
             },
         )
     }
@@ -876,12 +891,14 @@ private fun ExportPasswordDialog(
     onConfirm: () -> Unit,
     onViewBackup: () -> Unit,
     onDismiss: () -> Unit,
+    onDismissStart: () -> Unit,
 ) {
     val passwordValue = password.text.toString()
     val confirmationValue = confirmation.text.toString()
     val mismatch = confirmationValue.isNotEmpty() && passwordValue != confirmationValue
     WhiteNoiseAlertDialog(
         onDismissRequest = onDismiss,
+        onDismissStart = onDismissStart,
         title = { Text(stringResource(R.string.encrypted_private_key)) },
         text = {
             Column(
@@ -931,7 +948,7 @@ private fun ExportPasswordDialog(
                 ) { Text(stringResource(R.string.export)) }
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
@@ -968,7 +985,7 @@ internal fun EncryptedBackupResultDialog(
                 TextButton(onClick = onExport) { Text(stringResource(R.string.export)) }
             }
         },
-        dismissButton = { TextButton(onClick = onHide) { Text(stringResource(R.string.hide)) } },
+        dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.hide)) } },
     )
 }
 
@@ -1275,12 +1292,14 @@ internal fun SignOutSheet(
     onConfirm: (deleteKeyPackages: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     var deleteKeyPackages by remember { mutableStateOf(true) }
     ModalBottomSheet(
         modifier = Modifier.exposePerformanceTestTags(),
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().padding(24.dp),
@@ -1329,7 +1348,7 @@ internal fun SignOutSheet(
                 }
                 Switch(checked = deleteKeyPackages, onCheckedChange = null)
             }
-            Button(onClick = { onConfirm(deleteKeyPackages) }, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { terminal.close(deleteKeyPackages, onConfirm) }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Close, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.sign_out))
@@ -1351,10 +1370,12 @@ private fun SignOutAndWipeSheet(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().padding(24.dp),
@@ -1380,7 +1401,7 @@ private fun SignOutAndWipeSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(
-                onClick = onConfirm,
+                onClick = { terminal.close(onConfirm) },
                 modifier = Modifier.fillMaxWidth(),
                 colors =
                     ButtonDefaults.outlinedButtonColors(
@@ -1474,10 +1495,12 @@ internal fun WipeOutcomeSheet(
     report: WipeReport,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheetState, sheetState)
     ModalBottomSheet(
         containerColor = amoledSheetContainerColor(),
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismiss) },
+        sheetState = sheetState,
     ) {
         Column(
             Modifier.fillMaxWidth().padding(24.dp),
@@ -1488,7 +1511,7 @@ internal fun WipeOutcomeSheet(
                 style = MaterialTheme.typography.titleLarge,
             )
             report.stages.forEach { stage -> WipeOutcomeStageRow(stage) }
-            Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = { terminal.close(onDismiss) }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.close))
             }
         }

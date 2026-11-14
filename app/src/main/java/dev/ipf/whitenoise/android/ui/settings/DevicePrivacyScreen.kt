@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.state.setDefaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 /**
  * Privacy & Security: device protection switches, the auto-lock choice once device authentication is on, and the
@@ -68,7 +69,11 @@ internal fun DevicePrivacyScreen(
         SettingsList {
             item(key = "search.DevicePrivacy.1") { SettingsSection(stringResource(R.string.device_protection)) }
             item(key = "search.DevicePrivacy.2") {
-                SettingsGroup(modifier = Modifier.testTag("privacy.device_protection.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("privacy.device_protection.group"),
+                    destination = SettingsDetail.DevicePrivacy,
+                    surface = "device-protection",
+                ) {
                     row("screen_security") { rowContext ->
                         SettingsSwitch(
                             context = rowContext,
@@ -134,6 +139,7 @@ internal fun DevicePrivacyScreen(
                         SettingsLink(
                             context = rowContext,
                             title = stringResource(R.string.blocked_users),
+                            routeKey = SettingsDetail.BlockedUsers,
                             onClick = onOpenBlockedUsers,
                             value =
                                 appState.runtimeMirrors.blocks.users.size
@@ -166,6 +172,7 @@ internal fun DevicePrivacyScreen(
                         SettingsLink(
                             context = rowContext,
                             title = stringResource(R.string.diagnostics_improvements),
+                            routeKey = SettingsDetail.DiagnosticsImprovements,
                             onClick = onOpenDiagnostics,
                             value = stringResource(summary),
                             leading = { SettingsLeadingIcon(R.drawable.ic_monitoring) },

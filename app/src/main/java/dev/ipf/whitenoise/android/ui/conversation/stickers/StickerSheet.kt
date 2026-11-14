@@ -15,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.stickerFailureDetail
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -61,12 +63,13 @@ private sealed interface StickerSheetPage {
 
 /** Sticker picker with the pack browser and pack detail as pages of the same sheet. */
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
+// Picker, pack browser, and detail share this sheet navigation and terminal-exit owner.
 internal fun StickerSheet(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
-    onSend: (StickerFfi) -> Unit,
+    onSend: (StickerFfi, (Boolean) -> Unit) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var page by remember { mutableStateOf<StickerSheetPage>(StickerSheetPage.Picker) }
@@ -79,7 +82,26 @@ internal fun StickerSheet(
     val reportFailure: StickerFailureReporter = { title, code, throwable ->
         appState.presentFailure(title, code, throwable, stickerFailureDetail(throwable))
     }
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss, containerColor = amoledSheetContainerColor()) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal =
+        rememberSheetTerminalMotion(sheet, Triple(controller, appState.activeAccountRef, appState.runtimeGeneration))
+    val close = { terminal.close(onDismiss) }
+    var sending by remember(controller) { mutableStateOf(false) }
+    val send: (StickerFfi) -> Unit = { sticker ->
+        if (!sending && terminal.acceptsInput) {
+            sending = true
+            onSend(sticker) { sent ->
+                sending = false
+                if (sent) terminal.close(onDismiss)
+            }
+        }
+    }
+    WhiteNoiseModalBottomSheet(
+        onDismissRequest = close,
+        sheetState = sheet,
+        interactionEnabled = terminal.acceptsInput,
+        containerColor = amoledSheetContainerColor(),
+    ) {
         Column(Modifier.fillMaxWidth().heightIn(max = maxHeight).testTag("sticker.sheet")) {
             when (val current = page) {
                 StickerSheetPage.Picker ->
@@ -87,8 +109,8 @@ internal fun StickerSheet(
                         library = library,
                         cache = cache,
                         onBrowse = { page = StickerSheetPage.Browser },
-                        onSend = onSend,
-                        onClose = onDismiss,
+                        onSend = send,
+                        onClose = close,
                     )
                 StickerSheetPage.Browser ->
                     StickerBrowserPage(
@@ -96,7 +118,7 @@ internal fun StickerSheet(
                         onFailure = reportFailure,
                         onOpen = { page = StickerSheetPage.Detail(it) },
                         onBack = back,
-                        onClose = onDismiss,
+                        onClose = close,
                     )
                 is StickerSheetPage.Detail ->
                     StickerPackDetailPage(
@@ -107,14 +129,16 @@ internal fun StickerSheet(
                         onOpenAuthor = {
                             val npub = appState.npubForDisplay(current.pack.authorPubkeyHex)
                             if (npub.isNotBlank()) {
-                                onDismiss()
-                                appState.presentProfile(npub)
+                                terminal.close(npub) {
+                                    onDismiss()
+                                    appState.presentProfile(it)
+                                }
                             }
                         },
-                        onSend = onSend,
+                        onSend = send,
                         onFailure = reportFailure,
                         onBack = back,
-                        onClose = onDismiss,
+                        onClose = close,
                     )
             }
         }

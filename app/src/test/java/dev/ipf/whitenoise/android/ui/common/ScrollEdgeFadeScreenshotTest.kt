@@ -67,6 +67,7 @@ class ScrollEdgeFadeScreenshotTest {
     private val fadeEnabled = mutableStateOf(true)
     private val directionReversed = mutableStateOf(false)
     private val replacementList = mutableStateOf<LazyListState?>(null)
+    private val viewportMounted = mutableStateOf(true)
     private var background = Color.White
 
     /** A normal column fades both edges after a real touch scroll. */
@@ -257,6 +258,44 @@ class ScrollEdgeFadeScreenshotTest {
         rule.onNodeWithTag(VIEWPORT).captureRoboImage("src/test/snapshots/scroll_edges_side_shadows_overflow.png")
     }
 
+    /** A measured column returning from a child paints its edge bands on the first frame. */
+    @Test
+    fun returningColumnKeepsFirstFrameBands() = assertReturningBands(Kind.Column)
+
+    /** Default list motion follows the same restoration contract as ordinary scrolling columns. */
+    @Test
+    fun returningListKeepsFirstFrameBands() = assertReturningBands(Kind.List)
+
+    private fun assertReturningBands(kind: Kind) {
+        render(kind)
+        rule.runOnIdle {
+            scope.launch {
+                if (kind == Kind.Column) column.scrollTo(240) else list.scrollToItem(10)
+            }
+        }
+        rule.waitForIdle()
+        val before = rule.onNodeWithTag(VIEWPORT).captureToImage().toPixelMap()
+        rule.runOnIdle { viewportMounted.value = false }
+        rule.waitForIdle()
+        rule.mainClock.autoAdvance = false
+        rule.runOnIdle {
+            viewportMounted.value = true
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        org.robolectric.Shadows
+            .shadowOf(android.os.Looper.getMainLooper())
+            .idle()
+        rule.mainClock.advanceTimeByFrame()
+        rule.waitForIdle()
+        val returning = rule.onNodeWithTag(VIEWPORT).captureToImage().toPixelMap()
+        for (y in 0 until before.height) {
+            for (x in 0 until before.width) {
+                assertEquals("Returning $kind changed at $x,$y", before[x, y], returning[x, y])
+            }
+        }
+    }
+
     private fun render(
         kind: Kind,
         options: FixtureOptions = FixtureOptions(),
@@ -274,7 +313,7 @@ class ScrollEdgeFadeScreenshotTest {
                 LocalDensity provides Density(1f, options.fontScale),
             ) {
                 WhiteNoiseTheme(darkTheme = options.dark, amoled = options.amoled) {
-                    ScrollViewport(kind, options.heightDp, list)
+                    if (viewportMounted.value) ScrollViewport(kind, options.heightDp, list)
                 }
             }
         }

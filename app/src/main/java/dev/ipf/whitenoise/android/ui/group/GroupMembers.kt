@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -46,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -104,6 +106,9 @@ internal fun TransferAdminSheet(
     onPick: (AppGroupMemberRecordFfi) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal =
+        rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
     var query by remember { mutableStateOf("") }
     val candidates = remember(controller.members) { controller.transferAdminCandidates() }
     val filtered =
@@ -121,7 +126,8 @@ internal fun TransferAdminSheet(
         }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        onDismissRequest = { terminal.close(onDismiss) },
         containerColor = amoledSheetContainerColor(),
     ) {
         Column(
@@ -174,7 +180,10 @@ internal fun TransferAdminSheet(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .clickable(enabled = !busy, role = Role.Button) { onPick(member) }
+                                        .clickable(
+                                            enabled = !busy,
+                                            role = Role.Button,
+                                        ) { terminal.close(member, onPick) }
                                         .padding(vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -186,7 +195,10 @@ internal fun TransferAdminSheet(
                                     pictureDomain = AvatarImageLoader.publicProfiles(),
                                 )
                                 Spacer(Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
                                     val keyModifier = Modifier.testTag("transfer_admin.key.${member.memberIdHex}")
                                     if (nameIsKey) {
                                         PublicKeyCopyText(memberName, memberNpub, keyModifier, enabled = !busy)
@@ -234,14 +246,20 @@ private fun soleAdminEmptyPickerTag(empty: Boolean): Modifier =
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+// The member list and selection completion share one sheet terminal-motion lifetime.
+@Suppress("LongMethod", "FunctionNaming")
 internal fun SoleAdminDeletePicker(
     candidates: List<AppGroupMemberRecordFfi>,
     appState: WhiteNoiseAppState,
     onPick: (AppGroupMemberRecordFfi) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal =
+        rememberSheetTerminalMotion(sheetState, Triple(appState, appState.activeAccountRef, appState.runtimeGeneration))
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        onDismissRequest = { terminal.close(onDismiss) },
         containerColor = amoledSheetContainerColor(),
         modifier = soleAdminEmptyPickerTag(candidates.isEmpty()),
     ) {
@@ -267,7 +285,7 @@ internal fun SoleAdminDeletePicker(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .clickable(role = Role.Button) { onPick(member) }
+                                .clickable(role = Role.Button) { terminal.close(member, onPick) }
                                 .padding(vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

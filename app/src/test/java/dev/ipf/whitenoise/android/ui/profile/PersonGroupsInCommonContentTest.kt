@@ -79,9 +79,11 @@ class PersonGroupsInCommonContentTest {
         }
         composeRule.onNodeWithTag("groups_in_common.menu.friends").performClick()
         composeRule.onNodeWithText("Remove River from Friends").performClick()
-        assertEquals(listOf("friends"), removals)
-        assertEquals(0, opens)
-        assertEquals(0, adds)
+        composeRule.runOnIdle {
+            assertEquals(listOf("friends"), removals)
+            assertEquals(0, opens)
+            assertEquals(0, adds)
+        }
     }
 
     @Test fun unauthorizedGroupKeepsSafeNavigationWithoutRemovalMenu() {

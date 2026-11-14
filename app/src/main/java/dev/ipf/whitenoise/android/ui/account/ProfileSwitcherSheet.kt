@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -46,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.settings.settingsRowBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -84,7 +86,13 @@ internal fun ProfileSwitcherSheet(
     hasUnreadForAccount: (String) -> Boolean = { false },
     actionColorsForAccount: @Composable (String) -> AccountActionColors? = { null },
     npub: (String) -> String = { "" },
+    onAddProfileOrigin: (Rect?) -> Unit = {},
 ) {
+    val (addModifier, addClick) =
+        rememberMeasuredControlClick { origin ->
+            onAddProfileOrigin(origin)
+            onAddProfile()
+        }
     val profiles = profileSwitcherPresentation(state)
     Column(modifier.fillMaxWidth().testTag(ACCOUNT_SELECTOR_CONTENT_TAG)) {
         WhiteNoiseSheetHeader(stringResource(R.string.switch_profile), onClose = onDismiss)
@@ -182,8 +190,8 @@ internal fun ProfileSwitcherSheet(
                     SettingsAction(
                         context,
                         stringResource(R.string.add_profile),
-                        onAddProfile,
-                        modifier = Modifier.testTag("profile_switcher.add_profile"),
+                        addClick,
+                        modifier = addModifier.testTag("profile_switcher.add_profile"),
                         enabled = enabled,
                         leading = { SettingsLeadingIcon(R.drawable.ic_settings_person_add) },
                     )
@@ -193,6 +201,7 @@ internal fun ProfileSwitcherSheet(
                         context,
                         stringResource(R.string.settings),
                         onSettings,
+                        opensRoute = true,
                         modifier = Modifier.testTag("profile_switcher.settings"),
                         enabled = enabled,
                         leading = { SettingsLeadingIcon(R.drawable.ic_emoji_settings) },
@@ -201,12 +210,13 @@ internal fun ProfileSwitcherSheet(
             }
         } else {
             WhiteNoiseButton(
-                onClick = onAddProfile,
+                onClick = addClick,
                 enabled = enabled,
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .padding(PROFILE_SWITCHER_CONTENT_INSET)
+                        .then(addModifier)
                         .testTag("profile_switcher.add_profile"),
             ) {
                 Icon(

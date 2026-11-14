@@ -1151,7 +1151,7 @@
       {
         "surface": "Scroll boundaries: GroupDetailsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": ".whiteNoiseVerticalScroll(",
+        "anchor": ".fadingVerticalScroll(",
         "test_ids": [
           "SCR-001",
           "SCR-002",

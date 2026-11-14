@@ -245,7 +245,7 @@ internal fun GroupAbandonmentReviewDialog(
             ) { Text(stringResource(confirmLabel)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("group.abandon.cancel")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("group.abandon.cancel")) {
                 Text(stringResource(if (failed) R.string.close else R.string.cancel))
             }
         },
@@ -403,7 +403,7 @@ internal fun GroupSoleAdminLeaveDialog(
             ) { Text(stringResource(groupAbandonmentActionLabel(isDm))) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, modifier = Modifier.testTag("chat_info.sole_admin_leave.cancel")) {
+            TextButton(onClick = dismiss, modifier = Modifier.testTag("chat_info.sole_admin_leave.cancel")) {
                 Text(stringResource(R.string.cancel))
             }
         },

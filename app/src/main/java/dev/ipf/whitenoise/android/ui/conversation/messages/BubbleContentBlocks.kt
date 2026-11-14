@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -98,6 +99,7 @@ import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
 
@@ -174,7 +176,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     sharedUser: SharedUser?,
     remoteGiphyMedia: RemoteGiphyMedia?,
     giphyEditedLabel: String?,
-    onGiphyEditedClick: (() -> Unit)?,
+    onGiphyEditedClick: ((Rect?) -> Unit)?,
     deleted: Boolean,
     mine: Boolean,
     showStatus: Boolean,
@@ -555,13 +557,14 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     timestampColor: Color,
     showStatus: Boolean,
     editedLabel: String?,
-    onEditedClick: (() -> Unit)?,
+    onEditedClick: ((Rect?) -> Unit)?,
     footerOnVisualMedia: Boolean,
     footerOnPendingVisual: Boolean,
     showTimestamp: Boolean = true,
     invalidationWarning: String?,
     mine: Boolean,
     onExpand: () -> Unit,
+    onExpandAt: ((Rect?) -> Unit)? = null,
     statusContainerColor: Color? = null,
 ) {
     val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
@@ -867,16 +870,20 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             }
         }
         val readMoreFooter: @Composable () -> Unit = {
+            val (originModifier, expand) =
+                rememberMeasuredControlClick { origin ->
+                    onExpandAt?.invoke(origin) ?: onExpand()
+                }
             Text(
                 readMoreLabel,
                 style = MaterialTheme.typography.bodyLarge,
                 color = readMoreStyle.color,
                 fontWeight = readMoreStyle.fontWeight,
                 modifier =
-                    Modifier.clickable(
+                    Modifier.then(originModifier).clickable(
                         onClickLabel = readMoreLabel,
                         role = Role.Button,
-                        onClick = onExpand,
+                        onClick = expand,
                     ),
             )
         }

@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -15,6 +17,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberImageUploadPreview
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
@@ -294,6 +298,7 @@ internal fun NewGroupSetupScreen(
 }
 
 /** Current account's setup operations; prepared images remain in the caller's unsubmitted draft. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod") // Compose naming follows the framework convention.
 private fun NewGroupSetupAccountScreen(
@@ -344,6 +349,24 @@ private fun NewGroupSetupAccountScreen(
         )
     var imageDraft by draft::imageDraft
     var imagePreparing by remember { mutableStateOf(false) }
+    val sheetBusy by rememberUpdatedState(imagePreparing)
+    val searchState =
+        key(owner, showImagePicker) {
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+                confirmValueChange = { it != SheetValue.Hidden || !sheetBusy },
+            )
+        }
+    val searchTerminal = rememberSheetTerminalMotion(searchState)
+    val emojiImageState =
+        key(owner, showGroupEmojiImagePicker) {
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+                confirmValueChange = { it != SheetValue.Hidden || !sheetBusy },
+            )
+        }
+    val emojiImageTerminal = rememberSheetTerminalMotion(emojiImageState)
+
     var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var busy by remember { mutableStateOf(false) }
     var createStage by remember { mutableStateOf<NewGroupCreateStage?>(null) }
@@ -454,6 +477,7 @@ private fun NewGroupSetupAccountScreen(
         acceptedCrop: Boolean = false,
         load: suspend () -> ImageUploadDraft,
     ) {
+        val searchExit = searchTerminal
         if (!detailsEditableNow()) return
         if (acceptedCrop) cropRecovery.accepted()
         val generation = ++imageGeneration
@@ -467,7 +491,7 @@ private fun NewGroupSetupAccountScreen(
                 imageDraft = prepared
                 if (acceptedCrop) cropRecovery.settled()
                 draft.imageNeedsReselection = false
-                showImagePicker = false
+                searchExit.closeWhenReady(ready = { !sheetBusy }) { showImagePicker = false }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -654,6 +678,8 @@ private fun NewGroupSetupAccountScreen(
 
     if (showImagePicker) {
         ImageSearchSheet(
+            suppliedSheetState = searchState,
+            suppliedTerminal = searchTerminal,
             initialUrl = imageDraft?.sourceUrl.orEmpty(),
             hasCurrentImage = imageDraft != null,
             header = stringResource(R.string.group_image_search_title),
@@ -668,7 +694,7 @@ private fun NewGroupSetupAccountScreen(
                     imageDraft = null
                     draft.imageNeedsReselection = false
                     imageError = false
-                    showImagePicker = false
+                    searchTerminal.close { showImagePicker = false }
                 } else {
                     prepareImage { prepareRemoteImage(picked) }
                 }
@@ -683,8 +709,12 @@ private fun NewGroupSetupAccountScreen(
                 if (!detailsEditableNow()) return@ImageSearchSheet
                 imageFailureScope.clear()
                 imageError = false
-                showImagePicker = false
-                showGroupEmojiImagePicker = true
+                searchTerminal.close {
+                    if (detailsEditableNow()) {
+                        showImagePicker = false
+                        showGroupEmojiImagePicker = true
+                    }
+                }
             },
             onDismiss = {
                 if (!imagePreparing) {
@@ -714,6 +744,8 @@ private fun NewGroupSetupAccountScreen(
 
     if (showGroupEmojiImagePicker) {
         GroupEmojiImagePickerSheet(
+            suppliedSheetState = emojiImageState,
+            suppliedTerminal = emojiImageTerminal,
             applyInFlight = imagePreparing,
             recentEmojis = recentEmojiRecentsOwner.recents,
             onEmojiUsed = { if (detailsEditableNow()) recentEmojiRecentsOwner.onEmojiUsed(it) },
@@ -723,7 +755,7 @@ private fun NewGroupSetupAccountScreen(
                 imageDraft = prepared
                 draft.imageNeedsReselection = false
                 imageError = false
-                showGroupEmojiImagePicker = false
+                emojiImageTerminal.close { showGroupEmojiImagePicker = false }
             },
             onDismiss = {
                 if (!imagePreparing) {
@@ -737,6 +769,7 @@ private fun NewGroupSetupAccountScreen(
 
     if (showEmojiPicker && detailsEditable) {
         EmojiPickerSheet(
+            closeOnPick = false,
             onDismissRequest = { showEmojiPicker = false },
             onEmojiPicked = { emoji ->
                 if (detailsEditableNow()) {

@@ -16,9 +16,12 @@ internal class ChatFolderAssignmentSession(
     val intents get() = draft.intents
 
     /** A closing or replaced picker cannot revive writes through an already captured callback. */
-    fun isCurrent(): Boolean {
+    fun isCurrent(): Boolean = active && isAvailable()
+
+    /** Keeps exit decoration mounted without granting closing callbacks permission to write. */
+    fun isAvailable(): Boolean {
         val sameTargets = targetIds.isNotEmpty() && draft.matches(account, runtime, targetIds)
-        return active && current() && sameTargets
+        return current() && sameTargets
     }
 
     /** Captures one desired manual-membership state; rule-derived membership is not edited. */

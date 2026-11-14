@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -33,6 +34,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.CancellationException
@@ -56,8 +58,9 @@ internal fun supportRelayState(lists: AccountRelayListsFfi?): SupportRelayState 
  * Explains the canonical support contact before the user explicitly opens an existing DM or the normal
  * profile flow.
  */
-@Suppress("FunctionNaming", "LongParameterList", "TooGenericExceptionCaught")
+@Suppress("FunctionNaming", "LongParameterList", "TooGenericExceptionCaught", "CyclomaticComplexMethod")
 @Composable
+// Relay loading and tap-time account/chat checks belong to the same support-screen state owner.
 internal fun SupportScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
@@ -65,7 +68,7 @@ internal fun SupportScreen(
     onRelays: () -> Unit,
     loadRelayLists: suspend (String) -> AccountRelayListsFfi? = appState::loadAccountRelayLists,
     existingChat: (String) -> ChatListItem? = appState::existingDirectChat,
-    presentProfile: (String) -> Unit = appState::presentProfile,
+    presentProfile: ((String) -> Unit)? = null,
 ) {
     val account = appState.activeAccountRef
     var relayState by remember(appState, account) { mutableStateOf(SupportRelayState.Loading) }
@@ -92,14 +95,18 @@ internal fun SupportScreen(
         onBack = { if (!appState.signOutInProgress) onBack() },
         onRelays = { if (!appState.signOutInProgress) onRelays() },
         onRetry = { if (!appState.signOutInProgress) refresh++ },
-        onStart = {
+        onStart = { origin ->
             // Re-read both ownership and canonical chat selection at the actual tap boundary.
             if (account != null && appState.activeAccountRef == account && !appState.signOutInProgress) {
                 val existing = existingChat(SupportContact.NPUB)
                 if (existing != null) {
                     onOpenSupportChat(existing)
                 } else if (relayState == SupportRelayState.Configured) {
-                    presentProfile(SupportContact.NPUB)
+                    if (presentProfile != null) {
+                        presentProfile(SupportContact.NPUB)
+                    } else {
+                        appState.presentProfile(SupportContact.NPUB, origin = origin)
+                    }
                 }
             }
         },
@@ -115,7 +122,7 @@ internal fun SupportContent(
     relayState: SupportRelayState,
     busy: Boolean,
     onBack: () -> Unit,
-    onStart: () -> Unit,
+    onStart: (Rect?) -> Unit,
     onRelays: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -123,7 +130,11 @@ internal fun SupportContent(
     SettingsScaffold(title = stringResource(R.string.chat_with_support), onBack = onBack) {
         SettingsList {
             item(key = "search.SupportScreen.1") {
-                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section),
+                    destination = SettingsDetail.Support,
+                    surface = "support-controls",
+                ) {
                     row("support_identity") { context ->
                         SettingsGroupPanel(context) {
                             ListItem(
@@ -190,6 +201,7 @@ internal fun SupportContent(
                                     title = stringResource(R.string.support_open_relays),
                                     subtitle = stringResource(R.string.support_relays_review),
                                     enabled = !busy,
+                                    routeKey = SettingsDetail.SupportRelays,
                                     onClick = onRelays,
                                     modifier = Modifier.testTag("support.relays"),
                                     leading = { SettingsLeadingIcon(R.drawable.ic_settings_cell_tower) },
@@ -212,8 +224,9 @@ internal fun SupportContent(
                 }
             }
             item(key = "search.SupportScreen.5") {
+                val (startModifier, startClick) = rememberMeasuredControlClick(onStart)
                 WhiteNoiseButton(
-                    onClick = onStart,
+                    onClick = startClick,
                     enabled = canStart && !busy,
                     modifier =
                         Modifier
@@ -221,6 +234,7 @@ internal fun SupportContent(
                                 horizontal = WhiteNoiseSpacing.CompactScreenMargin,
                                 vertical = WhiteNoiseSpacing.Section,
                             ).fillMaxWidth()
+                            .then(startModifier)
                             .testTag("support.start"),
                 ) { Text(stringResource(R.string.start_chat)) }
             }

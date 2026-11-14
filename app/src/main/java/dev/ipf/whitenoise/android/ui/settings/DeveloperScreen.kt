@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.state.ReviewDemoStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
@@ -160,7 +161,11 @@ internal fun DeveloperContent(
                 )
             }
             item(key = "search.Developer.2") {
-                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("developer.mode")) {
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("developer.mode"),
+                    destination = SettingsDetail.Developer,
+                    surface = "developer-mode",
+                ) {
                     row("developer_mode") { context ->
                         SettingsSwitch(
                             context = context,
@@ -246,6 +251,7 @@ internal fun DeveloperContent(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.key_packages),
+                            routeKey = SettingsDetail.KeyPackages,
                             onClick = onOpenKeyPackages,
                             modifier = Modifier.testTag("developer.key_packages.row"),
                             subtitle = stringResource(R.string.key_packages_settings_subtitle),
@@ -261,6 +267,7 @@ internal fun DeveloperContent(
                             SettingsLink(
                                 context = context,
                                 title = stringResource(R.string.quarantined_groups),
+                                routeKey = SettingsDetail.QuarantinedGroups,
                                 onClick = onOpenQuarantinedGroups,
                                 subtitle = quarantineSummary,
                                 modifier = Modifier.testTag("developer.quarantined_groups"),
@@ -371,7 +378,7 @@ internal fun DeveloperContent(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmStart = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -390,7 +397,7 @@ internal fun DeveloperContent(
                 ) { Text(stringResource(R.string.review_demo_clear)) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }

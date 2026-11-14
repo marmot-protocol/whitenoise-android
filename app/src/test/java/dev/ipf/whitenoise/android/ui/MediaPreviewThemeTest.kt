@@ -169,7 +169,7 @@ class MediaPreviewThemeTest {
                             onRemoveDocumentAt = {},
                             onAddPhotos = {},
                             onAddDocuments = {},
-                            onEditMediaAt = { edited += it },
+                            onEditMediaAt = { index, _ -> edited += index },
                             preparedPhotoPreviews = mapOf("stable-photo" to PreparedPhotoPreview("prepared", bytes)),
                             nonEditableMediaSlotIds = if (nonEditable) setOf("stable-photo") else emptySet(),
                             previewOnly = previewOnly,

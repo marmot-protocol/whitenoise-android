@@ -13,7 +13,10 @@ internal class PersonProfileOwner(
     private var alive = true
 
     /** Checks the current account/runtime and local view lifetime at invocation. */
-    fun canAct(): Boolean = alive && available()
+    fun canAct(): Boolean = alive && canPresent()
+
+    /** Retains the closing decoration while the same account/runtime remains available. */
+    fun canPresent(): Boolean = available()
 
     /** Stops a stale callback before it can enter the next native stage. */
     fun requireCurrent() {

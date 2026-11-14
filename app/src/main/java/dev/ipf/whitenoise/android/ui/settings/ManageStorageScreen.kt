@@ -70,6 +70,7 @@ internal fun ManageStorageScreen(
             onBack = onBack,
             actions =
                 ManageStorageActions(
+                    ownerKey = controller,
                     onRefresh = controller::refresh,
                     onAction = controller::perform,
                     onOpenList = { list = it },
@@ -94,6 +95,7 @@ internal data class ManageStorageActions(
     val onAction: (StorageAction) -> Unit,
     val onOpenList: (String) -> Unit,
     val onLoadMoreChats: () -> Unit,
+    val ownerKey: Any? = Unit,
 )
 
 /** The overview: usage, free-up actions, Keep media and chats by size, with its confirmations. */
@@ -104,7 +106,7 @@ internal fun ManageStorageContent(
     onBack: () -> Unit,
     actions: ManageStorageActions,
 ) {
-    val dialogs = rememberStorageDialogs()
+    val dialogs = rememberStorageDialogs(actions.ownerKey)
     SettingsScaffold(title = stringResource(R.string.manage_storage_title), onBack = onBack) {
         SettingsList(listTag = "storage.list") {
             storageUsageItems(state, actions.onRefresh)

@@ -11,13 +11,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,6 +43,7 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -48,6 +53,7 @@ import kotlinx.coroutines.launch
 
 /** Real platform/file/web selection prepares a local bounded image; no upload occurs before Sign Up. */
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SignUpPhotoControls(
     owner: Any,
@@ -66,6 +72,16 @@ internal fun SignUpPhotoControls(
     var generation by remember(owner) { mutableStateOf(0L) }
     var active by remember(owner) { mutableStateOf(true) }
     var preparing by remember(owner) { mutableStateOf(false) }
+    val sheetBusy by rememberUpdatedState(preparing)
+    val webState =
+        key(owner, webSession) {
+            rememberModalBottomSheetState(
+                skipPartiallyExpanded = true,
+                confirmValueChange = { it != SheetValue.Hidden || !sheetBusy },
+            )
+        }
+    val webTerminal = rememberSheetTerminalMotion(webState)
+
     var error by remember(owner) { mutableStateOf(false) }
     var job by remember(owner) { mutableStateOf<Job?>(null) }
     val currentEnabled by rememberUpdatedState(enabled)
@@ -93,6 +109,8 @@ internal fun SignUpPhotoControls(
     /** Prepares a photo draft, dropping stale generations. */
     fun prepare(action: suspend () -> ImageUploadDraft) {
         if (!currentEnabled || !active) return
+        val webExit = webTerminal
+        val capturedWebSession = webSession
         val token = ++generation
         job?.cancel()
         preparing = true
@@ -104,7 +122,9 @@ internal fun SignUpPhotoControls(
                     val result = action()
                     if (token == generation && active && currentEnabled) {
                         currentPhoto(result)
-                        webSession = null
+                        webExit.closeWhenReady(ready = { !sheetBusy }) {
+                            if (webSession == capturedWebSession) webSession = null
+                        }
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -234,6 +254,8 @@ internal fun SignUpPhotoControls(
     val session = webSession
     if (session != null && enabled) {
         ImageSearchSheet(
+            suppliedSheetState = webState,
+            suppliedTerminal = webTerminal,
             initialUrl = photo?.sourceUrl.orEmpty(),
             hasCurrentImage = photo != null,
             header = stringResource(R.string.profile_picture_sheet_title),
@@ -244,8 +266,13 @@ internal fun SignUpPhotoControls(
             onApply = { url ->
                 if (webSession == session && currentEnabled && active) {
                     if (url == null) {
-                        invalidate()
+                        generation++
+                        pickerGeneration = null
+                        job?.cancel()
+                        preparing = false
+                        currentPreparing(false)
                         currentPhoto(null)
+                        webTerminal.close { if (webSession == session) webSession = null }
                     } else {
                         prepare { GroupImageDraftProcessor.fromRemoteUrl(url) }
                     }

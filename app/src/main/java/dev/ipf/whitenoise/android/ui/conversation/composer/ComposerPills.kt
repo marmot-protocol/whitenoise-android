@@ -1406,6 +1406,19 @@ internal fun ComposerPill(
             sendMotion?.sourceStrokeWidth = with(density) { ComposerOutlineThickness.toPx() }
         }
         val morphing = LocalComposerFabHandoff.current?.active == true
+        val nativePreview =
+            if (toolbarPreview) {
+                dev.ipf.whitenoise.android.ui.settings
+                    .rememberSettingsNativeSurface(
+                        destination = "composer.editor",
+                        surface = "composer.editor.preview",
+                        fill = sourceFill,
+                        shape = RoundedCornerShape(24.dp),
+                        strokeColor = sourceBorder,
+                    ).first
+            } else {
+                Modifier
+            }
         Surface(
             color = if (morphing) Color.Transparent else sourceFill,
             // Custom clipping owns motion; settled chrome remains the original Material surface.
@@ -1415,6 +1428,7 @@ internal fun ComposerPill(
                 Modifier
                     .fillMaxWidth()
                     .then(expandedHeightModifier)
+                    .then(nativePreview)
                     .testTag(COMPOSER_PILL_SURFACE_TAG)
                     .floatingDictationAnchor(followsComposerFab = true)
                     .composerFabSurface(

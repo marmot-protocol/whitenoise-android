@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -41,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Info
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +57,7 @@ internal fun MessageSelectionBottomBar(
     onInfo: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    onRouteOrigin: (MessageSelectionBarAction, Rect?) -> Unit = { _, _ -> },
 ) {
     val density = LocalDensity.current
     val actionSlotPx = with(density) { 48.dp.roundToPx() }
@@ -108,6 +111,7 @@ internal fun MessageSelectionBottomBar(
                             row.actions.forEach { action ->
                                 SelectionActionIconButton(
                                     action = action,
+                                    onRouteOrigin = onRouteOrigin,
                                     availability = availability,
                                     onCopy = onCopy,
                                     onForward = onForward,
@@ -151,21 +155,20 @@ private fun SelectionActionIconButton(
     onSave: () -> Unit,
     onReply: () -> Unit,
     onInfo: () -> Unit,
+    onRouteOrigin: (MessageSelectionBarAction, Rect?) -> Unit,
 ) {
     val label = selectionActionLabel(action)
+    val (originModifier, activate) =
+        rememberMeasuredControlClick { origin ->
+            if (selectionActionEnabled(action, availability)) {
+                onRouteOrigin(action, origin)
+                dispatchSelectionAction(action, availability, onCopy, onForward, onSave, onReply, onInfo)
+            }
+        }
     SelectionTooltipIconButton(
         label = label,
-        onClick = {
-            dispatchSelectionAction(
-                action = action,
-                availability = availability,
-                onCopy = onCopy,
-                onForward = onForward,
-                onSave = onSave,
-                onReply = onReply,
-                onInfo = onInfo,
-            )
-        },
+        modifier = originModifier,
+        onClick = activate,
         enabled = selectionActionEnabled(action, availability),
     ) {
         Icon(selectionActionIcon(action), contentDescription = label)
@@ -179,6 +182,7 @@ private fun SelectionTooltipIconButton(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    modifier: Modifier = Modifier,
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
     icon: @Composable () -> Unit,
 ) {
@@ -188,6 +192,7 @@ private fun SelectionTooltipIconButton(
         state = rememberTooltipState(),
     ) {
         IconButton(
+            modifier = modifier,
             onClick = onClick,
             enabled = enabled,
             colors = colors,

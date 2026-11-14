@@ -125,6 +125,8 @@ internal class PrivacyAuditFixture(
     @Volatile var statuses: List<AuditDeliveryStatusV5Ffi> = emptyList(),
     val clearPauseOnResume: Boolean = true,
 ) {
+    @Volatile var clearInventoryReads = 0
+
     @Volatile var retentionWrites = 0
 
     @Volatile var deliveryReads = 0
@@ -141,6 +143,10 @@ internal class PrivacyAuditFixture(
     ): Any? =
         when (method) {
             "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments!!.first()
+            "auditLogFiles" -> {
+                clearInventoryReads++
+                emptyList<dev.ipf.marmotkit.AuditLogFileFfi>()
+            }
             "auditLogSettings" -> auditSettings
             "auditLogRetention" -> retention
             "setAuditLogRetention" -> {

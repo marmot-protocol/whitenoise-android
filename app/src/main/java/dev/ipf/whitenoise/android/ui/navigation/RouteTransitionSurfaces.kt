@@ -1,20 +1,10 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedContentScope
-import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.Transition
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,105 +15,268 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
+import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
+import dev.ipf.whitenoise.android.ui.common.NativePageBody
+import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
+import dev.ipf.whitenoise.android.ui.common.drawNativePage
+import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
-/**
- * Conversation routes move only their full-screen render layers. Reading the
- * animated value inside [graphicsLayer] keeps every frame in the draw phase:
- * no animated recomposition, measurement, placement, or child-sized integer
- * offset can perturb the final frames. The short travel and crossfade retain
- * our live, already-prepared destination and Back route.
- */
+/** One visibility clock owns both drawing and outgoing-slot disposal. */
+internal interface ConversationRouteTransition<T> {
+    val currentState: T
+    val targetState: T
+    val isRunning: Boolean
+    val visibility: State<Float>
+    val retainedStates: List<T>
+}
+
+private class RetainedConversationRoute<T>(
+    initialState: T,
+    private val target: State<T>,
+    private val contentKey: (T) -> Any?,
+) : ConversationRouteTransition<T> {
+    private var settledState by mutableStateOf(initialState)
+    val progress = Animatable(if (initialState == null) 0f else 1f)
+    override val visibility: State<Float> = progress.asState()
+    override var retainedStates by mutableStateOf(listOf(initialState))
+        private set
+    override val targetState get() = target.value
+    override val currentState get() =
+        if (contentKey(settledState) == contentKey(targetState)) targetState else settledState
+    override val isRunning get() =
+        progress.isRunning ||
+            contentKey(settledState) != contentKey(targetState) ||
+            progress.value != if (targetState == null) 0f else 1f
+
+    fun retainLatestPayload() {
+        val latest = targetState
+        val latestKey = contentKey(latest)
+        retainedStates = retainedStates.map { if (contentKey(it) == latestKey) latest else it }
+        if (contentKey(settledState) == latestKey) settledState = latest
+    }
+
+    suspend fun moveTo(
+        destination: T,
+        suppressMotion: Boolean,
+    ) {
+        retainedStates = (retainedStates + destination).distinctBy(contentKey)
+        val end = if (destination == null) 0f else 1f
+        if (suppressMotion) {
+            progress.snapTo(end)
+        } else {
+            progress.animateTo(
+                end,
+                if (destination == null) {
+                    tween(APP_MOTION_CLOSE_MILLIS, easing = AppMotionCloseEasing)
+                } else {
+                    conversationRouteAnimationSpec
+                },
+            )
+        }
+        // Cancellation never reaches this point: an interrupted route keeps its live slots.
+        val latest = targetState
+        settledState = latest
+        retainedStates = listOf(latest)
+    }
+}
+
 @Composable
-@Suppress("FunctionNaming")
+internal fun <T> rememberConversationRouteTransition(
+    targetState: T,
+    suppressMotion: Boolean,
+    ownerKey: Any? = Unit,
+    contentKey: (T) -> Any? = { it },
+): ConversationRouteTransition<T> {
+    val target = rememberUpdatedState(targetState)
+    val latestKey = rememberUpdatedState(contentKey)
+    val transition = remember(ownerKey) { RetainedConversationRoute(targetState, target) { latestKey.value(it) } }
+    SideEffect { transition.retainLatestPayload() }
+    LaunchedEffect(transition, contentKey(targetState), suppressMotion) {
+        transition.moveTo(targetState, suppressMotion)
+    }
+    return transition
+}
+
+/** Retains live route owners while painting fixed native chrome and exclusive native bodies. */
+@Composable
+// Keep one retained-slot owner and one reversible clock; activation is optional route metadata.
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 internal fun <T> ConversationRouteAnimatedContent(
-    transition: Transition<T>,
+    transition: ConversationRouteTransition<T>,
     routeForwardDirection: Int,
     suppressMotion: Boolean,
     contentKey: (T) -> Any?,
-    content: @Composable AnimatedContentScope.(T) -> Unit,
+    activatingBounds: (T) -> Rect? = { null },
+    originOwner: ConversationRouteOrigin? = null,
+    content: @Composable (T) -> Unit,
 ) {
+    val view = LocalView.current
+    val background = MaterialTheme.colorScheme.background
+    var hostBounds by remember { mutableStateOf(Rect.Zero) }
+    val replacingConversation =
+        transition.currentState != null &&
+            transition.targetState != null &&
+            contentKey(transition.currentState) != contentKey(transition.targetState)
+    var retainedOrigin by remember(originOwner, transition) { mutableStateOf<Rect?>(null) }
+    val directOrigin = activatingBounds(transition.targetState ?: transition.currentState)
+    val source = if (transition.targetState != null) directOrigin else directOrigin ?: retainedOrigin
+    SideEffect {
+        if (transition.targetState != null) {
+            retainedOrigin = directOrigin
+        } else if (!transition.isRunning && transition.currentState == null) {
+            retainedOrigin = null
+        }
+    }
+    val containerMorph =
+        !suppressMotion &&
+            !replacingConversation &&
+            source != null &&
+            !source.isEmpty &&
+            !hostBounds.isEmpty &&
+            source.overlaps(hostBounds)
+    val nativeBodies = remember(transition) { androidx.compose.runtime.mutableStateMapOf<Any?, NativePageBody>() }
     val separatedChrome = LocalComposerFabHandoff.current?.morphSurface == true
+    val nativePresentation = separatedChrome || containerMorph
     val travelPx = with(LocalDensity.current) { CONVERSATION_ROUTE_LAYER_TRAVEL.toPx() }
     // One intrinsic progress value (list = 0, conversation = 1) is stable under
     // interruption. A Back during enter reverses from the exact rendered float
     // instead of creating a new target-relative 0 -> 1 animation that jumps.
-    val conversationVisibility =
-        transition.animateFloat(
-            transitionSpec = {
-                if (suppressMotion) {
-                    snap()
-                } else {
-                    conversationRouteAnimationSpec
-                }
-            },
-            label = "conversation route visibility",
-        ) { state ->
-            if (state != null) 1f else 0f
-        }
-    transition.AnimatedContent(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopStart,
-        transitionSpec = { routeContentTransform(suppressMotion) },
-        contentKey = contentKey,
-    ) { route ->
-        Box(
+    val conversationVisibility = transition.visibility
+    Box(
+        modifier =
             Modifier
                 .fillMaxSize()
-                .graphicsLayer {
-                    val progress = conversationVisibility.value
-                    val conversationRoute = route != null
-                    alpha =
-                        if (separatedChrome) {
-                            1f
-                        } else {
-                            conversationRouteLayerAlpha(progress, conversationRoute, suppressMotion)
-                        }
-                    translationX =
-                        (if (separatedChrome) 0f else travelPx) *
-                        routeForwardDirection *
-                        conversationRouteLayerTranslation(progress, conversationRoute, suppressMotion)
-                },
-        ) {
-            CompositionLocalProvider(
-                LocalControlHandoffEndpointCurrent provides (contentKey(route) == contentKey(transition.targetState)),
-                LocalConversationBodyMotion provides
-                    if (separatedChrome) {
-                        ConversationBodyMotion(
-                            conversationVisibility,
-                            route != null,
-                            routeForwardDirection,
-                            suppressMotion,
+                .onGloballyPositioned { hostBounds = it.settingsMorphBounds(view) }
+                .drawWithContent {
+                    if (containerMorph) {
+                        drawMeasuredPage(
+                            measuredPageBounds(checkNotNull(source), hostBounds, conversationVisibility.value)
+                                .translate(-hostBounds.topLeft),
+                            conversationVisibility.value,
+                            background,
                         )
-                    } else {
-                        null
-                    },
-            ) {
-                content(route)
+                    }
+                    drawContent()
+                }.pointerInput(transition, containerMorph) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val unsettled =
+                                transition.isRunning ||
+                                    transition.currentState != transition.targetState ||
+                                    conversationVisibility.value < 1f
+                            if (containerMorph && unsettled) {
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                },
+        contentAlignment = Alignment.TopStart,
+    ) {
+        // Keep each composition key stable, resolve the requested key to its latest payload,
+        // and put the requested chat above outgoing chats even for A -> B -> A.
+        val targetKey = contentKey(transition.targetState)
+        val routes =
+            if (suppressMotion) {
+                listOf(transition.targetState)
+            } else {
+                (transition.retainedStates + transition.currentState + transition.targetState)
+                    .distinctBy(contentKey)
+            }
+        routes.forEach { retained ->
+            val route = if (contentKey(retained) == targetKey) transition.targetState else retained
+            key(transition, contentKey(route)) {
+                val nativeBody = remember { NativePageBody() }
+                SideEffect { nativeBodies[contentKey(route)] = nativeBody }
+                androidx.compose.runtime.DisposableEffect(nativeBody) {
+                    onDispose { nativeBodies.remove(contentKey(route)) }
+                }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .zIndex(if (contentKey(route) == targetKey) 2f else 1f)
+                        .drawWithContent {
+                            if (!nativePresentation) {
+                                drawContent()
+                            } else {
+                                val body = nativeBody.bounds?.translate(-hostBounds.topLeft)
+                                val targetBody = nativeBodies[targetKey]?.bounds?.translate(-hostBounds.topLeft)
+                                drawNativePage(
+                                    body = body,
+                                    chrome = contentKey(route) == targetKey,
+                                    bodyPresence = nativePageBodyPresence(conversationVisibility.value, route != null),
+                                    bodyLimit = targetBody,
+                                )
+                            }
+                        }.graphicsLayer {
+                            val progress = conversationVisibility.value
+                            val conversationRoute = route != null
+                            alpha =
+                                if (nativePresentation) {
+                                    1f
+                                } else {
+                                    conversationRouteLayerAlpha(progress, conversationRoute, suppressMotion)
+                                }
+                            translationX =
+                                (if (nativePresentation) 0f else travelPx) *
+                                routeForwardDirection *
+                                conversationRouteLayerTranslation(progress, conversationRoute, suppressMotion)
+                        },
+                ) {
+                    CompositionLocalProvider(
+                        LocalConversationRouteOrigin provides originOwner,
+                        LocalControlHandoffEndpointCurrent provides
+                            (contentKey(route) == contentKey(transition.targetState)),
+                        LocalConversationBodyMotion provides
+                            if (nativePresentation) {
+                                ConversationBodyMotion(nativeBody)
+                            } else {
+                                null
+                            },
+                    ) {
+                        content(route)
+                    }
+                }
             }
         }
     }
 }
 
 /**
- * Routes leave their origin quickly and settle softly in both directions. One curve keeps the
- * shared visibility value reversible: a Back mid-entry continues from the rendered position.
+ * Routes arrive on the shared opening curve. The visibility owner applies the shared closing
+ * curve on Back; both directions continue from the exact rendered value when interrupted.
  */
 internal val ConversationRouteEasing = AppMotionOpenEasing
 
@@ -133,23 +286,6 @@ private val conversationRouteAnimationSpec =
         durationMillis = CONVERSATION_ROUTE_TRANSITION_MILLIS,
         easing = ConversationRouteEasing,
     )
-
-/** Retains both full-screen slots while draw-layer progress owns visible motion. */
-private fun <T> AnimatedContentTransitionScope<T>.routeContentTransform(suppressMotion: Boolean): ContentTransform {
-    if (suppressMotion) return EnterTransition.None togetherWith ExitTransition.None
-    // A non-zero delta keeps AnimatedContent's outgoing slot alive for the
-    // layer animation. Visible alpha is owned by conversationRouteLayerAlpha.
-    return (
-        fadeIn(
-            initialAlpha = CONVERSATION_ROUTE_SLOT_RETENTION_ALPHA,
-            animationSpec = conversationRouteAnimationSpec,
-        ) togetherWith
-            fadeOut(
-                targetAlpha = CONVERSATION_ROUTE_SLOT_RETENTION_ALPHA,
-                animationSpec = conversationRouteAnimationSpec,
-            )
-    ).using(SizeTransform(clip = false))
-}
 
 /** Resolves one route layer's alpha from the shared intrinsic conversation visibility. */
 internal fun conversationRouteLayerAlpha(
@@ -350,4 +486,3 @@ internal const val QUICK_ACCOUNT_SWITCH_TRANSITION_MILLIS = 128
 internal const val QUICK_ACCOUNT_SWITCH_MAX_PRESENTATION_MILLIS = 180
 internal const val QUICK_ACCOUNT_SWITCH_CUE_TAG = "quick-account-switch-cue"
 internal val CONVERSATION_ROUTE_LAYER_TRAVEL = 48.dp
-private const val CONVERSATION_ROUTE_SLOT_RETENTION_ALPHA = 0.999f

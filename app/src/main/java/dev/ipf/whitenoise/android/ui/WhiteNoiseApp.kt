@@ -852,8 +852,9 @@ internal fun WhiteNoiseApp(
     if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(
             offlineSpeechToText = dictationState.usesOfflineSpeechToText,
-            onConfirm = dictation::acceptDisclosure,
-            onDismiss = dictation::cancel,
+            ownerKey = dictationState,
+            onConfirm = { dictation.acceptDisclosure(dictationState) },
+            onDismiss = { if (dictation.state === dictationState) dictation.cancel() },
         )
     }
 }

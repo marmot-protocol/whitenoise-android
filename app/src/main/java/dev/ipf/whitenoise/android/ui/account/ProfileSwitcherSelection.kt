@@ -16,6 +16,11 @@ internal class ProfileSwitcherSelection {
     /** Invalidate UI intent synchronously on Back, Close, another route or sheet disposal. */
     fun close() {
         open = false
+        cancelPending()
+    }
+
+    /** Retire pending activation while Material owns exit; a cancelled hide keeps this sheet retryable. */
+    fun cancelPending() {
         generation++
         pendingLabel = null
     }

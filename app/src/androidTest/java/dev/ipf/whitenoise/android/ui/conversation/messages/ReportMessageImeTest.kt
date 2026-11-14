@@ -49,7 +49,7 @@ class ReportMessageImeTest {
         val submissions = mutableListOf<Pair<ReportReasonFfi, String>>()
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = 2f) {
-                ReportMessageSheet({}, { reason, text -> submissions += reason to text })
+                ReportMessageSheet({}, { reason, text, _ -> submissions += reason to text })
             }
         }
         composeRule.onNodeWithText("Impersonation").performScrollTo().performClick()

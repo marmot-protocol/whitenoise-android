@@ -95,8 +95,10 @@ internal fun GroupDisbandConfirmDialog(
     onDismiss: () -> Unit,
     identity: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
+    ownerKey: Any? = Unit,
 ) {
     ConfirmDialog(
+        ownerKey = ownerKey,
         title = stringResource(R.string.group_disband_dialog_title),
         message = stringResource(R.string.group_disband_dialog_message),
         confirmLabel = stringResource(R.string.group_disband_confirm),

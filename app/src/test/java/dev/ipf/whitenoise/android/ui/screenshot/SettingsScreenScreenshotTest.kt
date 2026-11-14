@@ -340,6 +340,7 @@ class SettingsScreenScreenshotTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithText("Send message").performClick()
+        composeRule.waitForIdle()
 
         assertEquals(5_000L, appState.conversationDictationPreferences.current().finishAfterSilenceMillis)
         assertEquals(

@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -126,6 +127,7 @@ internal fun ChatListTopBar(
 ) {
     var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
     val switchNotice = rememberQuickAccountSwitchNotice()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.signOutInProgress || appState.wipeInProgress) {
@@ -233,6 +235,9 @@ internal fun ChatListTopBar(
                             }
                         else -> {
                             val active = appState.activeAccount
+                            val (settingsOrigin, openSettings) =
+                                dev.ipf.whitenoise.android.ui.settings
+                                    .rememberSettingsRouteClick(onOpenSettings)
                             val title =
                                 active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
                                     ?: stringResource(R.string.app_name)
@@ -258,11 +263,16 @@ internal fun ChatListTopBar(
                                             if (appState.chatsAvatarOpensSelector()) {
                                                 openSelector()
                                             } else {
-                                                onOpenSettings()
+                                                openSettings()
                                             }
                                         }
                                     },
-                                    modifier = Modifier.padding(start = 8.dp).testTag("chats.switchProfile"),
+                                    modifier =
+                                        Modifier
+                                            .padding(
+                                                start = 8.dp,
+                                            ).testTag("chats.switchProfile")
+                                            .then(settingsOrigin),
                                     // Per-account dot: light only when the active account
                                     // itself has unread, same shared decision the other
                                     // avatars use — not "some other account has unread" (#805).
@@ -331,6 +341,7 @@ internal fun ChatListTopBar(
         AccountSelectorSheet(
             appState = appState,
             onDismiss = { showSelector = false },
+            onAddAccountOrigin = { addIdentityOrigin = it },
             onAddAccount = {
                 showSelector = false
                 showAddIdentity = true
@@ -343,7 +354,7 @@ internal fun ChatListTopBar(
         )
     }
     if (showAddIdentity) {
-        AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+        AddIdentitySheet(appState = appState, origin = addIdentityOrigin, onDismiss = { showAddIdentity = false })
     }
 }
 

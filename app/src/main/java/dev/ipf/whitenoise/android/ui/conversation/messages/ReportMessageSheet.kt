@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ModalBottomSheetProperties
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ import dev.ipf.whitenoise.android.state.REPORT_REASONS
 import dev.ipf.whitenoise.android.state.boundedExplanation
 import dev.ipf.whitenoise.android.state.reportReasonLabel
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 
 internal const val REPORT_SHEET_TEST_TAG = "message.report"
 internal const val REPORT_BODY_TEST_TAG = "message.report.body"
@@ -57,18 +59,35 @@ internal const val REPORT_BODY_TEST_TAG = "message.report.body"
 @Composable
 internal fun ReportMessageSheet(
     onDismissRequest: () -> Unit,
-    onSubmit: (ReportReasonFfi, String) -> Unit,
+    onSubmit: (ReportReasonFfi, String, () -> Unit) -> Unit,
     sending: Boolean = false,
+    ownerKey: Any? = Unit,
 ) {
     var reason by remember { mutableStateOf(REPORT_REASONS.first()) }
     var explanation by remember { mutableStateOf("") }
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet, ownerKey)
     ModalBottomSheet(
-        onDismissRequest = onDismissRequest,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { terminal.close(onDismissRequest) },
+        sheetState = sheet,
+        sheetGesturesEnabled = terminal.acceptsInput,
+        properties =
+            ModalBottomSheetProperties(
+                shouldDismissOnBackPress = terminal.acceptsInput,
+                shouldDismissOnClickOutside = terminal.acceptsInput,
+            ),
         modifier = Modifier.testTag(REPORT_SHEET_TEST_TAG),
         dragHandle = { ReportMessageDragHandle() },
     ) {
-        ReportMessageForm(reason, { reason = it }, explanation, { explanation = it }, sending, onSubmit)
+        ReportMessageForm(
+            reason,
+            { reason = it },
+            explanation,
+            { explanation = it },
+            sending || !terminal.acceptsInput,
+        ) { acceptedReason, acceptedExplanation ->
+            onSubmit(acceptedReason, acceptedExplanation) { terminal.close(onDismissRequest) }
+        }
     }
 }
 

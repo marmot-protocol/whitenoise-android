@@ -584,6 +584,7 @@ internal fun ConversationScreen(
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     searchChatsController: ChatsController? = null,
     onBroadenSearch: (GlobalSearchState) -> Unit = {},
+    onStartGroupWithPeerMeasured: ((RecipientSearch.Candidate, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
 ) {
     /** Records a conversation product observation per controller, chat, runtime and notification open. */
     @Composable
@@ -804,6 +805,12 @@ internal fun ConversationScreen(
         remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf<List<ForwardMessagePayload>?>(null)
         }
+    var batchForwardOrigin by remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<Rect?>(null)
+    }
+    var batchInfoOrigin by remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<Rect?>(null)
+    }
     var batchAttachmentSaveInFlight by
         remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchInfoSelection by
@@ -2055,6 +2062,9 @@ internal fun ConversationScreen(
     var pendingContactUri by rememberSaveable(conversationAccountRef, chat.id) { mutableStateOf<String?>(null) }
     // The picked point lives only here until the user sends or cancels; the
     // keyless OSM picker is the single confirmation surface.
+    var attachmentRouteOrigin by remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<Rect?>(null)
+    }
     var locationPickerOpen by remember(chat.id) { mutableStateOf(false) }
     // "Share user" (npub) — the identity-native counterpart to a phone contact.
     // Reuses the recipient picker; the selection sends a `nostr:npub…` reference
@@ -2090,6 +2100,7 @@ internal fun ConversationScreen(
         }
     }
 
+    @Suppress("MaxLineLength")
     fun hasLocationGrant(permission: String): Boolean = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
     val locationPermissionLauncher =
@@ -2231,6 +2242,7 @@ internal fun ConversationScreen(
             dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewUnavailableNotice(
                 onDismiss = { voiceReviewRecovery.updatePresence(false) },
                 onRecordAgain = {
+                    var accepted = false
                     voiceReviewRecovery.consume {
                         val ownsRecorder =
                             conversationAccountRef != null &&
@@ -2240,8 +2252,10 @@ internal fun ConversationScreen(
                         if (ownsRecorder && voiceRecordingController.start()) {
                             voiceReviewRecovery.updatePresence(false)
                             voiceRecordingController.lock()
+                            accepted = true
                         }
                     }
+                    accepted
                 },
             )
         }
@@ -2257,7 +2271,9 @@ internal fun ConversationScreen(
         DisposableEffect(controller, chat.id) {
             val ownerKey = controller.group.groupIdHex
             val unregister =
-                dev.ipf.whitenoise.android.audio.VoicePlaybackController.registerCompletionCallback(ownerKey) { completedKey ->
+                dev.ipf.whitenoise.android.audio.VoicePlaybackController.registerCompletionCallback(
+                    ownerKey,
+                ) { completedKey ->
                     val completedMsgId = completedKey.substringBefore('#')
                     val completedIdx = controller.timeline.indexOfFirst { it.record.messageIdHex == completedMsgId }
                     if (completedIdx >= 0) {
@@ -2540,7 +2556,8 @@ internal fun ConversationScreen(
     fun saveQuickReactionEmojis(choices: List<String>) {
         quickReactionEmojisTouched = true
         scope.launch {
-            quickReactionEmojis = withContext(Dispatchers.IO) { RecentEmojiPreferences.saveQuickReactions(context, choices) }
+            quickReactionEmojis =
+                withContext(Dispatchers.IO) { RecentEmojiPreferences.saveQuickReactions(context, choices) }
         }
     }
 
@@ -3833,19 +3850,25 @@ internal fun ConversationScreen(
     // One card morph for the transcript and both full-screen routes, so Back animates the return.
     // The header (or composer) becomes the next route's cards and they fold back into it, the same
     // container transform as Settings. Nothing travels with the closing keyboard.
+    val parentMorph = LocalSettingsCardMorph.current
     val routeMorph =
-        remember(controller, appState.runtimeGeneration) {
+        remember(controller, appState.runtimeGeneration, parentMorph) {
             // Composer settings survive recreation, so their Back must still fold into the pill.
-            SettingsCardMorph().apply {
+            SettingsCardMorph(fullScreen = true, parent = parentMorph).apply {
                 anchor = if (showComposerSettings) ConversationMorphAnchor.Composer else ConversationMorphAnchor.Details
             }
         }
+    CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
+        WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+    }
     val transcriptRouteMotion =
         rememberSettingsCardMorphHost(
             morph = routeMorph,
             target = showDetails to showComposerSettings,
             ownerKey = controller to appState.runtimeGeneration,
             motion = surfaceMotionEnabled && !routeTransitionInProgress && !routePresentationFrozen,
+            forward = transcriptRoutedAway,
+            captureContent = transcriptRoutedAway,
         ).second
     // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
     val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
@@ -3880,6 +3903,7 @@ internal fun ConversationScreen(
                         navigationState.searchOpen = true
                     },
                     onStartGroupWithPeer = onStartGroupWithPeer,
+                    onStartGroupWithPeerMeasured = onStartGroupWithPeerMeasured,
                 )
             }
             Box(Modifier.fillMaxSize().then(transcriptRouteMotion).then(routedAwayIme)) {
@@ -4285,6 +4309,13 @@ internal fun ConversationScreen(
                                 selectedMessages.clear()
                             }
                         },
+                        onSelectionRouteOrigin = { action, origin ->
+                            when (action) {
+                                MessageSelectionBarAction.Forward -> batchForwardOrigin = origin
+                                MessageSelectionBarAction.Info -> batchInfoOrigin = origin
+                                else -> Unit
+                            }
+                        },
                         onForwardSelection = {
                             if (batchSelectionUi.forwardPayloads.isNotEmpty()) {
                                 batchForwardSnapshot = batchSelectionUi.forwardPayloads
@@ -4461,6 +4492,7 @@ internal fun ConversationScreen(
                         onPickDocument = {
                             documentPickerLauncher.launch(arrayOf("*/*"))
                         },
+                        onAttachmentRouteOrigin = { _, origin -> attachmentRouteOrigin = origin },
                         onShareLocation = {
                             if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
                                 hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -5295,6 +5327,7 @@ internal fun ConversationScreen(
     fun conversationOverlays() {
         batchForwardSnapshot?.let { payloads ->
             ForwardMessageSheet(
+                origin = batchForwardOrigin,
                 appState = appState,
                 payloads = payloads,
                 sourceAccountRef = controller.boundAccountRef,
@@ -5316,6 +5349,7 @@ internal fun ConversationScreen(
                         .map { it.fileName.ifBlank { it.mediaType } }
                 }
             MessageDetailsScreen(
+                origin = batchInfoOrigin,
                 record = infoRecord,
                 status = infoSelection.status,
                 mine = infoMine,
@@ -5353,6 +5387,7 @@ internal fun ConversationScreen(
 
         pendingContactShare?.let { contact ->
             ContactPreviewScreen(
+                origin = attachmentRouteOrigin,
                 contact = contact,
                 onDismiss = { pendingContactShare = null },
                 onSend = { selected ->
@@ -5400,9 +5435,15 @@ internal fun ConversationScreen(
             StickerSheet(
                 controller = controller,
                 appState = appState,
-                onSend = { sticker ->
-                    stickerSheetOpen = false
-                    appState.launchMutation { controller.sendSticker(sticker) }
+                onSend = { sticker, onResult ->
+                    appState.launchMutation {
+                        var sent = false
+                        try {
+                            sent = controller.sendSticker(sticker)
+                        } finally {
+                            onResult(sent)
+                        }
+                    }
                 },
                 onDismiss = { stickerSheetOpen = false },
             )
@@ -5433,6 +5474,7 @@ internal fun ConversationScreen(
 
         if (locationPickerOpen) {
             LocationPickerScreen(
+                origin = attachmentRouteOrigin,
                 hasFineGrant = hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION),
                 onDismiss = { locationPickerOpen = false },
                 onPick = { location ->

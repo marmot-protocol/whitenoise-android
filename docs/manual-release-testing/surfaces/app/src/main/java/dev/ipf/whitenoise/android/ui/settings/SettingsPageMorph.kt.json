@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorph.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "rememberSettingsRouteClick",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorph.kt",
+        "anchor": "fun rememberSettingsRouteClick(",
+        "test_ids": [
+          "SET-039",
+          "CON-037"
+        ]
+      },
+      {
+        "surface": "rememberMeasuredControlClick",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorph.kt",
+        "anchor": "fun rememberMeasuredControlClick(",
+        "test_ids": [
+          "NAV-011",
+          "CON-037"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

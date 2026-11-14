@@ -36,8 +36,9 @@ internal fun ConversationNotificationCategoriesList(
     alertEnabled: Map<NotificationChannelSpec, Boolean> = emptyMap(),
     alertDetails: Map<NotificationChannelSpec, String> = emptyMap(),
     onAlertChange: (ConversationNotificationCategorySetting, Boolean) -> Unit = { _, _ -> },
+    destination: Any? = null,
 ) {
-    SettingsGroup {
+    SettingsGroup(destination = destination, surface = "conversation-notification-categories") {
         settings.forEach { setting ->
             row(setting.channel.id) { context ->
                 val title = notificationChannelTitle(setting.channel)

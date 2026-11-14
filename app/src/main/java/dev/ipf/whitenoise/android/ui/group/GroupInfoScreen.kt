@@ -52,7 +52,7 @@ private fun GroupIdentifierGroup(
     clipboard: ClipboardManager,
 ) {
     SettingsSection(stringResource(R.string.group_identifiers))
-    SettingsPanel {
+    SettingsPanel(destination = "group-info", surface = "group-identifiers") {
         Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.FormField)) {
             CopyableValueRow(
                 label = stringResource(R.string.mls_group_id),

@@ -1,11 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -13,6 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import java.security.MessageDigest
 
 /** Only an opaque account/chat binding and presence bit survive recreation; no file, audio, key, or duration does. */
@@ -79,17 +80,21 @@ internal fun rememberVoiceReviewRecoveryMarker(
 @Suppress("FunctionNaming")
 internal fun VoiceReviewUnavailableNotice(
     onDismiss: () -> Unit,
-    onRecordAgain: () -> Unit,
+    onRecordAgain: () -> Boolean,
 ) {
-    AlertDialog(
+    var attempt by remember { mutableIntStateOf(0) }
+    AnimatedAlertDialog(
+        ownerKey = attempt,
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.voice_review_unavailable_title)) },
         text = { Text(stringResource(R.string.voice_review_unavailable_message)) },
         confirmButton = {
-            TextButton(onClick = onRecordAgain) { Text(stringResource(R.string.voice_record_again)) }
+            TextButton(
+                onClick = { close { if (!onRecordAgain()) attempt++ } },
+            ) { Text(stringResource(R.string.voice_record_again)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.dismiss)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.dismiss)) }
         },
     )
 }

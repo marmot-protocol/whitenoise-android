@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -42,7 +43,8 @@ import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import java.time.Instant
@@ -64,6 +66,7 @@ internal fun EditHistoryDialog(
     // MarmotKit 0.10.1 owns accepted edits, so its history is complete where the loaded window's is not.
     // Null means the engine could not answer and the window's own edits stand in.
     loadAuthoritativeHistory: (suspend () -> List<EditVersion>?)? = null,
+    origin: Rect? = null,
 ) {
     var authoritative by remember(editState) { mutableStateOf<List<EditVersion>?>(null) }
     val load by rememberUpdatedState(loadAuthoritativeHistory)
@@ -75,7 +78,8 @@ internal fun EditHistoryDialog(
         remember(original, originalTimestamp, versions, editState.count) {
             editHistoryRows(original, originalTimestamp, versions, editState.count)
         }
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = origin,
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
@@ -88,7 +92,7 @@ internal fun EditHistoryDialog(
                     TopAppBar(
                         title = { Text(stringResource(R.string.edit_history)) },
                         navigationIcon = {
-                            IconButton(onClick = onDismissRequest) {
+                            IconButton(onClick = dismiss) {
                                 Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.back))
                             }
                         },
@@ -97,7 +101,7 @@ internal fun EditHistoryDialog(
                 }
             },
         ) { padding ->
-            AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
+            AdaptiveContent(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
                 Column(
                     modifier =
                         Modifier

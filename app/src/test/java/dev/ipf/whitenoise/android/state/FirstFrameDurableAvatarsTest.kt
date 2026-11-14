@@ -24,8 +24,16 @@ import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
 import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerReadiness
 import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -53,6 +61,7 @@ import kotlin.coroutines.startCoroutine
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
+@OptIn(ExperimentalCoroutinesApi::class)
 class FirstFrameDurableAvatarsTest {
     private val controllers = mutableListOf<ChatsController>()
 
@@ -144,7 +153,11 @@ class FirstFrameDurableAvatarsTest {
         val fixture = NativeAvatars { listOf(storedBytes) }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
-        runBlocking { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
+        withAvatarClock { scheduler ->
+            val handoff = fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored))
+            assertEquals(0L, scheduler.currentTime)
+            assertEquals(listOf(asset(GROUP).cacheKey(ACCOUNT)), handoff.map(FirstFrameDurableAvatar::key))
+        }
 
         assertEquals(1, fixture.reads.get())
         assertEquals("a restored frame never starts acquisition", 0, fixture.requests.get())
@@ -158,14 +171,32 @@ class FirstFrameDurableAvatarsTest {
     /** A read that never answers cannot hold the restored frame past the budget. */
     @Test
     fun slowStoredReadGivesUpWithinTheBudget() {
-        val fixture = NativeAvatars { awaitCancellation() }
+        val readEntered = CompletableDeferred<Unit>()
+        val fixture =
+            NativeAvatars {
+                readEntered.complete(Unit)
+                awaitCancellation()
+            }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
-        val started = System.nanoTime()
-        runBlocking { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
-        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MS
-
-        assertTrue("prewarm took ${elapsedMs}ms", elapsedMs < FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS * 4)
+        withAvatarClock { scheduler ->
+            val prewarm =
+                async(UnconfinedTestDispatcher(scheduler)) {
+                    fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored))
+                }
+            readEntered.await()
+            scheduler.advanceTimeBy(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS - 1)
+            scheduler.runCurrent()
+            assertTrue("prewarm still waits at 249ms", !prewarm.isCompleted)
+            scheduler.advanceTimeBy(1)
+            scheduler.runCurrent()
+            // Let the real IO read unwind cancellation without advancing the budget clock.
+            val handoff = prewarm.await()
+            assertTrue(handoff.isEmpty())
+            assertEquals(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS, scheduler.currentTime)
+        }
+        assertEquals(1, fixture.reads.get())
+        assertEquals("a timed-out frame never starts acquisition", 0, fixture.requests.get())
         assertNull(AvatarImageLoader.cachedImage(checkNotNull(asset(GROUP).cacheKey(ACCOUNT))))
         assertNull(firstFrame(fixture.state, stored).items.single().firstFrameAvatar)
     }
@@ -177,15 +208,15 @@ class FirstFrameDurableAvatarsTest {
             val fixture = NativeAvatars { awaitCancellation() }
             val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
-            val started = System.nanoTime()
             val handoff =
-                runBlocking {
-                    fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                withAvatarClock { scheduler ->
+                    val result =
+                        fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                    assertEquals(0L, scheduler.currentTime)
+                    result
                 }
-            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MS
 
             assertEquals("no stored bytes are read for a cold worker", 0, fixture.reads.get())
-            assertTrue("prewarm took ${elapsedMs}ms", elapsedMs < FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS)
             assertTrue(handoff.isEmpty())
         }
 
@@ -198,11 +229,16 @@ class FirstFrameDurableAvatarsTest {
             val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
             val handoff =
-                runBlocking {
-                    fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                withAvatarClock { scheduler ->
+                    val result =
+                        fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                    assertEquals(0L, scheduler.currentTime)
+                    result
                 }
 
             assertEquals(1, fixture.reads.get())
+            assertEquals("a quick switch never starts acquisition", 0, fixture.requests.get())
+            assertNotNull(AvatarImageLoader.cachedImage(checkNotNull(asset(GROUP).cacheKey(ACCOUNT))))
             assertEquals(listOf(asset(GROUP).cacheKey(ACCOUNT)), handoff.map(FirstFrameDurableAvatar::key))
         }
 
@@ -212,18 +248,35 @@ class FirstFrameDurableAvatarsTest {
         val storedBytes = payload()
         val fixture = NativeAvatars { listOf(storedBytes) }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
-        runBlocking { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
+        withAvatarClock { scheduler ->
+            val handoff = fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored))
+            assertEquals(0L, scheduler.currentTime)
+            assertEquals(listOf(asset(GROUP).cacheKey(ACCOUNT)), handoff.map(FirstFrameDurableAvatar::key))
+        }
 
         withDecoderWorkers(ready = false) {
             val handoff =
-                runBlocking {
-                    fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                withAvatarClock { scheduler ->
+                    val result =
+                        fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                    assertEquals(0L, scheduler.currentTime)
+                    result
                 }
 
             assertEquals("the cached pixels need no second read", 1, fixture.reads.get())
             assertEquals(listOf(asset(GROUP).cacheKey(ACCOUNT)), handoff.map(FirstFrameDurableAvatar::key))
         }
     }
+
+    /** Keeps the caller's budget clock still while real IO/native decoding runs; only tests advance it. */
+    private fun <T> withAvatarClock(block: suspend CoroutineScope.(TestCoroutineScheduler) -> T): T =
+        runBlocking {
+            // A real-clock hang guard, independent of the caller's manually advanced avatar budget.
+            withTimeout(30_000L) {
+                val scheduler = TestCoroutineScheduler()
+                withContext(UnconfinedTestDispatcher(scheduler)) { block(scheduler) }
+            }
+        }
 
     /** Runs [block] with a codec fixture whose workers are all running when [ready], or none when not. */
     private fun withDecoderWorkers(
@@ -321,7 +374,6 @@ class FirstFrameDurableAvatarsTest {
         val ACCOUNT_HEX = "00".repeat(32)
         val GROUP = "d1".repeat(16)
         val PEER = "aa".repeat(32)
-        const val NANOS_PER_MS = 1_000_000L
         const val FIRST_PIN = "first-pin"
         const val PENDING = "pending-invitation"
         const val DRAFTED = "drafted"

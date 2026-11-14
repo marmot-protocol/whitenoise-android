@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
@@ -30,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 
 /** One recognizable add action shared by simple, advanced and nested rules. */
 @Composable
@@ -57,16 +57,18 @@ internal fun <T> FolderChoice(
             FolderButtonLabel(label, R.drawable.ic_expand_more, open)
         }
         val menuScrollState = rememberScrollState()
-        DropdownMenu(
+        AnimatedDropdownMenu(
             scrollState = menuScrollState,
             modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
             expanded = open,
             onDismissRequest = { open = false },
-        ) {
+        ) { surface ->
             options.forEach { (value, title) ->
                 DropdownMenuItem(text = { Text(title) }, onClick = {
-                    open = false
-                    onSelect(value)
+                    surface.close {
+                        open = false
+                        onSelect(value)
+                    }
                 })
             }
         }

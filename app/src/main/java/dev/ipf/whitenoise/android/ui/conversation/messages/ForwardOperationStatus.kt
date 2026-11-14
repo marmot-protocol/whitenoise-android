@@ -20,6 +20,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
@@ -276,15 +278,17 @@ private fun ForwardOperationDetailsSheet(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onClose) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet)
+    ModalBottomSheet(onDismissRequest = { terminal.close(onClose) }, sheetState = sheet) {
         ForwardProgressContent(snapshot, targetTitles, Modifier.fillMaxWidth())
         ForwardOperationActions(
             snapshot = snapshot,
-            onDetails = onClose,
+            onDetails = { terminal.close(onClose) },
             detailsLabel = stringResource(R.string.close),
             onCancel = onCancel,
             onRetry = onRetry,
-            onDismiss = onDismiss,
+            onDismiss = { terminal.close(onDismiss) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg, vertical = 12.dp),
         )
     }

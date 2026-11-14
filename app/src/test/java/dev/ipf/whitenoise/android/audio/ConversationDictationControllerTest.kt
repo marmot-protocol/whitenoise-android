@@ -2631,6 +2631,30 @@ class ConversationDictationControllerTest {
     }
 
     @Test
+    fun acceptedDisclosureCannotApproveAReplacementSession() {
+        val platform = FakePlatform()
+        var accepted = false
+        val value = TextFieldValue("Keep")
+        val controller =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(value, 0) },
+                writeDraft = { _, _, _, _ -> error("Consent must not write") },
+                disclosureAccepted = { accepted },
+                markDisclosureAccepted = { accepted = true },
+            )
+        controller.requestStart(ACCOUNT, GROUP, value)
+        val old = controller.state as ConversationDictationState.DisclosureRequired
+        controller.cancel()
+        controller.requestStart(ACCOUNT, GROUP, value)
+        val replacement = controller.state
+        controller.acceptDisclosure(old)
+        assertFalse(accepted)
+        assertTrue(controller.state === replacement)
+        assertFalse(platform.session.started)
+    }
+
+    @Test
     fun acceptingOfflineDisclosureDoesNotApproveACloudProvider() {
         val platform = FakePlatform(providerPackage = OFFLINE_SPEECH_TO_TEXT_PACKAGE)
         var offlineAccepted = false

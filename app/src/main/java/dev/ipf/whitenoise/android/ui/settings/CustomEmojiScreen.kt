@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.readBoundedDocument
 import dev.ipf.whitenoise.android.ui.decodeEmojiImage
 import dev.ipf.whitenoise.android.ui.emojiCodeForFileName
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.rememberCustomEmojiStore
 import dev.ipf.whitenoise.android.ui.sanitizeEmojiCode
 import kotlinx.coroutines.Dispatchers
@@ -185,7 +186,11 @@ private fun CustomEmojiAddActions(
     onChooseFile: () -> Unit,
     onOpenSets: (() -> Unit)?,
 ) {
-    SettingsGroup(modifier = Modifier.testTag("custom_emoji.add")) {
+    SettingsGroup(
+        modifier = Modifier.testTag("custom_emoji.add"),
+        destination = SettingsDetail.CustomEmoji,
+        surface = "emoji-add-actions",
+    ) {
         row("choose_photo") { context ->
             SettingsAction(
                 context = context,
@@ -199,6 +204,7 @@ private fun CustomEmojiAddActions(
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.emoji_sets_title),
+                    routeKey = SettingsDetail.EmojiSets,
                     onClick = onOpenSets,
                     leading = { SettingsLeadingIcon(R.drawable.ic_add_reaction) },
                 )
@@ -234,11 +240,13 @@ internal fun CustomEmojiNameDialog(
     existing: CustomEmojiSet,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
+    ownerKey: Any? = preview,
 ) {
     val field = rememberTextFieldState(suggestedCode)
     val code = field.text.toString()
     val replaces = code.isNotEmpty() && existing[":$code:"] != null
     WhiteNoiseAlertDialog(
+        ownerKey = ownerKey,
         onDismissRequest = onDismiss,
         icon = { Image(preview, contentDescription = null, modifier = Modifier.size(CustomEmojiPreviewSize)) },
         title = { Text(stringResource(R.string.custom_emoji_name_title)) },
@@ -262,12 +270,12 @@ internal fun CustomEmojiNameDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(code) }, enabled = code.isNotEmpty()) {
+            TextButton(onClick = { close { onSave(code) } }, enabled = code.isNotEmpty()) {
                 Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -354,12 +362,12 @@ internal fun ConfirmEmojiRemoval(
         title = { Text(stringResource(R.string.custom_emoji_remove_title, emoji.shortcode)) },
         text = { Text(stringResource(R.string.custom_emoji_remove_detail)) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = { close(onConfirm) }) {
                 Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         },
     )
 }
@@ -412,6 +420,7 @@ internal fun StagedEmojiDialog(
     val scope = rememberCoroutineScope()
     pending?.let {
         CustomEmojiNameDialog(
+            ownerKey = Pair(store, it),
             preview = it.preview,
             suggestedCode = it.suggestedCode,
             existing = store.emoji,

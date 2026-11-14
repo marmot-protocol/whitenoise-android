@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -23,16 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.whitenoise.android.R
@@ -44,15 +41,16 @@ import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
-import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHeight
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.supportRelayState
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -72,7 +70,7 @@ internal fun ChatsNewMessageFab(
     appState: WhiteNoiseAppState,
     onNewMessage: () -> Unit,
     loadRelays: suspend (String) -> AccountRelayListsFfi? = appState::loadAccountRelayLists,
-    minimumTopInWindow: State<Float?>? = null,
+    onNewMessageOrigin: (Rect?) -> Unit = {},
 ) {
     val account = appState.activeAccountRef
     val runtime = appState.runtimeGeneration
@@ -101,14 +99,20 @@ internal fun ChatsNewMessageFab(
             }
         if (current()) missing = chatsFabNeedsRelays(result)
     }
+    var relayOrigin by remember(appState, account, runtime) { mutableStateOf<Rect?>(null) }
+    var fabBounds by remember { mutableStateOf<Rect?>(null) }
     val penFlight = LocalNewMessagePenFlight.current
     val motionAllowed = rememberSystemAnimationsEnabled()
-    ChatsNewMessageFabContent(missing, minimumTopInWindow = minimumTopInWindow, onClick = {
+    ChatsNewMessageFabContent(missing, onBounds = {
+        fabBounds = it
+    }, onClick = {
         if (current()) {
             if (missing) {
+                relayOrigin = fabBounds
                 relayOpening = Any()
             } else {
                 penFlight?.launchFromPen(motionAllowed)
+                onNewMessageOrigin(fabBounds)
                 onNewMessage()
             }
         }
@@ -123,11 +127,13 @@ internal fun ChatsNewMessageFab(
                     refresh++
                 }
             }
-            Dialog(
+            MeasuredPlaybackDialog(
+                origin = relayOrigin,
+                ownerKey = relayToken,
                 onDismissRequest = close,
                 properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
             ) {
-                RelaysScreen(appState, onBack = close, onFeedback = { result ->
+                RelaysScreen(appState, onBack = dismiss, onFeedback = { result ->
                     if (relayOpening === relayToken && current()) feedback = result
                 })
                 feedback?.let { result ->
@@ -145,29 +151,29 @@ internal fun ChatsNewMessageFab(
 @Composable
 internal fun ChatsNewMessageFabContent(
     missingRelays: Boolean,
-    minimumTopInWindow: State<Float?>? = null,
+    onBounds: (Rect) -> Unit = {},
     onClick: () -> Unit,
 ) {
     if (!LocalControlHandoffEndpointCurrent.current) {
         Box(Modifier.size(if (missingRelays) 56.dp else ComposerActionRowHeight))
         return
     }
-    // Keep the pen one action row tall, aligned with the last composer's upper edge.
-    // Retaining height rather than window coordinates lets current insets remain authoritative.
-    val composerHeight = LocalComposerFabHeight.current
+    // Keep the compact home pen on its bottom action baseline under current insets.
+    // The measured handoff retains the source rectangle for the morph.
+    val view = LocalView.current
     val outline =
         if (missingRelays) amoledOutlineBorder() else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     val finishControlMorph = LocalFinishControlMorph.current
     val morphing = !missingRelays && LocalComposerFabHandoff.current?.active == true
-    val placementTopInWindow = remember { mutableStateOf<Float?>(null) }
-    BoxWithConstraints(Modifier.onPlaced { placementTopInWindow.value = it.positionInWindow().y }) {
+    BoxWithConstraints {
         val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
         val modifier =
             Modifier
                 .padding(end = paneInset)
-                .alignWithComposer(composerHeight, minimumTopInWindow, placementTopInWindow, maxHeight, !missingRelays)
+                .offset(y = if (missingRelays) 0.dp else 16.dp - ComposerOuterVerticalPadding)
                 .floatingDictationAnchor(followsComposerFab = !missingRelays)
                 .newMessagePenOrigin()
+                .onGloballyPositioned { onBounds(it.settingsMorphBounds(view)) }
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         val chrome =
             if (morphing || outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape)
@@ -202,34 +208,6 @@ internal fun ChatsNewMessageFabContent(
                 },
             )
         }
-    }
-}
-
-/** Aligns the pen during placement while respecting the current measured home viewport. */
-private fun Modifier.alignWithComposer(
-    composerHeight: State<Dp>?,
-    minimumTopInWindow: State<Float?>?,
-    placementTopInWindow: State<Float?>,
-    maximumHeight: Dp,
-    enabled: Boolean,
-): Modifier {
-    if (!enabled) return this
-    return offset {
-        val baselineAdjustment = 16.dp - ComposerOuterVerticalPadding
-        val retainedHeight =
-            (composerHeight?.value ?: ComposerActionRowHeight)
-                .coerceIn(ComposerActionRowHeight, maximumHeight.coerceAtLeast(ComposerActionRowHeight))
-        val baseline = baselineAdjustment.roundToPx()
-        val desired = (baselineAdjustment - retainedHeight + ComposerActionRowHeight).roundToPx()
-        val minimum =
-            if (minimumTopInWindow == null) {
-                Int.MIN_VALUE
-            } else {
-                val top = minimumTopInWindow.value
-                val origin = placementTopInWindow.value
-                if (top == null || origin == null) baseline else kotlin.math.ceil(top - origin).toInt()
-            }
-        IntOffset(0, desired.coerceIn(minimum.coerceAtMost(baseline), baseline))
     }
 }
 

@@ -54,6 +54,7 @@ internal data class StoredAttachmentsActions(
     val onLoadMore: () -> Unit,
     val onRetry: () -> Unit,
     val onAction: (StorageAction) -> Unit,
+    val ownerKey: Any? = Unit,
 )
 
 /**
@@ -84,6 +85,7 @@ internal fun StoredAttachmentsRoute(
         onBack = onBack,
         actions =
             StoredAttachmentsActions(
+                ownerKey = controller,
                 onToggle = controller::toggle,
                 onSelectAll = controller::selectAll,
                 onLoadMore = controller::loadMore,
@@ -103,7 +105,7 @@ internal fun StoredAttachmentsContent(
     onBack: () -> Unit,
     actions: StoredAttachmentsActions,
 ) {
-    val dialogs = rememberStorageDialogs()
+    val dialogs = rememberStorageDialogs(actions.ownerKey)
     var confirm by rememberSaveable { mutableStateOf<String?>(null) }
     val title =
         groupIdHex?.let { storageChatTitle(appState, it) } ?: stringResource(R.string.storage_largest_attachments)
@@ -126,19 +128,29 @@ internal fun StoredAttachmentsContent(
     LaunchedEffect(selectionGone) { if (selectionGone) confirm = null }
     confirm?.takeUnless { selectionGone }?.let { target ->
         val selection = target == SELECTION
+        val acceptedSelection = list.selection.toList()
+        val request = remember(actions.ownerKey, target, acceptedSelection) { Any() }
         val figures =
             if (selection) list.selection.size.toLong() to list.selectedBytes else chatFigures(storage, list, target)
-        val onDismiss = { confirm = null }
+        val onDismiss = { if (confirm == target) confirm = null }
         val onConfirm = {
-            confirm = null
-            actions.onAction(
-                if (selection) StorageAction.RemoveAttachments(list.selection) else StorageAction.RemoveChat(target),
-            )
+            if (confirm == target) {
+                confirm = null
+                actions.onAction(
+                    if (selection) {
+                        StorageAction.RemoveAttachments(
+                            acceptedSelection,
+                        )
+                    } else {
+                        StorageAction.RemoveChat(target)
+                    },
+                )
+            }
         }
         if (figures != null) {
-            RemoveAttachmentsDialog(figures.first, figures.second, onDismiss, onConfirm)
+            RemoveAttachmentsDialog(figures.first, figures.second, onDismiss, onConfirm, request)
         } else {
-            RemoveChatAttachmentsDialog(onDismiss, onConfirm)
+            RemoveChatAttachmentsDialog(onDismiss, onConfirm, request)
         }
     }
 }

@@ -8,7 +8,6 @@ import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.indication
@@ -54,9 +53,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
@@ -103,6 +102,7 @@ internal data class FocusedMessageAction(
     val destructive: Boolean,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit,
+    val onClickAt: ((Rect?) -> Unit)? = null,
 )
 
 /**
@@ -223,7 +223,12 @@ private fun rememberFocusedStackTravel(
  * rather than leaving it to land on an overlay that is no longer there.
  */
 @Composable
-private fun Modifier.focusedStackDrag(travel: FocusedStackTravel): Modifier {
+private fun Modifier.focusedStackDrag(
+    travel: FocusedStackTravel,
+    initiatingHoldActive: Boolean,
+): Modifier {
+    // The initiating hold still owns the pointer until its release.
+    if (initiatingHoldActive) return this
     val scope = rememberCoroutineScope()
     val decay = rememberSplineBasedDecay<Float>()
     return draggable(
@@ -288,16 +293,29 @@ internal fun FocusedMessageActions(
     // Saveable so a popup window re-shown after an app switch does not hide content it already
     // revealed; the value lives in the host composition, not in the popup's own.
     var measured by rememberSaveable { mutableStateOf(false) }
-    val currentOnDismiss by rememberUpdatedState(onDismiss)
     KeyboardSafePopup(
         expanded = true,
         onDismissRequest = onDismiss,
         popupPositionProvider = FocusedMessageOverlayFrameProvider,
+        animateWindowContent = false,
         scrimModifier =
             Modifier.background(
                 MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = FOCUSED_BACKDROP_ALPHA),
             ),
     ) {
+        val popupMotion = this
+        val currentOnDismiss by rememberUpdatedState(popupMotion.dismiss)
+        val currentInitiatingHold by rememberUpdatedState(initiatingHoldActive)
+        val terminalActions =
+            actions.map { action ->
+                action.copy(
+                    onClick = { popupMotion.close(action.onClick) },
+                    onClickAt =
+                        action.onClickAt?.let { activate ->
+                            { origin -> popupMotion.close { activate(origin) } }
+                        },
+                )
+            }
         BoxWithConstraints(
             modifier =
                 Modifier
@@ -307,8 +325,10 @@ internal fun FocusedMessageActions(
                     .windowInsetsPadding(WindowInsets.safeDrawing)
                     // A tap reaching the frame landed beside the stack, on nothing, and dismisses
                     // exactly as the scrim underneath it would have before the frame covered it.
-                    .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                    .testTag(FOCUSED_OVERLAY_FRAME_TEST_TAG),
+                    .focusedDismissOnTap(
+                        initiatingHoldActive = { currentInitiatingHold },
+                        onDismiss = { currentOnDismiss() },
+                    ).testTag(FOCUSED_OVERLAY_FRAME_TEST_TAG),
         ) {
             // The lifted bubble reports a window coordinate; the frame below starts under the top
             // inset. The stack would rest a status bar too low without converting between them.
@@ -352,6 +372,7 @@ internal fun FocusedMessageActions(
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .heightIn(max = maxHeight)
+                        .then(popupMotion.modifier())
                         .offset { IntOffset(0, travel.offset.value.roundToInt()) }
                         .onSizeChanged {
                             measured = it.width > 0 && it.height > 0
@@ -359,14 +380,16 @@ internal fun FocusedMessageActions(
                         }.graphicsLayer { alpha = if (measured && previewReady && travel.placed) 1f else 0f }
                         // Children consume their own taps first, so a tap that reaches the column
                         // landed on empty stack space or its padding and dismisses like the scrim.
-                        .pointerInput(Unit) { detectTapGestures { currentOnDismiss() } }
-                        .padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
+                        .focusedDismissOnTap(
+                            initiatingHoldActive = { currentInitiatingHold },
+                            onDismiss = { currentOnDismiss() },
+                        ).padding(horizontal = FocusedStackHorizontalPadding, vertical = FocusedOverlayShadowSafeInset)
                         .semantics {
                             paneTitle = title
                             customActions =
                                 listOf(
                                     CustomAccessibilityAction(close) {
-                                        onDismiss()
+                                        currentOnDismiss()
                                         true
                                     },
                                 )
@@ -382,9 +405,18 @@ internal fun FocusedMessageActions(
                             quickReactions = quickReactions,
                             sizing = reactionSizing,
                             selectedReactions = selectedReactions,
-                            onReact = onReact,
-                            onReactionOrigin = onReactionOrigin,
-                            onMoreReactions = onMoreReactions,
+                            onReact = { emoji ->
+                                if (popupMotion.acceptsInput) {
+                                    // The native flight replaces its source in this frame,
+                                    // rather than after a faded gap.
+                                    popupMotion.close {}
+                                    onReact(emoji)
+                                }
+                            },
+                            onReactionOrigin = { emoji, bounds ->
+                                if (popupMotion.acceptsInput) onReactionOrigin?.invoke(emoji, bounds)
+                            },
+                            onMoreReactions = { popupMotion.close(onMoreReactions) },
                         )
                     }
                 }
@@ -405,7 +437,7 @@ internal fun FocusedMessageActions(
                                 .onPlaced {
                                     previewCenterInStackPx =
                                         it.positionInParent().y.roundToInt() + it.size.height / 2
-                                }.then(if (initiatingHoldActive) Modifier else Modifier.focusedStackDrag(travel))
+                                }.focusedStackDrag(travel, initiatingHoldActive)
                                 .clearAndSetSemantics {
                                     contentDescription = previewDescription
                                     // The same dismissal the tap performs, reachable without one: a
@@ -419,15 +451,11 @@ internal fun FocusedMessageActions(
                                 // control. Tapping it used to be swallowed, which made the overlay feel
                                 // as though it dismissed only in some places; it dismisses like the
                                 // scrim, and the actions beside it consume their own taps first.
-                                .pointerInput(Unit) {
-                                    // The overlay opens under the finger that long-pressed, so the
-                                    // release of that same press would otherwise land here as a tap and
-                                    // dismiss what it just opened. Wait for the gesture to end first.
-                                    awaitPointerEventScope {
-                                        while (currentEvent.changes.any { it.pressed }) awaitPointerEvent()
-                                    }
-                                    detectTapGestures { currentOnDismiss() }
-                                },
+                                .focusedDismissOnTap(
+                                    initiatingHoldActive = { currentInitiatingHold },
+                                    onDismiss = { currentOnDismiss() },
+                                    awaitRelease = true,
+                                ),
                     ) { preview() }
                 }
                 // When the IME shortens the safe frame, only the actions overflow. Scrolling the
@@ -443,7 +471,7 @@ internal fun FocusedMessageActions(
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
-                    FocusedActionMenu(actions)
+                    FocusedActionMenu(terminalActions)
                 }
             }
         }

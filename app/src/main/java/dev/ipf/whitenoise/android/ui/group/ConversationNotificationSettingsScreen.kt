@@ -336,6 +336,7 @@ private fun LoadedNotificationCategories(
     }
     ConversationNotificationCategoriesList(
         settings = settings.map(PreparedNotificationCategorySetting::setting),
+        destination = "notifications",
         pendingChannel = pendingChannel,
         onOpen = { setting ->
             if (appState.activeAccountRef == accountRef && launchGate.tryBegin()) {

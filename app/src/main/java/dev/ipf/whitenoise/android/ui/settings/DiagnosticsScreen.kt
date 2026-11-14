@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
@@ -301,7 +303,13 @@ internal fun DiagnosticsScreen(
                                         null,
                                     )
                                 }
-                            appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
+                            appState.marmotIo {
+                                sendText(
+                                    account,
+                                    groupId,
+                                    "ping at ${System.currentTimeMillis() / 1000L}",
+                                )
+                            }
                             // Archive the throwaway group so the chat list doesn't accumulate orphans.
                             appState.marmotIo { setGroupArchived(account, groupId, true) }
                             appendLog(String.format(sentPingFormat, IdentityFormatter.short(groupId)))
@@ -505,7 +513,10 @@ private fun DiagnosticsHealthSheet(
     onPerformanceEnabledChange: (Boolean) -> Unit,
     onCopyPerformanceLogs: () -> Unit,
 ) {
-    WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val terminal = rememberSheetTerminalMotion(sheet)
+    val close = { terminal.close(onDismiss) }
+    WhiteNoiseModalBottomSheet(onDismissRequest = close, sheetState = sheet) {
         Column(
             Modifier
                 .fillMaxWidth()
@@ -513,7 +524,7 @@ private fun DiagnosticsHealthSheet(
                 .testTag("diagnostics.health")
                 .padding(bottom = 24.dp),
         ) {
-            WhiteNoiseSheetHeader(stringResource(R.string.diagnostics_health), onClose = onDismiss)
+            WhiteNoiseSheetHeader(stringResource(R.string.diagnostics_health), onClose = close)
             SettingsGroup {
                 row("refresh") { context ->
                     SettingsAction(

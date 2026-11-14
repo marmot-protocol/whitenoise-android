@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
@@ -21,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -212,22 +214,39 @@ class TranslationSettingsWarningTest {
     fun messageTranslateAsksForTheProviderNoticeOnce() {
         val preferences = TranslationPreferences(context)
         var translated = 0
+        composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             WhiteNoiseTheme {
-                MessageTranslationNotice(
-                    onAccept = {
-                        preferences.acceptProviderNotice()
-                        translated += 1
-                    },
-                    onDismiss = {},
-                )
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    MessageTranslationNotice(
+                        onAccept = {
+                            preferences.acceptProviderNotice()
+                            translated += 1
+                        },
+                        onDismiss = {},
+                    )
+                }
             }
         }
+        composeRule.mainClock.advanceTimeBy(400)
         assertFalse(preferences.providerNoticeAccepted())
         composeRule.onNodeWithText(context.getString(R.string.translation_privacy_warning)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.accept)).performClick()
-        assertTrue(preferences.providerNoticeAccepted())
-        assertEquals(1, translated)
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.runOnIdle {
+            assertFalse(preferences.providerNoticeAccepted())
+            assertEquals(0, translated)
+        }
+        composeRule.mainClock.advanceTimeBy(400)
+        composeRule.runOnIdle {
+            assertTrue(preferences.providerNoticeAccepted())
+            assertEquals(1, translated)
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle {
+            assertTrue(preferences.providerNoticeAccepted())
+            assertEquals(1, translated)
+        }
         val bubble =
             appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt")
         val menuTranslate = bubble.substringAfter("onTranslate = {").substringBefore("},\n")

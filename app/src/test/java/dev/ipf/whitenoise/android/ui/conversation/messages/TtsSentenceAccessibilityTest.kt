@@ -73,6 +73,7 @@ class TtsSentenceAccessibilityTest {
         assertEquals(emptyList<Any>(), second.orEmpty())
         composeRule.runOnIdle { first.single().action() }
         composeRule.onNodeWithText("4. Four.").performClick()
+        composeRule.waitForIdle()
         assertEquals(listOf(paragraphs.getValue("second")[1]), selected)
     }
 
@@ -102,6 +103,7 @@ class TtsSentenceAccessibilityTest {
             .onNodeWithTag("tts_sentence_chooser")
             .captureRoboImage("src/test/snapshots/tts_sentence_chooser_dark_large_font.png")
         composeRule.onNodeWithText("2. Pay $12.50.").performClick()
+        composeRule.waitForIdle()
         assertEquals(listOf(choices[1]), selected)
     }
 
@@ -136,6 +138,7 @@ class TtsSentenceAccessibilityTest {
         composeRule.onNodeWithText("Next").performClick()
         composeRule.onNodeWithText("201. Line 200.").assertIsDisplayed()
         composeRule.onNodeWithText("250. Line 249.").performScrollTo().performClick()
+        composeRule.waitForIdle()
         assertEquals(listOf(choices.last()), selected)
     }
 
@@ -159,6 +162,7 @@ class TtsSentenceAccessibilityTest {
             assertEquals("Read from this sentence", actions.single().label)
             actions.single().action()
         }
+        composeRule.waitForIdle()
         assertEquals(listOf(choice), selected)
     }
 }

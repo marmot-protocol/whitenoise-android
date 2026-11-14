@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -21,6 +22,49 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class GroupDetailsDeleteTest {
+    /** A veto during exit retires its confirmation, allowing a later valid request. */
+    @Test fun disabledDeleteDuringExitRetiresRequestWithoutMutation() {
+        val allowed = mutableStateOf(true)
+        var confirmed = 0
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupDetailsLocalDeleteControl(
+                    isDm = false,
+                    readOnlyInvite = false,
+                    isSelfMember = false,
+                    membersVerified = true,
+                    enabled = allowed.value,
+                    inProgress = false,
+                    onDeleteConfirmed = { confirmed++ },
+                )
+            }
+        }
+        advanceTimeBy(400)
+        val row = composeRule.onNodeWithText(context.getString(R.string.chat_row_action_delete_group))
+        row.performClick()
+        advanceTimeBy(400)
+        composeRule.onNodeWithText(context.getString(R.string.delete_group_confirm)).performClick()
+        composeRule.runOnIdle { allowed.value = false }
+        advanceTimeBy(400)
+        composeRule.runOnIdle {
+            assertEquals(0, confirmed)
+            allowed.value = true
+        }
+        advanceTimeBy(16)
+        row.performClick()
+        advanceTimeBy(400)
+        composeRule.onNodeWithText(context.getString(R.string.delete_group_confirm)).performClick()
+        advanceTimeBy(400)
+        composeRule.runOnIdle { assertEquals(1, confirmed) }
+    }
+
+    /** Publish paused-clock state writes before the frame that consumes them. */
+    private fun advanceTimeBy(millis: Long) {
+        composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
+        composeRule.mainClock.advanceTimeBy(millis)
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 

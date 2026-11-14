@@ -3,9 +3,6 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.text.format.DateUtils
 import android.text.format.Formatter
 import androidx.annotation.StringRes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,7 +24,7 @@ import dev.ipf.whitenoise.android.state.AuditDiagnosticsSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.auditRetentionChoices
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -214,16 +211,13 @@ private fun ShorterAuditRetentionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    WhiteNoiseAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.audit_retention_confirm_title)) },
-        text = { Text(stringResource(R.string.audit_retention_confirm_body, auditRetentionDays(days))) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.audit_retention_confirm_action), color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    ConfirmDialog(
+        title = stringResource(R.string.audit_retention_confirm_title),
+        message = stringResource(R.string.audit_retention_confirm_body, auditRetentionDays(days)),
+        confirmLabel = stringResource(R.string.audit_retention_confirm_action),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
     )
 }
 

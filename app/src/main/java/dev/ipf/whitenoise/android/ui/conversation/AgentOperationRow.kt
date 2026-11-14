@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -59,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandLess
 import dev.ipf.whitenoise.android.ui.icons.filled.ExpandMore
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 
 private val FAILURE_STATUSES = setOf("failed", "error", "cancelled", "canceled")
 private val SUCCESS_STATUSES = setOf("completed", "complete", "finished", "success", "succeeded", "done")
@@ -111,7 +113,7 @@ internal fun AgentOperationTimelineRow(
             } else {
                 null
             },
-        onSenderClick = { appState.presentProfile(appState.npub(record.sender)) },
+        onSenderClick = { origin -> appState.presentProfile(appState.npub(record.sender), origin = origin) },
         onRequestDelete =
             if (deleteCapability.canDeleteAtAll) {
                 { deleteDialogOpen = true }
@@ -182,11 +184,12 @@ internal fun AgentOperationRow(
     operation: AgentOperationPresentation,
     mine: Boolean = false,
     sender: AgentOperationSenderPresentation? = null,
-    onSenderClick: (() -> Unit)? = null,
+    onSenderClick: ((Rect?) -> Unit)? = null,
     onRequestDelete: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var expanded by rememberSaveable(messageId) { mutableStateOf(false) }
+    val (senderModifier, senderClick) = rememberMeasuredControlClick { origin -> onSenderClick?.invoke(origin) }
     Box(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
         contentAlignment = if (mine) Alignment.CenterEnd else Alignment.CenterStart,
@@ -200,12 +203,13 @@ internal fun AgentOperationRow(
                     modifier =
                         if (onSenderClick != null) {
                             Modifier
+                                .then(senderModifier)
                                 .clip(CircleShape)
                                 .semantics { contentDescription = sender.name }
                                 .clickable(
                                     onClickLabel = stringResource(R.string.chat_list_search_open_profile),
                                     role = Role.Button,
-                                    onClick = onSenderClick,
+                                    onClick = senderClick,
                                 )
                         } else {
                             Modifier

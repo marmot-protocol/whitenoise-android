@@ -4,7 +4,9 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -30,18 +32,22 @@ internal class StorageDialogs(
     val olderPicker: MutableState<Boolean>,
     val olderCutoff: MutableState<Long?>,
     val clearCache: MutableState<Boolean>,
+    val ownerKey: Any? = Unit,
 )
 
 /** Saved dialog state for one storage screen. */
 @Composable
-internal fun rememberStorageDialogs(): StorageDialogs =
-    StorageDialogs(
-        keepPicker = rememberSaveable { mutableStateOf(false) },
-        pendingKeep = rememberSaveable { mutableStateOf(null) },
-        olderPicker = rememberSaveable { mutableStateOf(false) },
-        olderCutoff = rememberSaveable { mutableStateOf(null) },
-        clearCache = rememberSaveable { mutableStateOf(false) },
-    )
+internal fun rememberStorageDialogs(ownerKey: Any? = Unit): StorageDialogs =
+    key(ownerKey) {
+        StorageDialogs(
+            ownerKey = ownerKey,
+            keepPicker = rememberSaveable { mutableStateOf(false) },
+            pendingKeep = rememberSaveable { mutableStateOf(null) },
+            olderPicker = rememberSaveable { mutableStateOf(false) },
+            olderCutoff = rememberSaveable { mutableStateOf(null) },
+            clearCache = rememberSaveable { mutableStateOf(false) },
+        )
+    }
 
 /** The overview's Keep media, Remove older and Clear confirmations. */
 @Composable
@@ -53,8 +59,10 @@ internal fun StorageOverviewDialogs(
     KeepMediaDialogs(state.keepMedia, dialogs, onAction)
     RemoveOlderDialogs(dialogs, groupIdHex = null, onAction = onAction)
     if (dialogs.clearCache.value) {
+        val request = remember(dialogs.ownerKey) { Any() }
         val freed = storageBytes(state.usage?.clearableCacheBytes ?: 0)
         ConfirmDialog(
+            ownerKey = dialogs.ownerKey to request,
             title = stringResource(R.string.storage_clear_cache_title),
             message = stringResource(R.string.storage_clear_cache_message, freed),
             confirmLabel = stringResource(R.string.storage_clear),
@@ -95,16 +103,20 @@ private fun KeepMediaDialogs(
         )
     }
     dialogs.pendingKeep.value?.let { period ->
+        val request = remember(dialogs.ownerKey, period) { Any() }
         val label = stringResource(period.labelRes)
         ConfirmDialog(
+            ownerKey = dialogs.ownerKey to request,
             title = stringResource(R.string.storage_keep_confirm_title, label),
             message = stringResource(R.string.storage_keep_confirm_message, label),
             confirmLabel = stringResource(R.string.storage_remove),
             destructive = true,
-            onDismiss = { dialogs.pendingKeep.value = null },
+            onDismiss = { if (dialogs.pendingKeep.value == period) dialogs.pendingKeep.value = null },
             onConfirm = {
-                dialogs.pendingKeep.value = null
-                onAction(StorageAction.SetKeepMedia(period))
+                if (dialogs.pendingKeep.value == period) {
+                    dialogs.pendingKeep.value = null
+                    onAction(StorageAction.SetKeepMedia(period))
+                }
             },
         )
     }
@@ -132,6 +144,7 @@ internal fun RemoveOlderDialogs(
         )
     }
     dialogs.olderCutoff.value?.let { cutoff ->
+        val request = remember(dialogs.ownerKey, groupIdHex, cutoff) { Any() }
         val date = cutoffDate(cutoff)
         val message =
             when (groupIdHex) {
@@ -139,14 +152,17 @@ internal fun RemoveOlderDialogs(
                 else -> R.string.storage_remove_older_chat_message
             }
         ConfirmDialog(
+            ownerKey = dialogs.ownerKey to request,
             title = stringResource(R.string.storage_remove_older_title),
             message = stringResource(message, date),
             confirmLabel = stringResource(R.string.storage_remove),
             destructive = true,
-            onDismiss = { dialogs.olderCutoff.value = null },
+            onDismiss = { if (dialogs.olderCutoff.value == cutoff) dialogs.olderCutoff.value = null },
             onConfirm = {
-                dialogs.olderCutoff.value = null
-                onAction(StorageAction.RemoveOlder(cutoff, groupIdHex))
+                if (dialogs.olderCutoff.value == cutoff) {
+                    dialogs.olderCutoff.value = null
+                    onAction(StorageAction.RemoveOlder(cutoff, groupIdHex))
+                }
             },
         )
     }
@@ -159,9 +175,11 @@ internal fun RemoveAttachmentsDialog(
     bytes: Long,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    ownerKey: Any? = Unit,
 ) {
     val quantity = count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     ConfirmDialog(
+        ownerKey = ownerKey,
         title = pluralStringResource(R.plurals.storage_remove_attachments_title, quantity, count),
         message = stringResource(R.string.storage_remove_attachments_message, storageBytes(bytes)),
         confirmLabel = stringResource(R.string.storage_remove),
@@ -176,8 +194,10 @@ internal fun RemoveAttachmentsDialog(
 internal fun RemoveChatAttachmentsDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    ownerKey: Any? = Unit,
 ) {
     ConfirmDialog(
+        ownerKey = ownerKey,
         title = stringResource(R.string.storage_remove_chat_title),
         message = stringResource(R.string.storage_remove_chat_message),
         confirmLabel = stringResource(R.string.storage_remove),

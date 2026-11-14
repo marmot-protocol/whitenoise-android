@@ -247,6 +247,7 @@ class ChatFolderOwnershipTest {
         showList(state)
         composeRule.onNodeWithContentDescription(app.getString(R.string.actions_for, "Work")).performClick()
         composeRule.onNodeWithText(app.getString(R.string.folder_move_up)).performClick()
+        composeRule.waitForIdle()
         val reloaded = ChatFolderPreferences(app)
         val after = reloaded.foldersFor(A)
         val expected = before.toMutableList().apply { add(size - 2, removeAt(lastIndex)) }

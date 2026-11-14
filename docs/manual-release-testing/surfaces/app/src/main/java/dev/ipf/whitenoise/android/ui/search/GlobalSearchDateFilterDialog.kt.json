@@ -75,6 +75,15 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Animated dialog cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "INT-001",
+          "NAV-011"
+        ]
       }
     ]
   },

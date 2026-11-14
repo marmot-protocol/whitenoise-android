@@ -1,3 +1,6 @@
+// Timestamp traversal, clock updates, and span interaction form one rendering feature.
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui
 
 import android.content.BroadcastReceiver
@@ -10,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -20,7 +22,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +65,8 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownTimestampStyleFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
+import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.Schedule
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -270,7 +276,7 @@ internal fun MarkdownTimestampText(
                     onTextLayout?.invoke(it)
                 },
             )
-            TimestampOverlays(state)
+            TimestampOverlays(state, text)
         }
     }
 }
@@ -384,39 +390,66 @@ private fun Modifier.timestampPointers(
 /** Shows the hover tooltip and the tap disclosure dialog for the current [state]. */
 @Suppress("FunctionNaming")
 @Composable
-private fun TimestampOverlays(state: TimestampTextState) {
-    state.hovered?.let { token ->
+private fun TimestampOverlays(
+    state: TimestampTextState,
+    text: AnnotatedString,
+) {
+    // Token ownership survives relative-label refreshes; replacing tokens retires hover frames.
+    val tokens = text.getStringAnnotations(TIMESTAMP_TAG, 0, text.length).map { it.item }
+    key(tokens) { TimestampHoverTooltip(state, tokens) }
+    state.tapped?.let { token ->
+        AnimatedAlertDialog(
+            modifier = Modifier.testTag("timestamp.disclosure").exposePerformanceTestTags(),
+            onDismissRequest = { state.tapped = null },
+            text = { Text(timestampDisclosure(token)) },
+            confirmButton = {
+                TextButton(onClick = dismiss) {
+                    Text(stringResource(R.string.dismiss))
+                }
+            },
+        )
+    }
+}
+
+/** A nonfocusable tooltip keeps its final text and anchor through the shared exit curve. */
+@Suppress("FunctionNaming")
+@Composable
+private fun TimestampHoverTooltip(
+    state: TimestampTextState,
+    tokens: List<String>,
+) {
+    val hovered = state.hovered?.takeIf { it in tokens }
+    var retainedHover by remember { mutableStateOf<Pair<String, Offset>?>(null) }
+    val surface = rememberPopupSurfaceMotion(expanded = hovered != null, onDismiss = {})
+    val currentHover = hovered?.let { timestampDisclosure(it) to state.hoverPosition }
+    SideEffect {
+        if (currentHover != null) {
+            retainedHover = currentHover
+        } else if (!surface.visible) {
+            retainedHover = null
+        }
+    }
+    val hoverFrame = currentHover ?: retainedHover
+    if (surface.visible && hoverFrame != null) {
         Popup(
             alignment = Alignment.TopStart,
             offset =
                 IntOffset(
-                    state.hoverPosition.x.roundToInt(),
-                    state.hoverPosition.y.roundToInt() + TIMESTAMP_HOVER_OFFSET_PX,
+                    hoverFrame.second.x.roundToInt(),
+                    hoverFrame.second.y.roundToInt() + TIMESTAMP_HOVER_OFFSET_PX,
                 ),
         ) {
             Surface(
-                modifier = Modifier.testTag("timestamp.hover").exposePerformanceTestTags(),
+                modifier = Modifier.then(surface.modifier()).testTag("timestamp.hover").exposePerformanceTestTags(),
                 shape = MaterialTheme.shapes.small,
                 tonalElevation = 4.dp,
             ) {
                 Text(
-                    timestampDisclosure(token),
+                    hoverFrame.first,
                     modifier = Modifier.padding(8.dp),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
-    }
-    state.tapped?.let { token ->
-        AlertDialog(
-            modifier = Modifier.testTag("timestamp.disclosure").exposePerformanceTestTags(),
-            onDismissRequest = { state.tapped = null },
-            text = { Text(timestampDisclosure(token)) },
-            confirmButton = {
-                TextButton(onClick = { state.tapped = null }) {
-                    Text(stringResource(R.string.dismiss))
-                }
-            },
-        )
     }
 }

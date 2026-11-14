@@ -85,6 +85,7 @@ class PhotoEditorQualityControlTest {
         }
 
         composeRule.onNodeWithText(string(R.string.photo_editor_quality_high)).performClick()
+        composeRule.waitForIdle()
         assertEquals(MediaQuality.High, holder.state.quality)
 
         composeRule.onNodeWithContentDescription(string(R.string.save)).performClick()

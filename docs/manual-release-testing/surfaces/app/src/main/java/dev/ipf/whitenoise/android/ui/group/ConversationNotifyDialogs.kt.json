@@ -1,0 +1,61 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+  "legacy_sha256": "2c0458837548d33f6e0637e8153d8f1dfddc340afbca2348b8144cc880ccf51a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationModeRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+        "anchor": "fun NotificationModeRow(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "NotifyForDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+        "anchor": "fun NotifyForDialog(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "VibrationPatternDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+        "anchor": "fun VibrationPatternDialog(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "VibrationPatternRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+        "anchor": "fun VibrationPatternRow(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Animated dialog cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-001",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Animated dialog save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotifyDialogs.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "GRP-001",
+          "NAV-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

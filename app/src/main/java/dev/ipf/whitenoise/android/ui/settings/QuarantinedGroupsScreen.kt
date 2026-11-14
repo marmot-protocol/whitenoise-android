@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.state.QuarantinedGroupsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quarantineAccountEligible
 import dev.ipf.whitenoise.android.state.quarantinedGroupsAccess
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -150,7 +151,10 @@ internal fun QuarantinedGroupsContent(
             SettingsList(modifier = Modifier.testTag("quarantine.list")) {
                 item { SettingsExplainer(stringResource(R.string.quarantine_explanation)) }
                 item {
-                    SettingsGroup {
+                    SettingsGroup(
+                        destination = SettingsDetail.QuarantinedGroups,
+                        surface = "quarantine-controls",
+                    ) {
                         row("refresh") { context ->
                             SettingsLink(
                                 context = context,

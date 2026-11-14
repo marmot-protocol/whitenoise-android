@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -38,7 +39,7 @@ internal data class NewGroupRecipientActions(
     val pasteRejected: () -> Unit,
     val retry: () -> Unit,
     val toggle: (RecipientSearch.Candidate) -> Unit,
-    val profile: (RecipientSearch.Candidate) -> Unit,
+    val profile: (RecipientSearch.Candidate, Rect?) -> Unit,
 )
 
 /** Search-first prototype member selection, with a pinned action including explicit solo-group creation. */
@@ -135,7 +136,7 @@ internal fun NewGroupRecipientContent(
                     people.size,
                     selected = selected.any { it.candidate.accountIdHex.equals(person.candidate.accountIdHex, true) },
                     onClick = { actions.toggle(person.candidate) },
-                    onLongClick = { actions.profile(person.candidate) },
+                    onLongClick = { origin -> actions.profile(person.candidate, origin) },
                 )
             }
         }

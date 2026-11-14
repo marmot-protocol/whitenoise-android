@@ -114,7 +114,7 @@ class MediaViewerScreenshotTest {
             .onNodeWithText(context.getString(R.string.shared_content_go_to_message))
             .assertIsDisplayed()
             .performClick()
-        assertEquals(listOf("forward:first", "forward:second", "go:second"), delivered)
+        composeRule.runOnIdle { assertEquals(listOf("forward:first", "forward:second", "go:second"), delivered) }
     }
 
     /** Media viewer default frame. */
@@ -422,7 +422,7 @@ class MediaViewerScreenshotTest {
         composeRule.onNodeWithText(context.getString(R.string.media_save)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(context.getString(R.string.more_options)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.media_save)).performClick()
-        assertEquals(listOf("second"), saved)
+        composeRule.runOnIdle { assertEquals(listOf("second"), saved) }
     }
 
     private fun loadedConversationGallery(): MediaViewerGallery {

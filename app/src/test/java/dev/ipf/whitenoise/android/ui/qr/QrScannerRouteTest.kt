@@ -145,6 +145,47 @@ class QrScannerRouteTest {
         }
     }
 
+    @Test fun acceptedScanRetiresCameraBeforeDeliveringExactlyOnceAfterHide() {
+        show(granted = true)
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle {
+            requireNotNull(scan)("accepted synthetic payload")
+            requireNotNull(scan)("duplicate synthetic payload")
+            assertEquals(0, scans)
+        }
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.runOnIdle {
+            assertEquals(1, disposals)
+            assertEquals(0, scans)
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(1, scans) }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle { assertEquals(1, scans) }
+    }
+
+    @Test fun closingRejectsLateCameraIngressBeforeTheExitCompletes() {
+        show(granted = true)
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithTag("qr_scanner.close").performClick()
+        composeRule.runOnIdle {
+            requireNotNull(scan)("late synthetic payload")
+            assertEquals(0, scans)
+        }
+        composeRule.mainClock.advanceTimeBy(80)
+        composeRule.runOnIdle {
+            assertEquals(1, disposals)
+            assertTrue(visible.value)
+        }
+        composeRule.mainClock.advanceTimeBy(800)
+        composeRule.runOnIdle {
+            assertEquals(0, scans)
+            assertEquals(false, visible.value)
+        }
+    }
+
     /** The camera slot replaces hardware only; all sheet permission/state/disposal code runs unchanged. */
     private fun show(granted: Boolean) {
         permission(granted)
@@ -158,7 +199,10 @@ class QrScannerRouteTest {
                     if (visible.value) {
                         QrScannerSheet(
                             onDismiss = { visible.value = false },
-                            onScan = { scans++ },
+                            onScan = {
+                                scans++
+                                visible.value = false
+                            },
                             cameraContent = { onScan, onError, _ ->
                                 DisposableEffect(Unit) {
                                     mounts++

@@ -72,6 +72,7 @@ import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.PushPin
 import dev.ipf.whitenoise.android.ui.rememberMarkdownPreviewText
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 @OptIn(ExperimentalFoundationApi::class)
 internal fun Modifier.chatListSelectionRowClickable(
@@ -187,6 +188,9 @@ internal fun ChatRow(
         )
     val haptics = LocalHapticFeedback.current
     val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val routeOrigin = dev.ipf.whitenoise.android.ui.navigation.LocalConversationRouteOrigin.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val activatingBounds = remember { arrayOf<androidx.compose.ui.geometry.Rect?>(null) }
     val actionsLabel = stringResource(R.string.actions)
 
     fun pointerWindowY(position: Offset): Float? = rowCoordinates[0]?.localToWindow(position)?.y
@@ -280,8 +284,15 @@ internal fun ChatRow(
                 .then(profileActionModifier)
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
-                .testTag("chat.row.${item.id}"),
-        onClick = onClick,
+                .testTag("chat.row.${item.id}")
+                .onGloballyPositioned { activatingBounds[0] = it.settingsMorphBounds(view) },
+        onClick = {
+            if (!selectionMode && routeOrigin != null) {
+                routeOrigin.activate(item.group.groupIdHex, activatingBounds[0], onClick)
+            } else {
+                onClick()
+            }
+        },
         interactionsEnabled = interactionsEnabled,
         consumeSelectionLongPress = selectionMode && !rangeDragActive,
         titleMetadata = {

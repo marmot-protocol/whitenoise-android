@@ -20,7 +20,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -71,6 +73,7 @@ import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.insertEmojiAtSelection
@@ -153,6 +156,24 @@ internal fun GroupEditScreen(
         var avatarViewerOpen by remember { mutableStateOf(false) }
         var saving by remember { mutableStateOf(false) }
         var imageSaving by remember(imageOwner) { mutableStateOf(false) }
+        val sheetBusy by rememberUpdatedState(imageSaving || controller.mutationInFlight)
+        val searchState =
+            key(imageOwner, showImageSearch) {
+                rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                    confirmValueChange = { it != SheetValue.Hidden || !sheetBusy },
+                )
+            }
+        val searchTerminal = rememberSheetTerminalMotion(searchState)
+        val emojiImageState =
+            key(imageOwner, showGroupEmojiImagePicker) {
+                rememberModalBottomSheetState(
+                    skipPartiallyExpanded = true,
+                    confirmValueChange = { it != SheetValue.Hidden || !sheetBusy },
+                )
+            }
+        val emojiImageTerminal = rememberSheetTerminalMotion(emojiImageState)
+
         val imageFailureScope =
             remember(imageOwner) {
                 GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
@@ -218,6 +239,8 @@ internal fun GroupEditScreen(
         /** Apply or remove the encrypted group image and own any preparation failure shown here. */
         @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
         fun updateImage(prepare: suspend () -> ImageUploadDraft?) {
+            val searchExit = searchTerminal
+            val emojiExit = emojiImageTerminal
             if (imageSaving || controller.mutationInFlight) return
             val failureAttempt = imageFailureScope.begin()
             imageSaving = true
@@ -227,8 +250,8 @@ internal fun GroupEditScreen(
                     val draft = prepare()
                     val change = ScopedGroupImageMutation(draft) { imageFailureScope.isCurrent(failureAttempt) }
                     if (controller.updateGroupImage(change)) {
-                        showImageSearch = false
-                        showGroupEmojiImagePicker = false
+                        searchExit.closeWhenReady(ready = { !sheetBusy }) { showImageSearch = false }
+                        emojiExit.closeWhenReady(ready = { !sheetBusy }) { showGroupEmojiImagePicker = false }
                     } else if (controller.lastMutationError != null) {
                         imageFailureScope.captureFailure(failureAttempt)
                     }
@@ -265,6 +288,7 @@ internal fun GroupEditScreen(
         /** Validate and publish a public HTTPS avatar URL for this group's current editor. */
         @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
         fun setPublicAvatarUrl(url: String) {
+            val searchExit = searchTerminal
             val accountRef = appState.activeAccountRef
             if (accountRef == null || imageSaving || controller.mutationInFlight) return
             val failureAttempt = imageFailureScope.begin()
@@ -283,7 +307,7 @@ internal fun GroupEditScreen(
                 try {
                     val change = ScopedGroupImageMutation(safeUrl, attemptIsCurrent)
                     if (controller.updateGroupAvatarUrl(change)) {
-                        showImageSearch = false
+                        searchExit.closeWhenReady(ready = { !sheetBusy }) { showImageSearch = false }
                     } else if (attemptIsCurrent() && controller.lastMutationError != null) {
                         imageFailureScope.captureFailure(failureAttempt)
                     }
@@ -314,6 +338,7 @@ internal fun GroupEditScreen(
         ) {
             val accountRef = appState.activeAccountRef ?: return
             val editable = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
+            val searchExit = searchTerminal
             val busy = imageSaving || controller.mutationInFlight
             if (!imageOwnerIsCurrent() || !editable || busy) return
             if (acceptedCrop) cropRecovery.accepted()
@@ -349,7 +374,7 @@ internal fun GroupEditScreen(
                             finished = { if (acceptedCrop) cropRecovery.settled() },
                         )
                     if (updated) {
-                        showImageSearch = false
+                        searchExit.closeWhenReady(ready = { !sheetBusy }) { showImageSearch = false }
                     } else if (attemptIsCurrent() && controller.lastMutationError != null) {
                         imageFailureScope.captureFailure(failureAttempt)
                     }
@@ -412,6 +437,7 @@ internal fun GroupEditScreen(
                     pendingPublicPhoto == selected
             val gif = selected.gif
             dev.ipf.whitenoise.android.ui.common.ConfirmDialog(
+                ownerKey = Triple(imageOwner, generation, selected),
                 title = stringResource(if (gif) R.string.group_gif_upload_title else R.string.group_photo_upload_title),
                 message =
                     stringResource(if (gif) R.string.group_gif_upload_notice else R.string.group_photo_upload_notice),
@@ -655,6 +681,8 @@ internal fun GroupEditScreen(
 
         if (showImageSearch) {
             ImageSearchSheet(
+                suppliedSheetState = searchState,
+                suppliedTerminal = searchTerminal,
                 initialUrl = controller.group.avatarUrl.orEmpty(),
                 hasCurrentImage = hasGroupImage,
                 header = stringResource(R.string.group_image_search_title),
@@ -673,8 +701,10 @@ internal fun GroupEditScreen(
                 },
                 onPickEmoji = {
                     imageFailureScope.clear()
-                    showImageSearch = false
-                    showGroupEmojiImagePicker = true
+                    searchTerminal.close {
+                        showImageSearch = false
+                        showGroupEmojiImagePicker = true
+                    }
                 },
                 onDismiss = {
                     if (!imageSaving && !controller.mutationInFlight) {
@@ -687,6 +717,8 @@ internal fun GroupEditScreen(
 
         if (showGroupEmojiImagePicker) {
             GroupEmojiImagePickerSheet(
+                suppliedSheetState = emojiImageState,
+                suppliedTerminal = emojiImageTerminal,
                 applyInFlight = imageSaving || controller.mutationInFlight,
                 recentEmojis = recentEmojiRecentsOwner.recents,
                 onEmojiUsed = recentEmojiRecentsOwner::onEmojiUsed,
@@ -702,6 +734,7 @@ internal fun GroupEditScreen(
 
         if (showEmojiPicker && nameEditable) {
             EmojiPickerSheet(
+                closeOnPick = false,
                 onDismissRequest = { showEmojiPicker = false },
                 onEmojiPicked = { emoji ->
                     if (nameEditable) name = insertEmojiAtSelection(name, emoji)

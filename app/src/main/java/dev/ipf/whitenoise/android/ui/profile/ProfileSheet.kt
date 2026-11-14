@@ -116,7 +116,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
-import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
@@ -465,6 +465,7 @@ internal fun ProfileSheet(
     adminController: ConversationController? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
     openGroupsInCommon: Boolean = false,
+    onStartGroupMeasured: ((RecipientSearch.Candidate, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -490,9 +491,9 @@ internal fun ProfileSheet(
         appState.wipeInProgress,
         appState.retainedAccountReactivationRef,
     ) {
-        if (!owner.canAct()) currentDismiss()
+        if (!owner.canPresent()) currentDismiss()
     }
-    if (!owner.canAct() || appState.appLockScreenVisible) return
+    if (!owner.canPresent() || appState.appLockScreenVisible) return
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
@@ -805,7 +806,7 @@ internal fun ProfileSheet(
         remember(accountAtOpen, hex, notificationRevision) {
             appState.profileNotificationOverrides.get(accountAtOpen, hex)
         }
-    val profileContent: @Composable () -> Unit = {
+    val profileContent: @Composable (() -> Unit) -> Unit = { dismissProfile ->
         PersonProfileContent(
             startingAs =
                 if (hex != null && !targetIsSelf) {
@@ -843,7 +844,7 @@ internal fun ProfileSheet(
                     ),
             showSharedGroups = hex != null && !targetIsSelf,
             copied = copied,
-            onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
+            onBack = { if (!creatingChat) dismissProfile() },
             onMessage = { openOrCreateProfileChat() },
             notificationSummary =
                 if (accountAtOpen != null && hex != null && !targetIsSelf) {
@@ -943,6 +944,16 @@ internal fun ProfileSheet(
                     }
                 }
             },
+            onStartGroupMeasured = { origin ->
+                if (owner.canAct()) {
+                    hex?.let { target ->
+                        owner.leave {
+                            val candidate = RecipientSearch.Candidate(target, displayTitle, npub)
+                            onStartGroupMeasured?.invoke(candidate, origin) ?: onStartGroup(candidate)
+                        }
+                    }
+                }
+            },
             onGroupEntry = {
                 if (owner.canAct()) {
                     pickerParent = ProfileSheetPage.PROFILE
@@ -1009,14 +1020,16 @@ internal fun ProfileSheet(
         )
     }
 
-    PlaybackDialog(
+    MeasuredPlaybackDialog(
+        origin = appState.pendingProfileOrigin,
+        ownerKey = owner to appState.pendingProfilePresentationId,
+        dismissEnabled = { !creatingChat && !addingToGroups && !promotingAdmin },
+        onDismissStart = owner::dispose,
         onSourceDismiss =
-            ({ owner.leave { currentDismiss() } }).takeUnless {
+            ({ currentDismiss() }).takeUnless {
                 creatingChat || addingToGroups || promotingAdmin
             },
-        onDismissRequest = {
-            if (!creatingChat && !addingToGroups && !promotingAdmin) owner.leave { currentDismiss() }
-        },
+        onDismissRequest = { currentDismiss() },
         properties =
             DialogProperties(
                 securePolicy = securePolicy,
@@ -1029,7 +1042,7 @@ internal fun ProfileSheet(
         BackHandler {
             if (!creatingChat && !addingToGroups && !promotingAdmin) {
                 if (page == ProfileSheetPage.PROFILE) {
-                    owner.leave { currentDismiss() }
+                    dismiss()
                 } else {
                     page = if (page == ProfileSheetPage.ADD_TO_GROUPS) pickerParent else ProfileSheetPage.PROFILE
                 }
@@ -1041,8 +1054,9 @@ internal fun ProfileSheet(
                 target = motionPage,
                 depth = profileSheetPageDepth(motionPage, pickerParent),
                 ownerKey = owner,
-                contentVisible = owner.canAct() && !appState.appLockScreenVisible,
+                contentVisible = owner.canPresent() && !appState.appLockScreenVisible,
                 animationsEnabled = rememberConversationMotionEnabled(),
+                cardMorph = true,
             ) { targetPage ->
                 when (targetPage) {
                     ProfileSheetPage.ADD_TO_GROUPS -> {
@@ -1149,7 +1163,7 @@ internal fun ProfileSheet(
                             }
                         }
                     }
-                    ProfileSheetPage.PROFILE -> profileContent()
+                    ProfileSheetPage.PROFILE -> profileContent(dismiss)
                 }
             }
         }
@@ -1291,6 +1305,7 @@ internal fun ContactPrivateDetailsDialog(
     onRepositionPicture: () -> Unit = {},
     onClearPicture: () -> Unit = {},
     viewportInsets: WindowInsets? = null,
+    popupMotion: dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion? = null,
 ) {
     val nickname =
         remember(initialNickname) {
@@ -1310,9 +1325,11 @@ internal fun ContactPrivateDetailsDialog(
             securePolicy = securePolicy,
             viewportInsets = viewportInsets,
             onDismiss = onDismiss,
+            popupMotion = popupMotion,
+            dismissEnabled = { pictureState?.busy != true },
             actions = {
                 TextButton(
-                    onDismiss,
+                    dismiss,
                     Modifier.testTag("person_profile.private_cancel"),
                     enabled = pictureState?.busy != true,
                 ) { Text(stringResource(R.string.cancel)) }

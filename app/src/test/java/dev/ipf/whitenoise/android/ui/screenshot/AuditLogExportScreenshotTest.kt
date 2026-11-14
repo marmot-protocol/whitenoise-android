@@ -115,7 +115,7 @@ class AuditLogExportScreenshotTest {
                             Result.success(files),
                             false,
                             onDismiss = {},
-                            onExport = onExport,
+                            onExport = { paths -> onExport(paths) },
                             onRetry = {},
                         )
                     }

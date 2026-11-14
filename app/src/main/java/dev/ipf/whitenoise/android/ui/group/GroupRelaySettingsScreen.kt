@@ -97,7 +97,11 @@ private fun GroupRelayRows(
     copiedUrl: String?,
     onCopy: (String) -> Unit,
 ) {
-    SettingsGroup(modifier = Modifier.testTag(GROUP_RELAYS_LIST_TAG)) {
+    SettingsGroup(
+        modifier = Modifier.testTag(GROUP_RELAYS_LIST_TAG),
+        destination = "relays",
+        surface = "group-relays",
+    ) {
         if (relays.isEmpty()) {
             row("empty") { context -> GroupRelayEmptyRow(context) }
         } else {

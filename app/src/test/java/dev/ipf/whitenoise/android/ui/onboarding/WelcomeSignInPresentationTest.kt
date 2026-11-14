@@ -96,7 +96,7 @@ class WelcomeSignInPresentationTest {
         }
         composeRule.onNodeWithText(context.getString(R.string.onboarding_choose_profile)).performClick()
         composeRule.onNodeWithText("bob").performClick()
-        assertEquals(listOf("bob"), resumed)
+        composeRule.runOnIdle { assertEquals(listOf("bob"), resumed) }
     }
 
     /** Recovery remains an explicit acknowledgement, and declining it does not activate or recover an identity. */

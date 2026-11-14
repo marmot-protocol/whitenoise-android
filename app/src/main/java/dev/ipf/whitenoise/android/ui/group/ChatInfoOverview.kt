@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -27,7 +28,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeRow
+import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
 /** Equal-width overview action with one accessible tonal target and a wrapping visual caption. */
 @Suppress("FunctionNaming", "LongParameterList")
@@ -39,6 +44,7 @@ internal fun QuickInfoAction(
     modifier: Modifier = Modifier,
     state: String? = null,
     enabled: Boolean = true,
+    buttonModifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier,
@@ -49,7 +55,7 @@ internal fun QuickInfoAction(
             onClick = onClick,
             enabled = enabled,
             modifier =
-                Modifier.fillMaxWidth().height(56.dp).semantics {
+                buttonModifier.fillMaxWidth().height(56.dp).semantics {
                     state?.let { stateDescription = it }
                 },
         ) {
@@ -72,16 +78,51 @@ internal fun ChatInfoMemberCard(
     index: Int,
     count: Int,
     modifier: Modifier = Modifier,
+    suppressChrome: () -> Boolean = { false },
+    nativeGroup: Any? = null,
+    nativeKey: String = index.toString(),
     content: @Composable () -> Unit,
 ) {
+    val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
+    val shape = shapes.shape
+    val border = amoledOutlineBorder()
+    val nativeRow =
+        if (nativeGroup != null) {
+            rememberSettingsNativeRow(
+                nativeGroup,
+                nativeKey,
+                SettingsRowContext(
+                    shapes,
+                    MaterialTheme.colorScheme.surfaceContainerLowest,
+                    border?.let { Color.White } ?: Color.Unspecified,
+                ),
+            )
+        } else {
+            Modifier
+        }
     Surface(
         modifier =
-            modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(
-                bottom = if (index == count - 1) 0.dp else WhiteNoiseListItemDefaults.segmentedGap,
-            ),
-        shape = WhiteNoiseListItemDefaults.segmentedShapes(index, count).shape,
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(
+                    bottom = if (index == count - 1) 0.dp else WhiteNoiseListItemDefaults.segmentedGap,
+                ).then(nativeRow)
+                .then(
+                    if (shape is ConnectedRowShape && border != null) {
+                        Modifier.connectedRowBorder(
+                            shape,
+                            Color.White,
+                            suppressChrome = suppressChrome,
+                            suppressSeam = { false },
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = amoledOutlineBorder(),
+        border = if (shape is ConnectedRowShape) null else border,
     ) {
         Box(Modifier.heightIn(min = MemberRowMinimumHeight)) { content() }
     }

@@ -89,6 +89,6 @@ class PersonProfileFeedbackTest {
         }
         composeRule.onNodeWithTag("person-profile-feedback-copy").assertDoesNotExist()
         composeRule.onNodeWithTag("person-profile-feedback-dismiss").performClick()
-        assertTrue(dismissed)
+        composeRule.runOnIdle { assertTrue(dismissed) }
     }
 }

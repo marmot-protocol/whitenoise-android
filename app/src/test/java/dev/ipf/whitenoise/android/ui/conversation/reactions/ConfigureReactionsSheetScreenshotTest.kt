@@ -42,10 +42,11 @@ class ConfigureReactionsSheetScreenshotTest {
         val picks = mutableListOf<Pair<Int, List<String>>>()
         render(current = RecentEmojiList.DefaultQuickChoices, onPickSlot = { index, draft -> picks += index to draft })
 
+        captureScreenRoboImage("src/test/snapshots/configure_reactions_six_light.png")
         composeRule.onNodeWithContentDescription("Add a reaction").assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
 
         assertEquals(listOf(6 to RecentEmojiList.DefaultQuickChoices), picks)
-        captureScreenRoboImage("src/test/snapshots/configure_reactions_six_light.png")
     }
 
     /** Eight choices fill every slot, so the add slot disappears and both optional slots offer removal. */
@@ -59,6 +60,7 @@ class ConfigureReactionsSheetScreenshotTest {
         captureScreenRoboImage("src/test/snapshots/configure_reactions_eight_dark.png")
         composeRule.onNodeWithContentDescription("Remove reaction 7, 🚀").performClick()
         composeRule.onNodeWithText("Done").performClick()
+        composeRule.waitForIdle()
 
         assertEquals(listOf(RecentEmojiList.DefaultQuickChoices + "✅"), applied)
     }
@@ -92,6 +94,7 @@ class ConfigureReactionsSheetScreenshotTest {
         composeRule.onNodeWithText("Reset").performClick()
         composeRule.onNodeWithTag(CONFIGURE_REACTIONS_ADD_SLOT_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("Done").performClick()
+        composeRule.waitForIdle()
 
         assertEquals(listOf(RecentEmojiList.DefaultQuickChoices), applied)
     }

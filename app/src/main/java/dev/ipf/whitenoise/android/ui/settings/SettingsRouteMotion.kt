@@ -62,17 +62,41 @@ internal fun <T> SettingsRouteMotion(
     content: @Composable (T) -> Unit,
 ) {
     if (!contentVisible) return
-    val morph = if (cardMorph) remember(ownerKey) { SettingsCardMorph() } else null
+    val parent = LocalSettingsCardMorph.current
+    val morph =
+        if (cardMorph) {
+            remember(ownerKey, parent) {
+                SettingsCardMorph(fullScreen = true, parent = parent)
+            }
+        } else {
+            null
+        }
     val motion = animationsEnabled && !suppressMotion
-    val (morphing, morphHost) = rememberSettingsCardMorphHost(morph, target, ownerKey, motion)
+    val history = remember(ownerKey) { SettingsMotionHistory(target, depth) }
+    val previousDepth = remember(ownerKey, target) { history.depth }
+    val forward = depth >= previousDepth
+    SideEffect {
+        history.target = target
+        history.depth = depth
+    }
+    val (morphing, morphHost) =
+        rememberSettingsCardMorphHost(
+            morph,
+            target,
+            ownerKey,
+            motion,
+            forward,
+            captureContent =
+                !topLevelBubble || depth > 0,
+        )
     Box(
         Modifier.fillMaxSize().then(morphHost).then(
-            // Matched cards carry the transition; the page slide would fight their movement.
+            // The existing route clock owns block contraction and exclusive entry; unmeasured entries settle directly.
             rememberRouteMotionModifier(
                 target = target,
                 depth = depth,
                 ownerKey = ownerKey,
-                suppressMotion = suppressMotion || morphing,
+                suppressMotion = suppressMotion || morphing || morph?.page != null,
                 animationsEnabled = animationsEnabled,
                 topLevelBubble = topLevelBubble,
             ),

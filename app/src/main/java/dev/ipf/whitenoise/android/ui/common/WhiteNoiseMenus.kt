@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -11,8 +10,11 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -30,7 +32,7 @@ fun WhiteNoiseDropdownMenu(
     header: (@Composable () -> Unit)? = null,
 ) {
     val menuScrollState = rememberScrollState()
-    DropdownMenu(
+    AnimatedDropdownMenu(
         scrollState = menuScrollState,
         expanded = expanded,
         onDismissRequest = onDismissRequest,
@@ -38,7 +40,7 @@ fun WhiteNoiseDropdownMenu(
         shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         border = amoledOutlineBorder(),
-    ) {
+    ) { surface ->
         header?.invoke()
         items.forEach { item ->
             val contentColor =
@@ -47,13 +49,20 @@ fun WhiteNoiseDropdownMenu(
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 }
+            val (originModifier, activate) =
+                rememberMeasuredControlClick { origin ->
+                    if (surface.acceptsInput) {
+                        item.onOrigin?.invoke(origin)
+                        surface.close {
+                            onDismissRequest()
+                            item.onClick()
+                        }
+                    }
+                }
             DropdownMenuItem(
                 text = { Text(item.label) },
-                onClick = {
-                    onDismissRequest()
-                    item.onClick()
-                },
-                modifier = item.modifier,
+                onClick = activate,
+                modifier = item.modifier.then(originModifier),
                 leadingIcon =
                     item.icon?.let { icon ->
                         {
@@ -80,6 +89,7 @@ data class WhiteNoiseMenuItem(
     val enabled: Boolean = true,
     val destructive: Boolean = false,
     val modifier: Modifier = Modifier,
+    val onOrigin: ((Rect?) -> Unit)? = null,
 )
 
 private val MenuIconSize = 24.dp

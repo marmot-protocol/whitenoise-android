@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -42,6 +44,7 @@ class ChatDeletionUxScreenshotTest {
         }
         composeRule.onNodeWithText(context.getString(R.string.delete_from_device)).assertIsDisplayed()
         composeRule.onNodeWithTag("chat.action.LeaveAndDelete").performClick()
+        composeRule.waitForIdle()
         assertEquals(0, localDeletes)
         assertEquals(1, departures)
     }
@@ -57,17 +60,24 @@ class ChatDeletionUxScreenshotTest {
     @Test fun departureConfirmationHasNoImplicitSideEffect() {
         var confirmations = 0
         var dismissals = 0
+        val lifetime = mutableStateOf(0)
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChatLeaveAndDeleteConfirmationDialog({ confirmations++ }, { dismissals++ })
+                key(lifetime.value) {
+                    ChatLeaveAndDeleteConfirmationDialog({ confirmations++ }, { dismissals++ })
+                }
             }
         }
         composeRule.onNodeWithText(context.getString(R.string.leave_and_delete_message)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        composeRule.waitForIdle()
         assertEquals(0, confirmations)
         assertEquals(1, dismissals)
+        composeRule.runOnIdle { lifetime.value++ }
         composeRule.onNode(hasText(context.getString(R.string.leave_and_delete)) and hasClickAction()).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, confirmations)
+        assertEquals(1, dismissals)
     }
 
     /** The single-group menu makes both effects visible without explanatory paragraphs. */

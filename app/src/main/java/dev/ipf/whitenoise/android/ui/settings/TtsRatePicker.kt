@@ -26,9 +26,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsRatePreferences
+import dev.ipf.whitenoise.android.ui.common.AnimatedBasicAlertDialog
 import java.math.RoundingMode
 import java.text.NumberFormat
 import java.text.ParsePosition
@@ -82,15 +82,15 @@ internal fun TtsCustomRateDialog(
     onDismiss: () -> Unit,
     onRateSelected: (Float) -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    AnimatedBasicAlertDialog(onDismissRequest = onDismiss) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             tonalElevation = 6.dp,
         ) {
             TtsCustomRateEditor(
                 initialRate = initialRate,
-                onDismiss = onDismiss,
-                onRateSelected = onRateSelected,
+                onDismiss = dismiss,
+                onRateSelected = { rate -> close { onRateSelected(rate) } },
             )
         }
     }

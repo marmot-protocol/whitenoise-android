@@ -1017,6 +1017,7 @@ internal fun MessageBubble(
 
     /** Closes the action menu and shows Info, unless the message is already deleted. */
     fun openInfoSheet() {
+        surfaces.infoOrigin = null
         if (deleted) return
         onActionMenuOpenChange(false)
         surfaces.infoSheetOpen = true
@@ -1427,6 +1428,7 @@ internal fun MessageBubble(
 
     /** Opens the forward sheet on a snapshot of the message's forwardable payload. */
     fun beginForward() {
+        surfaces.forwardOrigin = null
         if (deleted || actionsReadOnly || forwardPayload == null) return
         onActionMenuOpenChange(false)
         surfaces.forwardSnapshot = forwardPayload
@@ -1692,6 +1694,8 @@ internal fun MessageBubble(
                     surfaces.reactionSheetOpen = true
                 },
                 MessageRowAction(stringResource(R.string.edit_history), editState != null) {
+                    // A row accessibility action has no activated edited-label rectangle.
+                    surfaces.editHistoryOrigin = null
                     surfaces.editHistoryOpen = true
                 },
             )
@@ -2523,9 +2527,12 @@ internal fun MessageBubble(
                         content()
                     }
                 }
-                val onEditedClick: (() -> Unit)? =
+                val onEditedClick: ((Rect?) -> Unit)? =
                     if (editState != null && !textSelectionMode) {
-                        { surfaces.editHistoryOpen = true }
+                        { origin ->
+                            surfaces.editHistoryOrigin = origin
+                            surfaces.editHistoryOpen = true
+                        }
                     } else {
                         null
                     }
@@ -3022,6 +3029,14 @@ internal fun MessageBubble(
                         }
                     },
                     onInfo = ::openInfoSheet,
+                    onInfoAt = { origin ->
+                        openInfoSheet()
+                        surfaces.infoOrigin = origin
+                    },
+                    onForwardAt = { origin ->
+                        beginForward()
+                        surfaces.forwardOrigin = origin
+                    },
                     onReport = {
                         onActionMenuOpenChange(false)
                         surfaces.reportSheetOpen = true
@@ -3279,6 +3294,7 @@ internal fun MessageBubble(
                 }
                 if (surfaces.editHistoryOpen && !deleted && editState != null) {
                     EditHistoryDialog(
+                        origin = surfaces.editHistoryOrigin,
                         // With an engine edit summary the record's plaintext is already the edited body.
                         original = record.plaintext.takeIf { item.projected?.edit == null },
                         originalTimestamp = record.recordedAt,
@@ -3291,12 +3307,18 @@ internal fun MessageBubble(
                     ReportMessageSheet(
                         onDismissRequest = { surfaces.reportSheetOpen = false },
                         sending = surfaces.reportInFlight,
-                        onSubmit = { reason, explanation ->
+                        ownerKey =
+                            Triple(
+                                controller,
+                                record.messageIdHex,
+                                appState.activeAccountRef to appState.runtimeGeneration,
+                            ),
+                        onSubmit = { reason, explanation, finishExit ->
                             surfaces.reportInFlight = true
                             appState.launchMutation {
                                 try {
                                     val outcome = controller.reportMessage(record.messageIdHex, reason, explanation)
-                                    surfaces.reportSheetOpen = false
+                                    finishExit()
                                     when (outcome) {
                                         ReportOutcome.Sent -> appState.present(R.string.report_message_sent)
                                         ReportOutcome.Queued -> appState.present(R.string.report_message_queued)
@@ -3317,6 +3339,7 @@ internal fun MessageBubble(
                         surfaces.messageReports = if (hasReports) controller.reportsFor(record.messageIdHex) else null
                     }
                     MessageDetailsScreen(
+                        origin = surfaces.infoOrigin,
                         record = record,
                         reports = surfaces.messageReports?.takeIf { hasReports },
                         reporterName = appState::displayName,
@@ -3354,6 +3377,7 @@ internal fun MessageBubble(
                     surfaces.forwardSnapshot?.takeIf { it is ForwardMessagePayload.Text || forwardPayload != null }
                 if (surfaces.forwardSheetOpen && !deleted && openForwardPayload != null) {
                     ForwardMessageSheet(
+                        origin = surfaces.forwardOrigin,
                         appState = appState,
                         payloads = listOf(openForwardPayload),
                         sourceAccountRef = controller.boundAccountRef,

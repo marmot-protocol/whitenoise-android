@@ -35,6 +35,7 @@ import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.group.notificationChannelIcon
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Refreshes Android permission, battery policy and local settings now and whenever the screen resumes. */
@@ -92,8 +93,10 @@ private fun NotificationPermissionPrompt(appState: WhiteNoiseAppState) {
  * Notifications overview: the preview switch and links to the sound, delivery and Android settings pages.
  * Detailed controls live on the child pages so this screen stays short.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
+// One declarative settings screen retains its existing permission and refresh owner.
+
 internal fun NotificationsScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
@@ -124,11 +127,16 @@ internal fun NotificationsScreen(
                 )
             }
             item(key = "search.Notifications.2") {
-                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section),
+                    destination = SettingsDetail.Notifications,
+                    surface = "notification-options",
+                ) {
                     row("sounds") { rowContext ->
                         SettingsLink(
                             context = rowContext,
                             title = stringResource(R.string.notification_sounds_vibration),
+                            routeKey = SettingsDetail.NotificationSounds,
                             onClick = onOpenSounds,
                             modifier = Modifier.testTag("notifications.sounds"),
                             leading = { SettingsLeadingIcon(R.drawable.ic_music_note) },
@@ -139,6 +147,7 @@ internal fun NotificationsScreen(
                             context = rowContext,
                             title = stringResource(R.string.notification_delivery_battery),
                             value = deliveryValue,
+                            routeKey = SettingsDetail.NotificationDelivery,
                             onClick = onOpenDelivery,
                             modifier = Modifier.testTag("notifications.delivery"),
                             leading = { SettingsLeadingIcon(R.drawable.ic_battery_full) },
@@ -179,6 +188,7 @@ internal fun NotificationSoundsScreen(
                 GlobalNotificationCategories(
                     onOpenChannel = { openNotificationChannelSettings(context, it) },
                     soundLabels = soundLabels,
+                    destination = SettingsDetail.NotificationSounds,
                 )
             }
             item(key = "search.NotificationSounds.3") {
@@ -216,6 +226,7 @@ internal fun NotificationDeliveryScreen(
             item(key = "search.NotificationDelivery.2") {
                 NotificationDeliverySelector(
                     selectedMode = appState.notificationDeliveryMode(),
+                    destination = SettingsDetail.NotificationDelivery,
                     capability = capability,
                     enabled = hasAccount && permissionGranted && !appState.notificationDeliveryModeBusy,
                     onSelect = { mode -> appState.launchMutation { appState.setNotificationDeliveryMode(mode) } },
@@ -268,8 +279,11 @@ internal fun NotificationDeliverySelector(
     capability: NativePushCapability,
     enabled: Boolean,
     onSelect: (NotificationDeliveryMode) -> Unit,
+    destination: Any? = null,
 ) {
     SettingsGroup(
+        destination = destination,
+        surface = "delivery-options",
         modifier =
             Modifier
                 .selectableGroup()
@@ -403,8 +417,9 @@ internal fun NativePushCapability.subtitleResource(): Int =
 internal fun GlobalNotificationCategories(
     onOpenChannel: (NotificationChannelSpec) -> Unit,
     soundLabels: Map<NotificationChannelSpec, String> = emptyMap(),
+    destination: Any? = null,
 ) {
-    SettingsGroup {
+    SettingsGroup(destination = destination, surface = "notification-categories") {
         NotificationChannelSpec.entries.filter { it != NotificationChannelSpec.USER_EVENT_SUMMARY }.forEach { channel ->
             row(channel.id) { context ->
                 SettingsLink(

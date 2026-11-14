@@ -11,6 +11,8 @@ except ModuleNotFoundError:
 
 MODAL_CONSTRUCTORS = frozenset({
     'AlertDialog', 'BasicAlertDialog', 'Dialog', 'Popup', 'DropdownMenu', 'ModalBottomSheet',
+    'DatePickerDialog', 'AnimatedAlertDialog', 'AnimatedBasicAlertDialog',
+    'AnimatedDatePickerDialog', 'AnimatedDropdownMenu', 'MeasuredPlaybackDialog',
     'WhiteNoiseAlertDialog', 'WhiteNoiseDropdownMenu', 'WhiteNoiseModalBottomSheet',
     'KeyboardSafePopup', 'ConfirmDialog', 'ChoiceDialog', 'SpeechChoiceDialog', 'PlaybackDialog',
 })

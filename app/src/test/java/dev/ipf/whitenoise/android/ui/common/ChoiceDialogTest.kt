@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -35,23 +36,49 @@ class ChoiceDialogTest {
     fun dialogReportsSelectionOnceAndCancelOnlyDismisses() {
         val selections = mutableListOf<String>()
         var dismissals = 0
+        val shown = mutableStateOf(true)
+        composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             WhiteNoiseTheme {
-                ChoiceDialog(
-                    title = "Font size",
-                    values = listOf("Small", "Default", "Large"),
-                    selected = "Default",
-                    label = { it },
-                    onDismiss = { dismissals++ },
-                    onSelect = { selections += it },
-                )
+                if (shown.value) {
+                    ChoiceDialog(
+                        title = "Font size",
+                        values = listOf("Small", "Default", "Large"),
+                        selected = "Default",
+                        label = { it },
+                        onDismiss = {
+                            dismissals++
+                            shown.value = false
+                        },
+                        onSelect = {
+                            selections += it
+                            shown.value = false
+                        },
+                    )
+                }
             }
         }
 
+        composeRule.mainClock.advanceTimeBy(400)
         composeRule.onAllNodes(isSelectable()).assertCountEquals(3)
         composeRule.onNodeWithText("Default").assertIsSelected()
         composeRule.onNodeWithText("Large").performClick()
+        composeRule.runOnIdle { assertEquals(emptyList<String>(), selections) }
+        composeRule.mainClock.advanceTimeBy(96)
+        composeRule.onNodeWithText("Font size", useUnmergedTree = true).assertExists()
+        composeRule.mainClock.advanceTimeBy(320)
+        composeRule.onNodeWithText("Font size").assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertEquals(listOf("Large"), selections)
+            assertEquals(0, dismissals)
+            shown.value = true
+            androidx.compose.runtime.snapshots.Snapshot
+                .sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeBy(400)
         composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.runOnIdle { assertEquals(0, dismissals) }
+        composeRule.mainClock.advanceTimeBy(400)
         composeRule.runOnIdle {
             assertEquals(listOf("Large"), selections)
             assertEquals(1, dismissals)

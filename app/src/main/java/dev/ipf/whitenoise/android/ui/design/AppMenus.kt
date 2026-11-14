@@ -1,26 +1,14 @@
 package dev.ipf.whitenoise.android.ui.design
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -53,8 +41,8 @@ internal val conversationMenuItemPadding = PaddingValues(horizontal = 24.dp, ver
 //      press is consumed so it never reaches the content. The scrim is itself
 //      non-focusable, so it too preserves the open keyboard.
 //
-// Positioning, anchoring and the menu chrome stay DropdownMenu's — only its
-// focus behavior and dismissal plumbing change.
+// Shared popup chrome retains the original parent anchor and two nonfocusable windows.
+// The scrim and host Back handler remain mounted until the final exit frame.
 @Composable
 internal fun KeyboardPreservingDropdownMenu(
     expanded: Boolean,
@@ -64,50 +52,15 @@ internal fun KeyboardPreservingDropdownMenu(
     shape: Shape = MenuDefaults.shape,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    // BackHandler + scrim only exist while the menu is open. They render in
-    // their own popup windows, so they never disturb the anchor's layout.
-    if (expanded) {
-        BackHandler(enabled = true) { onDismissRequest() }
-        // Scrim: composed before the menu so the menu renders on top of it.
-        // Fills the window and swallows any tap as a pure dismissal.
-        Popup(
-            properties =
-                PopupProperties(
-                    focusable = false,
-                    // The scrim owns outside-tap dismissal; the menu's own
-                    // outside-tap detection is disabled below so a single tap is
-                    // handled exactly once, here, and consumed.
-                    dismissOnClickOutside = false,
-                ),
-            onDismissRequest = onDismissRequest,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures { onDismissRequest() }
-                        },
-            )
-        }
-    }
     val menuScrollState = rememberScrollState()
-    DropdownMenu(
+    AnimatedDropdownMenu(
         scrollState = menuScrollState,
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = (modifier).scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+        modifier = modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
         offset = offset,
         shape = shape,
         border = amoledSurfaceBorderStroke(),
-        properties =
-            PopupProperties(
-                focusable = false,
-                // Outside taps are handled by the scrim above (which also blocks
-                // click-through); disabling the menu's own outside-dismiss keeps
-                // a single tap from being processed twice.
-                dismissOnClickOutside = false,
-            ),
-        content = content,
-    )
+        keyboardPreserving = true,
+    ) { content() }
 }

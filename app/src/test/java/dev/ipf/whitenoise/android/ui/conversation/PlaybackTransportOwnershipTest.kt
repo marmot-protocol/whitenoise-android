@@ -162,6 +162,27 @@ class PlaybackTransportOwnershipTest {
         rule.onNodeWithTag("voice-transport").assertIsDisplayed()
     }
 
+    @Test fun signOutDuringSourceExitNeverNavigates() = assertSourceExitPrivacy { it.signOutInProgress = true }
+
+    @Test fun wipeDuringSourceExitNeverNavigates() = assertSourceExitPrivacy { it.wipeInProgress = true }
+
+    private fun assertSourceExitPrivacy(block: (WhiteNoiseAppState) -> Unit) {
+        val appState = appState()
+        setVoice()
+        var opened = 0
+        var finish: (() -> Unit)? = null
+        val host = ShellPlaybackHost(appState) { opened++ }
+        host.requestOpenSourceAfterExit { _, next -> finish = next }
+        assertEquals(0, opened)
+        checkNotNull(finish)
+        block(appState)
+        finish?.invoke()
+        assertEquals(0, opened)
+        var admitted = false
+        host.requestOpenSourceAfterExit { _, _ -> admitted = true }
+        assertEquals(false, admitted)
+    }
+
     /** Audio time changes update the small strip, never the full navigation shell or modal destination tree. */
     @Test fun audioTicksDoNotRecomposeShellObservers() {
         val appState = appState()
@@ -238,6 +259,55 @@ class PlaybackTransportOwnershipTest {
         rule.runOnIdle { host.requestOpenSource { dismissals++ } }
         assertEquals(0, dismissals)
         rule.runOnIdle { appState.stopSpeaking() }
+    }
+
+    /** Routing waits for the actual window owner's completion, and duplicate completion is inert. */
+    @Test fun sourceNavigationWaitsForWindowExit() {
+        val appState = appState()
+        setVoice()
+        var opened = 0
+        var complete: (() -> Unit)? = null
+        val host = ShellPlaybackHost(appState) { opened++ }
+        host.requestOpenSourceAfterExit { current, next ->
+            assertTrue(current())
+            complete = next
+        }
+        assertEquals(0, opened)
+        checkNotNull(complete).invoke()
+        checkNotNull(complete).invoke()
+        assertEquals(1, opened)
+    }
+
+    /** The actual viewer must join the tested exit chain, rather than silently taking synchronous fallback. */
+    @Test fun realMediaViewerUsesItsMotionCompletionForPlaybackSource() {
+        val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt")
+        val exit = source.substringAfter("onSourceExit = { next ->").substringBefore("rootModifier =")
+        assertTrue(exit.contains("afterSourceExit = next"))
+        assertTrue(exit.contains("dismissWithMotion()"))
+        assertFalse(exit.contains("onDismiss()"))
+        val completion = source.substringAfter("onClosed = {").substringBefore("selectedSourceEpoch =")
+        assertTrue(completion.contains("afterSourceExit = null"))
+        assertTrue(completion.indexOf("onDismiss()") < completion.indexOf("next?.invoke()"))
+        assertTrue(source.contains("if (!sourceOwnerCurrent || privacyBlocked) {"))
+        assertTrue(source.contains("Modifier.clearAndSetSemantics {}.onPreviewKeyEvent { true }"))
+    }
+
+    /** Playback replacement during the exit cannot route a now-unrelated source. */
+    @Test fun windowExitCannotNavigateAfterPlaybackStops() {
+        val appState = appState()
+        setVoice()
+        var opened = 0
+        var complete: (() -> Unit)? = null
+        var current: (() -> Boolean)? = null
+        val host = ShellPlaybackHost(appState) { opened++ }
+        host.requestOpenSourceAfterExit { valid, next ->
+            current = valid
+            complete = next
+        }
+        VoicePlaybackController.stop()
+        assertFalse(checkNotNull(current).invoke())
+        checkNotNull(complete).invoke()
+        assertEquals(0, opened)
     }
 
     /** Pending dirty confirmation loses authority if playback is stopped or replaced while it is visible. */

@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -24,6 +25,7 @@ import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 /** Help: the bug report, reviewed before it leaves the app, and the build's own facts. */
 @Suppress("FunctionNaming")
@@ -36,11 +38,16 @@ internal fun HelpScreen(
     SettingsScaffold(title = stringResource(R.string.help), onBack = onBack) {
         SettingsList {
             item(key = "search.HelpAboutScreens.1") {
-                SettingsGroup(modifier = Modifier.testTag("help.destinations")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("help.destinations"),
+                    destination = SettingsDetail.Help,
+                    surface = "help-destinations",
+                ) {
                     row("bug_report") { context ->
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.report_a_bug),
+                            routeKey = SettingsDetail.BugReport,
                             onClick = onOpenBugReport,
                             modifier = Modifier.testTag("help.report_bug"),
                             subtitle = stringResource(R.string.report_a_bug_subtitle),
@@ -51,6 +58,7 @@ internal fun HelpScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.about_and_licenses),
+                            routeKey = SettingsDetail.About,
                             onClick = onOpenAbout,
                             modifier = Modifier.testTag("help.about"),
                             subtitle = stringResource(R.string.about_and_licenses_subtitle),
@@ -75,8 +83,10 @@ internal fun BugReportScreen(onBack: () -> Unit) {
  * What the hand-off does and what it does not attach, then one action. [onOpenReport] reports whether a
  * browser accepted it; a refusal keeps the screen and offers Retry.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
+// One declarative report screen keeps its launcher failure state and action in the mounted owner.
+
 internal fun BugReportContent(
     onBack: () -> Unit,
     onOpenReport: () -> Boolean,
@@ -107,7 +117,11 @@ internal fun BugReportContent(
                 SettingsSection(stringResource(R.string.report_bug_destination_section))
             }
             item(key = "search.HelpAboutScreens.3") {
-                SettingsGroup(modifier = Modifier.testTag("help.bug.destination")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("help.bug.destination"),
+                    destination = SettingsDetail.BugReport,
+                    surface = "bug-destination",
+                ) {
                     row("destination") { context ->
                         SettingsValue(
                             context,
@@ -218,7 +232,11 @@ internal fun AboutContent(
         SettingsList {
             item(key = "search.HelpAboutScreens.7") { SettingsSection(stringResource(R.string.about_app_section)) }
             item(key = "search.HelpAboutScreens.8") {
-                SettingsGroup(modifier = Modifier.testTag("about.app")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("about.app"),
+                    destination = SettingsDetail.About,
+                    surface = "about-app",
+                ) {
                     row("version") { context ->
                         SettingsValue(
                             context,
@@ -261,6 +279,7 @@ internal fun AboutContent(
                                 context = context,
                                 title = stringResource(R.string.developer),
                                 subtitle = stringResource(R.string.developer_mode_subtitle),
+                                routeKey = SettingsDetail.Developer,
                                 onClick = onOpenDeveloper,
                                 modifier = Modifier.testTag("about.developer"),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_code) },
@@ -323,18 +342,23 @@ private fun HelpOpenFailureDialog(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var attempt by remember { mutableIntStateOf(0) }
     WhiteNoiseAlertDialog(
+        ownerKey = LocalSettingsCardMorph.current to attempt,
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
                 onClick = {
-                    onDismiss()
-                    onRetry()
+                    close {
+                        onDismiss()
+                        attempt++
+                        onRetry()
+                    }
                 },
             ) { Text(stringResource(R.string.retry)) }
         },
         modifier = Modifier.testTag("help.open_failed"),
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+        dismissButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) } },
         title = { Text(title) },
         text = { Text(body) },
     )

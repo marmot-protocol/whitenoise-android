@@ -17,6 +17,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -36,6 +37,8 @@ internal class SettingsRowContext internal constructor(
     val shapes: ListItemShapes,
     val containerColor: Color,
     val borderColor: Color,
+    val suppressChrome: () -> Boolean = { false },
+    val suppressSeam: () -> Boolean = suppressChrome,
 )
 
 /** A rendering entry has no application state; its caller owns actions and displayed values. */
@@ -80,22 +83,34 @@ internal var SemanticsPropertyReceiver.settingsRow by SettingsRowKey
 internal fun SettingsGroup(
     modifier: Modifier = Modifier,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
+    destination: Any? = null,
+    surface: Any = destination ?: Unit,
     content: SettingsGroupScope.() -> Unit,
 ) {
     val group = SettingsGroupScope().apply(content)
     val gap = WhiteNoiseListItemDefaults.segmentedGap
+    val page = LocalSettingsCardMorph.current?.page
+    val token = remember(page, destination, surface) { Any() }
+    val native = rememberSettingsNativeSurface(destination, containerColor, surface, registrationToken = token)
     Column(
         modifier
             .fillMaxWidth()
             .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+            .then(native.first)
             .settingsCardMorph()
             .semantics { settingsGroup = Unit },
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         group.rows.forEachIndexed { index, entry ->
             key(entry.key) {
-                SettingsSearchRowReveal(entry.key) {
-                    entry.content(settingsRowContext(index, group.rows.size, containerColor))
+                val row = settingsRowContext(index, group.rows.size, containerColor)
+                SettingsSearchRowReveal(
+                    entry.key,
+                    Modifier.fillMaxWidth().then(rememberSettingsNativeRow(token, entry.key, row)),
+                ) {
+                    entry.content(
+                        SettingsRowContext(row.shapes, row.containerColor, row.borderColor, native.second, { false }),
+                    )
                 }
             }
         }
@@ -182,14 +197,17 @@ internal fun SettingsLink(
     destructive: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
     leading: (@Composable () -> Unit)?,
+    routeKey: Any? = null,
 ) {
+    val (origin, navigate) = rememberSettingsRouteClick(context, routeKey, onClick)
     val editable = enabled && !busy
     val summary = listOfNotNull(value, subtitle).distinct().joinToString("\n").takeIf { it.isNotEmpty() }
     ListItem(
-        onClick = onClick,
+        onClick = navigate,
         shapes = context.shapes,
         modifier =
             modifier
+                .then(origin)
                 .fillMaxWidth()
                 .settingsRowBorder(context)
                 .semantics {
@@ -228,13 +246,17 @@ internal fun SettingsAction(
     subtitle: String? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
+    opensRoute: Boolean = false,
     leading: (@Composable () -> Unit)?,
+    routeKey: Any? = null,
 ) {
+    val (origin, navigate) = rememberSettingsRouteClick(context, routeKey, onClick)
     ListItem(
-        onClick = onClick,
+        onClick = if (opensRoute) navigate else onClick,
         shapes = context.shapes,
         modifier =
             modifier
+                .then(if (opensRoute) origin else Modifier)
                 .fillMaxWidth()
                 .settingsRowBorder(context)
                 .semantics {

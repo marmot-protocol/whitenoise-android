@@ -153,6 +153,7 @@ class PhotoEditorSemanticsTest {
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         composeRule.onNodeWithText(string(R.string.photo_editor_discard_title)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.photo_editor_discard)).performClick()
+        composeRule.waitForIdle()
 
         assertEquals(1, cancels)
         assertEquals(0, saves)

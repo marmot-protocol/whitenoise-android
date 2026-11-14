@@ -48,6 +48,7 @@ class GroupChangeConfirmationScreenshotTest {
 
         composeRule.onNodeWithText("Weekend hikers").assertExists()
         composeRule.onNodeWithText("Wait").performClick()
+        composeRule.waitForIdle()
         assertEquals(false, decision.getCompleted())
     }
 

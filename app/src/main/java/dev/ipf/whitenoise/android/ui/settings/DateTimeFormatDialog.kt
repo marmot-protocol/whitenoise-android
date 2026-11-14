@@ -79,7 +79,7 @@ internal fun DateTimeFormatDialog(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
+        confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.done)) } },
         dismissButton = {
             TextButton(
                 enabled = !automatic,

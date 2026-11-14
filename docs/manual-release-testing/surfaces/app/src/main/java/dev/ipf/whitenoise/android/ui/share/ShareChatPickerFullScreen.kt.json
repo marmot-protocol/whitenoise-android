@@ -76,6 +76,16 @@
           "SYS-001",
           "PRO-008"
         ]
+      },
+      {
+        "surface": "Measured emoji-set route motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "rememberSettingsRouteClick",
+        "test_ids": [
+          "FLD-001",
+          "SYS-004",
+          "PRO-008"
+        ]
       }
     ],
     "source_coverage": [

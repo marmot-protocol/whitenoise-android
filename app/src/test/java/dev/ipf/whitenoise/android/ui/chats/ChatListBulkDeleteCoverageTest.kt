@@ -110,7 +110,11 @@ class ChatListBulkDeleteCoverageTest {
         assertTrue("request.targets.none { it.groupId in leavingAndDeleting }" in departure)
         assertTrue("leavingAndDeleting.add(target.groupId)" in departure)
         assertTrue("leavingAndDeleting.remove(target.groupId)" in departure)
-        val localDelete = source.requiredSection("pendingBulkDelete?.let", "onDismiss = { pendingBulkDelete = null }")
+        val localDelete =
+            source.requiredSection(
+                "pendingBulkDelete?.let",
+                "onDismiss = { if (pendingBulkDelete === request) pendingBulkDelete = null }",
+            )
         assertTrue("request.groupIds.any { it in leavingAndDeleting }" in localDelete)
     }
 

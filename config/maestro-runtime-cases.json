@@ -425,6 +425,15 @@
       "postcondition": "none",
       "fixture": "creation"
     },
+    "creation-new-chat-back-reopen": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "Native chat list opens New Message, Android Back removes the inline dialog and restores the chat list, and reopening remains usable.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
     "creation-group-setup-cancel": {
       "suite": "creation",
       "manual_ids": [

@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.navigation.DictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.navigation.LocalDictationLauncherOrigin
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Above-Add placement mirrors the pinned prototype, with its below-anchor fallback in short windows. */
@@ -123,7 +124,8 @@ internal data class ComposerMenuTextShortcuts(
 /** Native acquisition callbacks in the prototype command surface; no picker or permission owner is replaced. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongParameterList", "LongMethod")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+// Nullable platform acquisition callbacks form a declarative menu catalog, not alternative control-flow owners.
 internal fun ComposerAttachmentMenu(
     anchorBounds: IntRect,
     expanded: Boolean,
@@ -138,6 +140,7 @@ internal fun ComposerAttachmentMenu(
     onSticker: (() -> Unit)? = null,
     textShortcuts: ComposerMenuTextShortcuts = ComposerMenuTextShortcuts(),
     onCustomize: (() -> Unit)? = null,
+    onRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
 ) {
     val items =
         listOfNotNull(
@@ -147,11 +150,25 @@ internal fun ComposerAttachmentMenu(
             },
             onFiles?.let { WhiteNoiseMenuItem(stringResource(R.string.download_files), it, R.drawable.ic_description) },
             onLocation?.let {
-                WhiteNoiseMenuItem(stringResource(R.string.attach_location), it, R.drawable.ic_location_on)
+                WhiteNoiseMenuItem(
+                    stringResource(R.string.attach_location),
+                    it,
+                    R.drawable.ic_location_on,
+                    onOrigin = { origin -> onRouteOrigin(ComposerShortcut.Location, origin) },
+                )
             },
             onUser?.let { WhiteNoiseMenuItem(stringResource(R.string.attach_contact), it, R.drawable.ic_person) },
             onContact?.let {
-                WhiteNoiseMenuItem(stringResource(R.string.attachment_device_contact), it, R.drawable.ic_person)
+                WhiteNoiseMenuItem(
+                    stringResource(
+                        R.string.attachment_device_contact,
+                    ),
+                    it,
+                    R.drawable.ic_person,
+                    onOrigin = { origin ->
+                        onRouteOrigin(ComposerShortcut.Contact, origin)
+                    },
+                )
             },
             onPoll?.let { WhiteNoiseMenuItem(stringResource(R.string.poll_create), it, R.drawable.ic_description) },
             onSticker?.let { WhiteNoiseMenuItem(stringResource(R.string.stickers_title), it, R.drawable.ic_sticker) },
@@ -166,6 +183,7 @@ internal fun ComposerAttachmentMenu(
             )
         }
     KeyboardSafePopup(expanded, onDismiss, position) {
+        val popupMotion = this
         BoxWithConstraints {
             val menuMaxHeight =
                 with(density) {
@@ -192,13 +210,25 @@ internal fun ComposerAttachmentMenu(
                             onCustomize =
                                 onCustomize?.let { customize ->
                                     {
-                                        onDismiss()
-                                        customize()
+                                        popupMotion.close {
+                                            onDismiss()
+                                            customize()
+                                        }
                                     }
                                 },
                         ).fadingVerticalScroll(rememberScrollState()),
                 ) {
                     items.forEachIndexed { index, item ->
+                        val (originModifier, activate) =
+                            rememberMeasuredControlClick { origin ->
+                                if (popupMotion.acceptsInput && item.enabled) {
+                                    item.onOrigin?.invoke(origin)
+                                    popupMotion.close {
+                                        onDismiss()
+                                        item.onClick()
+                                    }
+                                }
+                            }
                         DropdownMenuItem(
                             text = { Text(item.label) },
                             leadingIcon = {
@@ -206,11 +236,8 @@ internal fun ComposerAttachmentMenu(
                             },
                             shape = MenuDefaults.itemShape(index, items.size).shape,
                             colors = MenuDefaults.selectableItemColors(),
-                            onClick = {
-                                onDismiss()
-                                item.onClick()
-                            },
-                            modifier = item.modifier,
+                            onClick = activate,
+                            modifier = item.modifier.then(originModifier),
                         )
                     }
                 }

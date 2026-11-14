@@ -2404,6 +2404,11 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: monotonically unique notice identity, not an async publication fence.
     private var transientNoticeSequence = 0L
 
+    /** Launch geometry belongs to this one profile presentation, never the next request. */
+    internal var pendingProfileOrigin by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
+        private set
+    internal var pendingProfilePresentationId by mutableLongStateOf(0L)
+        private set
     var pendingProfileNpub by mutableStateOf<String?>(null)
         private set
 
@@ -12403,6 +12408,8 @@ class WhiteNoiseAppState private constructor(
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
+        pendingProfilePresentationId++
+        pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
@@ -12417,7 +12424,10 @@ class WhiteNoiseAppState private constructor(
     fun presentProfile(
         npub: String,
         groupsInCommon: Boolean = false,
+        origin: androidx.compose.ui.geometry.Rect? = null,
     ) {
+        pendingProfilePresentationId++
+        pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
         pendingProfileGroupsInCommon = groupsInCommon
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
@@ -12427,7 +12437,10 @@ class WhiteNoiseAppState private constructor(
     fun presentDiscoveredProfile(
         npub: String,
         profile: UserProfileMetadataFfi?,
+        origin: androidx.compose.ui.geometry.Rect? = null,
     ) {
+        pendingProfilePresentationId++
+        pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = profile
         pendingProfileFromDiscovery = true
@@ -12531,6 +12544,8 @@ class WhiteNoiseAppState private constructor(
     }
 
     fun clearPresentedProfile() {
+        pendingProfilePresentationId++
+        pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileNpub = null
         pendingProfileMetadata = null

@@ -17,7 +17,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.hideFromAccessibility
@@ -52,6 +55,7 @@ import dev.ipf.whitenoise.android.state.performAttachmentUserAction
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -107,6 +111,9 @@ internal fun MediaFileBubble(
     val pillKey = "$messageIdHex#$attachmentIndex"
     var openRequested by remember(pillKey) { mutableStateOf(false) }
     var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
+    var readerOrigin by remember(controller, pillKey) { mutableStateOf<Rect?>(null) }
+    val activationBounds = remember(controller, pillKey) { arrayOf(Rect.Zero) }
+    val view = LocalView.current
     val initiallyAvailable =
         remember(controller, pillKey, mine) {
             controller.hasCachedAttachmentInMemory(messageIdHex, attachmentIndex)
@@ -392,6 +399,7 @@ internal fun MediaFileBubble(
         modifier =
             Modifier
                 .fileBubbleWidth()
+                .onGloballyPositioned { activationBounds[0] = it.settingsMorphBounds(view) }
                 .fileAttachmentFirstFrameVisibility(mine || firstFrameCacheResolved)
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
@@ -403,6 +411,7 @@ internal fun MediaFileBubble(
                         if (opening || heldUntilDelivered) return@combinedClickable
                         // A file that is not on the device yet is only downloaded, in place: the reader, installer
                         // or viewer opens only from a tap once it has arrived.
+                        val origin = activationBounds[0].takeUnless { it.isEmpty }
                         val downloaded = transferState == AttachmentTransferState.Available
                         controller.performAttachmentUserAction(
                             messageIdHex,
@@ -417,6 +426,7 @@ internal fun MediaFileBubble(
                                         priority = AttachmentDownloadPriority.Interactive,
                                     )
                                 } else if (textCandidate != null) {
+                                    readerOrigin = origin
                                     readerOpen = true
                                 } else if (usesDurableInstallerHandoff) {
                                     controller.requestAttachmentInstallerHandoff(
@@ -465,6 +475,7 @@ internal fun MediaFileBubble(
                 mine,
             )
         TextAttachmentReaderDialog(
+            origin = readerOrigin,
             actions = readerActions,
             candidate = textCandidate,
             appState = appState,

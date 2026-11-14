@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +36,7 @@ import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Shared by the live editing session and render tests; replacement is always an explicit draft edit. */
@@ -149,7 +149,7 @@ internal fun SmartFolderRulePanel(
                 ) { Text(stringResource(R.string.smart_folder_replace)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingPayload = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -208,19 +208,21 @@ private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
             Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.smart_folder_presets))
         }
         val menuScrollState = rememberScrollState()
-        DropdownMenu(
+        AnimatedDropdownMenu(
             scrollState = menuScrollState,
             modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
             expanded = open,
             onDismissRequest = { open = false },
-        ) {
+        ) { surface ->
             listOf(true, false).forEach { allRead ->
                 val title = if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
                 DropdownMenuItem(
                     text = { Text(stringResource(title)) },
                     onClick = {
-                        open = false
-                        onSelect(allRead)
+                        surface.close {
+                            open = false
+                            onSelect(allRead)
+                        }
                     },
                 )
             }

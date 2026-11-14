@@ -25,12 +25,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -53,6 +56,9 @@ import kotlinx.coroutines.flow.first
 
 /** True inside a [SettingsList], where the list owns the spacing between headings, groups and helpers. */
 internal val LocalSettingsList = staticCompositionLocalOf { false }
+
+/** Identifies the actual scroll viewport; it is not a container visible-bounds intersection. */
+internal val LocalSettingsNativeViewport = staticCompositionLocalOf<Any?> { null }
 
 /** Settings destination frame: low-container canvas, matching top bar, fields on the lowest surface. */
 @Suppress("FunctionNaming", "LongParameterList")
@@ -126,9 +132,16 @@ internal fun SettingsList(
             }
         }
     }
-    CompositionLocalProvider(LocalSettingsList provides true) {
+    val page = LocalSettingsCardMorph.current?.page
+    val viewport = remember(page) { Any() }
+    val view = LocalView.current
+    DisposableEffect(page, viewport) { onDispose { page?.removeViewport(viewport) } }
+    CompositionLocalProvider(LocalSettingsList provides true, LocalSettingsNativeViewport provides viewport) {
         WhiteNoiseLazyColumn(
-            modifier = modifier.fillMaxSize().testTag(listTag),
+            modifier =
+                modifier.fillMaxSize().testTag(listTag).onGloballyPositioned {
+                    page?.reportViewport(viewport, it.settingsMorphBounds(view))
+                },
             state = state,
             contentPadding = contentPadding,
             verticalArrangement = verticalArrangement,
@@ -302,17 +315,28 @@ private val SettingsBottomActionElevation = 2.dp
 @Composable
 internal fun SettingsPanel(
     modifier: Modifier = Modifier,
+    destination: Any? = null,
+    surface: Any = destination ?: Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val border = amoledOutlineBorder()
+    val native =
+        rememberSettingsNativeSurface(
+            destination = destination,
+            surface = surface,
+            shape = MaterialTheme.shapes.large,
+            strokeColor = if (border == null) Color.Unspecified else Color.White,
+        )
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                .then(native.first)
                 .settingsCardMorph(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
-        border = amoledOutlineBorder(),
+        border = border,
     ) {
         Column(Modifier.fillMaxWidth(), content = content)
     }

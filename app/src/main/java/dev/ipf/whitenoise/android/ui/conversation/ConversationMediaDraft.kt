@@ -17,6 +17,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
@@ -79,6 +80,7 @@ internal data class ActivePhotoEditor(
     val photo: DraftBackedPhoto,
     val previewBitmap: Bitmap,
     val stateHolder: PhotoEditorStateHolder,
+    val origin: Rect? = null,
 )
 
 internal data class RestoredConversationAttachments(
@@ -100,7 +102,8 @@ private data class DraftRestorationVersion(
  * method while preserving the existing conversation-scoped lifecycle.
  */
 @Stable
-@Suppress("TooManyFunctions") // Intent-style draft commands form one cohesive conversation-scoped owner.
+// Draft commands and asynchronous fences share one conversation-scoped owner.
+@Suppress("TooManyFunctions", "LargeClass")
 internal class ConversationMediaDraftState(
     private val appState: WhiteNoiseAppState,
     private val controller: ConversationController,
@@ -156,7 +159,13 @@ internal class ConversationMediaDraftState(
         private set
     var activeEditor by mutableStateOf<ActivePhotoEditor?>(null)
         private set
-    private var requestedEditorSlotId: String? = null
+
+    private class EditorRequest(
+        val slotId: String,
+        val origin: Rect?,
+    )
+
+    private var requestedEditor: EditorRequest? = null
 
     /**
      * Refreshes the latest shelf projection without making it the byte owner, and tells the controller which picks the
@@ -177,6 +186,10 @@ internal class ConversationMediaDraftState(
         currentSlots.filter { previous -> slots.none { it.uri == previous.uri } }.forEach { removed ->
             pendingCameraFiles?.discard(removed.uri)
         }
+        if (ownerChanged || requestedEditor?.slotId?.let { id -> slots.none { it.id == id } } == true) {
+            requestedEditor = null
+        }
+        activeEditor?.takeIf { editor -> ownerChanged || editor.slot !in slots }?.let(::dismissEditor)
         currentSlots = slots
         currentDocumentUris = documentUris
         currentAccountRef = accountRef
@@ -222,9 +235,12 @@ internal class ConversationMediaDraftState(
     val isPreparing: Boolean
         get() = preparingSlotIds.isNotEmpty()
 
-    fun openEditor(slot: PendingMediaSlot) {
+    fun openEditor(
+        slot: PendingMediaSlot,
+        origin: Rect? = null,
+    ) {
         if (slot.id in nonEditableDescriptions) return
-        requestedEditorSlotId = slot.id
+        requestedEditor = EditorRequest(slot.id, origin)
         if (slot.id !in preparingSlotIds) scope.launch { preparePhoto(slot) }
     }
 
@@ -275,6 +291,8 @@ internal class ConversationMediaDraftState(
 
     /** Revokes send ownership immediately, including removal before background preparation has completed. */
     fun releasePreparedPhoto(slotId: String) {
+        clearRequestedEditor(slotId)
+        activeEditor?.takeIf { it.slot.id == slotId }?.let(::dismissEditor)
         editsRevision += 1L
         val photo = backedPhotos[slotId]
         val prepared = preparedPhotos[slotId]
@@ -294,20 +312,40 @@ internal class ConversationMediaDraftState(
     }
 
     fun dismissEditor() {
-        activeEditor?.previewBitmap?.recycle()
-        activeEditor = null
+        activeEditor?.let(::dismissEditor)
     }
+
+    /** A staged result may mutate only the draft slot and account that accepted it. */
+    private fun ownsSlot(
+        slot: PendingMediaSlot,
+        accountRef: String,
+    ): Boolean = slot in currentSlots && currentAccountRef == accountRef && appState.activeAccountRef == accountRef
+
+    /** Re-read after suspension: replacing an editor retires its pending completion. */
+    private fun ownsEditor(
+        editor: ActivePhotoEditor,
+        accountRef: String,
+    ): Boolean = activeEditor === editor && ownsSlot(editor.slot, accountRef)
 
     /** Fences an accepted crop or quality edit before its asynchronous native write begins. */
     fun saveEditor(
         editor: ActivePhotoEditor,
         recipe: PhotoEditRecipe,
         quality: MediaQuality,
+        onSaved: () -> Unit = { dismissEditor(editor) },
     ) {
+        if (activeEditor !== editor) return
+        val acceptedAccount = currentAccountRef
+        if (acceptedAccount == null || !ownsEditor(editor, acceptedAccount)) return
         if (recipe != editor.photo.recipe || quality != editor.photo.quality) editsRevision += 1L
         scope.launch {
+            if (!ownsEditor(editor, acceptedAccount)) {
+                return@launch
+            }
             if (recipe == editor.photo.recipe && quality == editor.photo.quality) {
-                dismissEditor(editor)
+                if (ownsEditor(editor, acceptedAccount)) {
+                    onSaved()
+                }
                 return@launch
             }
             val accountRef = currentAccountRef
@@ -326,6 +364,9 @@ internal class ConversationMediaDraftState(
                     )
             ) {
                 is PhotoEditorCommitResult.Success -> {
+                    if (!ownsEditor(editor, acceptedAccount)) {
+                        return@launch
+                    }
                     backedPhotos +=
                         editor.slot.id to
                         editor.photo.copy(
@@ -334,7 +375,7 @@ internal class ConversationMediaDraftState(
                             recipe = recipe,
                             quality = quality,
                         )
-                    dismissEditor(editor)
+                    onSaved()
                 }
                 else -> editor.stateHolder.finishSaving(photoEditorSaveFailureMessage(result, messages))
             }
@@ -511,7 +552,8 @@ internal class ConversationMediaDraftState(
 
     /** Releases presentation resources without deleting the native attachment draft. */
     fun dispose() {
-        activeEditor?.previewBitmap?.recycle()
+        requestedEditor = null
+        dismissEditor()
         releaseDraftPresentationFiles(context, currentSlots.isEmpty() && currentDocumentUris.isEmpty())
         controller.clearRetainedUploads()
     }
@@ -644,7 +686,7 @@ internal class ConversationMediaDraftState(
         photo: DraftBackedPhoto,
     ) {
         pendingCameraFiles?.releasePersisted(slot.uri)
-        if (slot !in currentSlots) {
+        if (!ownsSlot(slot, accountRef)) {
             stager.remove(accountRef, controller.group.groupIdHex, photo)
             clearRequestedEditor(slot.id)
             return
@@ -652,18 +694,23 @@ internal class ConversationMediaDraftState(
         preparedPhotos -= slot.id
         nonEditableDescriptions -= slot.id
         backedPhotos += slot.id to photo
-        if (requestedEditorSlotId != slot.id) return
-
-        requestedEditorSlotId = null
+        val request = requestedEditor?.takeIf { it.slotId == slot.id } ?: return
         val sourceBytes = withContext(Dispatchers.IO) { appState.editorSourceStore.bytes(photo.sourceLeaseId) }
         val preview = sourceBytes?.let { renderer.decodePreview(it, controller.outgoingMediaTrustDomain(slot.id)) }
-        if (!currentCoroutineContext().isActive) {
+        if (!currentCoroutineContext().isActive ||
+            requestedEditor !== request ||
+            !ownsSlot(slot, accountRef)
+        ) {
             preview?.recycle()
         } else if (preview == null) {
+            requestedEditor = null
             appState.present(R.string.toast_couldnt_decode_image, copyable = true)
         } else {
+            requestedEditor = null
+            dismissEditor()
             activeEditor =
                 ActivePhotoEditor(
+                    origin = request.origin,
                     slot = slot,
                     photo = photo,
                     previewBitmap = preview,
@@ -683,8 +730,8 @@ internal class ConversationMediaDraftState(
     ) {
         val description = nonEditablePhotoDescription(result, messages)
         nonEditableDescriptions += slotId to description
-        if (requestedEditorSlotId == slotId) {
-            requestedEditorSlotId = null
+        if (requestedEditor?.slotId == slotId) {
+            requestedEditor = null
             appState.presentText(AppText.Plain(description), copyable = true)
         }
     }
@@ -699,16 +746,16 @@ internal class ConversationMediaDraftState(
     }
 
     private fun showUnavailableIfRequested(slotId: String) {
-        if (requestedEditorSlotId != slotId) return
-        requestedEditorSlotId = null
+        if (requestedEditor?.slotId != slotId) return
+        requestedEditor = null
         appState.presentText(AppText.Plain(messages.sourceUnavailable), copyable = true)
     }
 
     private fun clearRequestedEditor(slotId: String) {
-        if (requestedEditorSlotId == slotId) requestedEditorSlotId = null
+        if (requestedEditor?.slotId == slotId) requestedEditor = null
     }
 
-    private fun dismissEditor(editor: ActivePhotoEditor) {
+    fun dismissEditor(editor: ActivePhotoEditor) {
         if (activeEditor !== editor) return
         editor.previewBitmap.recycle()
         activeEditor = null
@@ -863,7 +910,7 @@ internal fun ConversationMediaDraftContent(
         }
     }
     val hasStagedAttachments = mediaSlots.isNotEmpty() || documentUris.isNotEmpty()
-    if (previewIndex != null && hasStagedAttachments && state.activeEditor == null) {
+    if (previewIndex != null && hasStagedAttachments) {
         // Preserve the caption's acceptance generation for the lifetime of this
         // preview; recomposition must not rebind its eventual callback to newer text.
         val seededCaption = remember(state, chatId) { composerText() }
@@ -881,6 +928,7 @@ internal fun ConversationMediaDraftContent(
                     state::pickedMediaDomain,
             ) {
                 MediaPreviewScreen(
+                    interactive = state.activeEditor == null,
                     mediaSlots = mediaSlots,
                     documentUris = documentUris,
                     chatTitle = chatTitle,
@@ -932,7 +980,12 @@ internal fun ConversationMediaDraftContent(
                     },
                     onAddPhotos = onAddPhotos,
                     onAddDocuments = onAddDocuments,
-                    onEditMediaAt = { index -> mediaSlots.getOrNull(index)?.let(state::openEditor) },
+                    onEditMediaAt = {
+                        index,
+                        origin,
+                        ->
+                        mediaSlots.getOrNull(index)?.let { state.openEditor(it, origin) }
+                    },
                     onSelectMediaQuality = { slotId, quality ->
                         mediaSlots.firstOrNull { it.id == slotId }?.let { state.selectQuality(it, quality) }
                     },
@@ -958,8 +1011,10 @@ internal fun ConversationMediaDraftContent(
             previewBitmap = editor.previewBitmap,
             sourceInfo = editor.photo.sourceInfo,
             stateHolder = editor.stateHolder,
-            onCancel = state::dismissEditor,
-            onSave = { recipe, quality -> state.saveEditor(editor, recipe, quality) },
+            onCancel = { state.dismissEditor(editor) },
+            origin = editor.origin,
+            ownerKey = editor,
+            onSave = { recipe, quality, onSaved -> state.saveEditor(editor, recipe, quality, onSaved) },
         )
     }
 }

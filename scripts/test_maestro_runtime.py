@@ -1012,6 +1012,22 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with self.subTest(source=path.name):
                 self.assertNotRegex(path.read_text(), r'\.\s*uiAutomation|\bgetUiAutomation\s*\(|\bUiDevice\b')
 
+    def test_new_chat_reopen_requires_native_parent_and_each_modal_exit(self):
+        name = 'creation-new-chat-back-reopen'
+        case = runtime.CASES[name]
+        self.assertEqual(case['fixture'], 'creation')
+        self.assertNotIn('presentation', case)
+        path = runtime.ROOT / '.maestro/runtime' / (name + '.yaml')
+        commands = list(yaml.safe_load_all(path.read_text()))[1]
+        parent = {'assertVisible': 'Maestro group'}
+        absent = {'assertNotVisible': {'id': 'new_message.screen'}}
+        opened = {'assertVisible': {'id': 'new_message.screen'}}
+        cycle = [{'tapOn': 'New Message'}, opened, 'back', absent, parent]
+        self.assertEqual(commands, [
+            {'runFlow': '../fixtures/runtime-ready.yaml'}, parent, absent,
+            *cycle, *cycle,
+        ])
+
     def test_generated_readiness_resets_a_failed_predecessors_orientation(self):
         """A failed landscape journey must not silently change the next case's initial viewport."""
         path = runtime.ROOT / '.maestro/fixtures/runtime-ready.yaml'

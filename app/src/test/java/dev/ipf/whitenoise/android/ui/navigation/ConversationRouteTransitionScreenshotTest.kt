@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -56,11 +56,16 @@ class ConversationRouteTransitionScreenshotTest {
         captureFrames(darkTheme = true, amoled = true, themeName = "amoled")
     }
 
+    @Test fun measuredRowMorphAndBackAmoled() {
+        captureFrames(darkTheme = true, amoled = true, themeName = "measured_amoled", measured = true)
+    }
+
     /** Drives the production route through deterministic visual checkpoints. */
     private fun captureFrames(
         darkTheme: Boolean,
         amoled: Boolean,
         themeName: String,
+        measured: Boolean = false,
     ) {
         var route by mutableStateOf<String?>(null)
         composeRule.mainClock.autoAdvance = false
@@ -70,12 +75,13 @@ class ConversationRouteTransitionScreenshotTest {
                     modifier = Modifier.fillMaxSize().testTag(ROOT_TAG),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    val transition = updateTransition(route, label = "conversation route screenshot")
+                    val transition = rememberConversationRouteTransition(route, suppressMotion = false)
                     ConversationRouteAnimatedContent(
                         transition = transition,
                         routeForwardDirection = 1,
                         suppressMotion = false,
                         contentKey = { it ?: "chat-list" },
+                        activatingBounds = { if (measured && it != null) Rect(16f, 86f, 344f, 166f) else null },
                     ) { destination ->
                         if (destination == null) ChatListFrame() else ConversationFrame()
                     }
@@ -96,6 +102,12 @@ class ConversationRouteTransitionScreenshotTest {
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.runOnIdle { }
         capture("conversation_route_terminal_$themeName.png")
+        if (measured) {
+            composeRule.runOnUiThread { route = null }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.mainClock.advanceTimeBy(CONVERSATION_ROUTE_TRANSITION_MILLIS / 2L)
+            capture("conversation_route_back_midpoint_$themeName.png")
+        }
     }
 
     /** Writes one root-surface Roborazzi baseline. */

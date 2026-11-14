@@ -134,6 +134,7 @@ internal data class ComposerToolbarBindings(
     val onCustomize: (() -> Unit)? = null,
     val canActivate: () -> Boolean = { true },
     val onVoiceBounds: (Rect?) -> Unit = {},
+    val onRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
     val slotModifier: @Composable (ComposerShortcut) -> Modifier = { Modifier },
     val translate: ComposerTranslateToggle? = null,
 )

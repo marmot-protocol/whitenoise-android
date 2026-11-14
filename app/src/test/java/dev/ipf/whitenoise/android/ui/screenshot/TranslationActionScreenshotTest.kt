@@ -95,6 +95,7 @@ class TranslationActionScreenshotTest {
         composeRule.onNodeWithText("Translate").assertIsDisplayed()
         composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name")
         composeRule.onNodeWithText("Translate").performClick()
+        composeRule.waitForIdle()
         assertEquals(true, translated)
     }
 }
