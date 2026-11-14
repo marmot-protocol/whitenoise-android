@@ -207,6 +207,7 @@ SEMANTIC_OWNER_IDS = {
         "permission:android.permission.FOREGROUND_SERVICE_SPECIAL_USE": {"NTF-006", "NTF-014"},
         "permission:android.permission.INTERNET": {"INT-006", "INT-007"},
         "permission:android.permission.POST_NOTIFICATIONS": {"NTF-001"},
+        "permission:android.permission.POST_PROMOTED_NOTIFICATIONS": {"DIC-002"},
         "permission:android.permission.RECEIVE_BOOT_COMPLETED": {"NTF-014"},
         "permission:android.permission.RECORD_AUDIO": {"MED-008", "DIC-001"},
         "permission:android.permission.RUN_USER_INITIATED_JOBS": {"MED-022"},

@@ -5,25 +5,27 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.widget.RemoteViews
+import android.graphics.drawable.Icon
+import android.os.Build
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 
 internal const val DICTATION_RECOVERY_NOTIFICATION_TAG = "dictation-recovery"
 internal const val DICTATION_RECOVERY_NOTIFICATION_ID = 1002
 
-/** Metadata-free rendering reads only the current controller; it never owns capture or a service lease. */
+/** Renders metadata-free dictation status and requests live promotion during the active session. */
 internal fun buildConversationDictationNotification(
     context: Context,
     controller: ConversationDictationController,
     actionIntent: (String, String) -> PendingIntent,
-): Notification =
-    Notification
+): Notification {
+    val recovery = controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer
+    return Notification
         .Builder(context, ConversationDictationForegroundService.CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
         .setContentTitle(
             context.getString(
-                if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
+                if (recovery) {
                     R.string.dictation_recovery_title
                 } else {
                     R.string.dictation_notification_title
@@ -31,7 +33,7 @@ internal fun buildConversationDictationNotification(
             ),
         ).setContentText(
             context.getString(
-                if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
+                if (recovery) {
                     R.string.dictation_recovery_text
                 } else {
                     dictationNotificationStatus(controller)
@@ -45,13 +47,14 @@ internal fun buildConversationDictationNotification(
         .setOnlyAlertOnce(true)
         .setShowWhen(false)
         .apply {
-            if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
+            if (recovery) {
                 addRecoveryActions(context, controller, actionIntent)
             } else {
-                setStyle(Notification.DecoratedCustomViewStyle())
-                setCustomContentView(compactDictationControls(context, controller, actionIntent))
+                extras.putBoolean(Notification.EXTRA_REQUEST_PROMOTED_ONGOING, true)
+                addActiveActions(context, controller, actionIntent)
             }
         }.build()
+}
 
 /** Optional audio recovery uses the existing drawer surface without taking composer controls. */
 private fun Notification.Builder.addRecoveryActions(
@@ -92,35 +95,41 @@ internal fun notifyConversationDictationRecoveryExpired(context: Context) {
     manager.notify(DICTATION_RECOVERY_NOTIFICATION_TAG, DICTATION_RECOVERY_NOTIFICATION_ID, notification)
 }
 
-private fun compactDictationControls(
+/**
+ * Shows only the actions currently available to this capture session. Cancel stays usable on the lock
+ * screen so the microphone can be stopped, while Paste and Send act on the dictated text and need an unlock.
+ */
+private fun Notification.Builder.addActiveActions(
     context: Context,
     controller: ConversationDictationController,
     actionIntent: (String, String) -> PendingIntent,
-): RemoteViews {
+) {
+    if (controller.deliveryInProgress) return
     val token = requireNotNull(controller.notificationSessionToken)
-    return RemoteViews(context.packageName, R.layout.notification_dictation_compact).apply {
-        val cancelEnabled = !controller.deliveryInProgress
-        val completionEnabled = controller.completionActionsEnabled
-        setBoolean(R.id.dictation_notification_cancel, "setEnabled", cancelEnabled)
-        setBoolean(R.id.dictation_notification_paste, "setEnabled", completionEnabled)
-        setBoolean(R.id.dictation_notification_send, "setEnabled", completionEnabled)
-        if (cancelEnabled) {
-            setOnClickPendingIntent(
-                R.id.dictation_notification_cancel,
-                actionIntent(ConversationDictationForegroundService.ACTION_CANCEL, token),
-            )
-        }
-        if (completionEnabled) {
-            setOnClickPendingIntent(
-                R.id.dictation_notification_paste,
-                actionIntent(ConversationDictationForegroundService.ACTION_PASTE, token),
-            )
-            setOnClickPendingIntent(
-                R.id.dictation_notification_send,
-                actionIntent(ConversationDictationForegroundService.ACTION_SEND, token),
-            )
-        }
-    }
+    addAction(
+        0,
+        context.getString(R.string.cancel),
+        actionIntent(ConversationDictationForegroundService.ACTION_CANCEL, token),
+    )
+    if (!controller.completionActionsEnabled) return
+    addUnlockedAction(
+        context.getString(R.string.paste),
+        actionIntent(ConversationDictationForegroundService.ACTION_PASTE, token),
+    )
+    addUnlockedAction(
+        context.getString(R.string.send),
+        actionIntent(ConversationDictationForegroundService.ACTION_SEND, token),
+    )
+}
+
+/** Adds an action that, on Android 12 and later, asks to unlock a locked device before it runs. */
+private fun Notification.Builder.addUnlockedAction(
+    title: String,
+    intent: PendingIntent,
+) {
+    val action = Notification.Action.Builder(null as Icon?, title, intent)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) action.setAuthenticationRequired(true)
+    addAction(action.build())
 }
 
 private fun openDictationAppIntent(context: Context): PendingIntent =

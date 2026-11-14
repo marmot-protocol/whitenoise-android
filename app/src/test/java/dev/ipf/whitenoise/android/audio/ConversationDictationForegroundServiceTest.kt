@@ -106,10 +106,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
                 .orEmpty()
         assertFalse(title.contains("account", ignoreCase = true))
         assertFalse(title.contains("group", ignoreCase = true))
-        assertTrue(notification.actions.isNullOrEmpty())
-        assertNotNull(notification.contentView)
-        assertNull(notification.bigContentView)
-        assertCompactButtonsEnabled(service, notification)
+        assertNativeNotificationActions(service, harness, notification)
         assertEquals("Starting dictation…", notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertFalse(notification.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
         assertExplicitNotificationDestinations(service, notification)
@@ -130,9 +127,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
                 .notification
         assertEquals("Transcribing…", processing.extras.getCharSequence(Notification.EXTRA_TEXT).toString())
         assertFalse(processing.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
-        assertTrue(processing.actions.isNullOrEmpty())
-        assertNull(processing.bigContentView)
-        assertCompactButtonsEnabled(service, processing)
+        assertNativeNotificationActions(service, harness, processing)
 
         service.onStartCommand(
             actionCommand(service, harness, ConversationDictationForegroundService.ACTION_CANCEL),
@@ -166,9 +161,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
 
         val backgroundRefresh = service.foreground.foregroundNotification()
         assertEquals("Dictation active", backgroundRefresh.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
-        assertTrue(backgroundRefresh.actions.isNullOrEmpty())
-        assertNull(backgroundRefresh.bigContentView)
-        assertCompactButtonsEnabled(service, backgroundRefresh)
+        assertNativeNotificationActions(service, harness, backgroundRefresh)
         lifecycle.destroy()
     }
 
@@ -731,7 +724,7 @@ internal class ConversationDictationForegroundServiceStartTest : ConversationDic
             "Dictation active",
             replacementNotification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
-        assertCompactButtonsEnabled(newService, replacementNotification)
+        assertNativeNotificationActions(newService, harness, replacementNotification)
         newLifecycle.destroy()
         assertFalse(harness.conversationDictation.hasDurableSession)
     }
