@@ -38,15 +38,33 @@ class AccountRelaySettingsEditTest {
             assertEquals(listOf(setOf(OTHER_POSTING, READ_ONLY)), fixture.nip65Writes)
         }
 
-    /** The Inbox setter uses the Inbox projection and does not read the NIP-65 union. */
+    /** The Inbox setter uses the Inbox projection, keeps an earlier addition and does not read the NIP-65 union. */
     @Test
     fun inboxEditsUseOnlyInboxRelays() =
         runTest {
             val fixture = RelayFixture(failFullRead = true)
             fixture.app.addAccountRelay(ACCOUNT, RelayListKind.Inbox, ADDED)
             fixture.app.removeAccountRelay(ACCOUNT, RelayListKind.Inbox, INBOX)
-            assertEquals(listOf(setOf(INBOX, OTHER_INBOX, ADDED), setOf(OTHER_INBOX)), fixture.inboxWrites)
+            assertEquals(listOf(setOf(INBOX, OTHER_INBOX, ADDED), setOf(OTHER_INBOX, ADDED)), fixture.inboxWrites)
             assertEquals(emptyList<Set<String>>(), fixture.nip65Writes)
+        }
+
+    /** Removing the last allowed posting relay is refused when the other posting relay is retired. */
+    @Test
+    fun removalThatLeavesOnlyReadOnlyRelaysIsRefused() =
+        runTest {
+            val fixture = RelayFixture(posting = listOf(POSTING, RETIRED), retired = setOf(RETIRED))
+            assertNull(fixture.app.removeAccountRelay(ACCOUNT, RelayListKind.Nip65, POSTING))
+            assertEquals(emptyList<Set<String>>(), fixture.nip65Writes)
+        }
+
+    /** Removing the retired relay itself still publishes the surviving posting and read-only relays. */
+    @Test
+    fun removingRetiredRelayKeepsPostingAndReadOnlyRelays() =
+        runTest {
+            val fixture = RelayFixture(posting = listOf(POSTING, RETIRED), retired = setOf(RETIRED))
+            fixture.app.removeAccountRelay(ACCOUNT, RelayListKind.Nip65, RETIRED)
+            assertEquals(listOf(setOf(POSTING, READ_ONLY)), fixture.nip65Writes)
         }
 
     /** A failed full-list read must never publish an incomplete replacement. */
@@ -59,17 +77,24 @@ class AccountRelaySettingsEditTest {
             assertEquals(emptyList<Set<String>>(), fixture.nip65Writes)
         }
 
-    /** Models the write projection and full list as different native return values. */
+    /**
+     * Models the posting projection and the full declared list as separate native return values. Each
+     * successful setter call replaces them, the way MarmotKit keeps [READ_ONLY] read-only, and [retired]
+     * endpoints classify as RETIRED.
+     */
     private class RelayFixture(
         failFullRead: Boolean = false,
+        posting: List<String> = listOf(POSTING, OTHER_POSTING),
+        retired: Set<String> = emptySet(),
     ) {
-        private val lists =
+        private var declared = posting + READ_ONLY
+        private var lists =
             AccountRelayListsFfi(
                 complete = true,
                 missing = emptyList(),
                 defaultRelays = emptyList(),
                 bootstrapRelays = emptyList(),
-                nip65 = RelayListFfi(kind = 10_002uL, relays = listOf(POSTING, OTHER_POSTING)),
+                nip65 = RelayListFfi(kind = 10_002uL, relays = posting),
                 inbox = RelayListFfi(kind = 10_050uL, relays = listOf(INBOX, OTHER_INBOX)),
             )
         val nip65Writes = mutableListOf<Set<String>>()
@@ -83,16 +108,30 @@ class AccountRelaySettingsEditTest {
                     "accountRelayLists" -> lists
                     "accountNip65Relays" -> {
                         check(!failFullRead) { "Full list unavailable" }
-                        listOf(POSTING, OTHER_POSTING, READ_ONLY)
+                        declared
                     }
                     "classifyRelayEndpoints" ->
                         (args!![0] as List<*>).map { raw ->
                             val endpoint = raw as String
-                            RelayEndpointClassificationFfi(endpoint, endpoint, RelayEndpointPolicyFfi.ALLOWED)
+                            val policy =
+                                if (endpoint in retired) {
+                                    RelayEndpointPolicyFfi.RETIRED
+                                } else {
+                                    RelayEndpointPolicyFfi.ALLOWED
+                                }
+                            RelayEndpointClassificationFfi(endpoint, endpoint, policy)
                         }
-                    "setAccountNip65Relays", "setAccountInboxRelays" -> {
-                        val writes = if (method.name == "setAccountNip65Relays") nip65Writes else inboxWrites
-                        writes += (args!![1] as List<*>).map { it as String }.toSet()
+                    "setAccountNip65Relays" -> {
+                        val written = (args!![1] as List<*>).map { it as String }
+                        nip65Writes += written.toSet()
+                        declared = written
+                        lists = lists.copy(nip65 = lists.nip65.copy(relays = written - READ_ONLY))
+                        lists
+                    }
+                    "setAccountInboxRelays" -> {
+                        val written = (args!![1] as List<*>).map { it as String }
+                        inboxWrites += written.toSet()
+                        lists = lists.copy(inbox = lists.inbox.copy(relays = written))
                         lists
                     }
                     else -> error("Unexpected native call: ${method.name}")
@@ -114,6 +153,7 @@ class AccountRelaySettingsEditTest {
         const val POSTING = "wss://posting.example.com"
         const val OTHER_POSTING = "wss://other-posting.example.com"
         const val READ_ONLY = "wss://read-only.example.com"
+        const val RETIRED = "wss://retired.example.com"
         const val INBOX = "wss://inbox.example.com"
         const val OTHER_INBOX = "wss://other-inbox.example.com"
         const val ADDED = "wss://1.1.1.1"
