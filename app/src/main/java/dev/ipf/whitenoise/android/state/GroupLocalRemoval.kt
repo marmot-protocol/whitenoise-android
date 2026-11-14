@@ -238,8 +238,8 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
     if (pending.mediaCacheKeys.isNotEmpty() || pending.ciphertextTags.isNotEmpty()) {
         cleanupStep("disk media") {
             withContext(Dispatchers.IO) {
-                pending.mediaCacheKeys.forEach { diskMediaCache.remove(it) }
-                if (pending.ciphertextTags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(pending.ciphertextTags)
+                pending.mediaCacheKeys.forEach { removeMediaDiskCacheEntry(it) }
+                if (pending.ciphertextTags.isNotEmpty()) removeMediaDiskCacheTags(pending.ciphertextTags)
             }
         }
     }
@@ -281,8 +281,8 @@ internal suspend fun WhiteNoiseAppState.evictGroupMediaCaches(
     )
     val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
     withContext(Dispatchers.IO) {
-        cacheKeys.forEach { diskMediaCache.remove(it) }
-        if (tags.isNotEmpty()) diskMediaCache.removeByCiphertextTags(tags)
+        cacheKeys.forEach { removeMediaDiskCacheEntry(it) }
+        if (tags.isNotEmpty()) removeMediaDiskCacheTags(tags)
     }
 }
 

@@ -5217,11 +5217,11 @@ class ConversationController(
             removeEntry = appState::removeMediaMemoryCacheEntry,
         )
         withContext(Dispatchers.IO) {
-            loadedKeys.forEach { appState.diskMediaCache.remove(it) }
+            loadedKeys.forEach { appState.removeMediaDiskCacheEntry(it) }
             // Plus any disk entry stamped with an expired ciphertext tag — the
             // only path that reaches media whose message isn't currently loaded,
             // including across process restarts. #674 review.
-            appState.diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
+            appState.removeMediaDiskCacheTags(expiredCiphertextSha256)
         }
     }
 

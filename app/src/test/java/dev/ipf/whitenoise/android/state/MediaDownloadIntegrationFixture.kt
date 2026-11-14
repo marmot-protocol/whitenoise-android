@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,6 +55,10 @@ internal class MediaDownloadIntegrationFixture(
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
     private val diskRoot = java.io.File(root, "encrypted")
     val disk = DiskByteCache(diskRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider)
+    val thumbnailRoot = java.io.File(root, "thumbnails")
+    val thumbnails = PersistentDisplayThumbnails(
+        DiskByteCache(thumbnailRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider),
+    )
     private val jobs = ConcurrentHashMap<String, Call>()
     val calls = CopyOnWriteArrayList<Call>()
     val entered = Channel<Call>(Channel.UNLIMITED)
@@ -96,6 +101,7 @@ internal class MediaDownloadIntegrationFixture(
         ).also {
             field("marmotRuntime").set(it, AppMarmotRuntime("test", nativeBoundary()))
             field("diskMediaCache").set(it, disk)
+            field("displayThumbnails").set(it, thumbnails)
         }
 
     /** A suspended native result; each test chooses when and whether verified bytes arrive. */

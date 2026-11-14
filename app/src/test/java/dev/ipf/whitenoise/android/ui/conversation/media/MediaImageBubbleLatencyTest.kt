@@ -30,6 +30,8 @@ import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
+import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
@@ -101,6 +103,64 @@ class MediaImageBubbleLatencyTest {
 
         assertLoaded()
         assertEquals(0, fixture.calls.size)
+    }
+
+    /** A derivative alone renders with downloads disabled and never opens an original or transfers bytes. */
+    @Test
+    fun displayThumbnailHitDoesNotReadAnOriginal() {
+        seedDisplayThumbnail()
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        awaitLoaded()
+        assertEquals(0, fixture.nativeAssetReads.get())
+        assertEquals(0, fixture.calls.size)
+        assertTrue(!fixture.disk.contains(request(0).cacheKey()))
+    }
+
+    /** Album tiles use the same derivative-only path and keep their original unavailable. */
+    @Test
+    fun albumDisplayThumbnailHitDoesNotReadAnOriginal() {
+        seedDisplayThumbnail()
+        composeRule.setContent { WhiteNoiseTheme { GridTile(0) } }
+        awaitLoaded()
+        assertEquals(0, fixture.nativeAssetReads.get())
+        assertEquals(0, fixture.calls.size)
+        assertTrue(!controller.hasCachedAttachment(request(0).messageIdHex, 0))
+    }
+
+    /** Authentication failure remains a policy-respecting miss, never an implicit download. */
+    @Test
+    fun corruptDisplayThumbnailDoesNotGrantNetworkPermission() {
+        seedDisplayThumbnail()
+        val entry = checkNotNull(fixture.thumbnailRoot.listFiles()).single { it.extension == "enc" }
+        java.io.RandomAccessFile(entry, "rw").use { file ->
+            val offset = file.length() - 1
+            file.seek(offset)
+            val value = file.readByte().toInt()
+            file.seek(offset)
+            file.writeByte(value xor 1)
+        }
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val download = context.getString(R.string.media_tap_to_download)
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithContentDescription(download).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(0, fixture.nativeAssetReads.get())
+        assertEquals(0, fixture.calls.size)
+    }
+
+    /** Writes only a synthetic derivative; no full-size encrypted/native fixture is seeded. */
+    private fun seedDisplayThumbnail() {
+        val source = DisplayThumbnailSource(request(0).cacheKey(), reference(0).sourceEpoch, reference(0).ciphertextSha256)
+        val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.MAGENTA)
+        runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+            fixture.thumbnails.write(
+                source,
+                MediaThumbnail(bitmap, MediaPipeline.THUMBNAIL_MAX_EDGE_PX),
+                fixture.thumbnails.captureGeneration(),
+            )
+        }
     }
 
     /** A cold encrypted index leads to decoded pixels, never a network call or a stale retry affordance. */

@@ -61,6 +61,10 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
+import dev.ipf.whitenoise.android.state.displayThumbnailRequest
+import dev.ipf.whitenoise.android.state.displayThumbnailRequestCurrent
+import dev.ipf.whitenoise.android.state.persistDisplayThumbnail
+import dev.ipf.whitenoise.android.state.readDisplayThumbnail
 import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
@@ -898,7 +902,8 @@ internal fun rememberImageLoadState(
     LaunchedEffect(*keys, materializationIntent, reloadToken, requestedMaxEdgePx) {
         if (requestedMaxEdgePx == 0) return@LaunchedEffect
         if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) return@LaunchedEffect
-        if (!startDownload) return@LaunchedEffect
+        val thumbnailRequest = controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference)
+            ?: return@LaunchedEffect
         val cached = controller.thumbnailEntryFor(messageIdHex, attachmentIndex, requestedMaxEdgePx)
         if (cached != null && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
             presentation = DecodedAttachmentPresentation.Static(cached.bitmap)
@@ -906,6 +911,17 @@ internal fun rememberImageLoadState(
             decodeRequest.onDecodedSize(cached.bitmap.width, cached.bitmap.height)
             return@LaunchedEffect
         }
+        if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+            val persisted = appState.readDisplayThumbnail(thumbnailRequest, requestedMaxEdgePx)
+            if (persisted != null) {
+                controller.cacheThumbnail(messageIdHex, attachmentIndex, persisted.bitmap, persisted.maxEdgePx)
+                presentation = DecodedAttachmentPresentation.Static(persisted.bitmap)
+                presentationMaxEdgePx = persisted.maxEdgePx
+                decodeRequest.onDecodedSize(persisted.bitmap.width, persisted.bitmap.height)
+                return@LaunchedEffect
+            }
+        }
+        if (!startDownload || !appState.displayThumbnailRequestCurrent(thumbnailRequest)) return@LaunchedEffect
         failed = false
         tooLargeToPreview = false
         try {
@@ -935,6 +951,7 @@ internal fun rememberImageLoadState(
                         domain = controller.mediaTrustDomain,
                     )
                 }
+            if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) return@LaunchedEffect
             if (decoded != null) {
                 if (decoded is DecodedAttachmentPresentation.Static && !decoded.animationDeferred) {
                     controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap, requestedMaxEdgePx)
@@ -946,6 +963,9 @@ internal fun rememberImageLoadState(
                 presentationMaxEdgePx = requestedMaxEdgePx
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     decodeRequest.onDecodedSize(decoded.bitmap.width, decoded.bitmap.height)
+                    if (!decoded.animationDeferred && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+                        appState.persistDisplayThumbnail(thumbnailRequest, decoded.bitmap, requestedMaxEdgePx)
+                    }
                 }
             } else {
                 markFailed()

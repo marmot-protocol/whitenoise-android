@@ -18,7 +18,8 @@ private val TemporaryAttachmentDirectories = listOf(MediaCacheDirs.VOICE, MediaC
 internal suspend fun WhiteNoiseAppState.temporaryAttachmentCopyBytes(): Long =
     withContext(Dispatchers.IO) {
         val disk = runCatchingCancellable { diskMediaCache.residentBytes() }.getOrDefault(0L)
-        disk + TemporaryAttachmentDirectories.sumOf { directoryBytes(File(appContext.cacheDir, it)) }
+        disk + runCatchingCancellable { displayThumbnails.residentBytes() }.getOrDefault(0L) +
+            TemporaryAttachmentDirectories.sumOf { directoryBytes(File(appContext.cacheDir, it)) }
     }
 
 /** Deletes playback copies that no player, save or share currently holds. */
@@ -35,11 +36,14 @@ internal suspend fun WhiteNoiseAppState.clearTemporaryAttachmentFiles() {
  * Attachments that are still retained decrypt again on their next view, while removed ones cannot keep rendering.
  */
 internal suspend fun WhiteNoiseAppState.clearDecryptedAttachmentCopies() {
-    withContext(Dispatchers.Main.immediate) { mediaMemoryCacheKeysSnapshot().forEach(::removeMediaMemoryCacheEntry) }
+    withContext(Dispatchers.Main.immediate) {
+        displayThumbnails.retirePending()
+        mediaMemoryCacheKeysSnapshot().forEach(::removeMediaMemoryCacheEntry)
+    }
     withContext(Dispatchers.IO) {
         AttachmentCachePublication.onWipeStarted()
         try {
-            runCatchingCancellable { diskMediaCache.clear() }
+            runCatchingCancellable { clearMediaDiskCaches() }
         } finally {
             AttachmentCachePublication.onWipeFinished()
         }
@@ -54,7 +58,7 @@ internal suspend fun WhiteNoiseAppState.evictAttachmentCopies(
 ) {
     val keys = items.map { mediaCacheKey(account, it.groupIdHex, it.messageIdHex, it.attachmentIndex) }
     withContext(Dispatchers.Main.immediate) { keys.forEach(::removeMediaMemoryCacheEntry) }
-    withContext(Dispatchers.IO) { keys.forEach { runCatchingCancellable { diskMediaCache.remove(it) } } }
+    withContext(Dispatchers.IO) { keys.forEach { runCatchingCancellable { removeMediaDiskCacheEntry(it) } } }
 }
 
 /** Sums the sizes of the files directly inside [directory]. */
