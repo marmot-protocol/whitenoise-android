@@ -22,6 +22,15 @@
         ]
       },
       {
+        "surface": "AvatarMonogram",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+        "anchor": "fun AvatarMonogram(",
+        "test_ids": [
+          "AXY-001",
+          "CHL-017"
+        ]
+      },
+      {
         "surface": "PersonAvatar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
         "anchor": "fun PersonAvatar(",

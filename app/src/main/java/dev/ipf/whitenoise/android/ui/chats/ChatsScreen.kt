@@ -121,6 +121,7 @@ import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.reportVisibleFolderChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
@@ -213,6 +214,7 @@ internal fun ChatsScreen(
     conversationReturnHead: ChatListReturnHead? = null,
     onConversationReturnHeadHandled: () -> Unit = {},
     retainedAvatarPreparation: RetainedGroupAvatarPreparation? = null,
+    retainedAccountAvatars: RetainedAccountAvatarPixels? = null,
     // Chat-list profile opens must capture the same visible filtered head used
     // by direct conversation opens so profile-sheet Message/shared-group routes
     // can arm the return snap (#1313).
@@ -2246,6 +2248,7 @@ internal fun ChatsScreen(
                 } else {
                     ChatListTopBar(
                         appState = appState,
+                        retainedAccountAvatars = retainedAccountAvatars,
                         searchOpen = searchOpen,
                         searchQuery = searchQuery,
                         searchFocusRequester = searchFocusRequester,
@@ -2698,6 +2701,7 @@ internal fun ChatsScreen(
                                 accountRef = controller.boundAccountRef,
                                 surfaceIdentity = controller,
                                 retainedPreparation = retainedAvatarPreparation,
+                                compatibilityId = { it.group.groupIdHex },
                             ) {
                                 LazyColumn(
                                     modifier =

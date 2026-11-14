@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
@@ -52,6 +53,8 @@ import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
 import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
+import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
+import dev.ipf.whitenoise.android.ui.account.RetainedTopBarAccountAvatar
 import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
@@ -75,10 +78,24 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 
+/** Supplies shell-owned pixels only to the active signed-in account's top-bar button. */
+private fun retainedAccountAvatarContent(
+    appState: WhiteNoiseAppState,
+    retained: RetainedAccountAvatarPixels?,
+    account: AccountSummaryFfi?,
+    title: String,
+): (@Composable (String?) -> Unit)? {
+    if (retained == null || account == null || account.signedOut) return null
+    return { url ->
+        RetainedTopBarAccountAvatar(appState, retained, account.accountIdHex, title, CHAT_LIST_ACCOUNT_AVATAR_SIZE, url)
+    }
+}
+
 internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chats.scope.chats"
 internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
 
 /** Separates the active avatar from the stacked other accounts without breaking the avatar cluster. */
+private val CHAT_LIST_ACCOUNT_AVATAR_SIZE = 40.dp
 private val CHAT_LIST_ACCOUNT_AVATAR_GAP = 8.dp
 
 /** Stable test tag for a folder pill. */
@@ -106,6 +123,7 @@ internal fun ChatListTopBar(
     searchFilterState: GlobalSearchState = GlobalSearchState(),
     onSearchFilterCategory: ((GlobalSearchFilterCategory) -> Unit)? = null,
     onClearSearchFilters: () -> Unit = {},
+    retainedAccountAvatars: RetainedAccountAvatarPixels? = null,
 ) {
     var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
@@ -228,14 +246,17 @@ internal fun ChatListTopBar(
                                         R.string.explanation_chat_list_avatar_settings,
                                     )
                                 }
+                            val title =
+                                active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
+                                    ?: stringResource(R.string.app_name)
+                            val avatarContent =
+                                retainedAccountAvatarContent(appState, retainedAccountAvatars, active, title)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 AccountAvatarButton(
-                                    title =
-                                        active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
-                                            ?: stringResource(R.string.app_name),
+                                    title = title,
                                     seed = active?.accountIdHex ?: "whitenoise",
                                     pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
-                                    size = 40.dp,
+                                    size = CHAT_LIST_ACCOUNT_AVATAR_SIZE,
                                     touchTargetSize = 48.dp,
                                     actionDescription =
                                         stringResource(
@@ -264,6 +285,7 @@ internal fun ChatListTopBar(
                                     // avatars use — not "some other account has unread" (#805).
                                     showUnreadDot = appState.accountShowsUnreadDot(active?.label),
                                     unreadDotColor = accountActionColors(appState, active?.label).container,
+                                    avatarContent = avatarContent,
                                 )
                                 // Quick account switching shows the other signed-in accounts themselves: tap one to
                                 // land on it, long-press for the full selector. Off, the active avatar stands alone.
@@ -279,6 +301,7 @@ internal fun ChatListTopBar(
                                             onSwitchAccount = ::switchTo,
                                             onOpenSwitcher = ::openSelector,
                                             barWidthDp = topBarWidthDp,
+                                            retainedAvatars = retainedAccountAvatars,
                                         )
                                     }
                                 }

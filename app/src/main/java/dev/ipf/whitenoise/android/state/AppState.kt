@@ -12143,6 +12143,13 @@ class WhiteNoiseAppState private constructor(
         return avatar
     }
 
+    /** Distinguishes a pending local profile read from a resolved profile without a picture. */
+    internal fun isProfilePresentationUnresolved(accountIdHex: String): Boolean =
+        synchronized(profilePresentationLock) { !profilePresentations.containsKey(accountIdHex) }
+
+    /** Profile publication or account-cache reset invalidates last-drawn top-bar pixels. */
+    internal val profilePresentationEpochForCompose: Int get() = profileAccountRevisionEpoch
+
     /**
      * Start local profile materialization and image decoding without waiting for
      * either. Chat/message projections call this before notification delivery,
