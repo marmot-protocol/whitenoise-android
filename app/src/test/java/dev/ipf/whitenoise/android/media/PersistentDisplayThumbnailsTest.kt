@@ -68,11 +68,12 @@ class PersistentDisplayThumbnailsTest {
     @Test
     fun removalCannotBeUndoneByLateFirstPublication() {
         val cache = cache()
-        val removals: List<() -> Unit> = listOf(
-            { cache.remove(source.attachmentKey) },
-            { cache.removeByCiphertextTags(setOf(source.ciphertextTag)) },
-            { cache.clear() },
-        )
+        val removals: List<() -> Unit> =
+            listOf(
+                { cache.remove(source.attachmentKey) },
+                { cache.removeByCiphertextTags(setOf(source.ciphertextTag)) },
+                { cache.clear() },
+            )
         removals.forEach { remove ->
             val pending = cache.captureGeneration()
             remove()
@@ -87,19 +88,20 @@ class PersistentDisplayThumbnailsTest {
         val pause = AtomicBoolean(false)
         val writing = CountDownLatch(1)
         val release = CountDownLatch(1)
-        val cache = PersistentDisplayThumbnails(
-            DiskByteCache(
-                directory,
-                maxBytes = PersistentDisplayThumbnails.MAX_BYTES,
-                keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") },
-                afterEncryptedWrite = {
-                    if (pause.get()) {
-                        writing.countDown()
-                        check(release.await(10, TimeUnit.SECONDS))
-                    }
-                },
-            ),
-        )
+        val cache =
+            PersistentDisplayThumbnails(
+                DiskByteCache(
+                    directory,
+                    maxBytes = PersistentDisplayThumbnails.MAX_BYTES,
+                    keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") },
+                    afterEncryptedWrite = {
+                        if (pause.get()) {
+                            writing.countDown()
+                            check(release.await(10, TimeUnit.SECONDS))
+                        }
+                    },
+                ),
+            )
         cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration())
         pause.set(true)
         val before = cache.captureGeneration()

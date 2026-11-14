@@ -56,9 +56,10 @@ internal class MediaDownloadIntegrationFixture(
     private val diskRoot = java.io.File(root, "encrypted")
     val disk = DiskByteCache(diskRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider)
     val thumbnailRoot = java.io.File(root, "thumbnails")
-    val thumbnails = PersistentDisplayThumbnails(
-        DiskByteCache(thumbnailRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider),
-    )
+    val thumbnails =
+        PersistentDisplayThumbnails(
+            DiskByteCache(thumbnailRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider),
+        )
     private val jobs = ConcurrentHashMap<String, Call>()
     val calls = CopyOnWriteArrayList<Call>()
     val entered = Channel<Call>(Channel.UNLIMITED)
