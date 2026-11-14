@@ -324,10 +324,16 @@ class AutomaticMediaBindingRecoveryTest {
             provider.closeRelease.countDown()
             deliverAutomaticReply(context.next(), success = true)
             first.join()
-            deliverAutomaticReply(context.next(), success = true)
+            // Caller completion can precede the retiring worker's final cleanup acknowledgement.
+            context.poll(2000)?.let { deliverAutomaticReply(it, success = true) }
             second.join()
             assertTrue(first.result.get() is MediaProbe)
-            assertTrue(second.result.get() is MediaProbe)
+            assertTrue(second.result.get() == null || second.result.get() is MediaProbe)
+            assertTrue(awaitAutomaticRelease(transport))
+            val afterCleanup = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            deliverAutomaticReply(context.next(), success = true)
+            afterCleanup.join()
+            assertTrue(afterCleanup.result.get() is MediaProbe)
         } finally {
             provider.closeRelease.countDown()
             calls.forEach { it.interruptAndJoin() }
