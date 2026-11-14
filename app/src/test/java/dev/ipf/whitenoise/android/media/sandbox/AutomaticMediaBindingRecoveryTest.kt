@@ -322,7 +322,7 @@ class AutomaticMediaBindingRecoveryTest {
             val second = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
             assertNull("Selected URI cleanup still owns automatic admission", context.poll(250))
             provider.closeRelease.countDown()
-            deliverAutomaticReply(context.next(), success = true)
+            deliverAutomaticReply(context.next(), success = true, retirementTransport = transport)
             first.join()
             deliverAutomaticReply(context.next(), success = true)
             second.join()
@@ -793,6 +793,7 @@ class AutomaticMediaBindingRecoveryTest {
         worker: Bound,
         success: Boolean,
         processGone: Boolean = true,
+        retirementTransport: IsolatedAutomaticAvTransport? = null,
     ) {
         assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
         val identity =
@@ -821,6 +822,17 @@ class AutomaticMediaBindingRecoveryTest {
                 .setCallingIdentityForCurrentThread(previous)
         }
         assertTrue(worker.remote.retired.await(2, TimeUnit.SECONDS))
+        if (retirementTransport != null) {
+            // RETIRE entry precedes its executor's finally; finish that RPC before simulating process death.
+            val field =
+                IsolatedAutomaticAvTransport::class.java.getDeclaredField("retirementThread").apply {
+                    isAccessible = true
+                }
+
+            @Suppress("UNCHECKED_CAST")
+            val retirement = field.get(retirementTransport) as Lazy<java.util.concurrent.ExecutorService>
+            retirement.value.submit {}.get(2, TimeUnit.SECONDS)
+        }
         if (processGone) worker.remote.die() else worker.remote.dieBinderOnly()
     }
 
