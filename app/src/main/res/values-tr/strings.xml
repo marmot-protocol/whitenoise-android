@@ -344,7 +344,6 @@
     <string name="add_member_already_in_group">%1$s zaten bu grupta</string>
     <string name="large_group_invite_warning_title">Büyük grup</string>
     <string name="large_group_invite_warning_message">150 veya daha fazla üyeli gruplarda ek davetler güvenilir şekilde teslim edilmeyebilir.</string>
-    <string name="large_group_invite_confirm_title">Büyük bir gruba davet edilsin mi?</string>
     <string name="large_group_invite_confirm_message">150 veya daha fazla üyeli gruplarda ek davetler güvenilir şekilde teslim edilmeyebilir. Yine de devam edebilirsiniz.</string>
     <string name="invite_pending">Davet bekliyor: %1$s</string>
     <string name="member_removal_pending">Üyenin kaldırılması bekleniyor: %1$s</string>
@@ -1953,8 +1952,6 @@
     <string name="composer_expand_full_screen">Mesaj alanını genişlet</string>
     <string name="composer_collapse">Mesaj alanını daralt</string>
     <string name="transcribe_audio">Metne dönüştür</string>
-    <string name="audio_transcription_title">Ses kaydının dökümü</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text, yüklü konuşma modelini kullanarak bu kaydı cihazınızda işleyecek. White Noise mikrofondan ses kaydetmez veya mesaj göndermez. Oluşturulan metin hatalı olabilir ve metni kapattığınızda ya da bu ekrandan ayrıldığınızda silinir.</string>
     <string name="audio_transcription_working">Kayıt bu cihazda metne dönüştürülüyor…</string>
     <string name="audio_transcription_generated">Oluşturulan döküm · gönderenin yazdığı metin değildir</string>
     <string name="audio_transcription_android_version">Kayıtları metne dönüştürmek için Android 13 veya üzeri gerekir.</string>

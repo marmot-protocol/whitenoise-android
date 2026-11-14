@@ -113,6 +113,7 @@ private fun OpenSourceLicensesList(
                 title = notice.name,
                 onClick = { onSelect(notice) },
                 modifier = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                leading = { SettingsLeadingIcon(R.drawable.ic_license) },
             )
         }
     }

@@ -346,7 +346,6 @@
     <string name="add_member_already_in_group">%1$s ya está en este grupo</string>
     <string name="large_group_invite_warning_title">Grupo grande</string>
     <string name="large_group_invite_warning_message">En grupos de 150 miembros o más, es posible que las invitaciones adicionales no se entreguen de forma fiable.</string>
-    <string name="large_group_invite_confirm_title">¿Invitar a un grupo grande?</string>
     <string name="large_group_invite_confirm_message">En grupos de 150 miembros o más, es posible que las invitaciones adicionales no se entreguen de forma fiable. Aun así, puedes continuar.</string>
     <string name="invite_pending">Invitación pendiente: %1$s</string>
     <string name="member_removal_pending">Eliminación pendiente: %1$s</string>
@@ -1960,8 +1959,6 @@
     <string name="composer_expand_full_screen">Expandir el campo de mensaje</string>
     <string name="composer_collapse">Contraer el campo de mensaje</string>
     <string name="transcribe_audio">Transcribir</string>
-    <string name="audio_transcription_title">Transcripción del audio</string>
-    <string name="audio_transcription_disclosure">Offline Speech to Text procesará esta grabación en tu dispositivo con su modelo de voz instalado. White Noise no graba el micrófono ni envía ningún mensaje. El texto generado puede contener errores y se borra cuando lo cierras o sales de esta pantalla.</string>
     <string name="audio_transcription_working">Transcribiendo la grabación en este dispositivo…</string>
     <string name="audio_transcription_generated">Transcripción generada · no es el texto del remitente</string>
     <string name="audio_transcription_android_version">Para transcribir grabaciones se necesita Android 13 o posterior.</string>

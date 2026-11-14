@@ -1,24 +1,33 @@
 package dev.ipf.whitenoise.android.maestro
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.translation.ComposerTranslationNotice
 import dev.ipf.whitenoise.android.translation.ComposerTranslationPreview
 import dev.ipf.whitenoise.android.translation.ComposerTranslationState
 import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
-import dev.ipf.whitenoise.android.translation.MessageTranslationDialog
-import dev.ipf.whitenoise.android.translation.MessageTranslationRendition
+import dev.ipf.whitenoise.android.translation.MessageTranslationNotice
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
+import dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth
 import dev.ipf.whitenoise.android.translation.TranslationChatSettingsDialog
 import dev.ipf.whitenoise.android.translation.TranslationEngine
 import dev.ipf.whitenoise.android.translation.TranslationEngineIdentity
 import dev.ipf.whitenoise.android.translation.TranslationOverride
 import dev.ipf.whitenoise.android.translation.TranslationPreferences
 import dev.ipf.whitenoise.android.translation.TranslationTrust
+import dev.ipf.whitenoise.android.translation.recoveryNotice
 
 /** Actual translation UI/session; controlled local engine outputs do not claim Binder or installed language packs. */
 @Composable
@@ -33,25 +42,34 @@ internal fun MaestroTranslationPresentation(fixture: MaestroPresentationFixture)
     }
 }
 
+/**
+ * The Translate trigger is a fixture stand-in for the long-press menu item: the production action menu needs the
+ * whole bubble, while the item only shows the production one-time notice on a fresh install (the default scenario)
+ * and then calls `translateMessage` on the real session.
+ */
 @Composable
 @Suppress("FunctionNaming")
 private fun MaestroMessageTranslationPresentation(fixture: MaestroPresentationFixture) {
     val scope = rememberCoroutineScope()
     val state = remember(fixture) { MaestroMessageTranslationState(fixture, scope) }
-    LaunchedEffect(state) { if (state.failure != null) state.session.request(state.source) }
     DisposableEffect(state) { onDispose { state.session.clear() } }
-    val translatedSource = state.selected?.let { state.source.copy(target = it) }
-    val rendition = translatedSource?.let { state.session.renditions[it] }
-    LaunchedEffect(rendition, state.selected, state.showing) { state.verifyRendition(rendition) }
+    val rendition = state.translated?.let { state.session.renditions[it] }
+    LaunchedEffect(rendition) { state.verifyRendition(rendition) }
     CompositionLocalProvider(LocalConversationTranslation provides state.session) {
-        if (state.showing) {
-            MessageTranslationDialog(
-                source = if (fixture.scenario.endsWith("disabled")) null else state.source,
-                onTargetSelected = state::targetSelected,
-                onDismiss = state::dismiss,
-            )
-        } else {
-            MessageTranslationRendition(translatedSource)
+        Column {
+            if (state.translated == null) {
+                Button(onClick = state::requestTranslate, modifier = Modifier.testTag("translation.menu")) {
+                    Text("Translate message")
+                }
+            }
+            if (state.noticeOpen) {
+                MessageTranslationNotice(onAccept = state::acceptNotice, onDismiss = state::dismissNotice)
+            }
+            MessageTranslationToggle(state.translated, Modifier.size(MessageTranslationToggleSlotWidth))
+            if (state.failure != null && state.session.failure != null) {
+                Text(stringResource(recoveryNotice(state.session.failure)))
+                Button(onClick = state::finishNotice) { Text("Finish notice check") }
+            }
         }
     }
 }

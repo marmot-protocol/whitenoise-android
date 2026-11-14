@@ -289,6 +289,7 @@ internal fun MediaVoiceBubble(
     mine: Boolean,
     focusPlaybackMessage: Boolean = true,
     onLongPress: () -> Unit = {},
+    audioTranscription: AudioTranscriptionToggleState? = null,
 ) {
     val playbackTitleCopy =
         dev.ipf.whitenoise.android.ui.common
@@ -591,9 +592,9 @@ internal fun MediaVoiceBubble(
                 }
             },
         )
-        if (!mine) {
+        if (!mine && audioTranscription != null) {
             key(localFile) {
-                ReceivedAudioTranscription(localFile)
+                ReceivedAudioTranscription(localFile, audioTranscription)
             }
         }
     }

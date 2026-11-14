@@ -1,19 +1,18 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.ManualDeviceFixture
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -36,24 +35,26 @@ class AudioTranscriptionDeviceTest {
                 file.outputStream().use { output -> input.copyTo(output) }
             }
             composeRule.setContent {
-                WhiteNoiseTheme { ReceivedAudioTranscription(file) }
+                WhiteNoiseTheme {
+                    val toggle = remember { AudioTranscriptionToggleState() }
+                    Column {
+                        AudioTranscriptionToggle(toggle)
+                        ReceivedAudioTranscription(file, toggle)
+                    }
+                }
             }
+            // One tap starts recognition inline; no confirmation dialog intervenes.
             composeRule.onNodeWithTag("audio.transcribe").performClick()
-            // Consent is explicit and cancellable before the provider receives audio.
-            composeRule.onNodeWithText("Cancel").performClick()
-            composeRule.onNodeWithText("Audio transcript").assertDoesNotExist()
-            composeRule.onNodeWithTag("audio.transcribe").performClick()
-            composeRule.onNode(hasText("Transcribe") and hasAnyAncestor(isDialog())).performClick()
-            val working = instrumentation.targetContext.getString(R.string.audio_transcription_working)
+            composeRule.onNode(isDialog()).assertDoesNotExist()
             composeRule.waitUntil(timeoutMillis = 300_000) {
                 composeRule
-                    .onAllNodesWithText(working)
+                    .onAllNodesWithTag(AUDIO_TRANSCRIPT_TEST_TAG)
                     .fetchSemanticsNodes()
-                    .isEmpty()
+                    .isNotEmpty()
             }
             composeRule.onNodeWithText("hello world", substring = true, ignoreCase = true).assertIsDisplayed()
             composeRule.onNodeWithText("good morning", substring = true, ignoreCase = true).assertIsDisplayed()
-            composeRule.onNodeWithText("Close").performClick()
+            composeRule.onNodeWithTag("audio.transcribe").performClick()
             composeRule.onNodeWithText("hello world", substring = true, ignoreCase = true).assertDoesNotExist()
         } finally {
             file.delete()

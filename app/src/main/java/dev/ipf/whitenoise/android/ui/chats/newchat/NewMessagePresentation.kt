@@ -16,7 +16,6 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -27,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -47,6 +45,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
@@ -185,7 +184,7 @@ private fun NewMessageActionGroup(
                 actions.newGroup,
                 modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_GROUP),
                 enabled = !busy,
-                leading = { Icon(painterResource(R.drawable.ic_group_add), null, Modifier.size(24.dp)) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
             )
         }
         row("scan_qr") { context ->
@@ -194,7 +193,7 @@ private fun NewMessageActionGroup(
                 stringResource(R.string.new_message_connect_qr),
                 actions.scanQr,
                 enabled = !busy && connectQrEnabled,
-                leading = { Icon(painterResource(R.drawable.ic_qr_code_scanner), null, Modifier.size(24.dp)) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_qr_code_scanner) },
             )
         }
         row("invite") { context ->
@@ -203,7 +202,7 @@ private fun NewMessageActionGroup(
                 stringResource(R.string.new_message_invite_friend),
                 actions.invite,
                 enabled = !busy,
-                leading = { Icon(painterResource(R.drawable.ic_share), null, Modifier.size(24.dp)) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_share) },
             )
         }
         row("agent_settings") { context ->
@@ -213,7 +212,7 @@ private fun NewMessageActionGroup(
                 actions.agentSettings,
                 modifier = Modifier.testTag("new_message.agentSettings"),
                 enabled = !busy && !inviteShareInProgress,
-                leading = { Icon(painterResource(R.drawable.ic_ai_agents), null, Modifier.size(24.dp)) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_ai_agents) },
             )
         }
     }

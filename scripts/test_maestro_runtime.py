@@ -1192,7 +1192,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         """Media, search and transient account surfaces must not disappear merely because of their names."""
         result = inventory()
         by_name = {screen['symbol']: screen for screen in result['screen_catalog']}
-        for name in ('MessageFullScreenView', 'AvatarFullScreenViewer', 'GlobalSearchDatePicker',
+        for name in ('TextAttachmentReaderScreen', 'AvatarFullScreenViewer', 'GlobalSearchDatePicker',
                      'QuickAccountSwitchTransitionOverlay', 'ComposerEmojiPickerPane'):
             with self.subTest(surface=name):
                 self.assertIn(name, by_name)

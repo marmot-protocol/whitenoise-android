@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -56,6 +58,16 @@ internal class SettingsGroupScope internal constructor() {
     }
 }
 
+/** Marks a settings group's container so tests can tell which rows share one group. */
+internal val SettingsGroupKey = SemanticsPropertyKey<Unit>("SettingsGroup")
+
+private var SemanticsPropertyReceiver.settingsGroup by SettingsGroupKey
+
+/** Marks a switch, link, action or value row, so tests tell rows apart from controls nested in a row's end slot. */
+internal val SettingsRowKey = SemanticsPropertyKey<Unit>("SettingsRow")
+
+internal var SemanticsPropertyReceiver.settingsRow by SettingsRowKey
+
 /**
  * Material list group with positions computed from the complete visible row set.
  *
@@ -73,7 +85,11 @@ internal fun SettingsGroup(
     val group = SettingsGroupScope().apply(content)
     val gap = WhiteNoiseListItemDefaults.segmentedGap
     Column(
-        modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin).settingsCardMorph(),
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+            .settingsCardMorph()
+            .semantics { settingsGroup = Unit },
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         group.rows.forEachIndexed { index, entry ->
@@ -102,7 +118,7 @@ internal fun settingsRowContext(
  *
  * Both [enabled] and [busy] gate edits while the caller retains the authoritative [checked] value.
  * Busy rows replace the decorative switch with the existing Material progress indicator. [leading]
- * is the same optional slot the link and action rows expose, so a group can carry one icon column.
+ * is the same slot the link and action rows expose, so every group carries one icon column.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -115,7 +131,7 @@ internal fun SettingsSwitch(
     subtitle: String? = null,
     enabled: Boolean = true,
     busy: Boolean = false,
-    leading: (@Composable () -> Unit)? = null,
+    leading: (@Composable () -> Unit)?,
 ) {
     val editable = enabled && !busy
     ListItem(
@@ -126,9 +142,12 @@ internal fun SettingsSwitch(
             modifier
                 .fillMaxWidth()
                 .settingsRowBorder(context)
-                .semantics { role = Role.Switch },
+                .semantics {
+                    role = Role.Switch
+                    settingsRow = Unit
+                },
         enabled = editable,
-        leadingContent = leading,
+        leadingContent = settingsLeadingSlot(leading, editable),
         supportingContent = subtitle?.let { { SettingsRowSupportingText(it, editable) } },
         trailingContent = {
             SettingsRowTrailing(busy) {
@@ -162,7 +181,7 @@ internal fun SettingsLink(
     busy: Boolean = false,
     destructive: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
-    leading: (@Composable () -> Unit)? = null,
+    leading: (@Composable () -> Unit)?,
 ) {
     val editable = enabled && !busy
     val summary = listOfNotNull(value, subtitle).distinct().joinToString("\n").takeIf { it.isNotEmpty() }
@@ -173,9 +192,12 @@ internal fun SettingsLink(
             modifier
                 .fillMaxWidth()
                 .settingsRowBorder(context)
-                .semantics { role = Role.Button },
+                .semantics {
+                    role = Role.Button
+                    settingsRow = Unit
+                },
         enabled = editable,
-        leadingContent = leading,
+        leadingContent = settingsLeadingSlot(leading, editable),
         supportingContent = summary?.let { { SettingsRowSupportingText(it, editable) } },
         trailingContent = {
             SettingsRowTrailing(busy) {
@@ -206,7 +228,7 @@ internal fun SettingsAction(
     subtitle: String? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
-    leading: (@Composable () -> Unit)? = null,
+    leading: (@Composable () -> Unit)?,
 ) {
     ListItem(
         onClick = onClick,
@@ -215,9 +237,12 @@ internal fun SettingsAction(
             modifier
                 .fillMaxWidth()
                 .settingsRowBorder(context)
-                .semantics { role = Role.Button },
+                .semantics {
+                    role = Role.Button
+                    settingsRow = Unit
+                },
         enabled = enabled,
-        leadingContent = leading,
+        leadingContent = settingsLeadingSlot(leading, enabled),
         supportingContent = subtitle?.let { { SettingsRowSupportingText(it, enabled) } },
         colors = settingsRowColors(context),
         content = { SettingsRowTitle(title, enabled, destructive) },

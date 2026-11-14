@@ -121,12 +121,15 @@ Failure reports and Gradle timing profiles use `android-ci-reports-<job>` and
 `compose-compiler`, `static-analysis-Zapstore`, `static-analysis-Play`,
 `compile-tests-Zapstore`, `compile-tests-Play`, `coverage`, or
 `<flavor>-<shard>` for the unit shards. Separate runners
-reduce the serial critical path but repeat some setup/compilation; compare both
-wall time and summed job durations when measuring CI performance. Each Gradle job
-retains its own task outputs on master pushes and same-repository PRs; fork PRs
-restore caches read-only. Assertions execute on every fresh runner. The separate
-MarmotKit cache retains one writer: Zapstore shard 0 when it runs. Only shard 0 of
-each distribution writes the Gradle cache; the other shards restore it read-only. Prechecks and docs-only runs do not write it. GitHub's ephemeral runner
+reduce the serial critical path but repeat some setup. The unit shards load the
+entries `compile-tests` wrote from a one-day `unit-compile-cache-<flavor>` artifact
+and compile any source set that is missing from it or from their restored cache;
+compare both wall time and summed job durations when measuring CI performance.
+Only master pushes save Gradle caches; PR runs restore them read-only. Assertions
+execute on every fresh runner. The separate MarmotKit cache retains one writer:
+Zapstore shard 0 when it runs. Only shard 0 of each distribution writes the unit
+lane's Gradle cache; the other shards and `compile-tests` restore it read-only.
+Prechecks and docs-only runs do not write it. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
