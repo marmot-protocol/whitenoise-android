@@ -94,6 +94,7 @@ internal fun SharedContentCategories(
                 SettingsAction(
                     context = it,
                     opensRoute = true,
+                    routeKey = "media-$category",
                     title = stringResource(category.titleRes),
                     subtitle =
                         if (category != SharedContentCategory.Links) {

@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineButtonColors
@@ -125,7 +126,7 @@ private fun ActionColorEditor(
                     }
                 }
                 item {
-                    SettingsGroup {
+                    SettingsGroup(destination = SettingsDetail.ActionColor, surface = "action-color-editor") {
                         row("controls") { context ->
                             SettingsGroupPanel(context) {
                                 Column(

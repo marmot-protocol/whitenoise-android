@@ -189,6 +189,7 @@ internal fun PersonProfileContent(
                                     row,
                                     stringResource(R.string.notifications),
                                     onNotifications,
+                                    routeKey = ProfileSheetPage.NOTIFICATIONS,
                                     value = notificationSummary,
                                     enabled = !busy,
                                     leading = { Icon(painterResource(R.drawable.ic_settings_notifications), null) },

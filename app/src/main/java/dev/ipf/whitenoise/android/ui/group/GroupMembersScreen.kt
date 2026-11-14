@@ -29,10 +29,17 @@ internal fun GroupMembersScreen(
     SettingsScaffold(title = stringResource(R.string.members), onBack = onBack) {
         Column(Modifier.fillMaxSize().testTag("chat_info.members_screen")) {
             feedback()
-            Column(
-                modifier = Modifier.weight(1f).whiteNoiseVerticalScroll(scrollState).padding(bottom = 24.dp),
-            ) {
-                content()
+            dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport { viewport ->
+                Column(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .then(viewport)
+                            .whiteNoiseVerticalScroll(scrollState)
+                            .padding(bottom = 24.dp),
+                ) {
+                    content()
+                }
             }
         }
     }

@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.queryDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.readBoundedDocument
 import dev.ipf.whitenoise.android.ui.decodeEmojiImage
 import dev.ipf.whitenoise.android.ui.emojiCodeForFileName
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.rememberCustomEmojiStore
 import dev.ipf.whitenoise.android.ui.sanitizeEmojiCode
 import kotlinx.coroutines.Dispatchers
@@ -187,7 +188,11 @@ private fun CustomEmojiAddActions(
     onChooseFile: () -> Unit,
     onOpenSets: (() -> Unit)?,
 ) {
-    SettingsGroup(modifier = Modifier.testTag("custom_emoji.add")) {
+    SettingsGroup(
+        modifier = Modifier.testTag("custom_emoji.add"),
+        destination = SettingsDetail.CustomEmoji,
+        surface = "emoji-add-actions",
+    ) {
         row("choose_photo") { context ->
             SettingsAction(
                 context = context,
@@ -201,6 +206,7 @@ private fun CustomEmojiAddActions(
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.emoji_sets_title),
+                    routeKey = SettingsDetail.EmojiSets,
                     onClick = onOpenSets,
                 )
             }

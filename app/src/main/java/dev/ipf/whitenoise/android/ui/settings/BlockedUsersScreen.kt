@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.Block
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 internal const val BLOCKED_USERS_CONTENT_TAG = "blocked-users-content"
 
@@ -68,7 +69,11 @@ private fun BlockedUsersGroup(
     busyUser: String?,
     onUnblock: (BlockedUserFfi) -> Unit,
 ) {
-    SettingsGroup(modifier = Modifier.testTag("blocked_users.group")) {
+    SettingsGroup(
+        modifier = Modifier.testTag("blocked_users.group"),
+        destination = SettingsDetail.BlockedUsers,
+        surface = "blocked-users",
+    ) {
         users.forEach { user ->
             row(user.publicKey) { rowContext ->
                 SettingsAction(

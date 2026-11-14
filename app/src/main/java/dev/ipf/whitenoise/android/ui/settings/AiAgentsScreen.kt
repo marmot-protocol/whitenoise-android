@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -97,7 +98,11 @@ internal fun AiAgentsContent(
             }
             item(key = "search.AiAgents.3") { SettingsSection(stringResource(R.string.ai_agents_connectors_title)) }
             item(key = "search.AiAgents.4") {
-                SettingsGroup(modifier = Modifier.testTag("ai_agents.connectors")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("ai_agents.connectors"),
+                    destination = SettingsDetail.AiAgents,
+                    surface = "ai-connectors",
+                ) {
                     agentConnectors.forEach { connector ->
                         row(connector.id) { rowContext ->
                             SettingsLink(

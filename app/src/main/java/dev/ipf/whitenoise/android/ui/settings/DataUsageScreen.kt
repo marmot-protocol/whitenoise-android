@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
 
@@ -100,12 +101,17 @@ internal fun DataUsageScreen(
     SettingsScaffold(title = stringResource(R.string.data_usage_title), onBack = onBack) {
         SettingsList {
             item(key = "search.DataUsage.10") {
-                SettingsGroup(modifier = Modifier.testTag("data_usage.storage")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("data_usage.storage"),
+                    destination = SettingsDetail.Data,
+                    surface = "data-storage",
+                ) {
                     row("manage_storage") { context ->
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.manage_storage_title),
                             subtitle = stringResource(R.string.manage_storage_entry_subtitle),
+                            routeKey = SettingsDetail.ManageStorage,
                             onClick = onOpenManageStorage,
                             modifier = Modifier.testTag("data_usage.manage_storage"),
                         )

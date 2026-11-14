@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,7 +23,6 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ControlMorphSurface
@@ -37,9 +35,6 @@ internal enum class ComposerFabEndpoint { Composer, NewMessage }
 
 internal val LocalComposerFabHandoff = staticCompositionLocalOf<MeasuredControlHandoff?> { null }
 
-/** Retains only the last measured composer height across the account-owned route handoff. */
-internal val LocalComposerFabHeight = staticCompositionLocalOf<MutableState<Dp>?> { null }
-
 /** The live editor keeps its owner; the pen's decorative glyph travels with the measured container. */
 @Composable
 internal fun Modifier.composerFabSurface(
@@ -51,12 +46,7 @@ internal fun Modifier.composerFabSurface(
 ): Modifier {
     if (!LocalControlHandoffEndpointCurrent.current) return clearAndSetSemantics { }.drawWithContent { }
     val density = LocalDensity.current
-    val composerHeight = LocalComposerFabHeight.current
-    return onPlaced { coordinates ->
-        if (endpoint == ComposerFabEndpoint.Composer && coordinates.size.height > 0) {
-            composerHeight?.value = with(density) { coordinates.size.height.toDp() }
-        }
-    }.controlMorphSurface(
+    return controlMorphSurface(
         LocalComposerFabHandoff.current,
         endpoint,
         ControlMorphSurface(

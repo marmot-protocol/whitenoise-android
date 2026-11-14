@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTok
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleBorder
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 /**
  * Chat bubble colour editor for the account's theme defaults or, with [groupIdHex], one conversation's override.
@@ -52,6 +53,7 @@ internal fun ChatBubbleColorsScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     groupIdHex: String? = null,
+    destination: Any = SettingsDetail.ChatBubbleColors,
 ) {
     val bubbleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
     val accountScope = appState.activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: "none"
@@ -74,6 +76,7 @@ internal fun ChatBubbleColorsScreen(
     key(accountScope, groupIdHex, bubbleTheme, initial, inherited) {
         ChatBubbleColorEditor(
             perChat = groupIdHex != null,
+            destination = destination,
             theme = bubbleTheme,
             source = BubbleColorSource(initial, inherited),
             onBack = onBack,
@@ -95,6 +98,7 @@ internal fun ChatBubbleColorsScreen(
 @Composable
 private fun ChatBubbleColorEditor(
     perChat: Boolean,
+    destination: Any,
     theme: BubbleTheme,
     source: BubbleColorSource,
     onBack: () -> Unit,
@@ -179,7 +183,7 @@ private fun ChatBubbleColorEditor(
             }
             item { SettingsSection(stringResource(R.string.bubble_my_messages)) }
             item {
-                SettingsGroup {
+                SettingsGroup(destination = destination, surface = "bubble-color-editor") {
                     row("mine") { context ->
                         SettingsGroupPanel(context) {
                             key(resetRevision) {

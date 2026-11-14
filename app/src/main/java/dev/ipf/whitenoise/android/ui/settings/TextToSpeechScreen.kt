@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.group.TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import java.util.Locale
 
 /** Which speech picker is open. */
@@ -104,7 +105,11 @@ internal fun TextToSpeechScreen(
     SettingsScaffold(title = stringResource(R.string.settings_read_aloud), onBack = onBack) {
         SettingsList {
             item(key = "search.TextToSpeech.1") {
-                SettingsGroup(modifier = Modifier.testTag("speech.engine.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("speech.engine.group"),
+                    destination = SettingsDetail.TextToSpeech,
+                    surface = "speech-engine",
+                ) {
                     if (showEngineChooser && engineChoice.engines.isNotEmpty()) {
                         row("engine") { rowContext ->
                             SettingsLink(

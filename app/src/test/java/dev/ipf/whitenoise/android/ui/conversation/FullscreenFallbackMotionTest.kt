@@ -28,7 +28,7 @@ class FullscreenFallbackMotionTest {
 
     @Test fun replacementOwnerCancelsTheAcceptedExit() = exercise(animate = true, replace = true)
 
-    @Test fun reducedMotionCompletesWithoutWaitingForTheFade() = exercise(animate = false, replace = false)
+    @Test fun reducedMotionCompletesWithoutWaitingForTheExit() = exercise(animate = false, replace = false)
 
     @Test fun disablingMotionDuringExitCompletesTheAcceptedRequest() {
         val motion = mutableStateOf(true)

@@ -46,6 +46,7 @@ internal class MeasuredControlHandoff(
     val morphSurface: Boolean = false,
     // Composer insets can move during entry; other controls retain the existing settle-on-movement policy.
     private val followMovingTarget: Boolean = false,
+    private val closeDestination: Any? = null,
 ) {
     private val live = mutableStateMapOf<Any, Pair<Any, Rect>>()
     private var previous = initialDestination
@@ -219,7 +220,22 @@ internal class MeasuredControlHandoff(
         end = target
         progress.snapTo(0f)
         awaitingFrame = false
-        progress.animateTo(1f, tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing))
+        progress.animateTo(
+            1f,
+            tween(
+                if (previous != null && previous == closeDestination) {
+                    APP_MOTION_CLOSE_MILLIS
+                } else {
+                    APP_MOTION_OPEN_MILLIS
+                },
+                easing =
+                    if (previous != null && previous == closeDestination) {
+                        AppMotionCloseEasing
+                    } else {
+                        AppMotionOpenEasing
+                    },
+            ),
+        )
         if (request === token) finish()
     }
 
@@ -308,7 +324,22 @@ internal class MeasuredControlHandoff(
         start = origin
         end = target
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(APP_MOTION_OPEN_MILLIS, easing = AppMotionOpenEasing))
+        progress.animateTo(
+            1f,
+            tween(
+                if (previous != null && previous == closeDestination) {
+                    APP_MOTION_CLOSE_MILLIS
+                } else {
+                    APP_MOTION_OPEN_MILLIS
+                },
+                easing =
+                    if (previous != null && previous == closeDestination) {
+                        AppMotionCloseEasing
+                    } else {
+                        AppMotionOpenEasing
+                    },
+            ),
+        )
         start = null
         end = null
     }
@@ -321,9 +352,10 @@ internal fun rememberMeasuredControlHandoff(
     destination: Any?,
     morphSurface: Boolean = false,
     followMovingTarget: Boolean = false,
+    closeDestination: Any? = null,
 ): MeasuredControlHandoff =
-    remember(owner, morphSurface, followMovingTarget) {
-        MeasuredControlHandoff(destination, morphSurface, followMovingTarget)
+    remember(owner, morphSurface, followMovingTarget, closeDestination) {
+        MeasuredControlHandoff(destination, morphSurface, followMovingTarget, closeDestination)
     }
 
 /** Measures the actual endpoint without changing its size, focus, hit target or semantics. */

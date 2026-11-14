@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.CancellationException
@@ -129,7 +130,11 @@ internal fun SupportContent(
     SettingsScaffold(title = stringResource(R.string.chat_with_support), onBack = onBack) {
         SettingsList {
             item(key = "search.SupportScreen.1") {
-                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
+                SettingsGroup(
+                    modifier = Modifier.padding(top = WhiteNoiseSpacing.Section),
+                    destination = SettingsDetail.Support,
+                    surface = "support-controls",
+                ) {
                     row("support_identity") { context ->
                         SettingsGroupPanel(context) {
                             ListItem(
@@ -196,6 +201,7 @@ internal fun SupportContent(
                                     title = stringResource(R.string.support_open_relays),
                                     subtitle = stringResource(R.string.support_relays_review),
                                     enabled = !busy,
+                                    routeKey = SettingsDetail.SupportRelays,
                                     onClick = onRelays,
                                     modifier = Modifier.testTag("support.relays"),
                                 )

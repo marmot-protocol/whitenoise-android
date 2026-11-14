@@ -65,7 +65,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -246,10 +245,6 @@ internal fun ChatsScreen(
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
     }
     val groupTitleCopy = rememberGroupTitleCopy()
-    val placementAccount = appState.activeAccountRef
-    val placementRuntime = appState.runtimeGeneration
-    val placementCurrent = dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent.current
-    val fabMinimumTopInWindow = remember(placementAccount, placementRuntime) { mutableStateOf<Float?>(null) }
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     // The list head when New Message opened, the row its keyed scroll anchor holds while the
     // flow replaces it. Not saved: after process death the open falls back to the current head.
@@ -2543,7 +2538,6 @@ internal fun ChatsScreen(
                     ChatsNewMessageFab(
                         appState,
                         openNewMessageFlow,
-                        minimumTopInWindow = fabMinimumTopInWindow,
                         onNewMessageOrigin = { newChatFlowOrigin = it },
                     )
                 }
@@ -2561,15 +2555,6 @@ internal fun ChatsScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .onPlaced { coordinates ->
-                    if (
-                        placementCurrent &&
-                        appState.activeAccountRef == placementAccount &&
-                        appState.runtimeGeneration == placementRuntime
-                    ) {
-                        fabMinimumTopInWindow.value = coordinates.positionInWindow().y
-                    }
-                }
                 // The scaffold padding above already clears a side cutout or side navigation bar, so the
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),

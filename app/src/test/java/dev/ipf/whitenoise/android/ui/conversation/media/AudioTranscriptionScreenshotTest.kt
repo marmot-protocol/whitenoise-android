@@ -122,8 +122,13 @@ class AudioTranscriptionScreenshotTest {
                 }
             }
         }
-        captureTransitionFrames("transcript/forward") { composeRule.runOnIdle { shown.value = true } }
-        captureTransitionFrames("transcript/reverse") { composeRule.onNodeWithText("Close").performClick() }
+        repeat(3) { cycle ->
+            captureTransitionFrames("transcript/cycle_$cycle/forward") { composeRule.runOnIdle { shown.value = true } }
+            captureTransitionFrames(
+                "transcript/cycle_$cycle/reverse",
+            ) { composeRule.onNodeWithText("Close").performClick() }
+            composeRule.runOnIdle { org.junit.Assert.assertFalse(shown.value) }
+        }
     }
 
     private fun captureTransitionFrames(

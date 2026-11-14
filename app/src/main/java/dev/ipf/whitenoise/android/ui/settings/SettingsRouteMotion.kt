@@ -91,7 +91,7 @@ internal fun <T> SettingsRouteMotion(
         )
     Box(
         Modifier.fillMaxSize().then(morphHost).then(
-            // One measured page transform owns the movement; missing origins settle directly.
+            // The existing route clock owns block contraction and exclusive entry; unmeasured entries settle directly.
             rememberRouteMotionModifier(
                 target = target,
                 depth = depth,

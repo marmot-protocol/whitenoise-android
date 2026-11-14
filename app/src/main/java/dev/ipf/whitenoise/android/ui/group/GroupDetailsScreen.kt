@@ -66,6 +66,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -176,6 +177,7 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
+import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -569,10 +571,17 @@ internal fun GroupDetailsScreen(
                 forward = detailsForward,
             )
 
+        val detailsViewport =
+            dev.ipf.whitenoise.android.ui.settings
+                .rememberViewport(detailsMorph.page)
+
         /** All child routes share one measured container transform and dispose their old controls immediately. */
         @Composable
         fun detailsRoute(content: @Composable () -> Unit) {
-            CompositionLocalProvider(LocalSettingsCardMorph provides detailsMorph) {
+            CompositionLocalProvider(
+                LocalSettingsCardMorph provides detailsMorph,
+                dev.ipf.whitenoise.android.ui.settings.LocalSettingsNativeViewport provides detailsViewport.first,
+            ) {
                 dev.ipf.whitenoise.android.ui.common
                     .WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
                 Box(Modifier.fillMaxSize().then(detailsMotion)) { content() }
@@ -843,7 +852,11 @@ internal fun GroupDetailsScreen(
                     globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
                 ),
             )
-        var showAutoReadPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        val autoReadPopupOwner = remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { Any() }
+        var autoReadPopupSource by remember(autoReadPopupOwner) {
+            mutableStateOf<dev.ipf.whitenoise.android.ui.common.PopupSourceActivation?>(null)
+        }
+        var showAutoReadPicker by remember(autoReadPopupOwner) { mutableStateOf(false) }
         var showTranslationPicker by remember(controller) { mutableStateOf(false) }
         var showDisappearingPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var pendingDisappearingSecs by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
@@ -873,6 +886,7 @@ internal fun GroupDetailsScreen(
                     appState = appState,
                     onBack = { showBubbleColors = false },
                     groupIdHex = controller.group.groupIdHex,
+                    destination = "bubble-colors",
                 )
             }
             return@PreparedGroupAvatarContent
@@ -1587,60 +1601,75 @@ internal fun GroupDetailsScreen(
                         // Row taps route into the profile sheet, which carries the same
                         // admin actions (grant/revoke admin, remove) the old per-row menu
                         // exposed (#444/#635 scope rules).
-                        GroupMemberIdentityRows(visibleMembers) { index, member ->
-                            val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
-                            val rowMutationPending =
-                                controller.isMemberMutationPending(member.memberIdHex) ||
-                                    activeMutation?.target == member.memberIdHex
-                            // Only another member with a presentable identity has a profile to
-                            // open, so self and unresolved rows stay inert and chevron-free.
-                            val profileNpub =
-                                if (isSelfRow) "" else appState.npubForDisplay(member.memberIdHex)
-                            val opensProfile = profileNpub.isNotBlank()
-                            val memberTitle =
-                                if (isSelfRow) {
-                                    stringResource(R.string.you)
-                                } else {
-                                    controller.memberDisplayName(member)
+                        val rosterToken = remember(detailsMorph, membersExpanded) { Any() }
+                        val rosterBorder = amoledOutlineBorder()
+                        val roster =
+                            dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface(
+                                destination = if (membersExpanded) "members" else null,
+                                surface = "members-roster",
+                                horizontalInset = 16.dp,
+                                registrationToken = rosterToken,
+                                strokeColor = if (rosterBorder != null) Color.White else Color.Unspecified,
+                            )
+                        Column(Modifier.fillMaxWidth().then(roster.first)) {
+                            GroupMemberIdentityRows(visibleMembers) { index, member ->
+                                val isSelfRow = GroupProjector.isActiveAccountMember(member, activeAccountIdHex)
+                                val rowMutationPending =
+                                    controller.isMemberMutationPending(member.memberIdHex) ||
+                                        activeMutation?.target == member.memberIdHex
+                                // Only another member with a presentable identity has a profile to
+                                // open, so self and unresolved rows stay inert and chevron-free.
+                                val profileNpub =
+                                    if (isSelfRow) "" else appState.npubForDisplay(member.memberIdHex)
+                                val opensProfile = profileNpub.isNotBlank()
+                                val memberTitle =
+                                    if (isSelfRow) {
+                                        stringResource(R.string.you)
+                                    } else {
+                                        controller.memberDisplayName(member)
+                                    }
+                                // The title actually shown decides: a member titled by their own key copies it (#3565).
+                                val titleIsKey = opensProfile && abbreviatesPublicKey(memberTitle, profileNpub)
+                                val profileLaunch =
+                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
+                                        appState.presentProfile(profileNpub, origin = origin)
+                                    }
+                                ChatInfoMemberCard(
+                                    index = index,
+                                    count = visibleMembers.size,
+                                    suppressChrome = roster.second,
+                                    nativeGroup = rosterToken,
+                                    nativeKey = member.memberIdHex,
+                                    modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
+                                ) {
+                                    ContactRow(
+                                        title = memberTitle,
+                                        subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
+                                        publicKey = profileNpub.takeIf { titleIsKey },
+                                        publicKeyInTitle = true,
+                                        avatarSeed = member.memberIdHex,
+                                        avatarUrl = controller.memberAvatarUrl(member),
+                                        modifier =
+                                            if (index == 0) {
+                                                profileLaunch.first.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
+                                            } else {
+                                                profileLaunch.first
+                                            },
+                                        onClick =
+                                            if (opensProfile) {
+                                                profileLaunch.second
+                                            } else {
+                                                null
+                                            },
+                                        trailing =
+                                            if (opensProfile) {
+                                                { ChatInfoRowChevron() }
+                                            } else {
+                                                null
+                                            },
+                                        avatarDomain = AvatarImageLoader.publicProfiles(),
+                                    )
                                 }
-                            // The title actually shown decides: a member titled by their own key copies it (#3565).
-                            val titleIsKey = opensProfile && abbreviatesPublicKey(memberTitle, profileNpub)
-                            val profileLaunch =
-                                dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
-                                    appState.presentProfile(profileNpub, origin = origin)
-                                }
-                            ChatInfoMemberCard(
-                                index = index,
-                                count = visibleMembers.size,
-                                modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
-                            ) {
-                                ContactRow(
-                                    title = memberTitle,
-                                    subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
-                                    publicKey = profileNpub.takeIf { titleIsKey },
-                                    publicKeyInTitle = true,
-                                    avatarSeed = member.memberIdHex,
-                                    avatarUrl = controller.memberAvatarUrl(member),
-                                    modifier =
-                                        if (index == 0) {
-                                            profileLaunch.first.performanceTestTag(PerformanceTestTags.MEMBER_LIST)
-                                        } else {
-                                            profileLaunch.first
-                                        },
-                                    onClick =
-                                        if (opensProfile) {
-                                            profileLaunch.second
-                                        } else {
-                                            null
-                                        },
-                                    trailing =
-                                        if (opensProfile) {
-                                            { ChatInfoRowChevron() }
-                                        } else {
-                                            null
-                                        },
-                                    avatarDomain = AvatarImageLoader.publicProfiles(),
-                                )
                             }
                         }
                         val canExpandMembers =
@@ -1658,6 +1687,7 @@ internal fun GroupDetailsScreen(
                                     SettingsLink(
                                         context = rowContext,
                                         title = stringResource(R.string.see_all_members),
+                                        routeKey = "members",
                                         onClick = { membersExpanded = true },
                                         leading = {
                                             Icon(painterResource(R.drawable.ic_group), contentDescription = null)
@@ -1781,6 +1811,7 @@ internal fun GroupDetailsScreen(
                     Modifier
                         .fillMaxSize()
                         .padding(padding)
+                        .then(detailsViewport.second)
                         .fadingVerticalScroll(detailsScrollState)
                         .testTag("chat_info.list")
                         .padding(bottom = 24.dp),
@@ -1935,6 +1966,7 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.person_add_to_group),
                                     opensRoute = true,
+                                    routeKey = "add-to-groups",
                                     onClick = { showDmAddToGroups = true },
                                     enabled = !addingDmPeerToGroups,
                                     leading = {
@@ -1972,6 +2004,7 @@ internal fun GroupDetailsScreen(
                                 SettingsLink(
                                     context = rowContext,
                                     title = stringResource(R.string.edit_group_info_title),
+                                    routeKey = "edit",
                                     onClick = { showEditGroup = true },
                                     enabled = activeMutation == null && !controller.mutationInFlight,
                                     leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
@@ -1981,6 +2014,7 @@ internal fun GroupDetailsScreen(
                                 SettingsLink(
                                     context = rowContext,
                                     title = stringResource(R.string.add_member),
+                                    routeKey = "add-members",
                                     onClick = {
                                         addMemberAutoOpened = false
                                         showAddMember = true
@@ -2118,6 +2152,9 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.tts_auto_read_title),
                                     provenanceLabel = autoReadSettingLabel,
+                                    sourceOwner = autoReadPopupOwner,
+                                    onSourceActivated = { autoReadPopupSource = it },
+                                    sourceActivation = autoReadPopupSource,
                                     onClick = { showAutoReadPicker = true },
                                 )
                             }
@@ -2142,6 +2179,7 @@ internal fun GroupDetailsScreen(
                             SettingsLink(
                                 context = rowContext,
                                 title = stringResource(R.string.sounds_and_notifications),
+                                routeKey = "notifications",
                                 onClick = { showNotificationSettings = true },
                                 modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
                                 value =
@@ -2157,6 +2195,7 @@ internal fun GroupDetailsScreen(
                             SettingsLink(
                                 context = rowContext,
                                 title = stringResource(R.string.chat_bubble_colors),
+                                routeKey = "bubble-colors",
                                 onClick = { showBubbleColors = true },
                                 leading = { SettingsLeadingIcon(Icons.Filled.Palette) },
                             )
@@ -2177,6 +2216,7 @@ internal fun GroupDetailsScreen(
                     }
                     if (showAutoReadPicker) {
                         TtsAutoReadPickerDialog(
+                            source = autoReadPopupSource,
                             globalDefaultEnabled = ttsAutoReadPrefs.globalDefaultEnabled,
                             selectedOverride = autoReadOverride,
                             onDismiss = { showAutoReadPicker = false },
@@ -2384,6 +2424,7 @@ internal fun GroupDetailsScreen(
                             SettingsLink(
                                 context = rowContext,
                                 title = stringResource(groupRelaysTitleRes(isDm)),
+                                routeKey = "relays",
                                 onClick = { showChatRelays = true },
                                 modifier = Modifier.testTag("chat_info.relays"),
                                 subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
@@ -2395,6 +2436,7 @@ internal fun GroupDetailsScreen(
                                 SettingsLink(
                                     context = rowContext,
                                     title = stringResource(R.string.developer_tools),
+                                    routeKey = "group-info",
                                     onClick = { showGroupInfo = true },
                                     modifier = Modifier.testTag("chat_info.developer_tools"),
                                     leading = {
@@ -2578,6 +2620,7 @@ internal fun GroupDetailsScreen(
                                 SettingsLink(
                                     context = rowContext,
                                     title = stringResource(R.string.developer_tools),
+                                    routeKey = "group-info",
                                     onClick = { showGroupInfo = true },
                                     modifier = Modifier.testTag("chat_info.developer_tools"),
                                     leading = {

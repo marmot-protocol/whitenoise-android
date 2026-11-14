@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -117,6 +118,8 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Language
 import dev.ipf.whitenoise.android.ui.icons.filled.MoreVert
 import dev.ipf.whitenoise.android.ui.icons.filled.Pause
 import dev.ipf.whitenoise.android.ui.icons.filled.PlayArrow
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
+import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.Dispatchers
@@ -674,7 +677,7 @@ private fun MediaTileGrid(
                 )
             }
             gridItems(section.items, key = { "${it.messageIdHex}#${it.attachmentIndex}" }) { tile ->
-                Box(Modifier.aspectRatio(1f), contentAlignment = Alignment.BottomStart) {
+                Box(Modifier.aspectRatio(1f).settingsCardMorph(), contentAlignment = Alignment.BottomStart) {
                     if (tile.isVideo) {
                         MediaVideoGridTile(
                             messageIdHex = tile.messageIdHex,
@@ -767,27 +770,29 @@ internal fun <T> MonthSectionedColumn(
         EmptyPlaceholder(emptyLabel)
         return
     }
-    WhiteNoiseLazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(bottom = 24.dp),
-        modifier = Modifier.fillMaxSize().trackWhiteNoiseHeader(listState),
-    ) {
-        sections.forEach { section ->
-            item(key = "header-${section.sectionKey}") {
-                Text(
-                    monthLabel(section.monthKey),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(16.dp).semantics { heading() },
-                )
-            }
-            items(section.items, key = { keyOf(it) }) { item ->
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    row(item)
-                    TextButton(
-                        onClick = { onJumpToMessage(messageIdOf(item)) },
-                        modifier = Modifier.testTag("shared.message.${keyOf(item)}"),
-                    ) {
-                        Text(stringResource(R.string.shared_content_go_to_message))
+    dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport { viewport ->
+        WhiteNoiseLazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(bottom = 24.dp),
+            modifier = Modifier.fillMaxSize().then(viewport).trackWhiteNoiseHeader(listState),
+        ) {
+            sections.forEach { section ->
+                item(key = "header-${section.sectionKey}") {
+                    Text(
+                        monthLabel(section.monthKey),
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(16.dp).semantics { heading() },
+                    )
+                }
+                items(section.items, key = { keyOf(it) }) { item ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        row(item)
+                        TextButton(
+                            onClick = { onJumpToMessage(messageIdOf(item)) },
+                            modifier = Modifier.testTag("shared.message.${keyOf(item)}"),
+                        ) {
+                            Text(stringResource(R.string.shared_content_go_to_message))
+                        }
                     }
                 }
             }
@@ -899,6 +904,8 @@ private suspend fun libraryClipAtTap(
 
 /** One voice row with playback. */
 @Composable
+// One native voice row retains playback, cache admission and nested action ownership.
+@Suppress("CyclomaticComplexMethod", "LongMethod", "FunctionNaming")
 internal fun VoiceLibraryRow(
     row: SharedMediaRow,
     controller: ConversationController,
@@ -935,6 +942,16 @@ internal fun VoiceLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(
+                    rememberSettingsNativeSurface(
+                        destination = null,
+                        fill = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = MaterialTheme.shapes.large,
+                        strokeColor =
+                            amoledSurfaceBorderStroke()?.let { MaterialTheme.colorScheme.outlineVariant }
+                                ?: Color.Unspecified,
+                    ).first,
+                ).settingsCardMorph()
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
@@ -1139,6 +1156,16 @@ internal fun FileLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(
+                    rememberSettingsNativeSurface(
+                        destination = null,
+                        fill = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = MaterialTheme.shapes.large,
+                        strokeColor =
+                            amoledSurfaceBorderStroke()?.let { MaterialTheme.colorScheme.outlineVariant }
+                                ?: Color.Unspecified,
+                    ).first,
+                ).settingsCardMorph()
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
@@ -1372,6 +1399,8 @@ private fun UrlLibraryTab(
 /** One link row. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
+// Keep native row measurement with the URL row and its existing tap callbacks.
+@Suppress("LongMethod", "FunctionNaming")
 private fun UrlLibraryRow(
     entry: MediaInventory.UrlEntry,
     appState: WhiteNoiseAppState,
@@ -1390,6 +1419,16 @@ private fun UrlLibraryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(
+                    rememberSettingsNativeSurface(
+                        destination = null,
+                        fill = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = MaterialTheme.shapes.large,
+                        strokeColor =
+                            amoledSurfaceBorderStroke()?.let { MaterialTheme.colorScheme.outlineVariant }
+                                ?: Color.Unspecified,
+                    ).first,
+                ).settingsCardMorph()
                 .clip(MaterialTheme.shapes.large)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .amoledSurfaceBorder(MaterialTheme.shapes.large)
@@ -1464,7 +1503,10 @@ private fun SenderAvatar(
 
 // Host of an absolute URL for the URL-row title, falling back to the raw URL
 // when it can't be parsed (the inventory already guarantees an http(s) prefix).
-private fun hostOf(url: String): String = runCatching { URI(url).host }.getOrNull()?.removePrefix("www.")?.takeIf { it.isNotBlank() } ?: url
+private fun hostOf(url: String): String =
+    runCatching {
+        URI(url).host
+    }.getOrNull()?.removePrefix("www.")?.takeIf { it.isNotBlank() } ?: url
 
 // Compact relative-ish timestamp for the media rows: today shows the clock,
 // older entries show the calendar date. `recordedAt` is epoch SECONDS.

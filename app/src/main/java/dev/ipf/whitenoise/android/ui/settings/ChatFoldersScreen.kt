@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
 
@@ -302,7 +303,10 @@ private fun ChatFolderRestoreDefaults(
     defaultsMissing: Boolean,
     onRestoreDefaults: () -> Unit,
 ) {
-    SettingsGroup {
+    SettingsGroup(
+        destination = SettingsDetail.ChatFolders,
+        surface = "folder-management-actions",
+    ) {
         row("restore") { context ->
             SettingsAction(
                 context = context,

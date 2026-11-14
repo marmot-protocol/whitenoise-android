@@ -52,14 +52,18 @@ internal class PopupSurfaceMotion(
     val dismiss: () -> Unit,
     private val requestClose: (() -> Unit) -> Unit,
     private val cancelClose: () -> Unit,
+    private val restoreAfterSourceInvalidation: () -> Unit,
 ) {
     val acceptsInput: Boolean get() = inputAllowed()
 
     /** The first terminal action wins synchronously and runs only after the last exit frame. */
     fun close(afterExit: () -> Unit) = requestClose(afterExit)
 
-    /** Forced owner/source navigation must not later execute an accepted button action. */
+    /** Forced owner navigation must not later execute an accepted button action. */
     fun cancelCompletion() = cancelClose()
+
+    /** Geometry loss keeps this owner mounted in its usable native fallback. */
+    fun invalidateSource() = restoreAfterSourceInvalidation()
 
     /** Keep the modal window inert during exit without disposing its native focus or IME host. */
     fun inputModifier(): Modifier =
@@ -86,7 +90,7 @@ internal class PopupSurfaceMotion(
 
 /** Delay a user dismissal until its last frame, even when the caller conditionally owns the window. */
 @Composable
-@Suppress("LongParameterList", "CyclomaticComplexMethod")
+@Suppress("LongParameterList", "CyclomaticComplexMethod", "LongMethod")
 // Visibility, input gating, and accepted completion share the same remembered popup lifetime.
 internal fun rememberPopupSurfaceMotion(
     expanded: Boolean,
@@ -95,12 +99,12 @@ internal fun rememberPopupSurfaceMotion(
     animate: Boolean = true,
     dismissEnabled: () -> Boolean = { true },
     onDismissStart: () -> Unit = {},
+    presentationReady: Boolean = true,
 ): PopupSurfaceMotion {
     val motion = rememberSystemAnimationsEnabled() && animate
     var completion by remember(ownerKey, expanded) { mutableStateOf<PopupCloseRequest?>(null) }
-    val inputAllowed = remember(ownerKey, expanded) { { expanded && completion == null } }
     val visibility = remember(ownerKey) { MutableTransitionState(if (motion) false else expanded) }
-    visibility.targetState = expanded && completion == null
+    visibility.targetState = expanded && completion == null && (!motion || presentationReady)
     val transition = updateTransition(visibility, label = "popup visibility")
     val presence =
         transition.animateFloat(
@@ -115,6 +119,15 @@ internal fun rememberPopupSurfaceMotion(
             },
             label = "popup presence",
         ) { if (it) 1f else 0f }
+    val ready = rememberUpdatedState(presentationReady)
+    val inputAllowed =
+        remember(ownerKey, expanded, motion) {
+            {
+                expanded &&
+                    completion == null &&
+                    (!motion || (ready.value && visibility.isIdle && visibility.currentState))
+            }
+        }
     // Capture the action accepted by this owner. A replacement owner or external removal cancels it.
     LaunchedEffect(ownerKey, motion, visibility.isIdle, visibility.currentState, completion) {
         if (!motion || (visibility.isIdle && !visibility.currentState)) completion?.complete()
@@ -125,7 +138,10 @@ internal fun rememberPopupSurfaceMotion(
     return PopupSurfaceMotion(
         visible =
             if (motion) {
-                visibility.targetState || !visibility.isIdle || visibility.currentState
+                (expanded && completion == null) ||
+                    visibility.targetState ||
+                    !visibility.isIdle ||
+                    visibility.currentState
             } else {
                 expanded &&
                     completion == null
@@ -140,5 +156,9 @@ internal fun rememberPopupSurfaceMotion(
         },
         requestClose = close,
         cancelClose = { completion?.consumed = true },
+        restoreAfterSourceInvalidation = {
+            completion?.consumed = true
+            completion = null
+        },
     )
 }

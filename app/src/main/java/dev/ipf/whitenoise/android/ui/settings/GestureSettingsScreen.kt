@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.SwipePreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SpeechChoice
 import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
 /** Settings owns Android gesture preferences; command eligibility stays with each current row. */
@@ -54,7 +55,7 @@ internal fun GestureSettingsContent(
         SettingsList {
             item(key = "search.GestureSettings.1") { SettingsSection(stringResource(R.string.gestures_messages)) }
             item(key = "search.GestureSettings.2") {
-                SettingsGroup {
+                SettingsGroup(destination = SettingsDetail.Gestures, surface = "message-gestures") {
                     for (binding in listOf(SwipeBinding.MessageLeft, SwipeBinding.MessageRight)) {
                         row(binding.name) { rowContext ->
                             SettingsAction(

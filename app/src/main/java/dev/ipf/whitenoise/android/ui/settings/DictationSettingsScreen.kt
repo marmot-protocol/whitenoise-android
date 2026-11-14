@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.state.ConversationDictationPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.SpeechChoice
 import dev.ipf.whitenoise.android.ui.common.SpeechChoiceDialog
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 
 /** Which dictation picker is open. */
 private enum class DictationSetting { Finish, Result }
@@ -115,7 +116,11 @@ internal fun DictationSettingsScreen(
                 }
             }
             item(key = "search.DictationSettings.4") {
-                SettingsGroup(modifier = Modifier.testTag("dictation.preferences.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("dictation.preferences.group"),
+                    destination = SettingsDetail.Dictation,
+                    surface = "dictation-preferences",
+                ) {
                     row("provider") { context ->
                         SettingsLink(
                             context = context,

@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.first
 
@@ -65,6 +66,7 @@ internal fun RelaysScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     onFeedback: (dev.ipf.whitenoise.android.state.ToastMessage) -> Unit = {},
+    destination: SettingsDetail = SettingsDetail.Relays,
 ) {
     val account = appState.activeAccountRef
     val feedbackRuntime = appState.runtimeGeneration
@@ -159,6 +161,7 @@ internal fun RelaysScreen(
 
     RelaysContent(
         state = RelaysUiState(lists = lists, publication = publication, busy = busy),
+        destination = destination,
         onBack = onBack,
         onOpenRelay = { selectedUrl = it },
         onAdd = { addSheet = true },
@@ -223,6 +226,7 @@ internal fun RelaysContent(
     onRefresh: () -> Unit,
     onPublishMissing: () -> Unit,
     onRestore: () -> Unit,
+    destination: SettingsDetail = SettingsDetail.Relays,
 ) {
     val lists = state.lists
     val relays = lists?.let(::accountRelays).orEmpty()
@@ -251,7 +255,11 @@ internal fun RelaysContent(
             item(key = "search.Relays.4") { SettingsExplainer(stringResource(relayListsHelpRes(lists))) }
             item(key = "search.Relays.5") { SettingsSection(stringResource(R.string.profile_relays)) }
             item(key = "search.Relays.6") {
-                SettingsGroup(modifier = Modifier.testTag("relays.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("relays.group"),
+                    destination = destination,
+                    surface = "account-relays",
+                ) {
                     relays.forEach { relay ->
                         row(relay.url) { context ->
                             SettingsLink(

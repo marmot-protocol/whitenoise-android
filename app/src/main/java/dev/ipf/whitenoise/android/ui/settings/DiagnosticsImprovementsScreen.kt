@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.launch
 import java.io.File
@@ -107,7 +108,11 @@ internal fun DiagnosticsImprovementsScreen(
     SettingsScaffold(title = stringResource(R.string.diagnostics_improvements), onBack = onBack) {
         SettingsList {
             item(key = "search.DiagnosticsImprovements.1") {
-                SettingsGroup(modifier = Modifier.testTag("diagnostics.choices.group")) {
+                SettingsGroup(
+                    modifier = Modifier.testTag("diagnostics.choices.group"),
+                    destination = SettingsDetail.DiagnosticsImprovements,
+                    surface = "diagnostics-choices",
+                ) {
                     row("usage") { rowContext ->
                         SettingsSwitch(
                             context = rowContext,

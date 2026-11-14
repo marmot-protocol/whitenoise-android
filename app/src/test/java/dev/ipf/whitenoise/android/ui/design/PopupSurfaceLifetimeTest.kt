@@ -141,4 +141,103 @@ class PopupSurfaceLifetimeTest {
         rule.mainClock.advanceTimeBy(800)
         publish { assertEquals(0, actions) }
     }
+
+    @Test fun sourceInvalidationDuringCloseRestoresUsableFallbackAndAcceptsOneNewAction() {
+        lateinit var surface: PopupSurfaceMotion
+        val sourceCurrent = mutableStateOf(true)
+        val actions = mutableListOf<String>()
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                surface = rememberPopupSurfaceMotion(true, { actions += "dismiss" }, animate = sourceCurrent.value)
+            }
+        }
+        rule.mainClock.advanceTimeBy(400)
+        publish {
+            surface.close { actions += "stale-choice" }
+            assertFalse(surface.acceptsInput)
+        }
+        rule.mainClock.advanceTimeByFrame()
+        publish {
+            surface.invalidateSource()
+            sourceCurrent.value = false
+        }
+        rule.mainClock.advanceTimeBy(400)
+        publish {
+            assertEquals(emptyList<String>(), actions)
+            assertEquals(true, surface.visible)
+            assertEquals(1f, surface.presence.value)
+            assertEquals(true, surface.acceptsInput)
+            surface.close { actions += "new-choice" }
+            surface.dismiss()
+            surface.close { actions += "duplicate" }
+        }
+        rule.mainClock.advanceTimeBy(400)
+        publish {
+            assertEquals(listOf("new-choice"), actions)
+            assertFalse(surface.visible)
+        }
+        rule.mainClock.advanceTimeBy(800)
+        publish { assertEquals(listOf("new-choice"), actions) }
+    }
+
+    @Test fun measurementHoldsTheSameClockAndActionsUntilNativeBodySettles() {
+        lateinit var surface: PopupSurfaceMotion
+        val ready = mutableStateOf(false)
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                surface = rememberPopupSurfaceMotion(true, {}, presentationReady = ready.value)
+            }
+        }
+        rule.mainClock.advanceTimeBy(800)
+        publish {
+            assertEquals(true, surface.visible)
+            assertEquals(0f, surface.presence.value)
+            assertFalse(surface.acceptsInput)
+            ready.value = true
+        }
+        rule.mainClock.advanceTimeByFrame()
+        publish { assertFalse(surface.acceptsInput) }
+        rule.mainClock.advanceTimeBy(400)
+        publish {
+            assertEquals(1f, surface.presence.value)
+            assertEquals(true, surface.acceptsInput)
+        }
+    }
+
+    @Test fun reducedMotionBypassesMeasurementAndDismissalStillCompletesOnce() {
+        lateinit var surface: PopupSurfaceMotion
+        var actions = 0
+        rule.setContent {
+            CompositionLocalProvider(LocalSystemAnimationsEnabled provides false) {
+                surface = rememberPopupSurfaceMotion(true, { actions++ }, presentationReady = false)
+            }
+        }
+        publish {
+            assertEquals(true, surface.acceptsInput)
+            assertEquals(1f, surface.presence.value)
+            surface.dismiss()
+            surface.dismiss()
+        }
+        publish { assertEquals(1, actions) }
+    }
+
+    @Test fun nativeDismissalDuringMeasurementCompletesWithoutStartingAnEntry() {
+        lateinit var surface: PopupSurfaceMotion
+        var actions = 0
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                surface = rememberPopupSurfaceMotion(true, { actions++ }, presentationReady = false)
+            }
+        }
+        publish { surface.dismiss() }
+        rule.mainClock.advanceTimeBy(400)
+        publish {
+            assertEquals(1, actions)
+            assertFalse(surface.visible)
+            assertEquals(0f, surface.presence.value)
+        }
+    }
 }

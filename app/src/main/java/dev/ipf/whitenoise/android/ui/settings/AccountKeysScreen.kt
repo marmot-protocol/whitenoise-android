@@ -103,6 +103,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
@@ -536,7 +537,7 @@ private fun ProfileKeysList(
         item(key = "search.AccountKeys.2") { AccountKeysIdentityHeader(identity) }
         item(key = "search.AccountKeys.3") { SettingsSection(stringResource(R.string.public_key)) }
         item(key = "search.AccountKeys.4") {
-            SettingsGroup {
+            SettingsGroup(destination = SettingsDetail.AccountKeys, surface = "account-public-key") {
                 row("public_key") { context ->
                     ProfileKeyValueRow(
                         context = context,

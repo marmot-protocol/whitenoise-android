@@ -115,7 +115,7 @@ internal fun ProfileNotificationOverrideScreen(
         SettingsList {
             item(key = "scope") { SettingsExplainer(stringResource(R.string.profile_notification_scope_detail)) }
             item(key = "choices") {
-                SettingsGroup {
+                SettingsGroup(destination = ProfileSheetPage.NOTIFICATIONS) {
                     row("defaults") { row ->
                         SettingsChoice(
                             context = row,

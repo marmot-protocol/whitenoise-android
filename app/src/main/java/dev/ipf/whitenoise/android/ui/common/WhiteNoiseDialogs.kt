@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -226,6 +225,7 @@ internal fun WhiteNoiseAlertDialog(
     dismissEnabled: () -> Boolean = { true },
     onDismissStart: () -> Unit = {},
     ownerKey: Any? = LocalSettingsCardMorph.current,
+    source: PopupSourceActivation? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val outline = amoledOutlineBorder()
@@ -235,10 +235,10 @@ internal fun WhiteNoiseAlertDialog(
             dismissEnabled = dismissEnabled,
             onDismissStart = onDismissStart,
             ownerKey = ownerKey,
+            source = source,
+            border = outline,
             confirmButton = confirmButton,
-            modifier =
-                (if (outline != null) modifier.border(outline, MaterialTheme.shapes.extraLarge) else modifier)
-                    .exposePerformanceTestTags(),
+            modifier = modifier.exposePerformanceTestTags(),
             dismissButton = dismissButton,
             icon = icon,
             title = title,

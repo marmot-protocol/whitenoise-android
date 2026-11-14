@@ -20,6 +20,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
@@ -73,6 +74,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 
 /** Temporal pixels from the production shell host and actual composer/FAB; no native conversation is fabricated. */
 @RunWith(RobolectricTestRunner::class)
@@ -209,6 +211,113 @@ class ComposerFabHandoffScreenshotTest {
         rule.runOnIdle { assertEquals(1f, motion.renderedContentAlpha, 0f) }
     }
 
+    /** Dense normal-palette reference: three actual round trips, with no synthetic motion. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+    fun composerRoundTripAmoledThreeCycles() {
+        org.junit.Assume.assumeTrue(System.getenv("ANIMATION_CAPTURE_FRAMES") == "1")
+        // Never overwrite evidence from a previous invocation; the caller archives it first.
+        val output = File("build/actual-composer-pen-motion")
+        check(!output.exists()) { "Archive the previous actual-composer-pen-motion output first" }
+        check(output.mkdirs())
+        renderEndpoints(dark = true, amoled = true)
+        val nativeComposer = assertCurrentEndpoint(ComposerFabEndpoint.Composer)
+        repeat(3) { cycle ->
+            captureDenseTransition(File(output, "composer_pen_cycle_$cycle/forward"), ComposerFabEndpoint.NewMessage)
+            captureDenseTransition(File(output, "composer_pen_cycle_$cycle/reverse"), ComposerFabEndpoint.Composer)
+            assertEquals(nativeComposer, assertCurrentEndpoint(ComposerFabEndpoint.Composer))
+        }
+    }
+
+    /** Samples the existing measured handoff; commitEndpoint remains the only commit owner. */
+    private fun captureDenseTransition(
+        folder: File,
+        target: ComposerFabEndpoint,
+    ) {
+        check(folder.mkdirs())
+        val motion = requireNotNull(handoff)
+        val sourceEndpoint =
+            if (target == ComposerFabEndpoint.NewMessage) {
+                ComposerFabEndpoint.Composer
+            } else {
+                ComposerFabEndpoint.NewMessage
+            }
+        assertCurrentEndpoint(sourceEndpoint)
+        rule.runOnIdle {
+            assertFalse(motion.active)
+            assertNull(motion.renderedBounds)
+        }
+        val source = rule.runOnIdle { requireNotNull(motion.captureOrigin()) }
+        val sourceStroke = strokePixels(source)
+        captureDenseFrame(folder, "source")
+        val start = rule.mainClock.currentTime
+        commitEndpoint(target)
+        val end = assertCurrentEndpoint(target)
+        assertEquals(
+            "Native and bridge strokes must occupy the same first-frame pixels",
+            sourceStroke,
+            strokePixels(source),
+        )
+        var middle: IntArray? = null
+        repeat(33) { frame ->
+            if (frame > 0) {
+                rule.mainClock.advanceTimeBy(16)
+                rule.waitForIdle()
+            }
+            assertEquals(start + 16L + frame * 16L, rule.mainClock.currentTime)
+            if (frame == 5) {
+                assertCurrentEndpoint(target)
+                assertInterpolating(source, end)
+                rule.runOnIdle { assertTrue(motion.active) }
+                middle = pixels()
+            }
+            if (frame == 32) {
+                assertCurrentEndpoint(target)
+                rule.runOnIdle {
+                    assertFalse(motion.active)
+                    assertNull(motion.renderedBounds)
+                }
+                assertFalse(
+                    "Actual intermediate pixels must differ from the native destination",
+                    requireNotNull(middle).contentEquals(pixels()),
+                )
+                assertEquals(TextFieldValue(PRIVATE_DRAFT, selection = TextRange(4)), draft)
+            }
+            captureDenseFrame(folder, "frame-%03d".format(frame))
+        }
+        // Record source/target separately: final renderedBounds is intentionally null after retirement.
+        File(folder, "bounds.txt").writeText("source=$source\ntarget=$end\ncommitStartMs=$start\n")
+    }
+
+    /** Export native pixels at the frozen clock, retaining actual dimensions, state and PNG hashes. */
+    private fun captureDenseFrame(
+        folder: File,
+        name: String,
+    ) {
+        val time = rule.mainClock.currentTime
+        assertFalse(rule.mainClock.autoAdvance)
+        val image = rule.onNodeWithTag(TAG).captureToImage()
+        assertEquals(360, image.width)
+        assertEquals(780, image.height)
+        val file = File(folder, "$name.png")
+        image.asAndroidBitmap().captureRoboImage(file.path)
+        assertEquals("Export must not advance the Compose clock", time, rule.mainClock.currentTime)
+        val sha256 =
+            MessageDigest
+                .getInstance(
+                    "SHA-256",
+                ).digest(file.readBytes())
+                .joinToString("") { "%02x".format(it) }
+        val motion = requireNotNull(handoff)
+        File(
+            folder,
+            "frames.tsv",
+        ).appendText(
+            "${file.name}\t$time\t${image.width}\t${image.height}\t$sha256\t" +
+                "${motion.active}\t${motion.renderedBounds}\n",
+        )
+    }
+
     private fun commitEndpoint(target: ComposerFabEndpoint) {
         val start = rule.mainClock.currentTime
         rule.runOnIdle {
@@ -227,6 +336,7 @@ class ComposerFabHandoffScreenshotTest {
     private fun renderEndpoints(
         dark: Boolean,
         largeRtl: Boolean = false,
+        amoled: Boolean = largeRtl,
     ) {
         val appState = ChatRowPortFixtures.state(context)
         rule.setContent {
@@ -234,7 +344,7 @@ class ComposerFabHandoffScreenshotTest {
                 LocalCursorBlinkEnabled provides false,
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = largeRtl, fontScale = if (largeRtl) 2f else 1f) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     Surface(Modifier.fillMaxSize().testTag(TAG)) {
                         preCommitContentAlpha = remember(destination) { handoff?.renderedContentAlpha }
                         MainShellNoticeLayout(

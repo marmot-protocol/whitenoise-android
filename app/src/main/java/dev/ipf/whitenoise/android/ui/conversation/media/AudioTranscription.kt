@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,7 +21,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,6 +42,7 @@ import dev.ipf.whitenoise.android.audio.transcribeAttachment
 import dev.ipf.whitenoise.android.media.holdCacheFileInUse
 import dev.ipf.whitenoise.android.media.releaseCacheFileInUse
 import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
+import dev.ipf.whitenoise.android.ui.common.PopupSourceActivation
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.openOfflineSpeechToTextListing
 import kotlinx.coroutines.CancellationException
@@ -54,6 +62,8 @@ internal data class AudioTranscriptUi(
 
 /** Belongs to the mounted attachment; transcripts never enter the message store or composer. */
 @Composable
+// The mounted attachment owns cancellation, transcript job and launcher measurement together.
+@Suppress("LongMethod")
 internal fun ReceivedAudioTranscription(file: File?) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -61,6 +71,13 @@ internal fun ReceivedAudioTranscription(file: File?) {
     var request by remember(file) { mutableStateOf<Job?>(null) }
     var listingFailed by remember { mutableStateOf(false) }
     val working = ui?.phase == AudioTranscriptPhase.WORKING
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    val launcherShape = ButtonDefaults.textShape
+    val owner = remember(file) { Any() }
+    var launcher by remember(file) { mutableStateOf<LayoutCoordinates?>(null) }
+    var source by remember(file) { mutableStateOf<PopupSourceActivation?>(null) }
 
     DisposableEffect(lifecycle, file) {
         val observer =
@@ -89,17 +106,30 @@ internal fun ReceivedAudioTranscription(file: File?) {
 
     TextButton(
         onClick = {
+            source =
+                PopupSourceActivation.capture(
+                    owner,
+                    launcher,
+                    view,
+                    launcherShape,
+                    Color.Transparent,
+                    null,
+                    density,
+                    direction,
+                )
             listingFailed = false
             ui = AudioTranscriptUi(AudioTranscriptPhase.CONFIRM)
         },
         enabled = file != null,
-        modifier = Modifier.testTag("audio.transcribe"),
+        modifier = Modifier.onGloballyPositioned { launcher = it }.testTag("audio.transcribe"),
     ) {
         Text(stringResource(R.string.transcribe_audio))
     }
     ui?.let { state ->
         AudioTranscriptDialog(
             state = state,
+            source = source,
+            ownerKey = owner,
             listingError =
                 if (listingFailed) stringResource(R.string.dictation_ostt_recommendation_open_failed) else null,
             onStart = { ui = AudioTranscriptUi(AudioTranscriptPhase.WORKING) },
@@ -142,16 +172,20 @@ internal fun AudioTranscriptDialog(
     onStart: () -> Unit,
     onDismiss: () -> Unit,
     onGetProvider: () -> Unit,
+    source: PopupSourceActivation? = null,
+    ownerKey: Any? = source?.ownerKey,
 ) {
     val cancellable = state.phase == AudioTranscriptPhase.WORKING || state.phase == AudioTranscriptPhase.CONFIRM
     AnimatedAlertDialog(
         onDismissRequest = onDismiss,
+        source = source,
+        ownerKey = ownerKey,
         properties = DialogProperties(securePolicy = androidx.compose.ui.window.SecureFlagPolicy.SecureOn),
         title = { Text(stringResource(R.string.audio_transcription_title)) },
         text = { AudioTranscriptBody(state, listingError) },
-        confirmButton = { AudioTranscriptConfirm(state, onStart, onGetProvider) },
+        confirmButton = { AudioTranscriptConfirm(state, onStart, onGetProvider, acceptsInput) },
         dismissButton = {
-            TextButton(onClick = dismiss) {
+            TextButton(onClick = dismiss, enabled = acceptsInput) {
                 Text(stringResource(if (cancellable) R.string.cancel else R.string.close))
             }
         },
@@ -193,10 +227,11 @@ private fun AudioTranscriptConfirm(
     state: AudioTranscriptUi,
     onStart: () -> Unit,
     onGetProvider: () -> Unit,
+    enabled: Boolean,
 ) {
     when (state.phase) {
         AudioTranscriptPhase.CONFIRM ->
-            TextButton(onClick = onStart) {
+            TextButton(onClick = onStart, enabled = enabled) {
                 Text(stringResource(R.string.transcribe_audio))
             }
         AudioTranscriptPhase.FAILED -> {
@@ -204,11 +239,11 @@ private fun AudioTranscriptConfirm(
                 state.failure == AttachmentSpeechFailure.PROVIDER_MISSING ||
                     state.failure == AttachmentSpeechFailure.PROVIDER_OUTDATED
             if (needsProvider) {
-                TextButton(onClick = onGetProvider) {
+                TextButton(onClick = onGetProvider, enabled = enabled) {
                     Text(stringResource(R.string.dictation_ostt_recommendation_title))
                 }
             } else if (state.failure != AttachmentSpeechFailure.ANDROID_VERSION) {
-                TextButton(onClick = onStart) { Text(stringResource(R.string.retry)) }
+                TextButton(onClick = onStart, enabled = enabled) { Text(stringResource(R.string.retry)) }
             }
         }
         AudioTranscriptPhase.COMPLETE, AudioTranscriptPhase.WORKING -> Unit

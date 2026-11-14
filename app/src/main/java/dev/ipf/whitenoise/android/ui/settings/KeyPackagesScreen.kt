@@ -37,6 +37,7 @@ import dev.ipf.whitenoise.android.state.fetchKeyPackageInventory
 import dev.ipf.whitenoise.android.state.keyPackageRelayHistory
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -353,7 +354,7 @@ private fun PublishingActions(
     onRepublish: () -> Unit,
     onPublishNew: () -> Unit,
 ) {
-    SettingsGroup {
+    SettingsGroup(destination = SettingsDetail.KeyPackages, surface = "key-package-publishing-actions") {
         row("republish") { context ->
             SettingsGroupPanel(context) {
                 TextButton(onClick = onRepublish, enabled = state.actionsEnabled, modifier = Modifier.fillMaxWidth()) {

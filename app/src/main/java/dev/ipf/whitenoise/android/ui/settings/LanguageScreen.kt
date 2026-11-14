@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** App language as one radio group; a choice applies immediately and the screen stays open. */
@@ -21,6 +22,8 @@ internal fun LanguageScreen(
         SettingsList {
             item {
                 SettingsGroup(
+                    destination = SettingsDetail.Language,
+                    surface = "language-options",
                     modifier =
                         Modifier
                             .selectableGroup()
