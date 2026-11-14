@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 /** Source identity authenticated inside each derivative, independently of its recyclable storage slot. */
@@ -25,6 +26,7 @@ internal data class DisplayThumbnailSource(
  */
 internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
     private val generation = AtomicLong()
+    private val invalidations = AtomicInteger()
     private val publicationLock = Any()
 
     /** Capture before reading an original, so removal during decoding also fences the eventual write. */
@@ -36,7 +38,7 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
     }
 
     /** Late reads and writes are expendable after any explicit cache invalidation. */
-    fun isCurrent(token: Long): Boolean = token == generation.get()
+    fun isCurrent(token: Long): Boolean = invalidations.get() == 0 && token == generation.get()
 
     /** Hydrates the authenticated disk index off main. */
     fun prepare() = disk.prepare()
@@ -95,8 +97,15 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
 
     /** Serializes invalidation with publication, while reads authenticate without holding this lock. */
     private fun invalidate(block: () -> Unit) {
+        invalidations.incrementAndGet()
         retirePending()
-        synchronized(publicationLock) { block() }
+        try {
+            synchronized(publicationLock) { block() }
+        } finally {
+            // Tokens captured while cleanup waited for a writer must also be obsolete after cleanup finishes.
+            retirePending()
+            invalidations.decrementAndGet()
+        }
     }
 
     /** A schema-specific slot prevents ordinary original-cache envelopes from entering this decoder. */

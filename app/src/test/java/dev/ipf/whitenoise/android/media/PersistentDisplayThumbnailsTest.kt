@@ -14,6 +14,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.crypto.spec.SecretKeySpec
 
 /** Exercises authenticated derivative storage, without a native or network boundary. */
@@ -74,6 +78,50 @@ class PersistentDisplayThumbnailsTest {
             remove()
             cache.write(source, MediaThumbnail(bitmap, 256), pending)
             assertNull(cache.read(source, 128, cache.captureGeneration()))
+        }
+    }
+
+    /** A producer that starts while cleanup waits for another writer cannot repopulate the completed wipe. */
+    @Test
+    fun tokensCapturedDuringBlockedCleanupAreRejected() {
+        val pause = AtomicBoolean(false)
+        val writing = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val cache = PersistentDisplayThumbnails(
+            DiskByteCache(
+                directory,
+                maxBytes = PersistentDisplayThumbnails.MAX_BYTES,
+                keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") },
+                afterEncryptedWrite = {
+                    if (pause.get()) {
+                        writing.countDown()
+                        check(release.await(10, TimeUnit.SECONDS))
+                    }
+                },
+            ),
+        )
+        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration())
+        pause.set(true)
+        val before = cache.captureGeneration()
+        val writer = CompletableFuture.runAsync { cache.write(source, MediaThumbnail(bitmap, 384), before) }
+        check(writing.await(10, TimeUnit.SECONDS))
+        val cleaner = CompletableFuture.runAsync { cache.clear() }
+        try {
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            while (cache.isCurrent(before) && System.nanoTime() < deadline) Thread.yield()
+            assertTrue(!cache.isCurrent(before))
+            val during = cache.captureGeneration()
+            assertNull(cache.read(source, 128, during))
+            release.countDown()
+            writer.get(10, TimeUnit.SECONDS)
+            cleaner.get(10, TimeUnit.SECONDS)
+            pause.set(false)
+            cache.write(source, MediaThumbnail(bitmap, 256), during)
+            assertEquals(0L, cache.residentBytes())
+        } finally {
+            release.countDown()
+            writer.get(10, TimeUnit.SECONDS)
+            cleaner.get(10, TimeUnit.SECONDS)
         }
     }
 
