@@ -10,6 +10,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -158,6 +159,41 @@ class PhotoEditorSemanticsTest {
             val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
             assertTrue("Canvas share for $tool: ${canvas.height / root.height}", canvas.height >= root.height * .6f)
         }
+    }
+
+    @Test
+    @Config(qualifiers = "w640dp-h300dp-mdpi")
+    fun shortWideWindowKeepsEveryToolFullyVisibleWithoutScrolling() {
+        render()
+        PhotoEditorTool.entries.forEach { tool ->
+            composeRule.runOnIdle { holder.selectTool(tool) }
+            listOf(
+                R.string.photo_editor_crop,
+                R.string.photo_editor_draw,
+                R.string.photo_editor_erase,
+                R.string.photo_editor_rotate_clockwise,
+            ).forEach { label ->
+                val button = composeRule.onNodeWithContentDescription(string(label))
+                button.assertIsDisplayed().assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
+                val unclipped = button.getUnclippedBoundsInRoot()
+                val visible = button.fetchSemanticsNode().boundsInRoot
+                // Density is 1: clipped semantics bounds must retain the entire target.
+                assertEquals(
+                    "Full visible width for ${string(label)}",
+                    (unclipped.right - unclipped.left).value,
+                    visible.width,
+                    .5f,
+                )
+                assertEquals(
+                    "Full visible height for ${string(label)}",
+                    (unclipped.bottom - unclipped.top).value,
+                    visible.height,
+                    .5f,
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription(string(R.string.photo_editor_rotate_clockwise)).performClick()
+        assertEquals(1, holder.state.recipe.quarterTurnsClockwise)
     }
 
     @Test

@@ -419,26 +419,34 @@ private fun PhotoEditorControls(
     modifier: Modifier,
 ) {
     if (wide) {
-        Row(modifier) {
-            Column(Modifier.weight(1f).fadingVerticalScroll(rememberScrollState())) {
-                EditorOptions(state, stateHolder, vertical = true)
-                EditorIconAction(R.drawable.ic_tune, coordinateDialogTitle(state.activeTool), !state.isSaving, onCoordinates)
-            }
-            Column(Modifier.weight(1f).fadingVerticalScroll(rememberScrollState())) {
-                PhotoEditorTool.entries.forEach { tool ->
-                    EditorToolButton(toolLabel(tool), toolIcon(tool), state.activeTool == tool, !state.isSaving, Modifier.fillMaxWidth()) {
-                        stateHolder.selectTool(tool)
+        Column(modifier) {
+            Column(Modifier.fillMaxWidth().selectableGroup()) {
+                Row(Modifier.fillMaxWidth()) {
+                    PhotoEditorTool.entries.take(2).forEach { tool ->
+                        EditorToolButton(toolLabel(tool), toolIcon(tool), state.activeTool == tool, !state.isSaving, Modifier.weight(1f)) {
+                            stateHolder.selectTool(tool)
+                        }
                     }
                 }
-                EditorToolButton(
-                    stringResource(R.string.photo_editor_rotate),
-                    R.drawable.ic_editor_rotate,
-                    false,
-                    !state.isSaving,
-                    Modifier.fillMaxWidth(),
-                ) {
-                    stateHolder.rotateClockwise()
+                Row(Modifier.fillMaxWidth()) {
+                    val tool = PhotoEditorTool.Erase
+                    EditorToolButton(toolLabel(tool), toolIcon(tool), state.activeTool == tool, !state.isSaving, Modifier.weight(1f)) {
+                        stateHolder.selectTool(tool)
+                    }
+                    EditorToolButton(
+                        stringResource(R.string.photo_editor_rotate),
+                        R.drawable.ic_editor_rotate,
+                        false,
+                        !state.isSaving,
+                        Modifier.weight(1f),
+                    ) {
+                        stateHolder.rotateClockwise()
+                    }
                 }
+            }
+            Column(Modifier.weight(1f).fillMaxWidth().fadingVerticalScroll(rememberScrollState())) {
+                EditorOptions(state, stateHolder, vertical = true)
+                EditorIconAction(R.drawable.ic_tune, coordinateDialogTitle(state.activeTool), !state.isSaving, onCoordinates)
             }
         }
     } else {

@@ -251,7 +251,6 @@ class PhotoEditorScreenshotTest {
             assertTrue(canvas.width > 0f && canvas.height > 0f)
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.photo_editor_draw))
-                .performScrollTo()
                 .assertIsDisplayed()
                 .performClick()
             assertEquals(PhotoEditorTool.Draw, holder.state.activeTool)
@@ -302,6 +301,44 @@ class PhotoEditorScreenshotTest {
             assertEquals(PhotoEditRecipe.Original, holder.state.recipe)
             composeRule.waitForIdle()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_light_landscape.png")
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    /** Short landscape keeps all four tools above independently scrolling options. */
+    @Test
+    @Config(qualifiers = "w640dp-h300dp-mdpi")
+    fun shortLandscapeKeepsAllToolsVisible() {
+        val bitmap = editorSourceBitmap()
+        val size = EditorPixelSize(bitmap.width, bitmap.height)
+        val holder = PhotoEditorStateHolder(PhotoEditRecipe.Original, MediaQuality.Standard, size)
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    PhotoEditorScreen(
+                        previewBitmap = bitmap,
+                        sourceInfo = PhotoEditorSourceInfo(size, size, 1, "image/png", false),
+                        stateHolder = holder,
+                        onCancel = {},
+                        onSave = { _, _ -> },
+                    )
+                }
+            }
+            composeRule.onNodeWithText(context.getString(R.string.photo_editor_title)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.save)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_draw)).performClick()
+            assertEquals(PhotoEditorTool.Draw, holder.state.activeTool)
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_crop)).performClick()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.photo_editor_rotate_clockwise))
+                .performClick()
+            assertEquals(1, holder.state.recipe.quarterTurnsClockwise)
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_undo)).performClick()
+            assertEquals(PhotoEditRecipe.Original, holder.state.recipe)
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_short_landscape.png")
         } finally {
             bitmap.recycle()
         }
