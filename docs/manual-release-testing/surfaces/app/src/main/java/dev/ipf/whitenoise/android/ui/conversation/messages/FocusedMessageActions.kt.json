@@ -78,6 +78,14 @@
         "test_ids": [
           "MSG-041"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "surface": "Focused message action carries an explanation",
+        "anchor": "val explanation: Explanation? = null",
+        "test_ids": [
+          "MSG-049"
+        ]
       }
     ],
     "settings_controls": [

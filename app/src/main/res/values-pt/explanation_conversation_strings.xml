@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Read Aloud bar explanations, shown when a transport button is held. -->
+    <string name="explanation_conversation_tts_previous_message">Leva a leitura em voz alta para o início da mensagem anterior. A mensagem não é alterada.</string>
+    <string name="explanation_conversation_tts_previous_sentence">Leva a leitura para o início da frase atual ou, se você já estiver lá, para a frase anterior.</string>
+    <string name="explanation_conversation_tts_next_sentence">Pula para a próxima frase da mensagem que está sendo lida em voz alta.</string>
+    <string name="explanation_conversation_tts_next_message">Pula para o início da próxima mensagem. A leitura em voz alta continua a partir dali.</string>
+    <string name="explanation_conversation_tts_resume_follow">Rola a conversa de volta para a mensagem que está sendo lida. Não pausa nem reinicia o áudio.</string>
+
+    <!-- Dictation explanations, shown when a dictation control is held. -->
+    <string name="explanation_conversation_dictation_cancel">Descarta o que você disse. Nada é enviado nem adicionado à mensagem, e isso não pode ser desfeito.</string>
+    <string name="explanation_conversation_dictation_send">Para de ouvir e envia o texto reconhecido como mensagem. Use Colar transcrição para revisá-lo antes de enviar.</string>
+    <string name="explanation_conversation_dictation_paste">Coloca o texto reconhecido na caixa de mensagem sem enviá-lo, para você editá-lo antes.</string>
+    <string name="explanation_conversation_dictation_recovery_paste">Coloca o texto reconhecido na caixa de mensagem sem enviá-lo.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_send">Tenta enviar de novo o texto reconhecido como mensagem.</string>
+    <string name="explanation_conversation_dictation_recovery_app_settings">Abre as configurações do Android para o White Noise, onde você pode permitir o acesso ao microfone.</string>
+    <string name="explanation_conversation_dictation_recovery_speech">Abre as configurações de reconhecimento de fala do Android, onde você pode escolher ou instalar um serviço de reconhecimento.</string>
+    <string name="explanation_conversation_dictation_recovery_retry">Volta a ouvir. O que foi reconhecido antes não é adicionado.</string>
+
+    <!-- Voice message explanations, shown when a recording or review control is held. -->
+    <string name="explanation_conversation_voice_discard">Exclui esta gravação sem enviá-la. Isso não pode ser desfeito.</string>
+    <string name="explanation_conversation_voice_record_again">Exclui esta gravação e começa uma nova. Nada é enviado.</string>
+    <string name="explanation_conversation_voice_delete">Para e exclui a gravação sem enviá-la. Isso não pode ser desfeito.</string>
+    <string name="explanation_conversation_voice_stop">Para a gravação e deixa você revisá-la. Nada é enviado até que você envie.</string>
+
+    <!-- Media preview explanations, shown when a preview control is held. -->
+    <string name="explanation_media_preview_send">Envia os anexos mostrados aqui, com sua legenda, para esta conversa. Com Concluído, eles ficam na caixa de mensagem.</string>
+    <string name="explanation_media_preview_done">Salva suas alterações e volta à caixa de mensagem. Nada é enviado, e os itens desmarcados são removidos do rascunho.</string>
+    <string name="explanation_media_preview_cancel">Fecha a pré-visualização sem enviar nada. Os anexos que você estava preparando são descartados.</string>
+    <string name="explanation_media_preview_add_more">Abre um menu para adicionar mais fotos ou arquivos a esta mensagem.</string>
+
+    <!-- Conversation header and navigation explanations. -->
+    <string name="explanation_conversation_header_details">Abre os detalhes desta conversa, como membros e configurações.</string>
+    <string name="explanation_conversation_jump_to_mention">Rola até a próxima mensagem não lida que menciona você.</string>
+    <string name="explanation_composer_draft_top">Rola o rascunho de volta para a primeira linha. O texto não é alterado.</string>
+    <string name="explanation_emoji_search">Pesquisa emojis pelo nome.</string>
+    <string name="explanation_emoji_configure">Abre as configurações onde você escolhe seus emojis de reação rápida.</string>
+
+    <!-- Poll creation explanations. -->
+    <string name="explanation_poll_add_option">Adiciona outra resposta à enquete, até o máximo permitido.</string>
+    <string name="explanation_poll_single_choice">Os membros só podem votar em uma resposta.</string>
+    <string name="explanation_poll_multiple_choice">Os membros podem votar em mais de uma resposta.</string>
+
+    <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_reply">Cita esta mensagem na caixa de texto para que sua resposta fique vinculada a ela.</string>
+    <string name="explanation_message_action_edit">Abre sua mensagem na caixa de texto para você alterá-la.</string>
+    <string name="explanation_message_action_select">Ativa o modo de seleção para escolher várias mensagens de uma vez.</string>
+    <string name="explanation_message_action_select_text">Permite selecionar parte do texto desta mensagem.</string>
+    <string name="explanation_message_action_copy">Copia o texto da mensagem para a área de transferência do telefone.</string>
+    <string name="explanation_message_action_translate">Abre um painel com uma tradução. A tradução é feita no seu dispositivo pelo app Offline Translator.</string>
+    <string name="explanation_message_action_read_aloud">Lê esta mensagem em voz alta e continua com as mensagens seguintes.</string>
+    <string name="explanation_message_action_read_code_literally">Lê esta mensagem em voz alta, pronunciando o código exatamente como está escrito, e continua com as mensagens seguintes.</string>
+    <string name="explanation_message_action_forward">Abre um seletor de conversas. As conversas escolhidas recebem uma nova cópia desta mensagem.</string>
+    <string name="explanation_message_action_keep_on_screen">Mantém esta mensagem em um pequeno cartão sobre a conversa. Você pode remover o cartão a qualquer momento.</string>
+    <string name="explanation_message_action_show_less">Recolhe esta mensagem longa em uma pré-visualização mais curta.</string>
+    <string name="explanation_message_action_share">Abre o compartilhamento do Android com esta mensagem. O app escolhido a recebe e fica fora do White Noise.</string>
+    <string name="explanation_message_action_save">Salva os anexos desta mensagem no seu dispositivo.</string>
+    <string name="explanation_message_action_info">Mostra quando esta mensagem foi enviada e recebida, quem a enviou, seu ID e seu status.</string>
+    <string name="explanation_message_action_report">Abre um formulário de denúncia para os administradores do grupo. Nada é enviado até você confirmar, e os administradores veem quem denunciou.</string>
+    <string name="explanation_message_action_delete">Permite excluir esta mensagem só neste dispositivo ou para todos. Excluir para todos não pode ser desfeito. Nada é excluído até você escolher.</string>
+</resources>

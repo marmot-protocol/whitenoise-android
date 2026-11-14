@@ -79,6 +79,14 @@
         "test_ids": [
           "MED-008"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Holding the jump to mention pill explains it",
+        "anchor": "R.string.explanation_conversation_jump_to_mention",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "settings_controls": [

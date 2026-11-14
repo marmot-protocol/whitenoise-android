@@ -180,6 +180,70 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_archived",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_draft",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_mentions",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_muted",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_pinned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_pinned",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_reset",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_type",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_type",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_quick_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderQuickFilterControls.kt",
+        "anchor": "R.string.explanation_organize_quick_unread",
+        "test_ids": [
+          "SET-057"
+        ]
       }
     ]
   },

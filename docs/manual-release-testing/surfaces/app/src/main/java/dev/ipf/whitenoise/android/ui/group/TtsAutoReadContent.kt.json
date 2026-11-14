@@ -1,0 +1,81 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+  "legacy_sha256": "7db31632fb4c4ba1546b1e19e3091694a308a433ee12236f653a5152fde49d77",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TtsAutoReadGroupActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "fun TtsAutoReadGroupActionRow(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TtsAutoReadPickerContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "fun TtsAutoReadPickerContent(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:tts_auto_read_override_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "R.string.tts_auto_read_override_off",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "string:tts_auto_read_override_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "R.string.tts_auto_read_override_on",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_tts_auto_read_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "R.string.explanation_appearance_tts_auto_read_default",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_tts_auto_read_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "R.string.explanation_appearance_tts_auto_read_group",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_tts_auto_read_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "R.string.explanation_appearance_tts_auto_read_off",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_tts_auto_read_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/TtsAutoReadContent.kt",
+        "anchor": "R.string.explanation_appearance_tts_auto_read_on",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

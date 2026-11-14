@@ -16,6 +16,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.GpsFixed
 
@@ -32,7 +34,12 @@ internal fun TtsResumeFollowButton(
             modifier
                 .size(48.dp)
                 .semantics { contentDescription = resumeFollowLabel }
-                .clickable(role = Role.Button, onClick = onClick),
+                .explainOnLongPress(
+                    composerExplanation(
+                        R.string.tts_resume_follow,
+                        R.string.explanation_conversation_tts_resume_follow,
+                    ),
+                ).clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Surface(

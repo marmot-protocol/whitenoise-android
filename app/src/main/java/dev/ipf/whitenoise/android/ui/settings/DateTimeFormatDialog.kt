@@ -22,8 +22,10 @@ import dev.ipf.whitenoise.android.core.DateFormatPreference
 import dev.ipf.whitenoise.android.core.DateTimeDisplay
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.TimeFormatPreference
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -87,7 +89,15 @@ internal fun DateTimeFormatDialog(
                     onSelectTime(TimeFormatPreference.Automatic)
                     onSelectDate(DateFormatPreference.Automatic)
                 },
-                modifier = Modifier.testTag("date_time_format.reset"),
+                modifier =
+                    Modifier
+                        .testTag("date_time_format.reset")
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.reset),
+                                stringResource(R.string.explanation_appearance_date_time_reset),
+                            ),
+                        ),
             ) {
                 Text(stringResource(R.string.reset))
             }
@@ -113,7 +123,24 @@ private fun TimeFormatChoices(
                 selected = selected == format,
                 highlightSelected = false,
                 onClick = { if (selected != format) onSelect(format) },
-                modifier = Modifier.testTag("date_time_format.time.${format.preferenceValue}"),
+                modifier =
+                    Modifier
+                        .testTag("date_time_format.time.${format.preferenceValue}")
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(format.labelRes),
+                                stringResource(
+                                    when (format) {
+                                        TimeFormatPreference.Automatic ->
+                                            R.string.explanation_appearance_date_time_time_automatic
+                                        TimeFormatPreference.TwelveHour ->
+                                            R.string.explanation_appearance_date_time_time_12
+                                        TimeFormatPreference.TwentyFourHour ->
+                                            R.string.explanation_appearance_date_time_time_24
+                                    },
+                                ),
+                            ),
+                        ),
             )
         }
     }
@@ -138,7 +165,21 @@ private fun DateFormatChoices(
                 selected = selected == format,
                 highlightSelected = false,
                 onClick = { if (selected != format) onSelect(format) },
-                modifier = Modifier.testTag("date_time_format.date.${format.preferenceValue}"),
+                modifier =
+                    Modifier
+                        .testTag("date_time_format.date.${format.preferenceValue}")
+                        .explainOnLongPress(
+                            Explanation(
+                                if (isAutomatic) stringResource(R.string.date_time_format_automatic) else sample,
+                                stringResource(
+                                    if (isAutomatic) {
+                                        R.string.explanation_appearance_date_time_date_automatic
+                                    } else {
+                                        R.string.explanation_appearance_date_time_date_order
+                                    },
+                                ),
+                            ),
+                        ),
             )
         }
     }

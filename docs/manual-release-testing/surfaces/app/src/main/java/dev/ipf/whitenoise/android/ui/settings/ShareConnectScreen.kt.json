@@ -270,6 +270,46 @@
         "test_ids": [
           "PRO-011"
         ]
+      },
+      {
+        "surface": "R.string.explanation_organize_share_card",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.explanation_organize_share_card",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_share_gallery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.explanation_organize_share_gallery",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_share_menu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.explanation_organize_share_menu",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_share_scan",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.explanation_organize_share_scan",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_share_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "R.string.explanation_organize_share_url",
+        "test_ids": [
+          "SET-057"
+        ]
       }
     ]
   },

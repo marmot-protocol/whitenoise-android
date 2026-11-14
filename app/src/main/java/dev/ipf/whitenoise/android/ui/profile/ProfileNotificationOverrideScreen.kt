@@ -125,6 +125,7 @@ internal fun ProfileNotificationOverrideScreen(
                             onClick = { onMode(ProfileNotificationMode.DEFAULT) },
                             enabled = !state.busy,
                             modifier = Modifier.testTag("profile_notifications.defaults"),
+                            explanation = stringResource(R.string.explanation_privacy_profile_defaults),
                         )
                     }
                     row("mute") { row ->
@@ -135,6 +136,7 @@ internal fun ProfileNotificationOverrideScreen(
                             onClick = { onMode(ProfileNotificationMode.MUTED) },
                             enabled = !state.busy,
                             modifier = Modifier.testTag("profile_notifications.mute"),
+                            explanation = stringResource(R.string.explanation_privacy_profile_mute),
                         )
                     }
                     row("system") { row ->
@@ -145,6 +147,7 @@ internal fun ProfileNotificationOverrideScreen(
                             value = profileNotificationSummary(state.selection),
                             enabled = !state.busy,
                             modifier = Modifier.testTag("profile_notifications.system"),
+                            explanation = stringResource(R.string.explanation_privacy_profile_system),
                             leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                         )
                     }
@@ -161,6 +164,7 @@ internal fun ProfileNotificationOverrideScreen(
                                 },
                             enabled = !state.busy,
                             modifier = Modifier.testTag("profile_notifications.vibration"),
+                            explanation = stringResource(R.string.explanation_privacy_profile_vibration),
                             leading = { SettingsLeadingIcon(R.drawable.ic_vibration) },
                         )
                     }

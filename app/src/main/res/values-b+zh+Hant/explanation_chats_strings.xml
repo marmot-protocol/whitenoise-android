@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
+    <string name="explanation_chat_actions_leave_and_delete">退出此聊天並將其從本裝置移除。其他成員仍留在聊天中，只有被他人重新加入後你才能回來。</string>
+    <string name="explanation_chat_actions_delete">從本裝置移除此聊天及其訊息。對其他成員而言，你不會因此退出群組。</string>
+    <string name="explanation_chat_actions_abandon_dm">放棄此私訊並將其從本裝置移除。對方不會收到通知。</string>
+    <string name="explanation_chat_actions_abandon_group">放棄此群組並將其從本裝置移除。其他成員仍留在群組中。</string>
+    <string name="explanation_chat_info_mute">停止此聊天的通知。你仍會收到其訊息，之後可以重新開啟通知。</string>
+    <string name="explanation_chat_info_unmute">重新開啟此聊天的通知。</string>
+    <string name="explanation_chat_info_disappearing">設定此聊天中的新訊息是否在所選時間後消失。已傳送的訊息不受影響。</string>
+    <string name="explanation_chat_info_copy_chat_link">複製指向此聊天的連結，你可以分享它，讓他人申請加入。</string>
+    <string name="explanation_chat_info_relays">顯示並編輯此群組用於傳送和接收訊息的中繼。變更適用於整個群組。</string>
+    <string name="explanation_chat_info_transfer_admin">將管理員身分交給另一位成員。你仍留在群組中，但新管理員將可以管理群組。</string>
+    <string name="explanation_chat_info_step_down">放棄你的管理員身分，以一般成員身分留在群組中。其他管理員可以再次將你設為管理員。</string>
+    <string name="explanation_group_enable_disbanding">允許管理員日後解散此群組。開啟此項不會解散群組。</string>
+    <string name="explanation_group_disband">為所有成員永久結束此群組。此操作無法復原。</string>
+    <string name="explanation_chat_list_avatar_switch">開啟帳號切換器，以變更你正在使用的帳號。你的其他帳號保持登入。</string>
+    <string name="explanation_chat_list_avatar_settings">開啟帳號和應用程式的設定。目前登入了一個帳號。</string>
+    <string name="explanation_new_message_talk_to_agent">開啟 AI 代理設定，你可以在其中設定一個可像聯絡人一樣傳訊息的代理。</string>
+    <string name="explanation_chats_fab_check_relays">你的中繼設定需要處理，訊息可能無法送達。開啟你的中繼以便檢查。</string>
+    <string name="explanation_new_message_admin">將此成員設為管理員，可管理群組。你日後可以變更。</string>
+    <string name="explanation_chat_list_manage_folders">開啟資料夾管理，可在其中建立、重新命名、排序和刪除聊天資料夾。</string>
+    <string name="explanation_app_update_icon">有可用的應用程式更新或正在處理中。開啟設定查看其狀態。</string>
+    <string name="explanation_search_filters_active">搜尋篩選已開啟，因此結果受到限制。開啟篩選以變更或清除。</string>
+</resources>

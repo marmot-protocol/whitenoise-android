@@ -114,6 +114,31 @@
         "test_ids": [
           "CON-041"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Composer shortcut explanations",
+        "anchor": "fun ComposerShortcut.explanation(): Explanation",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Composer explanation title and body",
+        "anchor": "fun composerExplanation(",
+        "test_ids": [
+          "CON-042",
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "TalkBack Customize composer action",
+        "anchor": "fun composerCustomizeAccessibilityActions(",
+        "test_ids": [
+          "CON-042"
+        ]
       }
     ],
     "composable_surfaces": [
@@ -123,6 +148,145 @@
         "anchor": "R.string.stickers_title",
         "test_ids": [
           "MSG-045"
+        ]
+      },
+      {
+        "surface": "ComposerShortcut.explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "anchor": "fun ComposerShortcut.explanation()",
+        "test_ids": [
+          "CON-048"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Customize composer label",
+        "anchor": "R.string.composer_customize",
+        "test_ids": [
+          "CON-042",
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Camera composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_camera",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Contact composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_contact",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Dictation composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_dictation",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Emoji composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_emoji",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Files composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_files",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Gallery composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_gallery",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Location composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_location",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "More composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_more",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Paste composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_paste",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Person composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_person",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Poll composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_poll",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Sending identity composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_sending_identity",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Sticker composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_sticker",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Translate composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_translate",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerShortcutCatalog.kt",
+        "surface": "Voice note composer shortcut explanation",
+        "anchor": "R.string.explanation_composer_voice_note",
+        "test_ids": [
+          "CON-048"
         ]
       }
     ]

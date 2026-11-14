@@ -48,6 +48,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_organize_add_filter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "R.string.explanation_organize_add_filter",
+        "test_ids": [
+          "SET-057"
+        ]
       }
     ]
   },

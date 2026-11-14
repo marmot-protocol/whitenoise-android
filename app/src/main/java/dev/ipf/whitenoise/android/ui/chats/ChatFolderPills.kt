@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -151,7 +152,13 @@ internal fun ChatFolderPills(
                         Modifier
                             .minimumInteractiveComponentSize()
                             .size(FOLDER_MANAGER_BUTTON_SIZE)
-                            .testTag("chats.manageFolders"),
+                            .testTag("chats.manageFolders")
+                            .explainOnLongPress(
+                                chatsExplanation(
+                                    R.string.manage_folders,
+                                    R.string.explanation_chat_list_manage_folders,
+                                ),
+                            ),
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_bookmark_manager),

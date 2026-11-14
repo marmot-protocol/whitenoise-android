@@ -51,6 +51,14 @@
         "test_ids": [
           "MED-006"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "surface": "Holding a media preview button explains it",
+        "anchor": "R.string.explanation_media_preview_cancel",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "settings_controls": [
@@ -100,6 +108,16 @@
         "anchor": "R.string.preview_media",
         "test_ids": [
           "MED-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_media_preview_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.explanation_media_preview_done",
+        "test_ids": [
+          "CON-049"
         ]
       }
     ]

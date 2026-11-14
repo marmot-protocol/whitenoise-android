@@ -186,6 +186,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -194,6 +195,7 @@ import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.conversation.composer.conversationDictationDraftWriter
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberAttachmentState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
@@ -5157,7 +5159,12 @@ internal fun ConversationScreen(
                                                     Modifier
                                                         .height(34.dp)
                                                         .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
-                                                        .clickable(role = Role.Button) { jumpToNextUnreadMention() }
+                                                        .explainOnLongPress(
+                                                            composerExplanation(
+                                                                R.string.conversation_jump_to_mention,
+                                                                R.string.explanation_conversation_jump_to_mention,
+                                                            ),
+                                                        ).clickable(role = Role.Button) { jumpToNextUnreadMention() }
                                                         .clearAndSetSemantics {
                                                             contentDescription = jumpToMentionLabel
                                                         },

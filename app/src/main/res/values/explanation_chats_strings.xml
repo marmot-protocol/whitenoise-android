@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
+    <string name="explanation_chat_actions_leave_and_delete">Leaves this chat and removes it from this device. Other members stay in the chat, and you can only return if someone adds you again.</string>
+    <string name="explanation_chat_actions_delete">Removes this chat and its messages from this device. It does not leave the group for other members.</string>
+    <string name="explanation_chat_actions_abandon_dm">Abandons this direct message and removes it from this device. The other person is not notified.</string>
+    <string name="explanation_chat_actions_abandon_group">Abandons this group and removes it from this device. Other members stay in the group.</string>
+    <string name="explanation_chat_info_mute">Stops notifications from this chat. You still receive its messages and can turn this off again.</string>
+    <string name="explanation_chat_info_unmute">Turns notifications for this chat back on.</string>
+    <string name="explanation_chat_info_disappearing">Sets whether new messages in this chat disappear after a chosen time. Messages already sent are not changed.</string>
+    <string name="explanation_chat_info_copy_chat_link">Copies a link to this chat that you can share so others can ask to join.</string>
+    <string name="explanation_chat_info_relays">Shows and edits the relays this group uses to send and receive messages. Changes apply to the whole group.</string>
+    <string name="explanation_chat_info_transfer_admin">Hands the admin role to another member. You stay in the group, but the new admin can then manage it.</string>
+    <string name="explanation_chat_info_step_down">Gives up your admin role and keeps you in the group as a regular member. Another admin can make you an admin again.</string>
+    <string name="explanation_group_enable_disbanding">Allows an admin to disband this group later. Turning this on does not disband it.</string>
+    <string name="explanation_group_disband">Permanently ends this group for every member. This cannot be undone.</string>
+    <string name="explanation_chat_list_avatar_switch">Opens the profile switcher so you can change which account you are using. Your other accounts stay signed in.</string>
+    <string name="explanation_chat_list_avatar_settings">Opens settings, where you manage your account and the app. You have one account signed in.</string>
+    <string name="explanation_new_message_talk_to_agent">Opens the AI agents settings, where you set up an agent you can message like a contact.</string>
+    <string name="explanation_chats_fab_check_relays">Your relay setup needs attention, so messages may not arrive. Opens your relays so you can check them.</string>
+    <string name="explanation_new_message_admin">Makes this member an admin, who can manage the group. You can change this later.</string>
+    <string name="explanation_chat_list_manage_folders">Opens folder management, where you create, rename, reorder and delete your chat folders.</string>
+    <string name="explanation_app_update_icon">An app update is available or being handled. Opens settings where you can see its status.</string>
+    <string name="explanation_search_filters_active">Search filters are on, so results are limited. Opens the filters so you can change or clear them.</string>
+</resources>

@@ -110,6 +110,7 @@ private fun StoredAttachmentRow(
         onClick = onToggle,
         enabled = enabled,
         modifier = Modifier.testTag("storage.attachment").semantics { this.selected = selected },
+        explanation = stringResource(R.string.explanation_privacy_storage_attachment),
         leading = { StoredAttachmentPreview(appState, attachment, kind) },
         trailing = {
             Row(

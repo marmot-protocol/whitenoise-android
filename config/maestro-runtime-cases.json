@@ -665,9 +665,10 @@
         "SEC-007",
         "SEC-008",
         "SEC-009",
-        "SEC-018"
+        "SEC-018",
+        "CON-048"
       ],
-      "assertions": "Sharing choices appear. Open the audit age chooser and cancel shortening. Open Choose Audit Files and cancel without exporting.",
+      "assertions": "Holding Privacy & Security explains it without opening it, and Back closes the explanation. Sharing choices appear. Open the audit age chooser and cancel shortening. Open Choose Audit Files and cancel without exporting.",
       "postcondition": "none"
     },
     "nested-diagnostics-log-confirm-cancel": {

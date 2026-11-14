@@ -23,6 +23,14 @@
           "NCH-008",
           "DIC-011"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
+        "surface": "Holding the relay warning button explains it",
+        "anchor": "R.string.explanation_chats_fab_check_relays",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ],
     "settings_controls": [

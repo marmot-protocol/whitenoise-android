@@ -48,6 +48,14 @@
           "FIND-001",
           "FIND-016"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "surface": "Holding the chat list avatar explains it",
+        "anchor": ".explainOnLongPress(avatarExplanation)",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ],
     "settings_controls": [
@@ -192,6 +200,22 @@
         "test_ids": [
           "NAV-001",
           "NAV-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_list_avatar_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.explanation_chat_list_avatar_settings",
+        "test_ids": [
+          "CHL-037"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_list_avatar_switch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.explanation_chat_list_avatar_switch",
+        "test_ids": [
+          "CHL-037"
         ]
       }
     ]

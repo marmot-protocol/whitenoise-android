@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">Explicar</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">Mostra qual das suas contas envia mensagens nesta conversa. Não troca de conta.</string>
+    <string name="explanation_composer_more">Abre as ações que não estão fixadas na barra de ferramentas, incluindo Personalizar campo de mensagem.</string>
+    <string name="explanation_composer_emoji">Abre o seletor de emojis, incluindo seus emojis personalizados.</string>
+    <string name="explanation_composer_paste">Cola na mensagem o que você copiou.</string>
+    <string name="explanation_composer_dictation">Digita o que você diz usando o reconhecimento de voz do Android. O White Noise pede reconhecimento offline, mas seu dispositivo ainda pode usar um serviço online.</string>
+    <string name="explanation_composer_translate">Liga ou desliga o modo de tradução. Enquanto estiver ligado, Enviar envia a tradução mostrada na linha Será enviado, e nada é enviado até que uma tradução esteja pronta.</string>
+    <string name="explanation_composer_voice_note">Segure para gravar uma mensagem de voz.</string>
+    <string name="explanation_composer_camera">Abre a câmera para você anexar uma nova foto. O Android pede acesso à câmera na primeira vez.</string>
+    <string name="explanation_composer_gallery">Abre o seletor de fotos do Android. O White Noise recebe apenas as fotos e os vídeos que você escolher.</string>
+    <string name="explanation_composer_files">Abre o seletor de arquivos do Android para anexar qualquer arquivo.</string>
+    <string name="explanation_composer_location">Envia sua localização atual uma vez, como um link de mapa. Não continua compartilhando sua localização.</string>
+    <string name="explanation_composer_person">Compartilha a chave pública de um usuário do White Noise como texto, para que outras pessoas possam enviar mensagens a ele.</string>
+    <string name="explanation_composer_contact">Compartilha um cartão de contato dos contatos do seu telefone.</string>
+    <string name="explanation_composer_poll">Cria uma enquete em que os membros do grupo podem votar.</string>
+    <string name="explanation_composer_sticker">Abre suas figurinhas para você enviar uma.</string>
+    <string name="explanation_composer_customize">Escolha quais atalhos ficam na barra de ferramentas, em que lado ficam e onde fica o botão de mensagem de voz.</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">Seu perfil, as chaves que provam quem você é e os relays que transportam suas mensagens.</string>
+    <string name="explanation_settings_notifications">Sons e vibração, entrega em segundo plano e as configurações de notificação do Android para o White Noise.</string>
+    <string name="explanation_settings_chats">Pastas, ações de deslizar, o campo de mensagem, a tecla Enter, emojis personalizados e troca rápida de conta.</string>
+    <string name="explanation_settings_appearance">Tema, cores, fonte, tamanho do texto e como datas e horas são exibidas.</string>
+    <string name="explanation_settings_voice_language">Idioma do app, Ler em voz alta, ditado e tradução de mensagens.</string>
+    <string name="explanation_settings_privacy_security">Bloqueio do app, segurança da tela, teclado anônimo, usuários bloqueados, mensagens temporárias padrão e compartilhamento de diagnósticos.</string>
+    <string name="explanation_settings_data_usage">Veja o que usa armazenamento e escolha quando as mídias são baixadas e com que qualidade são enviadas.</string>
+    <string name="explanation_settings_ai_agents">Conecte agentes de IA com quem você pode conversar no White Noise, ou configure um manualmente.</string>
+    <string name="explanation_settings_help_support">Artigos de ajuda, conversa com o suporte, doações e ferramentas de desenvolvedor.</string>
+</resources>

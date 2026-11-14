@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.ConversationMorphAnchor
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
@@ -2139,7 +2140,13 @@ internal fun ComposerBar(
                                         Modifier
                                             .width(
                                                 actionTargetWidth,
-                                            ).height(ComposerActionRowHeight),
+                                            ).height(ComposerActionRowHeight)
+                                            .explainOnLongPress(
+                                                composerExplanation(
+                                                    R.string.voice_message_cancel,
+                                                    R.string.explanation_conversation_voice_delete,
+                                                ),
+                                            ),
                                 ) {
                                     Icon(
                                         Icons.Default.Delete,
@@ -2155,15 +2162,35 @@ internal fun ComposerBar(
                                 contentColor = actionColors.content,
                                 description = stringResource(R.string.voice_recording_stop),
                                 icon = R.drawable.ic_stop,
+                                modifier =
+                                    Modifier.explainOnLongPress(
+                                        composerExplanation(
+                                            R.string.voice_recording_stop,
+                                            R.string.explanation_conversation_voice_stop,
+                                        ),
+                                    ),
                             )
                         } else if (showPrimaryTrailingAction && showConfiguredMic) {
                             Box(contentAlignment = Alignment.BottomCenter) {
                                 LockHintAbove(controller = voiceRecordingController)
+                                val voiceExplainable = !isRecordingVoice && !transactionActive
                                 MicHoldButton(
                                     controller = voiceRecordingController,
                                     slotWidth = actionTargetWidth,
                                     onHoldStart = { heldVoiceBounds = voiceSlotBounds },
                                     canStart = canAcquireVoice,
+                                    // Holding records; TalkBack still gets Explain and Customize composer.
+                                    modifier =
+                                        Modifier.explainOnLongPress(
+                                            explanation =
+                                                ComposerShortcut.VoiceNote.explanation(),
+                                            enabled = voiceExplainable,
+                                            holdToExplain = false,
+                                            additionalActions =
+                                                composerCustomizeAccessibilityActions(
+                                                    if (voiceExplainable) beginCustomization else null,
+                                                ),
+                                        ),
                                 )
                             }
                         } else if (showPrimaryTrailingAction && !configuredVoiceUsesSlot) {

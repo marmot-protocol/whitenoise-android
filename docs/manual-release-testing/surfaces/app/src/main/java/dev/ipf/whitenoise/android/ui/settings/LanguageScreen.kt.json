@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+  "legacy_sha256": "edcbaf332e5f4613d48c11b9cebc98c5599fbc76e45a323f57b1d2596c7bcf44",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "LanguageScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+        "anchor": "fun LanguageScreen(",
+        "test_ids": [
+          "SET-008"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+        "anchor": "R.string.language",
+        "test_ids": [
+          "SET-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_language_option",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+        "anchor": "R.string.explanation_appearance_language_option",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.view.View
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -43,6 +44,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.navigation.DictationLauncherOrigin
@@ -139,23 +141,24 @@ internal fun ComposerAttachmentMenu(
     textShortcuts: ComposerMenuTextShortcuts = ComposerMenuTextShortcuts(),
     onCustomize: (() -> Unit)? = null,
 ) {
+    // Holding any row closes the menu and explains it; Customize composer is the last row.
+    val explain: @Composable (ComposerShortcut) -> Modifier = { shortcut ->
+        Modifier.explainOnLongPress(shortcut.explanation(), beforeShow = onDismiss)
+    }
     val items =
         listOfNotNull(
-            onCamera?.let { WhiteNoiseMenuItem(stringResource(R.string.attachment_camera), it, R.drawable.ic_camera) },
-            onGallery?.let {
-                WhiteNoiseMenuItem(stringResource(R.string.attachment_photos_videos), it, R.drawable.ic_image)
-            },
-            onFiles?.let { WhiteNoiseMenuItem(stringResource(R.string.download_files), it, R.drawable.ic_description) },
+            onCamera?.let { composerAttachmentItem(ComposerShortcut.Camera, R.drawable.ic_camera, it, explain) },
+            onGallery?.let { composerAttachmentItem(ComposerShortcut.Gallery, R.drawable.ic_image, it, explain) },
+            onFiles?.let { composerAttachmentItem(ComposerShortcut.Files, R.drawable.ic_description, it, explain) },
             onLocation?.let {
-                WhiteNoiseMenuItem(stringResource(R.string.attach_location), it, R.drawable.ic_location_on)
+                composerAttachmentItem(ComposerShortcut.Location, R.drawable.ic_location_on, it, explain)
             },
-            onUser?.let { WhiteNoiseMenuItem(stringResource(R.string.attach_contact), it, R.drawable.ic_person) },
-            onContact?.let {
-                WhiteNoiseMenuItem(stringResource(R.string.attachment_device_contact), it, R.drawable.ic_person)
-            },
-            onPoll?.let { WhiteNoiseMenuItem(stringResource(R.string.poll_create), it, R.drawable.ic_description) },
-            onSticker?.let { WhiteNoiseMenuItem(stringResource(R.string.stickers_title), it, R.drawable.ic_sticker) },
-        ) + composerMenuTextItems(textShortcuts, anchorBounds)
+            onUser?.let { composerAttachmentItem(ComposerShortcut.Person, R.drawable.ic_person, it, explain) },
+            onContact?.let { composerAttachmentItem(ComposerShortcut.Contact, R.drawable.ic_person, it, explain) },
+            onPoll?.let { composerAttachmentItem(ComposerShortcut.Poll, R.drawable.ic_description, it, explain) },
+            onSticker?.let { composerAttachmentItem(ComposerShortcut.Sticker, R.drawable.ic_sticker, it, explain) },
+        ) + composerMenuTextItems(textShortcuts, anchorBounds, explain) +
+            listOfNotNull(onCustomize?.let { composerCustomizeItem(it, onDismiss) })
     val density = LocalDensity.current
     val position =
         remember(anchorBounds, density) {
@@ -184,20 +187,7 @@ internal fun ComposerAttachmentMenu(
                         .heightIn(max = menuMaxHeight)
                         .testTag("conversation.attachment.menu"),
             ) {
-                // Holding any row opens composer customization, matching a long press on the toolbar.
-                Column(
-                    Modifier
-                        .composerCustomizationEntry(
-                            enabled = onCustomize != null,
-                            onCustomize =
-                                onCustomize?.let { customize ->
-                                    {
-                                        onDismiss()
-                                        customize()
-                                    }
-                                },
-                        ).fadingVerticalScroll(rememberScrollState()),
-                ) {
+                Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                     items.forEachIndexed { index, item ->
                         DropdownMenuItem(
                             text = { Text(item.label) },
@@ -223,13 +213,16 @@ internal fun ComposerAttachmentMenu(
 private fun composerMenuTextItems(
     textShortcuts: ComposerMenuTextShortcuts,
     anchorBounds: IntRect,
+    explain: @Composable (ComposerShortcut) -> Modifier,
 ): List<WhiteNoiseMenuItem> {
     val textToolbar = LocalTextToolbar.current
     val dictationOrigin = rememberMenuDictationOrigin()
     return listOfNotNull(
-        textShortcuts.onEmoji?.let { composerMenuShortcutItem(ComposerShortcut.Emoji, onClick = it) },
+        textShortcuts.onEmoji?.let {
+            composerMenuShortcutItem(ComposerShortcut.Emoji, explain(ComposerShortcut.Emoji), onClick = it)
+        },
         textShortcuts.onPaste?.let { paste ->
-            composerMenuShortcutItem(ComposerShortcut.Paste) {
+            composerMenuShortcutItem(ComposerShortcut.Paste, explain(ComposerShortcut.Paste)) {
                 // Denied clipboard reads fall back to the trusted system Paste menu at the Plus button.
                 if (!paste()) {
                     textToolbar.showMenu(
@@ -240,7 +233,10 @@ private fun composerMenuTextItems(
             }
         },
         textShortcuts.onDictation?.let { dictate ->
-            composerMenuShortcutItem(ComposerShortcut.Dictation, dictationOrigin.modifier) {
+            composerMenuShortcutItem(
+                ComposerShortcut.Dictation,
+                dictationOrigin.modifier.then(explain(ComposerShortcut.Dictation)),
+            ) {
                 dictationOrigin.latch()
                 dictate()
             }
@@ -248,7 +244,9 @@ private fun composerMenuTextItems(
         textShortcuts.onTranslate?.let {
             composerMenuShortcutItem(
                 ComposerShortcut.Translate,
-                Modifier.semantics { selected = textShortcuts.translateActive },
+                Modifier
+                    .semantics { selected = textShortcuts.translateActive }
+                    .then(explain(ComposerShortcut.Translate)),
                 onClick = it,
             )
         },
@@ -285,6 +283,32 @@ private fun rememberMenuDictationOrigin(): MenuDictationOrigin {
     val enabled = LocalControlHandoffEndpointCurrent.current
     return remember(hostView, origin, enabled) { MenuDictationOrigin(hostView, origin, enabled) }
 }
+
+@Composable
+private fun composerAttachmentItem(
+    shortcut: ComposerShortcut,
+    @DrawableRes icon: Int,
+    onClick: () -> Unit,
+    explain: @Composable (ComposerShortcut) -> Modifier,
+) = WhiteNoiseMenuItem(stringResource(shortcut.labelRes), onClick, icon, modifier = explain(shortcut))
+
+/** Opens composer customization; holding it explains what customization covers. */
+@Composable
+private fun composerCustomizeItem(
+    onCustomize: () -> Unit,
+    onDismiss: () -> Unit,
+) = WhiteNoiseMenuItem(
+    stringResource(R.string.composer_customize),
+    onCustomize,
+    R.drawable.ic_tune,
+    modifier =
+        Modifier
+            .testTag("conversation.attachment.menu.customize")
+            .explainOnLongPress(
+                composerExplanation(R.string.composer_customize, R.string.explanation_composer_customize),
+                beforeShow = onDismiss,
+            ),
+)
 
 @Composable
 private fun composerMenuShortcutItem(

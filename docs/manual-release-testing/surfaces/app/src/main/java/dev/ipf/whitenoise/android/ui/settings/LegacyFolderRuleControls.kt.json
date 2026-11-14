@@ -1,0 +1,185 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+  "legacy_sha256": "c015e24bae835ecfbd64dcc180eba4570907bfb5c0471a0315d840fe6995a397",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "LegacyFolderRuleControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "internal fun LegacyFolderRuleControls(",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      }
+    ],
+    "documentation_contracts": [
+      {
+        "surface": "Simple folder keyword help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.folder_keyword_hint",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "Simple folder combination help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.folder_rule_hint",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "chat_folder_archived_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_archived_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_direct_chats_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_direct_chats_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_groups_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_groups_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_include_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_include_muted",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_keyword_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_keyword_label",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_people",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_pinned_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_pinned_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_unread_mentions_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_unread_mentions_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_unread_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_unread_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_archived_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_archived_only",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_direct_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_direct_only",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_groups_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_groups_only",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_include_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_include_muted",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_mentions_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_mentions_only",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_people",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_pinned_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_pinned_only",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_folder_unread_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.explanation_organize_folder_unread_only",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

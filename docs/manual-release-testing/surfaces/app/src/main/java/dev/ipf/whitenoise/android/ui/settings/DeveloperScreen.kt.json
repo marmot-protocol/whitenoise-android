@@ -1,0 +1,571 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+  "legacy_sha256": "fe06882f0c7d88feb8739084e1a08bbc233c348d45d9c05cc63853a25b0010ea",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Developer quarantined group navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "row(\"quarantined_groups\")",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "DeveloperContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "fun DeveloperContent(",
+        "test_ids": [
+          "SET-020",
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "DeveloperScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "fun DeveloperScreen(",
+        "test_ids": [
+          "SET-020",
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "DeveloperStagingBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "fun DeveloperStagingBadge(",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "Developer Tools seed-fixture row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_seed_fixture",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "Developer Tools seed-fixture row subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_seed_fixture_subtitle",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "Developer hold-to-explain: key packages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_developer_key_packages",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Developer hold-to-explain: quarantined groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_developer_quarantined_groups",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Developer hold-to-explain: streaming debug",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_developer_streaming_debug",
+        "test_ids": [
+          "SET-053"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.about",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:about_build",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.about_build",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:about_mdk",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.about_mdk",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:about_version",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.about_version",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "setting:developer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:developer_debugging",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_debugging",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "setting:developer_mode",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_mode",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:developer_mode_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_mode_subtitle",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:developer_testing_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_testing_only",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:developer_testing_only_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.developer_testing_only_detail",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "setting:diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.diagnostics",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:diagnostics_settings_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.diagnostics_settings_subtitle",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:key_packages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.key_packages",
+        "test_ids": [
+          "SET-019",
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:key_packages_settings_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.key_packages_settings_subtitle",
+        "test_ids": [
+          "SET-019",
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:settings_developer_tools",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.settings_developer_tools",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:settings_staging_badge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.settings_staging_badge",
+        "test_ids": [
+          "SET-019",
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "setting:streaming_debug",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.streaming_debug",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:streaming_debug_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.streaming_debug_subtitle",
+        "test_ids": [
+          "SET-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Quarantined group recovery: R.string.quarantined_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.quarantined_groups",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Developer review demo cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-020",
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo accepting invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_accepting_invitation",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo account missing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_account_missing",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo ambiguous account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_ambiguous_account",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_clear",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo clear explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_clear_explanation",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo confirm action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_confirm_action",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo confirm body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_confirm_body",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo confirm title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_confirm_title",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo create",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_create",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo creating account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_creating_account",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo creating conversation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_creating_conversation",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo delivery timed out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_delivery_timed_out",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_description",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo interrupted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_interrupted",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo invalid checkpoint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_invalid_checkpoint",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_open",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo operation failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_operation_failed",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo original missing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_original_missing",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo owner changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_owner_changed",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo preparing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_preparing",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo publishing profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_publishing_profile",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo reaction uncertain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_reaction_uncertain",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo ready",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_ready",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo resume",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_resume",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo resume confirm action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_resume_confirm_action",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo resume confirm body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_resume_confirm_body",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo resume confirm title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_resume_confirm_title",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo returning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_returning",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_section",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo sending demo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_sending_demo",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo sending original",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_sending_original",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo setup timed out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_setup_timed_out",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo stage error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_stage_error",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_unavailable",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "Developer review demo review demo verifying",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.review_demo_verifying",
+        "test_ids": [
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_dev_demo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_organize_dev_demo",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_dev_demo_clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_organize_dev_demo_clear",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_dev_diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_organize_dev_diagnostics",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_dev_mode",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_organize_dev_mode",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_dev_seed_fixture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.explanation_organize_dev_seed_fixture",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

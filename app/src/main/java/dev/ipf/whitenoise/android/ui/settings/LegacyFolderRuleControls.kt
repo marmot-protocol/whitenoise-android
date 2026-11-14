@@ -49,6 +49,7 @@ internal fun LegacyFolderRuleControls(
                 it,
                 stringResource(R.string.chat_folder_people),
                 onPeople,
+                explanation = stringResource(R.string.explanation_organize_folder_people),
                 value = peopleCount.toString(),
                 leading = { SettingsLeadingIcon(R.drawable.ic_person) },
             )
@@ -59,6 +60,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_unread_only),
                 unread,
                 onUnread,
+                explanation = stringResource(R.string.explanation_organize_folder_unread_only),
                 leading = { SettingsLeadingIcon(R.drawable.ic_mark_unread) },
             )
         }
@@ -68,6 +70,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_unread_mentions_only),
                 mentions,
                 onMentions,
+                explanation = stringResource(R.string.explanation_organize_folder_mentions_only),
                 leading = { SettingsLeadingIcon(R.drawable.ic_alternate_email) },
             )
         }
@@ -77,6 +80,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_pinned_only),
                 pinned,
                 onPinned,
+                explanation = stringResource(R.string.explanation_organize_folder_pinned_only),
                 leading = { SettingsLeadingIcon(R.drawable.ic_push_pin) },
             )
         }
@@ -86,6 +90,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_groups_only),
                 groups,
                 onGroups,
+                explanation = stringResource(R.string.explanation_organize_folder_groups_only),
                 leading = { SettingsLeadingIcon(R.drawable.ic_group) },
             )
         }
@@ -95,6 +100,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_direct_chats_only),
                 direct,
                 onDirect,
+                explanation = stringResource(R.string.explanation_organize_folder_direct_only),
                 leading = { SettingsLeadingIcon(R.drawable.ic_chat) },
             )
         }
@@ -104,6 +110,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_archived_only),
                 archived,
                 onArchived,
+                explanation = stringResource(R.string.explanation_organize_folder_archived_only),
                 leading = { SettingsLeadingIcon(R.drawable.ic_archive) },
             )
         }
@@ -113,6 +120,7 @@ internal fun LegacyFolderRuleControls(
                 stringResource(R.string.chat_folder_include_muted),
                 muted,
                 onMuted,
+                explanation = stringResource(R.string.explanation_organize_folder_include_muted),
                 leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
             )
         }

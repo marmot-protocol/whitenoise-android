@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explanation_account_keys_copy_private">Özel anahtarını hassas olarak işaretleyip panoya kopyalar. Ona sahip olan profilini yönetir; yalnızca güvendiğin yere yapıştır.</string>
+    <string name="explanation_account_keys_public_key">Açık anahtarın bu profili tanımlar. Başkaları seni bulmak, sohbet başlatmak ve gruplara eklemek için onu kullanır; paylaşmak güvenlidir. Onunla mesajların okunamaz ve senin yerine giriş yapılamaz.</string>
+    <string name="explanation_account_keys_private_key">Özel anahtarın bu profilin sen olduğunu kanıtlar. Ona sahip olan herkes senin yerine giriş yapıp paylaşım yapabilir ve anahtar değiştirilemez ya da sıfırlanamaz. Sen göstermeyi seçene kadar gizli kalır; güvenli bir yedeğini sakla.</string>
+    <string name="explanation_account_keys_export_encrypted">Özel anahtarını seçtiğin bir dosyaya, belirlediğin bir parolayla korunmuş olarak kaydeder. Dosyayı açmak için bu parola gerekir.</string>
+    <string name="explanation_account_keys_export_raw">Özel anahtarını bir uyarının ardından düz metin olarak seçtiğin bir uygulamayla paylaşır. Şifreli dışa aktarma daha güvenlidir.</string>
+    <string name="explanation_account_keys_reveal">Özel anahtarını bu ekranda gösterir veya gizler. Kopyalanmaz ya da paylaşılmaz.</string>
+    <string name="explanation_account_keys_sign_out">Bu cihazda bu profilden çıkış yapar. Gruplar, geçmiş ve taslaklar kalır; hesap seçicisinden tekrar giriş yapabilirsin.</string>
+    <string name="explanation_account_keys_wipe">Bu hesabı mesajlar, grup şifreleme verileri ve saklanan anahtar dahil bu cihazdan kalıcı olarak kaldırır. Aynı anahtarla tekrar giriş yapabilirsin, ancak önceki gruplar kaybolur.</string>
+    <string name="explanation_account_keys_signout_invitation_keys">Açıkken, yayımlanmış davet anahtarların çıkış yaparken rölelerden kaldırılır; böylece oturum kapalıyken kimse seni yeni gruplara davet edemez.</string>
+    <string name="explanation_settings_profile_row">Bu profil için Paylaş ve Bağlan ekranını açar. Tam genel anahtarı kopyalamak için kısa anahtara dokun.</string>
+    <string name="explanation_settings_profile_picture">Bu profil resminin seçeneklerini açar.</string>
+    <string name="explanation_settings_relays">Bu profilin kullandığı röleleri açar. Röle, şifreli mesajları ve profiliniz gibi herkese açık olayları saklayan ve ileten bir sunucudur. Burada hangi rölelere paylaşım yapacağınızı ve hangilerinden davet alacağınızı seçer, röle ekler veya kaldırırsınız. Röle herkese açık olayları görebilir ama şifreli mesajlarınızın içeriğini göremez.</string>
+    <string name="explanation_relays_role_profile">Bu röleyi, profilinizi ve bağlantı bilgilerinizi taşıyan rölelerin listesi olan “Nerede paylaşırım” içinde açar veya kapatır; böylece başkaları sizi bulabilir. Profiliniz herkese açıktır, bu yüzden onu saklayan her röle okuyabilir. Listede en az bir röle kalmalıdır.</string>
+    <string name="explanation_relays_role_inbox">Bu röleyi, size yeni sohbet ve grup davetlerinin gönderildiği rölelerin listesi olan “Nerede alırım” içinde açar veya kapatır. Davetler şifrelidir, röle onları okuyamaz. Liste boşsa davetler size ulaşmayabilir; bu yüzden en az bir röle açık kalmalıdır.</string>
+    <string name="explanation_relays_publish_missing">Eksik olarak işaretlenen röle listelerini, “Nerede paylaşırım” ve “Nerede alırım” listelerini yayımlar. Başkaları profilinizi bulmak ve size nereye davet göndereceklerini öğrenmek için bu listelere bakar. Yayımlanana kadar size ulaşamayabilirler. Yalnızca eksik listeler yayımlanır.</string>
+    <string name="explanation_account_setup_remove_relay">Bu kurulum adımında bu röleyi röle listelerinden kaldırır. Hemen ardından geri alabilirsin.</string>
+    <string name="explanation_developer_key_packages">Bu hesap için yayımlanan, başkalarının seni gruplara davet etmesini sağlayan anahtar paketlerini gösterir ve yönetmene izin verir.</string>
+    <string name="explanation_developer_quarantined_groups">Güvenli biçimde yüklenemeyen grupları listeler ve kurtarmayı yeniden denemene izin verir. Hiçbir şey silinmez.</string>
+    <string name="explanation_quarantine_refresh">Karantinadaki grupların listesini yeniden yükler. Kurtarmayı yeniden denemez.</string>
+    <string name="explanation_quarantine_retry">Bu grup için paylaşılan altyapının doğrulamasını yeniden dener. Geçmişi silmez, denetimleri atlamaz ve gruba yeniden katılmaz.</string>
+    <string name="explanation_notifications_push">White Noise uygulamasını kısa süre uyandırmak için Google Firebase Cloud Messaging kullanır; uygulama sonra mesajları güvenli biçimde kontrol eder. Yerel bildirimler bunun yerine bağlantıyı açık tutar.</string>
+    <string name="explanation_notifications_local">Bildirimler açıkken kalıcı bir bağlantı tutar ve bildirimleri push yerine bu cihazda oluşturur.</string>
+    <string name="explanation_diagnostics_usage">Bu cihazdaki tüm profiller için özellik kullanımını ve uygulama performansını, geçici bir oturum kimliği ve sıfırlanabilir bir kurulum kimliğiyle paylaşır. Hesap veya grup kimlikleri asla dahil edilmez.</string>
+    <string name="explanation_diagnostics_logs">Bu cihazdaki tüm profillerin gruplarına ait temizlenmiş teknik günlükleri, kullanım paylaşımından ayrı olarak White Noise ile paylaşır. Kapatmak yeni kaydı ve yüklemeleri durdurur.</string>
+    <string name="explanation_gestures_pull_unread">Sohbet listesini aşağı çekmek yalnızca okunmamış sohbetleri gösterir. Tümünü göster, tam listeyi geri getirir.</string>
+    <string name="explanation_data_usage_download_switch">Bu tür ağda otomatik indirmelere izin verir. Eşleşen her ağ kuralı buna izin vermelidir; elle indirmeler her zaman çalışır.</string>
+</resources>

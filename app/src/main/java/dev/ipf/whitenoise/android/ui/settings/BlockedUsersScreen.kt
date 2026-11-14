@@ -75,6 +75,7 @@ private fun BlockedUsersGroup(
                     onClick = { onUnblock(user) },
                     enabled = busyUser == null,
                     leading = { SettingsLeadingIcon(R.drawable.ic_block) },
+                    explanation = stringResource(R.string.explanation_privacy_blocked_unblock),
                 )
             }
         }

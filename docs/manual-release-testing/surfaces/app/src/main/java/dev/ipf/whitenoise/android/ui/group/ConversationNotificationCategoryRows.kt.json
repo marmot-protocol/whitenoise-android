@@ -71,6 +71,16 @@
           "SET-040"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_privacy_conversation_category",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.explanation_privacy_conversation_category",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

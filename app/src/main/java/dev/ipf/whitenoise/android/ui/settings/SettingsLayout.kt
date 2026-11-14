@@ -40,11 +40,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -321,7 +323,8 @@ internal fun SettingsPanel(
 /**
  * A read-only row: its glyph, then the title over its value in the quiet supporting style, on the
  * group's shape and fill. The glyph shares the switch, link and action rows' column so mixed groups
- * stay aligned, and the row reads as one node for TalkBack and the icon audit.
+ * stay aligned, and the row reads as one node for TalkBack and the icon audit. Holding a row with
+ * [explanation] explains [title].
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -330,9 +333,15 @@ internal fun SettingsValue(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
+    explanation: String? = null,
     leading: (@Composable () -> Unit)?,
 ) {
-    SettingsGroupPanel(context, modifier.semantics(mergeDescendants = true) { settingsRow = Unit }) {
+    SettingsGroupPanel(
+        context,
+        modifier
+            .explainOnLongPress(explanation?.let { Explanation(title, it) })
+            .semantics(mergeDescendants = true) { settingsRow = Unit },
+    ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.FormField),
             verticalAlignment = Alignment.CenterVertically,

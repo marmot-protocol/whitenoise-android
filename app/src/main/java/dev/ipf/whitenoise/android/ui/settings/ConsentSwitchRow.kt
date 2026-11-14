@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** Makes the complete choice tappable, retaining selected colors while persistence blocks further input. */
 @Composable
@@ -26,11 +28,13 @@ internal fun ConsentSwitchRow(
     enabled: Boolean,
     saving: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    explanation: String? = null,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .explainOnLongPress(explanation?.let { Explanation(title, it) })
                 .toggleable(
                     value = checked,
                     enabled = enabled && !saving,

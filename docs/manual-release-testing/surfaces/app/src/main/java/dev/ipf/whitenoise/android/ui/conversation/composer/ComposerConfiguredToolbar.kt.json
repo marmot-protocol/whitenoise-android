@@ -10,7 +10,28 @@
         "test_ids": [
           "CON-041",
           "CON-042",
-          "CON-040"
+          "CON-040",
+          "CON-048"
+        ]
+      },
+      {
+        "surface": "Modifier.explainComposerShortcut",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerConfiguredToolbar.kt",
+        "anchor": "fun Modifier.explainComposerShortcut(",
+        "test_ids": [
+          "CON-042",
+          "CON-048"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerConfiguredToolbar.kt",
+        "surface": "Holding a toolbar shortcut explains it; TalkBack keeps Customize",
+        "anchor": "composerCustomizeAccessibilityActions(bindings.onCustomize)",
+        "test_ids": [
+          "CON-042",
+          "CON-048"
         ]
       }
     ]

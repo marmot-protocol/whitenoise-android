@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleTheme
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -50,6 +52,7 @@ internal fun AppearanceAccessibilitySample(
                         title = stringResource(R.string.appearance_preview_rtl),
                         checked = state.rtl,
                         onCheckedChange = { state.rtl = it },
+                        explanation = stringResource(R.string.explanation_appearance_preview_rtl),
                         leading = { SettingsLeadingIcon(R.drawable.ic_format_textdirection_r_to_l) },
                     )
                 }
@@ -59,6 +62,7 @@ internal fun AppearanceAccessibilitySample(
                         title = stringResource(R.string.appearance_preview_large_text),
                         checked = state.largeText,
                         onCheckedChange = { state.largeText = it },
+                        explanation = stringResource(R.string.explanation_appearance_preview_large_text),
                         leading = { SettingsLeadingIcon(R.drawable.ic_text_increase) },
                     )
                 }
@@ -84,6 +88,7 @@ private fun AppearancePreviewDisclosure(
         subtitle = stringResource(R.string.appearance_preview_intro),
         onClick = { state.expanded = !state.expanded },
         modifier = Modifier.semantics { stateDescription = disclosure },
+        explanation = stringResource(R.string.explanation_appearance_preview_disclosure),
         trailing = {
             Icon(
                 painterResource(R.drawable.ic_expand_more),
@@ -130,7 +135,16 @@ private fun AppearancePreviewContent(
                 stringResource(motionLabel),
                 style = MaterialTheme.typography.bodySmall,
             )
-            TextButton(onClick = state::reset) {
+            TextButton(
+                onClick = state::reset,
+                modifier =
+                    Modifier.explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.appearance_preview_reset),
+                            stringResource(R.string.explanation_appearance_preview_reset),
+                        ),
+                    ),
+            ) {
                 Text(stringResource(R.string.appearance_preview_reset))
             }
         }

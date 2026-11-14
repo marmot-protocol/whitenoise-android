@@ -1,0 +1,141 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+  "legacy_sha256": "fbdb5be5fbc50c26d632d181797257ad48c78b1234fb44d2e5f7006fbcc5c8e3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ActionColorEditor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "fun ActionColorEditor(",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "ActionColorScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "fun ActionColorScreen(",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "OutlineColorNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "fun OutlineColorNotice(",
+        "test_ids": [
+          "SET-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:action_color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.action_color",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:action_color_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.action_color_detail",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:action_color_no_active_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.action_color_no_active_account",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:appearance_outline_colors_fixed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.appearance_outline_colors_fixed",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "setting:bubble_color_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.bubble_color_preview",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:color_preview_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.color_preview_action",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:reset_to_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.reset_to_default",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:theme_amoled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.theme_amoled",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:theme_dark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.theme_dark",
+        "test_ids": [
+          "SET-004"
+        ]
+      },
+      {
+        "surface": "string:theme_light",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.theme_light",
+        "test_ids": [
+          "SET-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_action_color_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.explanation_appearance_action_color_reset",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_action_color_save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+        "anchor": "R.string.explanation_appearance_action_color_save",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

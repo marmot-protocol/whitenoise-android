@@ -13,8 +13,10 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.ChatListRowActionsFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAnchoredMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentActionLabel
 
 /** Row-anchored prototype commands retain the production action policy and existing confirmation callbacks. */
@@ -106,6 +108,12 @@ internal fun ChatContextMenu(
                         R.drawable.ic_delete,
                         "LeaveAndDelete",
                         destructive = true,
+                        explanation =
+                            chatsExplanation(
+                                R.string.leave_and_delete,
+                                R.string.explanation_chat_actions_leave_and_delete,
+                            ),
+                        beforeShow = onDismiss,
                     ) {
                         onLeaveAndDelete()
                     },
@@ -116,7 +124,18 @@ internal fun ChatContextMenu(
             // no forget is offered (groups), and a passed [onAbandon] blocks it on its own.
             if (onAbandon == null && !historyDeleteBlocked && actions?.canDeleteLocal != false) {
                 add(
-                    chatMenuItem(R.string.delete_from_device, R.drawable.ic_delete, "Delete", destructive = true) {
+                    chatMenuItem(
+                        R.string.delete_from_device,
+                        R.drawable.ic_delete,
+                        "Delete",
+                        destructive = true,
+                        explanation =
+                            chatsExplanation(
+                                R.string.delete_from_device,
+                                R.string.explanation_chat_actions_delete,
+                            ),
+                        beforeShow = onDismiss,
+                    ) {
                         onDelete()
                     },
                 )
@@ -130,6 +149,16 @@ internal fun ChatContextMenu(
                         R.drawable.ic_person_remove,
                         "Abandon",
                         destructive = true,
+                        explanation =
+                            chatsExplanation(
+                                groupAbandonmentActionLabel(onAbandon.isDm),
+                                if (onAbandon.isDm) {
+                                    R.string.explanation_chat_actions_abandon_dm
+                                } else {
+                                    R.string.explanation_chat_actions_abandon_group
+                                },
+                            ),
+                        beforeShow = onDismiss,
                     ) { onAbandon.onClick() },
                 )
             }
@@ -179,6 +208,8 @@ private fun chatMenuItem(
     @DrawableRes icon: Int,
     tag: String,
     destructive: Boolean = false,
+    explanation: Explanation? = null,
+    beforeShow: () -> Unit = {},
     onClick: () -> Unit,
 ): WhiteNoiseMenuItem =
     WhiteNoiseMenuItem(
@@ -186,7 +217,7 @@ private fun chatMenuItem(
         icon = icon,
         onClick = onClick,
         destructive = destructive,
-        modifier = Modifier.testTag("chat.action.$tag"),
+        modifier = Modifier.testTag("chat.action.$tag").explainOnLongPress(explanation, beforeShow = beforeShow),
     )
 
 /** Shared confirmation reached by both single-chat and bulk delete actions. */

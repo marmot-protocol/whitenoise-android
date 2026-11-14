@@ -221,6 +221,56 @@
           "SEC-018"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_privacy_audit_last_success",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.explanation_privacy_audit_last_success",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_audit_refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.explanation_privacy_audit_refresh",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_audit_resume",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.explanation_privacy_audit_resume",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_audit_retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.explanation_privacy_audit_retention",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_audit_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.explanation_privacy_audit_status",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_audit_waiting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AuditDiagnosticsControls.kt",
+        "anchor": "R.string.explanation_privacy_audit_waiting",
+        "test_ids": [
+          "SET-055"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

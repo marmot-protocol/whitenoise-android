@@ -35,6 +35,7 @@ internal fun LanguageScreen(
                                 selected = appState.languageTag == option.tag,
                                 highlightSelected = false,
                                 onClick = { appState.updateLanguageTag(option.tag) },
+                                explanation = stringResource(R.string.explanation_appearance_language_option),
                             )
                         }
                     }

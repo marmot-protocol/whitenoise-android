@@ -42,7 +42,9 @@ import dev.ipf.whitenoise.android.state.StoredAttachmentsController
 import dev.ipf.whitenoise.android.state.StoredAttachmentsUiState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.manageStorageAccess
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 private val StorageLoadingIndicatorSize = 32.dp
@@ -180,6 +182,7 @@ private fun LazyListScope.storageChatActionItems(
                     enabled = enabled,
                     destructive = true,
                     modifier = Modifier.testTag("storage.chat.remove_all"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_remove_all_chat),
                     leading = {
                         SettingsLeadingIcon(R.drawable.ic_delete_sweep, tint = MaterialTheme.colorScheme.error)
                     },
@@ -192,6 +195,7 @@ private fun LazyListScope.storageChatActionItems(
                     onClick = { dialogs.olderPicker.value = true },
                     enabled = enabled,
                     modifier = Modifier.testTag("storage.chat.remove_older"),
+                    explanation = stringResource(R.string.explanation_privacy_storage_chat_remove_older),
                     leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }
@@ -212,10 +216,23 @@ private fun SelectAllAction(
     onSelectAll: (Boolean) -> Unit,
 ) {
     val all = list.selected.size == list.items.size
-    IconButton(onClick = { onSelectAll(!all) }, modifier = Modifier.testTag("storage.select_all")) {
+    val labelRes = selectAllLabel(all, list.complete)
+    val label = stringResource(labelRes)
+    val body =
+        stringResource(
+            when (labelRes) {
+                R.string.storage_clear_selection -> R.string.explanation_privacy_storage_clear_selection
+                R.string.storage_select_all -> R.string.explanation_privacy_storage_select_all
+                else -> R.string.explanation_privacy_storage_select_shown
+            },
+        )
+    IconButton(
+        onClick = { onSelectAll(!all) },
+        modifier = Modifier.testTag("storage.select_all").explainOnLongPress(Explanation(label, body)),
+    ) {
         Icon(
             painterResource(if (all) R.drawable.ic_deselect_all else R.drawable.ic_select_all),
-            contentDescription = stringResource(selectAllLabel(all, list.complete)),
+            contentDescription = label,
         )
     }
 }
@@ -255,7 +272,15 @@ private fun StorageSelectionBar(
                 enabled = !busy,
                 loading = busy,
                 loadingLabel = stringResource(R.string.storage_removing),
-                modifier = Modifier.testTag("storage.selection.remove"),
+                modifier =
+                    Modifier
+                        .testTag("storage.selection.remove")
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.storage_remove),
+                                stringResource(R.string.explanation_privacy_storage_remove_selected),
+                            ),
+                        ),
             ) { Text(stringResource(R.string.storage_remove)) }
         }
     }
@@ -277,6 +302,7 @@ internal fun StorageListRetry(
                 onClick = onRetry,
                 enabled = enabled,
                 modifier = Modifier.testTag("storage.list.retry"),
+                explanation = stringResource(R.string.explanation_privacy_storage_retry),
                 leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
             )
         }

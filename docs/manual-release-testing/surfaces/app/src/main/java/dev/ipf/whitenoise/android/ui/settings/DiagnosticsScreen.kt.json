@@ -423,6 +423,46 @@
         "test_ids": [
           "SET-021"
         ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_diagnostics_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.explanation_privacy_diagnostics_actions",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_diagnostics_perf_copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.explanation_privacy_diagnostics_perf_copy",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_diagnostics_perf_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.explanation_privacy_diagnostics_perf_logs",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_diagnostics_refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.explanation_privacy_diagnostics_refresh",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_diagnostics_send_to_self",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+        "anchor": "R.string.explanation_privacy_diagnostics_send_to_self",
+        "test_ids": [
+          "SET-055"
+        ]
       }
     ]
   },

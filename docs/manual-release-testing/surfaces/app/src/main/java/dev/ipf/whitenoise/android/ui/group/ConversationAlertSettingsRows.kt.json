@@ -1,0 +1,93 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+  "legacy_sha256": "dda79193eb899a85e61a55a3fc660eedb826403594e16c493a5374edb1f3e9be",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationAlertControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertControls(",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "conversationNotificationSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun conversationNotificationSummary(",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "ConversationAlertSettingsRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertSettingsRows(",
+        "test_ids": [
+          "NTF-031"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Chat category preference save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Paused category explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alert_paused",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Paused chat summary mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing_while_muted",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Paused chat summary silence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_system_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_system_blocked",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_alerts_on_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alerts_on_device",
+        "test_ids": [
+          "NTF-031"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_privacy_conversation_alert",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.explanation_privacy_conversation_alert",
+        "test_ids": [
+          "GRP-042"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

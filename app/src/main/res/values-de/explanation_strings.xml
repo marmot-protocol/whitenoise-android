@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">Erklären</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">Zeigt, welches deiner Konten in diesem Chat Nachrichten sendet. Das Konto wird nicht gewechselt.</string>
+    <string name="explanation_composer_more">Öffnet die Aktionen, die nicht an die Symbolleiste angeheftet sind, darunter Nachrichtenfeld anpassen.</string>
+    <string name="explanation_composer_emoji">Öffnet die Emoji-Auswahl, einschließlich deiner eigenen Emojis.</string>
+    <string name="explanation_composer_paste">Fügt das Kopierte in die Nachricht ein.</string>
+    <string name="explanation_composer_dictation">Tippt, was du sagst, mithilfe der Android-Spracherkennung. White Noise fordert Offline-Erkennung an, aber dein Gerät nutzt möglicherweise trotzdem einen Online-Dienst.</string>
+    <string name="explanation_composer_translate">Schaltet den Übersetzungsmodus ein oder aus. Solange er an ist, sendet Senden die Übersetzung aus der Zeile Wird gesendet, und es wird nichts gesendet, bis eine Übersetzung bereit ist.</string>
+    <string name="explanation_composer_voice_note">Gedrückt halten, um eine Sprachnachricht aufzunehmen.</string>
+    <string name="explanation_composer_camera">Öffnet die Kamera, damit du ein neues Foto anhängen kannst. Android fragt beim ersten Mal nach dem Kamerazugriff.</string>
+    <string name="explanation_composer_gallery">Öffnet die Android-Fotoauswahl. White Noise erhält nur die Fotos und Videos, die du auswählst.</string>
+    <string name="explanation_composer_files">Öffnet die Android-Dateiauswahl, um eine beliebige Datei anzuhängen.</string>
+    <string name="explanation_composer_location">Sendet deinen aktuellen Standort einmalig als Kartenlink. Dein Standort wird nicht weiter geteilt.</string>
+    <string name="explanation_composer_person">Teilt den öffentlichen Schlüssel eines White-Noise-Nutzers als Text, damit andere ihm schreiben können.</string>
+    <string name="explanation_composer_contact">Teilt eine Kontaktkarte aus den Kontakten deines Telefons.</string>
+    <string name="explanation_composer_poll">Erstellt eine Umfrage, an der Gruppenmitglieder abstimmen können.</string>
+    <string name="explanation_composer_sticker">Öffnet deine Sticker, damit du einen senden kannst.</string>
+    <string name="explanation_composer_customize">Wähle, welche Verknüpfungen in der Symbolleiste bleiben, auf welcher Seite sie stehen und wo die Sprachnachrichten-Taste sitzt.</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">Dein Profil, die Schlüssel, die belegen, wer du bist, und die Relays, die deine Nachrichten übertragen.</string>
+    <string name="explanation_settings_notifications">Töne und Vibration, Zustellung im Hintergrund und die Android-Benachrichtigungseinstellungen für White Noise.</string>
+    <string name="explanation_settings_chats">Ordner, Wischaktionen, das Nachrichtenfeld, die Eingabetaste, eigene Emojis und schneller Kontowechsel.</string>
+    <string name="explanation_settings_appearance">Design, Farben, Schriftart, Textgröße und wie Datum und Uhrzeit angezeigt werden.</string>
+    <string name="explanation_settings_voice_language">App-Sprache, Vorlesen, Diktat und Nachrichtenübersetzung.</string>
+    <string name="explanation_settings_privacy_security">App-Sperre, Bildschirmsicherheit, Inkognito-Tastatur, blockierte Nutzer, Standard für verschwindende Nachrichten und Teilen von Diagnosedaten.</string>
+    <string name="explanation_settings_data_usage">Sieh, was Speicher belegt, und lege fest, wann Medien heruntergeladen werden und in welcher Qualität sie gesendet werden.</string>
+    <string name="explanation_settings_ai_agents">Verbinde KI-Agenten, mit denen du in White Noise chatten kannst, oder richte einen manuell ein.</string>
+    <string name="explanation_settings_help_support">Hilfeartikel, Chat mit dem Support, Spenden und Entwicklertools.</string>
+</resources>

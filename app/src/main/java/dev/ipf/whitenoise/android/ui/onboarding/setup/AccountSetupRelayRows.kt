@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
 /** Exact endpoint selections, not independent raw-tag occurrences or inferred relay health. */
@@ -80,6 +82,7 @@ internal fun SetupRelayEditorRows(
                         Text(stringResource(setupFindingTitle(it.issue)), style = MaterialTheme.typography.bodySmall)
                     }
                 }
+                val removeLabel = stringResource(R.string.remove_named_relay, endpoint)
                 IconButton(
                     onClick = {
                         val before = fields.current(editor)
@@ -89,20 +92,40 @@ internal fun SetupRelayEditorRows(
                         undo = RelayRemovalUndo(before.reads, before.writes, after.reads, after.writes)
                     },
                     enabled = !busy && editor.canEditRelayDeclaration,
-                    modifier = Modifier.size(48.dp).testTag("setup.relay.remove.$index"),
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .explainOnLongPress(
+                                Explanation(
+                                    removeLabel,
+                                    stringResource(R.string.explanation_account_setup_remove_relay),
+                                ),
+                            ).testTag("setup.relay.remove.$index"),
                 ) {
-                    Icon(painterResource(R.drawable.ic_delete), stringResource(R.string.remove_named_relay, endpoint))
+                    Icon(painterResource(R.drawable.ic_delete), removeLabel)
                 }
             }
         }
     }
     val saved = undo
     if (saved != null && saved.afterReads == current.reads && saved.afterWrites == current.writes) {
-        TextButton(onClick = {
-            fields.reads.setTextAndPlaceCursorAtEnd(saved.beforeReads)
-            fields.writes.setTextAndPlaceCursorAtEnd(saved.beforeWrites)
-            undo = null
-        }, enabled = !busy, modifier = Modifier.testTag("setup.relay.undo")) {
+        TextButton(
+            onClick = {
+                fields.reads.setTextAndPlaceCursorAtEnd(saved.beforeReads)
+                fields.writes.setTextAndPlaceCursorAtEnd(saved.beforeWrites)
+                undo = null
+            },
+            enabled = !busy,
+            modifier =
+                Modifier
+                    .testTag("setup.relay.undo")
+                    .explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.setup_undo_removal),
+                            stringResource(R.string.explanation_relays_setup_undo),
+                        ),
+                    ),
+        ) {
             Text(stringResource(R.string.setup_undo_removal))
         }
     }

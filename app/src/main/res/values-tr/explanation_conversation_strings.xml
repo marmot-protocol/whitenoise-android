@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Read Aloud bar explanations, shown when a transport button is held. -->
+    <string name="explanation_conversation_tts_previous_message">Sesli okumayı önceki mesajın başına götürür. Mesaj değişmez.</string>
+    <string name="explanation_conversation_tts_previous_sentence">Okumayı geçerli cümlenin başına, zaten oradaysanız önceki cümleye götürür.</string>
+    <string name="explanation_conversation_tts_next_sentence">Sesli okunan mesajın bir sonraki cümlesine geçer.</string>
+    <string name="explanation_conversation_tts_next_message">Bir sonraki mesajın başına geçer. Sesli okuma oradan devam eder.</string>
+    <string name="explanation_conversation_tts_resume_follow">Sohbeti şu anda okunan mesaja kaydırır. Ses duraklatılmaz veya yeniden başlatılmaz.</string>
+
+    <!-- Dictation explanations, shown when a dictation control is held. -->
+    <string name="explanation_conversation_dictation_cancel">Söylediklerinizi atar. Hiçbir şey gönderilmez veya mesaja eklenmez ve bu geri alınamaz.</string>
+    <string name="explanation_conversation_dictation_send">Dinlemeyi bırakır ve tanınan metni mesaj olarak gönderir. Göndermeden önce gözden geçirmek için Transkripti yapıştır\'ı kullanın.</string>
+    <string name="explanation_conversation_dictation_paste">Tanınan metni göndermeden mesaj alanına yerleştirir, böylece önce düzenleyebilirsiniz.</string>
+    <string name="explanation_conversation_dictation_recovery_paste">Tanınan metni göndermeden mesaj alanına yerleştirir.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_send">Tanınan metni mesaj olarak göndermeyi yeniden dener.</string>
+    <string name="explanation_conversation_dictation_recovery_app_settings">White Noise için Android ayarlarını açar; mikrofon erişimine buradan izin verebilirsiniz.</string>
+    <string name="explanation_conversation_dictation_recovery_speech">Android konuşma tanıma ayarlarını açar; buradan bir tanıma hizmeti seçebilir veya yükleyebilirsiniz.</string>
+    <string name="explanation_conversation_dictation_recovery_retry">Dinlemeyi yeniden başlatır. Daha önce tanınanlar eklenmez.</string>
+
+    <!-- Voice message explanations, shown when a recording or review control is held. -->
+    <string name="explanation_conversation_voice_discard">Bu kaydı göndermeden siler. Geri alınamaz.</string>
+    <string name="explanation_conversation_voice_record_again">Bu kaydı siler ve yenisini başlatır. Hiçbir şey gönderilmez.</string>
+    <string name="explanation_conversation_voice_delete">Kaydı durdurur ve göndermeden siler. Geri alınamaz.</string>
+    <string name="explanation_conversation_voice_stop">Kaydı durdurur ve dinleyip gözden geçirmenizi sağlar. Siz göndermedikçe hiçbir şey gönderilmez.</string>
+
+    <!-- Media preview explanations, shown when a preview control is held. -->
+    <string name="explanation_media_preview_send">Burada gösterilen ekleri başlığınızla birlikte bu sohbete gönderir. Bitti ise onları mesaj alanında tutar.</string>
+    <string name="explanation_media_preview_done">Değişikliklerinizi kaydeder ve mesaj alanına döner. Hiçbir şey gönderilmez; işareti kaldırılan öğeler taslaktan çıkarılır.</string>
+    <string name="explanation_media_preview_cancel">Önizlemeyi hiçbir şey göndermeden kapatır. Hazırladığınız ekler atılır.</string>
+    <string name="explanation_media_preview_add_more">Bu mesaja daha fazla fotoğraf veya dosya eklemek için bir menü açar.</string>
+
+    <!-- Conversation header and navigation explanations. -->
+    <string name="explanation_conversation_header_details">Üyeler ve ayarlar gibi bu sohbetin ayrıntılarını açar.</string>
+    <string name="explanation_conversation_jump_to_mention">Sizden bahseden bir sonraki okunmamış mesaja kaydırır.</string>
+    <string name="explanation_composer_draft_top">Taslağı ilk satıra kaydırır. Metin değişmez.</string>
+    <string name="explanation_emoji_search">Emojileri adına göre arar.</string>
+    <string name="explanation_emoji_configure">Hızlı tepki emojilerinizi seçtiğiniz ayarları açar.</string>
+
+    <!-- Poll creation explanations. -->
+    <string name="explanation_poll_add_option">Ankete izin verilen üst sınıra kadar bir seçenek daha ekler.</string>
+    <string name="explanation_poll_single_choice">Üyeler yalnızca bir seçeneğe oy verebilir.</string>
+    <string name="explanation_poll_multiple_choice">Üyeler birden fazla seçeneğe oy verebilir.</string>
+
+    <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_reply">Bu mesajı yazı alanında alıntılar, böylece yanıtınız ona bağlı kalır.</string>
+    <string name="explanation_message_action_edit">Mesajınızı yazı alanında açar, böylece değiştirebilirsiniz.</string>
+    <string name="explanation_message_action_select">Aynı anda birden fazla mesaj seçmek için seçim modunu açar.</string>
+    <string name="explanation_message_action_select_text">Bu mesajın metninin bir bölümünü seçmenizi sağlar.</string>
+    <string name="explanation_message_action_copy">Mesaj metnini telefonun panosuna kopyalar.</string>
+    <string name="explanation_message_action_translate">Çeviri içeren bir panel açar. Çeviri, Offline Translator uygulaması aracılığıyla cihazınızda yapılır.</string>
+    <string name="explanation_message_action_read_aloud">Bu mesajı sesli okur, ardından sonraki mesajlarla devam eder.</string>
+    <string name="explanation_message_action_read_code_literally">Bu mesajı, kodu tam yazıldığı gibi telaffuz ederek sesli okur, ardından sonraki mesajlarla devam eder.</string>
+    <string name="explanation_message_action_forward">Bir sohbet seçici açar. Seçilen sohbetler bu mesajın yeni bir kopyasını alır.</string>
+    <string name="explanation_message_action_keep_on_screen">Bu mesajı sohbetin üstünde küçük bir kartta tutar. Kartı istediğiniz zaman kaldırabilirsiniz.</string>
+    <string name="explanation_message_action_show_less">Bu uzun mesajı daha kısa bir önizlemeye daraltır.</string>
+    <string name="explanation_message_action_share">Bu mesajla Android paylaşım menüsünü açar. Seçtiğiniz uygulama mesajı alır ve White Noise dışındadır.</string>
+    <string name="explanation_message_action_save">Bu mesajın eklerini cihazınıza kaydeder.</string>
+    <string name="explanation_message_action_info">Bu mesajın ne zaman gönderildiğini ve alındığını, kimin gönderdiğini, kimliğini ve durumunu gösterir.</string>
+    <string name="explanation_message_action_report">Grup yöneticileri için bir bildirim formu açar. Onaylamadan hiçbir şey gönderilmez ve yöneticiler bildirenin kim olduğunu görür.</string>
+    <string name="explanation_message_action_delete">Bu mesajı yalnızca bu cihazdan veya herkes için silmenizi sağlar. Herkes için silme geri alınamaz. Siz seçmeden hiçbir şey silinmez.</string>
+</resources>

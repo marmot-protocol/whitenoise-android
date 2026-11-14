@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+        "surface": "ExplanationSheet",
+        "anchor": "fun ExplanationSheet(",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+        "surface": "ExplanationHost",
+        "anchor": "fun ExplanationHost(",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+        "surface": "ExplanationSheetHost",
+        "anchor": "fun ExplanationSheetHost(",
+        "test_ids": [
+          "CON-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+        "surface": "Modifier.explainOnLongPress",
+        "anchor": "fun Modifier.explainOnLongPress(",
+        "test_ids": [
+          "CON-048"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LongPressExplanation.kt",
+        "surface": "TalkBack Explain action label",
+        "anchor": "R.string.explanation_action_explain",
+        "test_ids": [
+          "CON-048"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

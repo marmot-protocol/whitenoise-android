@@ -186,6 +186,78 @@
         "test_ids": [
           "ACC-013"
         ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: public key value",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_public_key",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: private key value",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_private_key",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: reveal key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_reveal",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: copy private key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_copy_private",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: export encrypted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_export_encrypted",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: export raw",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_export_raw",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: sign out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_sign_out",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: wipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_wipe",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: sign-out invitation keys",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_signout_invitation_keys",
+        "test_ids": [
+          "ACC-023"
+        ]
       }
     ],
     "settings_controls": [
@@ -931,6 +1003,62 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_backup_export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_organize_keys_backup_export",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_copy_public",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_organize_keys_copy_public",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_raw_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_organize_keys_raw_file",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_raw_share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_organize_keys_raw_share",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_result_copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_organize_keys_result_copy",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_result_export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_organize_keys_result_export",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_keys_view_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_organize_keys_view_backup",
+        "test_ids": [
+          "SET-057"
         ]
       }
     ]

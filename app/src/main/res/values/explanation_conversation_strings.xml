@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Read Aloud bar explanations, shown when a transport button is held. -->
+    <string name="explanation_conversation_tts_previous_message">Moves Read Aloud to the start of the previous message. It does not change the message.</string>
+    <string name="explanation_conversation_tts_previous_sentence">Moves Read Aloud back to the start of the current sentence, or to the previous sentence if you are already at its start.</string>
+    <string name="explanation_conversation_tts_next_sentence">Skips to the next sentence in the message being read aloud.</string>
+    <string name="explanation_conversation_tts_next_message">Skips to the start of the next message. Read Aloud keeps going from there.</string>
+    <string name="explanation_conversation_tts_resume_follow">Scrolls the chat back to the message being read aloud. It does not pause or restart the audio.</string>
+
+    <!-- Dictation explanations, shown when a dictation control is held. -->
+    <string name="explanation_conversation_dictation_cancel">Throws away what you said. Nothing is sent or added to the message, and this cannot be undone.</string>
+    <string name="explanation_conversation_dictation_send">Stops listening and sends the recognized text as a message. Use Paste transcript instead to review it before sending.</string>
+    <string name="explanation_conversation_dictation_paste">Puts the recognized text into the message box without sending it, so you can edit it first.</string>
+    <string name="explanation_conversation_dictation_recovery_paste">Puts the recognized text into the message box without sending it.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_send">Tries again to send the recognized text as a message.</string>
+    <string name="explanation_conversation_dictation_recovery_app_settings">Opens Android settings for White Noise, where you can allow microphone access.</string>
+    <string name="explanation_conversation_dictation_recovery_speech">Opens Android speech recognition settings, where you can choose or install a recognition service.</string>
+    <string name="explanation_conversation_dictation_recovery_retry">Starts listening again. What was recognized before is not added.</string>
+
+    <!-- Voice message explanations, shown when a recording or review control is held. -->
+    <string name="explanation_conversation_voice_discard">Deletes this recording without sending it. This cannot be undone.</string>
+    <string name="explanation_conversation_voice_record_again">Deletes this recording and starts a new one. Nothing is sent.</string>
+    <string name="explanation_conversation_voice_delete">Stops and deletes the recording without sending it. This cannot be undone.</string>
+    <string name="explanation_conversation_voice_stop">Stops recording and lets you review it. Nothing is sent until you send it.</string>
+
+    <!-- Media preview explanations, shown when a preview control is held. -->
+    <string name="explanation_media_preview_send">Sends the attachments shown here, with your caption, to this chat. Use Done to keep them in the composer instead.</string>
+    <string name="explanation_media_preview_done">Saves your changes and returns to the composer. Nothing is sent, and items you unticked are removed from the draft.</string>
+    <string name="explanation_media_preview_cancel">Closes the preview without sending anything. Attachments you were still preparing to send are discarded.</string>
+    <string name="explanation_media_preview_add_more">Opens a menu to add more photos or files to this message.</string>
+
+    <!-- Conversation header and navigation explanations. -->
+    <string name="explanation_conversation_header_details">Opens this chat\'s details, such as its members and settings.</string>
+    <string name="explanation_conversation_jump_to_mention">Scrolls to the next unread message that mentions you.</string>
+    <string name="explanation_composer_draft_top">Scrolls the draft back to its first line. It does not change the text.</string>
+    <string name="explanation_emoji_search">Searches the emoji list by name.</string>
+    <string name="explanation_emoji_configure">Opens the settings where you choose your quick reaction emoji.</string>
+
+    <!-- Poll creation explanations. -->
+    <string name="explanation_poll_add_option">Adds another answer to the poll, up to the allowed maximum.</string>
+    <string name="explanation_poll_single_choice">Members can vote for one answer only.</string>
+    <string name="explanation_poll_multiple_choice">Members can vote for more than one answer.</string>
+
+    <!-- Focused message menu explanations, shown when a message action is held. -->
+    <string name="explanation_message_action_reply">Quotes this message in the composer so your reply is linked to it.</string>
+    <string name="explanation_message_action_edit">Opens your message in the composer so you can change it.</string>
+    <string name="explanation_message_action_select">Turns on selection mode so you can pick several messages at once.</string>
+    <string name="explanation_message_action_select_text">Lets you select part of this message\'s text.</string>
+    <string name="explanation_message_action_copy">Copies the message text to your phone\'s clipboard.</string>
+    <string name="explanation_message_action_translate">Opens a panel with a translation. Translation runs on your device through the Offline Translator app.</string>
+    <string name="explanation_message_action_read_aloud">Reads this message aloud, then continues with the messages after it.</string>
+    <string name="explanation_message_action_read_code_literally">Reads this message aloud with code spoken exactly as written, then continues with the messages after it.</string>
+    <string name="explanation_message_action_forward">Opens a chat picker. The chats you choose receive a new copy of this message.</string>
+    <string name="explanation_message_action_keep_on_screen">Keeps this message in a small card on top of the chat. You can remove the card at any time.</string>
+    <string name="explanation_message_action_show_less">Collapses this long message to a shorter preview.</string>
+    <string name="explanation_message_action_share">Opens Android Share with this message. The app you choose receives it and is outside White Noise.</string>
+    <string name="explanation_message_action_save">Saves this message\'s attachments to your device.</string>
+    <string name="explanation_message_action_info">Shows when this message was sent and received, who sent it, its ID and its status.</string>
+    <string name="explanation_message_action_report">Opens a report form for the group admins. Nothing is sent until you confirm, and admins can see who reported.</string>
+    <string name="explanation_message_action_delete">Lets you delete this message on this device only or for everyone. Deleting for everyone cannot be undone. Nothing is deleted until you choose.</string>
+</resources>

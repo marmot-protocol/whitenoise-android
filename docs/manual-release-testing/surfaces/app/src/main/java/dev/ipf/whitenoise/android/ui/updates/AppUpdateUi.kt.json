@@ -1,0 +1,69 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/updates/AppUpdateUi.kt",
+  "legacy_sha256": "6084a145df3b60ceb0ac154aaac0ed9f4e5ce905ad181ce73a33c2b81edee516",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AppUpdateEmblem",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/updates/AppUpdateUi.kt",
+        "anchor": "fun AppUpdateEmblem(",
+        "test_ids": [
+          "SYS-008",
+          "SYS-009",
+          "SYS-010"
+        ]
+      },
+      {
+        "surface": "AppUpdateIconButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/updates/AppUpdateUi.kt",
+        "anchor": "fun AppUpdateIconButton(",
+        "test_ids": [
+          "SYS-008",
+          "SYS-009",
+          "SYS-010"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/updates/AppUpdateUi.kt",
+        "surface": "Holding the update icon explains it",
+        "anchor": "R.string.explanation_app_update_icon",
+        "test_ids": [
+          "CHL-037"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:app_update_available_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/updates/AppUpdateUi.kt",
+        "anchor": "R.string.app_update_available_title",
+        "test_ids": [
+          "SYS-008",
+          "SYS-009",
+          "SYS-010"
+        ]
+      },
+      {
+        "surface": "string:app_update_persistent_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/updates/AppUpdateUi.kt",
+        "anchor": "R.string.app_update_persistent_title",
+        "test_ids": [
+          "SYS-008",
+          "SYS-009",
+          "SYS-010"
+        ]
+      },
+      {
+        "surface": "string:app_updates",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/updates/AppUpdateUi.kt",
+        "anchor": "R.string.app_updates",
+        "test_ids": [
+          "SYS-008",
+          "SYS-009",
+          "SYS-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

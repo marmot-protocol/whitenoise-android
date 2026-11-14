@@ -44,11 +44,13 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.util.Locale
@@ -446,12 +448,21 @@ private fun ChatFolderEditSession(
             title = { Text(stringResource(R.string.folder_discard_title)) },
             text = { Text(stringResource(R.string.folder_discard_detail)) },
             confirmButton = {
-                TextButton(onClick = {
-                    val proceed = pendingPlaybackSource
-                    pendingPlaybackSource = null
-                    discard = false
-                    if (proceed != null) proceed() else onClose()
-                }) { Text(stringResource(R.string.folder_discard)) }
+                TextButton(
+                    onClick = {
+                        val proceed = pendingPlaybackSource
+                        pendingPlaybackSource = null
+                        discard = false
+                        if (proceed != null) proceed() else onClose()
+                    },
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.folder_discard),
+                                stringResource(R.string.explanation_organize_folder_discard),
+                            ),
+                        ),
+                ) { Text(stringResource(R.string.folder_discard)) }
             },
             dismissButton = {
                 TextButton(onClick = {
@@ -550,7 +561,15 @@ internal fun ChatFolderEditContent(
             TextButton(
                 enabled = state.canSave,
                 onClick = onSave,
-                modifier = Modifier.testTag("folder.save"),
+                modifier =
+                    Modifier
+                        .testTag("folder.save")
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.save),
+                                stringResource(R.string.explanation_organize_folder_save),
+                            ),
+                        ),
             ) { Text(stringResource(R.string.save)) }
         },
     ) {
@@ -589,6 +608,7 @@ internal fun ChatFolderEditContent(
                                 state.includeAll,
                                 onIncludeAllChange,
                                 modifier = Modifier.testTag("folder.includeAll"),
+                                explanation = stringResource(R.string.explanation_organize_folder_include_all),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_forum) },
                             )
                         }
@@ -611,6 +631,7 @@ internal fun ChatFolderEditContent(
                             onClick = onOpenManualChats,
                             value = state.manualChatCount.toString(),
                             modifier = Modifier.testTag("folder.includedChats"),
+                            explanation = stringResource(R.string.explanation_organize_folder_included_chats),
                             leading = { SettingsLeadingIcon(R.drawable.ic_playlist_add_check) },
                         )
                     }
@@ -629,6 +650,7 @@ internal fun ChatFolderEditContent(
                                 title = stringResource(R.string.chat_folder_people),
                                 onClick = onOpenPeople,
                                 value = state.peopleCount.toString(),
+                                explanation = stringResource(R.string.explanation_organize_folder_people),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_person) },
                             )
                         }
@@ -655,6 +677,7 @@ internal fun ChatFolderEditContent(
                                 state.unreadOnly,
                                 onUnreadOnlyChange,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_mark_unread) },
+                                explanation = stringResource(R.string.explanation_organize_folder_unread_only),
                             )
                         }
                         row("mentions") { context ->
@@ -664,6 +687,7 @@ internal fun ChatFolderEditContent(
                                 title,
                                 state.unreadMentionsOnly,
                                 onUnreadMentionsOnlyChange,
+                                explanation = stringResource(R.string.explanation_organize_folder_mentions_only),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_alternate_email) },
                             )
                         }
@@ -675,6 +699,7 @@ internal fun ChatFolderEditContent(
                                 state.pinnedOnly,
                                 onPinnedOnlyChange,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_push_pin) },
+                                explanation = stringResource(R.string.explanation_organize_folder_pinned_only),
                             )
                         }
                     }
@@ -689,6 +714,7 @@ internal fun ChatFolderEditContent(
                                 state.groupsOnly,
                                 onGroupsOnlyChange,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_group) },
+                                explanation = stringResource(R.string.explanation_organize_folder_groups_only),
                             )
                         }
                         row("direct") { context ->
@@ -699,6 +725,7 @@ internal fun ChatFolderEditContent(
                                 state.directChatsOnly,
                                 onDirectChatsOnlyChange,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_chat) },
+                                explanation = stringResource(R.string.explanation_organize_folder_direct_only),
                             )
                         }
                         row("archived") { context ->
@@ -709,6 +736,7 @@ internal fun ChatFolderEditContent(
                                 state.archivedOnly,
                                 onArchivedOnlyChange,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_archive) },
+                                explanation = stringResource(R.string.explanation_organize_folder_archived_only),
                             )
                         }
                         row("muted") { context ->
@@ -719,6 +747,7 @@ internal fun ChatFolderEditContent(
                                 state.includeMuted,
                                 onIncludeMutedChange,
                                 leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
+                                explanation = stringResource(R.string.explanation_organize_folder_include_muted),
                             )
                         }
                     }
@@ -733,6 +762,7 @@ internal fun ChatFolderEditContent(
                             context = context,
                             title = stringResource(R.string.folder_preview),
                             modifier = Modifier.testTag("folder.preview"),
+                            explanation = stringResource(R.string.explanation_organize_folder_preview),
                             onClick = onOpenPreview,
                             value = if (rulesContent != null) state.previewCount.toString() else null,
                             subtitle =
@@ -764,6 +794,7 @@ internal fun ChatFolderEditContent(
                             checked = state.showWhenEmpty,
                             onCheckedChange = onShowWhenEmptyChange,
                             modifier = Modifier.testTag("folder.showWhenEmpty"),
+                            explanation = stringResource(R.string.explanation_organize_folder_show_when_empty),
                             leading = { SettingsLeadingIcon(R.drawable.ic_folder_open) },
                         )
                     }
@@ -780,6 +811,7 @@ internal fun ChatFolderEditContent(
                                 selected = state.sort == sort,
                                 onClick = { onSortChange(sort) },
                                 modifier = Modifier.testTag("folder.sort.${sort.name}"),
+                                explanation = stringResource(folderSortExplanation(sort)),
                             )
                         }
                     }
@@ -796,6 +828,7 @@ internal fun ChatFolderEditContent(
                                 title = stringResource(R.string.folder_delete_action),
                                 onClick = onDelete,
                                 modifier = Modifier.testTag("folder.delete"),
+                                explanation = stringResource(R.string.explanation_organize_folder_delete),
                                 enabled = state.canDelete,
                                 destructive = true,
                                 leading = {
@@ -823,8 +856,20 @@ private fun folderDescription(description: TextFieldState) {
             lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 2, maxHeightInLines = 4),
         )
     } else {
-        TextButton(onClick = { expanded = true }, modifier = Modifier.testTag("folder.addDescription")) {
-            Text(stringResource(R.string.smart_folder_add_description))
+        val addLabel = stringResource(R.string.smart_folder_add_description)
+        TextButton(
+            onClick = { expanded = true },
+            modifier =
+                Modifier
+                    .testTag("folder.addDescription")
+                    .explainOnLongPress(
+                        Explanation(
+                            addLabel,
+                            stringResource(R.string.explanation_organize_folder_add_description),
+                        ),
+                    ),
+        ) {
+            Text(addLabel)
         }
     }
 }
@@ -841,6 +886,13 @@ private val FolderSelectionSaver =
         save = { it.toList() },
         restore = { it.toSet() },
     )
+
+private fun folderSortExplanation(sort: ChatFolderSort): Int =
+    when (sort) {
+        ChatFolderSort.RECENT -> R.string.explanation_organize_folder_sort_recent
+        ChatFolderSort.NAME -> R.string.explanation_organize_folder_sort_name
+        ChatFolderSort.UNREAD -> R.string.explanation_organize_folder_sort_unread
+    }
 
 /** Stable choices are persisted independently for each local folder. */
 private fun folderSortLabel(sort: ChatFolderSort): Int =

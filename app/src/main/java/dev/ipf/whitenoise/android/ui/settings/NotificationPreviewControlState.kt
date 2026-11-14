@@ -24,6 +24,7 @@ internal fun NotificationPreviewControl(
                 context = context,
                 title = stringResource(R.string.notification_show_previews),
                 subtitle = stringResource(R.string.notification_show_previews_detail),
+                explanation = stringResource(R.string.explanation_privacy_notif_previews),
                 checked = state.enabled,
                 busy = state.busy,
                 onCheckedChange = onChange,
@@ -37,6 +38,7 @@ internal fun NotificationPreviewControl(
                     title = stringResource(R.string.retry),
                     subtitle = stringResource(R.string.notification_preview_update_failed),
                     enabled = !state.busy,
+                    explanation = stringResource(R.string.explanation_privacy_notif_preview_retry),
                     onClick = onRetry,
                     leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
                 )

@@ -168,6 +168,7 @@ internal fun DeveloperContent(
                             checked = developerMode,
                             onCheckedChange = onDeveloperModeChange,
                             modifier = Modifier.testTag("developer.mode.switch"),
+                            explanation = stringResource(R.string.explanation_organize_dev_mode),
                             leading = { SettingsLeadingIcon(R.drawable.ic_code) },
                         )
                     }
@@ -218,6 +219,7 @@ internal fun DeveloperContent(
                                     ),
                             busy = demoStatus is ReviewDemoStatus.Running,
                             modifier = Modifier.testTag("developer.demo.action"),
+                            explanation = stringResource(R.string.explanation_organize_dev_demo),
                             leading = { SettingsLeadingIcon(R.drawable.ic_science) },
                         )
                     }
@@ -229,6 +231,7 @@ internal fun DeveloperContent(
                                 onClick = { confirmClear = true },
                                 destructive = true,
                                 modifier = Modifier.testTag("developer.demo.clear"),
+                                explanation = stringResource(R.string.explanation_organize_dev_demo_clear),
                                 leading = {
                                     SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
                                 },
@@ -249,6 +252,7 @@ internal fun DeveloperContent(
                             onClick = onOpenKeyPackages,
                             modifier = Modifier.testTag("developer.key_packages.row"),
                             subtitle = stringResource(R.string.key_packages_settings_subtitle),
+                            explanation = stringResource(R.string.explanation_developer_key_packages),
                             leading = { SettingsLeadingIcon(R.drawable.ic_package_2) },
                         )
                     }
@@ -263,6 +267,7 @@ internal fun DeveloperContent(
                                 title = stringResource(R.string.quarantined_groups),
                                 onClick = onOpenQuarantinedGroups,
                                 subtitle = quarantineSummary,
+                                explanation = stringResource(R.string.explanation_developer_quarantined_groups),
                                 modifier = Modifier.testTag("developer.quarantined_groups"),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_gpp_maybe) },
                             )
@@ -278,6 +283,7 @@ internal fun DeveloperContent(
                                 title = stringResource(R.string.streaming_debug),
                                 checked = streamingDebug,
                                 onCheckedChange = onStreamingDebugChange,
+                                explanation = stringResource(R.string.explanation_developer_streaming_debug),
                                 modifier = Modifier.testTag("developer.streaming_debug"),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_stream) },
                             )
@@ -289,6 +295,7 @@ internal fun DeveloperContent(
                                 onClick = onOpenDiagnostics,
                                 modifier = Modifier.testTag("developer.diagnostics"),
                                 subtitle = stringResource(R.string.diagnostics_settings_subtitle),
+                                explanation = stringResource(R.string.explanation_organize_dev_diagnostics),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_monitor_heart) },
                             )
                         }
@@ -300,6 +307,7 @@ internal fun DeveloperContent(
                                     onClick = onSeedConversationFixture,
                                     modifier = Modifier.testTag("developer.seed_fixture"),
                                     subtitle = stringResource(R.string.developer_seed_fixture_subtitle),
+                                    explanation = stringResource(R.string.explanation_organize_dev_seed_fixture),
                                     leading = { SettingsLeadingIcon(R.drawable.ic_data_object) },
                                 )
                             }
