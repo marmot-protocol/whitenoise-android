@@ -816,7 +816,13 @@ class DetailRouteMotionScreenshotTest {
         for (y in listOf(bitmap.height / 4, bitmap.height / 2, bitmap.height * 3 / 4)) {
             // A reverse starts with the outgoing page still covering this edge. Its
             // real source pixels, rather than a theme-color guess, define continuity.
-            val expected = source?.getPixel(edge, y) ?: checkNotNull(morphBackplate)
+            // Returning to the conversation keeps its native margin visible outside the morphing cards.
+            val expected =
+                if (name.endsWith("_entry_back")) {
+                    checkNotNull(routeBackground)
+                } else {
+                    source?.getPixel(edge, y) ?: checkNotNull(morphBackplate)
+                }
             assertEquals(message, expected, bitmap.getPixel(edge, y))
         }
     }
