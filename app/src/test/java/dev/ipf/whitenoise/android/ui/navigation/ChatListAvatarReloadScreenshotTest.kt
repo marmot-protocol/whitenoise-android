@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Looper
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
@@ -69,16 +70,7 @@ class ChatListAvatarReloadScreenshotTest {
             app.setAppInForeground(true)
             rule.setContent {
                 if (mounted.value) {
-                    WhiteNoiseTheme {
-                        val scheme = MaterialTheme.colorScheme
-                        val colors =
-                            if (markRowPreviews.value) {
-                                scheme.copy(onSurfaceVariant = ComposeColor(ROW_PREVIEW_COLOR))
-                            } else {
-                                scheme
-                            }
-                        MaterialTheme(colorScheme = colors) { MainShell(app, holder) }
-                    }
+                    RowPreviewPaintTheme(markRowPreviews.value) { MainShell(app, holder) }
                 }
             }
             rule.waitUntil(10_000) {
@@ -116,6 +108,20 @@ class ChatListAvatarReloadScreenshotTest {
             AvatarImageLoader.resetProfileImageFetcherForTests()
             AvatarImageLoader.clear()
             GroupAvatarImageLoader.clear()
+        }
+    }
+
+    /** Renders fixture previews in cyan until the test returns to the standard screenshot palette. */
+    @Composable
+    @Suppress("FunctionNaming")
+    private fun RowPreviewPaintTheme(
+        markRowPreviews: Boolean,
+        content: @Composable () -> Unit,
+    ) {
+        WhiteNoiseTheme {
+            val scheme = MaterialTheme.colorScheme
+            val colors = if (markRowPreviews) scheme.copy(onSurfaceVariant = ComposeColor(ROW_PREVIEW_COLOR)) else scheme
+            MaterialTheme(colorScheme = colors, content = content)
         }
     }
 
