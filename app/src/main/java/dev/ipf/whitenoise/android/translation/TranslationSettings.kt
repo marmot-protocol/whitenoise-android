@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -33,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
-import dev.ipf.whitenoise.android.ui.design.AnimatedDropdownMenu
 import dev.ipf.whitenoise.android.ui.settings.SettingsSearchRowReveal
 
 /**
@@ -69,15 +67,17 @@ internal fun TranslationLanguagePicker(
     val choices = rememberTranslationLanguageChoices(allowDetection)
     Box {
         TextButton(onClick = { expanded = true }) { Text("$title: ${choices.label(selected)}") }
-        AnimatedDropdownMenu(expanded, onDismissRequest = { expanded = false }) { surface ->
-            choices.codes.forEach { code ->
-                DropdownMenuItem(text = { Text(choices.label(code)) }, onClick = {
-                    surface.close {
-                        onSelected(code)
-                        expanded = false
-                    }
-                })
-            }
+        if (expanded) {
+            TranslationLanguagePickerSheet(
+                title = title,
+                choices = choices,
+                selected = selected,
+                onDismiss = { expanded = false },
+                onSelect = {
+                    onSelected(it)
+                    expanded = false
+                },
+            )
         }
     }
 }

@@ -165,7 +165,11 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
         self.assertGreater(len(others), 10)
         for line in others:
             with self.subTest(line=line):
-                self.assertTrue(line.startswith('[ "$FIXTURE_SCOPE" = video-metadata ] || bash '))
+                rebuild = line.endswith(' controller-background-receipt')
+                prefix = '[ "$FIXTURE_SCOPE" = video-metadata ] || ' + ('WN_FIXTURE_REUSE_APKS=0 ' if rebuild else '')
+                self.assertTrue(line.startswith(prefix + 'bash '))
+        # Later scenarios reuse the first build; background receipt keeps its Gradle pause.
+        self.assertIn("WN_FIXTURE_REUSE_APKS: '1'", job)
         script = (ROOT / 'scripts/run-controlled-attachment-fixture.sh').read_text()
         self.assertIn('controller-video-metadata) ;;', script)
         self.assertIn('tools/attachment-fixture/video_metadata_runner.py', script)

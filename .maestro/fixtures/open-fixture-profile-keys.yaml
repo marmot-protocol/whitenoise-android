@@ -16,4 +16,5 @@ appId: dev.ipf.whitenoise.android.maestrolab
     direction: UP
 - assertVisible:
     id: profile_keys.public_key_value
-    text: '^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$'
+    containsChild:
+      text: '^npub1[023456789acdefghjklmnpqrstuvwxyz]{58}$'

@@ -9,7 +9,7 @@ class GlobalSearchResultsWiringTest {
     /** The per-chat body scan is gone, so search cost no longer grows with the number of chats. */
     @Test
     fun perChatBodyScanIsGone() {
-        val sources = listOf("ui/chats/ChatsScreen.kt", "state/Controllers.kt").map { sourceFile(it).readText() }
+        val sources = listOf("ui/chats/ChatsScreen.kt", "state/ChatsController.kt").map { sourceFile(it).readText() }
 
         assertTrue(
             "message search must not fan out one timeline scan per chat",

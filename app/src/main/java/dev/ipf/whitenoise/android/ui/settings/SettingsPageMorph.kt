@@ -23,8 +23,10 @@ import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -91,8 +93,13 @@ internal class SettingsPageMorph {
     private var entryOnly = false
     internal var captureInputs: (() -> Any?)? = null
     internal var childContours: (() -> List<SettingsContour>?)? = null
+    internal var childBodyTop: (() -> Float)? = null
+    internal val bodyTop: Float
+        get() =
+            childBodyTop?.invoke()
+                ?: (viewports.values.minOfOrNull { it.top } ?: destinations.values.minOfOrNull { it.bounds.top } ?: 0f)
+    private var leavingBodyTop = 0f
     private var settledInputs: Any? = null
-    private var leavingInputs: Any? = null
     private var settled: Picture? = null
     private var leaving: Picture? = null
     private var maskFrame: List<SettingsContour>? = null
@@ -240,11 +247,11 @@ internal class SettingsPageMorph {
             returnTargets.remove(target)
         }
         if (!retainsOutgoing) {
+            leavingBodyTop = bodyTop
             leavingContours = settledContours
             // Bind the cached mask to this frozen picture; raster construction belongs to draw.
             leavingMask = null
             leaving = settled.takeIf { settledInputs == captureInputs?.invoke() }
-            leavingInputs = settledInputs
             outgoingTarget = target
         }
         sourceContours = current.orEmpty()
@@ -389,7 +396,6 @@ internal class SettingsPageMorph {
     ) {
         val inputs = captureInputs?.invoke()
         if (!recording) clearPictures()
-        if (leavingInputs != inputs) leaving = null
         if (!captureContent || settledInputs != inputs) settled = null
         val native = nativeContours(host)
         if (native == null) {
@@ -415,7 +421,29 @@ internal class SettingsPageMorph {
             clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
         }
         drawIncomingBody(body, time)
+        drawOutgoingInk(host, time)
         renderedContours(time).forEach { drawContinuousContour(it, host) }
+    }
+
+    /** Outgoing ink fades at its native coordinates; only the measured chrome changes geometry. */
+    private fun ContentDrawScope.drawOutgoingInk(
+        host: Rect,
+        time: Float,
+    ) {
+        val picture = leaving ?: return
+        val alpha = outgoingPresence(time)
+        if (alpha <= 0f) return
+        val chrome = leavingMask ?: nativeChromeMask(leavingContours, host).also { leavingMask = it }
+        // The source and destination's measured body edges leave both native headers untouched.
+        clipRect(top = (maxOf(leavingBodyTop, bodyTop) - host.top).coerceAtLeast(0f)) {
+            clipPath(chrome, ClipOp.Difference) {
+                drawIntoCanvas { canvas ->
+                    canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
+                    canvas.nativeCanvas.drawPicture(picture)
+                    canvas.restore()
+                }
+            }
+        }
     }
 
     /** Commit one measured native batch to this owner before painting its body and chrome. */

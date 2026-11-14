@@ -183,7 +183,7 @@ class CancellationHandlingTest {
         ).firstOrNull(File::exists)
             ?: error("Missing $fileName source file")
 
-    private fun controllersSource(): File = sourceFile("Controllers.kt")
+    private fun controllersSource(): File = sourceFile("ConversationController.kt")
 
     private fun appStateSource(): File = sourceFile("AppState.kt")
 

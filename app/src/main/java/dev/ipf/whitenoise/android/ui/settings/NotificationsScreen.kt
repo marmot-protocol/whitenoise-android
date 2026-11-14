@@ -11,8 +11,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -23,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -37,6 +34,7 @@ import dev.ipf.whitenoise.android.notifications.openNotificationBatterySettings
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.group.notificationChannelIcon
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -141,6 +139,7 @@ internal fun NotificationsScreen(
                             routeKey = SettingsDetail.NotificationSounds,
                             onClick = onOpenSounds,
                             modifier = Modifier.testTag("notifications.sounds"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_music_note) },
                         )
                     }
                     row("delivery") { rowContext ->
@@ -151,6 +150,7 @@ internal fun NotificationsScreen(
                             routeKey = SettingsDetail.NotificationDelivery,
                             onClick = onOpenDelivery,
                             modifier = Modifier.testTag("notifications.delivery"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_battery_full) },
                         )
                     }
                     row("android_settings") { rowContext ->
@@ -159,6 +159,7 @@ internal fun NotificationsScreen(
                             title = stringResource(R.string.android_notification_settings),
                             onClick = { openAppNotificationSettings(context) },
                             modifier = Modifier.testTag("notifications.android-settings"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                         )
                     }
                 }
@@ -341,6 +342,7 @@ private fun NotificationDevicePolicyGroup(
                         },
                     ),
                 onClick = onOpenNotificationSettings,
+                leading = { SettingsLeadingIcon(R.drawable.ic_notifications_active) },
             )
         }
         row("battery") { context ->
@@ -350,6 +352,7 @@ private fun NotificationDevicePolicyGroup(
                 subtitle = stringResource(batteryPolicy.subtitleResource()),
                 onClick = onOpenBatterySettings,
                 modifier = Modifier.testTag("notification-battery.settings"),
+                leading = { SettingsLeadingIcon(R.drawable.ic_battery_saver) },
             )
         }
     }
@@ -381,7 +384,7 @@ private fun NotificationPermissionGroup(
                     title = stringResource(R.string.notifications_are_off),
                     subtitle = stringResource(R.string.notifications_are_off_detail),
                     onClick = onOpenSettings,
-                    leading = { NotificationPermissionIcon(R.drawable.ic_notifications_off) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
                 )
             }
         } else {
@@ -391,22 +394,11 @@ private fun NotificationPermissionGroup(
                     title = stringResource(R.string.allow_notifications),
                     subtitle = stringResource(R.string.allow_notifications_detail),
                     onClick = onRequest,
-                    leading = { NotificationPermissionIcon(R.drawable.ic_settings_notifications) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                 )
             }
         }
     }
-}
-
-/** Leading glyph of the permission rows, tinted like the hub icons. */
-@Suppress("FunctionNaming")
-@Composable
-private fun NotificationPermissionIcon(drawable: Int) {
-    Icon(
-        painter = painterResource(drawable),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
 }
 
 /** Maps each native-push capability outcome to localized settings copy. */
@@ -436,6 +428,7 @@ internal fun GlobalNotificationCategories(
                     value = soundLabels[channel],
                     onClick = { onOpenChannel(channel) },
                     modifier = Modifier.testTag("global-notification-category-${channel.id}"),
+                    leading = { SettingsLeadingIcon(notificationChannelIcon(channel)) },
                 )
             }
         }

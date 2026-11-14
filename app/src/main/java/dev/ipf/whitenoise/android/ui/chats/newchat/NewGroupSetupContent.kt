@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
@@ -168,6 +169,7 @@ internal fun NewGroupSetupContent(
                             actions.retention,
                             value = state.retentionLabel,
                             enabled = state.detailsEditable,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
                         )
                     }
                 }

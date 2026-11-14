@@ -19,10 +19,13 @@ import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DestructiveAccountWipeRuntimeState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
+import dev.ipf.whitenoise.android.ui.account.rememberRetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.navigation.ReturnFixture
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -52,6 +55,71 @@ class RetainedAvatarNavigationCoverageTest {
 
     /** Removes only synthetic process pixels after each fixture. */
     @After fun clearPixels() = AvatarImageLoader.clear()
+
+    /** A pending profile read may borrow its own pixels, but deletion and URL replacement discard them. */
+    @Test
+    fun retainedAccountPixelsRespectProfileResolutionAndPictureIdentity() {
+        val retained = RetainedAccountAvatarPixels()
+        retained.record(ACCOUNT, "old-url", unresolved = false, image = image)
+        assertSame(image, retained.imageFor(ACCOUNT, null, unresolved = true))
+        assertNull(retained.imageFor("another-account", "old-url", unresolved = false))
+        assertNull(retained.imageFor(ACCOUNT, "new-url", unresolved = false))
+        retained.record(ACCOUNT, null, unresolved = false, image = null)
+        assertNull(retained.imageFor(ACCOUNT, null, unresolved = true))
+        retained.record(ACCOUNT, "new-url", unresolved = false, image = image)
+        assertSame(image, retained.imageFor(ACCOUNT, "new-url", unresolved = false))
+        assertNull(retained.imageFor(ACCOUNT, "old-url", unresolved = false))
+    }
+
+    /** The actual shell owner retires pixels after sign-out, cache clear, and a same-account runtime replacement. */
+    @Test
+    fun topBarOwnerRetiresLastDrawnPixels() {
+        lateinit var retained: RetainedAccountAvatarPixels
+        val accounts = state.accounts
+        val retiredAccount = accounts.single()
+        rule.setContent { retained = rememberRetainedAccountAvatarPixels(state) }
+        rule.waitForIdle()
+
+        fun assertRetired(change: () -> Unit) {
+            rule.runOnIdle {
+                retained.record(retiredAccount.accountIdHex, "url", unresolved = false, image = image)
+                change()
+            }
+            rule.waitForIdle()
+            assertNull(retained.imageFor(retiredAccount.accountIdHex, "url", unresolved = false))
+        }
+
+        assertRetired {
+            WhiteNoiseAppState::class.java
+                .getDeclaredMethod("notifyProfilesChanged")
+                .apply { isAccessible = true }
+                .invoke(state)
+        }
+        assertRetired { AvatarImageLoader.clear() }
+        assertRetired { replaceRuntime() }
+        assertRetired {
+            WhiteNoiseAppState::class.java
+                .getDeclaredMethod("setAccounts", List::class.java)
+                .apply { isAccessible = true }
+                .invoke(state, listOf(retiredAccount.copy(signedOut = true)))
+        }
+    }
+
+    /** A compatibility image is scoped to its measured row and exact source. */
+    @Test
+    fun compatibilityWindowDropsReplacedRowsAndRejectsAnotherSource() {
+        val retained = RetainedGroupCompatibilityPixels()
+        val source = ChatListAvatarSource.ENCRYPTED_GROUP
+        retained.select(setOf("visible"))
+        retained.record("visible", source, "image-hash", image)
+        retained.record("offscreen", source, "image-hash", image)
+        assertSame(image, retained.imageFor("visible", source, "image-hash"))
+        assertNull(retained.imageFor("visible", source, "replacement-hash"))
+        assertNull(retained.imageFor("visible", ChatListAvatarSource.LEGACY_URL, "image-hash"))
+        assertNull(retained.imageFor("offscreen", source, "image-hash"))
+        retained.select(setOf("offscreen"))
+        assertNull(retained.imageFor("visible", source, "image-hash"))
+    }
 
     /** Measured-window and late decode changes update their child content without restarting the shell owner. */
     @Test
@@ -173,10 +241,7 @@ class RetainedAvatarNavigationCoverageTest {
         val retired = owner.updateVisible
 
         rule.runOnIdle {
-            WhiteNoiseAppState::class.java
-                .getDeclaredMethod("applyDestructiveWipeRuntimeState", DestructiveAccountWipeRuntimeState::class.java)
-                .apply { isAccessible = true }
-                .invoke(state, DestructiveAccountWipeRuntimeState(ACCOUNT, null, null, state.runtimeGeneration + 1))
+            replaceRuntime()
         }
         rule.waitForIdle()
         rule.runOnIdle { retired(assets.take(1)) }
@@ -194,6 +259,14 @@ class RetainedAvatarNavigationCoverageTest {
         rule.waitForIdle()
 
         assertTrue(owner.pixels.images.isEmpty())
+    }
+
+    /** Changes the runtime owner without also changing the account label. */
+    private fun replaceRuntime() {
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("applyDestructiveWipeRuntimeState", DestructiveAccountWipeRuntimeState::class.java)
+            .apply { isAccessible = true }
+            .invoke(state, DestructiveAccountWipeRuntimeState(ACCOUNT, null, null, state.runtimeGeneration + 1))
     }
 
     /** Retained pins cannot override a newly removed, invalidated or different selected asset. */

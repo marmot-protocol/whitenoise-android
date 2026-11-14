@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -163,6 +164,7 @@ internal fun QuarantinedGroupsContent(
                                 enabled = state.available && !state.busy,
                                 busy = state.loading,
                                 modifier = Modifier.testTag("quarantine.refresh"),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                             )
                         }
                     }
@@ -211,7 +213,13 @@ private fun LazyListScope.quarantineRows(
             SettingsGroup {
                 if (!quarantineRetryable(entry.reason)) {
                     row("reopen") { context ->
-                        SettingsValue(context, group, guidance, Modifier.testTag("quarantine.reopen"))
+                        SettingsValue(
+                            context,
+                            group,
+                            guidance,
+                            Modifier.testTag("quarantine.reopen"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_gpp_maybe) },
+                        )
                     }
                 } else {
                     row("recovery") { context ->
@@ -223,9 +231,9 @@ private fun LazyListScope.quarantineRows(
                             enabled = state.available && state.loaded && !state.busy,
                             leading =
                                 if (state.recoveringGroup == entry.groupId) {
-                                    { CircularProgressIndicator() }
+                                    { CircularProgressIndicator(Modifier.size(SettingsRowDefaults.LeadingIconSize)) }
                                 } else {
-                                    null
+                                    { SettingsLeadingIcon(R.drawable.ic_restart_alt) }
                                 },
                             modifier = Modifier.testTag("quarantine.recover"),
                         )

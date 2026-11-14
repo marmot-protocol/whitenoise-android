@@ -64,6 +64,17 @@ internal fun GestureSettingsContent(
                                 subtitle = bindingSummary(state, binding, rtl),
                                 modifier = Modifier.testTag("gestures." + binding.name),
                                 onClick = { picker = binding },
+                                leading = {
+                                    SettingsLeadingIcon(
+                                        if (binding ==
+                                            SwipeBinding.MessageLeft
+                                        ) {
+                                            R.drawable.ic_swipe_left
+                                        } else {
+                                            R.drawable.ic_swipe_right
+                                        },
+                                    )
+                                },
                             )
                         }
                     }
@@ -80,6 +91,17 @@ internal fun GestureSettingsContent(
                                 subtitle = bindingSummary(state, binding, rtl),
                                 modifier = Modifier.testTag("gestures." + binding.name),
                                 onClick = { picker = binding },
+                                leading = {
+                                    SettingsLeadingIcon(
+                                        if (binding ==
+                                            SwipeBinding.ChatLeft
+                                        ) {
+                                            R.drawable.ic_swipe_left
+                                        } else {
+                                            R.drawable.ic_swipe_right
+                                        },
+                                    )
+                                },
                             )
                         }
                     }
@@ -94,6 +116,7 @@ internal fun GestureSettingsContent(
                             state.pullUnread,
                             onPullUnreadChange,
                             modifier = Modifier.testTag("gestures.pull_unread"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_mark_chat_unread) },
                         )
                     }
                 }
@@ -109,6 +132,7 @@ internal fun GestureSettingsContent(
                             title = stringResource(R.string.reset_to_default),
                             modifier = Modifier.testTag("gestures.reset"),
                             onClick = onReset,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
                         )
                     }
                 }

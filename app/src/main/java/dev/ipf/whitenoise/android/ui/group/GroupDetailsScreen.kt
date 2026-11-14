@@ -139,7 +139,6 @@ import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.WrapText
 import dev.ipf.whitenoise.android.ui.icons.filled.Archive
 import dev.ipf.whitenoise.android.ui.icons.filled.Check
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
@@ -147,8 +146,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.Edit
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
-import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
-import dev.ipf.whitenoise.android.ui.icons.filled.Palette
 import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.medialibrary.MediaLibraryRoute
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
@@ -356,6 +353,9 @@ internal fun GroupDetailsScreen(
         var showAddMember by rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) {
             mutableStateOf(false)
         }
+        // Saved with the staged selection so an open invite review survives recreation alongside it.
+        val addReviewOpen =
+            rememberSaveable(controller.group.groupIdHex, appState.activeAccountRef) { mutableStateOf(false) }
         val addSelection =
             rememberSaveable(
                 controller.group.groupIdHex,
@@ -376,14 +376,6 @@ internal fun GroupDetailsScreen(
             addAdminSelection.removeAll { admin ->
                 addSelection.none { it.accountIdHex.equals(admin, ignoreCase = true) }
             }
-        }
-        var showLargeGroupInviteConfirmation by
-            remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
-        var reviewedLargeInviteMembers by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateOf<List<RecipientSearch.Candidate>>(emptyList())
-        }
-        var reviewedLargeInviteAdmins by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
-            mutableStateOf<Set<String>>(emptySet())
         }
         var addMemberAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenAddMember) }
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
@@ -468,7 +460,7 @@ internal fun GroupDetailsScreen(
         LaunchedEffect(canAdministerMembers) {
             if (!canAdministerMembers) {
                 showAddMember = false
-                showLargeGroupInviteConfirmation = false
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
             }
@@ -830,7 +822,7 @@ internal fun GroupDetailsScreen(
                 }
         LaunchedEffect(showAddMember, inviteSelectionApplied, controller.mutationInFlight) {
             if (showAddMember && inviteSelectionApplied && !controller.mutationInFlight) {
-                showLargeGroupInviteConfirmation = false
+                addReviewOpen.value = false
                 addSelection.clear()
                 addAdminSelection.clear()
                 if (addMemberAutoOpened) onBack() else showAddMember = false
@@ -1010,11 +1002,6 @@ internal fun GroupDetailsScreen(
                 )
             }
 
-            LaunchedEffect(showLargeGroupInviteConfirmation, inviteProjection?.shouldWarn) {
-                if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == false) {
-                    showLargeGroupInviteConfirmation = false
-                }
-            }
             val reviewAvatar = rememberConversationGroupAvatar(appState, controller)
             detailsRoute {
                 ContactPickerScreen(
@@ -1029,27 +1016,25 @@ internal fun GroupDetailsScreen(
                     appState = appState,
                     title = stringResource(R.string.add_member),
                     selected = addSelection,
+                    reviewOpen = addReviewOpen,
                     onBack = {
                         // When auto-opened from the empty-group CTA, Back returns to the
                         // conversation (via the details onBack) rather than exposing the
                         // details body the user never intended to see.
                         if (!adding) {
-                            showLargeGroupInviteConfirmation = false
+                            addReviewOpen.value = false
                             addSelection.clear()
                             addAdminSelection.clear()
                             if (addMemberAutoOpened) onBack() else showAddMember = false
                         }
                     },
-                    onConfirm = confirm@{
-                        if (!canAdministerMembers || !rosterReady) return@confirm
+                    onConfirm = { submitSelectedInvites() },
+                    reviewDescription =
                         if (inviteProjection?.shouldWarn == true) {
-                            reviewedLargeInviteMembers = addSelection.toList()
-                            reviewedLargeInviteAdmins = addAdminSelection.toSet()
-                            showLargeGroupInviteConfirmation = true
+                            stringResource(R.string.large_group_invite_confirm_message)
                         } else {
-                            submitSelectedInvites()
-                        }
-                    },
+                            null
+                        },
                     confirmIcon = Icons.Default.Check,
                     initialAdminIds = addAdminSelection.toSet(),
                     onInitialAdminChange = { member, admin ->
@@ -1077,61 +1062,6 @@ internal fun GroupDetailsScreen(
                     footer = {
                         if (inviteProjection?.shouldWarn == true) {
                             LargeGroupInviteWarningBanner()
-                        }
-                    },
-                )
-            }
-            if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == true) {
-                val warningTicket = remember { GroupInviteWarningTicket() }
-                val warningMembers = remember(warningTicket) { reviewedLargeInviteMembers.toList() }
-                val warningAdmins = remember(warningTicket) { reviewedLargeInviteAdmins.toSet() }
-                DisposableEffect(warningTicket) {
-                    onDispose { warningTicket.active = false }
-                }
-                LargeGroupInviteConfirmationDialog(
-                    onContinue = {
-                        if (warningTicket.active && showLargeGroupInviteConfirmation) {
-                            warningTicket.active = false
-                            showLargeGroupInviteConfirmation = false
-                            if (warningMembers.map { it.accountIdHex } ==
-                                addSelection.map { it.accountIdHex } &&
-                                warningAdmins == addAdminSelection.toSet()
-                            ) {
-                                submitSelectedInvites(warningMembers, warningAdmins)
-                            }
-                        }
-                    },
-                    onDismiss = {
-                        if (warningTicket.active) {
-                            warningTicket.active = false
-                            showLargeGroupInviteConfirmation = false
-                        }
-                    },
-                    identity = {
-                        GroupActingAccountIdentity(appState, controller.boundAccountRef)
-                        Text(
-                            pluralStringResource(
-                                R.plurals.selected_members_count,
-                                warningMembers.size,
-                                warningMembers.size,
-                            ),
-                        )
-                        warningMembers.forEach { member ->
-                            GroupMemberReviewPair(
-                                appState = appState,
-                                group =
-                                    MemberReviewGroup(
-                                        controller.group.groupIdHex,
-                                        conversationTitle,
-                                        reviewAvatar.pictureUrl,
-                                        reviewAvatar.image,
-                                        groupAnimation = reviewAvatar.groupAnimation,
-                                    ),
-                                member = member,
-                                busy = true,
-                                initialAdminIds = warningAdmins,
-                                onInitialAdminChange = { _, _ -> },
-                            )
                         }
                     },
                 )
@@ -1690,7 +1620,7 @@ internal fun GroupDetailsScreen(
                                         routeKey = "members",
                                         onClick = { membersExpanded = true },
                                         leading = {
-                                            Icon(painterResource(R.drawable.ic_group), contentDescription = null)
+                                            SettingsLeadingIcon(R.drawable.ic_group)
                                         },
                                     )
                                 }
@@ -1939,12 +1869,7 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.person_start_group),
                                     onClick = launch.second,
-                                    leading = {
-                                        Icon(
-                                            painterResource(R.drawable.ic_group_add),
-                                            contentDescription = null,
-                                        )
-                                    },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                     modifier = launch.first.testTag("chat_info.start_group"),
                                 )
                             }
@@ -1957,7 +1882,7 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.person_groups_in_common),
                                     onClick = profileLaunch.second,
-                                    leading = { Icon(painterResource(R.drawable.ic_group), contentDescription = null) },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_group) },
                                     modifier = profileLaunch.first.testTag("chat_info.groups_in_common"),
                                 )
                             }
@@ -1969,12 +1894,7 @@ internal fun GroupDetailsScreen(
                                     routeKey = "add-to-groups",
                                     onClick = { showDmAddToGroups = true },
                                     enabled = !addingDmPeerToGroups,
-                                    leading = {
-                                        Icon(
-                                            painterResource(R.drawable.ic_group_add),
-                                            contentDescription = null,
-                                        )
-                                    },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                     modifier = Modifier.testTag("chat_info.add_to_group"),
                                 )
                             }
@@ -2007,7 +1927,7 @@ internal fun GroupDetailsScreen(
                                     routeKey = "edit",
                                     onClick = { showEditGroup = true },
                                     enabled = activeMutation == null && !controller.mutationInFlight,
-                                    leading = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_edit) },
                                 )
                             }
                             row("add_member") { rowContext ->
@@ -2026,12 +1946,7 @@ internal fun GroupDetailsScreen(
                                             controller.seededSelfMember,
                                         ) &&
                                             !mutationsBlocked,
-                                    leading = {
-                                        Icon(
-                                            painterResource(R.drawable.ic_group_add),
-                                            contentDescription = null,
-                                        )
-                                    },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                 )
                             }
                         }
@@ -2130,7 +2045,7 @@ internal fun GroupDetailsScreen(
                                         clipboard.setText(AnnotatedString(ChatLink.uri(controller.group.groupIdHex)))
                                         appState.present(R.string.copied)
                                     },
-                                    leading = { Icon(painterResource(R.drawable.ic_link), contentDescription = null) },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_link) },
                                 )
                             }
                         }
@@ -2143,7 +2058,7 @@ internal fun GroupDetailsScreen(
                                     appState.updateCollapseLongMessagesInGroup(controller.group.groupIdHex, it)
                                 },
                                 subtitle = stringResource(R.string.collapse_long_messages_subtitle),
-                                leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.WrapText) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_wrap_text) },
                             )
                         }
                         if (appState.ttsHasUsableEngine) {
@@ -2165,11 +2080,7 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.translation_automatic),
                                     leading = {
-                                        Icon(
-                                            painterResource(R.drawable.ic_translate),
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
+                                        SettingsLeadingIcon(R.drawable.ic_translate)
                                     },
                                     onClick = { showTranslationPicker = true },
                                 )
@@ -2188,7 +2099,7 @@ internal fun GroupDetailsScreen(
                                         controller.group.groupIdHex,
                                         conversationNotifyMode,
                                     ),
-                                leading = { SettingsLeadingIcon(Icons.Filled.Notifications) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                             )
                         }
                         row("bubble_colors") { rowContext ->
@@ -2197,7 +2108,7 @@ internal fun GroupDetailsScreen(
                                 title = stringResource(R.string.chat_bubble_colors),
                                 routeKey = "bubble-colors",
                                 onClick = { showBubbleColors = true },
-                                leading = { SettingsLeadingIcon(Icons.Filled.Palette) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_palette) },
                             )
                         }
                     }
@@ -2289,7 +2200,7 @@ internal fun GroupDetailsScreen(
                                 title = stringResource(R.string.chat_add_folder),
                                 onClick = { showFolderPicker = true },
                                 modifier = Modifier.testTag("chat_info.folders"),
-                                leading = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_add) },
                             )
                         }
                     }
@@ -2428,7 +2339,7 @@ internal fun GroupDetailsScreen(
                                 onClick = { showChatRelays = true },
                                 modifier = Modifier.testTag("chat_info.relays"),
                                 subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
-                                leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_tune) },
                             )
                         }
                         if (isDm) {
@@ -2440,7 +2351,7 @@ internal fun GroupDetailsScreen(
                                     onClick = { showGroupInfo = true },
                                     modifier = Modifier.testTag("chat_info.developer_tools"),
                                     leading = {
-                                        Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null)
+                                        SettingsLeadingIcon(R.drawable.ic_bug_report)
                                     },
                                 )
                             }
@@ -2479,10 +2390,7 @@ internal fun GroupDetailsScreen(
                                             enabled =
                                                 !mutationsBlocked && controller.transferAdminCandidates().isNotEmpty(),
                                             leading = {
-                                                Icon(
-                                                    painterResource(R.drawable.ic_swap_vert),
-                                                    contentDescription = null,
-                                                )
+                                                SettingsLeadingIcon(R.drawable.ic_swap_vert)
                                             },
                                         )
                                     }
@@ -2624,7 +2532,7 @@ internal fun GroupDetailsScreen(
                                     onClick = { showGroupInfo = true },
                                     modifier = Modifier.testTag("chat_info.developer_tools"),
                                     leading = {
-                                        Icon(painterResource(R.drawable.ic_bug_report), contentDescription = null)
+                                        SettingsLeadingIcon(R.drawable.ic_bug_report)
                                     },
                                 )
                             }
@@ -2890,7 +2798,7 @@ private fun DangerLeading(
     if (inProgress) {
         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
     } else {
-        Icon(painterResource(icon), contentDescription = null, tint = tint)
+        SettingsLeadingIcon(icon, tint = tint)
     }
 }
 
@@ -3134,10 +3042,6 @@ private class DetailsReviewSlot {
         ticket = Any()
         value = next
     }
-}
-
-private class GroupInviteWarningTicket {
-    var active: Boolean = true
 }
 
 /** Re-read each authority fence when claiming an administration confirmation. */

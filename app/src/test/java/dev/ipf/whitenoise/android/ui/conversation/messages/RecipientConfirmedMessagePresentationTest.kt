@@ -14,7 +14,6 @@ import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -85,44 +84,6 @@ class RecipientConfirmedMessagePresentationTest {
                 useUnmergedTree = true,
             ).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(0)
-    }
-
-    /** Receipt-backed status reaches the full-screen reader through the production controller projection. */
-    @Test
-    fun fullScreenReaderShowsConfirmedDeliveryWithoutASourceEvent() {
-        val fixture = fixture(Shape.Text)
-        val confirmed = confirmed(requireNotNull(fixture.item.projected))
-        fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(confirmed)))
-        composeRule.setContent {
-            val item = fixture.controller.timeline.single()
-            WhiteNoiseTheme {
-                MessageFullScreenView(
-                    senderDisplayName = "Sender",
-                    senderSeed = "sender",
-                    senderAvatarUrl = null,
-                    body = item.record.plaintext,
-                    bodyMarkdownDocument = null,
-                    mentionDisplayName = null,
-                    onNostrProfileTap = null,
-                    onCopyMarkdownLink = {},
-                    timeText = "10:30",
-                    showStatus = true,
-                    status = item.status,
-                    canReply = false,
-                    canReact = false,
-                    canDelete = false,
-                    onReply = {},
-                    onReact = {},
-                    onCopy = {},
-                    onDelete = {},
-                    onDismiss = {},
-                    bottomBar = {},
-                )
-            }
-        }
-
-        composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(1)
-        composeRule.onAllNodesWithContentDescription("Sending", useUnmergedTree = true).assertCountEquals(0)
     }
 
     /** Real bubble semantics follow live native upserts in both directions without reopening the conversation. */

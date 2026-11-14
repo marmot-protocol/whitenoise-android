@@ -112,6 +112,7 @@ internal fun AiAgentsContent(
                                 modifier = Modifier.testTag("ai_agents.connector.${connector.id}"),
                                 subtitle = stringResource(connector.subtitleRes),
                                 enabled = npub != null,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_cable) },
                             )
                         }
                     }
@@ -137,7 +138,7 @@ internal fun AiAgentsContent(
                             subtitle = npub?.let(::abbreviatedNpub),
                             enabled = npub != null,
                             leading = {
-                                Icon(painterResource(R.drawable.ic_content_copy), contentDescription = null)
+                                SettingsLeadingIcon(R.drawable.ic_content_copy)
                             },
                         )
                     }
@@ -148,6 +149,7 @@ internal fun AiAgentsContent(
                             onClick = { feedback = documentationOutcome(onOpenDocs()) },
                             modifier = Modifier.testTag("ai_agents.docs"),
                             subtitle = stringResource(R.string.ai_agents_connector_docs_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_menu_book) },
                         )
                     }
                 }

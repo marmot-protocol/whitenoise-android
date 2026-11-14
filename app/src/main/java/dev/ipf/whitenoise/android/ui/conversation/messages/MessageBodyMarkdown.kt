@@ -17,7 +17,8 @@ import kotlin.coroutines.coroutineContext
  * Returns only the Markdown document that belongs to [bodyText]. An edited
  * message supplies [overrideDocument]; while that parse is pending or empty,
  * the current edited body must stay plain rather than reusing the original
- * message's stale document.
+ * message's stale document. A truncated parse describes only a prefix, so the
+ * caller must use the full body when no complete document is available.
  */
 internal fun messageMarkdownDocumentForDisplayedBody(
     bodyText: String?,
@@ -31,6 +32,7 @@ internal fun messageMarkdownDocumentForDisplayedBody(
         bodyText != null &&
             !deleted &&
             !persistedFailure &&
+            !document.truncated &&
             document.blocks.isNotEmpty() &&
             (bodyText == recordPlaintext || overrideDocument != null)
     }
@@ -44,6 +46,8 @@ internal fun messageMarkdownDocumentForDisplayedBody(
  * but a long message opened through Read More must not regress to literal
  * Markdown. Parse the displayed body as a body-keyed fallback and let the
  * authoritative stored/edited document take over as soon as it is available.
+ * MDK applies the same input cap to stored and on-demand parses. When tokens
+ * for this body already hit that cap, render the complete source as plain text.
  */
 @Composable
 internal fun rememberMessageMarkdownDocumentForDisplayedBody(
@@ -66,9 +70,12 @@ internal fun rememberMessageMarkdownDocumentForDisplayedBody(
             deleted = deleted,
             persistedFailure = persistedFailure,
         )
+    val availableDocument = overrideDocument ?: storedDocument
+    val hitMarkdownCap = availableDocument.truncated && (bodyText == recordPlaintext || overrideDocument != null)
     val fallbackSource =
         bodyText?.takeIf {
             authoritativeDocument == null &&
+                !hitMarkdownCap &&
                 fallbackParsingEnabled &&
                 !deleted &&
                 !persistedFailure &&
@@ -84,7 +91,7 @@ internal fun rememberMessageMarkdownDocumentForDisplayedBody(
         }
         val parsed = parseMarkdownOrEmptyDocument(fallbackSource, parseMarkdown)
         coroutineContext.ensureActive()
-        fallbackDocument = parsed.takeIf { it.blocks.isNotEmpty() }
+        fallbackDocument = parsed.takeIf { !it.truncated && it.blocks.isNotEmpty() }
     }
     return authoritativeDocument ?: fallbackDocument
 }

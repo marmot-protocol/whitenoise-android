@@ -71,6 +71,33 @@ internal fun composerToolbarCompactWidth(
     return minOf(actionCount.coerceAtLeast(0), visibleTargets) * COMPOSER_SHORTCUT_TARGET_DP
 }
 
+/**
+ * Splits the expanded toolbar row between the start and end groups. The end group sits beside Send, so it
+ * receives whole target columns sized to its actions and never more; the start group absorbs the spare width.
+ * Returns the end group's width; the start group's width is `room - result` when it has actions.
+ */
+internal fun composerExpandedTrailingWidth(
+    room: Float,
+    leadingCount: Int,
+    trailingCount: Int,
+): Float {
+    if (trailingCount <= 0) return 0f
+    val share =
+        if (leadingCount <= 0) {
+            room
+        } else {
+            val leadingShare =
+                (room * leadingCount / (leadingCount + trailingCount))
+                    .coerceIn(
+                        COMPOSER_SHORTCUT_TARGET_DP,
+                        (room - COMPOSER_SHORTCUT_TARGET_DP).coerceAtLeast(COMPOSER_SHORTCUT_TARGET_DP),
+                    )
+            room - leadingShare
+        }
+    val columns = floor(share / COMPOSER_SHORTCUT_TARGET_DP).toInt().coerceIn(1, trailingCount)
+    return columns * COMPOSER_SHORTCUT_TARGET_DP
+}
+
 /** Counts complete target rows, retaining one row for an empty or extremely narrow toolbar. */
 internal fun composerToolbarRowCount(
     actionCount: Int,
@@ -130,6 +157,7 @@ internal fun ComposerConfiguredToolbar(
     heightLimit: Dp,
     modifier: Modifier = Modifier,
     singleRowOverflow: Boolean = false,
+    endAligned: Boolean = false,
     defaultFocus: FocusRequester? = null,
     content: @Composable (ComposerShortcut, Modifier) -> Unit,
 ) {
@@ -184,6 +212,7 @@ internal fun ComposerConfiguredToolbar(
                 viewport
                     .heightIn(max = heightLimit.coerceAtLeast(ComposerShortcutTarget))
                     .fadingVerticalScroll(scroll, enabled = scrollAllowed),
+            horizontalArrangement = if (endAligned) Arrangement.End else Arrangement.Start,
             verticalArrangement = Arrangement.spacedBy(ComposerToolbarRowOverlap),
             maxItemsInEachRow = floor(width.value / COMPOSER_SHORTCUT_TARGET_DP).toInt().coerceAtLeast(1),
         ) { slots() }

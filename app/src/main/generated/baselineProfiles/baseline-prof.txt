@@ -38159,7 +38159,6 @@ SPLdev/ipf/whitenoise/android/translation/MessageTranslationControlsKt$rememberM
 PLdev/ipf/whitenoise/android/translation/MessageTranslationControlsKt$rememberMessageTranslationSource$lambda$3$0$$inlined$onDispose$1;->dispose()V
 Ldev/ipf/whitenoise/android/translation/MessageTranslationControlsKt;
 SPLdev/ipf/whitenoise/android/translation/MessageTranslationControlsKt;->$r8$lambda$eQRaEGP3If8CcklvNiTtEbm5rIA(Ldev/ipf/whitenoise/android/translation/TranslationSource;Ldev/ipf/whitenoise/android/translation/ConversationTranslationSession;Landroidx/compose/runtime/DisposableEffectScope;)Landroidx/compose/runtime/DisposableEffectResult;
-SPLdev/ipf/whitenoise/android/translation/MessageTranslationControlsKt;->MessageTranslationRendition(Ldev/ipf/whitenoise/android/translation/TranslationSource;Landroidx/compose/runtime/Composer;I)V
 SPLdev/ipf/whitenoise/android/translation/MessageTranslationControlsKt;->rememberMessageTranslationSource$lambda$3$0(Ldev/ipf/whitenoise/android/translation/TranslationSource;Ldev/ipf/whitenoise/android/translation/ConversationTranslationSession;Landroidx/compose/runtime/DisposableEffectScope;)Landroidx/compose/runtime/DisposableEffectResult;
 HSPLdev/ipf/whitenoise/android/translation/MessageTranslationControlsKt;->rememberMessageTranslationSource(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Landroidx/compose/runtime/Composer;II)Ldev/ipf/whitenoise/android/translation/TranslationSource;
 Ldev/ipf/whitenoise/android/translation/TranslationChoice;

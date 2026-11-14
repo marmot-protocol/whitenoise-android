@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.shouldResetNavOnAccountChange
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
+import dev.ipf.whitenoise.android.ui.account.rememberRetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.ChatListReturnHead
 import dev.ipf.whitenoise.android.ui.chats.ChatsScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupFlow
@@ -414,6 +415,7 @@ internal fun MainShell(
             appState.activeAccountRef,
             chatsController,
         )
+    val retainedAccountAvatars = rememberRetainedAccountAvatarPixels(appState)
     var quickAccountSwitchTransition by remember {
         mutableStateOf<QuickAccountSwitchTransition?>(null)
     }
@@ -2170,6 +2172,7 @@ internal fun MainShell(
                                         appState = appState,
                                         controller = chatsController,
                                         retainedAvatarPreparation = retainedAvatarPreparation,
+                                        retainedAccountAvatars = retainedAccountAvatars,
                                         diagnosticsPrompt = {
                                             val chatsSettled =
                                                 selectedChat == null &&

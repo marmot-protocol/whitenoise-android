@@ -87,9 +87,14 @@ internal class SettingsCardMorph(
     /** Only the mounted child supplies its presented chrome to an ancestor recording its pixels. */
     internal fun observeChildContours(): () -> Unit {
         val read = { page?.presentedContours(host, time()) }
+        val bodyTop = { page?.bodyTop ?: 0f }
         parent?.page?.childContours = read
+        parent?.page?.childBodyTop = bodyTop
         return {
-            parent?.page?.let { if (it.childContours === read) it.childContours = null }
+            parent?.page?.let {
+                if (it.childContours === read) it.childContours = null
+                if (it.childBodyTop === bodyTop) it.childBodyTop = null
+            }
         }
     }
 

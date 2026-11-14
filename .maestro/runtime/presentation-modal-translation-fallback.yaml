@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-modal-translation-fallback
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    id: translation.menu
+- tapOn:
+    id: translation.menu
+- assertVisible:
+    text: Translate
+    checked: true
+- assertVisible:
+    id: presentation.complete

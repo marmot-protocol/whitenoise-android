@@ -1,0 +1,214 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Chat list or conversation still finishing the MarmotKit update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.error_not_ready",
+        "test_ids": [
+          "INT-010",
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Generic retry copy for a failed chat list or conversation load",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Loaded chats or messages kept while a refresh failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.error_loaded_content_may_be_out_of_date",
+        "test_ids": [
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "R.string.toast_group_needs_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_group_needs_admin",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_leave_not_confirmed_history_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_leave_not_confirmed_history_kept",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_left_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_left_chat",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_left_chat_delete_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_left_chat_delete_failed",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_make_another_admin_before_leaving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_make_another_admin_before_leaving",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "explicit single-group leave and delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "suspend fun leaveAndDeleteFromChatList(",
+        "test_ids": [
+          "CHL-012"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.toast_chat_archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_chat_archived",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_chat_restored",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_chat_restored",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_leave_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_couldnt_leave_chat",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_couldnt_update_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_couldnt_update_chat",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_demoted_but_couldnt_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.toast_demoted_but_couldnt_leave",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.group_action_step_down_and_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.group_action_step_down_and_leave",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "surface": "Chat-list successor retry names the combined transfer and departure",
+        "anchor": "R.string.group_action_transfer_and_leave",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Native manual reminder lookup for visible-read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "internal fun hasManualUnreadReminder(groupIdHex: String)",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "diagnosticAttempt = diagnosticAttempt,",
+        "test_ids": [
+          "SEC-009"
+        ]
+      },
+      {
+        "surface": "Single-owner initial chat-list Retry and timeout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "publishInitialLoadTimeout(",
+        "test_ids": [
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "R.string.startup_taking_too_long",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "R.string.startup_taking_too_long",
+        "test_ids": [
+          "INT-012"
+        ]
+      },
+      {
+        "surface": "Archive native commit adapter retains account binding and group lock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "private suspend fun applyArchiveMutation(",
+        "test_ids": [
+          "CHL-007"
+        ]
+      },
+      {
+        "surface": "Mark all read, mark unread and pin run through one admission check, account recheck and failure path",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt",
+        "anchor": "private suspend fun <T> runAdmittedChatListAction(",
+        "test_ids": [
+          "CHL-006",
+          "CHL-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

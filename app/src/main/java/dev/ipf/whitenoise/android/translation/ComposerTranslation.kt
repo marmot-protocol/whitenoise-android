@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.CancellationException
@@ -255,8 +254,8 @@ internal fun rememberComposerTranslation(
                 ownerCurrent = { appState.translationOwnerCurrent(account, runtime, lifecycle) },
                 initialTarget = preferences.outgoingTarget(account, group),
                 onTargetSaved = { preferences.setOutgoingTarget(account, group, it) },
-                noticeAccepted = preferences::composerNoticeAccepted,
-                onNoticeAccepted = preferences::acceptComposerNotice,
+                noticeAccepted = preferences::providerNoticeAccepted,
+                onNoticeAccepted = preferences::acceptProviderNotice,
             )
         }
     LaunchedEffect(state, appState.appLockScreenVisible) { state.invalidate() }
@@ -317,11 +316,10 @@ internal fun ComposerTranslationPreview(
         modifier = modifier,
     )
     if (choosing) {
-        ChoiceDialog(
+        TranslationLanguagePickerSheet(
             title = title,
-            values = choices.codes,
+            choices = choices,
             selected = target,
-            label = choices.label,
             onDismiss = {
                 choosing = false
                 if (state.target == null) state.close()

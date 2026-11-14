@@ -69,6 +69,9 @@ internal fun Modifier.fileAttachmentFirstFrameVisibility(resolved: Boolean): Mod
         alpha(0f).semantics { hideFromAccessibility() }
     }
 
+/** Tags the optimistic upload card, which has no protocol message id yet. */
+internal const val PENDING_FILE_CARD_TEST_TAG = "pending_file_card"
+
 internal fun fileAttachmentCardTestTag(
     messageIdHex: String,
     attachmentIndex: Int,
@@ -618,6 +621,7 @@ internal fun PendingFilePill(
         modifier =
             Modifier
                 .fileBubbleWidth()
+                .testTag(PENDING_FILE_CARD_TEST_TAG)
                 .then(
                     if (failed && onRetry != null) {
                         Modifier.clickable(onClick = onRetry)

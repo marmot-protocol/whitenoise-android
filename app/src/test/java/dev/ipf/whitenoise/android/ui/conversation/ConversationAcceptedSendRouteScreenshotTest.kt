@@ -10,16 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.platform.LocalCursorBlinkEnabled
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -51,7 +46,6 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.timelinePage
 import dev.ipf.whitenoise.android.state.timelineRecord
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
-import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_FULL_SCREEN_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -431,7 +425,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
             val conversation = createConversation(draftText = text)
             val evidence = SendRouteEvidence()
             val frames = LiveTailFrames()
-            mountHistoryConversation(
+            composeRule.mountSendRouteConversation(
                 conversation,
                 evidence,
                 liveTail = true,
@@ -484,7 +478,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
         val conversation = createConversation()
         val appState = conversation.appState
         val evidence = SendRouteEvidence()
-        mountHistoryConversation(conversation, evidence)
+        composeRule.mountSendRouteConversation(conversation, evidence)
         composeRule.waitForIdle()
         composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.ReadingHistory }
         assertTrue(checkNotNull(evidence.viewport).canScrollBackward)
@@ -522,83 +516,12 @@ class ConversationAcceptedSendRouteScreenshotTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_send_history_tail.png")
     }
 
-    /**
-     * Sending from a long message's Read more reader closes the reader once the send is accepted and reveals the
-     * pending bubble above the full conversation's composer, through the same snap the main composer uses (#3268).
-     */
-    @Test
-    fun acceptedSendFromReadMoreReaderClosesItAndRevealsThePendingTail() {
-        val conversation = createConversation(longHistoryMessage = true)
-        val evidence = SendRouteEvidence()
-        // Settlement takes a state-dependent number of frames; the focused caret must stay visible.
-        mountHistoryConversation(conversation, evidence, cursorBlinkEnabled = false)
-        composeRule.waitForIdle()
-        composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.ReadingHistory }
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        // The collapsed bubble also lays out a zero-size measurement copy of Read More; tap the visible one.
-        val readMoreId =
-            composeRule
-                .onAllNodesWithText(context.getString(R.string.message_read_more))
-                .fetchSemanticsNodes()
-                .first { it.boundsInRoot.width > 0f }
-                .id
-        composeRule.onNode(SemanticsMatcher("visible Read More") { it.id == readMoreId }).performClick()
-        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertIsDisplayed()
-        evidence.writes.clear()
-
-        composeRule.mainClock.autoAdvance = false
-        composeRule
-            .onNode(
-                hasContentDescription(context.getString(R.string.send)) and
-                    hasAnyAncestor(hasTestTag(MESSAGE_FULL_SCREEN_TAG)),
-            ).performClick()
-        awaitConversationCondition { publishCount == 1 }
-        // Reader exit precedes the viewport handoff; bound the actual terminal state.
-        var settlementFrames = 0
-        while (evidence.viewport?.mode !is ConversationScrollMode.FollowingTail && settlementFrames < 120) {
-            composeRule.mainClock.advanceTimeByFrame()
-            composeRule.waitForIdle()
-            settlementFrames++
-        }
-        composeRule.waitForIdle()
-
-        composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertDoesNotExist()
-        val sentId =
-            conversation.timeline
-                .single { it.record.plaintext == SENT_TEXT }
-                .record.messageIdHex
-        val bubbleBounds =
-            composeRule
-                .onNodeWithTag(messageBubbleColumnTestTag(sentId), useUnmergedTree = true)
-                .assertIsDisplayed()
-                .fetchSemanticsNode()
-                .boundsInRoot
-        val composerBounds = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
-        assertTrue("the pending bubble clears the conversation composer", bubbleBounds.bottom <= composerBounds.top)
-        assertEquals("the reader send publishes exactly once", 1, publishCount)
-        assertTrue("accepted reader sends never animate across history", evidence.writes.none { it.animated })
-        assertTrue(checkNotNull(evidence.viewport).mode is ConversationScrollMode.FollowingTail)
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_accepted_send_read_more_tail.png")
-    }
-
-    /**
-     * Builds one synthetic authoritative window with typed durable acceptance and no relay publication. With
-     * [longHistoryMessage], the restored history anchor is long enough to collapse behind Read more.
-     */
-    private fun createConversation(
-        longHistoryMessage: Boolean = false,
-        draftText: String = SENT_TEXT,
-    ): ConversationController {
+    /** Builds one synthetic authoritative window with typed durable acceptance and no relay publication. */
+    private fun createConversation(draftText: String = SENT_TEXT): ConversationController {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val records =
             List(60) { index ->
-                val text =
-                    if (longHistoryMessage && index == HISTORY_ANCHOR_INDEX) {
-                        List(LONG_MESSAGE_LINES) { line -> "Long history line $line" }.joinToString("\n")
-                    } else {
-                        "History $index"
-                    }
-                timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), text)
+                timelineRecord((index + 1).toString(16).padStart(64, '0'), (index + 1).toULong(), "History $index")
             }
         val timelineSubscription = ScriptedConversationTimelineSubscription(timelinePage(*records.toTypedArray()))
         val subscriptions =
@@ -621,7 +544,7 @@ class ConversationAcceptedSendRouteScreenshotTest {
                 startOnConstruction = true,
                 markdownParser = { text ->
                     if (deferMarkdownHydration && text == draftText) markdownHydrationGate.await()
-                    plainParagraphDocument(text, formattedHydration)
+                    plainParagraphDocument(text)
                 },
                 clockMillis = { 1_672_531_260_000L },
                 textPublisher = { _, _, _, _ ->
@@ -640,95 +563,30 @@ class ConversationAcceptedSendRouteScreenshotTest {
         return conversation
     }
 
-    /** Mounts the real route with a logical far-history bookmark and the actual production scroll writer. */
-    private fun mountHistoryConversation(
-        conversation: ConversationController,
-        evidence: SendRouteEvidence,
-        liveTail: Boolean = false,
-        keyboardClearanceDp: Int = 0,
-        onPaintedGeometry: ((ComposerSendFlightGeometry) -> Unit)? = null,
-        onMotionOwner: ((ComposerSendMotion) -> Unit)? = null,
-        cursorBlinkEnabled: Boolean = true,
-    ) {
-        val historyId = (HISTORY_ANCHOR_INDEX + 1).toString(16).padStart(64, '0')
-        composeRule.setContent {
-            CompositionLocalProvider(
-                LocalCursorBlinkEnabled provides cursorBlinkEnabled,
-                LocalConversationScrollEvidenceSink provides evidence,
-                LocalComposerSendGeometryObserver provides onPaintedGeometry,
-                LocalComposerSendOwnerObserver provides onMotionOwner,
-            ) {
-                WhiteNoiseTheme {
-                    Box(Modifier.fillMaxSize().padding(bottom = keyboardClearanceDp.dp)) {
-                        ConversationScreen(
-                            appState = conversation.appState,
-                            chat =
-                                ChatListItem(
-                                    group = conversationTimelineTestGroup(),
-                                    latest = null,
-                                    otherMemberAccount = null,
-                                    memberCount = 1,
-                                    memberSnapshot = conversationTimelineMemberSnapshot(),
-                                    projection = if (liveTail) liveTailProjection(conversation) else null,
-                                ),
-                            controller = conversation,
-                            onBack = {},
-                            restoredScrollSnapshot =
-                                if (liveTail) {
-                                    null
-                                } else {
-                                    ConversationScrollSnapshot(
-                                        firstVisibleItemIndex = 49,
-                                        firstVisibleItemScrollOffset = 0,
-                                        anchorItemId = "msg:$historyId",
-                                        anchorMessageIdHex = historyId,
-                                    )
-                                },
-                        )
-                    }
-                }
-            }
-        }
-    }
+    /**
+     * Parses text into a one-paragraph markdown document with soft breaks, or a bold run for the styled send when
+     * formatted hydration is on.
+     */
+    private fun plainParagraphDocument(text: String): MarkdownDocumentFfi =
+        MarkdownDocumentFfi(
+            truncated = false,
+            blocks =
+                if (formattedHydration && text == "**Styled send**") {
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Styled send")))),
+                        ),
+                    )
+                } else {
+                    sendRoutePlainMarkdownDocument(text).blocks
+                },
+            blankLinesBefore = ByteArray(0),
+        )
 
     private companion object {
         const val SENT_TEXT = "Accepted send from older history"
-        const val HISTORY_ANCHOR_INDEX = 10
-        const val LONG_MESSAGE_LINES = 70
     }
 }
-
-/**
- * Parses text into a one-paragraph markdown document with soft breaks, or a bold run for the styled send when
- * formatted hydration is on.
- */
-private fun plainParagraphDocument(
-    text: String,
-    formattedHydration: Boolean,
-): MarkdownDocumentFfi =
-    MarkdownDocumentFfi(
-        truncated = false,
-        blocks =
-            if (formattedHydration && text == "**Styled send**") {
-                listOf(
-                    MarkdownBlockFfi.Paragraph(
-                        listOf(MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Styled send")))),
-                    ),
-                )
-            } else {
-                listOf(
-                    MarkdownBlockFfi.Paragraph(
-                        text.split('\n').flatMapIndexed { index, line ->
-                            buildList {
-                                if (index > 0) add(MarkdownInlineFfi.SoftBreak)
-                                add(MarkdownInlineFfi.Text(line))
-                            }
-                        },
-                    ),
-                )
-            },
-        blankLinesBefore = ByteArray(0),
-    )
 
 private const val INCOMING_TEXT = "A received row while sending"
 
@@ -800,7 +658,7 @@ private class LiveTailFrames {
 }
 
 /** Keeps identifiers private in test memory while observing the real writer and measured viewport. */
-private class SendRouteEvidence : ConversationScrollEvidenceSink {
+internal class SendRouteEvidence : ConversationScrollEvidenceSink {
     val writes = CopyOnWriteArrayList<ConversationScrollWriteEvidence>()
     var viewport: ConversationViewportEvidence? = null
 
@@ -828,4 +686,73 @@ private fun liveTailProjection(conversation: ConversationController): dev.ipf.ma
         lastReadMessageIdHex = latest.messageIdHex,
         lastReadTimelineAt = latest.recordedAt,
     )
+}
+
+internal const val SEND_ROUTE_HISTORY_ANCHOR_INDEX = 10
+
+/** Projects the fixture's plain source with explicit soft breaks like the native parser. */
+internal fun sendRoutePlainMarkdownDocument(text: String): MarkdownDocumentFfi =
+    MarkdownDocumentFfi(
+        truncated = false,
+        blocks =
+            listOf(
+                MarkdownBlockFfi.Paragraph(
+                    text.split('\n').flatMapIndexed { index, line ->
+                        buildList {
+                            if (index > 0) add(MarkdownInlineFfi.SoftBreak)
+                            add(MarkdownInlineFfi.Text(line))
+                        }
+                    },
+                ),
+            ),
+        blankLinesBefore = ByteArray(0),
+    )
+
+/** Mounts the real route with a logical far-history bookmark and the actual production scroll writer. */
+internal fun ComposeContentTestRule.mountSendRouteConversation(
+    conversation: ConversationController,
+    evidence: ConversationScrollEvidenceSink,
+    liveTail: Boolean = false,
+    keyboardClearanceDp: Int = 0,
+    onPaintedGeometry: ((ComposerSendFlightGeometry) -> Unit)? = null,
+    onMotionOwner: ((ComposerSendMotion) -> Unit)? = null,
+) {
+    val historyId = (SEND_ROUTE_HISTORY_ANCHOR_INDEX + 1).toString(16).padStart(64, '0')
+    setContent {
+        CompositionLocalProvider(
+            LocalConversationScrollEvidenceSink provides evidence,
+            LocalComposerSendGeometryObserver provides onPaintedGeometry,
+            LocalComposerSendOwnerObserver provides onMotionOwner,
+        ) {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxSize().padding(bottom = keyboardClearanceDp.dp)) {
+                    ConversationScreen(
+                        appState = conversation.appState,
+                        chat =
+                            ChatListItem(
+                                group = conversationTimelineTestGroup(),
+                                latest = null,
+                                otherMemberAccount = null,
+                                memberCount = 1,
+                                memberSnapshot = conversationTimelineMemberSnapshot(),
+                                projection = if (liveTail) liveTailProjection(conversation) else null,
+                            ),
+                        controller = conversation,
+                        onBack = {},
+                        restoredScrollSnapshot =
+                            if (liveTail) {
+                                null
+                            } else {
+                                ConversationScrollSnapshot(
+                                    firstVisibleItemIndex = 49,
+                                    firstVisibleItemScrollOffset = 0,
+                                    anchorItemId = "msg:$historyId",
+                                    anchorMessageIdHex = historyId,
+                                )
+                            },
+                    )
+                }
+            }
+        }
+    }
 }

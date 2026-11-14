@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.ui.TtsSentenceActions
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
 import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptionToggleState
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.GiphyMessageFooter
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubble
@@ -188,6 +189,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
     // A caption carries the footer, so no file card may draw the time or state.
     hasCaption: Boolean = false,
     expandNarrowVisualToStandardWidth: Boolean = false,
+    audioTranscription: AudioTranscriptionToggleState? = null,
 ) {
     if (sharedLocation != null) {
         val shareContext = LocalContext.current
@@ -337,6 +339,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                     appState = appState,
                     presentationOwner = presentationOwner,
                     onLongPress = onMediaLongPress,
+                    audioTranscription = audioTranscription,
                 )
             }
         }

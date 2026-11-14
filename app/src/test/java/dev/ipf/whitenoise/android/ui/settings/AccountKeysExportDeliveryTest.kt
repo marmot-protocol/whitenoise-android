@@ -37,6 +37,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.reachSensitiveClipDeadline
+import dev.ipf.whitenoise.android.ui.common.useTestWorkManager
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -218,6 +220,28 @@ class AccountKeysExportDeliveryTest {
         dialogButton(R.string.hide).performClick()
         composeRule.onNodeWithTag("profile_keys.encrypted_backup").assertDoesNotExist()
         assertEquals(0, fixture.picker.launchCount)
+    }
+
+    /** The copied backup outlives the closed preview only until the clipboard deadline. */
+    @Test
+    fun copiedBackupLeavesTheClipboardAfterThePreviewCloses() {
+        useTestWorkManager(context)
+        render()
+        openBackupPreview()
+        dialogButton(R.string.copy).performClick()
+        dialogButton(R.string.hide).performClick()
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        composeRule.runOnIdle {
+            assertEquals(
+                ENCRYPTED_KEY,
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString(),
+            )
+        }
+        reachSensitiveClipDeadline(context)
+        assertFalse(clipboard.hasPrimaryClip())
     }
 
     /** The optional file action reuses the confirmed preview bytes, without requesting native encryption again. */

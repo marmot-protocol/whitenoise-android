@@ -124,6 +124,7 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.usage_diagnostics_subtitle),
                             enabled = state.snapshot != null && !state.failed,
                             busy = state.busy,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_analytics) },
                         )
                     }
                     row("audit_logs") { rowContext ->
@@ -145,6 +146,7 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.audit_upload_subtitle),
                             enabled = appState.auditLogSettings != null && !auditLogsBusy,
                             busy = auditLogsBusy,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_group) },
                         )
                     }
                 }
@@ -181,6 +183,7 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.choose_audit_files_subtitle),
                             onClick = { auditPickerOpen = true },
                             enabled = !auditLogsBusy && !exportInFlight,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_file_open) },
                         )
                     }
                     row("export") { rowContext ->
@@ -190,6 +193,7 @@ internal fun DiagnosticsImprovementsScreen(
                             onClick = { if (!exportInFlight) exportConfirmOpen = true },
                             subtitle = stringResource(R.string.export_audit_logs_subtitle),
                             enabled = !auditLogsBusy && !exportInFlight,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_upload_file) },
                         )
                     }
                     row("delete") { rowContext ->
@@ -201,6 +205,9 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.diagnostics_storage_device),
                             enabled = !auditLogsBusy && !exportInFlight,
                             destructive = true,
+                            leading = {
+                                SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
+                            },
                         )
                     }
                 }

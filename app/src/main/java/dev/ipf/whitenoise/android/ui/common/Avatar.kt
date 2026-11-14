@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
@@ -60,6 +61,8 @@ internal fun Avatar(
     groupAnimation: GroupAvatarAnimation? = null,
     pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    initialUrlImage: ImageBitmap? = null,
+    onUrlImageDisplayed: ((ImageBitmap?) -> Unit)? = null,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -74,7 +77,7 @@ internal fun Avatar(
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val loadedUrlImage by key(seed, pictureUrl, picture, lifetime) {
         rememberRecoverableAvatar(
-            initialImage = AvatarImageLoader.peek(pictureUrl),
+            initialImage = AvatarImageLoader.peek(pictureUrl) ?: initialUrlImage,
             enabled = pictureUrl != null && (picture == null || privateSource),
             awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(pictureUrl), lifetime) },
         ) {
@@ -91,6 +94,9 @@ internal fun Avatar(
             privateSource -> loadedUrlImage ?: picture
             else -> picture ?: loadedUrlImage
         }
+    if (onUrlImageDisplayed != null) {
+        SideEffect { onUrlImageDisplayed(loadedUrlImage.takeIf { image === loadedUrlImage }) }
+    }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,
@@ -112,37 +118,29 @@ internal fun Avatar(
                 }
             AvatarAnimationLayers(animatedKey, image, groupAnimation, size)
         } else {
-            // Derive the font size from the avatar diameter so the single
-            // monogram glyph (the prototype rule) fills the circle without
-            // touching its bounds at every render size used in the app
-            // (24dp..120dp); the cap keeps the large profile avatars at the
-            // prototype's headline size.
-            //
-            // The avatar's outer Modifier.size(...) is in dp and therefore
-            // does NOT scale with the user's accessibility font scale, but a
-            // raw `.sp` value would — pushing wide pairs back outside the
-            // circle for users on large-font settings. Divide the derived
-            // value by `fontScale` so the rendered size is constant in dp
-            // and tracks the avatar's actual size, then cap at titleMedium so
-            // the existing look is preserved on the large profile/group-detail
-            // avatars where titleMedium already fits comfortably. The cap is
-            // taken in the same dp-constant space, so it also resists font
-            // scale.
-            val fontScale = LocalDensity.current.fontScale
-            val headlineSp = MaterialTheme.typography.headlineMedium.fontSize
-            val fittedFontSize =
-                minOf(size.value * MONOGRAM_DIAMETER_RATIO, headlineSp.value * fontScale).sp / fontScale
-            Text(
-                IdentityFormatter.initials(title),
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                style =
-                    avatarMonogramStyle(MaterialTheme.typography.titleMedium, fittedFontSize),
-                fontSize = fittedFontSize,
-                maxLines = 1,
-            )
+            AvatarMonogram(title, size)
         }
     }
+}
+
+/** Fits initials to the fixed-dp circle, including when the system font is enlarged. */
+@Composable
+@Suppress("FunctionNaming")
+private fun AvatarMonogram(
+    title: String,
+    size: Dp,
+) {
+    val fontScale = LocalDensity.current.fontScale
+    val headlineSp = MaterialTheme.typography.headlineMedium.fontSize
+    val fittedFontSize = minOf(size.value * MONOGRAM_DIAMETER_RATIO, headlineSp.value * fontScale).sp / fontScale
+    Text(
+        IdentityFormatter.initials(title),
+        color = Color.White,
+        fontWeight = FontWeight.SemiBold,
+        style = avatarMonogramStyle(MaterialTheme.typography.titleMedium, fittedFontSize),
+        fontSize = fittedFontSize,
+        maxLines = 1,
+    )
 }
 
 /**

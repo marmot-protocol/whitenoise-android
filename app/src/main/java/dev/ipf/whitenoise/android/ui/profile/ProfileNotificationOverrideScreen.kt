@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.ui.group.vibrationPatternLabel
 import dev.ipf.whitenoise.android.ui.settings.SettingsChoice
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -144,6 +145,7 @@ internal fun ProfileNotificationOverrideScreen(
                             value = profileNotificationSummary(state.selection),
                             enabled = !state.busy,
                             modifier = Modifier.testTag("profile_notifications.system"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                         )
                     }
                     row("vibration") { row ->
@@ -159,6 +161,7 @@ internal fun ProfileNotificationOverrideScreen(
                                 },
                             enabled = !state.busy,
                             modifier = Modifier.testTag("profile_notifications.vibration"),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_vibration) },
                         )
                     }
                 }

@@ -26,7 +26,6 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenBody
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderTextSelectionController
 import dev.ipf.whitenoise.android.ui.conversation.messages.SelectableTextLayout
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReaderTextSelectionController
@@ -87,39 +86,6 @@ class MarkdownCodePathLayoutCoverageTest {
         )
         assertEquals(1, measured.single().lineCount)
         scrollToEnd(path)
-    }
-
-    /** Reusing a reader for different source cannot carry the previous path's scroll offset into it. */
-    @Test
-    fun changingReaderSourceRetiresThePreviousCodeViewport() {
-        val original = "/" + "directory/".repeat(40) + "old.md"
-        val replacement = "/" + "different/".repeat(40) + "new.md"
-        var source by mutableStateOf(original)
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                MessageFullScreenBody(
-                    body = source,
-                    markdownDocument =
-                        MarkdownDocumentFfi(
-                            listOf(MarkdownBlockFfi.CodeBlock(MarkdownCodeBlockKindFfi.FENCED, "", source)),
-                            false,
-                            byteArrayOf(),
-                        ),
-                    mentionDisplayName = null,
-                    onNostrProfileTap = null,
-                    onCopyMarkdownLink = {},
-                    modifier = Modifier.width(240.dp),
-                )
-            }
-        }
-        composeRule.waitForIdle()
-        scrollToEnd(original)
-        composeRule.runOnIdle { source = replacement }
-        composeRule.waitForIdle()
-        val range = horizontalRange(replacement)
-        assertTrue(range.maxValue() > 0f)
-        assertEquals(0f, range.value(), 0.1f)
-        composeRule.onNodeWithText(original).assertDoesNotExist()
     }
 
     /** The shared renderer owns source reset even when its caller keeps the surrounding composition alive. */

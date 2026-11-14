@@ -1710,12 +1710,35 @@ internal fun ComposerBar(
                         actionTargetWidth
                     }
                 val ordinarySendAlpha = if (originDictationRequiresCompletion()) 0.38f else 1f
+                // Translate mode shows Send only once the translation of this draft is ready; the gate in
+                // submitMessage stays as the safety net for Enter and the keyboard's Send action.
+                val translationSendHidden =
+                    translation != null &&
+                        translation.active &&
+                        text.isNotBlank() &&
+                        translation.outgoingFor(text) == null
                 val primaryActionEnabled =
                     !originDictationRequiresCompletion() &&
                         (!showMicButton || text.isNotBlank() || hasPendingAttachments) &&
                         (!hasPendingAttachments || editingMessageId != null || attachmentSendEnabled) &&
                         (translation == null || translation.outgoingFor(text) != null)
-                val trailingControlsWidth = primaryTrailingActionWidth
+                // Send renders in the action row, or in its own row when the mic overlays a toolbar slot.
+                val sendAction: @Composable () -> Unit = {
+                    if (translationSendHidden) {
+                        ComposerTranslationSendSlot(width = actionTargetWidth, pending = translation?.pending == true)
+                    } else {
+                        ComposerActionDisc(
+                            onClick = { submitMessage() },
+                            enabled = primaryActionEnabled,
+                            width = actionTargetWidth,
+                            containerColor = actionColors.container,
+                            contentColor = actionColors.content,
+                            description = stringResource(R.string.send),
+                            icon = R.drawable.ic_arrow_upward,
+                            modifier = Modifier.alpha(alpha = ordinarySendAlpha),
+                        )
+                    }
+                }
                 BoxWithConstraints(
                     modifier =
                         Modifier
@@ -1773,7 +1796,7 @@ internal fun ComposerBar(
                                                 .padding(
                                                     start =
                                                         if (lockedVoiceAtStart) {
-                                                            trailingControlsWidth + 4.dp
+                                                            primaryTrailingActionWidth + 4.dp
                                                         } else {
                                                             0.dp
                                                         },
@@ -1781,7 +1804,7 @@ internal fun ComposerBar(
                                                         if (lockedVoiceAtStart) {
                                                             0.dp
                                                         } else {
-                                                            trailingControlsWidth +
+                                                            primaryTrailingActionWidth +
                                                                 if (expandedControlLayout) 4.dp else 12.dp
                                                         },
                                                 ).pointerInput(recordingController) {
@@ -1983,7 +2006,7 @@ internal fun ComposerBar(
                         overlayBackRegistrar = overlayBackRegistrar,
                         inputContentVisible = !isRecordingVoice && voiceReviewClip == null,
                         inputFocusEnabled = voiceReviewClip == null,
-                        expandedTrailingActionInset = trailingControlsWidth,
+                        expandedTrailingActionInset = primaryTrailingActionWidth,
                         compactMeasurementWidth = maxWidth,
                         // Navigation is admitted only after geometry settles. Its optional row stays
                         // in the outer layout cap, never in the target that admits that same row.
@@ -2146,19 +2169,8 @@ internal fun ComposerBar(
                                     canStart = canAcquireVoice,
                                 )
                             }
-                        } else if (showPrimaryTrailingAction &&
-                            !(configuredVoiceUsesSlot)
-                        ) {
-                            ComposerActionDisc(
-                                onClick = { submitMessage() },
-                                enabled = primaryActionEnabled,
-                                width = actionTargetWidth,
-                                containerColor = actionColors.container,
-                                contentColor = actionColors.content,
-                                description = stringResource(R.string.send),
-                                icon = R.drawable.ic_arrow_upward,
-                                modifier = Modifier.alpha(alpha = ordinarySendAlpha),
-                            )
+                        } else if (showPrimaryTrailingAction && !configuredVoiceUsesSlot) {
+                            sendAction()
                         }
                     }
                     if (showPrimaryTrailingAction && configuredVoiceUsesSlot) {
@@ -2171,16 +2183,7 @@ internal fun ComposerBar(
                                     .expandedComposerActionRow()
                                     .composerFabContent(),
                         ) {
-                            ComposerActionDisc(
-                                onClick = { submitMessage() },
-                                enabled = primaryActionEnabled,
-                                width = actionTargetWidth,
-                                containerColor = actionColors.container,
-                                contentColor = actionColors.content,
-                                description = stringResource(R.string.send),
-                                icon = R.drawable.ic_arrow_upward,
-                                modifier = Modifier.alpha(alpha = ordinarySendAlpha),
-                            )
+                            sendAction()
                         }
                     }
                 }

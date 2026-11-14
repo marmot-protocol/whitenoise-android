@@ -3,12 +3,8 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,10 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
@@ -57,7 +51,7 @@ internal fun HelpScreen(
                             onClick = onOpenBugReport,
                             modifier = Modifier.testTag("help.report_bug"),
                             subtitle = stringResource(R.string.report_a_bug_subtitle),
-                            leading = { HelpLeadingIcon(R.drawable.ic_bug_report) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_bug_report) },
                         )
                     }
                     row("about") { context ->
@@ -68,7 +62,7 @@ internal fun HelpScreen(
                             onClick = onOpenAbout,
                             modifier = Modifier.testTag("help.about"),
                             subtitle = stringResource(R.string.about_and_licenses_subtitle),
-                            leading = { HelpLeadingIcon(R.drawable.ic_info) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_info) },
                         )
                     }
                 }
@@ -130,10 +124,10 @@ internal fun BugReportContent(
                 ) {
                     row("destination") { context ->
                         SettingsValue(
-                            context = context,
-                            title = stringResource(R.string.report_bug_destination),
-                            value = stringResource(R.string.report_bug_destination_detail),
-                        )
+                            context,
+                            stringResource(R.string.report_bug_destination),
+                            stringResource(R.string.report_bug_destination_detail),
+                        ) { SettingsLeadingIcon(R.drawable.ic_bug_report) }
                     }
                 }
             }
@@ -145,7 +139,7 @@ internal fun BugReportContent(
                     text = stringResource(R.string.report_bug_no_attachments_detail),
                     modifier = Modifier.testTag("help.bug.privacy"),
                     title = stringResource(R.string.report_bug_no_attachments_title),
-                    leading = { HelpLeadingIcon(R.drawable.ic_settings_front_hand) },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_front_hand) },
                 )
             }
             item(key = "search.HelpAboutScreens.6") {
@@ -256,13 +250,24 @@ internal fun AboutContent(
                                     onEnableDeveloper()
                                 }
                             },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_info) },
                         )
                     }
                     row("build") { context ->
-                        SettingsValue(context, stringResource(R.string.about_build), buildNumber)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_build),
+                            buildNumber,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_package_2) },
+                        )
                     }
                     row("mdk") { context ->
-                        SettingsValue(context, stringResource(R.string.about_mdk), mdkShortSha)
+                        SettingsValue(
+                            context,
+                            stringResource(R.string.about_mdk),
+                            mdkShortSha,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_data_object) },
+                        )
                     }
                 }
             }
@@ -277,6 +282,7 @@ internal fun AboutContent(
                                 routeKey = SettingsDetail.Developer,
                                 onClick = onOpenDeveloper,
                                 modifier = Modifier.testTag("about.developer"),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_code) },
                             )
                         }
                     }
@@ -292,7 +298,7 @@ internal fun AboutContent(
                             onClick = ::showLicenses,
                             modifier = Modifier.testTag("about.licenses"),
                             subtitle = stringResource(R.string.open_source_licenses_subtitle),
-                            leading = { HelpLeadingIcon(R.drawable.ic_description) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_description) },
                         )
                     }
                     row("privacy") { context ->
@@ -302,7 +308,7 @@ internal fun AboutContent(
                             onClick = ::openPrivacy,
                             modifier = Modifier.testTag("about.privacy_policy"),
                             subtitle = stringResource(R.string.privacy_policy_subtitle),
-                            leading = { HelpLeadingIcon(R.drawable.ic_settings_front_hand) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_front_hand) },
                         )
                     }
                 }
@@ -358,20 +364,6 @@ private fun HelpOpenFailureDialog(
     )
 }
 
-/** Decorative: the row and the callout already carry their own visible names. */
-@Suppress("FunctionNaming")
-@Composable
-private fun HelpLeadingIcon(
-    @DrawableRes icon: Int,
-) {
-    Icon(
-        painter = painterResource(icon),
-        contentDescription = null,
-        modifier = Modifier.size(HelpLeadingIconSize),
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
 /** Reports whether a browser accepted the hand-off; no app-owned data is placed in the intent. */
 private fun openHelpUrl(
     context: Context,
@@ -380,7 +372,5 @@ private fun openHelpUrl(
     val intent = Intent(Intent.ACTION_VIEW, url.toUri())
     return runCatching { context.startActivity(intent) }.isSuccess
 }
-
-private val HelpLeadingIconSize = 24.dp
 
 private const val DEVELOPER_UNLOCK_TAPS = 7

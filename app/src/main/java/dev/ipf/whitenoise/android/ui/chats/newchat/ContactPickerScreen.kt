@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -87,16 +88,19 @@ internal fun ContactPickerScreen(
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
     reviewGroup: MemberReviewGroup? = null,
+    reviewDescription: String? = null,
+    // Callers whose selection survives recreation pass saveable review state so an open review survives with it.
+    reviewOpen: MutableState<Boolean>? = null,
 ) {
     val queryState = rememberTextFieldState()
     val query = queryState.text.toString()
     var showScanner by remember { mutableStateOf(false) }
-    // The selection itself is owned by the caller and is not saveable. Keep
-    // this transient navigation state in the same lifetime so process
-    // recreation cannot restore an empty review screen over a rebuilt picker.
-    var reviewingSelection by remember(appState.activeAccountRef, appState.runtimeGeneration, reviewGroup?.id) {
-        mutableStateOf(false)
-    }
+    // The selection is owned by the caller. Without caller-owned review state,
+    // keep this navigation state in the same lifetime as a non-saveable
+    // selection so recreation cannot restore an empty review over a rebuilt picker.
+    val ownReview =
+        remember(appState.activeAccountRef, appState.runtimeGeneration, reviewGroup?.id) { mutableStateOf(false) }
+    var reviewingSelection by (reviewOpen ?: ownReview)
     var searchRetry by remember { mutableIntStateOf(0) }
     val resolution = rememberRecipientResolution(query, appState, searchRetry)
     val addressQuery = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05
@@ -143,6 +147,7 @@ internal fun ContactPickerScreen(
             confirmLabel = stringResource(groupReviewAddMembersLabel(selected.size)),
             initialAdminIds = initialAdminIds,
             onInitialAdminChange = onInitialAdminChange,
+            description = reviewDescription,
         )
     }
 
@@ -183,6 +188,14 @@ internal fun ContactPickerScreen(
         }
     }
 
+    // Register the plain picker body without inventing a border; the app bar stays outside the reveal.
+    val pickerBody =
+        dev.ipf.whitenoise.android.ui.settings
+            .rememberSettingsNativeSurface(
+                destination = "contact-picker",
+                shape = androidx.compose.ui.graphics.RectangleShape,
+                strokeColor = androidx.compose.ui.graphics.Color.Unspecified,
+            ).first
     Scaffold(
         modifier = Modifier.imePadding().exposePerformanceTestTags(),
         topBar = {
@@ -261,7 +274,8 @@ internal fun ContactPickerScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .consumeWindowInsets(padding),
+                .consumeWindowInsets(padding)
+                .then(pickerBody),
         ) {
             RecipientSearchField(
                 isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },

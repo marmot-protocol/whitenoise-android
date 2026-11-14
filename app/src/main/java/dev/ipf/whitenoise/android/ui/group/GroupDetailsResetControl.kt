@@ -148,7 +148,8 @@ internal fun GroupDetailsResetControl(
     inProgress: Boolean,
     onRequest: () -> Unit,
 ) {
-    // [offered] is the shared group rule, so Details hides it exactly where the chat list does.
+    // [offered] is the shared rule for chats the account still receives. Groups are reset only here; the chat
+    // list row menu offers the forget for direct chats alone.
     if (!offered) return
     DangerActionRow(
         icon = if (isDm) ImageVector.vectorResource(R.drawable.ic_person_remove) else Icons.Outlined.RestartAlt,

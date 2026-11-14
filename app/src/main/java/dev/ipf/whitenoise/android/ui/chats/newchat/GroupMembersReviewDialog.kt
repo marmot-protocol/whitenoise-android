@@ -87,16 +87,22 @@ internal fun GroupMembersReviewDialog(
     val liveBusy = rememberUpdatedState(busy)
     val liveMembers = rememberUpdatedState(members)
     val liveGroups = rememberUpdatedState(groups)
-    val liveAdmins = rememberUpdatedState(initialAdminIds)
-    val reviewedAdmins = initialAdminIds.toSet()
-    val reviewedMembers = members.map { it.accountIdHex }
-    val reviewedGroups = groups.map { it.id }
-    val ticket = remember(appState, reviewedMembers, reviewedGroups) { GroupMembersReviewTicket() }
+    // Identities are captured once when the review opens; Admin toggles made inside it are intended edits.
+    val reviewedMembers = remember { members.map { it.accountIdHex } }
+    val reviewedGroups = remember { groups.map { it.id } }
+    val ticket = remember(appState) { GroupMembersReviewTicket() }
     DisposableEffect(ticket) { onDispose { ticket.invalidate() } }
     val current = groupMembersReviewOwnerCurrent(appState, actingAccount, runtime)
 
     LaunchedEffect(current) {
         if (!current) {
+            ticket.invalidate()
+            onDismiss()
+        }
+    }
+    val selectionCurrent = sameReviewSelection(reviewedMembers, reviewedGroups, members, groups)
+    LaunchedEffect(selectionCurrent) {
+        if (!selectionCurrent) {
             ticket.invalidate()
             onDismiss()
         }
@@ -120,9 +126,12 @@ internal fun GroupMembersReviewDialog(
                                 ownerCurrent = { groupMembersReviewOwnerCurrent(appState, actingAccount, runtime) },
                                 busy = { liveBusy.value },
                                 selectionCurrent = {
-                                    reviewedMembers == liveMembers.value.map { it.accountIdHex } &&
-                                        reviewedGroups == liveGroups.value.map { it.id } &&
-                                        reviewedAdmins == liveAdmins.value
+                                    sameReviewSelection(
+                                        reviewedMembers,
+                                        reviewedGroups,
+                                        liveMembers.value,
+                                        liveGroups.value,
+                                    )
                                 },
                             )
                         ) {
@@ -176,6 +185,14 @@ internal fun GroupMembersReviewDialog(
         },
     )
 }
+
+/** Whether the people and destinations still match the ones the review opened with. */
+private fun sameReviewSelection(
+    reviewedMembers: List<String>,
+    reviewedGroups: List<String>,
+    members: List<RecipientSearch.Candidate>,
+    groups: List<MemberReviewGroup>,
+): Boolean = reviewedMembers == members.map { it.accountIdHex } && reviewedGroups == groups.map { it.id }
 
 /** The action is singular only for one selected person, independent of locale plural categories. */
 internal fun groupReviewAddMembersLabel(memberCount: Int): Int {

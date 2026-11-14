@@ -204,6 +204,7 @@ internal fun SupportContent(
                                     routeKey = SettingsDetail.SupportRelays,
                                     onClick = onRelays,
                                     modifier = Modifier.testTag("support.relays"),
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_cell_tower) },
                                 )
                             }
                             if (relayState == SupportRelayState.Unavailable) {
@@ -214,6 +215,7 @@ internal fun SupportContent(
                                         onClick = onRetry,
                                         enabled = !busy,
                                         modifier = Modifier.testTag("support.retry"),
+                                        leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
                                     )
                                 }
                             }
