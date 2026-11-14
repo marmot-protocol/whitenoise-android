@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.MarmotInterface
@@ -97,9 +98,9 @@ class AccountRelaySettingsEditTest {
                     else -> error("Unexpected native call: ${method.name}")
                 }
             } as MarmotInterface
-        val app =
+        val app: WhiteNoiseAppState =
             WhiteNoiseAppState(
-                context = ApplicationProvider.getApplicationContext(),
+                context = ApplicationProvider.getApplicationContext<Context>(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
                 accountIdHexResolver = { null },
                 initialMarmotRuntime = AppMarmotRuntime("relay-settings-test", native),
