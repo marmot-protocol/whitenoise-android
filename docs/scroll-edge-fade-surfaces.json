@@ -627,7 +627,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
       "calls": {
-        "fadingVerticalScroll": 3,
+        "fadingVerticalScroll": 2,
         "DropdownMenu": 1
       },
       "family": "conversation/media",
