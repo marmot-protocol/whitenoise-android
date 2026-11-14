@@ -103,6 +103,8 @@ class AccountRelaySettingsEditTest {
                 context = ApplicationProvider.getApplicationContext<Context>(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
                 accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = null,
                 initialMarmotRuntime = AppMarmotRuntime("relay-settings-test", native),
             )
     }
