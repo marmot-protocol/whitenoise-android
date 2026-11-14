@@ -271,7 +271,8 @@ class AppStateSendLockCoverageTest {
         )
         assertTrue(
             "disk eviction must stay ciphertext-tag scoped; only the in-memory tier may drop the whole group slice",
-            "removeByCiphertextTags(expiredCiphertextSha256)" in body &&
+            "removeMediaDiskCacheTags(expiredCiphertextSha256)" in body &&
+                "removeMediaDiskCacheEntry(" !in body &&
                 "diskMediaCache.remove(" !in body,
         )
     }

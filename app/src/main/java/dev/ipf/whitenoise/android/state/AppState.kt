@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaThumbnail
+import dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -1516,6 +1517,7 @@ class WhiteNoiseAppState private constructor(
 
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
         assertMainThread { "removeMediaMemoryCacheEntry" }
+        displayThumbnails.retirePending()
         mediaPlaintextCache.remove(cacheKey)
         if (mediaThumbnailCache.remove(cacheKey) != null) mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
@@ -1549,6 +1551,20 @@ class WhiteNoiseAppState private constructor(
             keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
             onMutation = ::bumpMediaCacheRevision,
         )
+
+    /** Derivatives have their own encrypted namespace and never satisfy original-availability probes. */
+    internal val displayThumbnails =
+        PersistentDisplayThumbnails(
+            DiskByteCache(
+                cacheDir = java.io.File(appContext.cacheDir, "display-thumbnails-v1"),
+                maxBytes = PersistentDisplayThumbnails.MAX_BYTES,
+                maxEntryBytes = PersistentDisplayThumbnails.MAX_ENTRY_BYTES.toLong(),
+                keyProvider = AndroidKeystoreDiskByteCacheKeyProvider("whitenoise.display_thumbnails.aes_gcm.v1"),
+            ),
+        )
+
+    /** Skip opportunistic writes while an encoder is busy instead of queuing shared bitmap references. */
+    internal val displayThumbnailWritePermit = java.util.concurrent.Semaphore(1)
 
     @Volatile
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
@@ -7229,6 +7245,7 @@ class WhiteNoiseAppState private constructor(
      */
     private fun clearInMemoryMediaCaches() {
         assertMainThread { "clearInMemoryMediaCaches" }
+        displayThumbnails.retirePending()
         pendingSendDiagnostics.clear()
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
@@ -7311,7 +7328,7 @@ class WhiteNoiseAppState private constructor(
                 // Each target holds decrypted plaintext, so wipe them independently
                 // and best-effort: a failure in one (IO error, locked file) must not
                 // skip the others, and a swallowed failure should still be visible.
-                runCatchingCancellable { diskMediaCache.clear() }
+                runCatchingCancellable { clearMediaDiskCaches() }
                     .onFailure {
                         appStateDebug { "disk media cache wipe failed: ${it.readableMessage()}" }
                     }
@@ -10035,7 +10052,7 @@ class WhiteNoiseAppState private constructor(
                 .forEach(::removeMediaMemoryCacheEntry)
         }
         withContext(Dispatchers.IO) {
-            diskMediaCache.removeByCiphertextTags(expiredCiphertextSha256)
+            removeMediaDiskCacheTags(expiredCiphertextSha256)
         }
     }
 
@@ -14721,7 +14738,10 @@ class WhiteNoiseAppState private constructor(
             mutationsScope.launch(Dispatchers.IO) { registerActiveNetworkListener() }
             // Wipe pre-encryption cache entries promptly after upgrade without doing
             // directory I/O in this main-thread constructor.
-            mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            mutationsScope.launch(Dispatchers.IO) {
+                diskMediaCache.prepare()
+                displayThumbnails.prepare()
+            }
             mutationsScope.launch(Dispatchers.IO) { contactPictureStore.cleanOrphans() }
             // Load the persisted per-chat channel scopes before the settings UI
             // can request them, without blocking the main-thread constructor.
