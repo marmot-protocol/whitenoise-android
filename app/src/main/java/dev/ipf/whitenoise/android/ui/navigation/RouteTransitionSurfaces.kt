@@ -46,8 +46,11 @@ import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
+import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
+import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** One visibility clock owns both drawing and outgoing-slot disposal. */
@@ -126,13 +129,7 @@ internal fun <T> rememberConversationRouteTransition(
     return transition
 }
 
-/**
- * Conversation routes move only their full-screen render layers. Reading the
- * animated value inside [graphicsLayer] keeps every frame in the draw phase:
- * no animated recomposition, measurement, placement, or child-sized integer
- * offset can perturb the final frames. The short travel and crossfade retain
- * our live, already-prepared destination and Back route.
- */
+/** Retains live route owners while painting fixed native chrome and exclusive native bodies. */
 @Composable
 // Keep one retained-slot owner and one reversible clock; activation is optional route metadata.
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
@@ -146,6 +143,7 @@ internal fun <T> ConversationRouteAnimatedContent(
     content: @Composable (T) -> Unit,
 ) {
     val view = LocalView.current
+    val background = MaterialTheme.colorScheme.background
     var hostBounds by remember { mutableStateOf(Rect.Zero) }
     val replacingConversation =
         transition.currentState != null &&
@@ -168,7 +166,9 @@ internal fun <T> ConversationRouteAnimatedContent(
             !source.isEmpty &&
             !hostBounds.isEmpty &&
             source.overlaps(hostBounds)
+    val nativeBodies = remember(transition) { androidx.compose.runtime.mutableStateMapOf<Any?, NativePageBody>() }
     val separatedChrome = LocalComposerFabHandoff.current?.morphSurface == true
+    val nativePresentation = separatedChrome || containerMorph
     val travelPx = with(LocalDensity.current) { CONVERSATION_ROUTE_LAYER_TRAVEL.toPx() }
     // One intrinsic progress value (list = 0, conversation = 1) is stable under
     // interruption. A Back during enter reverses from the exact rendered float
@@ -179,7 +179,17 @@ internal fun <T> ConversationRouteAnimatedContent(
             Modifier
                 .fillMaxSize()
                 .onGloballyPositioned { hostBounds = it.settingsMorphBounds(view) }
-                .pointerInput(transition, containerMorph) {
+                .drawWithContent {
+                    if (containerMorph) {
+                        drawMeasuredPage(
+                            measuredPageBounds(checkNotNull(source), hostBounds, conversationVisibility.value)
+                                .translate(-hostBounds.topLeft),
+                            conversationVisibility.value,
+                            background,
+                        )
+                    }
+                    drawContent()
+                }.pointerInput(transition, containerMorph) {
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Initial)
@@ -208,38 +218,39 @@ internal fun <T> ConversationRouteAnimatedContent(
         routes.forEach { retained ->
             val route = if (contentKey(retained) == targetKey) transition.targetState else retained
             key(transition, contentKey(route)) {
+                val nativeBody = remember { NativePageBody() }
+                SideEffect { nativeBodies[contentKey(route)] = nativeBody }
+                androidx.compose.runtime.DisposableEffect(nativeBody) {
+                    onDispose { nativeBodies.remove(contentKey(route)) }
+                }
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .zIndex(
-                            if (route == null) {
-                                0f
-                            } else if (contentKey(route) == targetKey) {
-                                2f
-                            } else {
-                                1f
-                            },
-                        ).drawWithContent {
-                            if (!containerMorph || route == null) {
+                        .zIndex(if (contentKey(route) == targetKey) 2f else 1f)
+                        .drawWithContent {
+                            if (!nativePresentation) {
                                 drawContent()
                             } else {
-                                val bubble =
-                                    measuredPageBounds(checkNotNull(source), hostBounds, conversationVisibility.value)
-                                        .translate(-hostBounds.topLeft)
-                                val destination = this
-                                drawMeasuredPage(bubble, conversationVisibility.value) { destination.drawContent() }
+                                val body = nativeBody.bounds?.translate(-hostBounds.topLeft)
+                                val targetBody = nativeBodies[targetKey]?.bounds?.translate(-hostBounds.topLeft)
+                                drawNativePage(
+                                    body = body,
+                                    chrome = contentKey(route) == targetKey,
+                                    bodyPresence = nativePageBodyPresence(conversationVisibility.value, route != null),
+                                    bodyLimit = targetBody,
+                                )
                             }
                         }.graphicsLayer {
                             val progress = conversationVisibility.value
                             val conversationRoute = route != null
                             alpha =
-                                if (separatedChrome || containerMorph) {
+                                if (nativePresentation) {
                                     1f
                                 } else {
                                     conversationRouteLayerAlpha(progress, conversationRoute, suppressMotion)
                                 }
                             translationX =
-                                (if (separatedChrome || containerMorph) 0f else travelPx) *
+                                (if (nativePresentation) 0f else travelPx) *
                                 routeForwardDirection *
                                 conversationRouteLayerTranslation(progress, conversationRoute, suppressMotion)
                         },
@@ -249,13 +260,8 @@ internal fun <T> ConversationRouteAnimatedContent(
                         LocalControlHandoffEndpointCurrent provides
                             (contentKey(route) == contentKey(transition.targetState)),
                         LocalConversationBodyMotion provides
-                            if (separatedChrome && !containerMorph) {
-                                ConversationBodyMotion(
-                                    conversationVisibility,
-                                    route != null,
-                                    routeForwardDirection,
-                                    suppressMotion,
-                                )
+                            if (nativePresentation) {
+                                ConversationBodyMotion(nativeBody)
                             } else {
                                 null
                             },

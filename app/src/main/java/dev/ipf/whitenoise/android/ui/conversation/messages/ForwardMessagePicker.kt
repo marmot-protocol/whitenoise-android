@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -398,7 +399,13 @@ internal fun ForwardMessagePickerContent(
             }
         },
     ) { padding ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .nativePageBody(padding)
+                .padding(padding)
+                .consumeWindowInsets(padding),
+        ) {
             val compactHeight = maxHeight < 480.dp
             val horizontalFilters = compactHeight && maxWidth >= 600.dp
             Column(

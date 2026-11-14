@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -33,9 +34,20 @@ class EmojiSheetTerminalTest {
             SemanticsMatcher("emoji choice") {
                 it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("emoji.picker.item.") == true
             }
-        rule.onAllNodes(emoji)[0].performClick()
-        rule.waitForIdle()
-        rule.onAllNodes(emoji)[0].performClick()
+        rule.waitUntil(5_000) { rule.onAllNodes(emoji).fetchSemanticsNodes().isNotEmpty() }
+        rule.onAllNodes(emoji)[0].assertIsDisplayed().performClick()
+        rule.runOnIdle {
+            assertEquals(1, picks)
+            assertEquals(0, dismissals)
+        }
+        rule.onAllNodes(emoji)[0].assertIsDisplayed().performClick()
+        rule.onAllNodes(emoji)[0].assertIsDisplayed()
+        rule.runOnIdle {
+            assertEquals(2, picks)
+            assertEquals(0, dismissals)
+        }
+        rule.mainClock.advanceTimeBy(800)
+        rule.onAllNodes(emoji)[0].assertIsDisplayed()
         rule.runOnIdle {
             assertEquals(2, picks)
             assertEquals(0, dismissals)

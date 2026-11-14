@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -48,6 +49,7 @@ class ProfileGroupOpeningPageUiTest {
                             Box(
                                 Modifier
                                     .fillMaxSize()
+                                    .nativePageBody()
                                     .background(Color.Red)
                                     .clickable { clicks++ }
                                     .testTag("destination"),

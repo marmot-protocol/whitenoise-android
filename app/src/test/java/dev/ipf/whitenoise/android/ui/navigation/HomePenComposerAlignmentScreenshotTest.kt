@@ -38,7 +38,7 @@ internal class HomePenComposerAlignmentScreenshotTest : DictationNavigationRende
     fun releaseVoiceFixture() = releasePreviewVoiceController()
 
     @Test
-    fun penAndBubbleKeepComposerUpperEdgeAcrossExpansion() {
+    fun homePenAndBubbleKeepCompactBaselineAcrossComposerExpansion() {
         val fixture = render(withComposerMorph = true, configured = true)
         composeRule.runOnIdle {
             checkNotNull(fixture.toolbarState)
@@ -59,7 +59,7 @@ internal class HomePenComposerAlignmentScreenshotTest : DictationNavigationRende
         composeRule.waitForIdle()
         assertEquals("No IME changes the reference viewport", 0, observedImeBottom)
         val resting = composerBounds()
-        assertHomeAlignment(fixture, "resting", resting)
+        val homeBaseline = assertHomeAlignment(fixture, "resting", resting)
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG, useUnmergedTree = true).performTouchInput {
             down(center)
             moveBy(Offset(0f, -160f), delayMillis = 200)
@@ -67,7 +67,7 @@ internal class HomePenComposerAlignmentScreenshotTest : DictationNavigationRende
         }
         composeRule.waitForIdle()
         val manual = composerBounds()
-        assertHomeAlignment(fixture, "manual", manual)
+        assertHomeAlignment(fixture, "manual", manual, homeBaseline)
         assertTrue("The diagnostic really enlarged the composer", manual.height > resting.height + 1f)
         val expand =
             composeRule
@@ -79,15 +79,16 @@ internal class HomePenComposerAlignmentScreenshotTest : DictationNavigationRende
         composeRule.waitForIdle()
         val fullscreen = composerBounds()
         assertTrue("Full-screen state must exceed the manual state", fullscreen.height > manual.height + 1f)
-        assertHomeAlignment(fixture, "fullscreen", fullscreen)
+        assertHomeAlignment(fixture, "fullscreen", fullscreen, homeBaseline)
     }
 
-    /** Navigation uses production state; expected coordinates come only from the measured composer. */
+    /** Home keeps its measured resting baseline; the conversation retains its own expanded geometry. */
     private fun assertHomeAlignment(
         fixture: Fixture,
         phase: String,
         composer: Rect,
-    ) {
+        homeBaseline: Pair<Rect, Rect>? = null,
+    ): Pair<Rect, Rect> {
         val capsuleBefore = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
         val retention = checkNotNull(fixture.toolbarState).composerExpansionStateRetention
         val retainedBefore = retention.preferenceFor(ACCOUNT, GROUP)
@@ -101,9 +102,16 @@ internal class HomePenComposerAlignmentScreenshotTest : DictationNavigationRende
         val capsuleAfter = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
         assertEquals("The pen width stays unchanged", 48f, pen.width, 1.1f)
         assertEquals("The pen height stays unchanged", 48f, pen.height, 1.1f)
-        assertEquals("The upper borders align after settling", composer.top, pen.top, 1.1f)
-        assertEquals("The bubble keeps its height across the route handoff", capsuleBefore.top, capsuleAfter.top, 1.1f)
-        assertEquals("The bubble bottom stays level across navigation", capsuleBefore.bottom, capsuleAfter.bottom, 1.1f)
+        val expectedPen = homeBaseline?.first ?: composer
+        val expectedCapsule = homeBaseline?.second ?: capsuleBefore
+        assertEquals("The home pen keeps its compact resting upper border", expectedPen.top, pen.top, 1.1f)
+        assertEquals("The home bubble keeps its compact resting top", expectedCapsule.top, capsuleAfter.top, 1.1f)
+        assertEquals(
+            "The home bubble keeps its compact resting bottom",
+            expectedCapsule.bottom,
+            capsuleAfter.bottom,
+            1.1f,
+        )
         captureAndReport("${phase}_home", pen)
         composeRule.runOnIdle { fixture.route = origin }
         composeRule.waitForIdle()
@@ -113,6 +121,15 @@ internal class HomePenComposerAlignmentScreenshotTest : DictationNavigationRende
             retention.preferenceFor(ACCOUNT, GROUP),
         )
         assertEquals("Returning preserves the real composer height", composer.top, composerBounds().top, 1.1f)
+        val returnedCapsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals("Returning preserves the conversation bubble top", capsuleBefore.top, returnedCapsule.top, 1.1f)
+        assertEquals(
+            "Returning preserves the conversation bubble bottom",
+            capsuleBefore.bottom,
+            returnedCapsule.bottom,
+            1.1f,
+        )
+        return pen to capsuleAfter
     }
 
     private fun composerBounds(): Rect =

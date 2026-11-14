@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.onConsumedWindowInsetsChanged
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
@@ -58,6 +59,7 @@ fun WhiteNoiseScaffold(
     scrollBehavior: TopAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val nativeBody = LocalNativePageBody.current
     CompositionLocalProvider(LocalWhiteNoiseHeaderScroll provides scrollBehavior) {
         Scaffold(
             modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -74,7 +76,13 @@ fun WhiteNoiseScaffold(
             containerColor = containerColor,
             contentColor = contentColor,
             contentWindowInsets = contentWindowInsets,
-            content = content,
+            content = { padding ->
+                if (nativeBody == null) {
+                    content(padding)
+                } else {
+                    Box(Modifier.fillMaxSize().nativePageBody(padding)) { content(padding) }
+                }
+            },
         )
     }
 }

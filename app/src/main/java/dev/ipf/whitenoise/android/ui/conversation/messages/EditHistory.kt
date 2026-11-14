@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -100,7 +101,7 @@ internal fun EditHistoryDialog(
                 }
             },
         ) { padding ->
-            AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
+            AdaptiveContent(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
                 Column(
                     modifier =
                         Modifier

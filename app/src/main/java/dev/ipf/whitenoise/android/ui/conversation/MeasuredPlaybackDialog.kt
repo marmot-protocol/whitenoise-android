@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,8 +12,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogProperties
+import dev.ipf.whitenoise.android.ui.common.LocalNativePageBody
+import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
+import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
@@ -31,6 +36,7 @@ internal fun MeasuredPlaybackDialog(
     dismissEnabled: () -> Boolean = { true },
     content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
+    val nativeBody = remember(ownerKey, origin) { NativePageBody() }
     var host by remember(ownerKey) { mutableStateOf(Rect.Zero) }
     var geometryValid by remember(ownerKey, origin) { mutableStateOf(origin != null && !origin.isEmpty) }
     val surface =
@@ -59,14 +65,14 @@ internal fun MeasuredPlaybackDialog(
                 }
             },
         rootModifier = {
-            measuredDialogPageModifier(origin.takeIf { geometryValid }, host, surface) { next ->
+            measuredDialogPageModifier(origin.takeIf { geometryValid }, host, surface, nativeBody) { next ->
                 // Once established, a moved/resized window retires the old launch rectangle.
                 if (measuredOriginRetired(origin, host, next)) geometryValid = false
                 host = next
             }
         },
     ) {
-        content(surface)
+        CompositionLocalProvider(LocalNativePageBody provides nativeBody) { content(surface) }
     }
 }
 
@@ -76,9 +82,11 @@ private fun measuredDialogPageModifier(
     origin: Rect?,
     host: Rect,
     surface: PopupSurfaceMotion,
+    nativeBody: NativePageBody,
     onHost: (Rect) -> Unit,
 ): Modifier {
     val view = LocalView.current
+    val background = androidx.compose.material3.MaterialTheme.colorScheme.background
     return Modifier
         .onGloballyPositioned { onHost(it.settingsMorphBounds(view)) }
         .drawWithContent {
@@ -87,8 +95,12 @@ private fun measuredDialogPageModifier(
             } else {
                 val presence = surface.presence.value
                 val bounds = measuredPageBounds(checkNotNull(origin), host, presence).translate(-host.topLeft)
-                val destination = this
-                drawMeasuredPage(bounds, presence) { destination.drawContent() }
+                drawMeasuredPage(bounds, presence, background)
+                drawNativePage(
+                    nativeBody.nativeBounds?.translate(-host.topLeft),
+                    chrome = true,
+                    bodyPresence = nativePageBodyPresence(presence, destination = true),
+                )
             }
         }.then(
             dev.ipf.whitenoise.android.ui.common.fullScreenSurfaceMotion(surface) {

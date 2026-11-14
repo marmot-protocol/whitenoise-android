@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -323,10 +324,10 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
     fun dictationMorphFramesAmoled() {
         val fixture = render(dark = true, amoled = true, withComposerMorph = true)
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
-        composeRule.mainClock.advanceTimeBy(256)
+        settleDictationHandoff(fixture)
         val chatsTop = requireNotNull(fixture.anchor?.topInWindow)
         firstNavigationFrame { fixture.route = origin }
-        composeRule.mainClock.advanceTimeBy(256)
+        settleDictationHandoff(fixture)
         if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
             repeat(3) { cycle ->
                 listOf(false, true).forEach { returning ->
@@ -379,7 +380,8 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
             composeRule.mainClock.advanceTimeBy(48)
             assertSingleActionSet()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_late_amoled.png")
-            composeRule.mainClock.advanceTimeBy(144)
+            settleDictationHandoff(fixture)
+            assertFalse(requireNotNull(fixture.handoff).active)
             if (!returning) assertEquals(chatsTop, requireNotNull(fixture.anchor?.topInWindow), 0.5f)
             assertSingleActionSet()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_settled_amoled.png")

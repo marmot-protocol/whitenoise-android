@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
@@ -315,7 +316,13 @@ internal fun TextAttachmentReaderScreen(
         },
         bottomBar = { TextAttachmentReaderBottomBar(transport = transport) },
     ) { padding ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding).then(speech.viewportModifier)) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxSize()
+                .nativePageBody(padding)
+                .padding(padding)
+                .then(speech.viewportModifier),
+        ) {
             val trailingHeight = maxHeight
             // Follow can place the active sentence at the viewport edge; keep its highlight legible.
             Column(Modifier.fillMaxSize().fadingVerticalScroll(scroll, fadeEnabled = playback == null)) {

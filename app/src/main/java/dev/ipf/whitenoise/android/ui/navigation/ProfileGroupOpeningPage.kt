@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -25,8 +26,12 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
+import dev.ipf.whitenoise.android.ui.common.LocalNativePageBody
+import dev.ipf.whitenoise.android.ui.common.NativePageBody
 import dev.ipf.whitenoise.android.ui.common.drawMeasuredPage
+import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
+import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
@@ -39,6 +44,7 @@ internal fun ProfileGroupOpeningPage(
     owner: Any,
     content: @Composable () -> Unit,
 ) {
+    val nativeBody = remember(owner, origin) { NativePageBody() }
     val background = MaterialTheme.colorScheme.background
     val view = LocalView.current
     val motion = rememberSystemAnimationsEnabled()
@@ -77,8 +83,12 @@ internal fun ProfileGroupOpeningPage(
                     drawContent()
                 } else {
                     val bounds = measuredPageBounds(origin, host, progress.value).translate(-host.topLeft)
-                    val destination = this
-                    drawMeasuredPage(bounds, progress.value) { destination.drawContent() }
+                    drawMeasuredPage(bounds, progress.value, background)
+                    drawNativePage(
+                        nativeBody.nativeBounds?.translate(-host.topLeft),
+                        chrome = true,
+                        bodyPresence = nativePageBodyPresence(progress.value, destination = true),
+                    )
                 }
             }.then(if (acceptsInput) Modifier else Modifier.clearAndSetSemantics {})
             .onPreviewKeyEvent { !acceptsInput && it.key != Key.Back }
@@ -90,7 +100,7 @@ internal fun ProfileGroupOpeningPage(
                     }
                 }
             },
-    ) { content() }
+    ) { CompositionLocalProvider(LocalNativePageBody provides nativeBody) { content() } }
 }
 
 /** A clipped or stale launch control cannot define a trustworthy replacement transform. */

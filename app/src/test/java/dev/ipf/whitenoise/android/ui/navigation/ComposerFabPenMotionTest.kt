@@ -91,7 +91,9 @@ class ComposerFabPenMotionTest {
         val pen = rule.runOnIdle { requireNotNull(handoff?.targetBounds) }
         assertTrue("The causal fixture must have unequal endpoint heights", abs(pen.center.y - composer.center.y) > 64f)
         assertNull("A pen fades in from an editor, without drawing a second editor", penPixelsNear(composer.center))
-        advance(80)
+        // The 230 ms close curve is still below the pixel detector near its first 80 ms.
+        // Sample native geometry while the decoration is visible and the handoff remains active.
+        advance(128)
         assertMovingPen()
         settle()
         assertPenAt(pen)
@@ -251,7 +253,12 @@ class ComposerFabPenMotionTest {
     /** Requires the real pen pixels to stay centered at [bounds] with their native glyph size. */
     private fun assertPenAt(bounds: Rect) {
         val pixels = penPixelsNear(bounds.center)
-        assertNotNull("The actual pen drawable must follow both the measured X and Y", pixels)
+        val decorationAlpha = rule.runOnIdle { handoff?.renderedDecorationAlpha }
+        assertNotNull(
+            "The actual pen drawable must follow both the measured X and Y: " +
+                "bounds=$bounds renderedDecorationAlpha=$decorationAlpha",
+            pixels,
+        )
         requireNotNull(pixels)
         assertEquals(bounds.center.x, pixels.center.x, 1.5f)
         assertEquals(bounds.center.y, pixels.center.y, 1.5f)

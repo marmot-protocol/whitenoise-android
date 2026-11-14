@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
@@ -247,7 +248,7 @@ internal fun SelectedMembersReviewScreen(
         },
     ) { padding ->
         WhiteNoiseLazyColumn(
-            modifier = Modifier.fillMaxWidth().padding(padding),
+            modifier = Modifier.fillMaxWidth().nativePageBody(padding).padding(padding),
             contentPadding = PaddingValues(bottom = 96.dp),
         ) {
             items(members, key = { it.accountIdHex }) { member ->

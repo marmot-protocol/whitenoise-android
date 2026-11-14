@@ -106,6 +106,7 @@ internal class SettingsPageMorph {
     private var maskHost: Rect = Rect.Zero
     private var mask: Path = Path()
     private var leavingMask: Path? = null
+    private var leavingBody: Path? = null
     var opening = true
         private set
     val active: Boolean get() = origin != null
@@ -249,6 +250,8 @@ internal class SettingsPageMorph {
         if (!retainsOutgoing) {
             leavingBodyTop = bodyTop
             leavingContours = settledContours
+            // Freeze unoutlined bodies too, before the source destination reports are cleared.
+            leavingBody = activeNativeBody(leavingContours, host)
             // Bind the cached mask to this frozen picture; raster construction belongs to draw.
             leavingMask = null
             leaving = settled.takeIf { settledInputs == captureInputs?.invoke() }
@@ -356,6 +359,7 @@ internal class SettingsPageMorph {
         targetContours = null
         leavingContours = emptyList()
         leavingMask = null
+        leavingBody = null
     }
 
     fun cancel() {
@@ -372,6 +376,7 @@ internal class SettingsPageMorph {
         settledContours = emptyList()
         leavingContours = emptyList()
         leavingMask = null
+        leavingBody = null
     }
 
     fun bounds(
@@ -431,16 +436,19 @@ internal class SettingsPageMorph {
         time: Float,
     ) {
         val picture = leaving ?: return
+        val body = checkNotNull(leavingBody) { "Outgoing picture requires its frozen measured body" }
         val alpha = outgoingPresence(time)
         if (alpha <= 0f) return
         val chrome = leavingMask ?: nativeChromeMask(leavingContours, host).also { leavingMask = it }
         // The source and destination's measured body edges leave both native headers untouched.
         clipRect(top = (maxOf(leavingBodyTop, bodyTop) - host.top).coerceAtLeast(0f)) {
-            clipPath(chrome, ClipOp.Difference) {
-                drawIntoCanvas { canvas ->
-                    canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
-                    canvas.nativeCanvas.drawPicture(picture)
-                    canvas.restore()
+            clipPath(body) {
+                clipPath(chrome, ClipOp.Difference) {
+                    drawIntoCanvas { canvas ->
+                        canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
+                        canvas.nativeCanvas.drawPicture(picture)
+                        canvas.restore()
+                    }
                 }
             }
         }

@@ -3,7 +3,9 @@ package dev.ipf.whitenoise.android.ui.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -48,14 +51,21 @@ class MeasuredConversationRouteTest {
                 routeForwardDirection = 1,
                 suppressMotion = false,
                 contentKey = { it ?: "list" },
-                activatingBounds = { if (it != null) Rect(16f, 340f, 344f, 392f) else null },
+                activatingBounds = { if (it != null) Rect(210f, 340f, 330f, 392f) else null },
             ) { destination ->
                 Box(
                     Modifier
                         .fillMaxSize()
                         .background(if (destination == null) Color.Red else Color.Blue)
                         .clickable { clicks++ },
-                )
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(PaddingValues(top = 80.dp))
+                            .conversationRouteBodyMotion(),
+                    )
+                }
             }
         }
         rule.mainClock.advanceTimeByFrame()
@@ -104,17 +114,12 @@ class MeasuredConversationRouteTest {
 
     private fun bluePixels(): Int {
         val pixels = rule.onRoot().captureToImage().toPixelMap()
-        var blue = 0
+        var blue = 0f
         for (y in 0 until pixels.height) {
             for (x in 0 until pixels.width) {
-                if (pixels[x, y].blue > 0.95f &&
-                    pixels[x, y].red < 0.05f &&
-                    pixels[x, y].green < 0.05f
-                ) {
-                    blue++
-                }
+                blue += pixels[x, y].blue
             }
         }
-        return blue
+        return blue.toInt()
     }
 }

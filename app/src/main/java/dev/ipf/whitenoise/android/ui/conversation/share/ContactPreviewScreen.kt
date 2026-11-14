@@ -38,6 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.nativePageFooter
+import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
@@ -71,12 +74,13 @@ internal fun ContactPreviewScreen(
         val canSend = (includePhone && contact.phone != null) || (includeEmail && contact.email != null)
 
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxSize().nativePageBody()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
+                                .nativePageHeader()
                                 .statusBarsPadding()
                                 .padding(horizontal = 4.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -142,6 +146,7 @@ internal fun ContactPreviewScreen(
                     modifier =
                         Modifier
                             .align(Alignment.BottomEnd)
+                            .nativePageFooter()
                             .navigationBarsPadding()
                             .padding(24.dp)
                             .semantics {

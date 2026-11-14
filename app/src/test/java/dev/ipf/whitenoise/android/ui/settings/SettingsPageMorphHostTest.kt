@@ -781,7 +781,106 @@ class SettingsPageMorphHostTest {
         }
     }
 
-    @Test fun liveHeaderStaysOpaqueAndBodyGlyphsRevealAtNativePositionsDuringBothDirections() {
+    @Test fun unoutlinedOutgoingBodyKeepsItsMeasuredViewportAfterSourceReportsClear() {
+        val page = SettingsPageMorph()
+        val time = mutableStateOf(1f)
+        val child = mutableStateOf(false)
+        val body = Rect(16f, 100f, 344f, 300f)
+        val viewport = Any()
+        val group = Any()
+        lateinit var host: Rect
+        rule.setContent {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        host = Rect(0f, 0f, size.width, size.height)
+                        if (!child.value) {
+                            page.reportViewport(viewport, Rect(0f, 100f, size.width, 220f))
+                            reportUnoutlinedBody(page, viewport, group, body)
+                        }
+                        with(page) { draw(host, time.value, true, Color.Black) }
+                    }.drawWithContent { drawRect(if (child.value) Color.Blue else Color.Red) },
+            )
+        }
+        rule.onRoot().captureToImage()
+        rule.runOnIdle {
+            page.pendingOrigin = body
+            assertTrue(page.begin(true, true, true, host))
+            child.value = true
+            time.value = 0.1f
+            assertTrue(page.admitDestination())
+        }
+        val pixels = rule.onRoot().captureToImage().toPixelMap()
+        assertEquals("measured unoutlined ink fades", 0.75f, pixels[100, 150].red, 0.02f)
+        assertEquals("header stays live", 1f, pixels[100, 50].blue, 0.01f)
+        assertEquals("outside group stays live", 1f, pixels[8, 150].blue, 0.01f)
+        assertEquals("source viewport stays frozen", 1f, pixels[100, 240].blue, 0.01f)
+        rule.runOnIdle { time.value = 0.4f }
+        assertEquals(
+            "unoutlined outgoing ink retires fast",
+            0f,
+            rule
+                .onRoot()
+                .captureToImage()
+                .toPixelMap()[100, 150]
+                .red,
+            0.01f,
+        )
+    }
+
+    private fun reportUnoutlinedBody(
+        page: SettingsPageMorph,
+        viewport: Any,
+        group: Any,
+        body: Rect,
+    ) {
+        page.reportDestination(
+            group,
+            SettingsRouteEndpoint(
+                group,
+                false,
+                body,
+                androidx.compose.ui.geometry
+                    .RoundRect(body, 0f, 0f),
+                Color.Black,
+                Color.Unspecified,
+                true,
+                true,
+                viewportToken = viewport,
+            ),
+        )
+    }
+
+    private fun assertStationaryGlyphs(
+        fraction: Float,
+        child: Boolean,
+        nativeHeader: List<List<Pair<Int, Int>>>,
+        nativeBody: List<List<Pair<Int, Int>>>,
+        nativeOutgoing: List<List<Pair<Int, Int>>>,
+        ink: (Float, (Color) -> Float) -> List<List<Pair<Int, Int>>>,
+    ) {
+        val actual = ink(0.8f) { if (child) it.blue else it.red }
+        val outgoing = ink(0.8f) { if (child) it.red else it.blue }.drop(2)
+        assertEquals("fixed opaque header", nativeHeader, ink(0.8f) { it.green }.take(2))
+        if (fraction == 0f) assertEquals("outgoing starts at native coordinates", nativeOutgoing, outgoing)
+        if (fraction >= 0.4f) {
+            val remaining = ink(0.01f) { if (child) it.red else it.blue }.drop(2)
+            assertTrue("outgoing retires in the fast phase", remaining.all { it.isEmpty() })
+        }
+        if (fraction <= 0.8f) {
+            assertTrue("body waits for the outlines", actual.drop(2).all { it.isEmpty() })
+        } else if (fraction == 1f) {
+            assertEquals("body arrives at native coordinates", nativeBody, actual.drop(2))
+        } else {
+            actual.drop(2).zip(nativeBody).forEach { (visible, native) ->
+                if (fraction >= 0.98f) assertTrue("late body is visibly present", visible.isNotEmpty())
+                assertTrue("body never travels outside native glyphs", native.containsAll(visible))
+            }
+        }
+    }
+
+    private inner class NativeGlyphScene {
         val page = SettingsPageMorph()
         val time = mutableStateOf(1f)
         val child = mutableStateOf(false)
@@ -806,77 +905,97 @@ class SettingsPageMorphHostTest {
                 ),
             )
         }
-        rule.setContent {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        host = Rect(0f, 0f, size.width, size.height)
-                        report(if (child.value) target else source)
-                        with(page) { draw(host, time.value, true, Color.Black) }
-                    }.drawWithContent {
-                        drawRect(Color.Black)
-                        drawIntoCanvas { canvas ->
-                            val paint =
-                                android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                                    color = android.graphics.Color.GREEN
-                                    textSize = 16f
-                                }
-                            canvas.nativeCanvas.drawText("Header", 60f, 50f, paint)
-                            canvas.nativeCanvas.drawText("Helper", 60f, 80f, paint)
-                            canvas.nativeCanvas.drawText("Voice & language", 60f, 160f, paint)
-                            canvas.nativeCanvas.drawText("Privacy & Security", 60f, 250f, paint)
-                        }
-                    },
-            )
-        }
 
-        fun greenInk() =
-            rule.onRoot().captureToImage().toPixelMap().let { pixels ->
-                listOf(40..52, 70..82, 150..162, 240..252).map { band ->
-                    (band.first..band.last)
-                        .flatMap { y -> (50..250).map { x -> x to y } }
-                        .filter { (x, y) -> pixels[x, y].green > 0.8f }
-                }
-            }
-        val nativeInk = greenInk()
-        assertTrue(nativeInk.all { it.isNotEmpty() })
-
-        fun assertStationaryGlyphs(fraction: Float) {
-            val actual = greenInk()
-            assertEquals("fixed opaque header", nativeInk.take(2), actual.take(2))
-            if (fraction <= 0.8f) {
-                assertTrue("body waits for the outlines", actual.drop(2).all { it.isEmpty() })
-            } else if (fraction == 1f) {
-                assertEquals("body arrives at native coordinates", nativeInk, actual)
-            } else {
-                actual.drop(2).zip(nativeInk.drop(2)).forEach { (visible, native) ->
-                    if (fraction >= 0.98f) assertTrue("late body is visibly present", visible.isNotEmpty())
-                    assertTrue("body never travels outside native glyphs", native.containsAll(visible))
-                }
+        fun install() {
+            rule.setContent {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .drawWithContent {
+                            host = Rect(0f, 0f, size.width, size.height)
+                            report(if (child.value) target else source)
+                            with(page) { draw(host, time.value, true, Color.Black) }
+                        }.drawWithContent {
+                            drawRect(Color.Black)
+                            drawIntoCanvas { canvas ->
+                                val paint =
+                                    android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                        color = android.graphics.Color.GREEN
+                                        textSize = 16f
+                                    }
+                                canvas.nativeCanvas.drawText("Header", 60f, 50f, paint)
+                                canvas.nativeCanvas.drawText("Helper", 60f, 80f, paint)
+                                paint.color =
+                                    if (child.value) android.graphics.Color.BLUE else android.graphics.Color.RED
+                                canvas.nativeCanvas.drawText("Voice & language", 60f, 160f, paint)
+                                canvas.nativeCanvas.drawText("Privacy & Security", 60f, 250f, paint)
+                            }
+                        },
+                )
             }
         }
-        rule.runOnIdle {
-            page.pendingOrigin = source
-            assertTrue(page.begin(true, true, true, host))
-            child.value = true
-            report(target)
-            assertTrue(page.admitDestination())
+
+        fun ink(
+            threshold: Float = 0.8f,
+            channel: (Color) -> Float,
+        ) = rule.onRoot().captureToImage().toPixelMap().let { pixels ->
+            listOf(40..52, 70..82, 150..162, 240..252).map { band ->
+                (band.first..band.last)
+                    .flatMap { y -> (50..250).map { x -> x to y } }
+                    .filter { (x, y) -> channel(pixels[x, y]) > threshold }
+            }
         }
-        for (fraction in listOf(0f, 0.2f, 0.39f, 0.4f, 0.41f, 0.65f, 0.9f, 0.98f, 1f)) {
-            rule.runOnIdle { time.value = fraction }
-            assertStationaryGlyphs(fraction)
-        }
-        rule.runOnIdle {
-            page.pendingOrigin = target
-            assertTrue(page.begin(false, false, true, host))
-            child.value = false
-            report(source)
-            assertTrue(page.admitDestination())
-        }
-        for (fraction in listOf(0f, 0.2f, 0.39f, 0.4f, 0.41f, 0.65f, 0.9f, 0.98f, 1f)) {
-            rule.runOnIdle { time.value = fraction }
-            assertStationaryGlyphs(fraction)
+    }
+
+    @Test fun liveHeaderStaysOpaqueAndBodyGlyphsRevealAtNativePositionsDuringBothDirections() {
+        with(NativeGlyphScene()) {
+            install()
+            val nativeHeader = ink { it.green }.take(2)
+            val nativeParent = ink { it.red }.drop(2)
+            // Calibrate each native color independently: channel thresholds can select different
+            // antialiased edge pixels even when the glyph geometry is unchanged.
+            rule.runOnIdle { child.value = true }
+            val nativeChild = ink { it.blue }.drop(2)
+            rule.runOnIdle { child.value = false }
+            rule.onRoot().captureToImage()
+            assertTrue((nativeHeader + nativeParent + nativeChild).all { it.isNotEmpty() })
+
+            rule.runOnIdle {
+                page.pendingOrigin = source
+                assertTrue(page.begin(true, true, true, host))
+                child.value = true
+                report(target)
+                assertTrue(page.admitDestination())
+            }
+            for (fraction in listOf(0f, 0.2f, 0.39f, 0.4f, 0.41f, 0.65f, 0.9f, 0.98f, 1f)) {
+                rule.runOnIdle { time.value = fraction }
+                assertStationaryGlyphs(
+                    fraction,
+                    child.value,
+                    nativeHeader,
+                    if (child.value) nativeChild else nativeParent,
+                    if (child.value) nativeParent else nativeChild,
+                    ::ink,
+                )
+            }
+            rule.runOnIdle {
+                page.pendingOrigin = target
+                assertTrue(page.begin(false, false, true, host))
+                child.value = false
+                report(source)
+                assertTrue(page.admitDestination())
+            }
+            for (fraction in listOf(0f, 0.2f, 0.39f, 0.4f, 0.41f, 0.65f, 0.9f, 0.98f, 1f)) {
+                rule.runOnIdle { time.value = fraction }
+                assertStationaryGlyphs(
+                    fraction,
+                    child.value,
+                    nativeHeader,
+                    if (child.value) nativeChild else nativeParent,
+                    if (child.value) nativeParent else nativeChild,
+                    ::ink,
+                )
+            }
         }
     }
 

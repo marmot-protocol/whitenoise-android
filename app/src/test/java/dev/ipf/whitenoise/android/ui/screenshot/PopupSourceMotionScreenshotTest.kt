@@ -12,8 +12,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +68,7 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@OptIn(ExperimentalMaterial3Api::class)
 class PopupSourceMotionScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
     private val captureFrames = System.getenv("ANIMATION_CAPTURE_FRAMES") == "1"
@@ -118,15 +122,17 @@ class PopupSourceMotionScreenshotTest {
                 Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.BottomCenter) {
                     SettingsGroup(Modifier.padding(bottom = sourceBottom.dp)) {
                         row("read-aloud") { rowContext ->
-                            TtsAutoReadGroupActionRow(
-                                context = rowContext,
-                                title = "Read Aloud",
-                                provenanceLabel = "Use global default",
-                                onClick = { shown = true },
-                                sourceOwner = "read-aloud",
-                                sourceActivation = activation,
-                                onSourceActivated = { activation = it },
-                            )
+                            CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                                TtsAutoReadGroupActionRow(
+                                    context = rowContext,
+                                    title = "Read Aloud",
+                                    provenanceLabel = "Use global default",
+                                    onClick = { shown = true },
+                                    sourceOwner = "read-aloud",
+                                    sourceActivation = activation,
+                                    onSourceActivated = { activation = it },
+                                )
+                            }
                         }
                     }
                 }
@@ -166,7 +172,9 @@ class PopupSourceMotionScreenshotTest {
                         confirmButton = {
                             val current = this
                             SideEffect { surface = current }
-                            TextButton(onClick = dismiss, enabled = acceptsInput) { Text("Cancel") }
+                            CompositionLocalProvider(LocalRippleConfiguration provides null) {
+                                TextButton(onClick = dismiss, enabled = acceptsInput) { Text("Cancel") }
+                            }
                         },
                     )
                 }

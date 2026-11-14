@@ -53,28 +53,81 @@ def check_automatic_resume(metrics, events):
         if samples[0].get("success") is not True or samples[0].get("payload_bytes") != PAYLOAD_BYTES:
             violations.append("wrong or unsuccessful sample")
     gets = [e["seq"] for e in events if e["kind"] == "get"]
-    uploads = [e["seq"] for e in events if e["kind"] == "upload"]
-    if len(gets) != 2 or len(uploads) != 1 or any(e["kind"] == "head" for e in events):
-        violations.append("wrong request count")
-    elif not all((
-        any(e["kind"] == "disconnect" and e["request"] == gets[0] for e in events),
-        any(e["kind"] == "complete" and e["request"] == gets[1] for e in events),
-        any(e["kind"] == "upload_complete" and e["request"] == uploads[0] for e in events),
-        not any(e["kind"] == "complete" and e["request"] == gets[0] for e in events),
-    )):
-        violations.append("missing independent request outcomes")
-    for kind, values in {"held": [PREFIX_BYTES, 3 * 1024 * 1024], "range_requested_offset": [PREFIX_BYTES],
-                         "if_range_match": [1], "range_offset": [0, PREFIX_BYTES], "status": [200, 206],
-                         "interrupt_acquisition": [0], "platform_stop_marker": [0], "release_acquisition": [0]}.items():
-        if [e["value"] for e in events if e["kind"] == kind] != values:
-            violations.append("incorrect " + kind)
-    for kind in ("upload_bytes", "body_bytes"):
-        if sum(e["value"] for e in events if e["kind"] == kind) != PAYLOAD_BYTES + 16:
-            violations.append("incorrect " + kind)
     markers = [e["seq"] for e in events if e["kind"] == "platform_stop_marker"]
-    ranges = [e["seq"] for e in events if e["kind"] == "range_requested_offset"]
-    if len(markers) != 1 or len(ranges) != 1 or ranges[0] <= markers[0]:
-        violations.append("Range recovery did not follow platform stop")
+    selected = []
+    setup = []
+    if len(markers) == 1:
+        marker = markers[0]
+        before = [r for r in gets if r < marker]
+        after = [r for r in gets if r > marker]
+        if before and len(after) == 1:
+            selected = [before[-1], after[0]]
+            setup = before[:-1]
+    if not selected:
+        violations.append("missing unique held initial and post-stop acquisition pair")
+    uploads = [e["seq"] for e in events if e["kind"] == "upload"]
+    if len(uploads) != 1 or any(e["kind"] == "head" for e in events):
+        violations.append("wrong request count")
+    elif not any(e["kind"] == "upload_complete" and e["request"] == uploads[0] for e in events):
+        violations.append("missing upload outcome")
+    for kind in ("interrupt_acquisition", "platform_stop_marker", "release_acquisition"):
+        if [e["value"] for e in events if e["kind"] == kind] != [0]:
+            violations.append("incorrect " + kind)
+    if sum(e["value"] for e in events if e["kind"] == "upload_bytes") != PAYLOAD_BYTES + 16:
+        violations.append("incorrect upload_bytes")
+    # Setup losses remain in the ledger and diagnostics; only the selected recovery pair qualifies.
+    for request in setup:
+        rows = [e for e in events if e["request"] == request]
+        ends = [e for e in rows if e["kind"] in ("disconnect", "complete")]
+        if len(ends) != 1 or ends[0]["kind"] != "disconnect" or ends[0]["seq"] >= selected[0]:
+            violations.append("setup acquisition was not aborted before selected initial request")
+    if selected:
+        initial, resumed = selected
+        rows = [e for e in events if e["request"] in selected]
+        # Range/validator evidence from any unselected request cannot be silently ignored.
+        if any(e["kind"] in ("range_requested_offset", "if_range_match")
+               and e["request"] != resumed for e in events):
+            violations.append("unmatched Range or validator evidence")
+        initial_rows = [e for e in rows if e["request"] == initial]
+        resumed_rows = [e for e in rows if e["request"] == resumed]
+        for request_rows, count in ((initial_rows, PREFIX_BYTES), (resumed_rows, PAYLOAD_BYTES + 16 - PREFIX_BYTES)):
+            if sum(e["value"] for e in request_rows if e["kind"] == "body_bytes") != count:
+                violations.append("incorrect selected body_bytes")
+        for request_rows, expected_values in ((initial_rows, {"range_offset": [0], "status": [200],
+                                                            "held": [PREFIX_BYTES]}),
+                                              (resumed_rows, {"range_offset": [PREFIX_BYTES], "status": [206],
+                                                              "range_requested_offset": [PREFIX_BYTES],
+                                                              "if_range_match": [1], "held": [3 * 1024 * 1024]})):
+            for kind, values in expected_values.items():
+                if [e["value"] for e in request_rows if e["kind"] == kind] != values:
+                    violations.append("incorrect request-bound " + kind)
+        def seq(request_rows, kind):
+            matches = [e["seq"] for e in request_rows if e["kind"] == kind]
+            return matches[0] if len(matches) == 1 else None
+        held, disconnected = seq(initial_rows, "held"), seq(initial_rows, "disconnect")
+        resumed_held, completed = seq(resumed_rows, "held"), seq(resumed_rows, "complete")
+        interrupts = [e["seq"] for e in events if e["kind"] == "interrupt_acquisition"]
+        releases = [e["seq"] for e in events if e["kind"] == "release_acquisition"]
+        if (None in (held, disconnected, resumed_held, completed) or len(interrupts) != 1 or len(releases) != 1
+                or not initial < held < markers[0] < interrupts[0] < disconnected < resumed < resumed_held < releases[0] < completed
+                or any(e["kind"] == "complete" for e in initial_rows)
+                or any(e["kind"] == "disconnect" for e in resumed_rows)):
+            violations.append("incorrect selected hold/stop/release/outcome ordering")
+        else:
+            if (any(not initial < e["seq"] <= disconnected for e in initial_rows)
+                    or any(not resumed < e["seq"] <= completed for e in resumed_rows)
+                    or (seq(resumed_rows, "range_requested_offset") or float("inf")) >= resumed_held
+                    or (seq(resumed_rows, "if_range_match") or float("inf")) >= resumed_held):
+                violations.append("incorrect request event ordering")
+            if (sum(e["value"] for e in resumed_rows if e["kind"] == "body_bytes" and e["seq"] < resumed_held)
+                    != 1024 * 1024
+                    or sum(e["value"] for e in initial_rows if e["kind"] == "body_bytes" and e["seq"] < held)
+                    != PREFIX_BYTES):
+                violations.append("incorrect live held checkpoint")
     return {"passed": not violations, "violations": violations, "scope": "ordinary-android-work-stop-and-native-resume",
             "platform_job_stop_qualified": not violations, "android_process_restart_qualified": False,
-            "performance_qualified": False}
+            "performance_qualified": False,
+            "setup_acquisition_count": len(setup),
+            "setup_body_bytes": sum(e["value"] for e in events if e["kind"] == "body_bytes" and e["request"] in setup),
+            "ledger_acquisition_count": len(gets),
+            "ledger_body_bytes": sum(e["value"] for e in events if e["kind"] == "body_bytes")}

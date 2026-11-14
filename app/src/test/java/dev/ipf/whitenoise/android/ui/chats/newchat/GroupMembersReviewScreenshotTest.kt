@@ -56,9 +56,9 @@ class GroupMembersReviewScreenshotTest {
 
     @Test fun busyAtCompletionRejectsAndRetiresReview() = checkTerminalExit(changeBusy = true)
 
-    @Test fun adminChangeAtCompletionRejectsAndRetiresReview() = checkTerminalExit(changeAdmins = true)
+    @Test fun adminChangeAtCompletionPreservesEditedReview() = checkTerminalExit(changeAdmins = true)
 
-    @Test fun replacementSelectionCancelsOldCompletion() = checkTerminalExit(replaceSelection = true)
+    @Test fun replacementSelectionRetiresOldReviewAndCancelsCompletion() = checkTerminalExit(replaceSelection = true)
 
     // Keep the action, mid-exit mutation, and final exactly-once assertions in chronological order.
     @Suppress("LongMethod")
@@ -119,17 +119,21 @@ class GroupMembersReviewScreenshotTest {
             androidx.compose.runtime.snapshots.Snapshot
                 .sendApplyNotifications()
         }
-        val expectsDismissal = cancel || changeBusy || changeAdmins
+        val expectsDismissal = cancel || changeBusy || replaceSelection
         val expectedDismissals = if (expectsDismissal) 1 else 0
-        val expectedConfirmations = if (expectsDismissal || replaceSelection) 0 else 1
+        val expectedConfirmations = if (expectsDismissal) 0 else 1
         rule.mainClock.advanceTimeBy(800)
         rule.runOnIdle {
             assertEquals(expectedConfirmations, confirmed)
             assertEquals(expectedDismissals, dismissed)
-            assertEquals(replaceSelection, open.value)
+            assertEquals(false, open.value)
         }
         rule.mainClock.advanceTimeBy(800)
-        rule.runOnIdle { assertEquals(expectedDismissals, dismissed) }
+        rule.runOnIdle {
+            assertEquals(expectedConfirmations, confirmed)
+            assertEquals(expectedDismissals, dismissed)
+            assertEquals(false, open.value)
+        }
     }
 
     /** Captures the destination and public member identity in the light theme. */

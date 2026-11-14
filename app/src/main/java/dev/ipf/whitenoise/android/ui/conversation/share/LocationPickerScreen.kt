@@ -43,6 +43,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.nativePageFooter
+import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
@@ -168,7 +171,7 @@ internal fun LocationPickerScreen(
         }
         LaunchedEffect(Unit) { centerOnCurrent() }
 
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().nativePageBody()) {
             AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
             // Fixed center pin — the map pans beneath it, and its map coordinate
@@ -188,6 +191,7 @@ internal fun LocationPickerScreen(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .nativePageHeader()
                         .statusBarsPadding()
                         .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -209,6 +213,7 @@ internal fun LocationPickerScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .nativePageFooter()
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(16.dp),

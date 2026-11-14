@@ -64,6 +64,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.nativePageHeader
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
@@ -161,7 +163,7 @@ internal fun NostrEventReaderScreen(
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Column(Modifier.fillMaxSize().systemBarsPadding()) {
+        Column(Modifier.fillMaxSize().systemBarsPadding().nativePageBody()) {
             NostrEventReaderHeader(
                 card = card,
                 onDismiss = onDismiss,
@@ -194,7 +196,7 @@ private fun NostrEventReaderHeader(
     onOpenExternal: (() -> Unit)?,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().nativePageHeader().padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onDismiss) {
@@ -428,7 +430,7 @@ private fun NostrVideoPlayerSurface(
     onDismiss: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black),
+        modifier = Modifier.fillMaxSize().nativePageBody().background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         AndroidView(
@@ -446,7 +448,12 @@ private fun NostrVideoPlayerSurface(
         if (playbackFailed) NostrVideoPlaybackFailure(onRetry)
         IconButton(
             onClick = onDismiss,
-            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .nativePageHeader()
+                    .statusBarsPadding()
+                    .padding(8.dp),
         ) {
             Icon(
                 Icons.AutoMirrored.Outlined.ArrowBack,

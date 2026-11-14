@@ -85,6 +85,7 @@ import dev.ipf.whitenoise.android.ui.common.AnimatedAlertDialog
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlin.math.hypot
@@ -173,7 +174,7 @@ internal fun PhotoEditorScreen(
             }
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
             PhotoEditorHistoryActions(state, stateHolder, stateHolder.hasUnsavedChanges)
             if (state.isSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {

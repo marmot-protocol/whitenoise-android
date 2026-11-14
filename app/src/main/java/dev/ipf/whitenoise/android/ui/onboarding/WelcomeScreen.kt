@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -146,7 +147,11 @@ internal fun WelcomeScreen(
         },
     ) { contentPadding ->
         Column(
-            Modifier.fillMaxSize().padding(contentPadding).consumeWindowInsets(contentPadding),
+            Modifier
+                .fillMaxSize()
+                .nativePageBody(contentPadding)
+                .padding(contentPadding)
+                .consumeWindowInsets(contentPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             BoxWithConstraints(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {

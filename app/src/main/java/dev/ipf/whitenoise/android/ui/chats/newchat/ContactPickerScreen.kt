@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowForward
@@ -273,6 +274,7 @@ internal fun ContactPickerScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                .nativePageBody(padding)
                 .padding(padding)
                 .consumeWindowInsets(padding)
                 .then(pickerBody),
