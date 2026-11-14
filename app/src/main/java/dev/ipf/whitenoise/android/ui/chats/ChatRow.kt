@@ -344,6 +344,7 @@ internal fun ChatRow(
                     firstFrameAvatar = item.firstFrameAvatar,
                     durableAvatar = item.selectedAvatarAsset,
                     durableAvatarIsPersonPicture = item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
+                    retainCompatibility = true,
                 )
                 if (pinned) {
                     Surface(
