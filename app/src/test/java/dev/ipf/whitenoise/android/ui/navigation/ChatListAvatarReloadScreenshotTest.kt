@@ -120,7 +120,12 @@ class ChatListAvatarReloadScreenshotTest {
     ) {
         WhiteNoiseTheme {
             val scheme = MaterialTheme.colorScheme
-            val colors = if (markRowPreviews) scheme.copy(onSurfaceVariant = ComposeColor(ROW_PREVIEW_COLOR)) else scheme
+            val colors =
+                if (markRowPreviews) {
+                    scheme.copy(onSurfaceVariant = ComposeColor(ROW_PREVIEW_COLOR))
+                } else {
+                    scheme
+                }
             MaterialTheme(colorScheme = colors, content = content)
         }
     }
