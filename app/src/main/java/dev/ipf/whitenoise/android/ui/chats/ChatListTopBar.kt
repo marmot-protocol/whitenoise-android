@@ -85,13 +85,16 @@ private fun retainedAccountAvatarContent(
     title: String,
 ): (@Composable (String?) -> Unit)? {
     if (retained == null || account == null || account.signedOut) return null
-    return { url -> RetainedTopBarAccountAvatar(appState, retained, account.accountIdHex, title, 40.dp, url) }
+    return { url ->
+        RetainedTopBarAccountAvatar(appState, retained, account.accountIdHex, title, CHAT_LIST_ACCOUNT_AVATAR_SIZE, url)
+    }
 }
 
 internal const val CHAT_LIST_FILTER_CHIP_ALL_TAG = "chats.scope.chats"
 internal const val CHAT_LIST_OTHER_ACCOUNT_AVATARS_TAG = "chat-list-other-account-avatars"
 
 /** Separates the active avatar from the stacked other accounts without breaking the avatar cluster. */
+private val CHAT_LIST_ACCOUNT_AVATAR_SIZE = 40.dp
 private val CHAT_LIST_ACCOUNT_AVATAR_GAP = 8.dp
 
 /** Stable test tag for a folder pill. */
@@ -240,7 +243,7 @@ internal fun ChatListTopBar(
                                     title = title,
                                     seed = active?.accountIdHex ?: "whitenoise",
                                     pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
-                                    size = 40.dp,
+                                    size = CHAT_LIST_ACCOUNT_AVATAR_SIZE,
                                     touchTargetSize = 48.dp,
                                     actionDescription =
                                         stringResource(
