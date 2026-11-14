@@ -42,7 +42,8 @@ class PersistentDisplayThumbnailsTest {
         assertEquals(768, result.maxEdgePx)
         assertEquals(24, result.bitmap.width)
         assertEquals(16, result.bitmap.height)
-        assertEquals(Color.MAGENTA, result.bitmap.getPixel(3, 3))
+        assertTrue(Color.red(result.bitmap.getPixel(3, 3)) >= 250)
+        assertEquals(255, Color.alpha(result.bitmap.getPixel(3, 3)))
         assertNull(reader.read(source, 1024, reader.captureGeneration()))
     }
 
@@ -90,6 +91,15 @@ class PersistentDisplayThumbnailsTest {
         assertEquals(0L, cache().residentBytes())
     }
 
+    /** Worker-shaped ARGB buffers still select JPEG when every copied pixel is actually opaque. */
+    @Test
+    fun opaqueWorkerPixelsUseTheMeasuredJpegPath() {
+        assertTrue(bitmap.hasAlpha())
+        assertEquals(Bitmap.CompressFormat.JPEG, displayThumbnailEncodingFormat(bitmap))
+        bitmap.setPixel(0, bitmap.height - 1, Color.TRANSPARENT)
+        assertEquals(Bitmap.CompressFormat.WEBP_LOSSLESS, displayThumbnailEncodingFormat(bitmap))
+    }
+
     /** Transparent pixels round-trip without replacing alpha with an opaque background. */
     @Test
     fun transparentDerivativesRemainLossless() {
@@ -118,7 +128,11 @@ class PersistentDisplayThumbnailsTest {
         val budget = 1024L
         val cache = cache(budget)
         repeat(30) { index ->
-            cache.write(source.copy(attachmentKey = "attachment-$index"), MediaThumbnail(bitmap, 128), cache.captureGeneration())
+            cache.write(
+                source.copy(attachmentKey = "attachment-$index"),
+                MediaThumbnail(bitmap, 128),
+                cache.captureGeneration(),
+            )
         }
         assertTrue(cache.residentBytes() <= budget)
         assertNull(cache.read(source.copy(attachmentKey = "attachment-0"), 128, cache.captureGeneration()))

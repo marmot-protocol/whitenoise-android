@@ -22,8 +22,7 @@ internal fun ConversationController.displayThumbnailRequest(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ): DisplayThumbnailRequest? {
-    val account = boundAccountRef ?: return null
-    if (appState.activeAccountRef != account) return null
+    val account = boundAccountRef?.takeIf { it == appState.activeAccountRef } ?: return null
     return DisplayThumbnailRequest(
         DisplayThumbnailSource(
             mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex),
@@ -38,8 +37,11 @@ internal fun ConversationController.displayThumbnailRequest(
 
 /** Main-thread publication check rejects account switches and invalidation during disk or original decoding. */
 internal fun WhiteNoiseAppState.displayThumbnailRequestCurrent(request: DisplayThumbnailRequest): Boolean =
-    activeAccountRef == request.account && mediaUploadSessionEpoch() == request.sessionEpoch &&
-        displayThumbnails.isCurrent(request.generation)
+    displayThumbnailSessionCurrent(request) && displayThumbnails.isCurrent(request.generation)
+
+/** An unrelated cache eviction may restart this session's loader, but a switched account must never retry. */
+internal fun WhiteNoiseAppState.displayThumbnailSessionCurrent(request: DisplayThumbnailRequest): Boolean =
+    activeAccountRef == request.account && mediaUploadSessionEpoch() == request.sessionEpoch
 
 /** Reads an expendable derivative off main; failures never request a transfer or alter download policy. */
 internal suspend fun WhiteNoiseAppState.readDisplayThumbnail(
@@ -50,9 +52,12 @@ internal suspend fun WhiteNoiseAppState.readDisplayThumbnail(
         withContext(Dispatchers.IO) {
             runCatchingCancellable { displayThumbnails.read(request.source, maxEdgePx, request.generation) }.getOrNull()
         } ?: return null
-    if (displayThumbnailRequestCurrent(request)) return entry
-    entry.bitmap.recycle()
-    return null
+    return if (displayThumbnailRequestCurrent(request)) {
+        entry
+    } else {
+        entry.bitmap.recycle()
+        null
+    }
 }
 
 /** Writes after display publication, at most one outstanding encoder, without taking ownership of shared pixels. */
@@ -63,14 +68,10 @@ internal fun WhiteNoiseAppState.persistDisplayThumbnail(
 ) {
     if (!displayThumbnailRequestCurrent(request) || !displayThumbnailWritePermit.tryAcquire()) return
     mutationsScope.launch(Dispatchers.IO) {
-        try {
-            runCatchingCancellable {
-                displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation)
-            }
-        } finally {
-            displayThumbnailWritePermit.release()
+        runCatchingCancellable {
+            displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation)
         }
-    }
+    }.invokeOnCompletion { displayThumbnailWritePermit.release() }
 }
 
 /** All original-removal callers also retire every derivative size, including in-flight producers. Run off main. */

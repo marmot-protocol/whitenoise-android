@@ -13,10 +13,13 @@ class DisplayThumbnailInvalidationCoverageTest {
     fun originalCleanupAlwaysUsesThePairedBoundary() {
         val root = appModuleFile("src/main/java/dev/ipf/whitenoise/android/state")
         val directRemoval = Regex("""\bdiskMediaCache\.(clear|remove|removeByCiphertextTags)\(""")
-        root.walkTopDown().filter { it.extension == "kt" && it.name != "DisplayThumbnailPresentation.kt" }.forEach {
-            assertFalse("Unpaired original-cache invalidation in ${it.name}", directRemoval.containsMatchIn(it.readText()))
+        root.walkTopDown().filter { it.extension == "kt" && it.name != "DisplayThumbnailRequest.kt" }.forEach {
+            assertFalse(
+                "Unpaired original-cache invalidation in ${it.name}",
+                directRemoval.containsMatchIn(it.readText()),
+            )
         }
-        val boundary = appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/DisplayThumbnailPresentation.kt")
+        val boundary = appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/DisplayThumbnailRequest.kt")
         listOf("remove", "removeByCiphertextTags", "clear").forEach { operation ->
             assertTrue("Derivative $operation missing", "displayThumbnails.$operation(" in boundary)
             assertTrue("Original $operation missing", "diskMediaCache.$operation(" in boundary)

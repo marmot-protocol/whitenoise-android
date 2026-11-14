@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.displayThumbnailRequest
 import dev.ipf.whitenoise.android.state.displayThumbnailRequestCurrent
+import dev.ipf.whitenoise.android.state.displayThumbnailSessionCurrent
 import dev.ipf.whitenoise.android.state.persistDisplayThumbnail
 import dev.ipf.whitenoise.android.state.readDisplayThumbnail
 import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
@@ -794,6 +795,8 @@ internal fun rememberImageLoadState(
         }
     val requestedMaxEdgePx = decodeRequest.maxEdgePx
     var presentationMaxEdgePx by remember(*keys) { mutableIntStateOf(cachedThumbnail?.maxEdgePx ?: 0) }
+    // A derivative proves display readiness only, never completion of a persisted original-download intent.
+    var originalMaterialized by remember(*keys) { mutableStateOf(false) }
     // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
     // image paints on the first frame — no decode spinner, no visible "reload".
     // Animated GIF/WebP and byte-sniffed unknowns skip the static thumbnail
@@ -901,17 +904,22 @@ internal fun rememberImageLoadState(
 
     LaunchedEffect(*keys, materializationIntent, reloadToken, requestedMaxEdgePx) {
         if (requestedMaxEdgePx == 0) return@LaunchedEffect
-        if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) return@LaunchedEffect
+        val fulfillOriginalDownload =
+            materializationIntent.readerRequested && controller.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)
+        if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx && !fulfillOriginalDownload) {
+            return@LaunchedEffect
+        }
         val thumbnailRequest = controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference)
             ?: return@LaunchedEffect
         val cached = controller.thumbnailEntryFor(messageIdHex, attachmentIndex, requestedMaxEdgePx)
-        if (cached != null && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+        val seedStatic = MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
+        if (!fulfillOriginalDownload && cached != null && seedStatic) {
             presentation = DecodedAttachmentPresentation.Static(cached.bitmap)
             presentationMaxEdgePx = cached.maxEdgePx
             decodeRequest.onDecodedSize(cached.bitmap.width, cached.bitmap.height)
             return@LaunchedEffect
         }
-        if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+        if (!fulfillOriginalDownload && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
             val persisted = appState.readDisplayThumbnail(thumbnailRequest, requestedMaxEdgePx)
             if (persisted != null) {
                 controller.cacheThumbnail(messageIdHex, attachmentIndex, persisted.bitmap, persisted.maxEdgePx)
@@ -921,7 +929,11 @@ internal fun rememberImageLoadState(
                 return@LaunchedEffect
             }
         }
-        if (!startDownload || !appState.displayThumbnailRequestCurrent(thumbnailRequest)) return@LaunchedEffect
+        if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) {
+            if (appState.displayThumbnailSessionCurrent(thumbnailRequest)) reloadToken++
+            return@LaunchedEffect
+        }
+        if (!startDownload) return@LaunchedEffect
         failed = false
         tooLargeToPreview = false
         try {
@@ -942,6 +954,14 @@ internal fun rememberImageLoadState(
                     if (automaticNetworkAllowed) reloadToken++
                     return@LaunchedEffect
                 }
+            if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) {
+                if (appState.displayThumbnailSessionCurrent(thumbnailRequest)) reloadToken++
+                return@LaunchedEffect
+            }
+            if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) {
+                originalMaterialized = true
+                return@LaunchedEffect
+            }
             val decoded =
                 appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_DECODE) {
                     decodeMessageAttachmentImage(
@@ -951,7 +971,12 @@ internal fun rememberImageLoadState(
                         domain = controller.mediaTrustDomain,
                     )
                 }
-            if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) return@LaunchedEffect
+            if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) {
+                decoded?.releaseOwnedPresentation()
+                if (appState.displayThumbnailSessionCurrent(thumbnailRequest)) reloadToken++
+                return@LaunchedEffect
+            }
+            originalMaterialized = true
             if (decoded != null) {
                 if (decoded is DecodedAttachmentPresentation.Static && !decoded.animationDeferred) {
                     controller.cacheThumbnail(messageIdHex, attachmentIndex, decoded.bitmap, requestedMaxEdgePx)
@@ -963,7 +988,9 @@ internal fun rememberImageLoadState(
                 presentationMaxEdgePx = requestedMaxEdgePx
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     decodeRequest.onDecodedSize(decoded.bitmap.width, decoded.bitmap.height)
-                    if (!decoded.animationDeferred && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+                    val persistStatic =
+                        !decoded.animationDeferred && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
+                    if (persistStatic) {
                         appState.persistDisplayThumbnail(thumbnailRequest, decoded.bitmap, requestedMaxEdgePx)
                     }
                 }
@@ -990,7 +1017,7 @@ internal fun rememberImageLoadState(
         controller = controller,
         appState = appState,
         // A download of an image that turned out too large to preview is settled once that is known.
-        isReady = { presentation != null || tooLargeToPreview },
+        isReady = { originalMaterialized || tooLargeToPreview },
         ensureMaterialization = {
             if (failed) {
                 failed = false

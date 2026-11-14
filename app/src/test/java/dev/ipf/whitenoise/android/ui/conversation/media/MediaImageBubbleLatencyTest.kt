@@ -149,9 +149,39 @@ class MediaImageBubbleLatencyTest {
         assertEquals(0, fixture.calls.size)
     }
 
+    /** A thumbnail-only hit cannot consume a durable explicit request for the original bytes. */
+    @Test
+    fun derivativeDoesNotCompleteAnOriginalDownloadIntent() {
+        seedDisplayThumbnail()
+        assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        composeRule.waitUntil(10_000) { fixture.calls.size == 1 }
+        composeRule.runOnIdle {
+            assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
+            fixture.calls.single().succeed(imageBytes())
+        }
+        composeRule.waitUntil(10_000) { !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0) }
+        awaitLoaded()
+    }
+
+    /** A cache-wide fence caused by another attachment restarts this still-current loader. */
+    @Test
+    fun unrelatedRemovalCannotStrandAnOriginalLoad() {
+        enableAutomaticImages()
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        composeRule.waitUntil(10_000) { fixture.calls.size == 1 }
+        composeRule.runOnIdle {
+            fixture.state.removeMediaMemoryCacheEntry(request(1).cacheKey())
+            fixture.calls.single().succeed(imageBytes())
+        }
+        awaitLoaded()
+        assertEquals(1, fixture.calls.size)
+    }
+
     /** Writes only a synthetic derivative; no full-size encrypted/native fixture is seeded. */
     private fun seedDisplayThumbnail() {
-        val source = DisplayThumbnailSource(request(0).cacheKey(), reference(0).sourceEpoch, reference(0).ciphertextSha256)
+        val source =
+            DisplayThumbnailSource(request(0).cacheKey(), reference(0).sourceEpoch, reference(0).ciphertextSha256)
         val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(android.graphics.Color.MAGENTA)
         runBlocking(kotlinx.coroutines.Dispatchers.IO) {

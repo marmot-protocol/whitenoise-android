@@ -49,8 +49,10 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
     fun read(source: DisplayThumbnailSource, requestedEdge: Int, token: Long): MediaThumbnail? {
         if (!isCurrent(token) || source.ciphertextTag.isBlank()) return null
         for (edge in edges.filter { it >= requestedEdge }) {
-            val bytes = disk.get(slot(source, edge)) ?: continue
-            val entry = runCatching { decode(bytes, source, edge) }.getOrNull() ?: continue
+            val entry =
+                disk.get(slot(source, edge))?.let { bytes ->
+                    runCatching { decode(bytes, source, edge) }.getOrNull()
+                } ?: continue
             if (isCurrent(token)) return entry
             entry.bitmap.recycle()
             return null
@@ -71,7 +73,9 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
         val bytes = encode(source, entry) ?: return
         synchronized(publicationLock) {
             if (isCurrent(token)) {
-                disk.put(slot(source, entry.maxEdgePx), bytes, disk.capturePublicationToken(), source.ciphertextTag)
+                val key = slot(source, entry.maxEdgePx)
+                disk.put(key, bytes, disk.capturePublicationToken(), source.ciphertextTag)
+                if (!isCurrent(token)) disk.remove(key)
             }
         }
     }
@@ -112,7 +116,7 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
             writeInt(entry.bitmap.width)
             writeInt(entry.bitmap.height)
         }
-        val format = if (entry.bitmap.hasAlpha()) Bitmap.CompressFormat.WEBP_LOSSLESS else Bitmap.CompressFormat.JPEG
+        val format = displayThumbnailEncodingFormat(entry.bitmap)
         if (!entry.bitmap.compress(format, QUALITY, output)) return null
         return output.toByteArray().takeIf { it.size <= MAX_ENTRY_BYTES }
     }
@@ -143,4 +147,19 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
         private const val QUALITY = 85
         private val edges = intArrayOf(128, 256, 384, 512, 768, 1024, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
     }
+}
+
+/**
+ * The isolated worker returns ARGB_8888 pixels with alpha capability even for JPEGs. Inspect actual alpha off main
+ * using one bounded row, rather than treating that storage capability as evidence of transparent content.
+ */
+@Suppress("ReturnCount") // Opaque metadata fast path, transparent pixel early exit, then fully opaque result.
+internal fun displayThumbnailEncodingFormat(bitmap: Bitmap): Bitmap.CompressFormat {
+    if (!bitmap.hasAlpha()) return Bitmap.CompressFormat.JPEG
+    val row = IntArray(bitmap.width)
+    for (y in 0 until bitmap.height) {
+        bitmap.getPixels(row, 0, bitmap.width, 0, y, bitmap.width, 1)
+        if (row.any { it ushr 24 != 255 }) return Bitmap.CompressFormat.WEBP_LOSSLESS
+    }
+    return Bitmap.CompressFormat.JPEG
 }
