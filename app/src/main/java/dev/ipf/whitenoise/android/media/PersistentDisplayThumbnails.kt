@@ -24,7 +24,9 @@ internal data class DisplayThumbnailSource(
  * authenticated headers also bind the source revision and ciphertext hash. Reusing a slot for a changed source
  * cannot return its previous pixels. Only this cache's own encoder supplies bytes to its in-process decoder.
  */
-internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
+internal class PersistentDisplayThumbnails(
+    private val disk: DiskByteCache,
+) {
     private val generation = AtomicLong()
     private val invalidations = AtomicInteger()
     private val publicationLock = Any()
@@ -48,7 +50,11 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
 
     /** Reads only a matching source and sufficient decode ceiling; corruption is an ordinary cache miss. */
     @Suppress("ReturnCount") // Fail closed at each provenance or invalidation boundary.
-    fun read(source: DisplayThumbnailSource, requestedEdge: Int, token: Long): MediaThumbnail? {
+    fun read(
+        source: DisplayThumbnailSource,
+        requestedEdge: Int,
+        token: Long,
+    ): MediaThumbnail? {
         if (!isCurrent(token) || source.ciphertextTag.isBlank()) return null
         for (edge in edges.filter { it >= requestedEdge }) {
             val entry =
@@ -68,7 +74,11 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
      * resurrected by a decode that started before removal. Displayed/shared bitmaps are never recycled here.
      */
     @Suppress("ReturnCount") // Reject ineligible pixels before encoding or publication.
-    fun write(source: DisplayThumbnailSource, entry: MediaThumbnail, token: Long) {
+    fun write(
+        source: DisplayThumbnailSource,
+        entry: MediaThumbnail,
+        token: Long,
+    ) {
         if (!isCurrent(token) || source.ciphertextTag.isBlank() || entry.maxEdgePx !in edges) return
         val bitmap = entry.bitmap
         if (bitmap.width !in 1..entry.maxEdgePx || bitmap.height !in 1..entry.maxEdgePx) return
@@ -83,9 +93,10 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
     }
 
     /** Retires every size, including slots hydrated after a process restart and not currently in memory. */
-    fun remove(attachmentKey: String) = invalidate {
-        edges.forEach { disk.remove(slot(attachmentKey, it)) }
-    }
+    fun remove(attachmentKey: String) =
+        invalidate {
+            edges.forEach { disk.remove(slot(attachmentKey, it)) }
+        }
 
     /** Uses the persisted ciphertext tags to retire derivatives of unloaded expired messages. */
     fun removeByCiphertextTags(tags: Set<String>) {
@@ -109,13 +120,22 @@ internal class PersistentDisplayThumbnails(private val disk: DiskByteCache) {
     }
 
     /** A schema-specific slot prevents ordinary original-cache envelopes from entering this decoder. */
-    private fun slot(source: DisplayThumbnailSource, edge: Int): String = slot(source.attachmentKey, edge)
+    private fun slot(
+        source: DisplayThumbnailSource,
+        edge: Int,
+    ): String = slot(source.attachmentKey, edge)
 
     /** Keeps all physical size slots enumerable without persisting a parallel identity index. */
-    private fun slot(key: String, edge: Int): String = "$key:display-thumbnail-v1:$edge"
+    private fun slot(
+        key: String,
+        edge: Int,
+    ): String = "$key:display-thumbnail-v1:$edge"
 
     /** Encodes only already-verified pixels; alpha is lossless and opaque display pixels use JPEG quality 85. */
-    private fun encode(source: DisplayThumbnailSource, entry: MediaThumbnail): ByteArray? {
+    private fun encode(
+        source: DisplayThumbnailSource,
+        entry: MediaThumbnail,
+    ): ByteArray? {
         val output = ByteArrayOutputStream()
         DataOutputStream(output).apply {
             writeInt(MAGIC)

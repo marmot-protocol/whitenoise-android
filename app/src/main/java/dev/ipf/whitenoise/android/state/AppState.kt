@@ -1557,7 +1557,8 @@ class WhiteNoiseAppState private constructor(
             DiskByteCache(
                 cacheDir = java.io.File(appContext.cacheDir, "display-thumbnails-v1"),
                 maxBytes = dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails.MAX_BYTES,
-                maxEntryBytes = dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails.MAX_ENTRY_BYTES.toLong(),
+                maxEntryBytes = dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails.MAX_ENTRY_BYTES
+                        .toLong(),
                 keyProvider = AndroidKeystoreDiskByteCacheKeyProvider("whitenoise.display_thumbnails.aes_gcm.v1"),
             ),
         )

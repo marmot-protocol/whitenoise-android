@@ -174,7 +174,12 @@ class PersistentDisplayThumbnailsTest {
     /** The derivative budget applies to encrypted bytes and evicts older entries instead of growing unbounded. */
     @Test
     fun encryptedFootprintIsBounded() {
-        val budget = 1024L
+        val sizingCache = cache()
+        sizingCache.write(source, MediaThumbnail(bitmap, 128), sizingCache.captureGeneration())
+        val entryBytes = sizingCache.residentBytes()
+        assertTrue(entryBytes > 0)
+        sizingCache.clear()
+        val budget = entryBytes * 2
         val cache = cache(budget)
         repeat(30) { index ->
             cache.write(
@@ -183,7 +188,7 @@ class PersistentDisplayThumbnailsTest {
                 cache.captureGeneration(),
             )
         }
-        assertTrue(cache.residentBytes() <= budget)
+        assertTrue(cache.residentBytes() in 1..budget)
         assertNull(cache.read(source.copy(attachmentKey = "attachment-0"), 128, cache.captureGeneration()))
         assertNotNull(cache.read(source.copy(attachmentKey = "attachment-29"), 128, cache.captureGeneration()))
     }

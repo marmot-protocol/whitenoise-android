@@ -910,8 +910,9 @@ internal fun rememberImageLoadState(
         if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx && !fulfillOriginalDownload) {
             return@LaunchedEffect
         }
-        val thumbnailRequest = controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference)
-            ?: return@LaunchedEffect
+        val thumbnailRequest =
+            controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference)
+                ?: return@LaunchedEffect
         val cached = controller.thumbnailEntryFor(messageIdHex, attachmentIndex, requestedMaxEdgePx)
         val seedStatic = MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
         if (!fulfillOriginalDownload && cached != null && seedStatic) {

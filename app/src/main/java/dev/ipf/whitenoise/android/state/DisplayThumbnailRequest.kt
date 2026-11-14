@@ -67,11 +67,12 @@ internal fun WhiteNoiseAppState.persistDisplayThumbnail(
     maxEdgePx: Int,
 ) {
     if (!displayThumbnailRequestCurrent(request) || !displayThumbnailWritePermit.tryAcquire()) return
-    mutationsScope.launch(Dispatchers.IO) {
-        runCatchingCancellable {
-            displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation)
-        }
-    }.invokeOnCompletion { displayThumbnailWritePermit.release() }
+    mutationsScope
+        .launch(Dispatchers.IO) {
+            runCatchingCancellable {
+                displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation)
+            }
+        }.invokeOnCompletion { displayThumbnailWritePermit.release() }
 }
 
 /** All original-removal callers also retire every derivative size, including in-flight producers. Run off main. */

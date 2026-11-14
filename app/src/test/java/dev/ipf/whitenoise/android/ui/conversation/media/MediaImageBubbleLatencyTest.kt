@@ -31,8 +31,9 @@ import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
-import dev.ipf.whitenoise.android.media.MediaThumbnail
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.MediaThumbnail
+import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -153,14 +154,27 @@ class MediaImageBubbleLatencyTest {
     @Test
     fun derivativeDoesNotCompleteAnOriginalDownloadIntent() {
         seedDisplayThumbnail()
+        fixture.state.attachmentOpens.setDestination(
+            AttachmentOpenDestination(
+                accountRef = MediaDownloadIntegrationFixture.ACCOUNT,
+                groupIdHex = MediaDownloadIntegrationFixture.GROUP,
+                navigationGeneration = 1L,
+            ),
+        )
         assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
-        composeRule.waitUntil(10_000) { fixture.calls.size == 1 }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.calls.size == 1
+        }
         composeRule.runOnIdle {
             assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
             fixture.calls.single().succeed(imageBytes())
         }
-        composeRule.waitUntil(10_000) { !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0) }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
+        }
         awaitLoaded()
     }
 
@@ -169,7 +183,10 @@ class MediaImageBubbleLatencyTest {
     fun unrelatedRemovalCannotStrandAnOriginalLoad() {
         enableAutomaticImages()
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
-        composeRule.waitUntil(10_000) { fixture.calls.size == 1 }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.calls.size == 1
+        }
         composeRule.runOnIdle {
             fixture.state.removeMediaMemoryCacheEntry(request(1).cacheKey())
             fixture.calls.single().succeed(imageBytes())
