@@ -202,6 +202,7 @@ internal fun ConversationBottomBar(
                     ComposerGate.INVITE ->
                         InvitationActions(
                             inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
+                            receivingAccount = inviteReceivingAccount(appState, controller),
                             mutationInFlight = controller.mutationInFlight,
                             onAccept = {
                                 appState.launchMutation {

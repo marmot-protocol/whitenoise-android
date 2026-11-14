@@ -277,6 +277,7 @@
     <string name="discard_failed_message">Descartar mensaje fallido</string>
     <string name="decline">Rechazar</string>
     <string name="accept">Aceptar</string>
+    <string name="invited_as_account">Cuenta invitada: %1$s</string>
     <string name="invited_to_chat_by">Invitado al chat por %1$s</string>
     <string name="someone">Alguien</string>
     <string name="invitation_pending">Invitación pendiente</string>

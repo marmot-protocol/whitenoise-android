@@ -301,6 +301,7 @@
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
+    <string name="invited_as_account">Приглашённый аккаунт: %1$s</string>
     <string name="invited_to_chat_by">Приглашение в чат от %1$s</string>
     <string name="someone">Кто-то</string>
     <string name="invitation_pending">Приглашение ожидает ответа</string>
