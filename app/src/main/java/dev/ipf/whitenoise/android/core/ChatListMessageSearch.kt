@@ -238,13 +238,8 @@ data class MessageSearchConstraints(
      * date, and the bound keeps the millisecond product from wrapping into a selected range.
      */
     private fun GlobalSearchEpochBounds.containsUnixSeconds(seconds: ULong): Boolean {
-        if (seconds > IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return false
-        val millis = seconds.toLong() * MILLIS_PER_SECOND
+        val millis = IdentityFormatter.epochMillis(seconds) ?: return false
         return millis >= startEpochMillisInclusive && millis < endEpochMillisExclusive
-    }
-
-    private companion object {
-        const val MILLIS_PER_SECOND = 1000L
     }
 }
 

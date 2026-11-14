@@ -20816,6 +20816,14 @@
         ]
       },
       {
+        "surface": "string:toast_wipe_outcome_unconfirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_wipe_outcome_unconfirmed",
+        "test_ids": [
+          "ACC-009"
+        ]
+      },
+      {
         "surface": "string:toast_signed_out_relay_cleanup_incomplete",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "R.string.toast_signed_out_relay_cleanup_incomplete",

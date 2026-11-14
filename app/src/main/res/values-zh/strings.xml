@@ -944,6 +944,7 @@
     <string name="private_key">私钥</string>
     <string name="profile_public_key_help">分享此密钥，让他人能找到并联系你。</string>
     <string name="profile_private_key_help">请保密。拥有它的人可控制你的个人资料，且无法找回。</string>
+    <string name="profile_private_key_use_help">用它以相同身份和公钥登录其他 Nostr 应用。只将它交给你信任能保管它的应用，或将它保存在 Amber 等签名器应用中，由签名器为其他应用签名，而不向它们提供私钥。</string>
     <string name="public_key_copied">公钥已复制</string>
     <string name="private_key_revealed">私钥已显示。使用“复制”获取。</string>
     <string name="private_key_hidden">私钥已隐藏</string>
@@ -2607,4 +2608,5 @@
     <string name="android_notification_settings">Android 通知设置</string>
     <string name="settings_help_support">帮助和支持</string>
     <string name="settings_voice_language">语音和语言</string>
+    <string name="toast_wipe_outcome_unconfirmed">无法确认清除结果。请先检查你的账户，然后再继续。</string>
 </resources>

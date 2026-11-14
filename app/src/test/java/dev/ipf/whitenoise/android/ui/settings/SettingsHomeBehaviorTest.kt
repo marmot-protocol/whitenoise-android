@@ -1,9 +1,12 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasTestTag
@@ -16,6 +19,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.AppRevision
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -45,6 +50,43 @@ class SettingsHomeBehaviorTest {
     private var appUpdateCount = 0
     private var backCount = 0
     private var searchOpenCount = 0
+
+    @Test
+    fun versionFooterCopiesInstalledBuildIdentity() {
+        mount(profileCount = 1)
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("settings.version_footer"))
+        composeRule
+            .onNodeWithTag("settings.version_footer")
+            .assertTextEquals("Version 2026.9.11")
+            .assertHasClickAction()
+            .assert(
+                androidx.compose.ui.test.SemanticsMatcher.expectValue(
+                    androidx.compose.ui.semantics.SemanticsProperties.Role,
+                    androidx.compose.ui.semantics.Role.Button,
+                ),
+            ).performClick()
+        composeRule.runOnIdle {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            assertEquals(
+                buildIdentity("2026.9.11", BuildConfig.VERSION_CODE, AppRevision.FULL_SHA, AppRevision.SOURCE_PR),
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    ?.toString(),
+            )
+        }
+    }
+
+    @Test
+    @Config(sdk = [32])
+    fun versionFooterShowsCopiedFeedbackBeforeAndroid13() {
+        versionFooterCopiesInstalledBuildIdentity()
+        assertEquals(
+            context.getString(R.string.copied),
+            org.robolectric.shadows.ShadowToast
+                .getTextOfLatestToast(),
+        )
+    }
 
     @Test fun searchToolbarActionIsAccessibleAndOpensOnlySearch() {
         mount(profileCount = 1)

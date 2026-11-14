@@ -961,6 +961,7 @@
     <string name="private_key">Clave privada</string>
     <string name="profile_public_key_help">Compártela para que otros te encuentren y se conecten contigo.</string>
     <string name="profile_private_key_help">Mantenla en secreto. Quien la tenga controla tu perfil y no se puede recuperar.</string>
+    <string name="profile_private_key_use_help">Úsala para iniciar sesión en otras apps de Nostr con la misma identidad y clave pública. Entrégala solo a apps en las que confíes para guardarla, o consérvala en una app de firma como Amber, que firma para otras apps sin entregarles la clave.</string>
     <string name="public_key_copied">Clave pública copiada</string>
     <string name="private_key_revealed">Clave privada visible. Usa Copiar para obtenerla.</string>
     <string name="private_key_hidden">Clave privada oculta</string>
@@ -2653,4 +2654,5 @@
     <string name="android_notification_settings">Ajustes de notificaciones de Android</string>
     <string name="settings_help_support">Ayuda y soporte</string>
     <string name="settings_voice_language">Voz e idioma</string>
+    <string name="toast_wipe_outcome_unconfirmed">No se pudo confirmar el resultado del borrado. Revisa tus cuentas antes de continuar.</string>
 </resources>

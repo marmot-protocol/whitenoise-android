@@ -20,7 +20,8 @@ def device_replies(qemu="1", packages=(runner.APP, runner.APP + ".test"), sdk="3
             ("shell", "pm", "list", "packages", runner.APP): listed}
 
 
-def run_scripted(passed=True, sdk="34", instrument_error=None, cleanup_error=None):
+def run_scripted(passed=True, sdk="34", instrument_error=None, cleanup_error=None,
+                 instrument_output="OK (1 test)"):
     """Runs the runner against a scripted emulator and fixture, optionally failing the instrumentation or the reverse
     cleanup, and returns the written report, every adb command and whether the run raised."""
     replies = device_replies(sdk=sdk)
@@ -35,7 +36,7 @@ def run_scripted(passed=True, sdk="34", instrument_error=None, cleanup_error=Non
 
     instrumented = (mock.patch.object(runner, "instrument", side_effect=instrument_error)
                     if instrument_error is not None
-                    else mock.patch.object(runner, "instrument", return_value="OK (1 test)"))
+                    else mock.patch.object(runner, "instrument", return_value=instrument_output))
 
     server = mock.MagicMock(server_port=4001)
     server.ledger.snapshot.return_value = []
@@ -124,6 +125,30 @@ class VideoMetadataRunnerTest(unittest.TestCase):
                 report, commands, raised = run_scripted(instrument_error=error)
                 self.assertFalse(report["qualified"])
                 self.assertEqual(type(error).__name__, report["failure_class"])
+                self.assertTrue(raised)
+                self.assertIn(("reverse", "--remove", "tcp:4001"), commands)
+                self.assertIn(("reverse", "--remove", "tcp:4002"), commands)
+
+    def test_failed_instrumentation_retains_only_closed_diagnostics(self):
+        """JUnit failure and failed/timeout adb output retain source lines without private messages or frames."""
+        transcript = (
+            "INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: content://private/account "
+            "https://private/?key=secret npub1private nsec1private\n"
+            "    at dev.ipf.whitenoise.android.ui.conversation.media.VideoMetadataFixtureDeviceTest"
+            "$send$2.invokeSuspend(VideoMetadataFixtureDeviceTest.kt:245)\n"
+            "    at private.Account.read(Private.kt:321)\n"
+            "INSTRUMENTATION_STATUS_CODE: -2\nINSTRUMENTATION_CODE: -1\n"
+        )
+        for error in (None, subprocess.CalledProcessError(1, ["adb"], output=transcript),
+                      subprocess.TimeoutExpired(["adb"], 1200, output=transcript.encode())):
+            with self.subTest(error=type(error).__name__):
+                report, commands, raised = run_scripted(instrument_error=error, instrument_output=transcript)
+                self.assertEqual({"kind": "assertion", "exception_class": "java.lang.AssertionError",
+                                  "fixture_lines": [245], "status_codes": [-2, -1]},
+                                 report["instrumentation_failure"])
+                self.assertNotIn("private", json.dumps(report))
+                self.assertNotIn("secret", json.dumps(report))
+                self.assertFalse(report["qualified"])
                 self.assertTrue(raised)
                 self.assertIn(("reverse", "--remove", "tcp:4001"), commands)
                 self.assertIn(("reverse", "--remove", "tcp:4002"), commands)

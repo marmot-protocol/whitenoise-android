@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -38,8 +37,7 @@ fun formatExactTimestamp(
     locale: Locale,
 ): String {
     if (recordedAtSeconds == 0uL) return ""
-    if (recordedAtSeconds > IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return ""
-    val instant = Instant.ofEpochSecond(recordedAtSeconds.toLong())
+    val instant = IdentityFormatter.instant(recordedAtSeconds) ?: return ""
     val formatter =
         DateTimeFormatter
             .ofLocalizedDateTime(FormatStyle.LONG, FormatStyle.LONG)

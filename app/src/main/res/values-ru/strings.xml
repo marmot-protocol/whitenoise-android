@@ -999,6 +999,7 @@
     <string name="private_key">Закрытый ключ</string>
     <string name="profile_public_key_help">Поделитесь, чтобы люди могли вас найти и связаться с вами.</string>
     <string name="profile_private_key_help">Держите её в секрете. Тот, у кого она есть, управляет вашим профилем, а восстановить её нельзя.</string>
+    <string name="profile_private_key_use_help">Используйте его для входа в другие приложения Nostr с той же личностью и открытым ключом. Передавайте его только приложениям, которым доверяете его хранение, или храните в приложении-подписанте, например Amber: оно подписывает для других приложений, не передавая им ключ.</string>
     <string name="public_key_copied">Открытый ключ скопирован.</string>
     <string name="private_key_revealed">Закрытый ключ показан. Используйте «Копировать», чтобы получить его.</string>
     <string name="private_key_hidden">Закрытый ключ скрыт</string>
@@ -2734,4 +2735,5 @@
     <string name="android_notification_settings">Настройки уведомлений Android</string>
     <string name="settings_help_support">Помощь и поддержка</string>
     <string name="settings_voice_language">Голос и язык</string>
+    <string name="toast_wipe_outcome_unconfirmed">Не удалось подтвердить результат удаления. Проверьте свои аккаунты, прежде чем продолжить.</string>
 </resources>

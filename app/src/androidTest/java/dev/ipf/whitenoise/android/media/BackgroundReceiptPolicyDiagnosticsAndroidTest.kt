@@ -59,6 +59,46 @@ class BackgroundReceiptPolicyDiagnosticsAndroidTest {
             }
         }
 
+    /** Association completion and exhausted shared budgets remain distinct, without exporting failures. */
+    @Test
+    fun wifiAssociationReportsCompletionAndOriginalFailure() {
+        var now = 100L
+        val reports = mutableListOf<JSONObject>()
+        val result =
+            traceBackgroundReceiptWifiAssociation(500L, { reports += it }, { now }) {
+                now = 300L
+                42
+            }
+        assertEquals(42, result)
+        assertEquals(listOf("entry", "complete"), reports.map { it.getString("event") })
+        assertEquals(200L, reports.last().getLong("elapsed_ms"))
+        assertEquals(200L, reports.last().getLong("remaining_budget_ms"))
+        reports.clear()
+        val original = AssertionError("private-ssid")
+        val failure =
+            runCatching {
+                traceBackgroundReceiptWifiAssociation(500L, { reports += it }, { now }) {
+                    now = 550L
+                    throw original
+                }
+            }.exceptionOrNull()
+        assertSame(original, failure)
+        assertEquals("failed", reports.last().getString("event"))
+        assertEquals(250L, reports.last().getLong("elapsed_ms"))
+        assertEquals(0L, reports.last().getLong("remaining_budget_ms"))
+        reports.forEach {
+            assertEquals(4, it.length())
+            assertFalse(it.toString().contains("private"))
+        }
+        assertEquals(7, traceBackgroundReceiptWifiAssociation(600L, { error("report failed") }, { now }) { 7 })
+        assertSame(
+            original,
+            runCatching {
+                traceBackgroundReceiptWifiAssociation(600L, { error("report failed") }, { now }) { throw original }
+            }.exceptionOrNull(),
+        )
+    }
+
     /** A successful wait returns its result without invoking the snapshot or reporter. */
     @Test
     fun successfulWaitDoesNotCollectDiagnostics() =

@@ -289,8 +289,7 @@ object IdentityFormatter {
         timeStyle: FormatStyle? = FormatStyle.SHORT,
         withoutYear: Boolean = false,
     ): String {
-        if (epochSeconds == 0uL || epochSeconds > MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return ""
-        val instant = Instant.ofEpochSecond(epochSeconds.toLong())
+        val instant = epochSeconds.takeIf { it != 0uL }?.let { instant(it) } ?: return ""
         return dateTime(instant, locale, zone, display, dateStyle, timeStyle, withoutYear)
     }
 
@@ -300,10 +299,9 @@ object IdentityFormatter {
         zone: ZoneId = ZoneId.systemDefault(),
         now: Instant = Instant.now(),
     ): Boolean =
-        epochSeconds <= MAX_DISPLAYABLE_EPOCH_SECONDS.toULong() &&
-            runCatching {
-                Instant.ofEpochSecond(epochSeconds.toLong()).atZone(zone).year == now.atZone(zone).year
-            }.getOrDefault(false)
+        instant(epochSeconds)?.let { instant ->
+            runCatching { instant.atZone(zone).year == now.atZone(zone).year }.getOrDefault(false)
+        } ?: false
 
     /**
      * The calendar day an untrusted epoch-second stamp falls on in [zone], or null past
@@ -312,20 +310,23 @@ object IdentityFormatter {
     fun localDate(
         epochSeconds: ULong,
         zone: ZoneId = ZoneId.systemDefault(),
-    ): LocalDate? =
-        if (epochSeconds > MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) {
-            null
-        } else {
-            Instant.ofEpochSecond(epochSeconds.toLong()).atZone(zone).toLocalDate()
-        }
+    ): LocalDate? = instant(epochSeconds)?.atZone(zone)?.toLocalDate()
+
+    /** Bounded received seconds, preserving zero for consumers that treat it as a valid epoch. */
+    fun instant(epochSeconds: ULong): Instant? =
+        epochSeconds
+            .takeIf { it <= MAX_DISPLAYABLE_EPOCH_SECONDS.toULong() }
+            ?.let { Instant.ofEpochSecond(it.toLong()) }
+
+    /** Milliseconds for display/filter consumers, or null for an unknown date. */
+    fun epochMillis(epochSeconds: ULong): Long? = instant(epochSeconds)?.toEpochMilli()
 
     /** [localDate], with stamps past that bound placed on its day in [zone] so grouping stays total and ordered. */
     fun clampedLocalDate(
         epochSeconds: ULong,
         zone: ZoneId = ZoneId.systemDefault(),
     ): LocalDate =
-        Instant
-            .ofEpochSecond(epochSeconds.coerceAtMost(MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()).toLong())
+        instant(epochSeconds.coerceAtMost(MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()))!!
             .atZone(zone)
             .toLocalDate()
 

@@ -1345,6 +1345,7 @@
     <string name="private_key">Private key</string>
     <string name="profile_public_key_help">Share this so people can find and connect with you.</string>
     <string name="profile_private_key_help">Keep it private. Anyone with it controls your profile, and it can’t be recovered.</string>
+    <string name="profile_private_key_use_help">Use it to sign in to other Nostr apps as the same identity, with the same public key. Give it only to apps you trust to hold it, or keep it in a signer app like Amber, which signs for other apps without handing them the key.</string>
     <string name="public_key_copied">Public key copied</string>
     <string name="private_key_revealed">Private key revealed. Use Copy to retrieve it.</string>
     <string name="private_key_hidden">Private key hidden</string>
@@ -2831,4 +2832,5 @@
     <string name="time_format_24_hour">24-hour</string>
     <string name="date_time_format_help">Automatic follows the app language and your region.</string>
     <string name="settings_search_alias_date_time_format">time format|date format|clock|12-hour|24-hour|AM/PM</string>
+    <string name="toast_wipe_outcome_unconfirmed">The wipe result could not be confirmed. Check your accounts before continuing.</string>
 </resources>

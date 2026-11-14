@@ -13,16 +13,17 @@ isolated measurement identity in place first.
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 import threading
 import time
 
 from apk_physical_runner import IDENTITY, PHYSICAL_PROFILE, installed_identity
 from budget_checker import PROFILES
-from device_runner import APP, adb_command
+from device_runner import APP, DIAGNOSTIC_EXCEPTIONS, adb_command, subprocess_text
 from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
-from media_lifecycle_runner import metrics_of, passed
+from media_lifecycle_runner import failure_kind, metrics_of, passed
 from video_metadata_checker import SCOPE, check_video_metadata
 
 TEST = ("dev.ipf.whitenoise.android.ui.conversation.media.VideoMetadataFixtureDeviceTest"
@@ -54,6 +55,24 @@ def instrument(adb, serial, ports):
                           timeout=INSTRUMENT_TIMEOUT_SECONDS).stdout
 
 
+def failure_diagnostics(output):
+    """Keep closed failure categories, status codes and fixture source positions, never raw stack messages."""
+    output = subprocess_text(output)
+    frames = re.findall(
+        r"^\s*at dev\.ipf\.whitenoise\.android\.ui\.conversation\.media\."
+        r"VideoMetadataFixtureDeviceTest(?:\$[\w$]+)?\.[\w$]+"
+        r"\(VideoMetadataFixtureDeviceTest\.kt:(\d{1,5})\)$", output, re.MULTILINE,
+    )
+    codes = re.findall(r"^INSTRUMENTATION_(?:STATUS_CODE|CODE): (-?[0-9]{1,3})$", output, re.MULTILINE)
+    header = re.search(r"^INSTRUMENTATION_STATUS: stack=([\w.$]+)(?=[:\s]|$)", output, re.MULTILINE)
+    allowed = DIAGNOSTIC_EXCEPTIONS + ("java.lang.AssertionError", "java.util.concurrent.TimeoutException",
+                                       "kotlinx.coroutines.TimeoutCancellationException")
+    exception = header.group(1) if header and header.group(1) in allowed else "unknown"
+    return {"kind": failure_kind(output), "exception_class": exception,
+            "fixture_lines": sorted({int(line) for line in frames})[:6],
+            "status_codes": [int(code) for code in codes[-6:]]}
+
+
 def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
     """Refuse any device this run may not use, run the fixture once and write a redacted, checked report."""
     verify_device(adb, serial, budget_profile)
@@ -64,6 +83,7 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
               "deferred": list(DEFERRED)}
     start = len(server.ledger.snapshot())
     forwards, threads, started, failure = [], [], [], None
+    stage = "setup"
     try:
         for service in (server, relay):
             thread = threading.Thread(target=service.serve_forever, daemon=True)
@@ -74,9 +94,13 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         for port in ports:
             adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{port}")
             forwards.append(port)
+        stage = "instrumentation"
         output_text = instrument(adb, serial, ports)
         report["metrics"] = metrics_of(output_text)
         report["instrumentation_passed"] = passed(output_text)
+        if not report["instrumentation_passed"]:
+            report["instrumentation_failure"] = failure_diagnostics(output_text)
+        stage = "environment"
         report["environment"] = {
             "api": adb_command(adb, serial, "shell", "getprop", "ro.build.version.sdk").strip(),
             "abi": adb_command(adb, serial, "shell", "getprop", "ro.product.cpu.abi").strip(),
@@ -84,6 +108,8 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
     except (subprocess.SubprocessError, OSError, ValueError) as error:
         failure = error
         report["failure_class"] = type(error).__name__
+        if stage == "instrumentation" and isinstance(error, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
+            report["instrumentation_failure"] = failure_diagnostics(getattr(error, "stdout", None))
     finally:
         # Failed and partial attempts stay in the ledger, and nothing is reset.
         time.sleep(0.5)

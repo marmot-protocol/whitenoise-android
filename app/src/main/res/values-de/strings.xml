@@ -959,6 +959,7 @@
     <string name="private_key">Privater Schlüssel</string>
     <string name="profile_public_key_help">Teile ihn, damit andere dich finden und sich mit dir verbinden können.</string>
     <string name="profile_private_key_help">Halte ihn geheim. Wer ihn hat, steuert dein Profil, und er lässt sich nicht wiederherstellen.</string>
+    <string name="profile_private_key_use_help">Melde dich damit in anderen Nostr-Apps mit derselben Identität und demselben öffentlichen Schlüssel an. Gib ihn nur Apps, denen du ihn anvertrauen möchtest, oder bewahre ihn in einer Signer-App wie Amber auf, die für andere Apps signiert, ohne ihnen den Schlüssel zu geben.</string>
     <string name="public_key_copied">Öffentlicher Schlüssel kopiert</string>
     <string name="private_key_revealed">Privater Schlüssel sichtbar. Kopiere ihn mit „Kopieren“.</string>
     <string name="private_key_hidden">Privater Schlüssel verborgen</string>
@@ -2665,4 +2666,5 @@
     <string name="android_notification_settings">Android-Benachrichtigungseinstellungen</string>
     <string name="settings_help_support">Hilfe &amp; Support</string>
     <string name="settings_voice_language">Sprache &amp; Stimme</string>
+    <string name="toast_wipe_outcome_unconfirmed">Das Ergebnis der Löschung konnte nicht bestätigt werden. Prüfe deine Konten, bevor du fortfährst.</string>
 </resources>
