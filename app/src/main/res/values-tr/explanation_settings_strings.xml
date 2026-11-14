@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="explanation_account_keys_copy_private">Özel anahtarını hassas olarak işaretleyip panoya kopyalar. Ona sahip olan profilini yönetir; yalnızca güvendiğin yere yapıştır.</string>
+    <string name="explanation_account_keys_public_key">Açık anahtarın bu profili tanımlar. Başkaları seni bulmak, sohbet başlatmak ve gruplara eklemek için onu kullanır; paylaşmak güvenlidir. Onunla mesajların okunamaz ve senin yerine giriş yapılamaz.</string>
+    <string name="explanation_account_keys_private_key">Özel anahtarın bu profilin sen olduğunu kanıtlar. Ona sahip olan herkes senin yerine giriş yapıp paylaşım yapabilir ve anahtar değiştirilemez ya da sıfırlanamaz. Sen göstermeyi seçene kadar gizli kalır; güvenli bir yedeğini sakla.</string>
     <string name="explanation_account_keys_export_encrypted">Özel anahtarını seçtiğin bir dosyaya, belirlediğin bir parolayla korunmuş olarak kaydeder. Dosyayı açmak için bu parola gerekir.</string>
     <string name="explanation_account_keys_export_raw">Özel anahtarını bir uyarının ardından düz metin olarak seçtiğin bir uygulamayla paylaşır. Şifreli dışa aktarma daha güvenlidir.</string>
     <string name="explanation_account_keys_reveal">Özel anahtarını bu ekranda gösterir veya gizler. Kopyalanmaz ya da paylaşılmaz.</string>

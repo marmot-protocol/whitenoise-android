@@ -538,7 +538,15 @@ private fun ProfileKeysList(
                     ProfileKeyValueRow(
                         context = context,
                         value = npub,
-                        valueModifier = Modifier.testTag("profile_keys.public_key_value"),
+                        valueModifier =
+                            Modifier
+                                .testTag("profile_keys.public_key_value")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.public_key),
+                                        stringResource(R.string.explanation_account_keys_public_key),
+                                    ),
+                                ),
                         fullPublicKey = true,
                     ) {
                         val copied = ui.copiedKey == CopiedProfileKey.Public
@@ -684,7 +692,12 @@ private fun PrivateKeyValueRow(
         valueModifier =
             Modifier
                 .testTag("profile_keys.private_key_value")
-                .clearAndSetSemantics { contentDescription = stateDescription },
+                .explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.private_key),
+                        stringResource(R.string.explanation_account_keys_private_key),
+                    ),
+                ).clearAndSetSemantics { contentDescription = stateDescription },
     ) {
         val revealLabel = stringResource(if (revealed) R.string.hide_private_key else R.string.show_private_key)
         IconButton(

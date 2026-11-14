@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="explanation_account_keys_copy_private">将您的私钥复制到剪贴板，并标记为敏感内容。拥有私钥的人可以控制您的个人资料，请只粘贴到您信任的地方。</string>
+    <string name="explanation_account_keys_public_key">您的公钥用于识别此个人资料。其他人用它来找到您、发起聊天并把您加入群组，因此可以放心分享。它不能用来读取您的消息，也不能用来以您的身份登录。</string>
+    <string name="explanation_account_keys_private_key">您的私钥证明您就是此个人资料的主人。拥有它的人可以以您的身份登录和发布内容，而且私钥无法更改或重置。在您选择显示之前它会一直隐藏；请妥善保存一份备份。</string>
     <string name="explanation_account_keys_export_encrypted">将您的私钥保存到您选择的文件中，并用您设置的密码加密。打开该文件需要此密码。</string>
     <string name="explanation_account_keys_export_raw">在显示警告后，将您的私钥以明文形式分享给您选择的应用。加密导出更安全。</string>
     <string name="explanation_account_keys_reveal">在此屏幕上显示或隐藏您的私钥，不会复制或分享。</string>

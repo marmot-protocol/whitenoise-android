@@ -2,6 +2,8 @@
 <resources>
     <!-- Hold-to-explain bodies for settings controls; titles reuse each control's own label. -->
     <string name="explanation_account_keys_copy_private">Copies your private key to the clipboard, marked as sensitive. Anyone who has it controls your profile, so paste it only where you trust.</string>
+    <string name="explanation_account_keys_public_key">Your public key identifies this profile. People use it to find you, start chats and add you to groups, so it is safe to share. It cannot be used to read your messages or sign in as you.</string>
+    <string name="explanation_account_keys_private_key">Your private key proves you are this profile. Anyone who has it can sign in and post as you, and it cannot be changed or reset. It stays hidden until you choose to show it; keep a safe backup.</string>
     <string name="explanation_account_keys_export_encrypted">Saves your private key to a file you choose, locked with a password you set. You need that password to open the file.</string>
     <string name="explanation_account_keys_export_raw">Shares your private key as plain text with an app you choose, after a warning. The encrypted export is safer.</string>
     <string name="explanation_account_keys_reveal">Shows or hides your private key on this screen. It does not copy or share it.</string>

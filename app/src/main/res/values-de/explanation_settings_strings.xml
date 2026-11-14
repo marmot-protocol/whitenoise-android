@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="explanation_account_keys_copy_private">Kopiert deinen privaten Schlüssel als sensibel markiert in die Zwischenablage. Wer ihn hat, kontrolliert dein Profil – füge ihn nur dort ein, wo du vertraust.</string>
+    <string name="explanation_account_keys_public_key">Dein öffentlicher Schlüssel kennzeichnet dieses Profil. Andere nutzen ihn, um dich zu finden, Chats zu starten und dich zu Gruppen hinzuzufügen – du kannst ihn bedenkenlos teilen. Mit ihm kann niemand deine Nachrichten lesen oder sich als du anmelden.</string>
+    <string name="explanation_account_keys_private_key">Dein privater Schlüssel beweist, dass du dieses Profil bist. Wer ihn hat, kann sich als du anmelden und in deinem Namen posten, und er lässt sich weder ändern noch zurücksetzen. Er bleibt verborgen, bis du ihn anzeigst; bewahre eine sichere Sicherung auf.</string>
     <string name="explanation_account_keys_export_encrypted">Speichert deinen privaten Schlüssel in einer Datei deiner Wahl, geschützt durch ein Passwort, das du festlegst. Ohne dieses Passwort lässt sich die Datei nicht öffnen.</string>
     <string name="explanation_account_keys_export_raw">Teilt deinen privaten Schlüssel nach einer Warnung als Klartext mit einer App deiner Wahl. Der verschlüsselte Export ist sicherer.</string>
     <string name="explanation_account_keys_reveal">Zeigt deinen privaten Schlüssel auf diesem Bildschirm an oder blendet ihn aus. Er wird weder kopiert noch geteilt.</string>

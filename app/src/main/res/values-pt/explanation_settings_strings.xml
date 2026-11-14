@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="explanation_account_keys_copy_private">Copia sua chave privada para a área de transferência, marcada como sensível. Quem a tiver controla seu perfil, então cole apenas onde confiar.</string>
+    <string name="explanation_account_keys_public_key">Sua chave pública identifica este perfil. As pessoas a usam para encontrar você, iniciar conversas e adicionar você a grupos, então é seguro compartilhá-la. Ela não permite ler suas mensagens nem entrar como você.</string>
+    <string name="explanation_account_keys_private_key">Sua chave privada comprova que você é este perfil. Quem a tiver pode entrar e publicar como você, e ela não pode ser alterada nem redefinida. Ela fica oculta até você escolher mostrá-la; guarde um backup seguro.</string>
     <string name="explanation_account_keys_export_encrypted">Salva sua chave privada em um arquivo que você escolher, protegido por uma senha definida por você. Essa senha é necessária para abrir o arquivo.</string>
     <string name="explanation_account_keys_export_raw">Compartilha sua chave privada como texto simples com um app que você escolher, após um aviso. A exportação criptografada é mais segura.</string>
     <string name="explanation_account_keys_reveal">Mostra ou oculta sua chave privada nesta tela. Ela não é copiada nem compartilhada.</string>

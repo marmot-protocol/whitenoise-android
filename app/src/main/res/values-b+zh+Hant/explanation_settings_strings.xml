@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="explanation_account_keys_copy_private">將您的私鑰複製到剪貼簿，並標記為敏感內容。擁有私鑰的人可以控制您的個人檔案，請只貼到您信任的地方。</string>
+    <string name="explanation_account_keys_public_key">您的公鑰用於識別此個人檔案。其他人用它來找到您、發起聊天並把您加入群組，因此可以放心分享。它不能用來讀取您的訊息，也不能用來以您的身分登入。</string>
+    <string name="explanation_account_keys_private_key">您的私鑰證明您就是此個人檔案的主人。擁有它的人可以以您的身分登入和發布內容，而且私鑰無法變更或重設。在您選擇顯示之前它會一直隱藏；請妥善保存一份備份。</string>
     <string name="explanation_account_keys_export_encrypted">將您的私鑰儲存到您選擇的檔案中，並用您設定的密碼加密。開啟該檔案需要此密碼。</string>
     <string name="explanation_account_keys_export_raw">在顯示警告後，將您的私鑰以純文字形式分享給您選擇的應用程式。加密匯出更安全。</string>
     <string name="explanation_account_keys_reveal">在此畫面上顯示或隱藏您的私鑰，不會複製或分享。</string>

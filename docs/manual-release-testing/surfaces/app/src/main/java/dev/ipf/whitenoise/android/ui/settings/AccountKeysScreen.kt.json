@@ -188,6 +188,22 @@
         ]
       },
       {
+        "surface": "Account keys hold-to-explain: public key value",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_public_key",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
+        "surface": "Account keys hold-to-explain: private key value",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.explanation_account_keys_private_key",
+        "test_ids": [
+          "ACC-023"
+        ]
+      },
+      {
         "surface": "Account keys hold-to-explain: reveal key",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "R.string.explanation_account_keys_reveal",

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="explanation_account_keys_copy_private">Copia la tua chiave privata negli appunti, contrassegnata come sensibile. Chi la possiede controlla il tuo profilo, quindi incollala solo dove ti fidi.</string>
+    <string name="explanation_account_keys_public_key">La tua chiave pubblica identifica questo profilo. Gli altri la usano per trovarti, avviare chat e aggiungerti ai gruppi, quindi puoi condividerla senza rischi. Non permette di leggere i tuoi messaggi né di accedere al tuo posto.</string>
+    <string name="explanation_account_keys_private_key">La tua chiave privata dimostra che sei questo profilo. Chi la possiede può accedere e pubblicare al tuo posto, e non può essere cambiata né reimpostata. Resta nascosta finché non scegli di mostrarla; conservane un backup sicuro.</string>
     <string name="explanation_account_keys_export_encrypted">Salva la tua chiave privata in un file a tua scelta, protetto da una password che imposti tu. Serve quella password per aprire il file.</string>
     <string name="explanation_account_keys_export_raw">Condivide la tua chiave privata come testo in chiaro con un’app a tua scelta, dopo un avviso. L’esportazione cifrata è più sicura.</string>
     <string name="explanation_account_keys_reveal">Mostra o nasconde la tua chiave privata in questa schermata. Non viene copiata né condivisa.</string>
