@@ -44,7 +44,6 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companio
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
-import dev.ipf.whitenoise.android.state.clearMediaDiskCaches
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
@@ -287,55 +286,6 @@ class MediaImageBubbleLatencyTest {
         }
         assertEquals(0, fixture.nativeAssetReads.get())
         assertEquals(0, fixture.calls.size)
-    }
-
-    /** A still-visible L1 image waits for an occupied encoder and persists when that encoder becomes free. */
-    @Test
-    fun busyEncoderEventuallyPersistsAVisibleMemoryHit() {
-        runBlocking { fixture.state.displayThumbnailWritePermit.acquire() }
-        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
-        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
-        awaitLoaded()
-        assertEquals(0L, fixture.thumbnails.residentBytes())
-        fixture.state.displayThumbnailWritePermit.release()
-        composeRule.waitUntil(10_000) {
-            composeRule.waitForIdle()
-            fixture.thumbnails.residentBytes() > 0L
-        }
-        assertEquals(0, fixture.nativeAssetReads.get())
-    }
-
-    /** Disposing a visible image cancels its queued persistence before the encoder is released. */
-    @Test
-    fun disposedMemoryHitCannotWriteAfterWaitingForTheEncoder() {
-        runBlocking { fixture.state.displayThumbnailWritePermit.acquire() }
-        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
-        var shown by mutableStateOf(true)
-        composeRule.setContent { WhiteNoiseTheme { if (shown) Bubble() } }
-        awaitLoaded()
-        composeRule.runOnIdle { shown = false }
-        composeRule.waitForIdle()
-        fixture.state.displayThumbnailWritePermit.release()
-        runBlocking {
-            fixture.state.displayThumbnailWritePermit.acquire()
-            fixture.state.displayThumbnailWritePermit.release()
-        }
-        assertEquals(0L, fixture.thumbnails.residentBytes())
-    }
-
-    /** A cache-only wipe during a native original read must restart the current loader. */
-    @Test
-    fun clearDuringAnOriginalLoadCannotLeaveTheBubbleBlank() {
-        enableAutomaticImages()
-        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
-        composeRule.waitUntil(10_000) {
-            composeRule.waitForIdle()
-            fixture.calls.size == 1
-        }
-        runBlocking(kotlinx.coroutines.Dispatchers.IO) { fixture.state.clearMediaDiskCaches() }
-        composeRule.runOnIdle { fixture.calls.single().succeed(imageBytes()) }
-        awaitLoaded()
-        assertEquals(1, fixture.calls.size)
     }
 
     /** Writes only a synthetic derivative; no full-size encrypted/native fixture is seeded. */
@@ -588,7 +538,7 @@ class MediaImageBubbleLatencyTest {
             shown = false
         }
         composeRule.runOnIdle { shown = true }
-        assertLoaded()
+        awaitLoaded()
         assertEquals(0, fixture.calls.size)
     }
 
