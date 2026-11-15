@@ -29,6 +29,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.espresso.Espresso
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -154,6 +155,9 @@ class DetailRouteMotionScreenshotTest {
     /** The real protected Members route shares the same measured host as other details children. */
     @Test fun membersAmoled() = capture("members_amoled", dark = true, amoled = true, membersRoute = true)
 
+    @Test fun conversationInterruptedAmoled() =
+        capture("conversation_amoled", dark = true, amoled = true, interruptEntry = true)
+
     /** The composer unfolds into composer settings and Back folds them into it, on the AMOLED theme. */
     @Test fun composerAmoled() = captureComposer("composer_amoled", dark = true, amoled = true)
 
@@ -202,6 +206,7 @@ class DetailRouteMotionScreenshotTest {
         sharedContent: Boolean = false,
         populatedSharedContent: Boolean = false,
         longRoster: Boolean = false,
+        interruptEntry: Boolean = false,
     ) {
         if (!profile) NotificationChannels.ensureChannels(app)
         val state =
@@ -323,6 +328,7 @@ class DetailRouteMotionScreenshotTest {
         }
         rule.waitForIdle()
         if (composer) return captureComposerRoute(name)
+        if (interruptEntry) return captureInterruptedEntry(name)
         if (sharedContent) return captureSharedContentCategories(populatedSharedContent)
         var retainedMemberBounds: androidx.compose.ui.geometry.Rect? = null
         repeat(if (captureFrames || profile) 3 else 1) { cycle ->
@@ -693,6 +699,23 @@ class DetailRouteMotionScreenshotTest {
     }
 
     /** Diagnostic frame sets are opt-in; only the three registered goldens participate in CI verification. */
+    /** Back while the composer is still unfolding folds the half-grown details cards back into it. */
+    private fun captureInterruptedEntry(name: String) {
+        val back = "${name}_interrupted_entry_back"
+        rule.mainClock.autoAdvance = false
+        rule.onNode(opensDetails()).performClick()
+        rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS / 3L)
+        captureSource(back, profile = false)
+        Espresso.pressBack()
+        rule.mainClock.advanceTimeByFrame()
+        captureTransition(back, profile = false)
+        rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS.toLong())
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        rule.onNode(opensDetails()).assertExists()
+        rule.onNodeWithText(app.getString(R.string.sounds_and_notifications)).assertDoesNotExist()
+    }
+
     private fun captureSource(
         name: String,
         profile: Boolean,
@@ -735,19 +758,21 @@ class DetailRouteMotionScreenshotTest {
         val frames = if (captureFrames) File("build/detail-route-motion/$name").apply { mkdirs() } else null
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
+        // Composer settings and the details route both grow out of the composer outline. Only AMOLED
+        // cards draw outlines, so only there do the details cards visibly fold back into it, as in Settings.
+        val outlined = !name.contains("_light") && !name.contains("_dark")
+        val morphs =
+            profile || name.startsWith("composer_") || name.endsWith("_entry") ||
+                (outlined && name.endsWith("_entry_back"))
         // Ordinary checks retain their timing; private exports include settled frames after preparation.
         for (frame in 0..(if (captureFrames) 31 else 22)) {
             if (captureFrames || frame in listOf(0, 6, 20)) {
                 val node = if (profile) rule.onNode(isDialog()) else rule.onRoot()
                 val bitmap = node.captureToImage().asAndroidBitmap()
-                if ((profile || name.startsWith("composer_")) &&
-                    frame == 6
-                ) {
+                if (morphs && frame == 6) {
                     intermediate = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
-                if ((profile || name.startsWith("composer_")) &&
-                    frame == 20
-                ) {
+                if (morphs && frame == 20) {
                     settled = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
                 exportTransitionFrame(frames, name, frame, bitmap)
@@ -762,7 +787,7 @@ class DetailRouteMotionScreenshotTest {
             }
             rule.mainClock.advanceTimeBy(16)
         }
-        if (profile || name.startsWith("composer_")) {
+        if (morphs) {
             val middle = checkNotNull(intermediate)
             org.junit.Assert.assertFalse(
                 "$name must move beyond its source pixels",

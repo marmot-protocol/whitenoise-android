@@ -3850,14 +3850,13 @@ internal fun ConversationScreen(
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
     // One card morph for the transcript and both full-screen routes, so Back animates the return.
-    // The header (or composer) becomes the next route's cards and they fold back into it, the same
+    // The composer outline becomes the next route's cards and they fold back into it, the same
     // container transform as Settings. Nothing travels with the closing keyboard.
     val parentMorph = LocalSettingsCardMorph.current
     val routeMorph =
         remember(controller, appState.runtimeGeneration, parentMorph) {
-            // Composer settings survive recreation, so their Back must still fold into the pill.
             SettingsCardMorph(fullScreen = true, parent = parentMorph).apply {
-                anchor = if (showComposerSettings) ConversationMorphAnchor.Composer else ConversationMorphAnchor.Details
+                anchor = ConversationMorphAnchor.Composer
             }
         }
     CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
@@ -4260,9 +4259,8 @@ internal fun ConversationScreen(
                                 freezeRoutePresentation = freezeRoutePresentation,
                                 openDetailsDescription = openDetailsDescription,
                                 onOpenDetails = {
-                                    // The keyboard starts closing as the header unfolds into the
+                                    // The keyboard starts closing as the composer unfolds into the
                                     // details cards, not after the composer leaves.
-                                    routeMorph.anchor = ConversationMorphAnchor.Details
                                     keyboardController?.hide()
                                     showDetails = true
                                 },
@@ -4278,7 +4276,6 @@ internal fun ConversationScreen(
                 CompositionLocalProvider(LocalSettingsCardMorph provides routeMorph) {
                     ConversationBottomBar(
                         onCustomizeComposer = {
-                            routeMorph.anchor = ConversationMorphAnchor.Composer
                             keyboardController?.hide()
                             showComposerSettings = true
                         },
@@ -4701,7 +4698,6 @@ internal fun ConversationScreen(
                                 EmptyGroupConversation(
                                     onAddMembers = {
                                         openAddMemberOnDetails = true
-                                        routeMorph.anchor = ConversationMorphAnchor.Details
                                         showDetails = true
                                     },
                                 )

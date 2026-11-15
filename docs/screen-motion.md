@@ -4,7 +4,7 @@ Use the existing presentation owner for each surface. Launch geometry belongs to
 
 ## Full screens
 
-For retained Settings and detail routes, use `SettingsPageMorph` through `SettingsRouteMotion` or the existing `SettingsCardMorph` page mode. Pass the actual control bounds using `rememberMeasuredControlClick` or the existing measured Settings launcher. The route owner retains the origin for Back. A later unmeasured entry must retire the earlier origin. When the source has no outlined groups, such as the chat header or composer, every destination group grows from that control's bounds at full presence.
+For retained Settings and detail routes, use `SettingsPageMorph` through `SettingsRouteMotion` or the existing `SettingsCardMorph` page mode. Pass the actual control bounds using `rememberMeasuredControlClick` or the existing measured Settings launcher. The route owner retains the origin for Back. A later unmeasured entry must retire the earlier origin. When the source has no outlined groups, such as the composer, every destination group grows from that control's bounds at full presence. Chat details and composer settings both grow from the composer outline and fold back into it.
 
 For native full-screen dialog windows, use `MeasuredPlaybackDialog`. It normalizes screen coordinates in the destination window and keeps the window mounted through user dismissal. Toolbar Back calls the surface `dismiss`; its completion removes the caller's route. Forced source/account removal remains immediate and cancels accepted terminal actions.
 
