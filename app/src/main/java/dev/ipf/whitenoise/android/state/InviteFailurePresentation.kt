@@ -30,9 +30,6 @@ internal fun inviteFailureDetail(
 ): AppText =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
-        is NoGroupMembersSelectedException ->
-            throwable.outcomes.skippedGroupMembersDetail(displayName)
-                ?: AppText.Resource(fallbackResource)
         // Only obsolete KeyPackages means the recipient must update; none at all means they still need setup.
         is MissingKeyPackage ->
             if (throwable.reason == MissingKeyPackageReasonFfi.OBSOLETE_ONLY) {
@@ -74,8 +71,17 @@ internal fun inviteFailureDetail(
         // A full disk refuses the change before anything is written; freeing space makes Retry worthwhile.
         is MarmotKitException.StorageFull -> AppText.Resource(R.string.error_storage_full)
         is MarmotKitException.EventTooLarge -> oversizedInviteDetail(throwable, fallbackResource)
-        else -> AppText.Resource(fallbackResource)
+        else -> skippedInviteFailureDetail(throwable, displayName, fallbackResource)
     }
+
+/** Resolves names only from a native report that explicitly skipped the entire selection. */
+private fun skippedInviteFailureDetail(
+    throwable: Throwable,
+    displayName: (String) -> String,
+    @StringRes fallbackResource: Int,
+): AppText =
+    (throwable as? NoGroupMembersSelectedException)?.outcomes?.skippedGroupMembersDetail(displayName)
+        ?: AppText.Resource(fallbackResource)
 
 /**
  * MDK refuses a create or invite up front when an invitee's Welcome fits none of their inbox relays, so Retry cannot

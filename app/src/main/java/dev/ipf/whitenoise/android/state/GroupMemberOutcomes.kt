@@ -6,11 +6,6 @@ import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 
-/** MDK resolved the selection without creating a group or publishing an invite. */
-internal class NoGroupMembersSelectedException(
-    val outcomes: List<MemberResolutionOutcomeFfi>,
-) : IllegalStateException("No selected recipients were available")
-
 /** Preserves typed single-recipient recovery for group creation and invites with no commit. */
 internal fun groupMemberSelectionFailure(outcomes: List<MemberResolutionOutcomeFfi>): Throwable {
     val outcome = outcomes.singleOrNull() ?: return NoGroupMembersSelectedException(outcomes)
@@ -19,7 +14,8 @@ internal fun groupMemberSelectionFailure(outcomes: List<MemberResolutionOutcomeF
             MarmotKitException.MissingKeyPackage(outcome.accountIdHex, MissingKeyPackageReasonFfi.NOT_FOUND)
         MemberResolutionStatusFfi.OBSOLETE_KEY_PACKAGE ->
             MarmotKitException.MissingKeyPackage(outcome.accountIdHex, MissingKeyPackageReasonFfi.OBSOLETE_ONLY)
-        MemberResolutionStatusFfi.MISSING_INBOX_ROUTE -> MarmotKitException.MissingMemberInboxRoute(outcome.accountIdHex)
+        MemberResolutionStatusFfi.MISSING_INBOX_ROUTE ->
+            MarmotKitException.MissingMemberInboxRoute(outcome.accountIdHex)
         MemberResolutionStatusFfi.INCOMPLETE -> MarmotKitException.DirectoryLookupIncomplete(outcome.accountIdHex)
         MemberResolutionStatusFfi.INVALID_KEY_PACKAGE -> MarmotKitException.InvalidKeyPackageEvent("Invalid KeyPackage")
         MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE,
@@ -35,6 +31,8 @@ internal fun GroupCreationResultFfi.requireCreatedGroupId(): String =
 /** Reports the skipped recipients using the existing add-members feedback. */
 internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMembersDetail(displayName: (String) -> String): AppText? =
     filter { it.status != MemberResolutionStatusFfi.SELECTED }
+        .map { displayName(it.accountIdHex) }
+        .filter(String::isNotBlank)
         .takeIf { it.isNotEmpty() }
-        ?.joinToString { displayName(it.accountIdHex) }
+        ?.joinToString()
         ?.let(AppText::Plain)

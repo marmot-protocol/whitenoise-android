@@ -2,10 +2,13 @@ package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.EventSizeClassFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.NoGroupMembersSelectedException
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
@@ -19,6 +22,28 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InviteFailurePresentationTest {
+    /** Reports named skipped recipients and falls back when every name is unavailable. */
+    @Test
+    fun foundingFailureSkipsBlankNames() {
+        val unavailable = MemberResolutionStatusFfi.MISSING_KEY_PACKAGE
+        val report =
+            NoGroupMembersSelectedException(
+                listOf(
+                    MemberResolutionOutcomeFfi("alice", unavailable, 0u),
+                    MemberResolutionOutcomeFfi("bob", unavailable, 0u),
+                ),
+            )
+
+        assertEquals(
+            AppText.Resource(R.string.error_group_create_failed_retry),
+            groupCreateSelectionFailureDetail(report, null),
+        )
+        assertEquals(
+            AppText.Plain("Alice"),
+            groupCreateFailureDetail(report) { if (it == "alice") "Alice" else " " },
+        )
+    }
+
     /** Unmatched typed identities keep the precise reason without blaming a selected person. */
     @Test fun foundingFailureRequiresCapturedRecipientForNamedCopy() {
         val missing = MarmotKitException.MissingKeyPackage("outside-selection", MissingKeyPackageReasonFfi.NOT_FOUND)
