@@ -15,13 +15,6 @@ internal data class NotificationPreviewControlState(
     val failed: Boolean = false,
 )
 
-/** The search anchor stays "previews" on the first choice; the other rows use the stored mode value. */
-private fun NotificationPreviewMode.rowKey(): String =
-    when (this) {
-        NotificationPreviewMode.FULL -> "previews"
-        else -> storedValue
-    }
-
 @StringRes
 private fun NotificationPreviewMode.titleRes(): Int =
     when (this) {
@@ -49,20 +42,15 @@ internal fun NotificationPreviewControl(
     val explanation = stringResource(R.string.explanation_privacy_notif_previews)
     SettingsSection(stringResource(R.string.notification_show_previews))
     SettingsGroup(modifier = Modifier.selectableGroup().testTag("notification-preview.choices")) {
-        NotificationPreviewMode.entries.forEach { mode ->
-            row(mode.rowKey()) { context ->
-                SettingsChoice(
-                    context = context,
-                    title = stringResource(mode.titleRes()),
-                    subtitle = stringResource(mode.detailRes()),
-                    explanation = explanation,
-                    selected = state.mode == mode,
-                    enabled = !state.busy,
-                    highlightSelected = false,
-                    modifier = Modifier.testTag("notification-preview.${mode.storedValue}"),
-                    onClick = { if (state.mode != mode) onChange(mode) },
-                )
-            }
+        // Literal keys let the settings search inventory review each choice; search anchors to "previews".
+        row("previews") { context ->
+            NotificationPreviewChoice(context, NotificationPreviewMode.FULL, state, explanation, onChange)
+        }
+        row("name_only") { context ->
+            NotificationPreviewChoice(context, NotificationPreviewMode.NAME_ONLY, state, explanation, onChange)
+        }
+        row("none") { context ->
+            NotificationPreviewChoice(context, NotificationPreviewMode.NONE, state, explanation, onChange)
         }
         if (state.failed) {
             row("retry") { context ->
@@ -78,4 +66,26 @@ internal fun NotificationPreviewControl(
             }
         }
     }
+}
+
+@Suppress("FunctionNaming")
+@Composable
+private fun NotificationPreviewChoice(
+    context: SettingsRowContext,
+    mode: NotificationPreviewMode,
+    state: NotificationPreviewControlState,
+    explanation: String,
+    onChange: (NotificationPreviewMode) -> Unit,
+) {
+    SettingsChoice(
+        context = context,
+        title = stringResource(mode.titleRes()),
+        subtitle = stringResource(mode.detailRes()),
+        explanation = explanation,
+        selected = state.mode == mode,
+        enabled = !state.busy,
+        highlightSelected = false,
+        modifier = Modifier.testTag("notification-preview.${mode.storedValue}"),
+        onClick = { if (state.mode != mode) onChange(mode) },
+    )
 }
