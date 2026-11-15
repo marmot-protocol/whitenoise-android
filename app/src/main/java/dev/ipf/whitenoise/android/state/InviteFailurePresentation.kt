@@ -84,19 +84,20 @@ private fun skippedInviteFailureDetail(
 ): AppText {
     if (failure !is NoGroupMembersSelectedException) return AppText.Resource(fallbackResource)
     val recipient = failure.outcomes.singleOrNull()
-    if (recipient?.status == MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE) {
-        return recipientFailureDetail(
+    return if (recipient?.status == MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE) {
+        recipientFailureDetail(
             recipient.accountIdHex,
             displayName,
             R.string.error_incompatible_key_package,
             R.string.error_incompatible_key_package_for,
         )
-    }
-    val skipped = failure.outcomes.skippedGroupMemberNames(displayName)
-    return if (skipped.isEmpty()) {
-        AppText.Resource(R.string.error_no_group_members_selected)
     } else {
-        AppText.Resource(R.string.error_no_group_members_selected_for, listOf(skipped.joinToString()))
+        val skipped = failure.outcomes.skippedGroupMemberNames(displayName)
+        if (skipped.isEmpty()) {
+            AppText.Resource(R.string.error_no_group_members_selected)
+        } else {
+            AppText.Resource(R.string.error_no_group_members_selected_for, listOf(skipped.joinToString()))
+        }
     }
 }
 
