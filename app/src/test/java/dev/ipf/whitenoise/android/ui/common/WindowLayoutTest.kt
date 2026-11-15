@@ -29,6 +29,7 @@ class WindowLayoutTest {
     @Test
     fun widthAndHeightBandsStartAtMaterialBreakpoints() {
         fun width(dp: Int) = WindowLayout.fromSize(DpSize(dp.dp, 700.dp)).widthClass
+
         fun height(dp: Int) = WindowLayout.fromSize(DpSize(400.dp, dp.dp)).heightClass
 
         assertEquals(WindowWidthClass.Compact, width(599))
