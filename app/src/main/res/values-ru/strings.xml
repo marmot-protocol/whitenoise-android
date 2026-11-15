@@ -2735,5 +2735,6 @@
     <string name="android_notification_settings">Настройки уведомлений Android</string>
     <string name="settings_help_support">Помощь и поддержка</string>
     <string name="settings_voice_language">Голос и язык</string>
+    <string name="photo_editor_rotate">Поворот</string>
     <string name="toast_wipe_outcome_unconfirmed">Не удалось подтвердить результат удаления. Проверьте свои аккаунты, прежде чем продолжить.</string>
 </resources>

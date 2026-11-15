@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,17 +33,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.systemGestureExclusion
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -48,6 +59,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -56,6 +68,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -67,7 +80,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.ActiveStrokeBuffer
@@ -86,8 +101,10 @@ import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.nativePageBody
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -147,6 +164,9 @@ internal fun PhotoEditorScreen(
     var showDiscardDialog by remember(stateHolder) { mutableStateOf(false) }
     var showCoordinates by remember { mutableStateOf(false) }
     var showQuality by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
+    // Edits are encoded at High, so Original only keeps its meaning while the recipe is untouched.
+    val originalEdited = state.quality == MediaQuality.Original && state.recipe != stateHolder.initialRecipe
 
     fun requestCancel() {
         if (state.isSaving || !inputEnabled()) return
@@ -161,9 +181,12 @@ internal fun PhotoEditorScreen(
             // App banners sit below this screen's bar rather than over it (#3312).
             Column {
                 PhotoEditorTopBar(
-                    saving = state.isSaving,
+                    state = state,
+                    holder = stateHolder,
                     frameIndex = frameIndex,
                     frameCount = frameCount,
+                    onQuality = { showQuality = true },
+                    onHelp = { showHelp = true },
                     onCancel = ::requestCancel,
                     onSave = {
                         stateHolder.beginSaving()
@@ -175,11 +198,10 @@ internal fun PhotoEditorScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().nativePageBody(padding).padding(padding)) {
-            PhotoEditorHistoryActions(state, stateHolder, stateHolder.hasUnsavedChanges)
             if (state.isSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val wide = maxWidth >= 600.dp || maxHeight < 360.dp
-                val sidePanelWidth = minOf(280.dp, maxWidth / 2)
+                val sidePanelWidth = minOf(144.dp, maxWidth / 2)
                 val photo: @Composable (Modifier) -> Unit = { canvasModifier ->
                     PhotoEditorCanvas(
                         previewBitmap = previewBitmap,
@@ -187,7 +209,7 @@ internal fun PhotoEditorScreen(
                         state = state,
                         onFreeCrop = stateHolder::commitFreeCrop,
                         onStroke = stateHolder::commitStroke,
-                        modifier = canvasModifier.padding(8.dp),
+                        modifier = canvasModifier,
                     )
                 }
                 if (wide) {
@@ -198,7 +220,7 @@ internal fun PhotoEditorScreen(
                             state = state,
                             stateHolder = stateHolder,
                             onCoordinates = { showCoordinates = true },
-                            onQuality = { showQuality = true },
+                            wide = true,
                             modifier = Modifier.width(controlsWidth).fillMaxHeight(),
                         )
                     }
@@ -209,17 +231,39 @@ internal fun PhotoEditorScreen(
                             state = state,
                             stateHolder = stateHolder,
                             onCoordinates = { showCoordinates = true },
-                            onQuality = { showQuality = true },
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                            wide = false,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
+            }
+            if (originalEdited) {
+                Text(
+                    text = stringResource(R.string.photo_editor_original_edited),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
             EditorStatus(state)
         }
     }
     val currentOnCancel by rememberUpdatedState(onCancel)
     val discardEnabled by rememberUpdatedState(!state.isSaving && inputEnabled())
+    if (showHelp) {
+        AnimatedAlertDialog(
+            onDismissRequest = { showHelp = false },
+            title = { Text(stringResource(R.string.help)) },
+            text = {
+                Column(Modifier.fadingVerticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.photo_editor_crop_hint))
+                    Text(stringResource(R.string.photo_editor_draw_hint))
+                    Text(stringResource(R.string.photo_editor_original_edited))
+                }
+            },
+            confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.done)) } },
+        )
+    }
     if (showDiscardDialog) {
         key(stateHolder, discardEnabled) {
             AnimatedAlertDialog(
@@ -275,30 +319,72 @@ internal fun PhotoEditorScreen(
                 showQuality = false
                 stateHolder.selectQuality(level)
             },
-            supportingText = stringResource(R.string.photo_editor_quality_explanation),
+            supportingText =
+                buildString {
+                    append(stringResource(R.string.photo_editor_quality_explanation))
+                    if (originalEdited) {
+                        append("\n\n")
+                        append(stringResource(R.string.photo_editor_original_edited))
+                    }
+                },
         )
     }
 }
 
-/** Keeps cancel/save on the prototype app bar while the native holder owns save acceptance. */
+/** Keeps cancel, history, quality and save on the app bar while the existing holder owns save acceptance. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongMethod", "LongParameterList")
 private fun PhotoEditorTopBar(
-    saving: Boolean,
+    state: PhotoEditorUiState,
+    holder: PhotoEditorStateHolder,
     frameIndex: Int,
     frameCount: Int,
+    onQuality: () -> Unit,
+    onHelp: () -> Unit,
     onCancel: () -> Unit,
     onSave: () -> Unit,
 ) {
+    val saving = state.isSaving
+    var expanded by remember { mutableStateOf(false) }
+    val resetLabel = stringResource(R.string.photo_editor_reset)
+    val menuScrollState = rememberScrollState()
     TopAppBar(
         title = {
-            Column {
-                Text(stringResource(R.string.photo_editor_title))
-                if (frameCount > 1) {
-                    Text(
-                        stringResource(R.string.photo_editor_frame, frameIndex + 1),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
+            // The title slot receives only the width left after Close, More and Save, so the
+            // history and quality actions sit here to give up the title's space before their own.
+            CompositionLocalProvider(LocalContentColor provides TopAppBarDefaults.topAppBarColors().actionIconContentColor) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // A lone ellipsis beside More reads as another control, so the title stays
+                    // in semantics but is not drawn until at least one whole word fits.
+                    Column(
+                        Modifier.weight(1f).layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            val wordFits = constraints.maxWidth >= measurable.minIntrinsicWidth(constraints.maxHeight)
+                            layout(placeable.width, placeable.height) {
+                                if (wordFits) placeable.place(0, 0) else placeable.placeWithLayer(0, 0) { alpha = 0f }
+                            }
+                        },
+                    ) {
+                        Text(
+                            stringResource(R.string.photo_editor_title),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (frameCount > 1) {
+                            Text(
+                                stringResource(R.string.photo_editor_frame, frameIndex + 1),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    EditorIconAction(R.drawable.ic_editor_undo, stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
+                    EditorIconAction(R.drawable.ic_editor_redo, stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
+                    PhotoEditorQualityAction(state.quality, !saving, onQuality)
                 }
             }
         },
@@ -308,7 +394,36 @@ private fun PhotoEditorTopBar(
             }
         },
         actions = {
-            EditorTextAction(
+            Box {
+                IconButton(onClick = { expanded = true }, enabled = !saving) {
+                    Icon(painterResource(R.drawable.ic_more_horiz), stringResource(R.string.more_options))
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    scrollState = menuScrollState,
+                    modifier = Modifier.scrollEdgeFade(menuScrollState, stableRenderTarget = true),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.photo_editor_reset)) },
+                        enabled = holder.hasUnsavedChanges && !saving,
+                        modifier = Modifier.semantics { contentDescription = resetLabel },
+                        onClick = {
+                            expanded = false
+                            holder.reset()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.help)) },
+                        onClick = {
+                            expanded = false
+                            onHelp()
+                        },
+                    )
+                }
+            }
+            EditorIconAction(
+                R.drawable.ic_check,
                 stringResource(if (saving) R.string.photo_editor_saving_action else R.string.save),
                 !saving,
                 onSave,
@@ -317,109 +432,226 @@ private fun PhotoEditorTopBar(
     )
 }
 
-/** Exposes every existing history command as a labeled, horizontally scrollable action. */
 @Composable
-private fun PhotoEditorHistoryActions(
-    state: PhotoEditorUiState,
-    holder: PhotoEditorStateHolder,
-    dirty: Boolean,
+private fun EditorIconAction(
+    icon: Int,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
 ) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        EditorTextAction(stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
-        EditorTextAction(stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
-        EditorTextAction(stringResource(R.string.photo_editor_reset), !state.isSaving && dirty, holder::reset)
-        EditorTextAction(
-            stringResource(R.string.photo_editor_rotate_clockwise),
-            !state.isSaving,
-            holder::rotateClockwise,
-        )
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+        Icon(painterResource(icon), contentDescription = label)
     }
 }
 
-/** Retains the named native action and its accessible minimum touch target. */
+/** Two compact bands: active-tool options and the four main icon-labelled actions. */
 @Composable
-private fun EditorTextAction(
-    description: String,
+@Suppress("LongMethod")
+private fun PhotoEditorControls(
+    state: PhotoEditorUiState,
+    stateHolder: PhotoEditorStateHolder,
+    onCoordinates: () -> Unit,
+    wide: Boolean,
+    modifier: Modifier,
+) {
+    if (wide) {
+        Column(modifier) {
+            Column(Modifier.fillMaxWidth().selectableGroup()) {
+                Row(Modifier.fillMaxWidth()) {
+                    PhotoEditorTool.entries.take(2).forEach { tool ->
+                        EditorToolButton(toolLabel(tool), toolIcon(tool), state.activeTool == tool, !state.isSaving, Modifier.weight(1f)) {
+                            stateHolder.selectTool(tool)
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth()) {
+                    val tool = PhotoEditorTool.Erase
+                    EditorToolButton(toolLabel(tool), toolIcon(tool), state.activeTool == tool, !state.isSaving, Modifier.weight(1f)) {
+                        stateHolder.selectTool(tool)
+                    }
+                    EditorToolButton(
+                        stringResource(R.string.photo_editor_rotate),
+                        R.drawable.ic_editor_rotate,
+                        false,
+                        !state.isSaving,
+                        Modifier.weight(1f),
+                    ) {
+                        stateHolder.rotateClockwise()
+                    }
+                }
+            }
+            Column(Modifier.weight(1f).fillMaxWidth().fadingVerticalScroll(rememberScrollState())) {
+                EditorOptions(state, stateHolder, vertical = true)
+                EditorIconAction(R.drawable.ic_tune, coordinateDialogTitle(state.activeTool), !state.isSaving, onCoordinates)
+            }
+        }
+    } else {
+        Column(modifier) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f).horizontalScroll(rememberScrollState())) {
+                    EditorOptions(state, stateHolder, vertical = false)
+                }
+                EditorIconAction(R.drawable.ic_tune, coordinateDialogTitle(state.activeTool), !state.isSaving, onCoordinates)
+            }
+            Row(Modifier.fillMaxWidth().selectableGroup().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                PhotoEditorTool.entries.forEach { tool ->
+                    EditorToolButton(toolLabel(tool), toolIcon(tool), state.activeTool == tool, !state.isSaving, Modifier.weight(1f)) {
+                        stateHolder.selectTool(tool)
+                    }
+                }
+                EditorToolButton(
+                    stringResource(R.string.photo_editor_rotate),
+                    R.drawable.ic_editor_rotate,
+                    false,
+                    !state.isSaving,
+                    Modifier.weight(1f),
+                ) {
+                    stateHolder.rotateClockwise()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@Suppress("LongMethod")
+private fun EditorOptions(
+    state: PhotoEditorUiState,
+    holder: PhotoEditorStateHolder,
+    vertical: Boolean,
+) {
+    val selectionColor = MaterialTheme.colorScheme.onSurface
+    val choices: @Composable () -> Unit = {
+        if (state.activeTool == PhotoEditorTool.Crop) {
+            PhotoCropPreset.entries.forEach { preset ->
+                EditorTextChoice(cropPresetLabel(preset), state.cropPreset == preset, !state.isSaving) { holder.selectCropPreset(preset) }
+            }
+        } else {
+            if (state.activeTool == PhotoEditorTool.Draw) {
+                editorColors().forEach { color ->
+                    val selected = state.drawColorArgb == color.argb
+                    TextButton(
+                        onClick = { holder.selectColor(color.argb) },
+                        enabled = !state.isSaving,
+                        modifier =
+                            Modifier.size(48.dp).semantics {
+                                this.selected = selected
+                                contentDescription = if (selected) color.selectedDescription else color.name
+                            },
+                        contentPadding = PaddingValues(8.dp),
+                    ) {
+                        Canvas(Modifier.size(24.dp)) {
+                            drawCircle(Color(color.argb), radius = 8.dp.toPx())
+                            drawCircle(selectionColor.copy(alpha = .5f), radius = 8.dp.toPx(), style = Stroke(1.dp.toPx()))
+                            if (selected) drawCircle(selectionColor, radius = 11.dp.toPx(), style = Stroke(2.dp.toPx()))
+                        }
+                    }
+                }
+            }
+            PhotoStrokeWidth.entries.forEach { width ->
+                EditorTextChoice(strokeWidthLabel(width), state.strokeWidth == width, !state.isSaving) { holder.selectStrokeWidth(width) }
+            }
+        }
+    }
+    if (vertical) {
+        FlowRow(Modifier.selectableGroup(), content = { choices() })
+    } else {
+        Row(Modifier.selectableGroup(), content = { choices() })
+    }
+}
+
+@Composable
+private fun EditorTextChoice(
+    label: String,
+    selected: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     TextButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = description },
-    ) { Text(description) }
+        modifier =
+            Modifier.heightIn(min = 48.dp).semantics {
+                this.selected = selected
+                contentDescription = label
+            },
+        contentPadding = PaddingValues(horizontal = 8.dp),
+    ) {
+        Text(label, fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold else null)
+    }
 }
 
-/** Arranges the native tool/preset/color/width commands in the prototype labeled chip rows. */
+private fun toolIcon(tool: PhotoEditorTool): Int =
+    when (tool) {
+        PhotoEditorTool.Crop -> R.drawable.ic_editor_crop
+        PhotoEditorTool.Draw -> R.drawable.ic_edit
+        PhotoEditorTool.Erase -> R.drawable.ic_editor_erase
+    }
+
 @Composable
 @Suppress("LongParameterList")
-private fun PhotoEditorControls(
-    state: PhotoEditorUiState,
-    stateHolder: PhotoEditorStateHolder,
-    onCoordinates: () -> Unit,
-    onQuality: () -> Unit,
+private fun EditorToolButton(
+    label: String,
+    icon: Int,
+    selected: Boolean,
+    enabled: Boolean,
     modifier: Modifier,
+    onClick: () -> Unit,
 ) {
-    Column(
-        modifier.fadingVerticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    val amoled = isAmoledSurfaceTheme()
+    val description = if (icon == R.drawable.ic_editor_rotate) stringResource(R.string.photo_editor_rotate_clockwise) else label
+    val colors = MaterialTheme.colorScheme
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier =
+            modifier.heightIn(min = 48.dp).semantics {
+                this.selected = selected
+                contentDescription = description
+            },
+        shape = MaterialTheme.shapes.small,
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+        border = if (amoled && !selected) null else BorderStroke(1.dp, colors.onSurface.copy(alpha = if (amoled) .44f else .2f)),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = if (selected && !amoled) colors.secondaryContainer else colors.surface),
     ) {
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            PhotoEditorTool.entries.forEach { tool ->
-                EditorChoiceChip(toolLabel(tool), state.activeTool == tool, !state.isSaving) {
-                    stateHolder.selectTool(tool)
-                }
-            }
-        }
-        if (state.activeTool == PhotoEditorTool.Crop) {
-            CropControls(state, stateHolder)
-        } else {
-            DrawControls(state, stateHolder, showColors = state.activeTool == PhotoEditorTool.Draw)
-        }
-        Text(
-            stringResource(
-                if (state.activeTool == PhotoEditorTool.Crop) {
-                    R.string.photo_editor_crop_hint
-                } else {
-                    R.string.photo_editor_draw_hint
-                },
-            ),
-            style = MaterialTheme.typography.bodySmall,
-        )
-        EditorTextAction(coordinateDialogTitle(state.activeTool), !state.isSaving, onCoordinates)
-        PhotoEditorQualityAction(state.quality, !state.isSaving, onQuality)
-        if (state.quality == MediaQuality.Original && state.recipe != stateHolder.initialRecipe) {
-            Text(
-                stringResource(R.string.photo_editor_original_edited),
-                style = MaterialTheme.typography.bodySmall,
-            )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(label, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
 
-/** The output-quality control the prototype keeps inside the editor rather than in the preview chrome. */
+/**
+ * Output quality beside the history actions. The chip shows only the level; its accessible name keeps
+ * the full "Photo quality: level" label. At large font scales the level text shrinks to fit the app
+ * bar instead of clipping.
+ */
 @Composable
 private fun PhotoEditorQualityAction(
     quality: MediaQuality,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val label = stringResource(R.string.photo_editor_quality) + ": " + photoQualityLevelLabel(quality)
+    val level = photoQualityLevelLabel(quality)
+    val label = stringResource(R.string.photo_editor_quality) + ": " + level
     TextButton(
         onClick = onClick,
         enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 4.dp),
         modifier =
             Modifier
                 .heightIn(min = 48.dp)
                 .semantics { contentDescription = label }
                 .testTag("photo.editor.quality"),
-    ) { Text(label) }
+    ) {
+        Text(
+            level,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = LocalTextStyle.current.fontSize),
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null, modifier = Modifier.size(18.dp))
+    }
 }
 
 /** Name of one selectable output level, as offered in the editor's quality dialog. */
@@ -433,86 +665,6 @@ internal fun photoQualityLevelLabel(quality: MediaQuality): String =
             MediaQuality.Original -> R.string.photo_editor_quality_original
         },
     )
-
-/** Keeps all native crop presets available without requiring a canvas gesture. */
-@Composable
-private fun CropControls(
-    state: PhotoEditorUiState,
-    stateHolder: PhotoEditorStateHolder,
-) {
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        PhotoCropPreset.entries.forEach { preset ->
-            EditorChoiceChip(cropPresetLabel(preset), state.cropPreset == preset, !state.isSaving) {
-                stateHolder.selectCropPreset(preset)
-            }
-        }
-    }
-}
-
-/** Keeps drawing colors and stroke widths on distinct rows with native selection state. */
-@Composable
-private fun DrawControls(
-    state: PhotoEditorUiState,
-    stateHolder: PhotoEditorStateHolder,
-    showColors: Boolean,
-) {
-    if (showColors) {
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            editorColors().forEach { color ->
-                val selected = state.drawColorArgb == color.argb
-                FilterChip(
-                    selected = selected,
-                    onClick = { stateHolder.selectColor(color.argb) },
-                    label = { Text(color.name) },
-                    enabled = !state.isSaving,
-                    leadingIcon = {
-                        Canvas(Modifier.size(20.dp)) {
-                            drawCircle(Color(color.argb))
-                            drawCircle(Color.Gray, style = Stroke(1.dp.toPx()))
-                        }
-                    },
-                    modifier =
-                        Modifier.heightIn(min = 48.dp).semantics {
-                            contentDescription = if (selected) color.selectedDescription else color.name
-                        },
-                )
-            }
-        }
-    }
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()).selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        PhotoStrokeWidth.entries.forEach { width ->
-            EditorChoiceChip(strokeWidthLabel(width), state.strokeWidth == width, !state.isSaving) {
-                stateHolder.selectStrokeWidth(width)
-            }
-        }
-    }
-}
-
-/** Presents one state-holder choice with an explicit label and unchanged selected semantics. */
-@Composable
-private fun EditorChoiceChip(
-    description: String,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(description) },
-        enabled = enabled,
-        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = description },
-    )
-}
 
 /** Error or limit status line of the editor. */
 @Composable
@@ -559,7 +711,7 @@ private fun PhotoEditorCanvas(
     modifier: Modifier,
 ) {
     val density = LocalDensity.current
-    val handleRadiusPx = with(density) { 24.dp.toPx() }
+    val handleRadiusPx = with(density) { 40.dp.toPx() }
     var activeCropCorner by remember { mutableStateOf<Int?>(null) }
     // A drag that took hold of the rectangle's inside rather than a corner, with where it began, so
     // the move is measured from the press and not accumulated frame by frame.
@@ -571,7 +723,7 @@ private fun PhotoEditorCanvas(
     var activeStrokeRevision by remember { mutableIntStateOf(0) }
     val canvasDescription = stringResource(R.string.photo_editor_image_description)
 
-    BoxWithConstraints(modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+    BoxWithConstraints(modifier.background(Color.Black)) {
         val viewWidth = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
         val viewHeight = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
         val cropMode = state.activeTool == PhotoEditorTool.Crop
@@ -601,8 +753,11 @@ private fun PhotoEditorCanvas(
             } else {
                 Modifier.pointerInput(state.activeTool, geometry, viewTransform, state.recipe.crop) {
                     detectDragGestures(
-                        onDragStart = { position ->
+                        orientationLock = null,
+                        onDragStart = { down, slopTrigger, _ ->
+                            // Select from the original press, before touch slop can move it away.
                             if (cropMode) {
+                                val position = down.position
                                 activeCropCorner =
                                     nearestCropCorner(position, state.recipe.crop, geometry, viewTransform, handleRadiusPx)
                                 // Missing a corner used to leave the drag doing nothing at all. A press
@@ -618,6 +773,7 @@ private fun PhotoEditorCanvas(
                                         null
                                     }
                             } else {
+                                val position = slopTrigger.position
                                 activeStroke.start(
                                     geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform).clamped(),
                                 )
@@ -645,7 +801,7 @@ private fun PhotoEditorCanvas(
                                 activeStrokeRevision++
                             }
                         },
-                        onDragEnd = {
+                        onDragEnd = { _ ->
                             transientCrop?.let(onFreeCrop)
                             if (!activeStroke.isEmpty()) onStroke(activeStroke.toStroke(), activeStroke.exceededPointBudget)
                             activeCropCorner = null
@@ -787,16 +943,48 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEditorPreview(
             androidx.compose.ui.geometry
                 .Size((size.width - right).coerceAtLeast(0f), (bottom - top).coerceAtLeast(0f)),
         )
-        drawRect(
-            Color.White,
-            Offset(left, top),
+        val cropOutline =
             androidx.compose.ui.geometry
-                .Size(right - left, bottom - top),
+                .Rect(left, top, right, bottom)
+        // Dark underlay stays visible on light photos; white dashes stay visible on dark ones.
+        drawRect(
+            Color.Black,
+            cropOutline.topLeft,
+            cropOutline.size,
             style =
                 androidx.compose.ui.graphics.drawscope
-                    .Stroke(2.dp.toPx()),
+                    .Stroke(4.dp.toPx()),
         )
-        corners.forEach { drawCircle(Color.White, radius = 7.dp.toPx(), center = Offset(it.x, it.y)) }
+        drawRect(
+            Color.White,
+            cropOutline.topLeft,
+            cropOutline.size,
+            style =
+                androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = 2.dp.toPx(),
+                    pathEffect =
+                        androidx.compose.ui.graphics.PathEffect
+                            .dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())),
+                ),
+        )
+        val handleLength = minOf(24.dp.toPx(), (right - left) / 4, (bottom - top) / 4)
+        corners.forEach { point ->
+            val origin = Offset(point.x, point.y)
+            val horizontal = if (point.x == left) handleLength else -handleLength
+            val vertical = if (point.y == top) handleLength else -handleLength
+            for ((color, width) in listOf(Color.Black to 7.dp.toPx(), Color.White to 3.dp.toPx())) {
+                drawLine(color, origin, origin + Offset(horizontal, 0f), strokeWidth = width)
+                drawLine(color, origin, origin + Offset(0f, vertical), strokeWidth = width)
+            }
+        }
+        if (transientCrop != null) {
+            for (fraction in listOf(1f / 3, 2f / 3)) {
+                val x = left + (right - left) * fraction
+                val y = top + (bottom - top) * fraction
+                drawLine(Color.White.copy(alpha = .3f), Offset(x, top), Offset(x, bottom), strokeWidth = 1.dp.toPx())
+                drawLine(Color.White.copy(alpha = .3f), Offset(left, y), Offset(right, y), strokeWidth = 1.dp.toPx())
+            }
+        }
     }
 }
 
@@ -850,13 +1038,28 @@ private fun nearestCropCorner(
     geometry: PhotoEditGeometry,
     viewTransform: EditorViewTransform,
     thresholdPx: Float,
-): Int? =
-    cropCorners(crop)
-        .map { geometry.orientedToOutput(it).let(viewTransform::outputToView) }
-        .mapIndexed { index, point -> index to hypot(position.x - point.x, position.y - point.y) }
-        .minByOrNull { it.second }
-        ?.takeIf { it.second <= thresholdPx }
-        ?.first
+): Int? {
+    val nearest =
+        cropCorners(crop)
+            .map { geometry.orientedToOutput(it).let(viewTransform::outputToView) }
+            .mapIndexed { index, point -> index to hypot(position.x - point.x, position.y - point.y) }
+            .minByOrNull { it.second }
+            ?.takeIf { it.second <= thresholdPx }
+            ?: return null
+    val point = geometry.viewToOriented(EditorPoint(position.x, position.y), viewTransform)
+    val centerOwnsPress =
+        if (crop.contains(point)) {
+            val center =
+                geometry
+                    .orientedToOutput(NormalizedPoint((crop.left + crop.right) / 2f, (crop.top + crop.bottom) / 2f))
+                    .let(viewTransform::outputToView)
+            // Keep a move region even when enlarged corner targets overlap in a small crop.
+            hypot(position.x - center.x, position.y - center.y) <= nearest.second
+        } else {
+            false
+        }
+    return nearest.first.takeUnless { centerOwnsPress }
+}
 
 private fun movedCropCorner(
     crop: NormalizedRect,
