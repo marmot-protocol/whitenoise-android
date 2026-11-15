@@ -73,15 +73,16 @@ internal fun inviteFailureDetail(
         // A full disk refuses the change before anything is written; freeing space makes Retry worthwhile.
         is MarmotKitException.StorageFull -> AppText.Resource(R.string.error_storage_full)
         is MarmotKitException.EventTooLarge -> oversizedInviteDetail(throwable, fallbackResource)
-        is NoGroupMembersSelectedException -> skippedInviteFailureDetail(throwable, displayName)
-        else -> AppText.Resource(fallbackResource)
+        else -> skippedInviteFailureDetail(throwable, displayName, fallbackResource)
     }
 
-/** Resolves names only from a native report that explicitly skipped the entire selection. */
+/** Resolves all-skipped reports and uses the caller's fallback for errors without typed recovery. */
 private fun skippedInviteFailureDetail(
-    failure: NoGroupMembersSelectedException,
+    failure: Throwable,
     displayName: (String) -> String,
+    @StringRes fallbackResource: Int,
 ): AppText {
+    if (failure !is NoGroupMembersSelectedException) return AppText.Resource(fallbackResource)
     val recipient = failure.outcomes.singleOrNull()
     if (recipient?.status == MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE) {
         return recipientFailureDetail(
