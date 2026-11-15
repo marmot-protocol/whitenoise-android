@@ -3846,7 +3846,8 @@ class ConversationController(
                             if (absent != null) {
                                 diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
                                 val skipped =
-                                    absent.takeIf { it.isNotEmpty() }
+                                    absent
+                                        .takeIf { it.isNotEmpty() }
                                         ?.joinToString(transform = appState::displayName)
                                         ?.let(AppText::Plain)
                                 presentInviteAccepted(skipped)

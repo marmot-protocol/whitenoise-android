@@ -15,7 +15,13 @@ private fun recipientFailureDetail(
     @StringRes genericResource: Int,
     @StringRes namedResource: Int,
 ): AppText {
-    val name = account.trim().takeIf(String::isNotEmpty)?.let(displayName)?.trim()?.takeIf(String::isNotEmpty)
+    val name =
+        account
+            .trim()
+            .takeIf(String::isNotEmpty)
+            ?.let(displayName)
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
     return if (name == null) {
         AppText.Resource(genericResource)
     } else {
