@@ -130,6 +130,7 @@ internal fun ConversationForegroundRestoreEffects(
     resolveScrollAnchorIndex: (ConversationScrollAnchor) -> Int?,
     currentTailIndex: () -> Int,
     timelineViewport: ConversationTimelineViewport? = null,
+    suppressComposerFocusRestore: () -> Boolean = { false },
 ) {
     val foregroundPreDrawSignals = remember(controller) { Channel<Unit>(capacity = Channel.CONFLATED) }
     var foregroundRestore by remember(controller) { mutableStateOf<ConversationForegroundRestoreBinding?>(null) }
@@ -325,6 +326,7 @@ internal fun ConversationForegroundRestoreEffects(
         composerFocused = composerFocused,
         searchOpen = searchOpen,
         hasActiveEditOrReplySession = hasActiveEditOrReplySession,
+        suppressFocusRestore = suppressComposerFocusRestore,
         onPause = {
             foregroundFocusIntent.pause()
             resumeScrollRestoreCoordinator.cancel()

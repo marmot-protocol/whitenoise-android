@@ -2,10 +2,8 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,22 +11,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -37,13 +36,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
@@ -56,49 +59,51 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.text.BidiFormatter
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.ChatFolder
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
-import dev.ipf.whitenoise.android.ui.chats.ChatFolderChip
-import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
-import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
+import dev.ipf.whitenoise.android.ui.chats.ChatListPinnedBoundary
+import dev.ipf.whitenoise.android.ui.chats.pinnedBoundaryIndex
+import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
+import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
-import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.controlHandoffEndpoint
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
+import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
+import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
+import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
-import dev.ipf.whitenoise.android.ui.share.ChatPickerSendingAccountRow
+import dev.ipf.whitenoise.android.ui.icons.filled.Search
 import dev.ipf.whitenoise.android.ui.share.DestinationFilterIncomplete
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilterState
-import dev.ipf.whitenoise.android.ui.share.DestinationPickerSearch
+import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilters
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerAccountSheet
 import dev.ipf.whitenoise.android.ui.share.destinationFolderInputsComplete
 import dev.ipf.whitenoise.android.ui.share.rememberDestinationFolderRows
 import dev.ipf.whitenoise.android.ui.share.rememberShareChatPickerDataSource
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import java.util.Locale
 
 internal const val FORWARD_CHAT_PICKER_SCREEN_TEST_TAG = "forward_chat_picker_full_screen"
 internal const val FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG = "forward_chat_picker_account_row"
-internal const val FORWARD_FOLDER_CHIP_ROW_TEST_TAG = "forward_folder_chip_row"
-private val FORWARD_FOLDER_CHIP_LABEL_MAX_WIDTH = 200.dp
-
-/** Stable semantics tag for a folder action whose visible label may be renamed. */
-internal fun forwardFolderChipTestTag(folderId: String): String = "forward_folder_chip-$folderId"
 
 /** Mirrors the picker's live destination account, selection, and selected-chat titles. */
 internal typealias PickerStateListener =
@@ -212,7 +217,7 @@ private fun rememberForwardDestinationState(
 }
 
 /**
- * Picker body: source-message summary, the sending-account row and sheet,
+ * Picker body: compact source summary, sending-avatar account sheet,
  * account-scoped search/folders/chat rows, and the confirm bar that binds the
  * explicit destination account to the accepted selection. Folder preference
  * changes refresh the current account's shortcuts while the picker stays open.
@@ -242,6 +247,20 @@ internal fun ForwardMessagePickerContent(
     // saved-state Bundle. Selections restored for a destination that is no
     // longer signed in are dropped rather than re-owned by the fallback.
     var query by remember(originGroupIdHex) { mutableStateOf("") }
+    var searchOpen by remember(originGroupIdHex) { mutableStateOf(false) }
+    val searchFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val closeSearch: () -> Unit = {
+        query = ""
+        searchOpen = false
+        focusManager.clearFocus()
+        keyboard?.hide()
+    }
+    BackHandler(searchOpen, onBack = closeSearch)
+    LaunchedEffect(searchOpen) { if (searchOpen) searchFocus.requestFocus() }
+    val searchCollapse = rememberSearchCollapse(searchOpen)
+    val searchHandoff = rememberMeasuredControlHandoff(originGroupIdHex, searchOpen)
     val selectedState =
         remember(originGroupIdHex) {
             val seedIsSafe =
@@ -327,10 +346,8 @@ internal fun ForwardMessagePickerContent(
                     filter.accepts(item.group.groupIdHex, folderRows, selected)
             }
         }
-    val bulkRows = folderRows.filter { (folder, members) -> folder.name.isNotBlank() && members.size >= 2 }
-    val visibleFolderRows = visibleForwardFolderRows(bulkRows, query)
     val sendingAccount = destination.accounts.firstOrNull { it.label == destination.selectedAccountRef }
-    val forwardTitle = stringResource(R.string.forward_to)
+    val forwardTitle = stringResource(R.string.forward)
 
     Scaffold(
         modifier =
@@ -345,135 +362,200 @@ internal fun ForwardMessagePickerContent(
         topBar = {
             // App banners sit below this screen's bar rather than over it (#3312).
             Column {
-                TopAppBar(
-                    title = { Text(forwardTitle) },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-                        }
-                    },
-                )
+                MeasuredControlHandoffHost(
+                    state = searchHandoff,
+                    destination = searchOpen,
+                    outlineVisible = { searchOpen },
+                ) {
+                    TopAppBar(
+                        modifier = Modifier.searchCollapseHost(searchCollapse),
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = amoledSheetContainerColor()),
+                        title = {
+                            if (searchOpen) {
+                                CompositionLocalProvider(LocalSearchCollapse provides searchCollapse) {
+                                    WhiteNoiseCompactSearchField(
+                                        value = query,
+                                        onValueChange = {
+                                            query = it
+                                            startFailed = false
+                                        },
+                                        placeholder = stringResource(R.string.forward_search_chats),
+                                        clearDescription = stringResource(R.string.chat_list_search_clear),
+                                        outlined = true,
+                                        onClear = closeSearch,
+                                        emptyTrailingIcon = {
+                                            IconButton(onClick = closeSearch) {
+                                                Icon(Icons.Default.Close, stringResource(R.string.close))
+                                            }
+                                        },
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .searchExpandReveal(query)
+                                                .controlHandoffEndpoint(searchHandoff, true)
+                                                .focusRequester(searchFocus)
+                                                .testTag("forward.searchField"),
+                                    )
+                                }
+                            } else {
+                                Column {
+                                    Text(
+                                        forwardTitle,
+                                        modifier = Modifier.testTag("forward.title"),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    ForwardSelectionSummary(messageCount, attachmentCount)
+                                }
+                            }
+                        },
+                        actions = {
+                            if (!searchOpen) {
+                                IconButton(
+                                    onClick = { searchOpen = true },
+                                    modifier = Modifier.controlHandoffEndpoint(searchHandoff, false),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = stringResource(R.string.forward_search_chats),
+                                    )
+                                }
+                            }
+                        },
+                        navigationIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { if (searchOpen) closeSearch() else onDismiss() }) {
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
+                                }
+                                sendingAccount?.let { account ->
+                                    val name = appState.networkDisplayName(account.accountIdHex)
+                                    val description = stringResource(R.string.share_sending_as_value, name)
+                                    val avatarModifier =
+                                        Modifier
+                                            .size(48.dp)
+                                            .testTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG)
+                                            .semantics { contentDescription = description }
+                                    if (destination.accounts.size > 1) {
+                                        IconButton(
+                                            onClick = { accountSelectorOpen = true },
+                                            modifier = avatarModifier,
+                                        ) {
+                                            Avatar(
+                                                name,
+                                                account.accountIdHex,
+                                                size = 32.dp,
+                                                pictureUrl = appState.avatarUrl(account.accountIdHex),
+                                                pictureDomain = AvatarImageLoader.publicProfiles(),
+                                            )
+                                        }
+                                    } else {
+                                        Box(avatarModifier, contentAlignment = Alignment.Center) {
+                                            Avatar(
+                                                name,
+                                                account.accountIdHex,
+                                                size = 32.dp,
+                                                pictureUrl = appState.avatarUrl(account.accountIdHex),
+                                                pictureDomain = AvatarImageLoader.publicProfiles(),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
                 TopNoticeSlot()
             }
         },
         bottomBar = {
-            StickyFormActionBar {
-                Button(
-                    onClick = {
-                        val destinationAccountRef =
-                            destination.selectedAccountRef?.takeIf { appState.isForwardOwnerSignedIn(it) }
-                        val recipients = forwardRecipientGroupIds(selected, originGroupIdHex)
-                        startFailed =
-                            destinationAccountRef == null ||
-                            !confirmForwardTargets(
-                                targets = recipients,
-                                start = { targetIds -> onForward(destinationAccountRef, targetIds) },
-                                dismiss = onDismiss,
-                            )
-                    },
-                    enabled = selected.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Forward,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (selected.isEmpty()) {
-                            stringResource(R.string.forward)
-                        } else {
-                            pluralStringResource(R.plurals.forward_to_chats_count, selected.size, selected.size)
+            BottomPanelSurface(Modifier.navigationBarsPadding().imePadding()) {
+                Box(Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceMd)) {
+                    Button(
+                        onClick = {
+                            val destinationAccountRef =
+                                destination.selectedAccountRef?.takeIf { appState.isForwardOwnerSignedIn(it) }
+                            val recipients = forwardRecipientGroupIds(selected, originGroupIdHex)
+                            startFailed =
+                                destinationAccountRef == null ||
+                                !confirmForwardTargets(
+                                    targets = recipients,
+                                    start = { targetIds -> onForward(destinationAccountRef, targetIds) },
+                                    dismiss = onDismiss,
+                                )
                         },
-                    )
+                        enabled = selected.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth().testTag("forward.confirm"),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Forward,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (selected.isEmpty()) {
+                                stringResource(R.string.forward)
+                            } else {
+                                pluralStringResource(R.plurals.forward_to_chats_count, selected.size, selected.size)
+                            },
+                        )
+                    }
                 }
             }
         },
     ) { padding ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-            val compactHeight = maxHeight < 480.dp
-            val horizontalFilters = compactHeight && maxWidth >= 600.dp
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(if (compactHeight) 8.dp else 12.dp),
-            ) {
-                if (compactHeight) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ForwardSelectionSummary(messageCount, attachmentCount, Modifier.weight(1f), compact = true)
-                        sendingAccount?.let { account ->
-                            ChatPickerSendingAccountRow(
-                                appState = appState,
-                                account = account,
-                                multipleAccounts = destination.accounts.size > 1,
-                                onOpenSelector = { accountSelectorOpen = true },
-                                modifier = Modifier.weight(1f),
-                                testTag = FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG,
-                                compact = true,
-                            )
-                        }
-                    }
-                } else {
-                    ForwardSelectionSummary(
-                        messageCount = messageCount,
-                        attachmentCount = attachmentCount,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                key(destination.selectedAccountRef) {
+                    DestinationFolderFilters(
+                        rows = folderRows,
+                        state = filter,
+                        selected = selected,
+                        onReviewSelected = {},
+                        modifier = Modifier.weight(1f),
+                        alwaysShow = true,
                     )
-                    sendingAccount?.let { account ->
-                        ChatPickerSendingAccountRow(
-                            appState = appState,
-                            account = account,
-                            multipleAccounts = destination.accounts.size > 1,
-                            onOpenSelector = { accountSelectorOpen = true },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
-                            testTag = FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG,
-                        )
-                    }
                 }
-                DestinationPickerSearch(
-                    query = query,
-                    onQueryChange = {
-                        query = it
-                        startFailed = false
-                    },
-                    placeholder = R.string.forward_search_chats,
-                    folders = folderRows,
-                    filter = filter,
-                    selected = selected,
-                    horizontal = horizontalFilters,
-                )
-                if (startFailed) {
-                    Text(
-                        text = stringResource(R.string.forward_start_failed),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier =
-                            Modifier.padding(horizontal = Dimens.spaceLg).semantics {
-                                liveRegion = LiveRegionMode.Polite
+                if (filter.folderId != null || filter.reviewingSelected || query.isNotBlank()) {
+                    ForwardVisibleSelectionAction(
+                        selected = selected,
+                        visibleIds =
+                            filteredTargets.map {
+                                it.first.group.groupIdHex
+                                    .lowercase(Locale.ROOT)
                             },
+                        complete = folderComplete && dataSource.targetsComplete,
+                        onSelectionChange = { selected = ArrayList(it) },
                     )
                 }
-                ForwardTargetList(
-                    appState = appState,
-                    targets = targets,
-                    filteredTargets = filteredTargets,
-                    visibleFolderRows = visibleFolderRows,
-                    targetLoading = targetLoading,
-                    targetsComplete = folderComplete,
-                    browsingFiltered = filter.folderId != null || filter.reviewingSelected,
-                    targetError = targetError,
-                    retryLoad = dataSource.retryLoad,
-                    ownerAccountRef = destination.selectedAccountRef,
-                    ownerAccountIdHex = destination.selectedAccountIdHex,
-                    selected = selected,
-                    onSelectionChange = { selected = ArrayList(it) },
-                    modifier = Modifier.weight(1f),
+            }
+            if (startFailed) {
+                Text(
+                    text = stringResource(R.string.forward_start_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier =
+                        Modifier.padding(horizontal = Dimens.spaceLg).semantics {
+                            liveRegion = LiveRegionMode.Polite
+                        },
                 )
             }
+            ForwardTargetList(
+                appState = appState,
+                targets = targets,
+                filteredTargets = filteredTargets,
+                searching = query.isNotBlank(),
+                targetLoading = targetLoading,
+                targetsComplete = folderComplete,
+                browsingFiltered = filter.folderId != null || filter.reviewingSelected || query.isNotBlank(),
+                targetError = targetError,
+                retryLoad = dataSource.retryLoad,
+                ownerAccountRef = destination.selectedAccountRef,
+                ownerAccountIdHex = destination.selectedAccountIdHex,
+                selected = selected,
+                onSelectionChange = { selected = ArrayList(it) },
+                modifier = Modifier.weight(1f),
+            )
         }
     }
     if (accountSelectorOpen) {
@@ -500,7 +582,6 @@ private fun ForwardSelectionSummary(
     messageCount: Int,
     attachmentCount: Int,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val bidiFormatter = remember(rtl) { BidiFormatter.Builder(rtl).build() }
@@ -511,30 +592,23 @@ private fun ForwardSelectionSummary(
                 add(pluralStringResource(R.plurals.forward_attachment_count, attachmentCount, attachmentCount))
             }
         }.joinToString(" · ") { bidiFormatter.unicodeWrap(it) }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-        border = amoledSurfaceBorderStroke(),
+    Text(
+        summary,
+        style = MaterialTheme.typography.bodySmall,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier,
-    ) {
-        Text(
-            summary,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = if (compact) 1 else Int.MAX_VALUE,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(if (compact) 8.dp else 12.dp),
-        )
-    }
+    )
 }
 
-/** Keeps folder bulk actions in one compact region above ordinary, individually selectable destinations. */
+/** Destination rows and their loading/empty states share the remaining screen height. */
 @Composable
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod") // Explicit loaded, partial and failed states.
 private fun ForwardTargetList(
     appState: WhiteNoiseAppState,
     targets: List<ChatListItem>,
     filteredTargets: List<Pair<ChatListItem, String>>,
-    visibleFolderRows: List<Pair<ChatFolder, List<String>>>,
+    searching: Boolean,
     targetLoading: Boolean,
     targetsComplete: Boolean,
     browsingFiltered: Boolean,
@@ -573,7 +647,7 @@ private fun ForwardTargetList(
                     }
                 }
             } else if (
-                forwardPickerHasNoRows(targets.isEmpty(), filteredTargets.isEmpty(), visibleFolderRows.isEmpty())
+                targets.isEmpty() || filteredTargets.isEmpty()
             ) {
                 item {
                     ForwardEmptyTargets(browsingFiltered, targetsComplete, targets.isEmpty(), retryLoad)
@@ -599,22 +673,22 @@ private fun ForwardTargetList(
                         )
                     }
                 }
-                if (visibleFolderRows.isNotEmpty()) {
-                    item(key = "forward-folder-controls") {
-                        Column {
-                            SectionHeader(stringResource(R.string.forward_select_by_folder))
-                            key(ownerAccountRef) {
-                                ForwardFolderChips(
-                                    folderRows = visibleFolderRows,
-                                    selected = selected,
-                                    onSelectionChange = onSelectionChange,
-                                )
-                            }
-                        }
+                val pinnedBoundary =
+                    if (searching) {
+                        null
+                    } else {
+                        pinnedBoundaryIndex(
+                            filteredTargets.map { it.first.pinned() },
+                            showArchived = false,
+                        )
                     }
-                }
-                if (filteredTargets.isNotEmpty()) item { SectionHeader(stringResource(R.string.recent_chats)) }
                 items(filteredTargets, key = { (item, _) -> item.group.groupIdHex }) { (item, title) ->
+                    if (
+                        pinnedBoundary != null &&
+                        filteredTargets[pinnedBoundary].first.group.groupIdHex == item.group.groupIdHex
+                    ) {
+                        ChatListPinnedBoundary()
+                    }
                     ForwardTargetRow(
                         appState = appState,
                         item = item,
@@ -652,42 +726,6 @@ private fun ForwardEmptyTargets(
     }
 }
 
-/** Compact bulk-selection controls that keep the destination list vertically primary. */
-@Composable
-internal fun ForwardFolderChips(
-    folderRows: List<Pair<ChatFolder, List<String>>>,
-    selected: List<String>,
-    onSelectionChange: (List<String>) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val selectedSet = remember(selected) { selected.toSet() }
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceSm)
-                .testTag(FORWARD_FOLDER_CHIP_ROW_TEST_TAG),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
-    ) {
-        folderRows.forEach { (folder, memberIds) ->
-            key(folder.id) {
-                ChatFolderChip(
-                    state = chatFolderTriState(memberIds, selectedSet),
-                    label = folder.name,
-                    trailingCount = memberIds.size,
-                    showStateIndicator = true,
-                    labelMaxWidth = FORWARD_FOLDER_CHIP_LABEL_MAX_WIDTH,
-                    onClick = {
-                        onSelectionChange(forwardSelectionAfterFolderToggle(selected, memberIds))
-                    },
-                    modifier = Modifier.testTag(forwardFolderChipTestTag(folder.id)),
-                )
-            }
-        }
-    }
-}
-
 /** One selectable destination chat row resolved through the owning account. */
 @Composable
 @Suppress("LongParameterList")
@@ -722,3 +760,28 @@ private fun awaitingForwardFilterRows(
     filteredEmpty: Boolean,
     browsingFiltered: Boolean,
 ): Boolean = targetsEmpty || (browsingFiltered && filteredEmpty)
+
+/** Adds/removes only this complete visible result; selections outside it remain untouched. */
+internal fun forwardSelectionAfterVisibleToggle(
+    selected: List<String>,
+    visibleIds: List<String>,
+): List<String> = forwardSelectionAfterFolderToggle(selected, visibleIds)
+
+/** A partial result can be browsed, but cannot authorize a bulk destination selection. */
+@Composable
+internal fun ForwardVisibleSelectionAction(
+    selected: List<String>,
+    visibleIds: List<String>,
+    complete: Boolean,
+    onSelectionChange: (List<String>) -> Unit,
+) {
+    val allSelected = visibleIds.isNotEmpty() && selected.containsAll(visibleIds)
+    val label = stringResource(if (allSelected) R.string.chat_list_deselect_all else R.string.chat_list_select_all)
+    IconButton(
+        onClick = { onSelectionChange(forwardSelectionAfterVisibleToggle(selected, visibleIds)) },
+        enabled = complete && visibleIds.isNotEmpty(),
+        modifier = Modifier.testTag("forward.selectAll"),
+    ) {
+        Icon(painterResource(if (allSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all), label)
+    }
+}

@@ -31,7 +31,7 @@
     <ID>CyclomaticComplexMethod:ConversationController.kt:ConversationController$private suspend fun CoroutineScope.runTimelineSubscriptionPipeline</ID>
     <ID>CyclomaticComplexMethod:ConversationController.kt:ConversationController$private suspend fun performMediaUpload</ID>
     <ID>CyclomaticComplexMethod:ConversationController.kt:ConversationController$suspend fun send</ID>
-    <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
+    <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun ConversationScreen</ID>
     <ID>CyclomaticComplexMethod:ConversationStreamPresentation.kt:internal fun durableStreamDisplayPositions: Map&lt;String, StreamFinalDisplayPosition&gt;</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$fun put</ID>
     <ID>CyclomaticComplexMethod:DiskByteCache.kt:DiskByteCache$private fun buildHydratedIndex: HydratedIndex</ID>
@@ -117,7 +117,7 @@
     <ID>FunctionNaming:ConversationRows.kt:@Composable internal fun BoxScope.StickyDayRibbon</ID>
     <ID>FunctionNaming:ConversationRows.kt:@Composable internal fun DaySeparator</ID>
     <ID>FunctionNaming:ConversationRows.kt:@Composable internal fun UnreadMessagesDivider</ID>
-    <ID>FunctionNaming:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
+    <ID>FunctionNaming:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun ConversationScreen</ID>
     <ID>FunctionNaming:CopyableValueRow.kt:@Composable internal fun CopyableValueRow</ID>
     <ID>FunctionNaming:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
     <ID>FunctionNaming:DisappearingMessages.kt:@Composable private fun DisappearingCustomDialog</ID>
@@ -249,7 +249,7 @@
     <ID>LongMethod:ConversationController.kt:ConversationController$private suspend fun runConversationSubscriptionIteration: Pair&lt;Boolean, Boolean&gt;</ID>
     <ID>LongMethod:ConversationController.kt:ConversationController$private suspend fun watchAgentTextStream</ID>
     <ID>LongMethod:ConversationController.kt:ConversationController$suspend fun send</ID>
-    <ID>LongMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
+    <ID>LongMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class) @Composable internal fun ConversationScreen</ID>
     <ID>LongMethod:ConversationTranscriptExportTest.kt:ConversationTranscriptExportTest$@Test fun documentEncodesTimelineMetadataInChronologicalOrder</ID>
     <ID>LongMethod:DiagnosticsScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun DiagnosticsScreen</ID>
     <ID>LongMethod:DisappearingMessages.kt:@Composable private fun DisappearingCustomDialog</ID>
