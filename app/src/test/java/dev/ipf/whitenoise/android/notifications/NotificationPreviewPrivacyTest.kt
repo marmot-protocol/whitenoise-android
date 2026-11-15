@@ -498,6 +498,68 @@ class NotificationPreviewPrivacyTest {
         }
     }
 
+    /** Name-only cards keep who wrote, but neither the message nor the reacted-to text reaches the tray. */
+    @Test
+    fun nameOnlyKeepsSenderAndHidesMessageText() {
+        runBlocking {
+            assertTrue(
+                NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, scrub = { true }),
+            )
+        }
+        val presenter = LocalNotificationPresenter(context, groupReconciliation = {})
+        presenter.ensureChannels()
+        runBlocking { assertTrue(presenter.show(update(), shortNpub = { "Private sender" })) }
+        val card =
+            manager.activeNotifications
+                .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                .notification
+        val messages = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card)!!.messages
+        assertEquals(
+            "Private sender",
+            messages
+                .single()
+                .person
+                ?.name
+                .toString(),
+        )
+        assertEquals(context.getString(R.string.notification_new_message), messages.single().text.toString())
+        assertTrue(
+            card.extras.keySet().none {
+                card.extras
+                    .get(it)
+                    .toString()
+                    .contains("Private text")
+            },
+        )
+        manager.cancelAll()
+        val reaction =
+            update().copy(
+                notificationKey = "reaction",
+                reactionEmoji = "❤️",
+                reactedToPreview = "Private text",
+            )
+        runBlocking { assertTrue(presenter.show(reaction, shortNpub = { "Private sender" })) }
+        val reactionCard =
+            manager.activeNotifications
+                .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                .notification
+        val body =
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(reactionCard)
+                ?.messages
+                ?.lastOrNull()
+                ?.text ?: reactionCard.extras.getCharSequence(Notification.EXTRA_TEXT)
+        assertEquals(context.getString(R.string.notification_reacted_hidden), body.toString())
+        assertTrue(
+            reactionCard.extras.keySet().none {
+                reactionCard.extras
+                    .get(it)
+                    .toString()
+                    .contains("Private text")
+            },
+        )
+    }
+
     /** Builds a new-message notification update carrying private group and sender names. */
     private fun update() =
         NotificationUpdateFfi(

@@ -215,6 +215,29 @@ object LocalNotificationFormatter {
         recipientLabel: String?,
     ): String? = recipientLabel?.takeIf { it.isNotBlank() && relevantSignedInAccountCount > 1 }
 
+    /**
+     * Name-only content (#3659): names, titles and pictures stay, while a message or reaction loses its text and
+     * emoji. Invites and role changes carry no message content and are unchanged.
+     */
+    fun nameOnlyContent(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        context: Context?,
+    ): LocalNotificationContent =
+        if (contentKind(update) != ContentKind.MESSAGE) {
+            content
+        } else {
+            content.copy(
+                body =
+                    if (isReaction(update)) {
+                        text(context, R.string.notification_reacted_hidden, "reacted to a message")
+                    } else {
+                        text(context, R.string.notification_new_message, "New message")
+                    },
+                reactionArtworkBody = null,
+            )
+        }
+
     /** Hidden-preview content: the app name replaces every sender and title, and no artwork body survives. */
     fun redactedContent(
         content: LocalNotificationContent,

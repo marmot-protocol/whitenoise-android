@@ -1321,6 +1321,7 @@
     <string name="voice_message_cancel">Cancelar mensagem de voz</string>
     <string name="notification_reacted_to_message">reagiu com %1$s a: \"%2$s\"</string>
     <string name="notification_reacted">reagiu com %1$s</string>
+    <string name="notification_reacted_hidden">reagiu a uma mensagem</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_video_metadata_not_removable">Não foi possível remover os detalhes privados, como a localização, deste vídeo, por isso ele não foi anexado.</string>
     <string name="profile_picture_hint">URL de imagem HTTPS pública</string>
@@ -2417,8 +2418,14 @@
     <string name="error_invite_welcome_too_large">Este convite é grande demais para os relays de entrada de um destinatário. Peça para ele adicionar um relay de entrada que aceite mensagens maiores.</string>
     <string name="error_update_too_large">Esta atualização é grande demais para seus relays. Nada foi alterado.</string>
     <string name="error_group_change_too_large">Uma alteração do grupo era grande demais para os relays do grupo, então não foi feita.</string>
-    <string name="notification_show_previews">Mostrar prévias das notificações</string>
-    <string name="notification_show_previews_detail">Quando desativado, oculta nomes e conteúdo das mensagens. Vale para todas as contas.</string>
+    <string name="notification_show_previews">Prévia das notificações</string>
+    <string name="notification_show_previews_detail">Escolha o que as notificações mostram. Vale para todas as contas.</string>
+    <string name="notification_preview_full">Nome e mensagem</string>
+    <string name="notification_preview_full_detail">Mostra o remetente e o texto da mensagem</string>
+    <string name="notification_preview_name_only">Só o nome</string>
+    <string name="notification_preview_name_only_detail">Mostra o remetente e oculta a mensagem</string>
+    <string name="notification_preview_none">Oculto</string>
+    <string name="notification_preview_none_detail">Mostra apenas que algo chegou</string>
     <string name="notification_preview_update_failed">Alterações podem ser perdidas após reiniciar.</string>
     <string name="profile_readiness_loading">A carregar o perfil…</string>
     <string name="profile_readiness_unavailable">Estado do perfil indisponível · Toque para editar</string>

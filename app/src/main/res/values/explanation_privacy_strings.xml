@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Hold-to-explain bodies for privacy controls; titles reuse each control's own label. -->
-    <string name="explanation_privacy_notif_previews">Controls whether notifications show sender names and message content. When off, both are hidden. This applies to every account on this device, and you can change it back at any time.</string>
+    <string name="explanation_privacy_notif_previews">Controls what notifications show. Name and message shows the sender and the text. Name only shows the sender and conversation but hides message text and reaction emoji. Hidden shows neither. This applies to every account on this device, and you can change it back at any time.</string>
     <string name="explanation_privacy_notif_preview_retry">Tries again to save your notification preview choice. Until it saves, the change may be lost after you restart the app.</string>
     <string name="explanation_privacy_notif_sounds">Opens the notification sound and vibration options. You can preview the White Noise tones here and open Android\'s settings for each category of alert.</string>
     <string name="explanation_privacy_notif_delivery">Opens the Android notification permission and battery policy for White Noise. These settings affect whether alerts can reach you while the app is in the background.</string>

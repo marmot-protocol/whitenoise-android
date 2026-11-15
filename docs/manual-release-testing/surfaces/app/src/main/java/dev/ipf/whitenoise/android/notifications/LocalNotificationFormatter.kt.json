@@ -55,6 +55,22 @@
           "NTF-034",
           "NTF-007"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "R.string.notification_new_message",
+        "surface": "name-only preview mode replaces message text with a generic line",
+        "test_ids": [
+          "NTF-048"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "R.string.notification_reacted_hidden",
+        "surface": "name-only preview mode hides the reaction and its quoted message",
+        "test_ids": [
+          "NTF-048"
+        ]
       }
     ],
     "source_coverage": [
