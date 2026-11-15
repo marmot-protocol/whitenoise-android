@@ -277,6 +277,7 @@
     <string name="discard_failed_message">Descartar mensaje fallido</string>
     <string name="decline">Rechazar</string>
     <string name="accept">Aceptar</string>
+    <string name="invited_as_account">Cuenta invitada: %1$s</string>
     <string name="invited_to_chat_by">Invitado al chat por %1$s</string>
     <string name="someone">Alguien</string>
     <string name="invitation_pending">Invitación pendiente</string>
@@ -1320,6 +1321,7 @@
     <string name="voice_message_cancel">Cancelar mensaje de voz</string>
     <string name="notification_reacted_to_message">reaccionó con %1$s a: \"%2$s\"</string>
     <string name="notification_reacted">reaccionó con %1$s</string>
+    <string name="notification_reacted_hidden">reaccionó a un mensaje</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_video_metadata_not_removable">No se pudieron quitar los datos privados, como la ubicación, de este vídeo, así que no se adjuntó.</string>
     <string name="profile_picture_hint">URL de imagen HTTPS pública</string>
@@ -2416,8 +2418,14 @@
     <string name="error_invite_welcome_too_large">Esta invitación es demasiado grande para los relays de entrada de un destinatario. Pídele que añada un relay de entrada que acepte mensajes más grandes.</string>
     <string name="error_update_too_large">Esta actualización es demasiado grande para tus relays. No se cambió nada.</string>
     <string name="error_group_change_too_large">Un cambio en el grupo era demasiado grande para los relays del grupo, así que no se aplicó.</string>
-    <string name="notification_show_previews">Mostrar vistas previas de notificaciones</string>
-    <string name="notification_show_previews_detail">Si está desactivado, se ocultan nombres y contenido de mensajes. Afecta a todas las cuentas.</string>
+    <string name="notification_show_previews">Vista previa de notificaciones</string>
+    <string name="notification_show_previews_detail">Elige qué muestran las notificaciones. Afecta a todas las cuentas.</string>
+    <string name="notification_preview_full">Nombre y mensaje</string>
+    <string name="notification_preview_full_detail">Muestra el remitente y el texto del mensaje</string>
+    <string name="notification_preview_name_only">Solo el nombre</string>
+    <string name="notification_preview_name_only_detail">Muestra el remitente y oculta el mensaje</string>
+    <string name="notification_preview_none">Oculto</string>
+    <string name="notification_preview_none_detail">Solo muestra que ha llegado algo</string>
     <string name="notification_preview_update_failed">Los cambios pueden perderse al reiniciar.</string>
     <string name="profile_readiness_loading">Cargando el perfil…</string>
     <string name="profile_readiness_unavailable">Estado del perfil no disponible · Toca para editar</string>

@@ -1,0 +1,61 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+  "legacy_sha256": "1b21273776f04920485d68ba25ea1c0da544b33025f2d7104a724af017552f3f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Key package relay history load failure toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.toast_couldnt_load_key_packages",
+        "test_ids": [
+          "ACC-016"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:error_couldnt_verify_relay_hosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.error_couldnt_verify_relay_hosts",
+        "test_ids": [
+          "ACC-018"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "string:toast_couldnt_publish_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.toast_couldnt_publish_key_package",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_republish_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.toast_couldnt_republish_key_package",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "string:toast_key_package_republished",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.toast_key_package_republished",
+        "test_ids": [
+          "ACC-016"
+        ]
+      },
+      {
+        "surface": "string:toast_new_key_package_published",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackages.kt",
+        "anchor": "R.string.toast_new_key_package_published",
+        "test_ids": [
+          "ACC-016"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

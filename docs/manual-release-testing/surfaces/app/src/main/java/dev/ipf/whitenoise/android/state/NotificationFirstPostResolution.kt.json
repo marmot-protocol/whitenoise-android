@@ -428,6 +428,14 @@
         "test_ids": [
           "CON-011"
         ]
+      },
+      {
+        "surface": "Group invite recipient subtext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationFirstPostResolution.kt",
+        "anchor": "suspend fun recipientAccountSubtext(",
+        "test_ids": [
+          "NTF-008"
+        ]
       }
     ]
   },

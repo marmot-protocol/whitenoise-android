@@ -492,7 +492,7 @@ internal fun ProfileSheet(
     ) {
         if (!owner.canAct()) currentDismiss()
     }
-    if (!owner.canAct() || appState.appLockScreenVisible) return
+    if (!owner.canAct() || appState.appLock.screenVisible) return
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
@@ -1041,7 +1041,7 @@ internal fun ProfileSheet(
                 target = motionPage,
                 depth = profileSheetPageDepth(motionPage, pickerParent),
                 ownerKey = owner,
-                contentVisible = owner.canAct() && !appState.appLockScreenVisible,
+                contentVisible = owner.canAct() && !appState.appLock.screenVisible,
                 animationsEnabled = rememberConversationMotionEnabled(),
             ) { targetPage ->
                 when (targetPage) {

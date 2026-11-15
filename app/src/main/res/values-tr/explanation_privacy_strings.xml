@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Hold-to-explain bodies for privacy controls; titles reuse each control's own label. -->
-    <string name="explanation_privacy_notif_previews">Bildirimlerin gönderen adlarını ve mesaj içeriğini gösterip göstermeyeceğini belirler. Kapalıyken ikisi de gizlenir. Bu, bu cihazdaki tüm hesaplar için geçerlidir ve istediğin zaman geri değiştirebilirsin.</string>
+    <string name="explanation_privacy_notif_previews">Bildirimlerin ne göstereceğini belirler. “Ad ve mesaj” göndereni ve metni gösterir. “Yalnızca ad” göndereni ve sohbeti gösterir, ancak mesaj metnini ve tepki emojilerini gizler. “Gizli” ikisini de göstermez. Bu, bu cihazdaki tüm hesaplar için geçerlidir ve istediğin zaman geri değiştirebilirsin.</string>
     <string name="explanation_privacy_notif_preview_retry">Bildirim önizlemesi seçimini yeniden kaydetmeyi dener. Kaydedilene kadar değişiklik, uygulamayı yeniden başlattığında kaybolabilir.</string>
     <string name="explanation_privacy_notif_sounds">Bildirim sesi ve titreşim seçeneklerini açar. Burada White Noise seslerini dinleyebilir ve her uyarı kategorisi için Android ayarlarını açabilirsin.</string>
     <string name="explanation_privacy_notif_delivery">White Noise için Android bildirim iznini ve pil politikasını açar. Bu ayarlar, uygulama arka plandayken uyarıların sana ulaşıp ulaşmayacağını etkiler.</string>

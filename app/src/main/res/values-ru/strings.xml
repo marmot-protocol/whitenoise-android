@@ -301,6 +301,7 @@
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
+    <string name="invited_as_account">Приглашённый аккаунт: %1$s</string>
     <string name="invited_to_chat_by">Приглашение в чат от %1$s</string>
     <string name="someone">Кто-то</string>
     <string name="invitation_pending">Приглашение ожидает ответа</string>
@@ -1379,6 +1380,7 @@
     <string name="voice_message_cancel">Отменить голосовое</string>
     <string name="notification_reacted_to_message">отреагировал(а) %1$s на: \"%2$s\"</string>
     <string name="notification_reacted">отреагировал(а) %1$s</string>
+    <string name="notification_reacted_hidden">отреагировал(а) на сообщение</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_video_metadata_not_removable">Не удалось удалить из этого видео личные данные, например местоположение, поэтому оно не прикреплено.</string>
     <string name="profile_picture_hint">Публичный HTTPS-URL изображения</string>
@@ -2491,8 +2493,14 @@
     <string name="error_invite_welcome_too_large">Это приглашение слишком велико для входящих ретрансляторов получателя. Попросите добавить входящий ретранслятор, который принимает сообщения большего размера.</string>
     <string name="error_update_too_large">Это обновление слишком велико для ваших ретрансляторов. Ничего не изменено.</string>
     <string name="error_group_change_too_large">Изменение группы оказалось слишком большим для ретрансляторов группы, поэтому оно не выполнено.</string>
-    <string name="notification_show_previews">Показывать содержимое уведомлений</string>
-    <string name="notification_show_previews_detail">Если выключено, скрывает имена и содержимое сообщений. Для всех аккаунтов.</string>
+    <string name="notification_show_previews">Предпросмотр уведомлений</string>
+    <string name="notification_show_previews_detail">Выберите, что показывают уведомления. Для всех аккаунтов.</string>
+    <string name="notification_preview_full">Имя и сообщение</string>
+    <string name="notification_preview_full_detail">Показывает отправителя и текст сообщения</string>
+    <string name="notification_preview_name_only">Только имя</string>
+    <string name="notification_preview_name_only_detail">Показывает отправителя, скрывает сообщение</string>
+    <string name="notification_preview_none">Скрыто</string>
+    <string name="notification_preview_none_detail">Показывает только, что что-то пришло</string>
     <string name="notification_preview_update_failed">Изменения могут потеряться после перезапуска.</string>
     <string name="profile_readiness_loading">Загрузка профиля…</string>
     <string name="profile_readiness_unavailable">Статус профиля недоступен · Нажмите для редактирования</string>

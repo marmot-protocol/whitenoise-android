@@ -122,7 +122,7 @@ internal class ProfileNotificationChannels(
         title: String?,
         redact: Boolean,
     ): String =
-        if (redact || !NotificationPreviewPreferences.enabled(context) || title.isNullOrBlank()) {
+        if (redact || !NotificationPreviewPreferences.mode(context).showsNames || title.isNullOrBlank()) {
             context.getString(R.string.notifications)
         } else {
             context.getString(R.string.profile_notification_channel_name, title.trim().take(MAX_NAME_LENGTH))

@@ -11,8 +11,7 @@ class AuditLogDeleteSemanticsCoverageTest {
     fun cacheCleanupCannotMaskEngineDeleteFailureOrEmptyStateFailure() {
         val body =
             appStateSource()
-                .substringAfter("suspend fun deleteAuditLogs(): Boolean {")
-                .substringBefore("fun updateThemeMode")
+                .substringAfter("suspend fun WhiteNoiseAppState.deleteAuditLogs(): Boolean {")
 
         assertFalse(body.contains("var anyDeleted = preparedDeleted"))
         assertTrue(body.contains("cacheFailure?.let"))
@@ -25,8 +24,7 @@ class AuditLogDeleteSemanticsCoverageTest {
     fun anyFailedNativeDeletionMakesTheResultAFailure() {
         val body =
             appStateSource()
-                .substringAfter("suspend fun deleteAuditLogs(): Boolean {")
-                .substringBefore("fun updateThemeMode")
+                .substringAfter("suspend fun WhiteNoiseAppState.deleteAuditLogs(): Boolean {")
 
         assertFalse("a successful sibling must not override a recorded failure", body.contains("anyDeleted ||"))
         assertTrue(body.contains("val failure = engineFailure") && body.contains("return failure == null"))
@@ -35,7 +33,7 @@ class AuditLogDeleteSemanticsCoverageTest {
     /** Reads the production delete path from either Gradle's module or repository working directory. */
     private fun appStateSource(): String =
         sequenceOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-        ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppState.kt")
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt"),
+        ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppStateAuditLogs.kt")
 }

@@ -288,8 +288,8 @@ class DocumentDestinationAppLockCoverageTest {
         composeRule.setContent {
             scope = rememberCoroutineScope()
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides registry) {
-                val state = rememberProtectedShellSavedState("doc-account", 0, suspended = app.appLockScreenVisible)
-                if (!app.appLockScreenVisible) {
+                val state = rememberProtectedShellSavedState("doc-account", 0, suspended = app.appLock.screenVisible)
+                if (!app.appLock.screenVisible) {
                     state.holder.SaveableStateProvider(state.key) {
                         androidx.compose.runtime.DisposableEffect(Unit) {
                             composed = true

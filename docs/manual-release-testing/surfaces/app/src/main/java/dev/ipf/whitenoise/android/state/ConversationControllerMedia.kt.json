@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMedia.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Media queue retained-byte limit feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMedia.kt",
+        "anchor": "R.string.media_album_too_large",
+        "test_ids": [
+          "MED-003",
+          "MED-009",
+          "MSG-021"
+        ]
+      },
+      {
+        "surface": "Reply refuses a file-backed large attachment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMedia.kt",
+        "anchor": "R.string.media_file_too_large",
+        "test_ids": [
+          "MED-030"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.media_album_too_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMedia.kt",
+        "anchor": "R.string.media_album_too_large",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_reattach_to_retry_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerMedia.kt",
+        "anchor": "R.string.toast_reattach_to_retry_media",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

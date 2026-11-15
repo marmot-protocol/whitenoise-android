@@ -64,8 +64,8 @@ internal fun rememberDocumentSaveFallback(
                     ?.toString()
             resultReady = true
         }
-    LaunchedEffect(resultReady, appState.appLockScreenVisible, origin) {
-        if (!resultReady || appState.appLockScreenVisible) return@LaunchedEffect
+    LaunchedEffect(resultReady, appState.appLock.screenVisible, origin) {
+        if (!resultReady || appState.appLock.screenVisible) return@LaunchedEffect
         val owner = requestedOwner
         val account = requestedAccount
         val destination = acceptedDestination?.let(Uri::parse)

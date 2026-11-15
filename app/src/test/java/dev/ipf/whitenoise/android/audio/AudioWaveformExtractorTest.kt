@@ -321,7 +321,7 @@ private fun shortPcmFrames(
 
 internal fun String.kotlinFunctionBody(functionName: String): String {
     val start =
-        Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+        Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(functionName)}\s*\(""")
             .find(this)
             ?.range
             ?.first

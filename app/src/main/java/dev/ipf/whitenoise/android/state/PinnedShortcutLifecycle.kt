@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 
 /** The live App Lock decision for a launcher tap, read from the same state the lock screen renders. */
 internal fun WhiteNoiseAppState.pinnedShortcutLockDecision(): PinnedShortcutLockDecision =
-    pinnedShortcutLockDecision(appLockScreenVisible, appUnlockEvaluationPending)
+    pinnedShortcutLockDecision(appLock.screenVisible, appLock.evaluationPending)
 
 /**
  * Launcher authority is checked again after native reads and account activation, immediately before routing.

@@ -39,9 +39,9 @@ class MainActivityAppUnlockLifecycleCoverageTest {
     fun successfulUnlockRequiresKeystoreBackedCryptoBeforeCompletingTheSession() {
         val launchBody = functionBody("launchAppUnlockPrompt")
         val callbackBody = functionBody("createAppUnlockPrompt")
-        val ownershipCheckIndex = callbackBody.indexOf("appState.appUnlockSessions.owns(sessionId, hostId)")
+        val ownershipCheckIndex = callbackBody.indexOf("appState.appLock.sessions.owns(sessionId, hostId)")
         val cryptoVerificationIndex = callbackBody.indexOf("appUnlockCryptoGate.verify(result, expectedCipher)")
-        val sessionCompletionIndex = callbackBody.indexOf("appState.appUnlockSessions.complete(")
+        val sessionCompletionIndex = callbackBody.indexOf("appState.appLock.sessions.complete(")
 
         assertTrue(launchBody.contains("appUnlockCryptoGate.createCryptoObject()"))
         assertTrue(launchBody.contains("appUnlockPromptHostState.expectedCipher = cryptoObject.cipher"))
@@ -68,12 +68,12 @@ class MainActivityAppUnlockLifecycleCoverageTest {
 
         assertTrue(installBody.contains("shouldReattachAppUnlockPrompt("))
         assertTrue(installBody.contains("retainedHostSessionMatches = appUnlockPromptHostState.sessionId == sessionId"))
-        assertTrue(installBody.contains("appState.appUnlockSessions.activeSessionId?.takeIf { sessionId ->"))
+        assertTrue(installBody.contains("appState.appLock.sessions.activeSessionId?.takeIf { sessionId ->"))
         assertTrue(installBody.contains("replaceExistingHost = true"))
-        assertTrue(installBody.contains("appState.appUnlockSessions.clear()"))
+        assertTrue(installBody.contains("appState.appLock.sessions.clear()"))
         assertTrue(installBody.contains("prompt-not-retained"))
         assertTrue(installBody.contains("if (abandonedSession)"))
-        assertTrue(installBody.contains("appState.requestAppUnlock()"))
+        assertTrue(installBody.contains("appState.appLock.requestUnlock()"))
         assertTrue(installBody.contains("requestAppUnlock()"))
         assertTrue(requestBody.contains("attachedAppUnlockSessionId == sessionId"))
         assertTrue(requestBody.contains("replaceExistingHost = false"))
@@ -84,9 +84,9 @@ class MainActivityAppUnlockLifecycleCoverageTest {
         val callbackBody = functionBody("createAppUnlockPrompt")
 
         assertTrue(callbackBody.contains("if (sessionId == null || hostId == null) return"))
-        assertTrue(callbackBody.contains("appState.appUnlockSessions.complete("))
-        assertTrue(callbackBody.contains("appState.markAppUnlockSucceeded("))
-        assertTrue(callbackBody.contains("appState.appUnlockSessions.terminate("))
+        assertTrue(callbackBody.contains("appState.appLock.sessions.complete("))
+        assertTrue(callbackBody.contains("appState.appLock.markUnlockSucceeded("))
+        assertTrue(callbackBody.contains("appState.appLock.sessions.terminate("))
         assertTrue(
             callbackBody.contains(
                 "foregroundReturnExpiryElapsedRealtime(",
@@ -94,7 +94,7 @@ class MainActivityAppUnlockLifecycleCoverageTest {
         )
         assertTrue(callbackBody.contains("stale-success-ignored"))
         assertTrue(callbackBody.contains("stale-error-ignored"))
-        assertTrue(source.contains("appState.appUnlockSessions.clearForegroundReturn()"))
+        assertTrue(source.contains("appState.appLock.sessions.clearForegroundReturn()"))
     }
 
     @Test
@@ -109,7 +109,7 @@ class MainActivityAppUnlockLifecycleCoverageTest {
 
     @Test
     fun protectedRetryCannotReplaceAnActivePlatformPrompt() {
-        assertTrue(appSource.contains("onRetry = { appState.requestAppUnlock() }"))
+        assertTrue(appSource.contains("onRetry = { appState.appLock.requestUnlock() }"))
         assertFalse(appSource.contains("retryAppUnlock"))
     }
 

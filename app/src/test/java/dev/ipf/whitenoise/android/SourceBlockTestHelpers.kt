@@ -15,7 +15,7 @@ internal fun appModuleSource(path: String): String = appModuleFile(path).readTex
 
 internal fun String.functionBody(functionName: String): String {
     val start =
-        Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+        Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(functionName)}\s*\(""")
             .find(this)
             ?.range
             ?.first
@@ -166,3 +166,20 @@ internal fun String.kotlinBlockFrom(
     require(blockStart >= 0) { "Missing opening delimiter for $description" }
     error("Unterminated delimiters for $description")
 }
+
+/**
+ * Lists `ConversationController.kt` followed by its `ConversationController<Topic>.kt` extension files,
+ * so source gates keep seeing the whole controller after implementation clusters moved out.
+ */
+internal fun conversationControllerFiles(): List<File> {
+    val state = appModuleFile("src/main/java/dev/ipf/whitenoise/android/state")
+    val topics =
+        state
+            .listFiles { file -> file.name.matches(Regex("""ConversationController\w+\.kt""")) }
+            .orEmpty()
+            .sortedBy(File::getName)
+    return listOf(File(state, "ConversationController.kt")) + topics
+}
+
+/** Reads the whole conversation controller: the class file and its topic extension files. */
+internal fun conversationControllerSource(): String = conversationControllerFiles().joinToString("\n") { it.readText() }

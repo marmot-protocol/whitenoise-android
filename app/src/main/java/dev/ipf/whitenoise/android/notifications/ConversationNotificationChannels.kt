@@ -165,7 +165,7 @@ object ConversationNotificationChannels {
                 null
             }
         return synchronized(UserEventNotificationGroup.mutationLock) {
-            val previews = NotificationPreviewPreferences.enabled(context)
+            val previews = NotificationPreviewPreferences.mode(context).showsNames
             val genericName = context.getString(dev.ipf.whitenoise.android.R.string.app_name)
             val genericDescription = context.getString(dev.ipf.whitenoise.android.R.string.notification_hidden_content)
             ensureConversationChannel(

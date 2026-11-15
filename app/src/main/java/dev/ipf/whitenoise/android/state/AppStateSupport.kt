@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.util.Log
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
+import dev.ipf.whitenoise.android.notifications.PushTokenStorageException
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.withTimeoutOrNull
@@ -114,3 +115,12 @@ internal suspend fun AccountSetupCoordinator.recoverAndRefresh(
     }.onFailure { failure ->
         appStateDebug(failure) { "onboarding checkpoint recovery failed" }
     }.getOrDefault(false)
+
+/** Defers passive push work when encrypted state is unavailable without inventing an empty queue. */
+internal inline fun <T> observePushState(read: () -> T): T? =
+    try {
+        read()
+    } catch (_: PushTokenStorageException) {
+        android.util.Log.w("PushTokenStorage", "lifecycle_work_deferred")
+        null
+    }

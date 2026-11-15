@@ -45,6 +45,15 @@
         "test_ids": [
           "CON-001"
         ]
+      },
+      {
+        "surface": "InvitationReceivingAccountRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "fun InvitationReceivingAccountRow(",
+        "test_ids": [
+          "CON-001",
+          "NTF-008"
+        ]
       }
     ],
     "documentation_contracts": [
@@ -136,6 +145,15 @@
         "anchor": "R.string.someone",
         "test_ids": [
           "CON-001"
+        ]
+      },
+      {
+        "surface": "string:invited_as_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.invited_as_account",
+        "test_ids": [
+          "CON-001",
+          "NTF-008"
         ]
       }
     ]

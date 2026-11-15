@@ -268,12 +268,12 @@ class SettingsRouteMotionTest {
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithTag("gestures.MessageLeft").assertExists()
         rule.runOnIdle {
-            replaceSettingsState(appState, "setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!, true)
+            replaceSettingsState(appState.appLock, "setScreenVisible", Boolean::class.javaPrimitiveType!!, true)
         }
         rule.mainClock.advanceTimeByFrame()
         rule.onNodeWithTag("gestures.MessageLeft").assertDoesNotExist()
         rule.runOnIdle {
-            replaceSettingsState(appState, "setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!, false)
+            replaceSettingsState(appState.appLock, "setScreenVisible", Boolean::class.javaPrimitiveType!!, false)
         }
         // Unlock remounts the LazyColumn. Allow layout frames, never a full 200 ms route animation.
         rule.mainClock.advanceTimeUntil(timeoutMillis = 64) {
@@ -303,14 +303,14 @@ class SettingsRouteMotionTest {
 
     /** Changes actual observable owner/lock state without invoking unrelated native session services. */
     private fun replaceSettingsState(
-        appState: WhiteNoiseAppState,
+        owner: Any,
         method: String,
         type: Class<*>,
         value: Any,
     ) {
-        WhiteNoiseAppState::class.java
+        owner.javaClass
             .getDeclaredMethod(method, type)
             .apply { isAccessible = true }
-            .invoke(appState, value)
+            .invoke(owner, value)
     }
 }

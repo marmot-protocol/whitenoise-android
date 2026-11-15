@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Hold-to-explain bodies for privacy controls; titles reuse each control's own label. -->
-    <string name="explanation_privacy_notif_previews">Détermine si les notifications affichent les noms des expéditeurs et le contenu des messages. Désactivé, les deux sont masqués. Cela s\'applique à tous les comptes de cet appareil, et vous pouvez le modifier à tout moment.</string>
+    <string name="explanation_privacy_notif_previews">Détermine ce qu\'affichent les notifications. « Nom et message » affiche l\'expéditeur et le texte. « Nom uniquement » affiche l\'expéditeur et la conversation, mais masque le texte des messages et les émojis des réactions. « Masqué » n\'affiche ni l\'un ni l\'autre. Cela s\'applique à tous les comptes de cet appareil, et vous pouvez le modifier à tout moment.</string>
     <string name="explanation_privacy_notif_preview_retry">Réessaie d\'enregistrer votre choix d\'aperçu des notifications. Tant qu\'il n\'est pas enregistré, la modification peut être perdue au redémarrage de l\'application.</string>
     <string name="explanation_privacy_notif_sounds">Ouvre les options de son et de vibration des notifications. Vous pouvez y écouter les sonneries de White Noise et ouvrir les réglages d\'Android pour chaque catégorie d\'alerte.</string>
     <string name="explanation_privacy_notif_delivery">Ouvre l\'autorisation de notification d\'Android et la politique de batterie pour White Noise. Ces réglages déterminent si les alertes vous parviennent lorsque l\'application est en arrière-plan.</string>

@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.conversationControllerFiles
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,6 +72,7 @@ class StalenessGuardCoverageTest {
     @Test
     fun awaitThenPublishPathsAreGuardedOrExplicitlyExempt() {
         val appState = productionSource("AppState.kt")
+        val notificationDelivery = productionSource("NotificationDeliveryController.kt")
         val chats = productionSource("ChatsController.kt")
         val conversation = productionSource("ConversationController.kt")
         val nativePushFallback = productionSource("NativePushFallbackRuntime.kt")
@@ -85,7 +88,7 @@ class StalenessGuardCoverageTest {
                         "accountSwitchHandoff.isCurrent(selectionEpoch)",
                         "accountSession.retireSelectionsForSignOut()",
                     ),
-                "AppState.kt:drainPendingPushDisables" to
+                "NotificationDeliveryController.kt:drainPendingPushDisables" to
                     listOf("runtime.marmot.setNativePushEnabled", "marmotRuntime !== runtime"),
                 "AppState.kt:refreshAccountUnreadCounts" to
                     listOf("accountListLifetime.capture", "accountListLifetime.isCurrent"),
@@ -116,29 +119,29 @@ class StalenessGuardCoverageTest {
                     ),
                 "AppState.kt:resolveNotificationFirstPost" to
                     listOf("postEpoch: Long", "epoch = postEpoch"),
-                "AppState.kt:reconcileUnavailableNativePushFallback" to
+                "NotificationDeliveryController.kt:reconcileUnavailableNativePushFallback" to
                     listOf(
                         "captureNativePushFallbackOwner",
                         "ownsNativePushFallback(owner)",
                         "nativePushFallback.reconcile",
                     ),
-                "AppState.kt:clearPushRegistrationForOwnerLocked" to
+                "NotificationDeliveryController.kt:clearPushRegistrationForOwnerLocked" to
                     listOf("ownsNativePushFallback(owner)", "clearPending(owner.accountRef)"),
                 "AppState.kt:acknowledgePendingPushWakeCatchUp" to
                     listOf("isCatchUpKeyCurrent(key)", "recordPendingPushWakeCatchUp"),
-                "AppState.kt:ensureNotificationRenderingEnabled" to
+                "NotificationDeliveryController.kt:ensureNotificationRenderingEnabled" to
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = it"),
-                "AppState.kt:selectFcmDelivery" to
+                "NotificationDeliveryController.kt:selectFcmDelivery" to
                     listOf("ownsNotificationDeliveryMode(owner)", "settleFailedFcmDelivery"),
-                "AppState.kt:configureNativeDeliveryForAccount" to
+                "NotificationDeliveryController.kt:configureNativeDeliveryForAccount" to
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = updated"),
-                "AppState.kt:disableNativePushForPersistentDelivery" to
+                "NotificationDeliveryController.kt:disableNativePushForPersistentDelivery" to
                     listOf("ownsNotificationDeliveryMode(modeOwner)", "nativePushFallback.isReady(fallbackOwner)"),
-                "AppState.kt:rollbackNativePushMode" to
+                "NotificationDeliveryController.kt:rollbackNativePushMode" to
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = restored"),
-                "AppState.kt:restorePersistentPreference" to
+                "NotificationDeliveryController.kt:restorePersistentPreference" to
                     listOf("ownsNotificationDeliveryMode(owner)", "backgroundConnectionEnabled = enabled"),
-                "AppState.kt:finishNotificationDeliveryModeTransaction" to
+                "NotificationDeliveryController.kt:finishNotificationDeliveryModeTransaction" to
                     listOf("notificationDeliveryModeIntent.isCurrent", "notificationDeliveryModeIntent.runIfCurrent"),
                 "NativePushFallbackRuntime.kt:reconcile" to
                     listOf("readNativePushFallbackSettings", "ownerIsCurrent", "ensurePersistentFallback"),
@@ -230,6 +233,7 @@ class StalenessGuardCoverageTest {
             val source =
                 when (fileName) {
                     "AppState.kt" -> appState
+                    "NotificationDeliveryController.kt" -> notificationDelivery
                     "NativePushFallbackRuntime.kt" -> nativePushFallback
                     "DirectChatResolution.kt" -> directChatResolution
                     else -> productionSource(fileName)
@@ -288,15 +292,19 @@ class StalenessGuardCoverageTest {
                 // Telemetry toggle completion is an authoritative engine command, not a replaceable cache read.
                 "AppState.kt:setTelemetryEnabled" to "authoritative settings command result",
                 // Setter completions are authoritative engine commands; every accepted toggle must apply.
-                "AppState.kt:setLocalNotificationsEnabled" to "authoritative settings command result",
+                "NotificationDeliveryController.kt:setLocalNotificationsEnabled" to
+                    "authoritative settings command result",
                 // Foreground-service and preference side effects belong to every accepted toggle.
-                "AppState.kt:setBackgroundConnectionEnabled" to "authoritative settings command result",
+                "NotificationDeliveryController.kt:setBackgroundConnectionEnabled" to
+                    "authoritative settings command result",
                 // The caller holds nativePushSyncMutex and re-reads the runtime setting before caching.
-                "AppState.kt:syncPushForAccount" to "serialized sync with authoritative re-read",
+                "NotificationDeliveryController.kt:syncPushForAccount" to "serialized sync with authoritative re-read",
                 // Enable/disable is an authoritative command and rollback is transactionally explicit.
-                "AppState.kt:setNativePushEnabled" to "authoritative settings command with rollback",
+                "NotificationDeliveryController.kt:setNativePushEnabled" to
+                    "authoritative settings command with rollback",
                 // The caller rechecks ownership under the lifetime and delivery-mode locks before this body runs.
-                "AppState.kt:setNativePushEnabledLocked" to "lock-owned authoritative settings command with rollback",
+                "NotificationDeliveryController.kt:setNativePushEnabledLocked" to
+                    "lock-owned authoritative settings command with rollback",
                 // Foreground catch-up is lifecycle-admitted and clears only the durable generation it observed.
                 "AppState.kt:catchUpAfterForegroundActivation" to "lifecycle admission with generation-checked clear",
                 // The durable attempted flag makes this a one-shot orchestration, not a refresh race.
@@ -356,8 +364,13 @@ class StalenessGuardCoverageTest {
         val guardedNames = guardedPaths.keys
         val candidates =
             asyncPublicationCandidates("AppState.kt", appState) +
+                asyncPublicationCandidates("NotificationDeliveryController.kt", notificationDelivery) +
                 asyncPublicationCandidates("ChatsController.kt", chats) +
-                asyncPublicationCandidates("ConversationController.kt", conversation) +
+                asyncPublicationCandidates(
+                    "ConversationController.kt",
+                    conversation,
+                    conversationControllerFunctionSections(),
+                ) +
                 asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution) +
                 asyncPublicationCandidates("ConversationTimelineSession.kt", timelineSession) +
                 asyncPublicationCandidates("ConversationMutationPresentation.kt", mutationPresentation)
@@ -495,13 +508,14 @@ class StalenessGuardCoverageTest {
     private fun asyncPublicationCandidates(
         fileName: String,
         source: String,
+        sections: List<Pair<String, String>> = source.functionSections(),
     ): Set<String> {
         val mutableFields =
             Regex("""(?m)^ {4}(?:(?:private|internal|public|protected)\s+)?(?:lateinit\s+)?var\s+(\w+)""")
                 .findAll(source)
                 .map { it.groupValues[1] }
                 .toSet()
-        return source.functionSections().mapNotNullTo(mutableSetOf()) { (name, body) ->
+        return sections.mapNotNullTo(mutableSetOf()) { (name, body) ->
             if ("suspend" !in body.substringBefore('(')) {
                 return@mapNotNullTo null
             }
@@ -519,6 +533,13 @@ class StalenessGuardCoverageTest {
                 }
             if (writesSharedField) "$fileName:$name" else null
         }
+    }
+
+    /** Splits class members, plus the top-level extension functions of each controller topic file. */
+    private fun conversationControllerFunctionSections(): List<Pair<String, String>> {
+        val (classFile, topicFiles) = conversationControllerFiles().let { it.first() to it.drop(1) }
+        return classFile.readText().functionSections() +
+            topicFiles.flatMap { it.readText().functionSections(indentation = "") }
     }
 
     /** Splits functions at one declaration indentation into bounded source-policy windows. */
@@ -544,6 +565,7 @@ class StalenessGuardCoverageTest {
         listOf(
             "StalenessGuard.kt",
             "AppState.kt",
+            "NotificationDeliveryController.kt",
             "ChatsController.kt",
             "ConversationController.kt",
             "ConversationTimelineSession.kt",
@@ -562,6 +584,7 @@ class StalenessGuardCoverageTest {
 
     /** Locates one production source from either the module or repository working directory. */
     private fun productionSource(fileName: String): String {
+        if (fileName == "ConversationController.kt") return conversationControllerSource()
         val packages =
             listOf(
                 "state",

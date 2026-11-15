@@ -11,7 +11,7 @@ class WarmResumeAppLockPrivacyTest {
         val source = whiteNoiseAppSource()
         val lockedBranch =
             source
-                .substringAfter("if (appState.appLockScreenVisible) {")
+                .substringAfter("if (appState.appLock.screenVisible) {")
                 .substringBefore("                    } else {")
 
         assertTrue(lockedBranch.contains("AppLockScreen("))

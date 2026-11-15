@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WindowLayout.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ProvideWindowLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WindowLayout.kt",
+        "anchor": "fun ProvideWindowLayout(",
+        "test_ids": [
+          "CON-010",
+          "CON-013",
+          "CON-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

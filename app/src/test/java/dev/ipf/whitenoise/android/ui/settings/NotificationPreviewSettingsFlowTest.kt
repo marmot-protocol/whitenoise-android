@@ -8,9 +8,10 @@ import android.os.Looper
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -20,6 +21,7 @@ import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NotificationGroupReconciler
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -77,24 +79,26 @@ class NotificationPreviewSettingsFlowTest {
                 activeAccountRef = "missing-account",
             )
         composeRule.setContent { WhiteNoiseTheme { NotificationsScreen(appState = state, onBack = {}) } }
-        composeRule.onNodeWithText("Show notification previews").assertIsOn().performClick()
+        composeRule.onNodeWithTag("notification-preview.full").assertIsSelected()
+        composeRule.onNodeWithTag("notification-preview.none").assertIsNotSelected().performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             Shadows.shadowOf(Looper.getMainLooper()).idle()
             !state.notificationPreviewSettings.busy &&
-                !state.notificationPreviewSettings.enabled &&
+                state.notificationPreviewSettings.mode == NotificationPreviewMode.NONE &&
                 !preferences.getBoolean("show_notification_previews", true) &&
                 currentCard()
                     ?.extras
                     ?.getCharSequence(Notification.EXTRA_TITLE)
                     ?.toString() == context.getString(R.string.app_name)
         }
-        composeRule.onNodeWithText("Show notification previews").assertIsOff()
+        composeRule.onNodeWithTag("notification-preview.none").assertIsSelected()
+        composeRule.onNodeWithTag("notification-preview.full").assertIsNotSelected()
         val hidden = checkNotNull(currentCard())
         assertEquals(original.channelId, hidden.channelId)
         assertEquals(original.contentIntent, hidden.contentIntent)
         assertEquals(original.deleteIntent, hidden.deleteIntent)
         assertTrue(hidden.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
-        composeRule.onNodeWithText("Show notification previews").performClick()
+        composeRule.onNodeWithTag("notification-preview.full").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             Shadows.shadowOf(Looper.getMainLooper()).idle()
             !state.notificationPreviewSettings.busy && preferences.getBoolean("show_notification_previews", false)
@@ -105,21 +109,44 @@ class NotificationPreviewSettingsFlowTest {
         )
     }
 
-    /** Busy disables the whole switch row; failed writes have an accessible explicit Retry action. */
+    /** Busy disables every choice; failed writes keep the saved choice and offer an accessible explicit Retry. */
     @Test
     fun pendingAndFailedSettingsHaveClearActions() {
-        val state = mutableStateOf(NotificationPreviewControlState(enabled = false, busy = true))
+        val state = mutableStateOf(NotificationPreviewControlState(mode = NotificationPreviewMode.NONE, busy = true))
         var retries = 0
         composeRule.setContent {
             WhiteNoiseTheme {
                 NotificationPreviewControl(state = state.value, onChange = {}, onRetry = { retries++ })
             }
         }
-        composeRule.onNodeWithText("Show notification previews").assertIsNotEnabled()
-        composeRule.runOnIdle { state.value = NotificationPreviewControlState(enabled = false, failed = true) }
-        composeRule.onNodeWithText("Show notification previews").assertIsEnabled().assertIsOff()
+        NotificationPreviewMode.entries.forEach { mode ->
+            composeRule.onNodeWithTag("notification-preview.${mode.storedValue}").assertIsNotEnabled()
+        }
+        composeRule.runOnIdle {
+            state.value = NotificationPreviewControlState(mode = NotificationPreviewMode.NONE, failed = true)
+        }
+        composeRule.onNodeWithTag("notification-preview.none").assertIsEnabled().assertIsSelected()
         composeRule.onNodeWithText("Retry").assertIsEnabled().performClick()
         assertEquals(1, retries)
+    }
+
+    /** Each choice reports its own mode once; tapping the saved choice changes nothing. */
+    @Test
+    fun choicesReportTheirModeOnce() {
+        val changes = mutableListOf<NotificationPreviewMode>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NotificationPreviewControl(
+                    state = NotificationPreviewControlState(mode = NotificationPreviewMode.FULL),
+                    onChange = { changes += it },
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Name and message").performClick()
+        composeRule.onNodeWithText("Name only").performClick()
+        composeRule.onNodeWithText("Hidden").performClick()
+        assertEquals(listOf(NotificationPreviewMode.NAME_ONLY, NotificationPreviewMode.NONE), changes)
     }
 
     /** Synthetic message with no account runtime dependency. */
