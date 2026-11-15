@@ -252,26 +252,6 @@
         ]
       },
       {
-        "surface": "Notification permission feedback for delivery-mode activation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_notification_permission_needed",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-022"
-        ]
-      },
-      {
-        "surface": "Notification rendering repair failure feedback",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_enable_notifications",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-022"
-        ]
-      },
-      {
         "surface": "DM trace attribution and owner-approved diagnostic export",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "DmCreationDiagnostics.setEnabled(",
