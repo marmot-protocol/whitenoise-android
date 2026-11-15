@@ -7,6 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.unit.IntSize
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -103,6 +106,73 @@ class MediaDisplayThumbnailPersistenceTest {
         composeRule.runOnIdle { fixture.calls.single().succeed(imageBytes()) }
         awaitLoaded()
         assertEquals(1, fixture.calls.size)
+    }
+
+    /** Cleanup retires the previous oversized-source affordance before offering a fresh download. */
+    @Test
+    fun nativeCleanupClearsTheOversizedPreviewState() {
+        fixture.retainNatively(0, imageBytes())
+        fixture.nativeAssetDeclaredBytes = Long.MAX_VALUE.toULong()
+        var loadState: ImageLoadState? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                loadState =
+                    rememberImageLoadState(
+                        controller = controller,
+                        appState = fixture.state,
+                        messageIdHex = request(0).messageIdHex,
+                        attachmentIndex = 0,
+                        reference = reference(0),
+                        mine = false,
+                        decodeKeys = listOf(controller, request(0).messageIdHex),
+                        fallbackAspectRatio = 1f,
+                        intentIdentity = "cleaned-oversized-source",
+                        failureLogTag = "ThumbnailPersistenceTest",
+                        failureLogMessage = "synthetic failure",
+                    )
+            }
+        }
+        composeRule.runOnIdle { checkNotNull(loadState).decodeRequest.onSizeChanged(IntSize(128, 128)) }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            loadState?.tooLargeToPreview == true
+        }
+        composeRule.runOnIdle { fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING) }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            loadState?.transfer?.progress?.phase == AttachmentTransferStateFfi.CLEANED_BY_SETTING &&
+                loadState?.tooLargeToPreview == false
+        }
+        assertEquals(0, fixture.calls.size)
+        assertEquals(0, fixture.nativeAssetReads.get())
+    }
+
+    /** A user request for a cleaned original reaches durable scheduling while passive loading stays suppressed. */
+    @Test
+    fun cleanedOriginalDownloadIntentEnqueuesInteractiveWork() {
+        fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
+        fixture.state.attachmentOpens.setDestination(
+            AttachmentOpenDestination(
+                accountRef = MediaDownloadIntegrationFixture.ACCOUNT,
+                groupIdHex = MediaDownloadIntegrationFixture.GROUP,
+                navigationGeneration = 1L,
+            ),
+        )
+        val transfer = MediaDownloadIntegrationFixture.qualifiedRequest(0)
+        assertTrue(!fixture.state.hasInteractive(transfer))
+        assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
+        // Model scheduler registration lost while the persisted foreground intent still needs fulfillment.
+        fixture.state.clearInteractiveAttachmentDownloadIntent(transfer)
+        assertTrue(!fixture.state.hasInteractive(transfer))
+        assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.state.hasInteractive(transfer)
+        }
+        assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
+        assertEquals(0, fixture.calls.size)
+        assertEquals(0, fixture.nativeAssetReads.get())
     }
 
     /** Mounts the shipping image path with a synthetic received row. */

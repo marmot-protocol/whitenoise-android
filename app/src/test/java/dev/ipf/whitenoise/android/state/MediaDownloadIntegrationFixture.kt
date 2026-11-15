@@ -85,6 +85,9 @@ internal class MediaDownloadIntegrationFixture(
 
     val nativeAssetReads = AtomicInteger()
 
+    /** Overrides retained-asset length to exercise bounded presentation without allocating a large fixture. */
+    var nativeAssetDeclaredBytes: ULong? = null
+
     /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
     val automaticPolicyBlocks = AtomicInteger()
 
@@ -199,7 +202,7 @@ internal class MediaDownloadIntegrationFixture(
                 "attachmentLocalAssets" ->
                     targets(args!!).map { target ->
                         val key = key(args[0] as String, args[1] as String, target)
-                        jobs[key]?.bytes?.let { AttachmentLocalAssetFfi(key, it.size.toULong()) }
+                        jobs[key]?.bytes?.let { AttachmentLocalAssetFfi(key, nativeAssetDeclaredBytes ?: it.size.toULong()) }
                             ?: AttachmentLocalAssetFfi(null, 0u)
                     }
                 "readAttachmentAsset" -> {

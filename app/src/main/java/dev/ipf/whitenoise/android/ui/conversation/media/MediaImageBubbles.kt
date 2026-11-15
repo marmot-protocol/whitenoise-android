@@ -964,7 +964,11 @@ internal fun rememberImageLoadState(
             presentationMaxEdgePx = 0
             originalMaterialized = false
             cachedPlaintextOnEntry = false
+            tooLargeToPreview = false
             withContext(NonCancellable) { controller.evictCachedAttachment(messageIdHex, attachmentIndex) }
+            if (fulfillOriginalDownload) {
+                controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
+            }
             return@LaunchedEffect
         }
         val displayReady = presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx
