@@ -1740,12 +1740,7 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: observable profile versions invalidate narrowly keyed Compose projections.
     private var profileRevision by mutableIntStateOf(0)
     private var contactNicknameRevision by mutableIntStateOf(0)
-    private var profileAccountRevisionEpoch by mutableIntStateOf(0)
-
-    // staleness-exempt: bounded per-account ordering value, not an async publication guard.
-    private var profileAccountRevisionSequence = 0
-    private val profileAccountRevisions = mutableStateMapOf<String, Int>()
-    private val profileAccountRevisionOrder = linkedSetOf<String>()
+    private val profileAccountRevisions = ProfileAccountRevisions(MAX_PROFILE_PRESENTATION_CACHE_ENTRIES)
 
     /**
      * Read-only Compose-tracked snapshot of profile-presentation invalidations
@@ -1757,34 +1752,7 @@ class WhiteNoiseAppState private constructor(
     internal val profileRevisionForCompose: ProfilePresentationRevision
         get() = ProfilePresentationRevision(profileRevision, contactNicknameRevision)
 
-    internal fun profileAccountRevisionForCompose(accountIdHex: String): ProfileAccountRevision {
-        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
-        return ProfileAccountRevision(
-            epoch = profileAccountRevisionEpoch,
-            account = profileAccountRevisions[normalized] ?: 0,
-        )
-    }
-
-    private fun bumpProfileAccountRevision(accountIdHex: String) {
-        val normalized = accountIdHex.trim().lowercase(Locale.ROOT)
-        if (normalized.isEmpty()) return
-        profileAccountRevisionSequence += 1
-        profileAccountRevisions[normalized] = profileAccountRevisionSequence
-        profileAccountRevisionOrder.remove(normalized)
-        profileAccountRevisionOrder.add(normalized)
-        if (profileAccountRevisionOrder.size > MAX_PROFILE_PRESENTATION_CACHE_ENTRIES) {
-            val evicted = profileAccountRevisionOrder.first()
-            profileAccountRevisionOrder.remove(evicted)
-            profileAccountRevisions.remove(evicted)
-        }
-    }
-
-    private fun bumpAllProfileAccountRevisions() {
-        profileAccountRevisionEpoch += 1
-        profileAccountRevisionSequence = 0
-        profileAccountRevisions.clear()
-        profileAccountRevisionOrder.clear()
-    }
+    internal fun profileAccountRevisionForCompose(accountIdHex: String) = profileAccountRevisions.revision(accountIdHex)
 
     private val profilePresentations =
         ScopedCache<String, ProfilePresentation>(
@@ -6515,7 +6483,7 @@ class WhiteNoiseAppState private constructor(
             }
         if (nicknamesCleared) {
             contactNicknameRevision += 1
-            bumpAllProfileAccountRevisions()
+            profileAccountRevisions.reset()
         }
     }
 
@@ -6563,7 +6531,7 @@ class WhiteNoiseAppState private constructor(
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
-        bumpAllProfileAccountRevisions()
+        profileAccountRevisions.reset()
     }
 
     /** Exercises the production account-cache invalidation boundary without starting an account switch. */
@@ -10304,7 +10272,7 @@ class WhiteNoiseAppState private constructor(
         if (isContactRefBeingCleared(account)) return
         if (ContactNicknamePreferences.writeNickname(preferences, account, accountIdHex, nickname)) {
             contactNicknameRevision += 1
-            bumpProfileAccountRevision(accountIdHex)
+            profileAccountRevisions.bump(accountIdHex)
             notificationNicknameRefresh.refresh(account, accountIdHex)
         }
     }
@@ -10629,7 +10597,7 @@ class WhiteNoiseAppState private constructor(
                 }
                 warmPrivateContactAvatar(account, contact)
                 contactNicknameRevision += 1
-                bumpProfileAccountRevision(contact)
+                profileAccountRevisions.bump(contact)
                 mutationsScope.launch { refreshPrivateContactPresentation(account, contact, adoptLegacy = true) }
             }
         }
@@ -10706,7 +10674,7 @@ class WhiteNoiseAppState private constructor(
         synchronized(profilePresentationLock) { !profilePresentations.containsKey(accountIdHex) }
 
     /** Profile publication or account-cache reset invalidates last-drawn top-bar pixels. */
-    internal val profilePresentationEpochForCompose: Int get() = profileAccountRevisionEpoch
+    internal val profilePresentationEpochForCompose: Int get() = profileAccountRevisions.epoch
 
     /**
      * Start local profile materialization and image decoding without waiting for
@@ -11388,7 +11356,7 @@ class WhiteNoiseAppState private constructor(
             }
         if (changed) {
             profileRevision += 1
-            bumpProfileAccountRevision(senderIdHex)
+            profileAccountRevisions.bump(senderIdHex)
         }
     }
 
@@ -13198,7 +13166,7 @@ class WhiteNoiseAppState private constructor(
         if (canonicalNpub == null || npubs.get(accountIdHex) == canonicalNpub) return
         npubs.put(accountIdHex, canonicalNpub)
         profileRevision += 1
-        bumpProfileAccountRevision(accountIdHex)
+        profileAccountRevisions.bump(accountIdHex)
     }
 
     /** Read one persisted profile without mutating the active account caches. */
@@ -13250,7 +13218,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (changed) {
             profileRevision += 1
-            bumpProfileAccountRevision(accountIdHex)
+            profileAccountRevisions.bump(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
             refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
             val viewers = accounts.filter { !it.signedOut && contactPictureStore.hasChoice(it.label, accountIdHex) }
@@ -13270,7 +13238,7 @@ class WhiteNoiseAppState private constructor(
             profileMaterializations.clear()
         }
         profileRevision += 1
-        bumpAllProfileAccountRevisions()
+        profileAccountRevisions.reset()
     }
 
     // Keep platform callbacks at the end of instance initialization. These

@@ -75,7 +75,8 @@ internal fun PlaybackDialog(
                     LocalPlaybackDismissals provides dismissals,
                     LocalPlaybackSourceAllowed provides sourceAllowed,
                 ) {
-                    val visible = host.appState.observePlaybackTransportVisible() && !host.appState.appLock.screenVisible
+                    val visible =
+                        host.appState.observePlaybackTransportVisible() && !host.appState.appLock.screenVisible
                     val noticeSlot = rememberTopNoticeSlot()
                     // With no strip above it, a presented banner is the first thing under the status bar.
                     val bannerOwnsStatusBar =
