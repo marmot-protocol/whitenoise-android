@@ -147,7 +147,10 @@ class AtomicAdminInviteTest {
                     AppText.Resource(R.string.toast_some_members_not_added),
                     fixture.state.transientNotice?.title,
                 )
-                assertEquals(AppText.Plain(fixture.state.displayName(OTHER)), fixture.state.transientNotice?.detail)
+                assertEquals(
+                    AppText.Resource(R.string.group_members_not_added_count, listOf(1)),
+                    fixture.state.transientNotice?.detail,
+                )
                 assertNull(fixture.controller.lastMutationError)
                 assertReconciliationOutcomes(listOf("start", "success"))
             } finally {
