@@ -233,7 +233,9 @@ class MediaDisplayThumbnailPersistenceTest {
             state?.startDownload == true && state?.downloadActionReady == true && fixture.state.hasInteractive(transfer)
         }
         val producer = AtomicReference<Job>()
-        fixture.onNativeSnapshot = { producer.compareAndSet(null, effectJobs.currentMainOwner()) }
+        fixture.onNativeSnapshot = {
+            effectJobs.currentMainOwnerOrNull()?.let { producer.compareAndSet(null, it) }
+        }
         composeRule.runOnIdle { checkNotNull(state).decodeRequest.onSizeChanged(IntSize(128, 128)) }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()
@@ -296,12 +298,15 @@ class MediaDisplayThumbnailPersistenceTest {
             current.set(oldState)
         }
 
-        /** Finds the nearest captured Main ancestor, the effect that owns this particular native read. */
+        /** Requires a Compose effect owner for a test that deliberately blocks its metadata read. */
+        fun currentMainOwner(): Job = checkNotNull(currentMainOwnerOrNull()) { "the read has no Compose owner" }
+
+        /** Ignores app-owned native snapshots while locating the Compose producer under test. */
         @OptIn(ExperimentalCoroutinesApi::class)
-        fun currentMainOwner(): Job {
-            var job = checkNotNull(current.get()) { "the binding did not inherit its Compose effect context" }
-            while (job !in mainJobs) {
-                job = checkNotNull(job.parent) { "the read has no captured Main effect owner" }
+        fun currentMainOwnerOrNull(): Job? {
+            var job = current.get()
+            while (job != null && job !in mainJobs) {
+                job = job.parent
             }
             return job
         }
