@@ -29,6 +29,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
 import dev.ipf.whitenoise.android.media.MediaPipeline
@@ -42,6 +43,7 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companio
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.state.clearMediaDiskCaches
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
@@ -94,15 +96,17 @@ class MediaImageBubbleLatencyTest {
         fixture.close()
     }
 
-    /** Freezing the frame clock prevents an asynchronous decode from disguising a first-frame cache regression. */
+    /** Confirmed L1 pixels wait for a fresh native retention answer before their first displayed frame. */
     @Test
-    fun decodedThumbnailIsVisibleBeforeAnyFollowUpFrame() {
+    fun decodedThumbnailWaitsForNativeRetentionBeforeDisplay() {
         val bitmap = Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
         composeRule.mainClock.autoAdvance = false
         controller.cacheThumbnail(request(0).messageIdHex, 0, bitmap)
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
 
-        assertLoaded()
+        composeRule.onNodeWithContentDescription(reference(0).fileName).assertDoesNotExist()
+        composeRule.mainClock.autoAdvance = true
+        awaitLoaded()
         assertEquals(0, fixture.calls.size)
     }
 
@@ -195,6 +199,104 @@ class MediaImageBubbleLatencyTest {
         assertEquals(1, fixture.calls.size)
     }
 
+    /** A controller opened for another account still reads that account's HOST-cached original. */
+    @Test
+    fun nonActiveAccountFallsThroughToTheOriginalCache() {
+        controller =
+            ConversationController(
+                appState = fixture.state,
+                initialGroup = conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
+                accountRefOverride = MediaDownloadIntegrationFixture.ACCOUNT,
+            )
+        fixture.disk.put(request(0).cacheKey(), imageBytes())
+        fixture.state.activeAccountRef = "another-synthetic-account"
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        awaitLoaded()
+        composeRule.runOnIdle { fixture.state.activeAccountRef = MediaDownloadIntegrationFixture.ACCOUNT }
+        awaitLoaded()
+        assertEquals(0, fixture.calls.size)
+    }
+
+    /** A fresh entry checks native retention before accepting a persisted derivative. */
+    @Test
+    fun cleanedOriginalCannotRenderItsPersistedDerivative() {
+        seedDisplayThumbnail()
+        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
+        fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.thumbnails.residentBytes() == 0L
+        }
+        composeRule.onNodeWithContentDescription(reference(0).fileName).assertDoesNotExist()
+        assertEquals(0, fixture.calls.size)
+    }
+
+    /** MDK's later age sweep revokes pixels already displayed by a visible bubble. */
+    @Test
+    fun visibleDerivativeIsRevokedWhenMdkCleansTheOriginal() {
+        seedDisplayThumbnail()
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        awaitLoaded()
+        composeRule.runOnIdle { fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING) }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.thumbnails.residentBytes() == 0L &&
+                composeRule.onAllNodesWithContentDescription(reference(0).fileName).fetchSemanticsNodes().isEmpty()
+        }
+        assertEquals(0, fixture.nativeAssetReads.get())
+        assertEquals(0, fixture.calls.size)
+    }
+
+    /** A still-visible L1 image waits for an occupied encoder and persists when that encoder becomes free. */
+    @Test
+    fun busyEncoderEventuallyPersistsAVisibleMemoryHit() {
+        runBlocking { fixture.state.displayThumbnailWritePermit.acquire() }
+        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        awaitLoaded()
+        assertEquals(0L, fixture.thumbnails.residentBytes())
+        fixture.state.displayThumbnailWritePermit.release()
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.thumbnails.residentBytes() > 0L
+        }
+        assertEquals(0, fixture.nativeAssetReads.get())
+    }
+
+    /** Disposing a visible image cancels its queued persistence before the encoder is released. */
+    @Test
+    fun disposedMemoryHitCannotWriteAfterWaitingForTheEncoder() {
+        runBlocking { fixture.state.displayThumbnailWritePermit.acquire() }
+        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
+        var shown by mutableStateOf(true)
+        composeRule.setContent { WhiteNoiseTheme { if (shown) Bubble() } }
+        awaitLoaded()
+        composeRule.runOnIdle { shown = false }
+        composeRule.waitForIdle()
+        fixture.state.displayThumbnailWritePermit.release()
+        runBlocking {
+            fixture.state.displayThumbnailWritePermit.acquire()
+            fixture.state.displayThumbnailWritePermit.release()
+        }
+        assertEquals(0L, fixture.thumbnails.residentBytes())
+    }
+
+    /** A cache-only wipe during a native original read must restart the current loader. */
+    @Test
+    fun clearDuringAnOriginalLoadCannotLeaveTheBubbleBlank() {
+        enableAutomaticImages()
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.calls.size == 1
+        }
+        runBlocking(kotlinx.coroutines.Dispatchers.IO) { fixture.state.clearMediaDiskCaches() }
+        composeRule.runOnIdle { fixture.calls.single().succeed(imageBytes()) }
+        awaitLoaded()
+        assertEquals(1, fixture.calls.size)
+    }
+
     /** Writes only a synthetic derivative; no full-size encrypted/native fixture is seeded. */
     private fun seedDisplayThumbnail() {
         val source =
@@ -205,7 +307,7 @@ class MediaImageBubbleLatencyTest {
             fixture.thumbnails.write(
                 source,
                 MediaThumbnail(bitmap, MediaPipeline.THUMBNAIL_MAX_EDGE_PX),
-                fixture.thumbnails.captureGeneration(),
+                fixture.thumbnails.captureGeneration(source),
             )
         }
     }

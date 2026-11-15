@@ -40,28 +40,28 @@ class PersistentDisplayThumbnailsTest {
     @Test
     fun restartRetainsPixelsAndDecodeProvenance() {
         val writer = cache()
-        writer.write(source, MediaThumbnail(bitmap, 768), writer.captureGeneration())
+        writer.write(source, MediaThumbnail(bitmap, 768), writer.captureGeneration(source))
         val reader = cache()
-        val result = checkNotNull(reader.read(source, 512, reader.captureGeneration()))
+        val result = checkNotNull(reader.read(source, 512, reader.captureGeneration(source)))
         assertEquals(768, result.maxEdgePx)
         assertEquals(24, result.bitmap.width)
         assertEquals(16, result.bitmap.height)
         assertTrue(Color.red(result.bitmap.getPixel(3, 3)) >= 250)
         assertEquals(255, Color.alpha(result.bitmap.getPixel(3, 3)))
-        assertNull(reader.read(source, 1024, reader.captureGeneration()))
+        assertNull(reader.read(source, 1024, reader.captureGeneration(source)))
     }
 
     /** Account, attachment index, source epoch and ciphertext replacement cannot reuse old pixels. */
     @Test
     fun identitiesCannotAlias() {
         val cache = cache()
-        cache.write(source, MediaThumbnail(bitmap, 256), cache.captureGeneration())
+        cache.write(source, MediaThumbnail(bitmap, 256), cache.captureGeneration(source))
         listOf(
             source.copy(attachmentKey = "other:chat:message:0"),
             source.copy(attachmentKey = "account:chat:message:1"),
             source.copy(sourceEpoch = 8uL),
             source.copy(ciphertextTag = "b".repeat(64)),
-        ).forEach { assertNull(cache.read(it, 128, cache.captureGeneration())) }
+        ).forEach { assertNull(cache.read(it, 128, cache.captureGeneration(it))) }
     }
 
     /** Every explicit invalidation rejects a producer that began before it, even when no file existed yet. */
@@ -75,10 +75,10 @@ class PersistentDisplayThumbnailsTest {
                 { cache.clear() },
             )
         removals.forEach { remove ->
-            val pending = cache.captureGeneration()
+            val pending = cache.captureGeneration(source)
             remove()
             cache.write(source, MediaThumbnail(bitmap, 256), pending)
-            assertNull(cache.read(source, 128, cache.captureGeneration()))
+            assertNull(cache.read(source, 128, cache.captureGeneration(source)))
         }
     }
 
@@ -102,16 +102,16 @@ class PersistentDisplayThumbnailsTest {
                     },
                 ),
             )
-        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration())
+        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration(source))
         pause.set(true)
-        val before = cache.captureGeneration()
+        val before = cache.captureGeneration(source)
         val writer = CompletableFuture.runAsync { cache.write(source, MediaThumbnail(bitmap, 384), before) }
         check(writing.await(10, TimeUnit.SECONDS))
         val cleaner = CompletableFuture.runAsync { cache.clear() }
         try {
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-            while (cache.captureGeneration() == before && System.nanoTime() < deadline) Thread.yield()
-            val during = cache.captureGeneration()
+            while (cache.isCurrent(before) && System.nanoTime() < deadline) Thread.yield()
+            val during = cache.captureGeneration(source)
             assertTrue(during != before)
             assertTrue(!cache.isCurrent(during))
             assertNull(cache.read(source, 128, during))
@@ -128,16 +128,39 @@ class PersistentDisplayThumbnailsTest {
         }
     }
 
+    /** An unrelated key or tag cannot discard another attachment's completed decode or pending write. */
+    @Test
+    fun invalidationOnlyRetiresMatchingSources() {
+        val cache = cache()
+        val pending = cache.captureGeneration(source)
+        cache.remove("another-attachment")
+        cache.removeByCiphertextTags(setOf("b".repeat(64)))
+        assertTrue(cache.isCurrent(pending))
+        cache.write(source, MediaThumbnail(bitmap, 128), pending)
+        assertNotNull(cache.read(source, 128, pending))
+        cache.removeByCiphertextTags(setOf(source.ciphertextTag))
+        assertTrue(!cache.isCurrent(pending))
+        assertNull(cache.read(source, 128, cache.captureGeneration(source)))
+    }
+
+    /** Disposing a queued presentation prevents its encoder from publishing after it has left the screen. */
+    @Test
+    fun disposedEncoderCannotPublish() {
+        val cache = cache()
+        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration(source)) { false }
+        assertEquals(0L, cache.residentBytes())
+    }
+
     /** Persisted tags and enumerable size slots survive a restart; no loaded-message index is required. */
     @Test
     fun expiryAndRemovalDeleteAllSizesAfterRestart() {
         val writer = cache()
-        listOf(128, 384, 768).forEach { writer.write(source, MediaThumbnail(bitmap, it), writer.captureGeneration()) }
+        listOf(128, 384, 768).forEach { writer.write(source, MediaThumbnail(bitmap, it), writer.captureGeneration(source)) }
         val reader = cache()
         reader.removeByCiphertextTags(setOf(source.ciphertextTag))
         assertEquals(0L, reader.residentBytes())
-        assertNull(cache().read(source, 128, cache().captureGeneration()))
-        listOf(128, 384).forEach { reader.write(source, MediaThumbnail(bitmap, it), reader.captureGeneration()) }
+        assertNull(reader.read(source, 128, reader.captureGeneration(source)))
+        listOf(128, 384).forEach { reader.write(source, MediaThumbnail(bitmap, it), reader.captureGeneration(source)) }
         cache().remove(source.attachmentKey)
         assertEquals(0L, cache().residentBytes())
     }
@@ -156,8 +179,8 @@ class PersistentDisplayThumbnailsTest {
     fun transparentDerivativesRemainLossless() {
         bitmap.eraseColor(Color.argb(80, 255, 0, 255))
         val cache = cache()
-        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration())
-        val decoded = checkNotNull(cache.read(source, 128, cache.captureGeneration()))
+        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration(source))
+        val decoded = checkNotNull(cache.read(source, 128, cache.captureGeneration(source)))
         assertEquals(bitmap.getPixel(3, 3), decoded.bitmap.getPixel(3, 3))
     }
 
@@ -165,19 +188,19 @@ class PersistentDisplayThumbnailsTest {
     @Test
     fun corruptionIsAMiss() {
         val cache = cache()
-        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration())
+        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration(source))
         val file = checkNotNull(directory.listFiles()).single { it.extension == "enc" }
         val bytes = file.readBytes()
         bytes[bytes.lastIndex] = (bytes.last().toInt() xor 1).toByte()
         file.writeBytes(bytes)
-        assertNull(cache.read(source, 128, cache.captureGeneration()))
+        assertNull(cache.read(source, 128, cache.captureGeneration(source)))
     }
 
     /** The derivative budget applies to encrypted bytes and evicts older entries instead of growing unbounded. */
     @Test
     fun encryptedFootprintIsBounded() {
         val sizingCache = cache()
-        sizingCache.write(source, MediaThumbnail(bitmap, 128), sizingCache.captureGeneration())
+        sizingCache.write(source, MediaThumbnail(bitmap, 128), sizingCache.captureGeneration(source))
         val entryBytes = sizingCache.residentBytes()
         assertTrue(entryBytes > 0)
         sizingCache.clear()
@@ -187,12 +210,12 @@ class PersistentDisplayThumbnailsTest {
             cache.write(
                 source.copy(attachmentKey = "attachment-$index"),
                 MediaThumbnail(bitmap, 128),
-                cache.captureGeneration(),
+                cache.captureGeneration(source.copy(attachmentKey = "attachment-$index")),
             )
         }
         assertTrue(cache.residentBytes() in 1..budget)
-        assertNull(cache.read(source.copy(attachmentKey = "attachment-0"), 128, cache.captureGeneration()))
-        assertNotNull(cache.read(source.copy(attachmentKey = "attachment-29"), 128, cache.captureGeneration()))
+        assertNull(cache.read(source.copy(attachmentKey = "attachment-0"), 128, cache.captureGeneration(source.copy(attachmentKey = "attachment-0"))))
+        assertNotNull(cache.read(source.copy(attachmentKey = "attachment-29"), 128, cache.captureGeneration(source.copy(attachmentKey = "attachment-29"))))
     }
 
     /** Independent instances share encrypted bytes and a test-only key, as across process restart. */

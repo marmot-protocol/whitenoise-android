@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -17,6 +18,18 @@ internal data class DisplayThumbnailSource(
     val sourceEpoch: ULong,
     val ciphertextTag: String,
 )
+
+/** A source-scoped publication fence retained only while a reader or encoder owns it. */
+internal class DisplayThumbnailToken internal constructor(
+    internal val source: DisplayThumbnailSource,
+    internal val lifetime: Long,
+    private val revision: AtomicLong,
+    private val capturedRevision: Long,
+    internal val admitted: Boolean,
+) {
+    /** A matching source removal retires this token without affecting another attachment. */
+    internal fun sourceCurrent(): Boolean = revision.get() == capturedRevision
+}
 
 /**
  * Bounded encrypted derivatives of verified static pixels, never a source of original attachment availability.
@@ -29,18 +42,43 @@ internal class PersistentDisplayThumbnails(
 ) {
     private val generation = AtomicLong()
     private val invalidations = AtomicInteger()
+    private val requestLock = Any()
     private val publicationLock = Any()
+    private val sourceRevisions = mutableMapOf<DisplayThumbnailSource, WeakReference<AtomicLong>>()
+    private val removingKeys = mutableMapOf<String, Int>()
+    private val removingTags = mutableMapOf<String, Int>()
 
-    /** Capture before reading an original, so removal during decoding also fences the eventual write. */
-    fun captureGeneration(): Long = generation.get()
+    /** Captures before an original read; weak revision cells disappear after their last request is released. */
+    fun captureGeneration(source: DisplayThumbnailSource): DisplayThumbnailToken =
+        synchronized(requestLock) {
+            sourceRevisions.entries.removeAll { it.value.get() == null }
+            val revision =
+                sourceRevisions[source]?.get() ?: AtomicLong().also {
+                    sourceRevisions[source] = WeakReference(it)
+                }
+            DisplayThumbnailToken(
+                source,
+                generation.get(),
+                revision,
+                revision.get(),
+                invalidations.get() == 0 && source.attachmentKey !in removingKeys && source.ciphertextTag !in removingTags,
+            )
+        }
 
-    /** Immediately fences producers when the main-thread owner retires presentation state. */
-    fun retirePending() {
-        generation.incrementAndGet()
+    /** Retires a source's pending work, or the whole session when [attachmentKey] is absent. */
+    fun retirePending(attachmentKey: String? = null) {
+        synchronized(requestLock) {
+            if (attachmentKey == null) {
+                generation.incrementAndGet()
+            } else {
+                retireSources { it.attachmentKey == attachmentKey }
+            }
+        }
     }
 
-    /** Late reads and writes are expendable after any explicit cache invalidation. */
-    fun isCurrent(token: Long): Boolean = invalidations.get() == 0 && token == generation.get()
+    /** Matching removals and session teardown fence a reader or encoder; unrelated removals preserve it. */
+    fun isCurrent(token: DisplayThumbnailToken): Boolean =
+        token.admitted && invalidations.get() == 0 && token.lifetime == generation.get() && token.sourceCurrent()
 
     /** Hydrates the authenticated disk index off main. */
     fun prepare() = disk.prepare()
@@ -53,9 +91,9 @@ internal class PersistentDisplayThumbnails(
     fun read(
         source: DisplayThumbnailSource,
         requestedEdge: Int,
-        token: Long,
+        token: DisplayThumbnailToken,
     ): MediaThumbnail? {
-        if (!isCurrent(token) || source.ciphertextTag.isBlank()) return null
+        if (token.source != source || !isCurrent(token) || source.ciphertextTag.isBlank()) return null
         for (edge in thumbnailDecodeBuckets.filter { it >= requestedEdge }) {
             val entry =
                 disk.get(slot(source, edge))?.let { bytes ->
@@ -77,46 +115,94 @@ internal class PersistentDisplayThumbnails(
     fun write(
         source: DisplayThumbnailSource,
         entry: MediaThumbnail,
-        token: Long,
+        token: DisplayThumbnailToken,
+        canPublish: () -> Boolean = { true },
     ) {
-        if (!isCurrent(token) || source.ciphertextTag.isBlank() || entry.maxEdgePx !in thumbnailDecodeBuckets) return
+        if (token.source != source ||
+            !isCurrent(token) ||
+            source.ciphertextTag.isBlank() ||
+            entry.maxEdgePx !in thumbnailDecodeBuckets
+        ) {
+            return
+        }
         val bitmap = entry.bitmap
         if (bitmap.width !in 1..entry.maxEdgePx || bitmap.height !in 1..entry.maxEdgePx) return
         val bytes = encode(source, entry) ?: return
         synchronized(publicationLock) {
-            if (isCurrent(token)) {
+            if (isCurrent(token) && canPublish()) {
                 val key = slot(source, entry.maxEdgePx)
                 disk.put(key, bytes, disk.capturePublicationToken(), source.ciphertextTag)
-                if (!isCurrent(token)) disk.remove(key)
+                if (!isCurrent(token) || !canPublish()) disk.remove(key)
             }
         }
     }
 
     /** Retires every size, including slots hydrated after a process restart and not currently in memory. */
     fun remove(attachmentKey: String) =
-        invalidate {
+        invalidate(attachmentKey = attachmentKey) {
             thumbnailDecodeBuckets.forEach { disk.remove(slot(attachmentKey, it)) }
         }
 
     /** Uses the persisted ciphertext tags to retire derivatives of unloaded expired messages. */
     fun removeByCiphertextTags(tags: Set<String>) {
-        if (tags.isNotEmpty()) invalidate { disk.removeByCiphertextTags(tags) }
+        if (tags.isNotEmpty()) invalidate(tags = tags) { disk.removeByCiphertextTags(tags) }
     }
 
     /** Account teardown and Clear Cache retire both persisted data and all pending producers. */
     fun clear() = invalidate { disk.clear() }
 
-    /** Serializes invalidation with publication, while reads authenticate without holding this lock. */
-    private fun invalidate(block: () -> Unit) {
-        invalidations.incrementAndGet()
-        retirePending()
+    /** Fences matching requests before disk work and again after it, including requests admitted during removal. */
+    private fun invalidate(
+        attachmentKey: String? = null,
+        tags: Set<String> = emptySet(),
+        block: () -> Unit,
+    ) {
+        val global = attachmentKey == null && tags.isEmpty()
+        val matches: (DisplayThumbnailSource) -> Boolean = {
+            it.attachmentKey == attachmentKey || it.ciphertextTag in tags
+        }
+        synchronized(requestLock) {
+            if (global) {
+                invalidations.incrementAndGet()
+                generation.incrementAndGet()
+            } else {
+                attachmentKey?.let { removingKeys[it] = removingKeys.getOrDefault(it, 0) + 1 }
+                tags.forEach { removingTags[it] = removingTags.getOrDefault(it, 0) + 1 }
+                retireSources(matches)
+            }
+        }
         try {
             synchronized(publicationLock) { block() }
         } finally {
-            // Tokens captured while cleanup waited for a writer must also be obsolete after cleanup finishes.
-            retirePending()
-            invalidations.decrementAndGet()
+            synchronized(requestLock) {
+                if (global) {
+                    generation.incrementAndGet()
+                    invalidations.decrementAndGet()
+                } else {
+                    retireSources(matches)
+                    attachmentKey?.let { endRemoval(removingKeys, it) }
+                    tags.forEach { endRemoval(removingTags, it) }
+                }
+            }
         }
+    }
+
+    /** Revision cells are weak so removed sources cannot accumulate as permanent generation tombstones. */
+    private fun retireSources(matches: (DisplayThumbnailSource) -> Boolean) {
+        sourceRevisions.entries.removeAll { (source, reference) ->
+            val revision = reference.get()
+            if (matches(source)) revision?.incrementAndGet()
+            revision == null
+        }
+    }
+
+    /** Overlapping removals retain the admission fence until their final owner finishes. */
+    private fun endRemoval(
+        removals: MutableMap<String, Int>,
+        key: String,
+    ) {
+        val count = removals.getValue(key) - 1
+        if (count == 0) removals.remove(key) else removals[key] = count
     }
 
     /** A schema-specific slot prevents ordinary original-cache envelopes from entering this decoder. */

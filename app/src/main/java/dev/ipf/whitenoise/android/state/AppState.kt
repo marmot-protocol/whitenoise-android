@@ -1531,7 +1531,7 @@ class WhiteNoiseAppState private constructor(
 
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
         assertMainThread { "removeMediaMemoryCacheEntry" }
-        displayThumbnails.retirePending()
+        displayThumbnails.retirePending(cacheKey)
         mediaPlaintextCache.remove(cacheKey)
         if (mediaThumbnailCache.remove(cacheKey) != null) mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
@@ -1577,8 +1577,8 @@ class WhiteNoiseAppState private constructor(
             ),
         )
 
-    /** Skip opportunistic writes while an encoder is busy instead of queuing shared bitmap references. */
-    internal val displayThumbnailWritePermit = java.util.concurrent.Semaphore(1)
+    /** Serializes presentation-owned encoders whose queued bitmap references are weak and cancellable. */
+    internal val displayThumbnailWritePermit = kotlinx.coroutines.sync.Semaphore(1)
 
     @Volatile
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime

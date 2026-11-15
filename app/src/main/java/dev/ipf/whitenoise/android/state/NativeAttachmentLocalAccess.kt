@@ -20,6 +20,8 @@ private const val NATIVE_ATTACHMENT_TARGET_LIMIT = 64
 private val nativeAttachmentLeaseCounter = AtomicLong()
 private val preparedNativeAttachmentRoots = mutableSetOf<String>()
 
+private val attachmentMaterializationTracer = MarmotBridgeTracer()
+
 /** Exact native identity for an attachment displayed in a projected timeline row. */
 internal data class NativeAttachmentTarget(
     val displayMessageIdHex: String,
@@ -162,9 +164,20 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachment(
             marmotIo { attachmentLocalAssets(request.accountRef, request.groupIdHex, targets) }
         },
         readAsset = { reference, offset, limit ->
-            marmotIo { readAttachmentAsset(request.accountRef, reference, offset, limit) }
+            marmotIo {
+                android.os.Trace.beginSection("WhiteNoise.attachment.original.chunk")
+                try {
+                    readAttachmentAsset(request.accountRef, reference, offset, limit)
+                } finally {
+                    android.os.Trace.endSection()
+                }
+            }
         },
-    ).open(listOf(target), maxBytes).single()
+    ).let { access ->
+        attachmentMaterializationTracer.trace("WhiteNoise.attachment.original.materialize") {
+            access.open(listOf(target), maxBytes).single()
+        }
+    }
 }
 
 /** Returns whether MarmotKit currently owns verified readable plaintext for this exact target. */

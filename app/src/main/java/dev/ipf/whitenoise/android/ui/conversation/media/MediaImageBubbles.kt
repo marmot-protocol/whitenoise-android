@@ -61,9 +61,12 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
+import dev.ipf.whitenoise.android.state.displayAttachmentNativeState
 import dev.ipf.whitenoise.android.state.displayThumbnailRequest
 import dev.ipf.whitenoise.android.state.displayThumbnailRequestCurrent
-import dev.ipf.whitenoise.android.state.displayThumbnailSessionCurrent
+import dev.ipf.whitenoise.android.state.enqueueInteractiveAttachmentDownload
+import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.state.hasDisplayAttachmentOriginal
 import dev.ipf.whitenoise.android.state.persistDisplayThumbnail
 import dev.ipf.whitenoise.android.state.readDisplayThumbnail
 import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
@@ -78,7 +81,9 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import java.lang.ref.WeakReference
 
 /** The prototype's single-media frame: 256 dp tall, width from the aspect ratio, capped at 256 dp. */
 internal const val SINGLE_MEDIA_MAX_EXTENT_DP = 256f
@@ -797,13 +802,12 @@ internal fun rememberImageLoadState(
     var presentationMaxEdgePx by remember(*keys) { mutableIntStateOf(cachedThumbnail?.maxEdgePx ?: 0) }
     // A derivative proves display readiness only, never completion of a persisted original-download intent.
     var originalMaterialized by remember(*keys) { mutableStateOf(false) }
-    // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
-    // image paints on the first frame — no decode spinner, no visible "reload".
-    // Animated GIF/WebP and byte-sniffed unknowns skip the static thumbnail
-    // cache so they always decode through the ImageDecoder path.
+    // Pending outgoing pixels can seed immediately. Confirmed sources first check MDK's current retention phase,
+    // so returning to a chat cannot briefly display a derivative of an original cleaned while offscreen.
+    // Animated or byte-sniffed unknown sources always use their existing decoder path.
     var presentation by remember(*keys) {
         val cached =
-            if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+            if (reference.sourceEpoch == 0uL && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
                 cachedThumbnail?.bitmap
             } else {
                 null
@@ -900,41 +904,88 @@ internal fun rememberImageLoadState(
             mine,
             cancelledByReader,
             startDownload,
+            observeRetention =
+                MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType) &&
+                    controller.boundAccountRef == appState.activeAccountRef &&
+                    reference.sourceEpoch != 0uL,
         )
+    val nativeRemoved = transfer.progress?.phase in LOCALLY_REMOVED_PHASES
+    val activeAccount = appState.activeAccountRef
+    val runtime = appState.runtimeGeneration
+    val session = appState.mediaUploadSessionEpoch()
 
-    LaunchedEffect(*keys, materializationIntent, reloadToken, requestedMaxEdgePx) {
+    LaunchedEffect(*keys, materializationIntent, reloadToken, requestedMaxEdgePx, activeAccount, runtime, session, nativeRemoved) {
         if (requestedMaxEdgePx == 0) return@LaunchedEffect
         val fulfillOriginalDownload =
             materializationIntent.readerRequested &&
                 controller.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)
-        if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx && !fulfillOriginalDownload) {
+        // A thumbnail request is optional. HOST-cached originals still load for account-override controllers.
+        val thumbnailRequest = controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference)
+        val ownerCurrent = {
+            appState.activeAccountRef == activeAccount &&
+                appState.runtimeGeneration == runtime &&
+                appState.mediaUploadSessionEpoch() == session
+        }
+        val sourceCurrent = {
+            ownerCurrent() && (thumbnailRequest == null || appState.displayThumbnailRequestCurrent(thumbnailRequest))
+        }
+
+        suspend fun loadCurrent(): Boolean {
+            if (sourceCurrent()) return true
+            if (appState.activeAccountRef == activeAccount && appState.runtimeGeneration == runtime) {
+                // Let an in-progress removal finish before capturing a replacement source token.
+                kotlinx.coroutines.delay(16)
+                reloadToken++
+            }
+            return false
+        }
+        val seedStatic = MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
+        val nativeState =
+            if (thumbnailRequest != null && seedStatic) {
+                controller.displayAttachmentNativeState(messageIdHex, attachmentIndex)
+            } else {
+                null
+            }
+        if (!loadCurrent()) return@LaunchedEffect
+        if (nativeRemoved || nativeState in LOCALLY_REMOVED_PHASES) {
+            presentation = null
+            presentationMaxEdgePx = 0
+            originalMaterialized = false
+            cachedPlaintextOnEntry = false
+            withContext(NonCancellable) { controller.evictCachedAttachment(messageIdHex, attachmentIndex) }
             return@LaunchedEffect
         }
-        val thumbnailRequest =
-            controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference)
-                ?: return@LaunchedEffect
+        val displayReady = presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx
+        if (displayReady && fulfillOriginalDownload) {
+            if (controller.hasDisplayAttachmentOriginal(messageIdHex, attachmentIndex)) {
+                if (sourceCurrent()) originalMaterialized = true
+            } else {
+                controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
+            }
+            return@LaunchedEffect
+        }
+        if (displayReady) return@LaunchedEffect
         val cached = controller.thumbnailEntryFor(messageIdHex, attachmentIndex, requestedMaxEdgePx)
-        val seedStatic = MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
-        if (!fulfillOriginalDownload && cached != null && seedStatic) {
+        if (cached != null && seedStatic && nativeState != null) {
             presentation = DecodedAttachmentPresentation.Static(cached.bitmap)
             presentationMaxEdgePx = cached.maxEdgePx
             decodeRequest.onDecodedSize(cached.bitmap.width, cached.bitmap.height)
+            if (fulfillOriginalDownload) reloadToken++
             return@LaunchedEffect
         }
-        if (!fulfillOriginalDownload && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+        if (thumbnailRequest != null && seedStatic && nativeState != null) {
             val persisted = appState.readDisplayThumbnail(thumbnailRequest, requestedMaxEdgePx)
             if (persisted != null) {
                 controller.cacheThumbnail(messageIdHex, attachmentIndex, persisted.bitmap, persisted.maxEdgePx)
                 presentation = DecodedAttachmentPresentation.Static(persisted.bitmap)
                 presentationMaxEdgePx = persisted.maxEdgePx
                 decodeRequest.onDecodedSize(persisted.bitmap.width, persisted.bitmap.height)
+                // An armed download is handled by metadata/durable work on the next effect pass.
+                if (fulfillOriginalDownload) reloadToken++
                 return@LaunchedEffect
             }
         }
-        if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) {
-            if (appState.displayThumbnailSessionCurrent(thumbnailRequest)) reloadToken++
-            return@LaunchedEffect
-        }
+        if (!loadCurrent()) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         failed = false
         tooLargeToPreview = false
@@ -956,10 +1007,7 @@ internal fun rememberImageLoadState(
                     if (automaticNetworkAllowed) reloadToken++
                     return@LaunchedEffect
                 }
-            if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) {
-                if (appState.displayThumbnailSessionCurrent(thumbnailRequest)) reloadToken++
-                return@LaunchedEffect
-            }
+            if (!loadCurrent()) return@LaunchedEffect
             if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) {
                 originalMaterialized = true
                 return@LaunchedEffect
@@ -973,9 +1021,8 @@ internal fun rememberImageLoadState(
                         domain = controller.mediaTrustDomain,
                     )
                 }
-            if (!appState.displayThumbnailRequestCurrent(thumbnailRequest)) {
+            if (!loadCurrent()) {
                 decoded?.releaseOwnedPresentation()
-                if (appState.displayThumbnailSessionCurrent(thumbnailRequest)) reloadToken++
                 return@LaunchedEffect
             }
             originalMaterialized = true
@@ -990,12 +1037,6 @@ internal fun rememberImageLoadState(
                 presentationMaxEdgePx = requestedMaxEdgePx
                 if (decoded is DecodedAttachmentPresentation.Static) {
                     decodeRequest.onDecodedSize(decoded.bitmap.width, decoded.bitmap.height)
-                    val persistStatic =
-                        !decoded.animationDeferred &&
-                            MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
-                    if (persistStatic) {
-                        appState.persistDisplayThumbnail(thumbnailRequest, decoded.bitmap, requestedMaxEdgePx)
-                    }
                 }
             } else {
                 markFailed()
@@ -1027,8 +1068,20 @@ internal fun rememberImageLoadState(
                 reloadToken++
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
+            reloadToken++
         },
     )
+    val staticPixels = (presentation as? DecodedAttachmentPresentation.Static)?.takeUnless { it.animationDeferred }
+    val pendingPixels = remember(staticPixels) { staticPixels?.bitmap?.let { WeakReference(it) } }
+    LaunchedEffect(*keys, pendingPixels, presentationMaxEdgePx, activeAccount, runtime, session, nativeRemoved) {
+        if (pendingPixels == null || nativeRemoved || !MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+            return@LaunchedEffect
+        }
+        val request = controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference) ?: return@LaunchedEffect
+        val phase = controller.displayAttachmentNativeState(messageIdHex, attachmentIndex)
+        if (phase == null || phase in LOCALLY_REMOVED_PHASES) return@LaunchedEffect
+        appState.persistDisplayThumbnail(request, pendingPixels, presentationMaxEdgePx)
+    }
     return ImageLoadState(
         decodeRequest = decodeRequest,
         presentation = presentation,

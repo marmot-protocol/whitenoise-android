@@ -34,7 +34,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -69,6 +68,18 @@ internal class MediaDownloadIntegrationFixture(
     val retryDemands = AtomicInteger()
 
     /** Chunk reads of retained plaintext, each of which the host writes into a lease file. */
+    private val nativePhases = ConcurrentHashMap<String, AttachmentTransferStateFfi>()
+
+    /** Simulates MDK's hourly cleanup or a later reacquisition without changing Android policy. */
+    fun setNativePhase(
+        index: Int,
+        phase: AttachmentTransferStateFfi,
+    ) {
+        val request = qualifiedRequest(index)
+        val target = AttachmentLocalTargetFfi(request.messageIdHex, checkNotNull(request.sourceMessageIdHex), 0u)
+        nativePhases[key(request.accountRef, request.groupIdHex, target)] = phase
+    }
+
     val nativeAssetReads = AtomicInteger()
 
     /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
@@ -337,14 +348,15 @@ internal class MediaDownloadIntegrationFixture(
     private fun status(key: String): AttachmentTransferStatusFfi {
         val call = jobs[key]
         val state =
-            when {
-                call == null -> AttachmentTransferStateFfi.NOT_REQUESTED
-                call.bytes != null -> AttachmentTransferStateFfi.READY
-                call.failure != null -> AttachmentTransferStateFfi.FAILED
-                call.result.isCancelled -> AttachmentTransferStateFfi.CANCELLED
-                call.paused -> AttachmentTransferStateFfi.PAUSED
-                else -> AttachmentTransferStateFfi.DOWNLOADING
-            }
+            nativePhases[key]
+                ?: when {
+                    call == null -> AttachmentTransferStateFfi.NOT_REQUESTED
+                    call.bytes != null -> AttachmentTransferStateFfi.READY
+                    call.failure != null -> AttachmentTransferStateFfi.FAILED
+                    call.result.isCancelled -> AttachmentTransferStateFfi.CANCELLED
+                    call.paused -> AttachmentTransferStateFfi.PAUSED
+                    else -> AttachmentTransferStateFfi.DOWNLOADING
+                }
         return AttachmentTransferStatusFfi(if (call == null) null else key, state, 0u, 0u, null, null)
     }
 
@@ -352,30 +364,20 @@ internal class MediaDownloadIntegrationFixture(
      * Emits an initial snapshot; later observation awaits native work without owning or cancelling it. A paused
      * job is reported once per subscription, then the feed waits for the job to end.
      */
-    private fun subscription(key: String): AttachmentTransferSubscription {
-        val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
-        return nativeStub(FixtureTransferFeed::class.java).also {
-            var initial = true
-            var pauseDelivered = false
+    private fun subscription(key: String): AttachmentTransferSubscription =
+        nativeStub(FixtureTransferFeed::class.java).also {
+            var previous: AttachmentTransferStatusFfi? = null
             it.nextSnapshot = {
-                if (initial) {
-                    initial = false
-                    initialSnapshot
-                } else {
-                    val call = checkNotNull(jobs[key])
-                    call.observed.complete(Unit)
-                    val deliverPause =
-                        !pauseDelivered &&
-                            select {
-                                call.result.onJoin { false }
-                                call.pausedSignal.onJoin { true }
-                            }
-                    if (deliverPause) pauseDelivered = true else call.result.await()
-                    AttachmentTransferSnapshotFfi(listOf(status(key)))
+                var current = status(key)
+                while (current == previous) {
+                    jobs[key]?.observed?.complete(Unit)
+                    delay(10)
+                    current = status(key)
                 }
+                previous = current
+                AttachmentTransferSnapshotFfi(listOf(current))
             }
         }
-    }
 
     /** Scripted feed allocated without running UniFFI's Android native-cleaner constructor. */
     private class FixtureTransferFeed : AttachmentTransferSubscription(NoPointer) {

@@ -134,9 +134,9 @@ internal class TileTransfer(
 /**
  * Observes the shared native transfer of one attachment for a tile, without requesting, restarting or cancelling it.
  *
- * The engine feed is opened only while [observeNative] is true, that is while the tile is materializing, or while the
- * host reports another surface downloading the attachment ([tileObservesNative]), so idle tiles in a long conversation
- * hold no subscription. Own sends have no download to show and ignore native phases.
+ * The engine feed follows materialization and shared transfers ([tileObservesNative]). Static image tiles also
+ * set [observeRetention] while composed so MDK's later age-based cleanup revokes displayed derivatives, including
+ * for confirmed own sends. The feed closes when the tile leaves composition.
  */
 @Composable
 internal fun rememberTileTransfer(
@@ -149,6 +149,7 @@ internal fun rememberTileTransfer(
     observeNative: Boolean,
     failedLocally: Boolean = false,
     storageBlockedLocally: Boolean = false,
+    observeRetention: Boolean = false,
 ): TileTransfer {
     val key = "$messageIdHex#$attachmentIndex"
     val initiallyAvailable =
@@ -165,9 +166,13 @@ internal fun rememberTileTransfer(
         controller.attachmentCancellationState(messageIdHex, attachmentIndex)
     }.collectAsStateWithLifecycle()
     val materializing = observeNative && !mine
-    val observing = tileObservesNative(observeNative, mine, host)
-    val observed by remember(controller, key, reference.ciphertextSha256, reference.sourceEpoch, observing) {
-        if (observing) controller.attachmentNativeProgress(messageIdHex, attachmentIndex) else emptyFlow()
+    val observing = observeRetention || tileObservesNative(observeNative, mine, host)
+    val observed by remember(controller, key, reference.ciphertextSha256, reference.sourceEpoch, observing, observeRetention) {
+        if (observing) {
+            controller.attachmentNativeProgress(messageIdHex, attachmentIndex, observeRetention)
+        } else {
+            emptyFlow()
+        }
     }.collectAsStateWithLifecycle(initialValue = null)
     // An idle tile the cache cannot fill reads its native phase once, so a body this device removed offers Download
     // again even in a conversation opened after the removal, without every idle tile holding a subscription.

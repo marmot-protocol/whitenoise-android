@@ -3,17 +3,23 @@ package dev.ipf.whitenoise.android.state
 import android.graphics.Bitmap
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
+import dev.ipf.whitenoise.android.media.DisplayThumbnailToken
 import dev.ipf.whitenoise.android.media.MediaThumbnail
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.job
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.lang.ref.WeakReference
+
+private val displayThumbnailTracer = MarmotBridgeTracer()
 
 /** A producer's immutable account/session and cache-generation fences, captured before any original read. */
 internal data class DisplayThumbnailRequest(
     val source: DisplayThumbnailSource,
     val account: String,
     val sessionEpoch: Long,
-    val generation: Long,
+    val generation: DisplayThumbnailToken,
 )
 
 /** Captures the displayed row's authoritative source revision without consulting protocol storage. */
@@ -23,15 +29,17 @@ internal fun ConversationController.displayThumbnailRequest(
     reference: MediaAttachmentReferenceFfi,
 ): DisplayThumbnailRequest? {
     val account = boundAccountRef?.takeIf { it == appState.activeAccountRef } ?: return null
-    return DisplayThumbnailRequest(
+    val source =
         DisplayThumbnailSource(
             mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex),
             reference.sourceEpoch,
             reference.ciphertextSha256,
-        ),
+        )
+    return DisplayThumbnailRequest(
+        source,
         account,
         appState.mediaUploadSessionEpoch(),
-        appState.displayThumbnails.captureGeneration(),
+        appState.displayThumbnails.captureGeneration(source),
     )
 }
 
@@ -39,7 +47,7 @@ internal fun ConversationController.displayThumbnailRequest(
 internal fun WhiteNoiseAppState.displayThumbnailRequestCurrent(request: DisplayThumbnailRequest): Boolean =
     displayThumbnailSessionCurrent(request) && displayThumbnails.isCurrent(request.generation)
 
-/** An unrelated cache eviction may restart this session's loader, but a switched account must never retry. */
+/** Account and session ownership remain independent of a source-specific cache eviction. */
 internal fun WhiteNoiseAppState.displayThumbnailSessionCurrent(request: DisplayThumbnailRequest): Boolean =
     activeAccountRef == request.account && mediaUploadSessionEpoch() == request.sessionEpoch
 
@@ -49,30 +57,47 @@ internal suspend fun WhiteNoiseAppState.readDisplayThumbnail(
     maxEdgePx: Int,
 ): MediaThumbnail? {
     val entry =
-        withContext(Dispatchers.IO) {
-            runCatchingCancellable { displayThumbnails.read(request.source, maxEdgePx, request.generation) }.getOrNull()
-        } ?: return null
-    return if (displayThumbnailRequestCurrent(request)) {
-        entry
-    } else {
-        entry.bitmap.recycle()
-        null
-    }
+        displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.read") {
+            withContext(Dispatchers.IO) {
+                runCatchingCancellable { displayThumbnails.read(request.source, maxEdgePx, request.generation) }.getOrNull()
+            }
+        }
+    val current = entry?.takeIf { displayThumbnailRequestCurrent(request) }
+    if (entry != null && current == null) entry.bitmap.recycle()
+    displayThumbnailTracer.trace(
+        if (current == null) "WhiteNoise.displayThumbnail.miss" else "WhiteNoise.displayThumbnail.hit",
+    ) {}
+    return current
 }
 
-/** Writes after display publication, at most one outstanding encoder, without taking ownership of shared pixels. */
-internal fun WhiteNoiseAppState.persistDisplayThumbnail(
+/**
+ * Waits for the single encoder within the presentation's lifetime, retaining only a weak bitmap while queued.
+ * An L1 revisit retries deferred persistence; cancellation or source removal prevents late publication.
+ */
+internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
     request: DisplayThumbnailRequest,
-    bitmap: Bitmap,
+    pixels: WeakReference<Bitmap>,
     maxEdgePx: Int,
 ) {
-    if (!displayThumbnailRequestCurrent(request) || !displayThumbnailWritePermit.tryAcquire()) return
-    mutationsScope
-        .launch(Dispatchers.IO) {
+    val owner = currentCoroutineContext().job
+    displayThumbnailWritePermit.withPermit {
+        if (!displayThumbnailRequestCurrent(request)) return@withPermit
+        withContext(Dispatchers.IO) {
             runCatchingCancellable {
-                displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation)
+                val existing = displayThumbnails.read(request.source, maxEdgePx, request.generation)
+                if (existing != null) {
+                    existing.bitmap.recycle()
+                    return@runCatchingCancellable
+                }
+                val bitmap = pixels.get()?.takeUnless { it.isRecycled } ?: return@runCatchingCancellable
+                displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.write") {
+                    displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation) {
+                        owner.isActive
+                    }
+                }
             }
-        }.invokeOnCompletion { displayThumbnailWritePermit.release() }
+        }
+    }
 }
 
 /** All original-removal callers also retire every derivative size, including in-flight producers. Run off main. */
@@ -100,4 +125,29 @@ internal fun WhiteNoiseAppState.clearMediaDiskCaches() {
     } finally {
         displayThumbnails.clear()
     }
+}
+
+/** Reads MDK's current retention phase without materializing an original or using a conversation-memoized answer. */
+internal suspend fun ConversationController.displayAttachmentNativeState(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): dev.ipf.marmotkit.AttachmentTransferStateFfi? {
+    val request = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return null
+    val target =
+        appState.resolveNativeAttachmentTarget(
+            request.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)),
+        ) ?: return null
+    return appState.nativeAttachmentState(request.copy(sourceMessageIdHex = target.sourceMessageIdHex))
+}
+
+/** Confirms native original availability using metadata only, including while a thumbnail is already displayed. */
+internal suspend fun ConversationController.hasDisplayAttachmentOriginal(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): Boolean {
+    if (hasCachedAttachment(messageIdHex, attachmentIndex)) return true
+    val request = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return false
+    return runCatchingCancellable {
+        appState.hasNativeAttachment(request.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)))
+    }.getOrDefault(false)
 }
