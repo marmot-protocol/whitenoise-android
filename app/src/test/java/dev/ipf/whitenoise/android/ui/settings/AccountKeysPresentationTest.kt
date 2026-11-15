@@ -102,6 +102,7 @@ class AccountKeysPresentationTest {
         composeRule.onNodeWithText(app.getString(R.string.copied)).performClick()
         composeRule.onNodeWithText(app.getString(R.string.export)).performClick()
         composeRule.onNodeWithText(app.getString(R.string.hide)).performClick()
+        composeRule.waitForIdle()
         assertEquals(1, copies)
         assertEquals(1, exports)
         assertEquals(1, hides)
