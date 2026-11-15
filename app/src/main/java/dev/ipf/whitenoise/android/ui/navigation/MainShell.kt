@@ -797,11 +797,14 @@ internal fun MainShell(
     // doesn't contend with the conversation's own streams on the heaviest nav
     // path. The subscription keeps draining updates into the controller's maps
     // throughout; one recompute flushes on return.
+    // Search focus returns when the conversation closes. Widening beside an open chat is not a return.
+    LaunchedEffect(chatsController, selectedChat == null) {
+        if (selectedChat == null) globalSearch.viewport.selection.onConversationReturned()
+    }
     LaunchedEffect(chatsController, selectedChat == null || twoPane) {
         val listVisible = selectedChat == null || twoPane
         chatsController.setChatListVisible(listVisible)
         if (listVisible) {
-            globalSearch.viewport.selection.onConversationReturned()
             chatListReturnHeadSnap = onChatListBecameVisible(chatListReturnHeadSnap)
         }
     }
@@ -2147,7 +2150,13 @@ internal fun MainShell(
             }
             val currentMainRoute by rememberUpdatedState(mainRoute)
             val movableMainRoute = remember { movableContentOf { currentMainRoute() } }
-            TwoPaneChatFrame(twoPane = twoPane, listPane = { movableMainRoute() }) {
+            // Notification, share, update and read-aloud routes cover the whole frame, as on a phone,
+            // so the previous account's list cannot be tapped while they resolve.
+            val listBesideConversation =
+                twoPane &&
+                    !(routingNotification || routingShare || routingAppUpdate) &&
+                    pendingTtsDestinationNavigation == null
+            TwoPaneChatFrame(twoPane = listBesideConversation, listPane = { movableMainRoute() }) {
                 ConversationRouteAnimatedContent(
                     transition = routeTransition,
                     routeForwardDirection = routeForwardDirection,
@@ -2332,7 +2341,7 @@ internal fun MainShell(
                             )
                         }
                         MainShellContentRoute.Main ->
-                            if (twoPane) ConversationPanePlaceholder() else movableMainRoute()
+                            if (listBesideConversation) ConversationPanePlaceholder() else movableMainRoute()
                     }
 
                     ConversationRouteSettledPerformanceMarker(
