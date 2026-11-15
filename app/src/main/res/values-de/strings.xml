@@ -896,6 +896,8 @@
     <string name="toast_invite_sent">Einladung gesendet</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Einladung gesendet, aber Adminrechte konnten nicht hinzugefügt werden</string>
     <string name="toast_couldnt_add_members">Mitglieder konnten nicht hinzugefügt werden. Bitte erneut versuchen.</string>
+    <string name="toast_some_members_not_added">Einige Personen wurden nicht hinzugefügt</string>
+    <string name="group_members_not_added_count">Nicht hinzugefügte Personen (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s konnte nicht hinzugefügt werden. Die Person ist bereits Mitglied oder ihr Signaturschlüssel steht im Konflikt mit dem eines vorhandenen Mitglieds.</string>
     <string name="toast_invites_sent_to_groups">Einladungen an ausgewählte Gruppen gesendet</string>
     <string name="toast_invites_sent_to_groups_partial">Einladungen an einige Gruppen gesendet; einige sind fehlgeschlagen</string>

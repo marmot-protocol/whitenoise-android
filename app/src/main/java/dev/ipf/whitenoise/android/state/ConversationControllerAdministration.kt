@@ -136,10 +136,10 @@ internal suspend fun ConversationController.publishInitialAdminInviteResult(
     }
 }
 
-/** A partial invite reports the skipped names after applying the committed roster. */
+/** A partial invite reports the skipped people after applying the committed roster. */
 internal fun ConversationController.presentInviteAccepted(skipped: AppText?) {
     val account = conversationAccountRef ?: return
-    val title = if (skipped == null) R.string.toast_invite_sent else R.string.toast_couldnt_add_members
+    val title = if (skipped == null) R.string.toast_invite_sent else R.string.toast_some_members_not_added
     appState.presentConversationTransient(account, group.groupIdHex, title, skipped)
 }
 
@@ -151,7 +151,6 @@ internal fun checkInviteAccepted(result: GroupInviteResultFfi) {
 /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */
 private fun ConversationController.inviteReplyNeedsReconciliation(throwable: Throwable): Boolean =
     when (throwable) {
-        is NoGroupMembersSelectedException,
         is MarmotKitException.MissingKeyPackage,
         is MarmotKitException.MissingMemberInboxRoute,
         is MarmotKitException.InvalidKeyPackageEvent,
@@ -162,12 +161,16 @@ private fun ConversationController.inviteReplyNeedsReconciliation(throwable: Thr
         else -> true
     }
 
-/** Only an uncertain first invitation for absent recipients may reconcile by reading membership. */
+/** A definite all-skipped result cannot be reconciled against membership changed by another invitation. */
 internal fun ConversationController.canReconcileInviteReply(
     nativeInvoked: Boolean,
     absentBefore: Boolean,
     failure: Throwable,
-): Boolean = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+): Boolean =
+    nativeInvoked &&
+        absentBefore &&
+        failure !is NoGroupMembersSelectedException &&
+        inviteReplyNeedsReconciliation(failure)
 
 /** Read actual membership after an uncertain reply and return the requested people still absent. */
 internal suspend fun ConversationController.reconcileInitialAdminInvite(

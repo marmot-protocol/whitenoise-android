@@ -1248,6 +1248,8 @@
     <string name="toast_invite_sent">Invite sent</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invite sent, but couldn\'t add admin</string>
     <string name="toast_couldnt_add_members">Couldn\'t add members</string>
+    <string name="toast_some_members_not_added">Some people weren’t added</string>
+    <string name="group_members_not_added_count">People not added (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Couldn\'t add %1$s. They\'re already a member, or their signing key conflicts with an existing member.</string>
     <string name="toast_invites_sent_to_groups">Invites sent to selected groups</string>
     <string name="toast_invites_sent_to_groups_partial">Invites sent to some groups; some failed</string>

@@ -249,7 +249,7 @@ internal fun createdGroupNoticeTitle(
     skipped: AppText?,
 ): Int? =
     when {
-        skipped != null -> R.string.toast_couldnt_add_members
+        skipped != null -> R.string.toast_some_members_not_added
         showCreatedToast -> R.string.toast_chat_created
         else -> null
     }

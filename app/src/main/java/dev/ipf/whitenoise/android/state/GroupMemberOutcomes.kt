@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
+import dev.ipf.whitenoise.android.R
 
 /** Preserves typed single-recipient recovery for group creation and invites with no commit. */
 internal fun groupMemberSelectionFailure(outcomes: List<MemberResolutionOutcomeFfi>): Throwable {
@@ -31,10 +32,25 @@ internal fun GroupCreationResultFfi.requireCreatedGroupId(): String =
 
 /** Resolves only skipped recipients and leaves unnamed recipients out of the display list. */
 internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberNames(displayName: (String) -> String): List<String> =
-    filter { it.status != MemberResolutionStatusFfi.SELECTED }
-        .map { displayName(it.accountIdHex) }
+    skippedGroupMemberRefs()
+        .map(displayName)
         .filter(String::isNotBlank)
 
-/** Reports skipped recipients after a partial commit using the existing add-members feedback. */
+/** Preserves a partial result even when some skipped recipients have no display name. */
 internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMembersDetail(displayName: (String) -> String): AppText? =
-    skippedGroupMemberNames(displayName).takeIf { it.isNotEmpty() }?.joinToString()?.let(AppText::Plain)
+    skippedGroupMemberRefs().missingGroupMembersDetail(displayName)
+
+/** A missing name keeps the total visible, without implying that the named subset was the entire result. */
+internal fun List<String>.missingGroupMembersDetail(displayName: (String) -> String): AppText? {
+    if (isEmpty()) return null
+    val names = map(displayName)
+    return if (names.any(String::isBlank)) {
+        AppText.Resource(R.string.group_members_not_added_count, listOf(size))
+    } else {
+        AppText.Plain(names.joinToString())
+    }
+}
+
+/** Reads the shared runtime's eligibility result independently of its display names. */
+private fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberRefs(): List<String> =
+    filter { it.status != MemberResolutionStatusFfi.SELECTED }.map(MemberResolutionOutcomeFfi::accountIdHex)

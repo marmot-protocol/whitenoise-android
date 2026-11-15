@@ -177,7 +177,7 @@ class GroupCreationStagesTest {
                                 assertEquals("accepted", it)
                                 assertEquals(AppText.Plain("bob"), owner.skippedMembers)
                                 assertEquals(
-                                    R.string.toast_couldnt_add_members,
+                                    R.string.toast_some_members_not_added,
                                     createdGroupNoticeTitle(showCreatedToast = false, skipped = owner.skippedMembers),
                                 )
                             },

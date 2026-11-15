@@ -3845,12 +3845,7 @@ class ConversationController(
                             val absent = reconcileInitialAdminInvite(refs, adminTargets)
                             if (absent != null) {
                                 diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
-                                val skipped =
-                                    absent
-                                        .takeIf { it.isNotEmpty() }
-                                        ?.joinToString(transform = appState::displayName)
-                                        ?.let(AppText::Plain)
-                                presentInviteAccepted(skipped)
+                                presentInviteAccepted(absent.missingGroupMembersDetail(appState::displayName))
                                 return@track true
                             }
                             diagnostic.record(

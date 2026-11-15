@@ -896,6 +896,8 @@
     <string name="toast_invite_sent">Davet gönderildi</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Davet gönderildi, ancak yönetici eklenemedi</string>
     <string name="toast_couldnt_add_members">Üye eklenemedi. Lütfen tekrar deneyin.</string>
+    <string name="toast_some_members_not_added">Bazı kişiler eklenmedi</string>
+    <string name="group_members_not_added_count">Eklenmeyen kişi sayısı (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s eklenemedi. Zaten üye ya da imzalama anahtarı mevcut bir üyeninkiyle çakışıyor.</string>
     <string name="toast_invites_sent_to_groups">Davetler seçili gruplara gönderildi</string>
     <string name="toast_invites_sent_to_groups_partial">Davetler bazı gruplara gönderildi; bazıları başarısız oldu</string>

@@ -15,12 +15,14 @@ import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.groupMemberSelectionFailure
 import dev.ipf.whitenoise.android.state.requireCreatedGroupId
+import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.ui.chats.newchat.startChatErrorUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -68,6 +70,34 @@ class InviteFailurePresentationTest {
         )
         assertFalse(startProfileChatFailureIsMissingSetup(failure))
         assertFalse(startProfileChatFailureCopyable(failure))
+    }
+
+    /** Blank names cannot make a partial commit appear to have added everyone. */
+    @Test
+    fun partialCommitCountsAllSkippedPeopleWhenSomeNamesAreBlank() {
+        val selected = MemberResolutionOutcomeFfi("alice", MemberResolutionStatusFfi.SELECTED, 1u)
+        val unavailable = MemberResolutionStatusFfi.MISSING_KEY_PACKAGE
+        val outcomes = listOf(selected, MemberResolutionOutcomeFfi("bob", unavailable, 0u))
+        val twoSkipped = outcomes + MemberResolutionOutcomeFfi("carol", unavailable, 0u)
+
+        assertEquals(
+            AppText.Resource(R.string.group_members_not_added_count, listOf(1)),
+            outcomes.skippedGroupMembersDetail { " " },
+        )
+        assertEquals(
+            AppText.Resource(R.string.group_members_not_added_count, listOf(2)),
+            twoSkipped.skippedGroupMembersDetail { if (it == "bob") "Bob" else "" },
+        )
+        assertNull(listOf(selected).skippedGroupMembersDetail { "" })
+    }
+
+    /** An explicit solo create can return a valid group ID without any recipient outcomes. */
+    @Test
+    fun emptySelectionCanCreateASoloGroup() {
+        val result = GroupCreationResultFfi("solo-group", emptyList())
+
+        assertEquals("solo-group", result.requireCreatedGroupId())
+        assertNull(result.memberOutcomes.skippedGroupMembersDetail { "" })
     }
 
     /** Every native single-recipient rejection keeps its typed recovery reason. */

@@ -898,6 +898,8 @@
     <string name="toast_invite_sent">Convite enviado</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Convite enviado, mas não foi possível adicionar o administrador</string>
     <string name="toast_couldnt_add_members">Não foi possível adicionar membros. Tente novamente.</string>
+    <string name="toast_some_members_not_added">Algumas pessoas não foram adicionadas</string>
+    <string name="group_members_not_added_count">Pessoas não adicionadas (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Não foi possível adicionar %1$s. Já é membro ou a chave de assinatura conflita com a de um membro existente.</string>
     <string name="toast_invites_sent_to_groups">Convites enviados aos grupos selecionados</string>
     <string name="toast_invites_sent_to_groups_partial">Convites enviados a alguns grupos; alguns falharam</string>

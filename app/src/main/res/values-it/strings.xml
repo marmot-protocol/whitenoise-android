@@ -898,6 +898,8 @@
     <string name="toast_invite_sent">Invito inviato</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invito inviato, ma impossibile aggiungere l’amministratore</string>
     <string name="toast_couldnt_add_members">Impossibile aggiungere membri. Riprova.</string>
+    <string name="toast_some_members_not_added">Alcune persone non sono state aggiunte</string>
+    <string name="group_members_not_added_count">Persone non aggiunte (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Impossibile aggiungere %1$s. È già un membro oppure la sua chiave di firma è in conflitto con quella di un membro esistente.</string>
     <string name="toast_invites_sent_to_groups">Inviti inviati ai gruppi selezionati</string>
     <string name="toast_invites_sent_to_groups_partial">Inviti inviati ad alcuni gruppi; alcuni non sono riusciti</string>

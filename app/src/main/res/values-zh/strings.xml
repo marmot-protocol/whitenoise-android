@@ -881,6 +881,8 @@
     <string name="toast_invite_sent">邀请已发送</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">邀请已发送，但无法添加管理员</string>
     <string name="toast_couldnt_add_members">添加成员失败。请重试。</string>
+    <string name="toast_some_members_not_added">部分联系人未添加</string>
+    <string name="group_members_not_added_count">未添加的联系人（%1$d 位）</string>
     <string name="toast_couldnt_add_member_duplicate_detail">无法添加 %1$s。对方已是成员，或其签名密钥与现有成员冲突。</string>
     <string name="toast_invites_sent_to_groups">邀请已发送到所选群组</string>
     <string name="toast_invites_sent_to_groups_partial">邀请已发送到部分群组；有些失败了</string>

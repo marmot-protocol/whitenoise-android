@@ -112,6 +112,14 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "setting:toast_some_members_not_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_some_members_not_added",
+        "test_ids": [
+          "GRP-005"
+        ]
       }
     ]
   },

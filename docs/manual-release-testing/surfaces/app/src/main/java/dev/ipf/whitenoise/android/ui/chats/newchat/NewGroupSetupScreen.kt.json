@@ -73,9 +73,9 @@
         ]
       },
       {
-        "surface": "setting:toast_couldnt_add_members",
+        "surface": "setting:toast_some_members_not_added",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
-        "anchor": "R.string.toast_couldnt_add_members",
+        "anchor": "R.string.toast_some_members_not_added",
         "test_ids": [
           "NCH-002"
         ]

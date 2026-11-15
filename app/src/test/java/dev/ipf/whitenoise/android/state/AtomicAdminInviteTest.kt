@@ -66,13 +66,14 @@ class AtomicAdminInviteTest {
             }
         }
 
-    /** All-skipped is a preflight outcome and needs neither reconciliation nor another invite. */
+    /** An unrelated roster update cannot turn a definite all-skipped result into a successful invite. */
     @Test
     fun allSkippedReportDoesNotSettleOrReconcileAnInvite() =
         runTest {
             val fixture = Fixture(unavailable = setOf(PEER, OTHER))
             try {
                 fixture.controller.refreshManagementState()
+                fixture.beforeReply = { fixture.publishNewerRoster() }
                 assertFalse(fixture.controller.inviteMembers(listOf(PEER, OTHER)))
                 assertEquals(1, fixture.invocations.size)
                 assertEquals(1, fixture.snapshotReads)
@@ -142,7 +143,10 @@ class AtomicAdminInviteTest {
                 assertEquals(2, fixture.snapshotReads)
                 assertEquals(listOf(SELF, PEER), fixture.controller.members.map { it.memberIdHex })
                 assertEquals(listOf(SELF, PEER), fixture.controller.group.admins)
-                assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), fixture.state.transientNotice?.title)
+                assertEquals(
+                    AppText.Resource(R.string.toast_some_members_not_added),
+                    fixture.state.transientNotice?.title,
+                )
                 assertEquals(AppText.Plain(fixture.state.displayName(OTHER)), fixture.state.transientNotice?.detail)
                 assertNull(fixture.controller.lastMutationError)
                 assertReconciliationOutcomes(listOf("start", "success"))
@@ -157,7 +161,7 @@ class AtomicAdminInviteTest {
             val fixture = Fixture()
             try {
                 fixture.controller.refreshManagementState()
-                fixture.afterCommit = {
+                fixture.beforeReply = {
                     fixture.publishNewerRoster()
                     fixture.controller.refreshManagementState()
                 }
@@ -291,7 +295,7 @@ class AtomicAdminInviteTest {
         var snapshotReads = 0
         var revokeOnRecipientResolution = false
         var onPeerResolution: () -> Unit = {}
-        var afterCommit: suspend () -> Unit = {}
+        var beforeReply: suspend () -> Unit = {}
 
         /** Replaces the current snapshot with a newer roster that adds the other member and makes the peer an admin. */
         fun publishNewerRoster() {
@@ -334,7 +338,7 @@ class AtomicAdminInviteTest {
                     current = snapshot(listOf(SELF) + selected, listOf(SELF) + admins.filter(selected::contains))
                     if (loseReply) error("native response lost after commit")
                     val result = nativeInviteResult(members, selected)
-                    afterCommit()
+                    beforeReply()
                     result
                 },
             )
