@@ -261,7 +261,7 @@ class ChatListProfileReturnSnapCoverageTest {
 
         val visibilityEffect =
             mainShell.requiredSection(
-                start = "LaunchedEffect(chatsController, selectedChat == null) {",
+                start = "LaunchedEffect(chatsController, selectedChat == null || twoPane) {",
                 end = "\n    }\n\n    LaunchedEffect(appState.pendingProfileNpub) {",
             )
         val setVisibleIndex = visibilityEffect.indexOf("setChatListVisible")

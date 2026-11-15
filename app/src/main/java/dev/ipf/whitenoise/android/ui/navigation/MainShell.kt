@@ -1793,13 +1793,15 @@ internal fun MainShell(
             appState.activeForwardOperation.map { it != null }.distinctUntilChanged()
         }.collectAsState(initial = false)
     val playbackVisible = appState.observePlaybackTransportVisible()
-    // The rendered Chats slot keeps its player during preparation and while AnimatedContent exits it.
-    // Promoting a pending tap to the shell would move the player above the account picker for one frame.
-    val playbackInChatList = section == MainSection.Chats
     // Switching chats beside the list keeps the previous conversation on screen while the
     // tapped one prepares, instead of flashing the empty pane between them.
     val twoPaneRetainedContent =
         accountOwnedExitingConversationContent.takeIf { twoPane && accountOwnedPendingConversationOpen != null }
+    // The open conversation beside the list owns the one player bar.
+    val conversationBesideList = twoPane && (selectedChat != null || twoPaneRetainedContent != null)
+    // The rendered Chats slot keeps its player during preparation and while AnimatedContent exits it.
+    // Promoting a pending tap to the shell would move the player above the account picker for one frame.
+    val playbackInChatList = section == MainSection.Chats
     val playbackInShell =
         playbackVisible &&
             !playbackInChatList &&
@@ -2016,10 +2018,7 @@ internal fun MainShell(
                                 selectedFolderId = selectedChatListFolderId,
                                 onSelectFolder = { selectedChatListFolderId = it },
                                 onTtsTransportBodyClick = guardedPlaybackSourceOpen,
-                                // The open conversation beside the list owns the one player bar.
-                                showPlaybackTransport =
-                                    playbackInChatList &&
-                                        !(twoPane && (selectedChat != null || twoPaneRetainedContent != null)),
+                                showPlaybackTransport = playbackInChatList && !conversationBesideList,
                                 onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
                                 onQuickSwitchToAccount = { targetLabel ->
                                     appState.requestQuickAccountSwitchTo(
