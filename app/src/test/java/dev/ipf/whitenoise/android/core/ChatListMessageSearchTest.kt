@@ -234,6 +234,34 @@ class ChatListMessageSearchTest {
         }
     }
 
+    @Test
+    fun dateFiltersRetainZeroAndMaximumAndRejectOverflowInExtremeZones() {
+        val maximum = 253_402_300_799uL
+        for (zone in listOf(java.time.ZoneId.of("Etc/GMT+12"), java.time.ZoneId.of("Pacific/Kiritimati"))) {
+            for (valid in listOf(0uL, maximum)) {
+                val date =
+                    java.time.Instant
+                        .ofEpochSecond(valid.toLong())
+                        .atZone(zone)
+                        .toLocalDate()
+                val bounds =
+                    GlobalSearchEpochBounds(
+                        date.atStartOfDay(zone).toInstant().toEpochMilli(),
+                        date
+                            .plusDays(1)
+                            .atStartOfDay(zone)
+                            .toInstant()
+                            .toEpochMilli(),
+                    )
+                val constraints = MessageSearchConstraints(dateBounds = bounds)
+                assertTrue(constraints.matches(Rec(9uL, false, "", "m", timelineAt = valid)))
+                for (invalid in listOf(maximum + 1uL, 18_446_744_073_709_552uL, ULong.MAX_VALUE)) {
+                    assertFalse(constraints.matches(Rec(9uL, false, "", "m", timelineAt = invalid)))
+                }
+            }
+        }
+    }
+
     /** Content kinds follow the prototype classification. */
     @Test
     fun contentKindsFollowThePrototypeClassification() {

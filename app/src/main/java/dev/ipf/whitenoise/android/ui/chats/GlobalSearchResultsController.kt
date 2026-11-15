@@ -180,14 +180,8 @@ internal class GlobalSearchResultsController(
     }
 
     /** Drains changes queued by [reportChanged] onto [from] in arrival order. */
-    private fun applyQueued(from: GlobalSearchResultsState): GlobalSearchResultsState {
-        val reducer = GlobalSearchResultsReducer
-        var next = from
-        generateSequence { reportedChanges.poll() }.forEach { changes ->
-            next = reducer.restore(reducer.withdraw(next, changes.removed), changes.restored)
-        }
-        return next
-    }
+    private fun applyQueued(from: GlobalSearchResultsState): GlobalSearchResultsState =
+        GlobalSearchResultsReducer.applyKeyChanges(from, generateSequence { reportedChanges.poll() })
 
     /** Starts one bounded recheck pass, from the head or [continuing] where the previous capped pass stopped. */
     private fun recheck(continuing: Boolean) {
