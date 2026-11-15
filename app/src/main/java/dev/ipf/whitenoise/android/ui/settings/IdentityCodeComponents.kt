@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -40,6 +42,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.QrCodeEncoder
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** Black-on-white QR code on a large-corner white card sized from the available width. */
 @Suppress("FunctionNaming")
@@ -101,7 +105,8 @@ private fun IdentityQrCode(
 
 /**
  * 48 dp copy target around a 240 dp capsule that shows a middle-ellipsized identifier and a copy glyph, which turns
- * into a check while [copied]. The whole target is the button; the capsule is the visual.
+ * into a check while [copied]. [explanationRes] defaults to the wording for the user's own key. The whole target is
+ * the button; the capsule is the visual.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -116,6 +121,7 @@ internal fun IdentifierCopyCapsule(
     targetTestTag: String,
     visualTestTag: String,
     modifier: Modifier = Modifier,
+    @StringRes explanationRes: Int = R.string.explanation_organize_copy_public_key,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val actionDescription = if (copied) copiedContentDescription else copyContentDescription
@@ -125,7 +131,12 @@ internal fun IdentifierCopyCapsule(
             modifier
                 .widthIn(max = IdentityCodeDefaults.CapsuleMaxWidth)
                 .heightIn(min = IdentityCodeDefaults.CapsuleMinHeight)
-                .clickable(
+                .explainOnLongPress(
+                    Explanation(
+                        copyContentDescription,
+                        stringResource(explanationRes),
+                    ),
+                ).clickable(
                     interactionSource = interactionSource,
                     indication = null,
                     role = Role.Button,

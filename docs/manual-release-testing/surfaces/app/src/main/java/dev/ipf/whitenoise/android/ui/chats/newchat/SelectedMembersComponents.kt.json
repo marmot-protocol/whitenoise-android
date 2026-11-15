@@ -103,6 +103,14 @@
         "test_ids": [
           "NCH-002"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "surface": "Holding the Admin switch explains it",
+        "anchor": "R.string.explanation_new_message_admin",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ]
   },

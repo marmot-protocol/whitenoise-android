@@ -33,7 +33,9 @@ import dev.ipf.whitenoise.android.core.SupportContact
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -200,6 +202,7 @@ internal fun SupportContent(
                                     context = context,
                                     title = stringResource(R.string.support_open_relays),
                                     subtitle = stringResource(R.string.support_relays_review),
+                                    explanation = stringResource(R.string.explanation_organize_support_relays),
                                     enabled = !busy,
                                     routeKey = SettingsDetail.SupportRelays,
                                     onClick = onRelays,
@@ -212,6 +215,7 @@ internal fun SupportContent(
                                     SettingsLink(
                                         context = context,
                                         title = stringResource(R.string.retry),
+                                        explanation = stringResource(R.string.explanation_organize_support_retry),
                                         onClick = onRetry,
                                         enabled = !busy,
                                         modifier = Modifier.testTag("support.retry"),
@@ -225,6 +229,7 @@ internal fun SupportContent(
             }
             item(key = "search.SupportScreen.5") {
                 val (startModifier, startClick) = rememberMeasuredControlClick(onStart)
+                val startLabel = stringResource(R.string.start_chat)
                 WhiteNoiseButton(
                     onClick = startClick,
                     enabled = canStart && !busy,
@@ -235,8 +240,14 @@ internal fun SupportContent(
                                 vertical = WhiteNoiseSpacing.Section,
                             ).fillMaxWidth()
                             .then(startModifier)
-                            .testTag("support.start"),
-                ) { Text(stringResource(R.string.start_chat)) }
+                            .testTag("support.start")
+                            .explainOnLongPress(
+                                Explanation(
+                                    startLabel,
+                                    stringResource(R.string.explanation_organize_support_start),
+                                ),
+                            ),
+                ) { Text(startLabel) }
             }
         }
     }

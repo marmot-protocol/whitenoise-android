@@ -1,0 +1,135 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+  "legacy_sha256": "3b5ec9d616d0a2349d387a0530b9d9212b303a263db4a7cc329ef2526a328c3a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "string:seed_fixture_stopped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_stopped",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "ConversationFixtureSeedDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun ConversationFixtureSeedDialog(",
+        "test_ids": [
+          "SET-020",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "ConversationFixtureSeedDialogContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun ConversationFixtureSeedDialogContent(",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "ConversationFixtureTargetList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun ConversationFixtureTargetList(",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "SeedProgressText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "fun SeedProgressText(",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:seed_fixture_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_title",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:seed_fixture_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_detail",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:seed_fixture_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_count",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:seed_fixture_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_start",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:seed_fixture_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_progress",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:seed_fixture_no_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.seed_fixture_no_groups",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-020"
+        ]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-020"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ConversationFixtureSeedDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_seed_target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+        "anchor": "R.string.explanation_organize_seed_target",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

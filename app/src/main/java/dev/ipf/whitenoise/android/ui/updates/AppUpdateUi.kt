@@ -19,6 +19,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 
 private val AppUpdateEmblemBackground = Color(0xFF55D6C2)
@@ -50,10 +52,11 @@ internal fun AppUpdateIconButton(
     IconButton(
         onClick = openSettings,
         modifier =
-            modifier.then(settingsOrigin).testTag("appUpdate.openSettings").semantics {
-                stateDescription =
-                    availability
-            },
+            modifier
+                .then(settingsOrigin)
+                .testTag("appUpdate.openSettings")
+                .semantics { stateDescription = availability }
+                .explainOnLongPress(chatsExplanation(R.string.app_updates, R.string.explanation_app_update_icon)),
     ) {
         AppUpdateEmblem(stringResource(R.string.app_updates))
     }

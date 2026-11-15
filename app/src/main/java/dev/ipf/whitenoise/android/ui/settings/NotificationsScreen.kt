@@ -139,6 +139,7 @@ internal fun NotificationsScreen(
                             routeKey = SettingsDetail.NotificationSounds,
                             onClick = onOpenSounds,
                             modifier = Modifier.testTag("notifications.sounds"),
+                            explanation = stringResource(R.string.explanation_privacy_notif_sounds),
                             leading = { SettingsLeadingIcon(R.drawable.ic_music_note) },
                         )
                     }
@@ -150,6 +151,7 @@ internal fun NotificationsScreen(
                             routeKey = SettingsDetail.NotificationDelivery,
                             onClick = onOpenDelivery,
                             modifier = Modifier.testTag("notifications.delivery"),
+                            explanation = stringResource(R.string.explanation_privacy_notif_delivery),
                             leading = { SettingsLeadingIcon(R.drawable.ic_battery_full) },
                         )
                     }
@@ -159,6 +161,7 @@ internal fun NotificationsScreen(
                             title = stringResource(R.string.android_notification_settings),
                             onClick = { openAppNotificationSettings(context) },
                             modifier = Modifier.testTag("notifications.android-settings"),
+                            explanation = stringResource(R.string.explanation_privacy_notif_android_settings),
                             leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                         )
                     }
@@ -296,6 +299,7 @@ internal fun NotificationDeliverySelector(
                     context = rowContext,
                     title = stringResource(R.string.notification_delivery_push),
                     subtitle = stringResource(R.string.notification_delivery_push_detail),
+                    explanation = stringResource(R.string.explanation_notifications_push),
                     selected = selectedMode == NotificationDeliveryMode.Fcm,
                     enabled = enabled,
                     highlightSelected = false,
@@ -309,6 +313,7 @@ internal fun NotificationDeliverySelector(
                 context = rowContext,
                 title = stringResource(R.string.local_notifications),
                 subtitle = stringResource(R.string.notification_delivery_local_detail),
+                explanation = stringResource(R.string.explanation_notifications_local),
                 selected = selectedMode == NotificationDeliveryMode.Local,
                 enabled = enabled,
                 highlightSelected = false,
@@ -342,6 +347,7 @@ private fun NotificationDevicePolicyGroup(
                         },
                     ),
                 onClick = onOpenNotificationSettings,
+                explanation = stringResource(R.string.explanation_privacy_notif_permission),
                 leading = { SettingsLeadingIcon(R.drawable.ic_notifications_active) },
             )
         }
@@ -352,6 +358,7 @@ private fun NotificationDevicePolicyGroup(
                 subtitle = stringResource(batteryPolicy.subtitleResource()),
                 onClick = onOpenBatterySettings,
                 modifier = Modifier.testTag("notification-battery.settings"),
+                explanation = stringResource(R.string.explanation_privacy_notif_battery),
                 leading = { SettingsLeadingIcon(R.drawable.ic_battery_saver) },
             )
         }
@@ -385,6 +392,7 @@ private fun NotificationPermissionGroup(
                     subtitle = stringResource(R.string.notifications_are_off_detail),
                     onClick = onOpenSettings,
                     leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
+                    explanation = stringResource(R.string.explanation_privacy_notif_off),
                 )
             }
         } else {
@@ -395,6 +403,7 @@ private fun NotificationPermissionGroup(
                     subtitle = stringResource(R.string.allow_notifications_detail),
                     onClick = onRequest,
                     leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
+                    explanation = stringResource(R.string.explanation_privacy_notif_allow),
                 )
             }
         }
@@ -428,6 +437,7 @@ internal fun GlobalNotificationCategories(
                     value = soundLabels[channel],
                     onClick = { onOpenChannel(channel) },
                     modifier = Modifier.testTag("global-notification-category-${channel.id}"),
+                    explanation = stringResource(R.string.explanation_privacy_notif_category),
                     leading = { SettingsLeadingIcon(notificationChannelIcon(channel)) },
                 )
             }

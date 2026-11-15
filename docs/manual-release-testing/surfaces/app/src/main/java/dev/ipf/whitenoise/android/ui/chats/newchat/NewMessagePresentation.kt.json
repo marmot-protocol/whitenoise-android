@@ -64,6 +64,14 @@
         "test_ids": [
           "NCH-001"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "surface": "Holding Talk to your agent explains it",
+        "anchor": "R.string.explanation_new_message_talk_to_agent",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ],
     "settings_controls": [

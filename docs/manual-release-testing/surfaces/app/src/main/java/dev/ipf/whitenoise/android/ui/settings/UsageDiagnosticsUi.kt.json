@@ -101,6 +101,22 @@
         "test_ids": [
           "STB-004"
         ]
+      },
+      {
+        "surface": "Usage diagnostics hold-to-explain: usage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.explanation_diagnostics_usage",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Usage diagnostics hold-to-explain: logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+        "anchor": "R.string.explanation_diagnostics_logs",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "settings_controls": [

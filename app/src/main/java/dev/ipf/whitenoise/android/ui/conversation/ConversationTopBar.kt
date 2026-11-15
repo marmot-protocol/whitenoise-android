@@ -57,10 +57,12 @@ import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
@@ -253,7 +255,12 @@ internal fun ConversationTopBar(
                                         Color.Transparent,
                                     ).clip(RoundedCornerShape(12.dp))
                                     // The reader speaks the chat name and member line, then offers Details.
-                                    .clickable(
+                                    .explainOnLongPress(
+                                        Explanation(
+                                            openDetailsDescription,
+                                            stringResource(R.string.explanation_conversation_header_details),
+                                        ),
+                                    ).clickable(
                                         onClickLabel = openDetailsDescription,
                                         role = Role.Button,
                                         onClick = onOpenDetails,

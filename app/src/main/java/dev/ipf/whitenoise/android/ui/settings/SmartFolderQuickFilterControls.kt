@@ -34,7 +34,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /**
  * Three-state controls edit the same draft tree as Advanced. A neutral row adds no condition for its field; a rule
@@ -91,7 +93,12 @@ internal fun SmartFolderQuickFilterControls(
                                 .fillMaxHeight()
                                 .heightIn(min = 48.dp)
                                 .testTag("folder.quick.${field.name}.${mode.name}")
-                                .semantics {
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(quickFilterLabel(field, mode)),
+                                        stringResource(quickFilterExplanation(field)),
+                                    ),
+                                ).semantics {
                                     selected = active
                                     stateDescription = rowState
                                 },
@@ -120,10 +127,29 @@ internal fun SmartFolderQuickFilterControls(
         TextButton(
             onClick = { onChange(root.resetQuickFilters()) },
             enabled = quickFolderFields.any { root.quickMode(it) != null },
-            modifier = Modifier.testTag("folder.quick.reset"),
+            modifier =
+                Modifier
+                    .testTag("folder.quick.reset")
+                    .explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.smart_folder_quick_reset),
+                            stringResource(R.string.explanation_organize_quick_reset),
+                        ),
+                    ),
         ) { Text(stringResource(R.string.smart_folder_quick_reset)) }
     }
 }
+
+private fun quickFilterExplanation(field: FolderField): Int =
+    when (field) {
+        FolderField.UNREAD -> R.string.explanation_organize_quick_unread
+        FolderField.MENTIONS -> R.string.explanation_organize_quick_mentions
+        FolderField.DRAFT -> R.string.explanation_organize_quick_draft
+        FolderField.MUTED -> R.string.explanation_organize_quick_muted
+        FolderField.PINNED -> R.string.explanation_organize_quick_pinned
+        FolderField.ARCHIVED -> R.string.explanation_organize_quick_archived
+        else -> R.string.explanation_organize_quick_type
+    }
 
 /** The button label for [mode] in [field]'s paired row. */
 private fun quickFilterLabel(

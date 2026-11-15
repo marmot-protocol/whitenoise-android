@@ -27,7 +27,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeRow
 import dev.ipf.whitenoise.android.ui.theme.ConnectedRowShape
@@ -45,6 +47,7 @@ internal fun QuickInfoAction(
     state: String? = null,
     enabled: Boolean = true,
     buttonModifier: Modifier = Modifier,
+    explanation: Explanation? = null,
 ) {
     Column(
         modifier = modifier,
@@ -55,9 +58,11 @@ internal fun QuickInfoAction(
             onClick = onClick,
             enabled = enabled,
             modifier =
-                buttonModifier.fillMaxWidth().height(56.dp).semantics {
-                    state?.let { stateDescription = it }
-                },
+                buttonModifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .semantics { state?.let { stateDescription = it } }
+                    .explainOnLongPress(explanation),
         ) {
             Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(24.dp))
         }

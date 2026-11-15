@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hold-to-explain bodies for relays controls; titles reuse each control's own label. -->
+    <string name="explanation_relays_posting">顯示你的「我發布到哪裡」清單是否已發布。該清單告訴他人哪些中繼站保存你的個人檔案和公開事件。中繼站是儲存並轉送事件的伺服器，無法讀取你的加密訊息。如果缺少，他人可能找不到你的個人檔案。使用「發布缺少的清單」即可解決。</string>
+    <string name="explanation_relays_receiving">顯示你的「我在哪裡接收」清單是否已發布。新聊天和群組的邀請會以加密形式傳送到這些中繼站，中繼站無法讀取。如果清單缺少，他人可能不知道把邀請傳到哪裡，邀請也可能無法送達你。</string>
+    <string name="explanation_relays_retry">重試失敗的中繼站清單操作，即檢查狀態或發布缺少的清單。在成功之前，你的中繼站不會有任何變化。</string>
+    <string name="explanation_relays_refresh">重新檢查你的中繼站，查看「我發布到哪裡」和「我在哪裡接收」清單是否已發布。只讀取，不會發布或變更任何內容。</string>
+    <string name="explanation_relays_relay_row">開啟此中繼站的詳細資料，你可以查看其位址，選擇它用於發布、接收還是兩者兼有，或將其移除。中繼站是儲存並轉送加密訊息和公開事件的伺服器。既有聊天保留各自的中繼站。</string>
+    <string name="explanation_relays_add">為此個人檔案新增一個中繼站。中繼站是儲存並轉送加密訊息和公開事件的伺服器。你可以選擇它用於發布、接收還是兩者兼有，你的中繼站清單會隨之更新，讓他人看到這項變更。</string>
+    <string name="explanation_relays_restore">將此個人檔案的中繼站及其用途替換為應用程式預設值。你新增的自訂中繼站會從清單中移除。既有聊天保留各自的中繼站。如果你已在使用預設值，則無法使用。</string>
+    <string name="explanation_relays_restore_confirm">確認將此個人檔案的中繼站和用途替換為預設值。自訂中繼站會從清單中移除，之後可以重新新增。既有聊天保留各自的中繼站。</string>
+    <string name="explanation_relays_remove">此個人檔案不再使用該中繼站，並將其從你的清單中移除。既有聊天保留各自的中繼站，之後可以重新新增該中繼站。如果它是清單中的最後一個中繼站則無法使用，這樣你始終有地方發布和接收。</string>
+    <string name="explanation_relays_remove_confirm">確認從此個人檔案中移除該中繼站。之後可以重新新增。既有聊天保留各自的中繼站。</string>
+    <string name="explanation_relays_add_submit">依你開啟的用途新增該中繼站，並更新你的中繼站清單。請先至少選擇一種用途（發布或接收），讓該中繼站有明確作用。</string>
+    <string name="explanation_relays_key_packages_refresh">從中繼站重新載入為此帳號發布的金鑰套件。只讀取，不會發布或刪除任何內容。</string>
+    <string name="explanation_relays_key_packages_republish">將你目前的本機金鑰套件重新發布到中繼站，不會建立新的。金鑰套件是公開的邀請金鑰，他人可以用它把你加入加密群組。如果他人無法邀請你，請使用此操作。</string>
+    <string name="explanation_relays_key_packages_publish_new">建立新的金鑰套件並發布到中繼站，用於日後的邀請。現有金鑰套件會保留。金鑰套件是公開的邀請金鑰，他人可以用它把你加入加密群組。</string>
+    <string name="explanation_relays_key_package_delete">開啟確認視窗，從保存此金鑰套件的中繼站上刪除它。他人將無法再用它邀請你。你之後可以發布新的金鑰套件。</string>
+    <string name="explanation_relays_key_package_delete_confirm">從保存此金鑰套件的中繼站上刪除它。刪除後無法復原，但你之後可以發布新的金鑰套件。</string>
+    <string name="explanation_relays_key_package_id">此金鑰套件的識別碼。輕點可將完整值複製到剪貼簿，長按可閱讀本說明。</string>
+    <string name="explanation_relays_key_package_event">包含此金鑰套件的中繼站事件的識別碼。輕點可將完整值複製到剪貼簿，長按可閱讀本說明。</string>
+    <string name="explanation_relays_key_package_ref">用於識別此金鑰套件的參照。輕點可將完整值複製到剪貼簿，長按可閱讀本說明。</string>
+    <string name="explanation_relays_key_package_local_state">顯示此裝置是否持有與該金鑰套件對應的私密金鑰，以及它是目前使用的，還是為較早的邀請而保留的。</string>
+    <string name="explanation_relays_key_package_seen_on">發現此金鑰套件的中繼站。刪除它時會請這些中繼站將其移除。</string>
+    <string name="explanation_relays_quarantine_reopen">一個無法安全載入的群組。下方文字說明了如何復原它。不會刪除任何內容。</string>
+    <string name="explanation_relays_group_relay_row">為此聊天設定的中繼站之一。聊天的加密訊息透過這些中繼站送達每位成員。這裡只顯示設定，不顯示該中繼站目前是否已連線。</string>
+    <string name="explanation_relays_group_relay_copy">將此中繼站的位址複製到剪貼簿。</string>
+    <string name="explanation_relays_setup_undo">將你在此設定步驟中剛移除的中繼站原樣還原。</string>
+</resources>

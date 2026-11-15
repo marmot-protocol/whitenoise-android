@@ -81,6 +81,7 @@ internal fun DevicePrivacyScreen(
                             checked = !appState.allowChatScreenshotsInChats,
                             onCheckedChange = { appState.updateAllowChatScreenshotsInChats(!it) },
                             subtitle = stringResource(R.string.allow_chat_screenshots_subtitle),
+                            explanation = stringResource(R.string.explanation_privacy_screen_security),
                             leading = { SettingsLeadingIcon(R.drawable.ic_screenshot_monitor) },
                         )
                     }
@@ -91,6 +92,7 @@ internal fun DevicePrivacyScreen(
                             checked = appState.forceIncognitoKeyboard,
                             onCheckedChange = { appState.updateForceIncognitoKeyboard(it) },
                             subtitle = stringResource(R.string.incognito_keyboard_detail),
+                            explanation = stringResource(R.string.explanation_privacy_incognito_keyboard),
                             leading = { SettingsLeadingIcon(R.drawable.ic_keyboard) },
                         )
                     }
@@ -106,6 +108,7 @@ internal fun DevicePrivacyScreen(
                                     if (secure) R.string.app_lock_enabled_detail else R.string.app_lock_setup_detail,
                                 ),
                             enabled = secure,
+                            explanation = stringResource(R.string.explanation_privacy_device_auth),
                             leading = { SettingsLeadingIcon(R.drawable.ic_fingerprint) },
                         )
                     }
@@ -115,6 +118,7 @@ internal fun DevicePrivacyScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.open_android_security_settings),
                                 onClick = { openSecuritySettings(context) },
+                                explanation = stringResource(R.string.explanation_privacy_security_settings),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                             )
                         }
@@ -126,6 +130,7 @@ internal fun DevicePrivacyScreen(
                                 title = stringResource(R.string.auto_lock),
                                 onClick = { autoLockPicker = true },
                                 value = delayLabels.getValue(appState.appLockDelay),
+                                explanation = stringResource(R.string.explanation_privacy_auto_lock),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_lock_clock) },
                             )
                         }
@@ -141,6 +146,7 @@ internal fun DevicePrivacyScreen(
                             title = stringResource(R.string.blocked_users),
                             routeKey = SettingsDetail.BlockedUsers,
                             onClick = onOpenBlockedUsers,
+                            explanation = stringResource(R.string.explanation_privacy_blocked_users),
                             value =
                                 appState.runtimeMirrors.blocks.users.size
                                     .toString(),
@@ -160,6 +166,7 @@ internal fun DevicePrivacyScreen(
                             value = disappearingMessagesLabel(defaultDisappearingSeconds),
                             subtitle = stringResource(R.string.default_disappearing_messages_detail),
                             enabled = activeAccountRef != null,
+                            explanation = stringResource(R.string.explanation_privacy_default_disappearing),
                             leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
                         )
                     }
@@ -175,6 +182,7 @@ internal fun DevicePrivacyScreen(
                             routeKey = SettingsDetail.DiagnosticsImprovements,
                             onClick = onOpenDiagnostics,
                             value = stringResource(summary),
+                            explanation = stringResource(R.string.explanation_privacy_diagnostics_link),
                             leading = { SettingsLeadingIcon(R.drawable.ic_monitoring) },
                         )
                     }

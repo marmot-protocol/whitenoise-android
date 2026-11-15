@@ -33,9 +33,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentation
 import dev.ipf.whitenoise.android.ui.conversation.messages.BubblePresentationTokens
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
@@ -124,7 +126,18 @@ private fun ChatBubbleColorEditor(
             // The overflow holds only Reset, so it appears only once there is something to reset.
             if (canReset) {
                 Box {
-                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.testTag("bubble_colors.menu")) {
+                    IconButton(
+                        onClick = { menuOpen = true },
+                        modifier =
+                            Modifier
+                                .testTag("bubble_colors.menu")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.more_options),
+                                        stringResource(R.string.explanation_appearance_bubble_colors_menu),
+                                    ),
+                                ),
+                    ) {
                         Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
                     }
                     WhiteNoiseDropdownMenu(
@@ -159,7 +172,16 @@ private fun ChatBubbleColorEditor(
                         onBack()
                     },
                     enabled = changed && mineValid && otherValid,
-                    modifier = Modifier.fillMaxWidth().testTag("bubble_colors.save"),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .testTag("bubble_colors.save")
+                            .explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.save),
+                                    stringResource(R.string.explanation_appearance_bubble_colors_save),
+                                ),
+                            ),
                 ) { Text(stringResource(R.string.save)) }
             }
         },

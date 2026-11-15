@@ -28,7 +28,9 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -143,6 +145,7 @@ internal fun SettingsSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    explanation: String? = null,
     subtitle: String? = null,
     enabled: Boolean = true,
     busy: Boolean = false,
@@ -157,6 +160,7 @@ internal fun SettingsSwitch(
             modifier
                 .fillMaxWidth()
                 .settingsRowBorder(context)
+                .explainOnLongPress(explanation, title)
                 .semantics {
                     role = Role.Switch
                     settingsRow = Unit
@@ -190,6 +194,8 @@ internal fun SettingsLink(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    explanation: String? = null,
+    holdToExplain: Boolean = true,
     subtitle: String? = null,
     value: String? = null,
     enabled: Boolean = true,
@@ -210,6 +216,7 @@ internal fun SettingsLink(
                 .then(origin)
                 .fillMaxWidth()
                 .settingsRowBorder(context)
+                .explainOnLongPress(explanation, title, holdToExplain)
                 .semantics {
                     role = Role.Button
                     settingsRow = Unit
@@ -243,6 +250,7 @@ internal fun SettingsAction(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    explanation: String? = null,
     subtitle: String? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
@@ -259,6 +267,7 @@ internal fun SettingsAction(
                 .then(if (opensRoute) origin else Modifier)
                 .fillMaxWidth()
                 .settingsRowBorder(context)
+                .explainOnLongPress(explanation, title)
                 .semantics {
                     role = Role.Button
                     settingsRow = Unit
@@ -270,6 +279,14 @@ internal fun SettingsAction(
         content = { SettingsRowTitle(title, enabled, destructive) },
     )
 }
+
+/** Holding a row with [explanation] explains [title]; rows without one keep their ordinary press. */
+@Composable
+private fun Modifier.explainOnLongPress(
+    explanation: String?,
+    title: String,
+    holdToExplain: Boolean = true,
+): Modifier = explainOnLongPress(explanation?.let { Explanation(title, it) }, holdToExplain = holdToExplain)
 
 /** Keep the group fill identical at rest, checked, and disabled so only the control reports state. */
 @Composable
@@ -295,6 +312,7 @@ internal fun SettingsChoice(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    explanation: String? = null,
     subtitle: String? = null,
     enabled: Boolean = true,
     highlightSelected: Boolean = true,
@@ -303,7 +321,7 @@ internal fun SettingsChoice(
         selected = selected,
         onClick = onClick,
         shapes = context.shapes,
-        modifier = modifier.fillMaxWidth().settingsRowBorder(context),
+        modifier = modifier.fillMaxWidth().settingsRowBorder(context).explainOnLongPress(explanation, title),
         enabled = enabled,
         leadingContent = {
             RadioButton(

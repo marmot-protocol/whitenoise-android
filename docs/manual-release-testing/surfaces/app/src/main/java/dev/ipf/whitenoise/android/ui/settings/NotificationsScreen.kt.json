@@ -84,6 +84,22 @@
         "test_ids": [
           "NTF-047"
         ]
+      },
+      {
+        "surface": "Notifications hold-to-explain: push",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_notifications_push",
+        "test_ids": [
+          "SET-053"
+        ]
+      },
+      {
+        "surface": "Notifications hold-to-explain: local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_notifications_local",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "settings_controls": [
@@ -475,6 +491,70 @@
         "anchor": "R.string.toast_notification_settings_unavailable",
         "test_ids": [
           "NTF-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_allow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_allow",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_android_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_android_settings",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_battery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_battery",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_category",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_category",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_delivery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_delivery",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_off",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_permission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_permission",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_sounds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.explanation_privacy_notif_sounds",
+        "test_ids": [
+          "SET-055"
         ]
       }
     ]

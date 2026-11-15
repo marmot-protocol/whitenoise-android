@@ -154,6 +154,14 @@
         "test_ids": [
           "SET-032"
         ]
+      },
+      {
+        "surface": "Gestures hold-to-explain: pull unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_gestures_pull_unread",
+        "test_ids": [
+          "SET-053"
+        ]
       }
     ],
     "source_coverage": [
@@ -163,6 +171,46 @@
         "anchor": "R.string.pull_unread_setting",
         "test_ids": [
           "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_gesture_chat_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_gesture_chat_left",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_gesture_chat_right",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_gesture_chat_right",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_gesture_message_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_gesture_message_left",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_gesture_message_right",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_gesture_message_right",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_gesture_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_appearance_gesture_reset",
+        "test_ids": [
+          "SET-054"
         ]
       }
     ]

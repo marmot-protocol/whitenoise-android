@@ -62,6 +62,7 @@ internal fun AuditDeliverySection(
                 context = rowContext,
                 title = stringResource(R.string.audit_delivery_title),
                 value = listOfNotNull(status, delivery?.httpStatus?.let { "HTTP $it" }).joinToString(" · "),
+                explanation = stringResource(R.string.explanation_privacy_audit_status),
                 leading = { SettingsLeadingIcon(R.drawable.ic_monitor_heart) },
             )
         }
@@ -73,6 +74,7 @@ internal fun AuditDeliverySection(
                     title = stringResource(R.string.audit_delivery_resume),
                     onClick = onResume,
                     enabled = enabled,
+                    explanation = stringResource(R.string.explanation_privacy_audit_resume),
                     subtitle =
                         when {
                             settings.resumingDelivery -> stringResource(R.string.audit_delivery_resuming)
@@ -91,6 +93,7 @@ internal fun AuditDeliverySection(
                     onRefresh,
                     enabled = enabled,
                     leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
+                    explanation = stringResource(R.string.explanation_privacy_audit_refresh),
                 )
             }
         }
@@ -115,6 +118,7 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                 stringResource(R.string.audit_delivery_last_success),
                 lastCheck,
                 leading = { SettingsLeadingIcon(R.drawable.ic_history) },
+                explanation = stringResource(R.string.explanation_privacy_audit_last_success),
             )
         }
     }
@@ -124,6 +128,7 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                 rowContext,
                 stringResource(R.string.audit_delivery_waiting),
                 Formatter.formatShortFileSize(LocalContext.current, delivery.waitingBytes),
+                explanation = stringResource(R.string.explanation_privacy_audit_waiting),
                 leading = { SettingsLeadingIcon(R.drawable.ic_pending) },
             )
         }
@@ -162,6 +167,7 @@ internal fun AuditRetentionRow(
         context = context,
         title = label,
         modifier = Modifier.testTag("audit.retention"),
+        explanation = stringResource(R.string.explanation_privacy_audit_retention),
         onClick = { if (current == null) onRefresh() else pickerOpen = true },
         value = current?.let { auditRetentionDays(it) },
         subtitle =

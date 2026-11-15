@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSourceBounds
@@ -103,6 +104,7 @@ internal data class FocusedMessageAction(
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit,
     val onClickAt: ((Rect?) -> Unit)? = null,
+    val explanation: Explanation? = null,
 )
 
 /**

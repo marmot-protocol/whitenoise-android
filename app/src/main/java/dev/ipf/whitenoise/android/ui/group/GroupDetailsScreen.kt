@@ -114,6 +114,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
+import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.DangerActionRow
@@ -1831,6 +1832,15 @@ internal fun GroupDetailsScreen(
                                     showMuteDurationDialog = true
                                 }
                             },
+                            explanation =
+                                chatsExplanation(
+                                    if (conversationMuted) R.string.chat_row_action_unmute else R.string.mute,
+                                    if (conversationMuted) {
+                                        R.string.explanation_chat_info_unmute
+                                    } else {
+                                        R.string.explanation_chat_info_mute
+                                    },
+                                ),
                             modifier = Modifier.weight(1f),
                         )
                         QuickInfoAction(
@@ -1838,6 +1848,11 @@ internal fun GroupDetailsScreen(
                             icon = R.drawable.ic_timer,
                             state = disappearingMessagesLabel(controller.group.disappearingMessageSecs.toLong()),
                             enabled = canEdit && !mutationsBlocked,
+                            explanation =
+                                chatsExplanation(
+                                    R.string.disappearing,
+                                    R.string.explanation_chat_info_disappearing,
+                                ),
                             onClick = { showDisappearingPicker = true },
                             modifier = Modifier.weight(1f),
                         )
@@ -2041,6 +2056,7 @@ internal fun GroupDetailsScreen(
                                     context = rowContext,
                                     title = stringResource(R.string.copy_chat_link),
                                     subtitle = stringResource(R.string.copy_chat_link_subtitle),
+                                    explanation = stringResource(R.string.explanation_chat_info_copy_chat_link),
                                     onClick = {
                                         clipboard.setText(AnnotatedString(ChatLink.uri(controller.group.groupIdHex)))
                                         appState.present(R.string.copied)
@@ -2336,6 +2352,7 @@ internal fun GroupDetailsScreen(
                                 context = rowContext,
                                 title = stringResource(groupRelaysTitleRes(isDm)),
                                 routeKey = "relays",
+                                explanation = stringResource(R.string.explanation_chat_info_relays),
                                 onClick = { showChatRelays = true },
                                 modifier = Modifier.testTag("chat_info.relays"),
                                 subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
@@ -2382,6 +2399,7 @@ internal fun GroupDetailsScreen(
                                         SettingsAction(
                                             context = rowContext,
                                             title = stringResource(R.string.transfer_admin),
+                                            explanation = stringResource(R.string.explanation_chat_info_transfer_admin),
                                             onClick = {
                                                 transferThenLeaveName = null
                                                 showTransferAdmin = true
@@ -2400,6 +2418,7 @@ internal fun GroupDetailsScreen(
                                         SettingsAction(
                                             context = rowContext,
                                             title = stringResource(R.string.step_down_as_admin),
+                                            explanation = stringResource(R.string.explanation_chat_info_step_down),
                                             onClick = {
                                                 pendingConfirm =
                                                     if (controller.isSoleAdminWithOtherMembers) {
@@ -2686,6 +2705,7 @@ internal fun GroupDetailsHeader(
                         copiedStateDescription = stringResource(R.string.copied),
                         targetTestTag = "chat_info.copy_public_key",
                         visualTestTag = "chat_info.copy_public_key.visual",
+                        explanationRes = R.string.explanation_chat_info_copy_peer_public_key,
                     )
                 }
             } else if (onAddDescription != null) {

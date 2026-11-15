@@ -142,6 +142,14 @@
         "test_ids": [
           "STB-004"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "surface": "App lock drops an open explanation",
+        "anchor": "ExplanationSheetHost(explanationHost, visible = !appState.appLockScreenVisible)",
+        "test_ids": [
+          "CON-048"
+        ]
       }
     ]
   },

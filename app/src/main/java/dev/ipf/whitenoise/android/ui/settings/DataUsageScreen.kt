@@ -37,7 +37,9 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -87,7 +89,7 @@ private val MediaAutoDownloadType.iconRes: Int
  * of switches that write the account's matrix immediately, M105), Reset download settings, the automatic download
  * queue's Stop/Restart action with its confirmation, and the sent-media quality choice.
  */
-@Suppress("LongMethod")
+@Suppress("CyclomaticComplexMethod", "LongMethod")
 @Composable
 internal fun DataUsageScreen(
     appState: WhiteNoiseAppState,
@@ -124,6 +126,7 @@ internal fun DataUsageScreen(
                             routeKey = SettingsDetail.ManageStorage,
                             onClick = onOpenManageStorage,
                             modifier = Modifier.testTag("data_usage.manage_storage"),
+                            explanation = stringResource(R.string.explanation_privacy_data_manage_storage),
                             leading = { SettingsLeadingIcon(R.drawable.ic_settings_hard_drive) },
                         )
                     }
@@ -144,6 +147,7 @@ internal fun DataUsageScreen(
                                         .map(networkLabels::getValue)
                                         .joinToString()
                                         .ifEmpty { stringResource(R.string.download_never) },
+                                explanation = stringResource(R.string.explanation_privacy_data_media_type),
                                 leading = { SettingsLeadingIcon(type.iconRes) },
                             )
                         }
@@ -155,6 +159,7 @@ internal fun DataUsageScreen(
                             onClick = { resetMediaAutoDownload(appState) },
                             subtitle = stringResource(R.string.download_reset_help),
                             enabled = matrix != MediaAutoDownloadMatrix.DEFAULT,
+                            explanation = stringResource(R.string.explanation_privacy_data_reset),
                             leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
                         )
                     }
@@ -174,6 +179,14 @@ internal fun DataUsageScreen(
                             modifier = Modifier.testTag("data_usage.queue.action"),
                             subtitle =
                                 stringResource(if (paused) R.string.download_paused else R.string.download_enabled),
+                            explanation =
+                                stringResource(
+                                    if (paused) {
+                                        R.string.explanation_privacy_data_queue_restart
+                                    } else {
+                                        R.string.explanation_privacy_data_queue_stop
+                                    },
+                                ),
                             leading = { SettingsLeadingIcon(R.drawable.ic_restart_alt) },
                         )
                     }
@@ -188,6 +201,7 @@ internal fun DataUsageScreen(
                             title = stringResource(R.string.download_quality),
                             onClick = { qualityPicker = true },
                             value = qualityLabels.getValue(appState.mediaQuality),
+                            explanation = stringResource(R.string.explanation_privacy_data_quality),
                             leading = { SettingsLeadingIcon(R.drawable.ic_high_quality) },
                         )
                     }
@@ -207,6 +221,7 @@ internal fun DataUsageScreen(
                             checked = previewChoices[previewAccountId] == true,
                             enabled = previewAccountId != null && !savingPreview,
                             modifier = Modifier.testTag("data_usage.public_jpeg_previews"),
+                            explanation = stringResource(R.string.explanation_privacy_data_jpeg_previews),
                             onCheckedChange = { enabled ->
                                 if (previewAccountId != null && !savingPreview) {
                                     if (!enabled) {
@@ -303,6 +318,7 @@ internal fun DownloadNetworkOptions(
             checked = network in networks,
             tag = "download.network.${network.name}",
             enabled = enabled,
+            explanation = stringResource(R.string.explanation_data_usage_download_switch),
             onChange = { onChange(network, it) },
         )
     }
@@ -315,12 +331,14 @@ internal fun DownloadSwitch(
     checked: Boolean,
     tag: String,
     enabled: Boolean = true,
+    explanation: String? = null,
     onChange: (Boolean) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .whiteNoiseDialogSelection(checked && enabled)
+            .explainOnLongPress(explanation?.let { Explanation(title, it) })
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .testTag(tag)
             .heightIn(min = DownloadSwitchMinHeight)

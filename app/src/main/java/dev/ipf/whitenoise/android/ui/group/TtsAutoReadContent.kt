@@ -22,8 +22,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.PopupSourceActivation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
@@ -87,6 +89,7 @@ internal fun TtsAutoReadGroupActionRow(
                 .semantics(mergeDescendants = true) { contentDescription = "$title. $provenanceLabel" },
         value = provenanceLabel,
         leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
+        explanation = stringResource(R.string.explanation_appearance_tts_auto_read_group),
     )
 }
 
@@ -106,18 +109,39 @@ internal fun TtsAutoReadPickerContent(
             enabled = enabled,
             selected = selectedOverride == null,
             onClick = { onSelect(null) },
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(ttsAutoReadSettingLabelRes(null, globalDefaultEnabled)),
+                        stringResource(R.string.explanation_appearance_tts_auto_read_default),
+                    ),
+                ),
         )
         WhiteNoiseDialogChoiceRow(
             title = stringResource(R.string.tts_auto_read_override_on),
             enabled = enabled,
             selected = selectedOverride == TtsAutoReadOverride.ON,
             onClick = { onSelect(TtsAutoReadOverride.ON) },
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.tts_auto_read_override_on),
+                        stringResource(R.string.explanation_appearance_tts_auto_read_on),
+                    ),
+                ),
         )
         WhiteNoiseDialogChoiceRow(
             title = stringResource(R.string.tts_auto_read_override_off),
             enabled = enabled,
             selected = selectedOverride == TtsAutoReadOverride.OFF,
             onClick = { onSelect(TtsAutoReadOverride.OFF) },
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.tts_auto_read_override_off),
+                        stringResource(R.string.explanation_appearance_tts_auto_read_off),
+                    ),
+                ),
         )
     }
 }

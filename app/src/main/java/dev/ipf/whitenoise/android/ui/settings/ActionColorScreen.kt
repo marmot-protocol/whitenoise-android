@@ -27,8 +27,10 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -93,7 +95,16 @@ private fun ActionColorEditor(
                             onBack()
                         },
                         enabled = valid && draft != initial,
-                        modifier = Modifier.fillMaxWidth().testTag("action_color.save"),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag("action_color.save")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.save),
+                                        stringResource(R.string.explanation_appearance_action_color_save),
+                                    ),
+                                ),
                     ) { Text(stringResource(R.string.save)) }
                 }
             },
@@ -150,7 +161,18 @@ private fun ActionColorEditor(
                                                 reset = true
                                                 resetRevision++
                                             },
-                                            modifier = Modifier.fillMaxWidth().testTag("action_color.reset"),
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .testTag("action_color.reset")
+                                                    .explainOnLongPress(
+                                                        Explanation(
+                                                            stringResource(R.string.reset_to_default),
+                                                            stringResource(
+                                                                R.string.explanation_appearance_action_color_reset,
+                                                            ),
+                                                        ),
+                                                    ),
                                         ) { Text(stringResource(R.string.reset_to_default)) }
                                     }
                                 }

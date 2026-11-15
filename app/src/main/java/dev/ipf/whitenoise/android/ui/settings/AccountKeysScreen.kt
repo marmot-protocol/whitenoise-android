@@ -98,10 +98,12 @@ import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.wipeReport
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.copySensitiveToClipboard
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -547,11 +549,29 @@ private fun ProfileKeysList(
                     ProfileKeyValueRow(
                         context = context,
                         value = npub,
-                        valueModifier = Modifier.testTag("profile_keys.public_key_value"),
+                        valueModifier =
+                            Modifier
+                                .testTag("profile_keys.public_key_value")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.public_key),
+                                        stringResource(R.string.explanation_account_keys_public_key),
+                                    ),
+                                ),
                         fullPublicKey = true,
                     ) {
                         val copied = ui.copiedKey == CopiedProfileKey.Public
-                        IconButton(onClick = onCopyPublic) {
+                        val copyPublicLabel = stringResource(R.string.copy_public_key)
+                        IconButton(
+                            onClick = onCopyPublic,
+                            modifier =
+                                Modifier.explainOnLongPress(
+                                    Explanation(
+                                        copyPublicLabel,
+                                        stringResource(R.string.explanation_organize_keys_copy_public),
+                                    ),
+                                ),
+                        ) {
                             Icon(
                                 painter = painterResource(copyGlyph(copied)),
                                 contentDescription =
@@ -587,6 +607,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.copy_private_key),
+                            explanation = stringResource(R.string.explanation_account_keys_copy_private),
                             onClick = onCopyPrivate,
                             leading = {
                                 SettingsLeadingIcon(copyGlyph(copied))
@@ -606,6 +627,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.export_encrypted_private_key),
+                            explanation = stringResource(R.string.explanation_account_keys_export_encrypted),
                             onClick = onExportEncrypted,
                             enabled = exportsEnabled,
                             leading = { SettingsLeadingIcon(R.drawable.ic_lock) },
@@ -615,6 +637,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.export_nsec),
+                            explanation = stringResource(R.string.explanation_account_keys_export_raw),
                             onClick = onExportRaw,
                             modifier = Modifier.testTag("profile_keys.export_raw"),
                             enabled = exportsEnabled,
@@ -631,6 +654,7 @@ private fun ProfileKeysList(
                     SettingsAction(
                         context = context,
                         title = stringResource(R.string.sign_out),
+                        explanation = stringResource(R.string.explanation_account_keys_sign_out),
                         onClick = onSignOut,
                         modifier = Modifier.testTag("profile_keys.sign_out"),
                         leading = {
@@ -647,6 +671,7 @@ private fun ProfileKeysList(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.sign_out_and_wipe),
+                            explanation = stringResource(R.string.explanation_account_keys_wipe),
                             onClick = onWipe,
                             modifier = Modifier.testTag(WIPE_ACTION_TAG),
                             destructive = true,
@@ -679,13 +704,24 @@ private fun PrivateKeyValueRow(
         valueModifier =
             Modifier
                 .testTag("profile_keys.private_key_value")
-                .clearAndSetSemantics { contentDescription = stateDescription },
+                .explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.private_key),
+                        stringResource(R.string.explanation_account_keys_private_key),
+                    ),
+                ).clearAndSetSemantics { contentDescription = stateDescription },
     ) {
-        IconButton(onClick = onToggleReveal) {
+        val revealLabel = stringResource(if (revealed) R.string.hide_private_key else R.string.show_private_key)
+        IconButton(
+            onClick = onToggleReveal,
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(revealLabel, stringResource(R.string.explanation_account_keys_reveal)),
+                ),
+        ) {
             Icon(
                 painter = painterResource(if (revealed) R.drawable.ic_visibility_off else R.drawable.ic_visibility),
-                contentDescription =
-                    stringResource(if (revealed) R.string.hide_private_key else R.string.show_private_key),
+                contentDescription = revealLabel,
             )
         }
     }
@@ -782,12 +818,21 @@ private fun ProfileKeysDialogs(
             },
             confirmButton = {
                 FlowRow(horizontalArrangement = Arrangement.End) {
+                    val shareLabel = stringResource(R.string.share)
+                    val fileLabel = stringResource(R.string.export_nsec)
                     TextButton(
                         enabled = !ui.exportBusy,
                         onClick = { if (acceptsInput) onExport(false, KeyExportDestination.Share) },
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    shareLabel,
+                                    stringResource(R.string.explanation_organize_keys_raw_share),
+                                ),
+                            ),
                     ) {
                         ProfileKeyActionLabel(
-                            stringResource(R.string.share),
+                            shareLabel,
                             R.drawable.ic_share,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -795,9 +840,16 @@ private fun ProfileKeysDialogs(
                     TextButton(
                         enabled = !ui.exportBusy,
                         onClick = { if (acceptsInput) onExport(false, KeyExportDestination.File) },
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    fileLabel,
+                                    stringResource(R.string.explanation_organize_keys_raw_file),
+                                ),
+                            ),
                     ) {
                         ProfileKeyActionLabel(
-                            stringResource(R.string.export_nsec),
+                            fileLabel,
                             R.drawable.ic_download,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -975,17 +1027,35 @@ private fun ExportPasswordDialog(
             }
         },
         confirmButton = {
+            val viewLabel = stringResource(R.string.key_export_view_backup)
+            val exportLabel = stringResource(R.string.export)
             FlowRow(horizontalArrangement = Arrangement.End) {
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onViewBackup,
-                    modifier = Modifier.testTag("profile_keys.view_backup"),
-                ) { ProfileKeyActionLabel(stringResource(R.string.key_export_view_backup), R.drawable.ic_visibility) }
+                    modifier =
+                        Modifier
+                            .testTag("profile_keys.view_backup")
+                            .explainOnLongPress(
+                                Explanation(
+                                    viewLabel,
+                                    stringResource(R.string.explanation_organize_keys_view_backup),
+                                ),
+                            ),
+                ) { ProfileKeyActionLabel(viewLabel, R.drawable.ic_visibility) }
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onConfirm,
-                    modifier = Modifier.testTag("profile_keys.export_file"),
-                ) { ProfileKeyActionLabel(stringResource(R.string.export), R.drawable.ic_download) }
+                    modifier =
+                        Modifier
+                            .testTag("profile_keys.export_file")
+                            .explainOnLongPress(
+                                Explanation(
+                                    exportLabel,
+                                    stringResource(R.string.explanation_organize_keys_backup_export),
+                                ),
+                            ),
+                ) { ProfileKeyActionLabel(exportLabel, R.drawable.ic_download) }
             }
         },
         dismissButton = {
@@ -1025,15 +1095,33 @@ internal fun EncryptedBackupResultDialog(
         },
         confirmButton = {
             FlowRow(horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onCopy) {
+                val copyLabel = stringResource(R.string.copy)
+                val exportLabel = stringResource(R.string.export)
+                TextButton(
+                    onClick = onCopy,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                copyLabel,
+                                stringResource(R.string.explanation_organize_keys_result_copy),
+                            ),
+                        ),
+                ) {
                     ProfileKeyActionLabel(
                         stringResource(if (copied) R.string.copied else R.string.copy),
                         copyGlyph(copied),
                     )
                 }
-                TextButton(onClick = onExport) {
-                    ProfileKeyActionLabel(stringResource(R.string.export), R.drawable.ic_download)
-                }
+                TextButton(
+                    onClick = onExport,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                exportLabel,
+                                stringResource(R.string.explanation_organize_keys_result_export),
+                            ),
+                        ),
+                ) { ProfileKeyActionLabel(exportLabel, R.drawable.ic_download) }
             }
         },
         dismissButton = {
@@ -1409,7 +1497,12 @@ internal fun SignOutSheet(
                 Modifier
                     .fillMaxWidth()
                     .testTag("profile_keys.signout_invitation_keys")
-                    .toggleable(
+                    .explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.sign_out_delete_key_packages_label),
+                            stringResource(R.string.explanation_account_keys_signout_invitation_keys),
+                        ),
+                    ).toggleable(
                         value = deleteKeyPackages,
                         role = Role.Switch,
                         onValueChange = { deleteKeyPackages = it },

@@ -31,8 +31,10 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationProvider
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderCapability
 import dev.ipf.whitenoise.android.audio.ConversationDictationProviderChoice
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
@@ -98,6 +100,13 @@ internal fun DictationProviderSheet(
                     subtitle = stringResource(R.string.dictation_provider_precedence),
                     selected = selected == null,
                     onClick = { terminal.close(null, onSelect) },
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.dictation_provider_automatic),
+                                stringResource(R.string.explanation_appearance_dictation_provider_automatic),
+                            ),
+                        ),
                 )
             }
             if (providers == null) {
@@ -137,6 +146,13 @@ internal fun DictationProviderSheet(
                                 accessibilityLabel = "${provider.appName}, $engine, $capability",
                                 selected = selected?.sameInstallation(choice) == true,
                                 onClick = { terminal.close(choice, onSelect) },
+                                modifier =
+                                    Modifier.explainOnLongPress(
+                                        Explanation(
+                                            engine,
+                                            stringResource(R.string.explanation_appearance_dictation_provider_engine),
+                                        ),
+                                    ),
                             )
                         }
                     }

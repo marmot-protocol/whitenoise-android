@@ -46,6 +46,7 @@ internal fun SettingsGroupScope.groupDisbandRows(
             SettingsAction(
                 context = context,
                 title = stringResource(R.string.group_disband_enable_action),
+                explanation = stringResource(R.string.explanation_group_enable_disbanding),
                 onClick = onEnable,
                 enabled = enabled,
                 leading = { DisbandLeading(inProgress = enableInProgress, destructive = false) },
@@ -57,6 +58,7 @@ internal fun SettingsGroupScope.groupDisbandRows(
             SettingsAction(
                 context = context,
                 title = stringResource(R.string.group_disband_action),
+                explanation = stringResource(R.string.explanation_group_disband),
                 onClick = onDisbandRequested,
                 enabled = enabled,
                 destructive = true,

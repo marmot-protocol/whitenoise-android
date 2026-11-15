@@ -40,6 +40,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.newMessagePenOrigin
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
@@ -184,7 +185,12 @@ internal fun ChatsNewMessageFabContent(
             },
             modifier =
                 if (missingRelays) {
-                    chrome
+                    chrome.explainOnLongPress(
+                        chatsExplanation(
+                            R.string.chats_check_relays,
+                            R.string.explanation_chats_fab_check_relays,
+                        ),
+                    )
                 } else {
                     chrome.size(ComposerActionRowHeight).composerFabSurface(
                         ComposerFabEndpoint.NewMessage,

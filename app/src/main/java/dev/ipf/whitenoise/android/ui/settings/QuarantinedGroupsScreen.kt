@@ -159,6 +159,7 @@ internal fun QuarantinedGroupsContent(
                             SettingsLink(
                                 context = context,
                                 title = stringResource(R.string.quarantine_refresh),
+                                explanation = stringResource(R.string.explanation_quarantine_refresh),
                                 onClick = onRefresh,
                                 subtitle = quarantinedGroupsSummary(state),
                                 enabled = state.available && !state.busy,
@@ -219,6 +220,7 @@ private fun LazyListScope.quarantineRows(
                             guidance,
                             Modifier.testTag("quarantine.reopen"),
                             leading = { SettingsLeadingIcon(R.drawable.ic_gpp_maybe) },
+                            explanation = stringResource(R.string.explanation_relays_quarantine_reopen),
                         )
                     }
                 } else {
@@ -226,6 +228,7 @@ private fun LazyListScope.quarantineRows(
                         SettingsAction(
                             context = context,
                             title = stringResource(R.string.quarantine_retry),
+                            explanation = stringResource(R.string.explanation_quarantine_retry),
                             subtitle = group + "\n" + guidance,
                             onClick = { onRecover(entry.groupId) },
                             enabled = state.available && state.loaded && !state.busy,

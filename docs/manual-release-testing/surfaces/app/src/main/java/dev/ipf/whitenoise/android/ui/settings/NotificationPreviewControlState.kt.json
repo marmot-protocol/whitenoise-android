@@ -1,0 +1,71 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+  "legacy_sha256": "77b9b3da82fb8b97830564bd1cd410a2dbfe4cd0eb643eb45e415d5bcbdb7ac9",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "NotificationPreviewControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "fun NotificationPreviewControl(",
+        "test_ids": [
+          "NTF-030"
+        ]
+      }
+    ],
+    "notification_content_contracts": [
+      {
+        "surface": "Notification preview failure restart guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_update_failed",
+        "test_ids": [
+          "NTF-030"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_show_previews",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_show_previews_detail",
+        "test_ids": [
+          "NTF-030"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_privacy_notif_preview_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.explanation_privacy_notif_preview_retry",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_notif_previews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.explanation_privacy_notif_previews",
+        "test_ids": [
+          "SET-055"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
