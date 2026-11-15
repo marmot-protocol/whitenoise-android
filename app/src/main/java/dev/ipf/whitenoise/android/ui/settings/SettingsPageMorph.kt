@@ -85,8 +85,6 @@ internal class SettingsPageMorph {
     private var sourceContours: List<SettingsContour> = emptyList()
     private var targetContours: List<SettingsContour>? = null
     private var rebaseTime = 0f
-    private var settledContours: List<SettingsContour> = emptyList()
-    private var leavingContours: List<SettingsContour> = emptyList()
     private var transitionHost = Rect.Zero
     private var target: Any? = null
     private var outgoingTarget: Any? = null
@@ -105,15 +103,22 @@ internal class SettingsPageMorph {
         get() =
             childBodyTop?.invoke()
                 ?: (viewports.values.minOfOrNull { it.top } ?: destinations.values.minOfOrNull { it.bounds.top } ?: 0f)
-    private var leavingBodyTop = 0f
-    private var settledInputs: Any? = null
-    private var settled: Picture? = null
-    private var leaving: Picture? = null
+
+    private data class PresentedFrame(
+        val picture: Picture,
+        val contours: List<SettingsContour>,
+        val body: Path,
+        val bodyTop: Float,
+        val host: Rect,
+        val inputs: Any?,
+    )
+
+    private var settled: PresentedFrame? = null
+    private var leaving: PresentedFrame? = null
     private var maskFrame: List<SettingsContour>? = null
     private var maskHost: Rect = Rect.Zero
     private var mask: Path = Path()
     private var leavingMask: Path? = null
-    private var leavingBody: Path? = null
     var opening = true
         private set
     val active: Boolean get() = origin != null
@@ -225,36 +230,46 @@ internal class SettingsPageMorph {
     ): Boolean {
         val changedHost = transitionHost != Rect.Zero && transitionHost != host
         if (changedHost || !animate) returnTargets.clear()
-        if (changedHost || settledInputs != captureInputs?.invoke()) clearPictures()
+        if (changedHost || (settled ?: leaving)?.inputs != captureInputs?.invoke()) clearPictures()
         val oldExit = outgoingPresence(currentTime)
         val oldEntry = incomingPresence(currentTime)
         val interrupted = active && currentTime < 1f && host == transitionHost
-        val current = if (interrupted) renderedContours(currentTime) else nativeContours(host)
+        // A cached picture and its geometry always come from the same presented draw.
+        // Changed capture inputs discard the whole frame and fall back to native geometry without replay.
+        val frame = settled?.takeIf { it.host == host }
+        val current = if (interrupted) renderedContours(currentTime) else frame?.contours ?: nativeContours(host)
         val returnsToVisibleParent = interrupted && oldExit > 0f && next == outgoingTarget
         val retainsOutgoing = interrupted && oldExit > 0f && !returnsToVisibleParent
+        // Active incoming pixels are never recorded. Once they are visible, restarting without
+        // a coherent frame would hide the body until the next incoming phase. Settle instead;
+        // early reversals can still return to their retained parent without capturing active content.
+        val settleInterrupted = interrupted && oldEntry > 0f && frame == null &&
+            !returnsToVisibleParent && !(retainsOutgoing && leaving != null)
         val selected =
             if (pendingEndpoint != null) {
                 pendingEndpoint?.takeIf { it.destination == next }?.bounds
             } else {
                 pendingOrigin
             }
+        val visibleSelection = pendingEndpoint?.takeIf { it.destination == next }?.visibleBounds ?: selected
         val returnTarget = returnTargets[target]
         val returnPoint = returnTarget?.point
         // Resolve the activating row against native groups before freezing or clearing their reports.
         val activatedGroup =
             selected?.let { bounds ->
-                nativeContours(
-                    host,
-                )?.takeIf { it.isNotEmpty() }?.let { it[nearestSettingsContour(it, bounds.center)].key }
+                (frame?.contours ?: nativeContours(host))
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { it[nearestSettingsContour(it, bounds.center)].key }
             }
         correspondenceKey =
             if (forward) activatedGroup ?: correspondenceKey else returnTarget?.groupKey ?: correspondenceKey
         val eligible =
             animate &&
+                !settleInterrupted &&
                 !changedHost &&
                 !host.isEmpty &&
                 current != null &&
-                (selected?.validIn(host) == true || (!forward && returnPoint != null) || interrupted)
+                (visibleSelection?.visibleIn(host) == true || (!forward && returnPoint != null) || interrupted)
         // An anchor-only route contributes its one real outline; it pairs with one destination group.
         val anchorSource =
             anchorContour
@@ -264,8 +279,8 @@ internal class SettingsPageMorph {
                 ?.copy(key = anchorGroupKeys.getOrPut(next) { nextGroupKey++ }, viewport = host)
         if (anchorSource != null) correspondenceKey = anchorSource.key
         if (forward) {
-            if (eligible &&
-                selected?.validIn(host) == true
+            if (eligible && selected != null &&
+                visibleSelection?.visibleIn(host) == true
             ) {
                 returnTargets[next] = ReturnTarget(selected.center, correspondenceKey)
             } else {
@@ -275,13 +290,9 @@ internal class SettingsPageMorph {
             returnTargets.remove(target)
         }
         if (!retainsOutgoing) {
-            leavingBodyTop = bodyTop
-            leavingContours = settledContours
-            // Freeze unoutlined bodies too, before the source destination reports are cleared.
-            leavingBody = activeNativeBody(leavingContours, host)
             // Bind the cached mask to this frozen picture; raster construction belongs to draw.
             leavingMask = null
-            leaving = settled.takeIf { settledInputs == captureInputs?.invoke() }
+            leaving = frame
             outgoingTarget = target
         }
         sourceContours = anchorSource?.let(::listOf) ?: current.orEmpty()
@@ -384,9 +395,7 @@ internal class SettingsPageMorph {
         leaving = null
         sourceContours = emptyList()
         targetContours = null
-        leavingContours = emptyList()
         leavingMask = null
-        leavingBody = null
     }
 
     fun cancel() {
@@ -401,10 +410,7 @@ internal class SettingsPageMorph {
     fun clearPictures() {
         settled = null
         leaving = null
-        settledContours = emptyList()
-        leavingContours = emptyList()
         leavingMask = null
-        leavingBody = null
     }
 
     fun bounds(
@@ -429,7 +435,7 @@ internal class SettingsPageMorph {
     ) {
         val inputs = captureInputs?.invoke()
         if (!recording) clearPictures()
-        if (!captureContent || settledInputs != inputs) settled = null
+        if (!captureContent || settled?.inputs != inputs) settled = null
         val native = nativeContours(host)
         if (native == null) {
             finish()
@@ -438,10 +444,17 @@ internal class SettingsPageMorph {
         if (bounds(host, time) == null || time >= 1f) {
             leaving = null
             if (recording && captureContent) {
-                val picture = settled ?: Picture().also { settled = it }
+                val picture = settled?.picture ?: Picture()
                 drawAndRecord(picture)
-                settledInputs = inputs
-                settledContours = native.orEmpty()
+                settled =
+                    PresentedFrame(
+                        picture,
+                        native.orEmpty(),
+                        activeNativeBody(native.orEmpty(), host),
+                        bodyTop,
+                        host,
+                        inputs,
+                    )
             } else {
                 drawContent()
             }
@@ -502,18 +515,18 @@ internal class SettingsPageMorph {
         host: Rect,
         time: Float,
     ) {
-        val picture = leaving ?: return
-        val body = checkNotNull(leavingBody) { "Outgoing picture requires its frozen measured body" }
+        val frame = leaving ?: return
+        val body = frame.body
         val alpha = outgoingPresence(time)
         if (alpha <= 0f) return
-        val chrome = leavingMask ?: nativeChromeMask(leavingContours, host).also { leavingMask = it }
+        val chrome = leavingMask ?: nativeChromeMask(frame.contours, host).also { leavingMask = it }
         // The source and destination's measured body edges leave both native headers untouched.
-        clipRect(top = (maxOf(leavingBodyTop, bodyTop) - host.top).coerceAtLeast(0f)) {
+        clipRect(top = (maxOf(frame.bodyTop, bodyTop) - host.top).coerceAtLeast(0f)) {
             clipPath(body) {
                 clipPath(chrome, ClipOp.Difference) {
                     drawIntoCanvas { canvas ->
                         canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
-                        canvas.nativeCanvas.drawPicture(picture)
+                        canvas.nativeCanvas.drawPicture(frame.picture)
                         canvas.restore()
                     }
                 }
@@ -534,8 +547,8 @@ internal class SettingsPageMorph {
             rebaseTime = time.coerceIn(0f, 1f)
             targetContours = end
         }
-        // Body ink is revealed in place after the contour has nearly settled. No old route
-        // picture travels with the outline or covers the destination's fixed header.
+        // One presence schedule reveals body ink in place. No old route picture travels
+        // with the outline or covers the destination's fixed header.
         // Headers and other ink outside the measured groups remain live throughout.
         val chrome = if (!opening && native?.isEmpty() == true) end else native
         if (maskFrame != chrome || maskHost != host) {
@@ -561,7 +574,7 @@ internal class SettingsPageMorph {
         body: Path,
         time: Float,
     ) {
-        val incoming = ((incomingPresence(time) - 0.75f) / 0.25f).coerceIn(0f, 1f)
+        val incoming = incomingPresence(time)
         if (incoming > 0f) {
             clipPath(body) {
                 clipPath(mask, ClipOp.Difference) {
@@ -692,6 +705,9 @@ private fun Rect.validIn(host: Rect): Boolean =
         right <= host.right &&
         bottom <= host.bottom
 
+private fun Rect.visibleIn(host: Rect): Boolean =
+    listOf(left, top, right, bottom).all { it.isFinite() } && !isEmpty && !intersect(host).isEmpty
+
 /** Compatibility facade for existing rectangle-only launchers. */
 @Composable
 internal fun rememberSettingsRouteClick(onClick: () -> Unit) = rememberSettingsRouteClick(null, null, onClick)
@@ -721,8 +737,9 @@ internal fun rememberSettingsRouteClick(
     }
     return Modifier
         .onGloballyPositioned {
-            val rect = it.settingsMorphBounds(view)
-            bounds[0] = rect
+            val rect = it.fullSettingsMorphBounds(view)
+            val visible = it.settingsMorphBounds(view)
+            bounds[0] = rect.takeUnless { visible.isEmpty } ?: Rect.Zero
             if (context != null && routeKey != null && !rect.isEmpty) {
                 val shape = context.shapes.shape
                 val corners =
@@ -747,6 +764,7 @@ internal fun rememberSettingsRouteClick(
                         } else {
                             context.borderColor
                         },
+                        visibleBounds = visible,
                     )
                 endpoint[0] = measured
             }

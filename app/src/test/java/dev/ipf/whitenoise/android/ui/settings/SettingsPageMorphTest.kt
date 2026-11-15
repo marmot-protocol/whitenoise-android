@@ -61,6 +61,31 @@ class SettingsPageMorphTest {
             assertTrue(page.begin("child", true, true, host))
         }
 
+    @Test fun partiallyVisibleActivationKeepsFullSourcePerimeterAndReturnsToIt() {
+        val page = SettingsPageMorph()
+        page.begin("parent", true, false, host)
+        val full = Rect(16f, -90f, 344f, 160f)
+        reportGroup(page, full)
+        page.pendingEndpoint = surface(full).copy(destination = "child", visibleBounds = full.intersect(host))
+        assertTrue(page.begin("child", true, true, host))
+        assertEquals(full, page.renderedContours(0f).single().bounds)
+        reportGroup(page, second)
+        assertTrue(page.admitDestination())
+        page.finish()
+        assertTrue(page.begin("parent", false, true, host))
+        reportGroup(page, full)
+        assertTrue(page.admitDestination())
+        assertEquals(full, page.renderedContours(1f).single().bounds)
+    }
+
+    @Test fun fullyClippedActivationCannotStartTransition() {
+        val page = SettingsPageMorph()
+        page.begin("parent", true, false, host)
+        reportGroup(page, first)
+        page.pendingEndpoint = surface(Rect(16f, -120f, 344f, -20f)).copy(destination = "child", visibleBounds = Rect.Zero)
+        assertFalse(page.begin("child", true, true, host))
+    }
+
     @Test fun backUsesCloseCurveAndFreezesRenderedContourBeforeReversal() {
         val page = departing()
         val child = Rect(16f, 130f, 344f, 370f)

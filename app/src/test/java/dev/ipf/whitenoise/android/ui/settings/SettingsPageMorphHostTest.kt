@@ -781,6 +781,155 @@ class SettingsPageMorphHostTest {
         }
     }
 
+    @Test fun destinationBodyUsesOnePresenceScheduleAndHeaderStaysFixed() {
+        val page = SettingsPageMorph()
+        val time = mutableStateOf(1f)
+        val child = mutableStateOf(false)
+        val body = Rect(16f, 100f, 344f, 300f)
+        val viewport = Any()
+        val group = Any()
+        lateinit var host: Rect
+        rule.setContent {
+            Box(
+                Modifier.fillMaxSize().drawWithContent {
+                    host = Rect(0f, 0f, size.width, size.height)
+                    page.reportViewport(viewport, host)
+                    reportUnoutlinedBody(page, viewport, group, body)
+                    with(page) { draw(host, time.value, true, Color.Black) }
+                }.drawWithContent { drawRect(if (child.value) Color.Blue else Color.Red) },
+            )
+        }
+        rule.onRoot().captureToImage()
+        rule.runOnIdle {
+            page.pendingOrigin = body
+            assertTrue(page.begin(true, true, true, host))
+            child.value = true
+            time.value = 0.4f
+        }
+        for (fraction in listOf(0.39f, 0.4f, 0.6f, 0.84f, 0.86f)) {
+            rule.runOnIdle { time.value = fraction }
+            val pixels = rule.onRoot().captureToImage().toPixelMap()
+            assertEquals(
+                "one incoming body schedule at $fraction",
+                ((fraction - 0.4f) / 0.6f).coerceIn(0f, 1f),
+                pixels[100, 150].blue,
+                0.02f,
+            )
+            assertEquals("fixed live header at $fraction", 1f, pixels[100, 50].blue, 0.01f)
+        }
+    }
+
+    @Test fun visibleIncomingBodySettlesOnReverseAtPointSix() = assertInterruptedBodySettles(0.6f, false, true)
+
+    @Test fun visibleIncomingBodySettlesOnReverseAtPointEightFour() = assertInterruptedBodySettles(0.84f, false, true)
+
+    @Test fun visibleIncomingBodySettlesOnForwardAtPointSix() = assertInterruptedBodySettles(0.6f, true, true)
+
+    @Test fun visibleIncomingBodySettlesOnForwardAtPointEightFour() = assertInterruptedBodySettles(0.84f, true, true)
+
+    @Test fun uncapturedIncomingBodySettlesOnReverse() = assertInterruptedBodySettles(0.6f, false, false)
+
+    @Test fun uncapturedIncomingBodySettlesOnForward() = assertInterruptedBodySettles(0.84f, true, false)
+
+    private fun assertInterruptedBodySettles(interruption: Float, forward: Boolean, capture: Boolean) {
+        val page = SettingsPageMorph()
+        val time = mutableStateOf(1f)
+        val color = mutableStateOf(Color.Red)
+        val body = Rect(16f, 100f, 344f, 300f)
+        val viewport = Any()
+        val group = Any()
+        lateinit var host: Rect
+        rule.setContent {
+            Box(
+                Modifier.fillMaxSize().drawWithContent {
+                    host = Rect(0f, 0f, size.width, size.height)
+                    page.reportViewport(viewport, host)
+                    reportUnoutlinedBody(page, viewport, group, body)
+                    with(page) { draw(host, time.value, capture, Color.Black) }
+                }.drawWithContent { drawRect(color.value) },
+            )
+        }
+        rule.onRoot().captureToImage()
+        rule.runOnIdle {
+            page.pendingOrigin = body
+            assertTrue(page.begin("child", true, true, host))
+            color.value = Color.Blue
+            time.value = interruption
+        }
+        val before = rule.onRoot().captureToImage().toPixelMap()
+        assertTrue("incoming body is visible before interruption", before[100, 150].blue > 0.3f)
+        rule.runOnIdle {
+            page.pendingOrigin = body
+            assertFalse("no coherent active-body frame: settle immediately", page.begin(if (forward) "grandchild" else null, forward, true, host, interruption))
+            assertFalse(page.active)
+            assertEquals(0, page.keptPictures)
+            color.value = Color.Green
+            time.value = 0f
+        }
+        for (fraction in listOf(0f, 0.2f, 0.4f)) {
+            rule.runOnIdle { time.value = fraction }
+            val pixels = rule.onRoot().captureToImage().toPixelMap()
+            assertEquals("settled body at $fraction", 1f, pixels[100, 150].green, 0.01f)
+            assertEquals("fixed header at $fraction", 1f, pixels[100, 50].green, 0.01f)
+        }
+        if (!capture) rule.runOnIdle { assertFalse(page.hasSettledPicture) }
+    }
+
+    @Test fun navigationBeforeNextDrawFreezesPictureAndContoursFromSameFrame() = assertPresentedFrame(false)
+
+    @Test fun changedCaptureInputsDiscardPictureAndUseCurrentNativeGeometry() = assertPresentedFrame(true)
+
+    private fun assertPresentedFrame(changeInputs: Boolean) {
+        val page = SettingsPageMorph()
+        var inputs = 0
+        page.captureInputs = { inputs }
+        val time = mutableStateOf(1f)
+        val source = Rect(16f, 100f, 344f, 300f)
+        val group = Any()
+        lateinit var host: Rect
+        fun report(bounds: Rect) {
+            page.reportDestination(
+                group,
+                SettingsRouteEndpoint(
+                    group,
+                    "parent",
+                    bounds,
+                    androidx.compose.ui.geometry.RoundRect(Rect(0f, 0f, bounds.width, bounds.height), 20f, 20f),
+                    Color.Black,
+                    Color.White,
+                    true,
+                    true,
+                ),
+            )
+        }
+        rule.setContent {
+            Box(
+                Modifier.fillMaxSize().drawWithContent {
+                    host = Rect(0f, 0f, size.width, size.height)
+                    if (!page.active) report(source)
+                    with(page) { draw(host, time.value, true, Color.Black) }
+                }.background(Color.Red),
+            )
+        }
+        rule.onRoot().captureToImage()
+        rule.runOnIdle {
+            val moved = source.translate(androidx.compose.ui.geometry.Offset(0f, -60f))
+            report(moved)
+            if (changeInputs) inputs++
+            page.pendingOrigin = source
+            assertTrue(page.begin("child", true, true, host))
+            assertEquals(
+                "source outline matches recorded pixels or the uncaptured native fallback",
+                if (changeInputs) moved else source,
+                page.renderedContours(0f).single().bounds,
+            )
+            assertEquals(if (changeInputs) 0 else 1, page.keptPictures)
+            page.cancel()
+            assertEquals(0, page.keptPictures)
+            assertFalse(page.hasSettledPicture)
+        }
+    }
+
     @Test fun unoutlinedOutgoingBodyKeepsItsMeasuredViewportAfterSourceReportsClear() {
         val page = SettingsPageMorph()
         val time = mutableStateOf(1f)
