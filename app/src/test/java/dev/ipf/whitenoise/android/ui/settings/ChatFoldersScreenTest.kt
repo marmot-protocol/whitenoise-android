@@ -94,11 +94,7 @@ class ChatFoldersScreenTest {
         controller: ChatsController,
         items: List<ChatListItem>,
     ) {
-        val setter =
-            ChatsController::class.java.getDeclaredMethod("setItems", List::class.java).apply {
-                isAccessible = true
-            }
-        setter.invoke(controller, items)
+        controller.items = items
     }
 
     /** Returns the running active account summary for the chat folders screen. */

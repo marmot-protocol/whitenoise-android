@@ -279,11 +279,7 @@ class ChatFolderOwnershipTest {
         val state = appState()
         val controller = ChatsController(state)
         state.attachChatsController(controller)
-        val setter =
-            ChatsController::class.java.getDeclaredMethod("setItems", List::class.java).apply {
-                isAccessible = true
-            }
-        setter.invoke(controller, listOf(chatItem("g1")))
+        controller.items = listOf(chatItem("g1"))
         val restoration = StateRestorationTester(composeRule)
         restoration.setContent { WhiteNoiseTheme { ChatFolderEditScreen(state, A, null, {}) } }
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Rotated")
