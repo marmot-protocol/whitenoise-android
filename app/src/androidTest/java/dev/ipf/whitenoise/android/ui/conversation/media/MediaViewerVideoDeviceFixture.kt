@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.core.graphics.Insets
@@ -336,17 +337,36 @@ internal class EdgeClipViewerFixture(
         }
     }
 
-    /** Polls [condition] between idle frames and fails the test with [description] once [timeoutMs] passes. */
+    /**
+     * Polls [condition] between idle frames and fails the test with [description] once [timeoutMs] passes. The test
+     * clock is advanced by the real time spent waiting, so composition delays such as the controls timeout and the
+     * seek bar's position poll run as they would on a device.
+     */
     fun awaitCondition(
         description: String,
         timeoutMs: Long = TIMEOUT_MS,
         condition: () -> Boolean,
     ) {
         val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var last = SystemClock.uptimeMillis()
         while (!condition()) {
             if (SystemClock.uptimeMillis() > deadline) throw AssertionError("Timed out waiting for $description")
             SystemClock.sleep(POLL_MS)
+            val now = SystemClock.uptimeMillis()
+            rule.mainClock.advanceTimeBy(now - last)
+            last = now
             rule.waitForIdle()
+        }
+    }
+
+    /** Waits until the seek bar knows the clip's duration and accepts drags. */
+    fun awaitSeekBarEnabled() {
+        awaitCondition("the seek bar to be enabled") {
+            rule
+                .onAllNodesWithTag(VIDEO_VIEWER_SEEK_TAG)
+                .fetchSemanticsNodes()
+                .singleOrNull()
+                ?.let { SemanticsProperties.Disabled !in it.config } == true
         }
     }
 

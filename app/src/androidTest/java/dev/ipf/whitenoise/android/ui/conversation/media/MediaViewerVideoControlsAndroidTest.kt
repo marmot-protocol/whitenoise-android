@@ -124,7 +124,8 @@ class MediaViewerVideoControlsAndroidTest {
         assertTrue("decoded clip duration $durationMs ms", durationMs in CLIP_DURATION_RANGE_MS)
         val targetMs = (durationMs * SEEK_FRACTION).roundToLong()
 
-        fixture.dragTimeBar(opened, SEEK_FRACTION)
+        fixture.awaitSeekBarEnabled()
+        fixture.dragTimeBar(fixture.geometry(), SEEK_FRACTION)
         fixture.awaitCondition("the seek to reach $targetMs ms") {
             abs(fixture.readPlayer { it.currentPosition } - targetMs) <= SEEK_TOLERANCE_MS
         }
