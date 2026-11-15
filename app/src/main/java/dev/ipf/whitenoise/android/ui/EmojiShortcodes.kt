@@ -70,6 +70,7 @@ internal val LocalReceivedEmoji = compositionLocalOf { ReceivedEmoji.None }
 internal object EmojiShortcodes {
     const val LITERAL_TAG = "emoji-shortcode-literal"
     const val MAX_CODE_LENGTH = 64
+
     private class Builtin(
         @DrawableRes val drawable: Int,
         @StringRes val name: Int,
