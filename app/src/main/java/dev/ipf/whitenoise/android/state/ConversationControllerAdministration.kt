@@ -7,7 +7,6 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
-import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
