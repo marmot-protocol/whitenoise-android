@@ -175,14 +175,14 @@ class AppStateSendLockCoverageTest {
     /** Keeps delivery cutover cleanup atomic with registration sync and suppresses competing token work. */
     @Test
     fun notificationDeliveryCleanupSerializesWithNativePushSync() {
-        val disableBody = appStateFunctionBody("disableNativePushForPersistentDelivery")
-        val rollbackBody = appStateFunctionBody("rollbackNativePushMode")
-        val rotationBody = appStateFunctionBody("onPushTokenRotated")
-        val finishBody = appStateFunctionBody("finishNotificationDeliveryModeTransaction")
+        val disableBody = notificationDeliveryFunctionBody("disableNativePushForPersistentDelivery")
+        val rollbackBody = notificationDeliveryFunctionBody("rollbackNativePushMode")
+        val rotationBody = notificationDeliveryFunctionBody("onPushTokenRotated")
+        val finishBody = notificationDeliveryFunctionBody("finishNotificationDeliveryModeTransaction")
         val modeEntryBodies =
             listOf(
-                appStateFunctionBody("setNotificationDeliveryMode"),
-                appStateFunctionBody("launchNotificationDeliveryModeReconciliation"),
+                notificationDeliveryFunctionBody("setNotificationDeliveryMode"),
+                notificationDeliveryFunctionBody("launchNotificationDeliveryModeReconciliation"),
             )
 
         listOf(disableBody, rollbackBody).forEach { body ->
@@ -632,6 +632,9 @@ class AppStateSendLockCoverageTest {
         require(braceStart >= 0) { "Missing body for $functionName" }
         return source.kotlinBlockFrom(braceStart, "function $functionName")
     }
+
+    private fun notificationDeliveryFunctionBody(functionName: String): String =
+        controllerFunctionBody(functionName, controllerFileName = "NotificationDeliveryController.kt")
 
     private fun appStateSource(): File =
         listOf(

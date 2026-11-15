@@ -221,6 +221,7 @@
     <ID>LargeClass:LocalNotificationPresenter.kt:LocalNotificationPresenter</ID>
     <ID>LargeClass:MarkdownInlineTextTest.kt:MarkdownInlineTextTest</ID>
     <ID>LargeClass:MediaPipeline.kt:MediaPipeline</ID>
+    <ID>LargeClass:NotificationDeliveryController.kt:NotificationDeliveryController</ID>
     <ID>LargeClass:NotificationTargetTest.kt:NotificationTargetTest</ID>
     <ID>LongMethod:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountKeysScreen</ID>
     <ID>LongMethod:AgentStreamPreviewTest.kt:AgentStreamPreviewTest$@Test fun durableStreamDisplayPositions_reanchorsAfterOptimisticPromptOverride</ID>
@@ -467,6 +468,7 @@
     <ID>MagicNumber:NotificationAction.kt:NotificationActions$31</ID>
     <ID>MagicNumber:NotificationActionReceiver.kt:NotificationActionReceiver$8</ID>
     <ID>MagicNumber:NotificationChannels.kt:NotificationChannels$150L</ID>
+    <ID>MagicNumber:NotificationDeliveryController.kt:NotificationDeliveryController$8</ID>
     <ID>MagicNumber:NotificationIdentityRendering.kt:0.45f</ID>
     <ID>MagicNumber:NotificationIdentityRendering.kt:0.58f</ID>
     <ID>MagicNumber:NotificationMarkReadWorker.kt:NotificationMarkReadWorker$8</ID>
@@ -563,13 +565,10 @@
     <ID>MaxLineLength:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$assertEquals(TimeUnit.SECONDS.toMillis(AppSelfUpdateDownloader.READ_TIMEOUT_SECONDS), client.readTimeoutMillis.toLong())</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"active conversation=${groupIdHex?.take(8) ?: "&lt;none&gt;"} account=${activeConversationAccountRef?.take(8) ?: "&lt;none&gt;"}"</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"local notifications account=${account.take(8)} enabled=${settings.localNotificationsEnabled} permission=$localNotificationPermissionGranted"</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appStateDebug { "push settings re-read failed; keeping registration account=${account.take(8)}" }</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appStateDebug(it) { "external signer re-register failed for ${account.label.take(8)}: ${it.readableMessage()}" }</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appStateDebug(it) { "notification reply dedupe probe failed for group=${group.take(8)}: ${it.readableMessage()}" }</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun launchVerifiedAppSelfUpdate: Boolean</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private fun cachedUserProfile: UserProfileMetadataFfi?</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private val notificationDrainSignals = MutableSharedFlow&lt;Long&gt;(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private</ID>
@@ -809,6 +808,7 @@
     <ID>MaxLineLength:NostrEvent.kt:private fun String.isHex: Boolean</ID>
     <ID>MaxLineLength:NotificationAction.kt:NotificationActions$val target = NotificationNavigation.parseTargetExtras(accountRef, groupIdHex, messageIdHex, targetKindName) ?: return null</ID>
     <ID>MaxLineLength:NotificationChannelSpecTest.kt:NotificationChannelSpecTest$update(trigger = NotificationTriggerFfi.NEW_MESSAGE, isDm = false, reactionEmoji = "👍", isMention = true)</ID>
+    <ID>MaxLineLength:NotificationDeliveryController.kt:NotificationDeliveryController$"local notifications account=${account.take(8)} enabled=${settings.localNotificationsEnabled} permission=$localNotificationPermissionGranted"</ID>
     <ID>MaxLineLength:NotificationInteractionFactory.kt:NotificationInteractionFactory$NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))</ID>
     <ID>MaxLineLength:NotificationPushWakeDrainCoverageTest.kt:NotificationPushWakeDrainCoverageTest$assertEquals(35_000L, pushWakeLockTimeoutMs(pushDrainTimeoutMs = 10_000L, bootstrapBudgetMs = 5_000L, nativePushSyncBudgetMs = 20_000L))</ID>
     <ID>MaxLineLength:NotificationPushWakeDrainCoverageTest.kt:NotificationPushWakeDrainCoverageTest$private fun appStateFunctionBody: String</ID>
@@ -911,11 +911,8 @@
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$internal suspend fun sendNotificationReply: NotificationReplySendOutcome</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun notificationReplyCommitState: NotificationReplyCommitProbe</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun refreshAccountUnreadCount</ID>
-    <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$private suspend fun syncPushForAccount: Boolean</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun enableDefaultNotificationsIfReady: Boolean</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun markNotificationMessageRead: Boolean</ID>
-    <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun setBackgroundConnectionEnabled: Boolean</ID>
-    <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun setLocalNotificationsEnabled: Boolean</ID>
     <ID>ReturnCount:AppUpdateNotifier.kt:AppUpdateNavigation$fun isUpdateTap: Boolean</ID>
     <ID>ReturnCount:AppUpdateNotifier.kt:AppUpdateNotifier$@SuppressLint("MissingPermission") fun show: Boolean</ID>
     <ID>ReturnCount:AttachmentCachePublication.kt:AttachmentCachePublication$fun capturePermit: Permit?</ID>
@@ -1050,6 +1047,9 @@
     <ID>ReturnCount:NotificationAction.kt:NotificationActions$private fun parseFields: NotificationAction?</ID>
     <ID>ReturnCount:NotificationActionReceiver.kt:NotificationActionReceiver$private suspend fun enqueueReplyAction</ID>
     <ID>ReturnCount:NotificationConversationShortcuts.kt:NotificationConversationShortcuts$private fun pruneConversationShortcutsBeforePublish</ID>
+    <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$private suspend fun syncPushForAccount: Boolean</ID>
+    <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$suspend fun setBackgroundConnectionEnabled: Boolean</ID>
+    <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$suspend fun setLocalNotificationsEnabled: Boolean</ID>
     <ID>ReturnCount:NotificationMarkReadWorker.kt:NotificationMarkReadWorker$override suspend fun doWork: Result</ID>
     <ID>ReturnCount:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore$private fun recoveryState: NotificationReplyRecoveryState?</ID>
     <ID>ReturnCount:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore$private fun strictlyLaterBoundary: NotificationReplyRecoveryBoundary?</ID>
@@ -1186,6 +1186,7 @@
     <ID>TooManyFunctions:MentionComposer.kt:MentionComposer</ID>
     <ID>TooManyFunctions:MessageProjector.kt:MessageProjector</ID>
     <ID>TooManyFunctions:Nip55SignerProtocol.kt:Nip55</ID>
+    <ID>TooManyFunctions:NotificationDeliveryController.kt:NotificationDeliveryController</ID>
     <ID>TooManyFunctions:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore</ID>
     <ID>TooManyFunctions:NotificationReplyWorker.kt:NotificationReplyWorker$Companion</ID>
     <ID>TooManyFunctions:NotificationStreamForegroundService.kt:dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService.kt</ID>
