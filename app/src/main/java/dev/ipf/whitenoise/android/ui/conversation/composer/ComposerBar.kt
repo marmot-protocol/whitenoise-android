@@ -108,6 +108,8 @@ import dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
+import dev.ipf.whitenoise.android.ui.common.LocalWindowLayout
+import dev.ipf.whitenoise.android.ui.common.WindowLayout
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
@@ -425,14 +427,16 @@ internal class ComposerAcceptanceToken(
     ): Boolean = source === state && this.text == text && this.contentRevision == contentRevision
 }
 
-// Last measured keyboard pane height per orientation, shared across composer
+// Last measured keyboard pane height per window shape, shared across composer
 // instances for the life of the process. The keyboard's height belongs to the
 // device and IME, not to a conversation, so a freshly entered chat can reserve
 // the real keyboard space on its first emoji-pane open instead of guessing
-// with the fallback height.
+// with the fallback height. Keyed by window shape rather than orientation: a
+// foldable keeps its orientation when it opens, but its keyboard does not keep
+// its height.
 // Tests clear it so a run does not inherit a height from an earlier test.
 @VisibleForTesting
-internal val composerImePaneHeightMemory = mutableStateMapOf<Int, Dp>()
+internal val composerImePaneHeightMemory = mutableStateMapOf<WindowLayout, Dp>()
 
 @Composable
 internal fun rememberComposerTextState(
@@ -564,6 +568,7 @@ internal fun ComposerBar(
         )
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
+    val windowLayout = LocalWindowLayout.current
     val density = LocalDensity.current
     val editorLineHeight = rememberComposerEditorLineHeight()
     val layoutDirection = LocalLayoutDirection.current
@@ -605,13 +610,13 @@ internal fun ComposerBar(
             ?.toComposerExpansionState(density)
             ?: if (retainedExpansionOwner != null) ComposerExpansionState() else localComposerExpansion
     var composerHeightDragActive by
-        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation) {
+        remember(draftKey, draftAccountRef, draftGroupIdHex, windowLayout) {
             mutableStateOf(false)
         }
     // Keep pointer-rate pixels local and publish one density-independent record
     // when the drag settles; SavedStateHandle must not serialize every delta.
     var composerHeightDragState by
-        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation) {
+        remember(draftKey, draftAccountRef, draftGroupIdHex, windowLayout) {
             mutableStateOf<ComposerExpansionState?>(null)
         }
     val composerExpansion = composerHeightDragState ?: currentComposerExpansion()
@@ -635,12 +640,13 @@ internal fun ComposerBar(
     var editingProgressSource by remember { mutableStateOf<State<Float>?>(null) }
     val trailingActionAlignment =
         remember { ComposerActionRowAlignment(Alignment.End) { editingProgressSource?.value ?: 0f } }
+    // These two mirror measurements that are republished only when they change.
+    // A new window shape alone may not change them, so it must not reset them.
     var composerUsesMultilineControls by
         remember(
             draftKey,
             draftAccountRef,
             draftGroupIdHex,
-            configuration.orientation,
             configuration.fontScale,
         ) {
             mutableStateOf(false)
@@ -652,18 +658,17 @@ internal fun ComposerBar(
             draftKey,
             draftAccountRef,
             draftGroupIdHex,
-            configuration.orientation,
             configuration.fontScale,
         ) {
             mutableFloatStateOf(0f)
         }
-    var customInputPaneHeightPx by remember(configuration.orientation) { mutableFloatStateOf(0f) }
+    var customInputPaneHeightPx by remember(windowLayout) { mutableFloatStateOf(0f) }
     var automaticLayoutEstimate by
-        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation, configuration.fontScale) {
+        remember(draftKey, draftAccountRef, draftGroupIdHex, windowLayout, configuration.fontScale) {
             mutableStateOf<Pair<TextFieldValue, Float>?>(null)
         }
     var measuredAutomaticLayoutEstimate by
-        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation, configuration.fontScale) {
+        remember(draftKey, draftAccountRef, draftGroupIdHex, windowLayout, configuration.fontScale) {
             mutableStateOf<Pair<TextFieldValue, Float>?>(null)
         }
 
@@ -792,11 +797,13 @@ internal fun ComposerBar(
     // emoji-pane open in a freshly entered chat reserves the keyboard's real
     // space instead of the fallback guess (which made the later pane-to-
     // keyboard handoff grow the bottom region and cover the newest bubble).
-    var rememberedImePaneHeight by remember(configuration.orientation) {
-        mutableStateOf(composerImePaneHeightMemory[configuration.orientation] ?: 0.dp)
+    var rememberedImePaneHeight by remember(windowLayout) {
+        mutableStateOf(composerImePaneHeightMemory[windowLayout] ?: 0.dp)
     }
-    var lockedComposerEmojiPaneHeight by remember(configuration.orientation) { mutableStateOf(0.dp) }
-    LaunchedEffect(targetImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen) {
+    var lockedComposerEmojiPaneHeight by remember(windowLayout) { mutableStateOf(0.dp) }
+    // A new window shape resets the remembered height above, so record the
+    // keyboard that is already showing in the new window too.
+    LaunchedEffect(targetImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen, windowLayout) {
         rememberedImePaneHeight =
             updatedComposerRememberedImeHeight(
                 previousRememberedImeHeight = rememberedImePaneHeight,
@@ -804,7 +811,7 @@ internal fun ComposerBar(
                 freezeUpdates = composerEmojiPickerOpen || attachmentSheetState.isOpen,
             )
         if (rememberedImePaneHeight > 0.dp) {
-            composerImePaneHeightMemory[configuration.orientation] = rememberedImePaneHeight
+            composerImePaneHeightMemory[windowLayout] = rememberedImePaneHeight
         }
     }
     val composerKeyboardHeight =
@@ -1659,7 +1666,7 @@ internal fun ComposerBar(
                 // Receiving draft content does not acquire a recording or send transaction.
                 val canReceiveComposerContent: () -> Boolean = {
                     appState?.runtimeGeneration == toolbarRuntime &&
-                        appState?.appLockScreenVisible != true &&
+                        appState?.appLock?.screenVisible != true &&
                         appState?.signOutInProgress != true &&
                         appState?.wipeInProgress != true
                 }

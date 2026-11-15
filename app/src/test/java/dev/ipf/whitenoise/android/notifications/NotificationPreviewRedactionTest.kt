@@ -69,6 +69,24 @@ class NotificationPreviewRedactionTest {
             assertTrue(hidden.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
+    /** Name-only keeps cards written under the current choice and still scrubs older full-text cards. */
+    @Test
+    fun nameOnlyScrubsOlderCardsAndKeepsCurrentOnes() =
+        runBlocking {
+            postPrivate()
+            assertTrue(
+                NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, scrub = { true }),
+            )
+            assertTrue(NotificationPreviewRedactor(context, pacer = pacer, sleep = {}).redact())
+            val hidden = manager.activeNotifications.first { it.tag == TAG }.notification
+            assertEquals(context.getString(R.string.app_name), hidden.extras.getCharSequence(Notification.EXTRA_TITLE))
+            assertFalse(hidden.extras.containsKey("private_debug"))
+            postPrivate(NotificationPreviewPreferences.capture(context))
+            assertTrue(NotificationPreviewRedactor(context, pacer = pacer, sleep = {}).redact())
+            val current = manager.activeNotifications.first { it.tag == TAG }.notification
+            assertEquals("Private content", current.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+        }
+
     /** Shed notify updates fall back to targeted cancellation and Retry, leaving a service card alone. */
     @Test
     fun unconfirmedRewriteCancelsOnlyTheKnownPrivateCardAndReportsFailure() =
@@ -185,13 +203,14 @@ class NotificationPreviewRedactionTest {
             assertTrue(NotificationPreviewRedactor(context, pacer = pacer, sleep = {}).redact())
         }
 
-    private fun postPrivate() {
+    private fun postPrivate(token: NotificationPreviewToken? = null) {
         val builder =
             NotificationCompat
                 .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
                 .setSmallIcon(R.drawable.ic_stat_whitenoise)
                 .setContentTitle("Private content")
                 .addExtras(android.os.Bundle().apply { putString("private_debug", "Private text") })
+        token?.let { NotificationPreviewPreferences.stamp(builder, it, correction = false) }
         UserEventNotificationGroup.decorateChild(
             context,
             builder,

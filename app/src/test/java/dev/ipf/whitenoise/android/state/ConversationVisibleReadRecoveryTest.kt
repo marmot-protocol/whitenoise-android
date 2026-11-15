@@ -46,7 +46,7 @@ internal class ConversationVisibleReadRecoveryTest : ConversationVisibleReadTest
                 showAppLock(fixture.appState)
                 controller.markReadUpTo(MESSAGE_ID)
                 assertEquals(1, fixture.markReadCalls.get())
-                fixture.appState.markAppUnlockSucceeded(dismissRetainedVisibleConversation = false)
+                fixture.appState.appLock.markUnlockSucceeded(dismissRetainedVisibleConversation = false)
                 fixture.appState.setActiveConversationFromUi("other-account", reminder.groupIdHex)
                 controller.markReadUpTo(MESSAGE_ID)
                 assertEquals(1, fixture.markReadCalls.get())

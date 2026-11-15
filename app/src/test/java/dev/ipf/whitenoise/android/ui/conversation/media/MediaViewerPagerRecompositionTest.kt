@@ -224,9 +224,9 @@ class MediaViewerPagerRecompositionTest {
         assertTrue(mediaViewerChromeVisibilityAfterPageChange(currentlyVisible = true, pageIsVideo = false))
     }
 
-    /** Hiding and restoring chrome resizes the mounted page in place, never recreating it or changing pages. */
+    /** Hiding and restoring chrome keeps the mounted page in place at one size, without recreating or changing it. */
     @Test
-    fun chromeToggleResizesTheMountedPageWithoutRecreatingIt() {
+    fun chromeToggleKeepsTheMountedPageAtOneSize() {
         val pages = listOf(page("image"), page("clip", mediaType = "video/mp4"), page("later"))
         var chromeVisible by mutableStateOf(true)
         val mountedStates = mutableListOf<Any>()
@@ -267,7 +267,7 @@ class MediaViewerPagerRecompositionTest {
         }
         composeRule.runOnIdle {
             assertEquals("the current page must stay mounted across chrome changes", 1, mountedStates.size)
-            assertEquals("hiding chrome must hand its height to the page", 2, pageHeights.distinct().size)
+            assertEquals("toggling chrome must not resize the page", 1, pageHeights.distinct().size)
         }
     }
 

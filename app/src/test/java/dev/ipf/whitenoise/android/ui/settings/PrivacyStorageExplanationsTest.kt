@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewMode
 import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -39,15 +40,15 @@ class PrivacyStorageExplanationsTest {
     private var retries = 0
 
     @Test
-    fun previewSwitchHoldExplainsAndQuickClickToggles() {
+    fun previewChoiceHoldExplainsAndQuickClickSelects() {
         render {
             NotificationPreviewControl(
-                state = NotificationPreviewControlState(enabled = false),
+                state = NotificationPreviewControlState(mode = NotificationPreviewMode.NONE),
                 onChange = { changes++ },
                 onRetry = { retries++ },
             )
         }
-        val title = context.getString(R.string.notification_show_previews)
+        val title = context.getString(R.string.notification_preview_full)
         composeRule.onNode(hasText(title)).performClick()
         assertEquals(1, changes)
         changes = 0
@@ -61,7 +62,7 @@ class PrivacyStorageExplanationsTest {
     fun previewRetryHoldExplainsAndQuickClickRetries() {
         render {
             NotificationPreviewControl(
-                state = NotificationPreviewControlState(enabled = false, failed = true),
+                state = NotificationPreviewControlState(mode = NotificationPreviewMode.NONE, failed = true),
                 onChange = { changes++ },
                 onRetry = { retries++ },
             )

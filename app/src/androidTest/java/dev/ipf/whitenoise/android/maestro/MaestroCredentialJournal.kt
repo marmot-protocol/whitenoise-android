@@ -31,7 +31,7 @@ internal fun requireMaestroSyntheticCredential(
         biometric == BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ||
             biometric == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED,
     )
-    check(state.appLockCredentialAvailable)
+    check(state.appLock.credentialAvailable)
     return true
 }
 
@@ -49,14 +49,14 @@ internal class MaestroCredentialJournal(
         val row =
             withContext(Dispatchers.Main.immediate) {
                 JSONObject()
-                    .put("cover", state.appLockScreenVisible)
-                    .put("evaluating", state.appUnlockEvaluationPending)
-                    .put("cancelled", state.appUnlockError == AppText.Resource(R.string.app_lock_auth_cancelled))
-                    .put("activeSession", state.appUnlockSessions.activeSessionId ?: JSONObject.NULL)
-                    .put("latestSession", state.appUnlockSessions.latestSessionId)
-                    .put("required", state.requireAppUnlock)
-                    .put("available", state.appLockCredentialAvailable)
-                    .put("delay", state.appLockDelay.preferenceValue)
+                    .put("cover", state.appLock.screenVisible)
+                    .put("evaluating", state.appLock.evaluationPending)
+                    .put("cancelled", state.appLock.unlockError == AppText.Resource(R.string.app_lock_auth_cancelled))
+                    .put("activeSession", state.appLock.sessions.activeSessionId ?: JSONObject.NULL)
+                    .put("latestSession", state.appLock.sessions.latestSessionId)
+                    .put("required", state.appLock.required)
+                    .put("available", state.appLock.credentialAvailable)
+                    .put("delay", state.appLock.lockDelay.preferenceValue)
                     .put("storedDelay", storedDelay ?: JSONObject.NULL)
                     .put("lifecycle", activity.lifecycle.currentState.name)
                     .put("orientation", activity.resources.configuration.orientation)
@@ -88,8 +88,8 @@ internal class MaestroCredentialJournal(
         if (disabled) verifyDisabledWarmReturn(final.getLong("latestSession"))
         if (delayPicker) verifyDelayChoices()
         withContext(Dispatchers.Main.immediate) {
-            check(state.appUnlockError == null)
-            check(state.appLockDelay == expectedDelay)
+            check(state.appLock.unlockError == null)
+            check(state.appLock.lockDelay == expectedDelay)
         }
         check(preferences.getBoolean("require_app_unlock", false) == !disabled)
         val persistedDelay = preferences.getString("app_lock_delay", null)

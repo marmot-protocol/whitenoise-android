@@ -102,9 +102,15 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.conversationNotifyMode
+import dev.ipf.whitenoise.android.state.conversationRestoreNotifyMode
+import dev.ipf.whitenoise.android.state.conversationVibrationPattern
 import dev.ipf.whitenoise.android.state.folderMemberIds
+import dev.ipf.whitenoise.android.state.groupDetailsMuteDisplay
+import dev.ipf.whitenoise.android.state.isConversationMutePending
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.setConversationNotifyMode
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.abandonmentAccountName
@@ -302,7 +308,7 @@ internal fun GroupDetailsScreen(
         val memberResolution =
             rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
         // Reuse the established account/runtime admission owner for protected route drawing.
-        if (appState.appLockScreenVisible || !controller.isCurrentGroupMutationOwner(appState, reviewRuntime)) {
+        if (appState.appLock.screenVisible || !controller.isCurrentGroupMutationOwner(appState, reviewRuntime)) {
             BackHandler { onBack() }
             return@PreparedGroupAvatarContent
         }
@@ -1995,7 +2001,7 @@ internal fun GroupDetailsScreen(
                             controller.group.groupIdHex,
                             { showTranslationPicker = false },
                             ownerCurrent = {
-                                appState.activeAccountRef == account && !appState.appLockScreenVisible
+                                appState.activeAccountRef == account && !appState.appLock.screenVisible
                             },
                         )
                     }

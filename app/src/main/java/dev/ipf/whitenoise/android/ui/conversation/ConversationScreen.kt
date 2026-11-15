@@ -610,7 +610,7 @@ internal fun ConversationScreen(
     productObservationEffect()
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // Protected windows and decorative pixels must disappear in the lock-producing frame.
-    if (appState.appLockScreenVisible) return
+    if (appState.appLock.screenVisible) return
     // The conversation's own account. Identical to the active account except
     // during a notification-routed early open (#586), while the switch is
     // still landing; conversation-scoped state keys and self-identity follow

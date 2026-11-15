@@ -49,7 +49,8 @@
           "MED-007",
           "MED-017",
           "MED-033",
-          "MED-041"
+          "MED-041",
+          "MED-051"
         ]
       },
       {
@@ -125,15 +126,6 @@
       }
     ],
     "source_coverage": [
-      {
-        "surface": "Viewer video fit, native controls and chrome coordination",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "fun viewerPlayerView(",
-        "test_ids": [
-          "MED-007",
-          "MED-033"
-        ]
-      },
       {
         "surface": "Video tile unknown versus known-missing local file readiness",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",

@@ -29,7 +29,7 @@ class NotificationMarkReadWorker(
                 .decode(inputData)
                 ?.takeIf { it.kind == NotificationActionKind.MARK_READ }
                 ?: return Result.failure().also { retryStore.clear(retryKey) }
-        if (!application.appState.notificationActionsAllowed) {
+        if (!application.appState.appLock.notificationActionsAllowed) {
             notificationWarning(TAG, "mark-read deferred by app lock") {
                 "group=${action.target.groupIdHex.take(8)}"
             }

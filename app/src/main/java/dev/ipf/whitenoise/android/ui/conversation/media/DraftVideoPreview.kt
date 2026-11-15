@@ -14,11 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -32,9 +29,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -43,8 +37,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
-import dev.ipf.whitenoise.android.R
-import kotlinx.coroutines.delay
 
 /** Seek buttons jump a fixed ten seconds, matching the prototype's transport. */
 internal const val DRAFT_VIDEO_SEEK_STEP_MS = 10_000L
@@ -52,7 +44,6 @@ internal const val DRAFT_VIDEO_SEEK_STEP_MS = 10_000L
 /** Below this height the centre transport would collide with the frame, so it moves into the bottom row. */
 internal val DRAFT_VIDEO_COMPACT_HEIGHT = 480.dp
 
-private const val PROGRESS_POLL_MILLIS = 200L
 private val CONTROL_SPACING = 8.dp
 private val PLAYBACK_SPEEDS = listOf(1f, 1.5f, 2f, 0.5f)
 
@@ -278,7 +269,7 @@ private fun DraftVideoBottomBar(
                     .testTag("conversation.media.preview.video.buffering"),
             )
         }
-        DraftVideoSeekSlider(player)
+        VideoSeekSlider(player, testTag = "conversation.media.preview.video.seek")
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(if (compact) 0.dp else CONTROL_SPACING, Alignment.End),
@@ -294,38 +285,4 @@ private fun DraftVideoBottomBar(
             DraftVideoMuteButton(player)
         }
     }
-}
-
-/** Scrub bar without an end-stop marker; dragging holds a local value until the pointer lifts. */
-@Composable
-private fun DraftVideoSeekSlider(player: Player) {
-    var duration by remember(player) { mutableLongStateOf(0L) }
-    var position by remember(player) { mutableLongStateOf(0L) }
-    var scrub by remember(player) { mutableStateOf<Float?>(null) }
-    LaunchedEffect(player) {
-        while (true) {
-            duration = player.duration.takeIf { it > 0L } ?: 0L
-            position = player.currentPosition.coerceAtLeast(0L)
-            delay(PROGRESS_POLL_MILLIS)
-        }
-    }
-    val fraction = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    val label = stringResource(R.string.video_playback_position)
-    Slider(
-        value = scrub ?: fraction,
-        onValueChange = { scrub = it },
-        onValueChangeFinished = {
-            scrub?.let { player.seekTo((it * duration).toLong()) }
-            scrub = null
-        },
-        enabled = duration > 0L,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = label }
-                .testTag("conversation.media.preview.video.seek"),
-        track = { state ->
-            SliderDefaults.Track(sliderState = state, enabled = duration > 0L, drawStopIndicator = null)
-        },
-    )
 }

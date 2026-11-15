@@ -1034,8 +1034,8 @@ internal fun MainShell(
         },
     )
 
-    LaunchedEffect(appState.appLockScreenVisible) {
-        if (appState.appLockScreenVisible) {
+    LaunchedEffect(appState.appLock.screenVisible) {
+        if (appState.appLock.screenVisible) {
             supersedePendingTtsDestinationNavigation()
             routingShare = false
         }
@@ -1045,7 +1045,7 @@ internal fun MainShell(
         pendingShareRequestStore,
         preparedShareRequest,
         appState.phase,
-        appState.appLockScreenVisible,
+        appState.appLock.screenVisible,
         appState.activeAccountRef,
         appState.accounts,
         chatsController,
@@ -1066,7 +1066,7 @@ internal fun MainShell(
         supersedePendingTtsDestinationNavigation()
         val store = pendingShareRequestStore ?: return@LaunchedEffect
         val persisted = shellStateHolder.pendingShareRequestId == request.requestId
-        if (!shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) return@LaunchedEffect
+        if (!shouldPresentInboundShare(appState.phase, appState.appLock.screenVisible)) return@LaunchedEffect
         if (request.shortcutId.isNullOrBlank() || request.payload.importErrors.isNotEmpty()) {
             val promoted = shellStateHolder.promoteInboundShareRequest(request, persisted)
             if (promoted) {
@@ -1199,7 +1199,7 @@ internal fun MainShell(
         pendingTtsDestinationNavigation,
         observedTtsDestination,
         appState.runtimeGeneration,
-        appState.appLockScreenVisible,
+        appState.appLock.screenVisible,
         appState.activeAccountRef,
         appState.accounts,
         chatsController,
@@ -1265,7 +1265,7 @@ internal fun MainShell(
             if (
                 appState.runtimeGeneration != routingRuntime ||
                 appState.activeAccountRef != request.accountRef ||
-                appState.appLockScreenVisible
+                appState.appLock.screenVisible
             ) {
                 return
             }
@@ -1295,7 +1295,7 @@ internal fun MainShell(
             clearPendingRequest()
         }
 
-        if (appState.appLockScreenVisible) {
+        if (appState.appLock.screenVisible) {
             clearPendingRequest()
             return@LaunchedEffect
         }
@@ -1788,13 +1788,13 @@ internal fun MainShell(
         playbackVisible &&
             !playbackInChatList &&
             selectedChat == null &&
-            !appState.appLockScreenVisible &&
+            !appState.appLock.screenVisible &&
             navAccountStable
     MainShellNoticeLayout(
         notice = appState.transientNotice,
         dictationController = appState.conversationDictation,
         dictationComposerRoute = dictationComposerRoute,
-        appLockScreenVisible = appState.appLockScreenVisible,
+        appLockScreenVisible = appState.appLock.screenVisible,
         persistentTopContent = {
             ForwardOperationStatusHost(appState)
             if (playbackInShell) {
@@ -1812,7 +1812,7 @@ internal fun MainShell(
         handoffDestination =
             when {
                 !navAccountStable ||
-                    appState.appLockScreenVisible ||
+                    appState.appLock.screenVisible ||
                     routingNotification ||
                     routingShare ||
                     routingAppUpdate ||
@@ -1997,7 +1997,7 @@ internal fun MainShell(
                                 playbackTransport = {
                                     // Match released read-aloud: retain this screen's chrome until its Back
                                     // animation disposes it. Route deselection must not collapse the outgoing header.
-                                    if (navAccountStable && !appState.appLockScreenVisible) {
+                                    if (navAccountStable && !appState.appLock.screenVisible) {
                                         dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
                                             appState,
                                             onBodyClick = guardedPlaybackSourceOpen,
@@ -2126,7 +2126,7 @@ internal fun MainShell(
                                     routingShare ||
                                     routingAppUpdate ||
                                     pendingTtsDestinationNavigation != null,
-                            contentVisible = !appState.appLockScreenVisible,
+                            contentVisible = !appState.appLock.screenVisible,
                             topLevelBubble = true,
                         ) { animatedSection ->
                             when (animatedSection) {
@@ -2337,7 +2337,7 @@ internal fun MainShell(
             // Compose after every shell/profile/new-group surface. The full-screen
             // Dialog owns pointer and accessibility focus while preserving the route
             // underneath for an exact return after cancellation (issue #1721).
-            if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
+            if (shouldPresentInboundShare(appState.phase, appState.appLock.screenVisible)) {
                 dev.ipf.whitenoise.android.ui.share.ShareImportStatus(
                     importing = inboundShareRequest != null && preparedShareRequest == null,
                     progress = shareImportProgress,

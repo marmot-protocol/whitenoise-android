@@ -349,6 +349,7 @@
     <string name="discard_failed_message">Discard failed message</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
+    <string name="invited_as_account">Invited as %1$s</string>
     <string name="invited_to_chat_by">Invited to chat by %1$s</string>
     <string name="someone">Someone</string>
     <string name="invitation_pending">Invitation pending</string>
@@ -1160,6 +1161,7 @@
     <string name="notification_removed_as_admin_of_unnamed_group">You are no longer an admin of a group</string>
     <string name="notification_reacted_to_message">reacted %1$s to: \"%2$s\"</string>
     <string name="notification_reacted">reacted %1$s</string>
+    <string name="notification_reacted_hidden">reacted to a message</string>
     <string name="background_connection_notification_title">White Noise is connected</string>
     <string name="background_connection_notification_text">Listening for messages</string>
     <string name="background_connection_notification_hint">Long-press to hide this notification</string>
@@ -2594,8 +2596,14 @@
     <string name="error_invite_welcome_too_large">This invitation is too large for a recipient’s inbox relays to accept. Ask them to add an inbox relay that accepts larger messages.</string>
     <string name="error_update_too_large">This update is too large for your relays. Nothing was changed.</string>
     <string name="error_group_change_too_large">A group change was too large for the group’s relays, so it wasn’t made.</string>
-    <string name="notification_show_previews">Show notification previews</string>
-    <string name="notification_show_previews_detail">When off, hides names and message content. Applies to all accounts.</string>
+    <string name="notification_show_previews">Notification previews</string>
+    <string name="notification_show_previews_detail">Choose what notifications show. Applies to all accounts.</string>
+    <string name="notification_preview_full">Name and message</string>
+    <string name="notification_preview_full_detail">Shows the sender and message text</string>
+    <string name="notification_preview_name_only">Name only</string>
+    <string name="notification_preview_name_only_detail">Shows the sender, hides the message</string>
+    <string name="notification_preview_none">Hidden</string>
+    <string name="notification_preview_none_detail">Shows only that something arrived</string>
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
     <string name="profile_readiness_loading">Loading profile…</string>
     <string name="profile_readiness_unavailable">Profile status unavailable · Tap to edit</string>
