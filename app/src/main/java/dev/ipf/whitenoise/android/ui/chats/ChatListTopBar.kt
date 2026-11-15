@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowDown
 import dev.ipf.whitenoise.android.ui.icons.filled.KeyboardArrowUp
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateIconButton
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -128,6 +129,7 @@ internal fun ChatListTopBar(
 ) {
     var showSelector by remember(appState.runtimeGeneration) { mutableStateOf(false) }
     var showAddIdentity by remember(appState.runtimeGeneration) { mutableStateOf(false) }
+    var addIdentityContour by remember(appState.runtimeGeneration) { mutableStateOf<SettingsContour?>(null) }
     var addIdentityOrigin by remember(appState.runtimeGeneration) { mutableStateOf<Rect?>(null) }
     val switchNotice = rememberQuickAccountSwitchNotice()
     LaunchedEffect(appState.signOutInProgress, appState.wipeInProgress) {
@@ -355,6 +357,7 @@ internal fun ChatListTopBar(
             appState = appState,
             onDismiss = { showSelector = false },
             onAddAccountOrigin = { addIdentityOrigin = it },
+            onAddAccountContour = { addIdentityContour = it },
             onAddAccount = {
                 showSelector = false
                 showAddIdentity = true
@@ -367,7 +370,12 @@ internal fun ChatListTopBar(
         )
     }
     if (showAddIdentity) {
-        AddIdentitySheet(appState = appState, origin = addIdentityOrigin, onDismiss = { showAddIdentity = false })
+        AddIdentitySheet(
+            appState = appState,
+            origin = addIdentityOrigin,
+            sourceContour = addIdentityContour,
+            onDismiss = { showAddIdentity = false },
+        )
     }
 }
 

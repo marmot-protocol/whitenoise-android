@@ -713,6 +713,8 @@ private fun SettingsHomeScreen(
     selfUpdateEnabled: Boolean,
 ) {
     var showAccountSelector by remember { mutableStateOf(false) }
+    var addIdentityOrigin by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var addIdentityContour by remember { mutableStateOf<SettingsContour?>(null) }
     var showAddIdentity by remember { mutableStateOf(false) }
     var showSignOut by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -779,6 +781,10 @@ private fun SettingsHomeScreen(
         onOpenShareConnect = { whenIdle { onOpenDetail(SettingsDetail.ShareConnect) } },
         onOpenProfilePictureActions = { whenIdle(onOpenProfilePictureActions) },
         onAddProfile = { whenIdle { showAddIdentity = true } },
+        onAddProfileMeasured = { origin, contour ->
+            addIdentityOrigin = origin
+            addIdentityContour = contour
+        },
         onSwitchProfile = { whenIdle { showAccountSelector = true } },
         onOpenDetail = { detail -> whenIdle { onOpenDetail(detail) } },
         onSignOut = { whenIdle { showSignOut = true } },
@@ -809,11 +815,18 @@ private fun SettingsHomeScreen(
                 showAccountSelector = false
                 showAddIdentity = true
             },
+            onAddAccountOrigin = { addIdentityOrigin = it },
+            onAddAccountContour = { addIdentityContour = it },
             onAccountSwitched = onBackToChats,
         )
     }
     if (showAddIdentity) {
-        AddIdentitySheet(appState = appState, onDismiss = { showAddIdentity = false })
+        AddIdentitySheet(
+            appState = appState,
+            origin = addIdentityOrigin,
+            sourceContour = addIdentityContour,
+            onDismiss = { showAddIdentity = false },
+        )
     }
     if (showSignOut) {
         SignOutSheet(
@@ -872,6 +885,7 @@ internal fun SettingsHomeContent(
     searchResultList: LazyListState = rememberLazyListState(),
     searchAnimationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     onSearchSelection: (SettingsSearchEntry) -> Unit = {},
+    onAddProfileMeasured: (androidx.compose.ui.geometry.Rect?, SettingsContour?) -> Unit = { _, _ -> },
 ) {
     val currentOnViewportChange by rememberUpdatedState(onViewportChange)
     val listState =
@@ -920,6 +934,7 @@ internal fun SettingsHomeContent(
                                         onOpenShareConnect = onOpenShareConnect,
                                         onOpenProfilePictureActions = onOpenProfilePictureActions,
                                         onAddProfile = onAddProfile,
+                                        onAddProfileMeasured = onAddProfileMeasured,
                                         onSwitchProfile = onSwitchProfile,
                                         onOpenAccount = { onOpenDetail(SettingsHomeRow.Account.detail) },
                                     )
@@ -985,6 +1000,7 @@ private fun SettingsProfileHeader(
     onAddProfile: () -> Unit,
     onSwitchProfile: () -> Unit,
     onOpenAccount: () -> Unit,
+    onAddProfileMeasured: (androidx.compose.ui.geometry.Rect?, SettingsContour?) -> Unit = { _, _ -> },
 ) {
     Column(Modifier.padding(bottom = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
         SettingsGroup {
@@ -1008,11 +1024,16 @@ private fun SettingsProfileHeader(
             }
             if (profileCount == 1) {
                 row("add_profile") { context ->
+                    val launch =
+                        rememberMeasuredContourClick { origin, contour ->
+                            onAddProfileMeasured(origin, contour)
+                            onAddProfile()
+                        }
                     SettingsAction(
                         context = context,
                         title = stringResource(R.string.settings_add_profile),
-                        onClick = onAddProfile,
-                        modifier = Modifier.testTag("settings.add_profile"),
+                        onClick = launch.second,
+                        modifier = launch.first.testTag("settings.add_profile"),
                         leading = {
                             SettingsLeadingIcon(R.drawable.ic_settings_person_add)
                         },

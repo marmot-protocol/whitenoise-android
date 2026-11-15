@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.settings.SettingsNativeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 
@@ -71,73 +72,78 @@ internal fun NewGroupRecipientContent(
             )
         },
     ) {
-        WhiteNoiseLazyColumn(
-            modifier = Modifier.fillMaxSize().testTag("new_group.list"),
-            contentPadding = PaddingValues(bottom = 24.dp),
-        ) {
-            item {
-                NewGroupRecipientSearchField(
-                    query,
-                    actions.pasteRejected,
-                    actions.scan,
-                    isValidNpub,
-                    Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_group.search"),
-                )
-            }
-            if (selected.isNotEmpty()) {
-                item { SettingsSection(stringResource(R.string.group_selected_people)) }
+        SettingsNativeViewport { viewport ->
+            WhiteNoiseLazyColumn(
+                modifier = Modifier.fillMaxSize().then(viewport).testTag("new_group.list"),
+                contentPadding = PaddingValues(bottom = 24.dp),
+            ) {
                 item {
-                    LazyRow(
-                        Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(selected, key = { it.candidate.accountIdHex }) { person ->
-                            GroupSelectedPerson(person) { actions.toggle(person.candidate) }
+                    NewGroupRecipientSearchField(
+                        query,
+                        actions.pasteRejected,
+                        actions.scan,
+                        isValidNpub,
+                        Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag("new_group.search"),
+                    )
+                }
+                if (selected.isNotEmpty()) {
+                    item { SettingsSection(stringResource(R.string.group_selected_people)) }
+                    item {
+                        LazyRow(
+                            Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(selected, key = { it.candidate.accountIdHex }) { person ->
+                                GroupSelectedPerson(person) { actions.toggle(person.candidate) }
+                            }
+                        }
+                    }
+                    item {
+                        TextButton(actions.review, Modifier.padding(horizontal = 16.dp).testTag("new_group.review")) {
+                            Text(stringResource(R.string.group_review_people))
                         }
                     }
                 }
-                item {
-                    TextButton(actions.review, Modifier.padding(horizontal = 16.dp).testTag("new_group.review")) {
-                        Text(stringResource(R.string.group_review_people))
+                item { SettingsSection(stringResource(R.string.new_message_people)) }
+                if (addressLookupFailed) item { RecipientAddressLookupFeedback(false, actions.retry) }
+                if (searching) item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
+                if (failed || incomplete) {
+                    item {
+                        UserSearchStatusRow(
+                            if (failed) R.string.user_search_failed else R.string.user_search_incomplete,
+                        )
+                        TextButton(actions.retry, Modifier.padding(horizontal = 16.dp).testTag("new_group.retry")) {
+                            Text(stringResource(R.string.retry))
+                        }
                     }
                 }
-            }
-            item { SettingsSection(stringResource(R.string.new_message_people)) }
-            if (addressLookupFailed) item { RecipientAddressLookupFeedback(false, actions.retry) }
-            if (searching) item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
-            if (failed || incomplete) {
-                item {
-                    UserSearchStatusRow(if (failed) R.string.user_search_failed else R.string.user_search_incomplete)
-                    TextButton(actions.retry, Modifier.padding(horizontal = 16.dp).testTag("new_group.retry")) {
-                        Text(stringResource(R.string.retry))
+                val searchComplete = !searching && !failed && !incomplete
+                if (people.isEmpty() && searchComplete) {
+                    item {
+                        WhiteNoiseEmptyState(
+                            stringResource(R.string.no_matches),
+                            stringResource(
+                                if (query.text.isBlank()) {
+                                    R.string.recipient_search_empty_hint
+                                } else {
+                                    R.string.search_people_hint
+                                },
+                            ),
+                        )
                     }
                 }
-            }
-            val searchComplete = !searching && !failed && !incomplete
-            if (people.isEmpty() && searchComplete) {
-                item {
-                    WhiteNoiseEmptyState(
-                        stringResource(R.string.no_matches),
-                        stringResource(
-                            if (query.text.isBlank()) {
-                                R.string.recipient_search_empty_hint
-                            } else {
-                                R.string.search_people_hint
-                            },
-                        ),
+                itemsIndexed(people, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
+                    GroupCreationPersonRow(
+                        person,
+                        index,
+                        people.size,
+                        selected =
+                            selected.any { it.candidate.accountIdHex.equals(person.candidate.accountIdHex, true) },
+                        onClick = { actions.toggle(person.candidate) },
+                        onLongClick = { origin -> actions.profile(person.candidate, origin) },
                     )
                 }
-            }
-            itemsIndexed(people, key = { _, person -> person.candidate.accountIdHex }) { index, person ->
-                GroupCreationPersonRow(
-                    person,
-                    index,
-                    people.size,
-                    selected = selected.any { it.candidate.accountIdHex.equals(person.candidate.accountIdHex, true) },
-                    onClick = { actions.toggle(person.candidate) },
-                    onLongClick = { origin -> actions.profile(person.candidate, origin) },
-                )
             }
         }
     }

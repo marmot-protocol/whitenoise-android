@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.rememberSheetTerminalMotion
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import kotlinx.coroutines.CancellationException
 
 internal const val ACCOUNT_SELECTOR_CONTENT_TAG = "account-selector-content"
@@ -95,6 +96,7 @@ internal fun AccountSelectorSheet(
     onAccountSwitched: () -> Unit,
     onSettings: (() -> Unit)? = null,
     onAddAccountOrigin: (Rect?) -> Unit = {},
+    onAddAccountContour: (SettingsContour?) -> Unit = {},
 ) {
     val runtime = appState.runtimeGeneration
     val sourceAccount = appState.activeAccountRef
@@ -165,6 +167,7 @@ internal fun AccountSelectorSheet(
                 }
             },
             onAddProfileOrigin = onAddAccountOrigin,
+            onAddProfileContour = onAddAccountContour,
             onAddProfile = {
                 if (!appState.profileSwitcherBlocked()) {
                     closeWithMotion { add() }

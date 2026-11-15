@@ -21,10 +21,14 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -43,11 +47,16 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
+import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredContourClick
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 import dev.ipf.whitenoise.android.ui.settings.settingsRowBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
@@ -87,9 +96,11 @@ internal fun ProfileSwitcherSheet(
     actionColorsForAccount: @Composable (String) -> AccountActionColors? = { null },
     npub: (String) -> String = { "" },
     onAddProfileOrigin: (Rect?) -> Unit = {},
+    onAddProfileContour: (SettingsContour?) -> Unit = {},
 ) {
     val (addModifier, addClick) =
         rememberMeasuredControlClick { origin ->
+            onAddProfileContour(null)
             onAddProfileOrigin(origin)
             onAddProfile()
         }
@@ -185,27 +196,42 @@ internal fun ProfileSwitcherSheet(
             }
         }
         if (onSettings != null) {
-            SettingsGroup(Modifier.padding(vertical = PROFILE_SWITCHER_CONTENT_INSET)) {
-                row("add_profile") { context ->
-                    SettingsAction(
-                        context,
-                        stringResource(R.string.add_profile),
-                        addClick,
-                        modifier = addModifier.testTag("profile_switcher.add_profile"),
-                        enabled = enabled,
-                        leading = { SettingsLeadingIcon(R.drawable.ic_settings_person_add) },
-                    )
-                }
-                row("settings") { context ->
-                    SettingsAction(
-                        context,
-                        stringResource(R.string.settings),
-                        onSettings,
-                        opensRoute = true,
-                        modifier = Modifier.testTag("profile_switcher.settings"),
-                        enabled = enabled,
-                        leading = { SettingsLeadingIcon(R.drawable.ic_emoji_settings) },
-                    )
+            // This window collects its own real source outline, without ancestor geometry or pixels.
+            val sourceMorph = remember { SettingsCardMorph(fullScreen = true) }
+            val view = LocalView.current
+            CompositionLocalProvider(LocalSettingsCardMorph provides sourceMorph) {
+                SettingsGroup(
+                    Modifier
+                        .padding(vertical = PROFILE_SWITCHER_CONTENT_INSET)
+                        .onGloballyPositioned { sourceMorph.placeHost(it.settingsMorphBounds(view)) },
+                ) {
+                    row("add_profile") { context ->
+                        val launch =
+                            rememberMeasuredContourClick { origin, contour ->
+                                onAddProfileContour(contour)
+                                onAddProfileOrigin(origin)
+                                onAddProfile()
+                            }
+                        SettingsAction(
+                            context,
+                            stringResource(R.string.add_profile),
+                            launch.second,
+                            modifier = launch.first.testTag("profile_switcher.add_profile"),
+                            enabled = enabled,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_settings_person_add) },
+                        )
+                    }
+                    row("settings") { context ->
+                        SettingsAction(
+                            context,
+                            stringResource(R.string.settings),
+                            onSettings,
+                            opensRoute = true,
+                            modifier = Modifier.testTag("profile_switcher.settings"),
+                            enabled = enabled,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_emoji_settings) },
+                        )
+                    }
                 }
             }
         } else {

@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -45,7 +46,9 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick
+import dev.ipf.whitenoise.android.ui.settings.rememberSettingsNativeSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
+import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 
 /** Current native person reference plus sanitized display data; this is not a discovery cache. */
 internal data class GroupCreationPerson(
@@ -57,7 +60,7 @@ internal data class GroupCreationPerson(
 /** Native checked rows preserve long-press profile preview; setup rows are full-contrast and read-only. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("FunctionNaming") // Compose naming follows the framework convention.
+@Suppress("FunctionNaming", "LongMethod") // Native measurement and input callbacks belong to the same row.
 internal fun GroupCreationPersonRow(
     person: GroupCreationPerson,
     index: Int,
@@ -71,10 +74,17 @@ internal fun GroupCreationPersonRow(
     val shapes = WhiteNoiseListItemDefaults.segmentedShapes(index, count)
     val followed = if (candidate.isFollowing) stringResource(R.string.user_search_you_follow) else null
     val (profileModifier, profileClick) = rememberMeasuredControlClick { origin -> onLongClick?.invoke(origin) }
+    val native =
+        rememberSettingsNativeSurface(
+            destination = candidate.accountIdHex,
+            shape = shapes.shape,
+            strokeColor = if (isAmoledSurfaceTheme()) MaterialTheme.colorScheme.outlineVariant else Color.Unspecified,
+        ).first
     val modifier =
         Modifier
             .fillMaxWidth()
             .then(profileModifier)
+            .then(native)
             .amoledSurfaceBorder(shapes.shape)
             .testTag("new_group.person.${candidate.accountIdHex}")
             .recipientRelationshipSemantics(followed, selected)

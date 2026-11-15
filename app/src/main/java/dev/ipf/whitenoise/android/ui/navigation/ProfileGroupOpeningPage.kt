@@ -33,17 +33,27 @@ import dev.ipf.whitenoise.android.ui.common.drawNativePage
 import dev.ipf.whitenoise.android.ui.common.measuredPageBounds
 import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** Replacement page only: its source is already disposed, so Back never reverses into it. */
 @Composable
 // Compose naming; measurement, drawing, and input retirement share one replacement-page lifetime.
-@Suppress("FunctionNaming", "CyclomaticComplexMethod")
+@Suppress("FunctionNaming", "CyclomaticComplexMethod", "LongMethod")
 internal fun ProfileGroupOpeningPage(
     origin: Rect?,
     owner: Any,
+    sourceContour: SettingsContour? = null,
     content: @Composable () -> Unit,
 ) {
+    val contourMorph =
+        remember(owner, sourceContour) {
+            sourceContour?.let {
+                SettingsCardMorph(fullScreen = true)
+            }
+        }
     val nativeBody = remember(owner, origin) { NativePageBody() }
     val background = MaterialTheme.colorScheme.background
     val view = LocalView.current
@@ -81,6 +91,8 @@ internal fun ProfileGroupOpeningPage(
                     // Wait for the real destination measurement; never flash a settled frame.
                 } else if (!motion || retired || origin == null) {
                     drawContent()
+                } else if (sourceContour != null && contourMorph?.page != null) {
+                    with(contourMorph.page) { drawExternal(sourceContour, host, progress.value, background) }
                 } else {
                     val bounds = measuredPageBounds(origin, host, progress.value).translate(-host.topLeft)
                     drawMeasuredPage(bounds, progress.value, background)
@@ -100,7 +112,14 @@ internal fun ProfileGroupOpeningPage(
                     }
                 }
             },
-    ) { CompositionLocalProvider(LocalNativePageBody provides nativeBody) { content() } }
+    ) {
+        CompositionLocalProvider(
+            LocalNativePageBody provides nativeBody,
+            LocalSettingsCardMorph provides contourMorph,
+        ) {
+            content()
+        }
+    }
 }
 
 /** A clipped or stale launch control cannot define a trustworthy replacement transform. */

@@ -91,6 +91,7 @@ import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceSta
 import dev.ipf.whitenoise.android.ui.icons.filled.Settings
 import dev.ipf.whitenoise.android.ui.profile.ProfileSheet
 import dev.ipf.whitenoise.android.ui.settings.DiagnosticsScreen
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewportEvent
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
@@ -236,18 +237,24 @@ internal class ProfileGroupForegroundState {
     var initialMember by mutableStateOf<RecipientSearch.Candidate?>(null)
         private set
 
+    var launchContour by mutableStateOf<SettingsContour?>(null)
+        private set
+
     var launchOrigin by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
         private set
 
     fun open(
         member: RecipientSearch.Candidate,
         origin: androidx.compose.ui.geometry.Rect? = null,
+        contour: SettingsContour? = null,
     ) {
+        launchContour = contour
         launchOrigin = origin
         initialMember = member
     }
 
     fun close() {
+        launchContour = null
         launchOrigin = null
         initialMember = null
     }
@@ -292,7 +299,7 @@ internal fun ProfileGroupForegroundCoordinator(
     when (route) {
         is ProfileForegroundRoute.NewGroup -> {
             secureWindowEnabled?.let { WindowSecureFlag(enabled = it) }
-            ProfileGroupOpeningPage(foregroundState.launchOrigin, route.initialMember) {
+            ProfileGroupOpeningPage(foregroundState.launchOrigin, route.initialMember, foregroundState.launchContour) {
                 NewGroupFlow(
                     appState = appState,
                     initialMembers = listOf(route.initialMember),
@@ -325,9 +332,9 @@ internal fun ProfileGroupForegroundCoordinator(
                 appState = appState,
                 npub = it,
                 onOpenGroup = onOpenConversation,
-                onStartGroupMeasured = { candidate, origin ->
+                onStartGroupMeasured = { candidate, origin, contour ->
                     appState.clearPresentedProfile()
-                    foregroundState.open(candidate, origin)
+                    foregroundState.open(candidate, origin, contour)
                 },
                 onStartGroup = { candidate ->
                     appState.clearPresentedProfile()

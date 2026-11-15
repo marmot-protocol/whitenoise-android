@@ -20,6 +20,7 @@ import dev.ipf.whitenoise.android.ui.onboarding.OnboardingAction
 import dev.ipf.whitenoise.android.ui.onboarding.SignInStep
 import dev.ipf.whitenoise.android.ui.onboarding.importIdentityErrorRes
 import dev.ipf.whitenoise.android.ui.onboarding.signInStepFor
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 
 /** Full-screen Add Profile entry; shared Sign Up and the existing import/Amber owners perform native work. */
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
@@ -27,6 +28,7 @@ import dev.ipf.whitenoise.android.ui.onboarding.signInStepFor
 internal fun AddIdentitySheet(
     appState: WhiteNoiseAppState,
     origin: Rect? = null,
+    sourceContour: SettingsContour? = null,
     onDismiss: () -> Unit,
 ) {
     WindowSecureFlag()
@@ -105,6 +107,7 @@ internal fun AddIdentitySheet(
     }
     MeasuredPlaybackDialog(
         origin = origin,
+        sourceContour = sourceContour,
         ownerKey = session,
         onDismissRequest = session::dismiss,
         onSourceDismiss = session::dismiss,

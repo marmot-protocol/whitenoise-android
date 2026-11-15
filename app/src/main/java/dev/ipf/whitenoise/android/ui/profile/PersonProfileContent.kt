@@ -54,11 +54,13 @@ import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredContourClick
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /**
@@ -101,7 +103,7 @@ internal fun PersonProfileContent(
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
     startingAs: StartingAccount? = null,
-    onStartGroupMeasured: ((androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
+    onStartGroupMeasured: ((androidx.compose.ui.geometry.Rect?, SettingsContour?) -> Unit)? = null,
 ) {
     SettingsScaffold(
         topBarActions = { StartingAccountIndicator(startingAs) },
@@ -146,8 +148,8 @@ internal fun PersonProfileContent(
                     SettingsGroup {
                         row("start_group") { row ->
                             val launch =
-                                dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
-                                    onStartGroupMeasured?.invoke(origin) ?: onStartGroup()
+                                rememberMeasuredContourClick { origin, contour ->
+                                    onStartGroupMeasured?.invoke(origin, contour) ?: onStartGroup()
                                 }
                             SettingsAction(
                                 row,

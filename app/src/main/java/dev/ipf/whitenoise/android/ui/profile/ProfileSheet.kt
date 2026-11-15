@@ -124,6 +124,7 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Add
 import dev.ipf.whitenoise.android.ui.icons.filled.Shield
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
@@ -465,7 +466,13 @@ internal fun ProfileSheet(
     adminController: ConversationController? = null,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
     openGroupsInCommon: Boolean = false,
-    onStartGroupMeasured: ((RecipientSearch.Candidate, androidx.compose.ui.geometry.Rect?) -> Unit)? = null,
+    onStartGroupMeasured: (
+        (
+            RecipientSearch.Candidate,
+            androidx.compose.ui.geometry.Rect?,
+            SettingsContour?,
+        ) -> Unit
+    )? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
@@ -944,12 +951,12 @@ internal fun ProfileSheet(
                     }
                 }
             },
-            onStartGroupMeasured = { origin ->
+            onStartGroupMeasured = { origin, contour ->
                 if (owner.canAct()) {
                     hex?.let { target ->
                         owner.leave {
                             val candidate = RecipientSearch.Candidate(target, displayTitle, npub)
-                            onStartGroupMeasured?.invoke(candidate, origin) ?: onStartGroup(candidate)
+                            onStartGroupMeasured?.invoke(candidate, origin, contour) ?: onStartGroup(candidate)
                         }
                     }
                 }

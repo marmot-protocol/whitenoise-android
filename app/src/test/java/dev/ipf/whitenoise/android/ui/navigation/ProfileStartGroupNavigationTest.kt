@@ -186,6 +186,32 @@ class ProfileStartGroupNavigationTest {
     }
 
     @Test
+    fun replacementRetainsLaunchContourUntilCloseAndDoesNotReuseItForUnmeasuredEntry() {
+        val bounds =
+            androidx.compose.ui.geometry
+                .Rect(20f, 100f, 340f, 180f)
+        val contour =
+            dev.ipf.whitenoise.android.ui.settings.SettingsContour(
+                bounds,
+                androidx.compose.ui.geometry
+                    .RoundRect(bounds, 20f, 20f),
+                bounds,
+                androidx.compose.ui.graphics.Color.White,
+                1f,
+            )
+        val state = ProfileGroupForegroundState()
+        state.open(viewedCandidate(), bounds, contour)
+        assertEquals(contour, state.launchContour)
+        assertEquals(bounds, state.launchOrigin)
+        state.close()
+        assertEquals(null, state.launchContour)
+        assertEquals(null, state.initialMember)
+        state.open(viewedCandidate())
+        assertEquals(null, state.launchContour)
+        assertEquals(null, state.launchOrigin)
+    }
+
+    @Test
     fun shellProfileStartGroupPromotesPickerWithViewedMember() {
         val candidate = viewedCandidate()
         val state = ProfileGroupForegroundState().apply { open(candidate) }
