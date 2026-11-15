@@ -639,12 +639,13 @@ internal fun ComposerBar(
     var editingProgressSource by remember { mutableStateOf<State<Float>?>(null) }
     val trailingActionAlignment =
         remember { ComposerActionRowAlignment(Alignment.End) { editingProgressSource?.value ?: 0f } }
+    // These two mirror measurements that are republished only when they change.
+    // A new window shape alone may not change them, so it must not reset them.
     var composerUsesMultilineControls by
         remember(
             draftKey,
             draftAccountRef,
             draftGroupIdHex,
-            windowLayout,
             configuration.fontScale,
         ) {
             mutableStateOf(false)
@@ -656,7 +657,6 @@ internal fun ComposerBar(
             draftKey,
             draftAccountRef,
             draftGroupIdHex,
-            windowLayout,
             configuration.fontScale,
         ) {
             mutableFloatStateOf(0f)
