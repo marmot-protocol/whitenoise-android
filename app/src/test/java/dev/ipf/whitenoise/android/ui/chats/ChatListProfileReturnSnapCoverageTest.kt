@@ -272,6 +272,11 @@ class ChatListProfileReturnSnapCoverageTest {
             "setChatListVisible(true) must run before onChatListBecameVisible",
             setVisibleIndex < publishIndex,
         )
+        val returnIndex = visibilityEffect.indexOf("onConversationReturned")
+        assertTrue(
+            "search focus must return after the list is visible and before the return head snaps",
+            returnIndex in (setVisibleIndex + 1) until publishIndex,
+        )
 
         val chatsScreenWiring =
             mainShell.requiredSection(

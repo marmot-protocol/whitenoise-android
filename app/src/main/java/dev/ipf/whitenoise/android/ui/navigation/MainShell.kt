@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -501,6 +502,9 @@ internal fun MainShell(
     // controller and decrypted seed are one ownership unit; retaining only the
     // chat would rebuild it against the active account during an early Back.
     var exitingConversationContent by remember { mutableStateOf<ConversationTransitionContent?>(null) }
+    // A second close before the first one's release displaces the older exiting controller.
+    // AnimatedContent can still draw it, so it stays owned until the route transition settles.
+    val displacedConversationControllers = remember { mutableStateListOf<ConversationController>() }
     // A normal chat-list tap keeps the already-rendered list on screen while
     // the destination controller reads its first local authoritative page.
     // Once ready, the same controller is promoted into the conversation route,
@@ -797,18 +801,21 @@ internal fun MainShell(
     // doesn't contend with the conversation's own streams on the heaviest nav
     // path. The subscription keeps draining updates into the controller's maps
     // throughout; one recompute flushes on return.
+    // Search focus returns when the conversation closes. Widening beside an open chat, or
+    // switching chats beside the list, is not a return.
+    val conversationReturned = selectedChat == null && !(twoPane && pendingConversationOpen != null)
     LaunchedEffect(chatsController, selectedChat == null || twoPane) {
         val listVisible = selectedChat == null || twoPane
         chatsController.setChatListVisible(listVisible)
         if (listVisible) {
+            if (conversationReturned && !twoPane) globalSearch.viewport.selection.onConversationReturned()
             chatListReturnHeadSnap = onChatListBecameVisible(chatListReturnHeadSnap)
         }
     }
-    // Search focus returns when the conversation closes. Widening beside an open chat, or
-    // switching chats beside the list, is not a return.
-    val conversationReturned = selectedChat == null && !(twoPane && pendingConversationOpen != null)
+    // Beside the list a close leaves the list visible, so the visibility effect above does not
+    // rerun. Each width has one owner of the return, which keeps it to one per close.
     LaunchedEffect(chatsController, conversationReturned) {
-        if (conversationReturned) globalSearch.viewport.selection.onConversationReturned()
+        if (conversationReturned && twoPane) globalSearch.viewport.selection.onConversationReturned()
     }
 
     LaunchedEffect(appState.pendingProfileNpub) {
@@ -1190,6 +1197,7 @@ internal fun MainShell(
                 reduceShellNavigation(shellNavState, ShellNavigationEvent.AccountSwitched).state
             pendingConversationOpen = null
             exitingConversationContent = null
+            displacedConversationControllers.clear()
             selectedChat = null
             selectedChatOpenContext = ConversationOpenContext()
             selectedChatJustCreated = false
@@ -1663,11 +1671,18 @@ internal fun MainShell(
     // controllers during a rapid Back -> open gesture. Keep each instance alive
     // for as long as any route slot references it; a single "current" effect
     // would clear the outgoing controller while AnimatedContent still composes it.
+    val displacedControllers = displacedConversationControllers.toList()
     val ownedConversationControllers =
-        remember(selectedOrPendingConversationController, accountOwnedExitingConversationContent?.controller) {
-            listOfNotNull(
-                selectedOrPendingConversationController,
-                accountOwnedExitingConversationContent?.controller,
+        remember(
+            selectedOrPendingConversationController,
+            accountOwnedExitingConversationContent?.controller,
+            displacedControllers,
+        ) {
+            (
+                listOfNotNull(
+                    selectedOrPendingConversationController,
+                    accountOwnedExitingConversationContent?.controller,
+                ) + displacedControllers
             ).distinct()
         }
     ownedConversationControllers.forEach { ownedController ->
@@ -1926,6 +1941,9 @@ internal fun MainShell(
                     releaseNotificationFirstFrameGate(it)
                     NotificationRouteTrace.finishRequest(it)
                 }
+                exitingConversationContent
+                    ?.takeIf { it.controller !== content.controller }
+                    ?.let { displacedConversationControllers += it.controller }
                 exitingConversationContent = content
                 selectedChat = null
                 selectedChatOpenContext = ConversationOpenContext()
@@ -1964,6 +1982,18 @@ internal fun MainShell(
                 // the outgoing ConversationScreen may still reference.
                 withFrameNanos { }
                 if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
+            }
+            LaunchedEffect(displacedConversationControllers.isEmpty(), routeTransition) {
+                if (displacedConversationControllers.isEmpty()) return@LaunchedEffect
+                snapshotFlow {
+                    conversationRouteTransitionComplete(
+                        currentStateMatchesTarget = routeTransition.currentState == routeTransition.targetState,
+                        transitionRunning = routeTransition.isRunning,
+                    )
+                }.filter { it }
+                    .first()
+                withFrameNanos { }
+                displacedConversationControllers.clear()
             }
             // One movable list route, so its screen state survives moving between the side pane and the
             // full-width slot when the window crosses the two-pane width.
