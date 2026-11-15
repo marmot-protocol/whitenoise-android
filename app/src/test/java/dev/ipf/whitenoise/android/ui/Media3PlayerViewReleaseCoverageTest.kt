@@ -14,11 +14,22 @@ class Media3PlayerViewReleaseCoverageTest {
         val functionName = "VideoViewerPage"
         val body = source.functionBody(functionName)
 
-        assertEquals("$functionName must own exactly one PlayerView", 1, Regex("AndroidView\\(").findAll(body).count())
+        assertEquals(
+            "$functionName must mount exactly one viewer surface",
+            1,
+            Regex("VideoViewerSurface\\(").findAll(body).count(),
+        )
+        assertTrue("$functionName must not mount a second PlayerView", !body.contains("AndroidView("))
+        val surface = mediaSource("VideoViewerControls.kt").readText().functionBody("VideoViewerSurface")
+        assertEquals(
+            "the viewer surface must own exactly one PlayerView",
+            1,
+            Regex("AndroidView\\(").findAll(surface).count(),
+        )
         assertTrue(
-            "$functionName must detach its exact PlayerView on release",
+            "the viewer surface must detach its exact PlayerView on release",
             Regex("onRelease\\s*=\\s*\\{\\s*playerView\\s*->\\s*playerView\\.player\\s*=\\s*null\\s*}")
-                .containsMatchIn(body),
+                .containsMatchIn(surface),
         )
         assertTrue(
             "$functionName must clear its published player and release that exact player on disposal",

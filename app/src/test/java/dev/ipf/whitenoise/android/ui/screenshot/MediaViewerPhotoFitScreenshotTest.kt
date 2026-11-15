@@ -43,7 +43,7 @@ class MediaViewerPhotoFitScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    /** A tall photo fits whole between visible chrome, then grows to the safe area with every edge kept. */
+    /** A tall photo fits whole in the safe area and stays put when the translucent chrome hides, every edge kept. */
     @Test
     fun tallPhotoKeepsAllFourEdgesWithChromeVisibleAndHidden() {
         var chromeVisible by mutableStateOf(true)
@@ -53,14 +53,15 @@ class MediaViewerPhotoFitScreenshotTest {
             chromeVisible = { chromeVisible },
         )
 
-        assertPhotoEdgesVisible(photoWidth = 90, photoHeight = 160)
+        val shown = contentSlot()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_tall_photo_chrome_visible.png")
         composeRule.runOnIdle { chromeVisible = false }
+        assertEquals("hiding the chrome must not move the photo", shown, contentSlot())
         assertPhotoEdgesVisible(photoWidth = 90, photoHeight = 160)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_tall_photo_chrome_hidden.png")
     }
 
-    /** A wide photo in landscape keeps clear of cutouts and chrome, and fills the safe width once chrome hides. */
+    /** A wide photo in landscape keeps clear of cutouts and stays put when the chrome hides, every edge kept. */
     @Test
     @Config(sdk = [36], qualifiers = "w780dp-h360dp-land-mdpi")
     fun landscapeWidePhotoKeepsAllFourEdgesBesideCutouts() {
@@ -72,9 +73,10 @@ class MediaViewerPhotoFitScreenshotTest {
             darkTheme = true,
         )
 
-        assertPhotoEdgesVisible(photoWidth = 160, photoHeight = 90)
+        val shown = contentSlot()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_wide_photo_landscape_visible.png")
         composeRule.runOnIdle { chromeVisible = false }
+        assertEquals("hiding the chrome must not move the photo", shown, contentSlot())
         assertPhotoEdgesVisible(photoWidth = 160, photoHeight = 90)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_wide_photo_landscape_hidden.png")
     }
@@ -109,6 +111,9 @@ class MediaViewerPhotoFitScreenshotTest {
             }
         }
     }
+
+    /** The media slot's root-relative bounds. */
+    private fun contentSlot() = composeRule.onNodeWithTag(MEDIA_VIEWER_CONTENT_TAG).fetchSemanticsNode().boundsInRoot
 
     /** Samples the drawn pixels inside each fitted edge band and requires its marker colour. */
     private fun assertPhotoEdgesVisible(

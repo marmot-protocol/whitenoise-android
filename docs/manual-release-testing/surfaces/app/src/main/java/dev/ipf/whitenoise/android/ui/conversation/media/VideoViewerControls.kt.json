@@ -1,0 +1,124 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "VideoViewerSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoViewerSurface(",
+        "test_ids": [
+          "MED-007",
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "VideoViewerTapLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoViewerTapLayer(",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "VideoViewerPlaybackControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoViewerPlaybackControls(",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "VideoViewerPlayPauseButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoViewerPlayPauseButton(",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "VideoSeekSlider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoSeekSlider(",
+        "test_ids": [
+          "MED-001",
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "VideoTimeText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun VideoTimeText(",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:video_playback_position",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "R.string.video_playback_position",
+        "test_ids": [
+          "MED-001",
+          "MED-033"
+        ]
+      },
+      {
+        "surface": "string:media_viewer_toggle_controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "R.string.media_viewer_toggle_controls",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "string:video_play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "R.string.video_play",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "string:video_pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "R.string.video_pause",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Viewer video fit inside fixed safe-area bounds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "fun viewerPlayerView(",
+        "test_ids": [
+          "MED-007",
+          "MED-033",
+          "MED-051"
+        ]
+      },
+      {
+        "surface": "Viewer video controls auto-hide and paused/ended reveal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
+        "anchor": "LaunchedEffect(controlsVisible, forced, scrubbing, touchExploration)",
+        "test_ids": [
+          "MED-033",
+          "MED-051"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

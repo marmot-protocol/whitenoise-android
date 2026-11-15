@@ -1,9 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
-import android.graphics.Rect
 import android.os.Looper
-import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,10 +16,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -33,11 +37,9 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
-import androidx.media3.ui.PlayerView
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.google.common.util.concurrent.Futures
@@ -60,9 +62,9 @@ import java.time.Duration
 import kotlin.math.abs
 
 /**
- * Drives the production viewer PlayerView — real Media3 controller, time bar and touch handling — inside the real
- * viewer frame and pager. A scripted player stands in for decoding, so these tests establish control geometry,
- * seek arbitration and chrome coordination, not decoded-frame pixels.
+ * Drives the production viewer video surface — Media3 PlayerView with the viewer's Compose controls — inside the real
+ * viewer frame and pager. A scripted player stands in for decoding, so these tests establish control geometry, fixed
+ * video bounds, seek arbitration and chrome coordination, not decoded-frame pixels.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -71,17 +73,16 @@ class MediaViewerVideoControlsScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private lateinit var playerView: PlayerView
     private var chromeVisible by mutableStateOf(true)
     private var saves = 0
 
-    /** Portrait large type keeps the time bar, times and play/pause above the actions and inside the safe area. */
+    /** Portrait large type keeps the time row and play/pause above the actions and inside the safe area. */
     @Test
     fun portraitControlsSitBetweenTheChromeInsideTheSafeArea() {
         val insets = WindowInsets(left = 0.dp, top = 42.dp, right = 0.dp, bottom = 28.dp)
         render(ScriptedVideoPlayer(durationMs = CLIP_MS), insets, fontScale = LARGE_FONT_SCALE)
 
-        assertControlsInsideContent(viewport = Rect(0, 42, 360, 780 - 28))
+        assertControlsInsideContent(viewport = Rect(0f, 42f, 360f, 780f - 28f))
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_video_controls_portrait_large.png")
     }
 
@@ -92,24 +93,21 @@ class MediaViewerVideoControlsScreenshotTest {
         val insets = WindowInsets(left = 32.dp, top = 28.dp, right = 0.dp, bottom = 24.dp)
         render(ScriptedVideoPlayer(durationMs = CLIP_MS), insets, darkTheme = true, amoled = true)
 
-        assertControlsInsideContent(viewport = Rect(32, 28, 915, 411 - 24))
+        assertControlsInsideContent(viewport = Rect(32f, 28f, 915f, 411f - 24f))
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_video_controls_landscape_amoled.png")
     }
 
-    /**
-     * A short landscape window at large type leaves Media3 too little height for its full layout. Its minimal
-     * layout drops the time text but keeps the time bar and play/pause visible, clear of the cutouts and actions.
-     */
+    /** A short landscape window at large type with cutouts on both sides still fits every control in the safe area. */
     @Test
     @Config(sdk = [36], qualifiers = "w780dp-h360dp-land-mdpi")
-    fun shortLandscapeKeepsTheTimeBarAndPlayPauseReachable() {
+    fun shortLandscapeKeepsEveryControlReachable() {
         val insets = WindowInsets(left = 56.dp, top = 18.dp, right = 28.dp, bottom = 22.dp)
         render(ScriptedVideoPlayer(durationMs = CLIP_MS), insets, fontScale = LARGE_FONT_SCALE)
 
-        assertControlsInsideContent(viewport = Rect(56, 18, 780 - 28, 360 - 22), controls = ESSENTIAL_CONTROL_IDS)
+        assertControlsInsideContent(viewport = Rect(56f, 18f, 780f - 28f, 360f - 22f))
     }
 
-    /** RTL dark large type mirrors the viewer chrome while Media3's controls stay above the actions. */
+    /** RTL dark large type mirrors the viewer chrome while the controls stay above the actions. */
     @Test
     fun rtlControlsStayAboveTheActions() {
         val insets = WindowInsets(top = 24.dp, bottom = 48.dp)
@@ -121,31 +119,48 @@ class MediaViewerVideoControlsScreenshotTest {
             layoutDirection = LayoutDirection.Rtl,
         )
 
-        assertControlsInsideContent(viewport = Rect(0, 24, 360, 780 - 48))
+        assertControlsInsideContent(viewport = Rect(0f, 24f, 360f, 780f - 48f))
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_video_controls_dark_large_rtl.png")
     }
 
-    /** Dragging the time bar seeks to the released position and never pages the gallery. */
+    /** Play/pause, the scrub bar and the show/hide gesture are labelled, and both controls are large enough to hit. */
+    @Test
+    fun controlsAreLabelledAndLargeEnoughToTouch() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        render(ScriptedVideoPlayer(durationMs = CLIP_MS), WindowInsets(bottom = 48.dp))
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.video_play)).assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.video_playback_position))
+            .assertIsDisplayed()
+        listOf(VIDEO_VIEWER_PLAY_PAUSE_TAG, VIDEO_VIEWER_SEEK_TAG).forEach { tag ->
+            val bounds = boundsOf(tag)
+            assertTrue("$tag $bounds is under 48dp", bounds.width >= MIN_TOUCH_DP && bounds.height >= MIN_TOUCH_DP)
+        }
+        val toggle = context.getString(R.string.media_viewer_toggle_controls)
+        val actions =
+            composeRule
+                .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions))
+                .fetchSemanticsNodes()
+                .flatMap { it.config[SemanticsActions.CustomActions] }
+        assertTrue("the show/hide gesture needs an accessibility action", actions.any { it.label == toggle })
+    }
+
+    /** Dragging the scrub bar seeks to the released position and never pages the gallery. */
     @Test
     fun timeBarDragSeeksWithoutPagingTheGallery() {
         val player = ScriptedVideoPlayer(durationMs = CLIP_MS)
         render(player, WindowInsets(bottom = 48.dp), pageCount = 2)
-        val timeBar = timeBarBoundsInPlayer()
 
-        composeRule.onNodeWithTag(PLAYER_TAG).performTouchInput {
-            val y = timeBar.centerY()
-            down(Offset(timeBar.left + timeBar.width() * 0.1f, y))
-            moveTo(Offset(timeBar.left + timeBar.width() * 0.3f, y))
-            moveTo(Offset(timeBar.left + timeBar.width() * 0.5f, y))
-            up()
-        }
-        settle()
+        val released = dragSeekBar(from = 0.1f, to = 0.5f)
 
         composeRule.onNodeWithTag(PLAYER_TAG).assertExists()
         composeRule.onNodeWithTag(NEXT_PAGE_TAG).assertDoesNotExist()
-        val target = CLIP_MS / 2
         val sought = player.seeks.last()
-        assertTrue("seek $sought is too far from $target", abs(sought - target) <= SEEK_TOLERANCE_MS)
+        val shown = (released * CLIP_MS).toLong()
+        assertTrue("seek $sought must match the released bar position $shown", abs(sought - shown) <= 1L)
+        // Material's slider drops the touch slop from a press-then-drag, so the release lands short of the finger.
+        assertTrue("seek $sought must land within the drag", sought in (CLIP_MS / 10)..(CLIP_MS / 2))
         assertEquals(sought, player.currentPosition)
         assertTrue("seeking must not hide the controls", chromeVisible)
     }
@@ -165,21 +180,37 @@ class MediaViewerVideoControlsScreenshotTest {
         assertTrue("a page swipe must not seek", player.seeks.isEmpty())
     }
 
-    /** A tap hides Media3's controls and the viewer chrome together, and the next tap restores both. */
+    /** A tap hides the controls and chrome together without moving or resizing the video; a tap restores them. */
     @Test
     fun tapHidesAndRestoresControlsWithTheChrome() {
         render(ScriptedVideoPlayer(durationMs = CLIP_MS), WindowInsets(top = 24.dp, bottom = 48.dp))
-        assertControllerAndChrome(visible = true)
+        assertControlsAndChrome(visible = true)
+        val shown = videoBounds()
+        assertEquals("the video fills the safe area", Rect(0f, 24f, 360f, 780f - 48f), shown)
 
         tapPicture()
-        assertControllerAndChrome(visible = false)
-        val content = composeRule.onNodeWithTag(MEDIA_VIEWER_CONTENT_TAG).fetchSemanticsNode().boundsInWindow
-        assertEquals("hidden chrome gives its space back to the video", 24f, content.top, 0.5f)
-        assertEquals("hidden chrome gives its space back to the video", 780f - 48f, content.bottom, 0.5f)
+        assertControlsAndChrome(visible = false)
+        assertEquals("hiding the chrome must not move or resize the video", shown, videoBounds())
         composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_video_chrome_hidden.png")
 
         tapPicture()
-        assertControllerAndChrome(visible = true)
+        assertControlsAndChrome(visible = true)
+        assertEquals("showing the chrome must not move or resize the video", shown, videoBounds())
+    }
+
+    /** Playback timing out the controls in a landscape cutout window leaves the video exactly where it was. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w915dp-h411dp-land-mdpi")
+    fun controlsTimeoutKeepsTheVideoBounds() {
+        val player = ScriptedVideoPlayer(durationMs = CLIP_MS)
+        render(player, WindowInsets(left = 32.dp, top = 28.dp, right = 0.dp, bottom = 24.dp))
+        val shown = videoBounds()
+
+        composeRule.runOnUiThread { player.update { setPlayWhenReady(true, PLAY_REQUEST) } }
+        settle(Duration.ofSeconds(3))
+
+        assertControlsAndChrome(visible = false)
+        assertEquals("the controls timing out must not move or resize the video", shown, videoBounds())
     }
 
     /** Playing hides both after the timeout, buffering shows progress, and pausing or ending restores both. */
@@ -190,25 +221,41 @@ class MediaViewerVideoControlsScreenshotTest {
 
         composeRule.runOnUiThread { player.update { setPlayWhenReady(true, PLAY_REQUEST) } }
         settle(Duration.ofSeconds(3))
-        assertControllerAndChrome(visible = false)
+        assertControlsAndChrome(visible = false)
 
         composeRule.runOnUiThread { player.update { setPlaybackState(Player.STATE_BUFFERING) } }
         settle()
-        assertEquals(View.VISIBLE, playerView.findViewById<View>(androidx.media3.ui.R.id.exo_buffering).visibility)
+        composeRule.onNodeWithTag(VIDEO_VIEWER_BUFFERING_TAG).assertExists()
 
         composeRule.runOnUiThread { player.update { setPlaybackState(Player.STATE_READY) } }
         tapPicture()
-        assertControllerAndChrome(visible = true)
+        assertControlsAndChrome(visible = true)
+        composeRule.onNodeWithTag(VIDEO_VIEWER_BUFFERING_TAG).assertDoesNotExist()
         settle(Duration.ofSeconds(3))
-        assertControllerAndChrome(visible = false)
+        assertControlsAndChrome(visible = false)
 
         composeRule.runOnUiThread { player.update { setPlayWhenReady(false, PLAY_REQUEST) } }
         settle(Duration.ofSeconds(3))
-        assertControllerAndChrome(visible = true)
+        assertControlsAndChrome(visible = true)
 
         composeRule.runOnUiThread { player.update { setPlaybackState(Player.STATE_ENDED) } }
         settle(Duration.ofSeconds(3))
-        assertControllerAndChrome(visible = true)
+        assertControlsAndChrome(visible = true)
+    }
+
+    /** Play/pause follows the player and drives it. */
+    @Test
+    fun playPauseTogglesPlayback() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val player = ScriptedVideoPlayer(durationMs = CLIP_MS)
+        render(player, WindowInsets(bottom = 48.dp))
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.video_play)).performClick()
+        settle()
+        assertTrue("play starts playback", player.playWhenReady)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.video_pause)).performClick()
+        settle()
+        assertFalse("pause stops playback", player.playWhenReady)
     }
 
     /** An open More menu keeps its chrome when playback controls time out, and choosing Save then hides it. */
@@ -222,34 +269,29 @@ class MediaViewerVideoControlsScreenshotTest {
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.more_options)).performClick()
         settle(Duration.ofSeconds(3))
-        composeRule.runOnIdle { assertFalse("the controls still time out", playerView.isControllerFullyVisible) }
+        composeRule.onNodeWithTag(VIDEO_VIEWER_CONTROLS_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertExists()
         composeRule.onNodeWithText(context.getString(R.string.media_save)).assertIsDisplayed().performClick()
         settle()
 
         composeRule.runOnIdle { assertEquals(1, saves) }
-        assertControllerAndChrome(visible = false)
+        assertControlsAndChrome(visible = false)
     }
 
-    /** An unknown duration leaves the time bar unseekable instead of seeking to a guessed position. */
+    /** An unknown duration leaves the scrub bar unseekable instead of seeking to a guessed position. */
     @Test
     fun unknownDurationDisablesSeeking() {
         val player = ScriptedVideoPlayer(durationMs = null)
         render(player, WindowInsets(bottom = 48.dp))
-        val timeBar = timeBarBoundsInPlayer()
 
-        composeRule.onNodeWithTag(PLAYER_TAG).performTouchInput {
-            val y = timeBar.centerY()
-            down(Offset(timeBar.left + timeBar.width() * 0.1f, y))
-            moveTo(Offset(timeBar.left + timeBar.width() * 0.6f, y))
-            up()
-        }
-        settle()
+        composeRule.onNodeWithTag(VIDEO_VIEWER_SEEK_TAG).assertIsNotEnabled()
+        dragSeekBar(from = 0.1f, to = 0.6f)
 
         assertTrue("an unknown duration must not seek", player.seeks.isEmpty())
+        composeRule.onNodeWithTag(VIDEO_VIEWER_TOTAL_TAG).assertTextEquals("--:--")
     }
 
-    /** Renders the frame and a pager of [pageCount] pages whose first page hosts the production viewer PlayerView. */
+    /** Renders the frame and a pager of [pageCount] pages whose first page hosts the production video surface. */
     private fun render(
         player: ScriptedVideoPlayer,
         insets: WindowInsets,
@@ -296,13 +338,11 @@ class MediaViewerVideoControlsScreenshotTest {
                 userScrollEnabled = true,
             ) { page, isCurrent ->
                 if (page.attachmentIndex == 0) {
-                    AndroidView(
+                    VideoViewerSurface(
+                        player = player,
+                        controlsVisible = isCurrent && chromeVisible,
+                        onControlsVisibleChange = { visible -> if (isCurrent) chromeVisible = visible },
                         modifier = Modifier.fillMaxSize().background(Color.Black).testTag(PLAYER_TAG),
-                        factory = { context ->
-                            viewerPlayerView(context, player) { visible -> if (isCurrent) chromeVisible = visible }
-                                .also { playerView = it }
-                        },
-                        onRelease = { it.player = null },
                     )
                 } else {
                     Box(Modifier.fillMaxSize()) { Text("next", Modifier.testTag(NEXT_PAGE_TAG)) }
@@ -311,69 +351,77 @@ class MediaViewerVideoControlsScreenshotTest {
         }
     }
 
-    /** Asserts the shown Media3 [controls] lie inside the content slot, below the top and above the bottom chrome. */
-    private fun assertControlsInsideContent(
-        viewport: Rect,
-        controls: List<Pair<String, Int>> = ESSENTIAL_CONTROL_IDS + TIME_TEXT_IDS,
-    ) {
-        val content = composeRule.onNodeWithTag(MEDIA_VIEWER_CONTENT_TAG).fetchSemanticsNode().boundsInWindow
-        val top = composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).fetchSemanticsNode().boundsInWindow
-        val bottom = composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).fetchSemanticsNode().boundsInWindow
-        assertTrue("controller must be showing", playerView.isControllerFullyVisible)
-        controls.forEach { (label, id) ->
-            val control = playerView.findViewById<View>(id)
-            assertTrue("$label is not shown", control.isShown)
-            val bounds = control.boundsInWindow()
-            assertFalse("$label is empty", bounds.isEmpty)
-            assertTrue("$label $bounds is under the top chrome ${top.bottom}", bounds.top >= top.bottom)
-            assertTrue("$label $bounds is under the actions ${bottom.top}", bounds.bottom <= bottom.top)
-            assertTrue("$label $bounds leaves the content $content", bounds.left >= content.left)
-            assertTrue("$label $bounds leaves the content $content", bounds.right <= content.right)
-            assertTrue("$label $bounds leaves the safe area $viewport", viewport.contains(bounds))
+    /** Asserts every control lies inside the content slot and safe area, below the top and above the bottom chrome. */
+    private fun assertControlsInsideContent(viewport: Rect) {
+        val content = boundsOf(MEDIA_VIEWER_CONTENT_TAG)
+        val top = boundsOf(MEDIA_VIEWER_TOP_CHROME_TAG)
+        val bottom = boundsOf(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
+        CONTROL_TAGS.forEach { tag ->
+            composeRule.onNodeWithTag(tag).assertIsDisplayed()
+            val bounds = boundsOf(tag)
+            assertFalse("$tag is empty", bounds.isEmpty)
+            assertTrue("$tag $bounds is under the top chrome ${top.bottom}", bounds.top >= top.bottom - EPSILON)
+            assertTrue("$tag $bounds is under the actions ${bottom.top}", bounds.bottom <= bottom.top + EPSILON)
+            assertTrue("$tag $bounds leaves the content $content", content.contains(bounds))
+            assertTrue("$tag $bounds leaves the safe area $viewport", viewport.contains(bounds))
         }
     }
 
-    /** Asserts the Media3 controller and the viewer chrome agree on [visible]. */
-    private fun assertControllerAndChrome(visible: Boolean) {
-        composeRule.runOnIdle {
-            assertEquals("Media3 controller", visible, playerView.isControllerFullyVisible)
-            assertEquals("viewer chrome", visible, chromeVisible)
+    /** Asserts the video controls and the viewer chrome agree on [visible]. */
+    private fun assertControlsAndChrome(visible: Boolean) {
+        composeRule.runOnIdle { assertEquals("viewer chrome", visible, chromeVisible) }
+        listOf(VIDEO_VIEWER_CONTROLS_TAG, MEDIA_VIEWER_BOTTOM_CHROME_TAG).forEach { tag ->
+            val node = composeRule.onNodeWithTag(tag)
+            if (visible) node.assertExists() else node.assertDoesNotExist()
         }
-        val chrome = composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
-        if (visible) chrome.assertExists() else chrome.assertDoesNotExist()
     }
 
-    /** Taps the picture away from Media3's centre and bottom controls. */
+    /** The video surface's bounds in the root. */
+    private fun videoBounds(): Rect = boundsOf(VIDEO_VIEWER_SURFACE_TAG)
+
+    private fun boundsOf(tag: String): Rect = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+
+    /** Drags the seek bar from [from] to [to] of its width and returns the bar fraction shown at release. */
+    private fun dragSeekBar(
+        from: Float,
+        to: Float,
+    ): Float {
+        val bar = composeRule.onNodeWithTag(VIDEO_VIEWER_SEEK_TAG)
+        bar.performTouchInput {
+            val y = height / 2f
+            down(Offset(width * from, y))
+            moveTo(Offset(width * (from + to) / 2f, y))
+            moveTo(Offset(width * to, y))
+        }
+        composeRule.waitForIdle()
+        val shown = bar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
+        bar.performTouchInput { up() }
+        composeRule.waitForIdle()
+        val held = bar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
+        assertEquals("the thumb must stay at the released position before the next poll", shown, held, 0.001f)
+        settle()
+        return shown
+    }
+
+    /** Taps the picture away from the centre and bottom controls. */
     private fun tapPicture() {
         composeRule.onNodeWithTag(PLAYER_TAG).performTouchInput { click(Offset(width * 0.2f, height * 0.25f)) }
         settle()
     }
 
-    /** Returns the real time bar's bounds relative to the hosting AndroidView node. */
-    private fun timeBarBoundsInPlayer(): android.graphics.RectF {
-        val host = composeRule.onNodeWithTag(PLAYER_TAG).fetchSemanticsNode().boundsInWindow
-        val bar = playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress).boundsInWindow()
-        return android.graphics.RectF(
-            bar.left - host.left,
-            bar.top - host.top,
-            bar.right - host.left,
-            bar.bottom - host.top,
-        )
-    }
-
-    /** Runs View timers and Compose frames until both settle. */
+    /** Runs View timers and Compose frames and effect delays until both settle. */
     private fun settle(duration: Duration = Duration.ofMillis(SETTLE_MS)) {
         composeRule.waitForIdle()
         shadowOf(Looper.getMainLooper()).idleFor(duration)
+        composeRule.mainClock.advanceTimeBy(duration.toMillis())
         composeRule.waitForIdle()
     }
 
-    /** Window bounds of a laid-out Android view, including any transform. */
-    private fun View.boundsInWindow(): Rect {
-        val origin = IntArray(2)
-        getLocationInWindow(origin)
-        return Rect(origin[0], origin[1], origin[0] + width, origin[1] + height)
-    }
+    private fun Rect.contains(other: Rect): Boolean =
+        other.left >= left - EPSILON &&
+            other.top >= top - EPSILON &&
+            other.right <= right + EPSILON &&
+            other.bottom <= bottom + EPSILON
 
     /** Creates a logical video page for the pager. */
     private fun page(index: Int) =
@@ -451,7 +499,6 @@ class MediaViewerVideoControlsScreenshotTest {
         const val PLAYER_TAG = "media-viewer-video-player"
         const val NEXT_PAGE_TAG = "media-viewer-next-page"
         const val CLIP_MS = 60_000L
-        const val SEEK_TOLERANCE_MS = 2_000L
         const val SETTLE_MS = 300L
         const val US_PER_MS = 1_000L
         const val LARGE_FONT_SCALE = 1.6f
@@ -469,15 +516,9 @@ class MediaViewerVideoControlsScreenshotTest {
                     Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
                     Player.COMMAND_GET_TIMELINE,
                 ).build()
-        val ESSENTIAL_CONTROL_IDS =
-            listOf(
-                "time bar" to androidx.media3.ui.R.id.exo_progress,
-                "play/pause" to androidx.media3.ui.R.id.exo_play_pause,
-            )
-        val TIME_TEXT_IDS =
-            listOf(
-                "elapsed time" to androidx.media3.ui.R.id.exo_position,
-                "total time" to androidx.media3.ui.R.id.exo_duration,
-            )
+        const val EPSILON = 0.5f
+        const val MIN_TOUCH_DP = 48f
+        val CONTROL_TAGS =
+            listOf(VIDEO_VIEWER_PLAY_PAUSE_TAG, VIDEO_VIEWER_SEEK_TAG, VIDEO_VIEWER_ELAPSED_TAG, VIDEO_VIEWER_TOTAL_TAG)
     }
 }

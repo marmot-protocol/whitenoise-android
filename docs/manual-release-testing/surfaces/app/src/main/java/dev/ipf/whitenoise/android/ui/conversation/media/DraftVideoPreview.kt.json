@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DraftVideoPreview.kt",
+  "legacy_sha256": "67c4d5720f745d371a5eddc30dc81689282c6d4d3b5e3f1cb8f10bd0b426de4e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DraftVideoBottomBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DraftVideoPreview.kt",
+        "anchor": "fun DraftVideoBottomBar(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "DraftVideoPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DraftVideoPreview.kt",
+        "anchor": "fun DraftVideoPreview(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "Draft preview shared seek bar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DraftVideoPreview.kt",
+        "anchor": "VideoSeekSlider(player, testTag = \"conversation.media.preview.video.seek\")",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "DraftVideoSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DraftVideoPreview.kt",
+        "anchor": "fun DraftVideoSurface(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "DraftVideoTransport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DraftVideoPreview.kt",
+        "anchor": "fun DraftVideoTransport(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "KeepScreenOnWhilePlaying",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/DraftVideoPreview.kt",
+        "anchor": "fun KeepScreenOnWhilePlaying(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
