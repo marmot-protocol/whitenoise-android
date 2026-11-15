@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.marmotkit.EventSizeClassFfi
+import dev.ipf.marmotkit.GroupCreationResultFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
@@ -12,17 +13,20 @@ import dev.ipf.whitenoise.android.state.NoGroupMembersSelectedException
 import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
+import dev.ipf.whitenoise.android.state.groupMemberSelectionFailure
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
 import dev.ipf.whitenoise.android.ui.chats.newchat.startChatErrorUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InviteFailurePresentationTest {
-    /** Reports named skipped recipients and falls back when every name is unavailable. */
+    /** Setup names skipped recipients from its captured selection and preserves the reason without names. */
     @Test
     fun foundingFailureSkipsBlankNames() {
         val unavailable = MemberResolutionStatusFfi.MISSING_KEY_PACKAGE
@@ -35,13 +39,64 @@ class InviteFailurePresentationTest {
             )
 
         assertEquals(
-            AppText.Resource(R.string.error_group_create_failed_retry),
+            AppText.Resource(R.string.error_no_group_members_selected),
             groupCreateSelectionFailureDetail(report, null),
         )
         assertEquals(
-            AppText.Plain("Alice"),
-            groupCreateFailureDetail(report) { if (it == "alice") "Alice" else " " },
+            AppText.Resource(R.string.error_no_group_members_selected_for, listOf("Alice")),
+            groupCreateSelectionFailureDetail(report, null) { if (it == "alice") "Alice" else " " },
         )
+        assertEquals(
+            AppText.Resource(R.string.error_no_group_members_selected_for, listOf("Alice, Bob")),
+            groupCreateSelectionFailureDetail(report, null) { if (it == "alice") "Alice" else "Bob" },
+        )
+    }
+
+    /** An incompatible chat key has a reason and action even without a known name. */
+    @Test
+    fun incompatibleRecipientShowsChatKeyGuidance() {
+        val outcome = MemberResolutionOutcomeFfi("alice", MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE, 0u)
+        val failure = groupMemberSelectionFailure(listOf(outcome))
+
+        assertEquals(
+            AppText.Resource(R.string.error_incompatible_key_package_for, listOf("Alice")),
+            startProfileChatFailureDetail(failure) { "Alice" },
+        )
+        assertEquals(
+            AppText.Resource(R.string.error_incompatible_key_package),
+            startProfileChatFailureDetail(failure) { " " },
+        )
+        assertFalse(startProfileChatFailureIsMissingSetup(failure))
+        assertFalse(startProfileChatFailureCopyable(failure))
+    }
+
+    /** Every native single-recipient rejection keeps its typed recovery reason. */
+    @Test
+    fun singleRecipientOutcomesPreserveTypedFailures() {
+        val cases =
+            mapOf(
+                MemberResolutionStatusFfi.MISSING_KEY_PACKAGE to MarmotKitException.MissingKeyPackage::class.java,
+                MemberResolutionStatusFfi.OBSOLETE_KEY_PACKAGE to MarmotKitException.MissingKeyPackage::class.java,
+                MemberResolutionStatusFfi.INVALID_KEY_PACKAGE to MarmotKitException.InvalidKeyPackageEvent::class.java,
+                MemberResolutionStatusFfi.MISSING_INBOX_ROUTE to MarmotKitException.MissingMemberInboxRoute::class.java,
+                MemberResolutionStatusFfi.INCOMPLETE to MarmotKitException.DirectoryLookupIncomplete::class.java,
+                MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE to NoGroupMembersSelectedException::class.java,
+                MemberResolutionStatusFfi.SELECTED to NoGroupMembersSelectedException::class.java,
+            )
+        cases.forEach { (status, type) ->
+            val outcome = MemberResolutionOutcomeFfi("alice", status, 0u)
+            val failure = assertThrows(type) { GroupCreationResultFfi(null, listOf(outcome)).requireCreatedGroupId() }
+            if (failure is MarmotKitException.MissingKeyPackage) {
+                val expected =
+                    if (status == MemberResolutionStatusFfi.MISSING_KEY_PACKAGE) {
+                        MissingKeyPackageReasonFfi.NOT_FOUND
+                    } else {
+                        MissingKeyPackageReasonFfi.OBSOLETE_ONLY
+                    }
+                assertEquals(expected, failure.reason)
+                assertEquals("alice", failure.account)
+            }
+        }
     }
 
     /** Unmatched typed identities keep the precise reason without blaming a selected person. */

@@ -1,5 +1,12 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import dev.ipf.marmotkit.GroupCreationResultFfi
+import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
+import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -138,13 +145,18 @@ class GroupCreationStagesTest {
             }
         }
 
-    /** Projection recovery retains the accepted ID and cannot call creation a second time. */
+    /** Partial creation retains the accepted ID and skipped notice through a failed projection and reopen. */
     @Test fun acceptedCreateThenReadFailureRetriesCanonicalGroup() =
         runTest {
             val owner = GroupCreationSession { true }
             var canonical: String? = null
             var creates = 0
             var opens = 0
+            val outcomes =
+                listOf(
+                    MemberResolutionOutcomeFfi("alice", MemberResolutionStatusFfi.SELECTED, 1u),
+                    MemberResolutionOutcomeFfi("bob", MemberResolutionStatusFfi.MISSING_KEY_PACKAGE, 0u),
+                )
             repeat(2) { attempt ->
                 val result =
                     runCatching {
@@ -153,7 +165,9 @@ class GroupCreationStagesTest {
                             createOrRetry = {
                                 canonical ?: run {
                                     creates++
-                                    "accepted"
+                                    val result = GroupCreationResultFfi("accepted", outcomes)
+                                    owner.skippedMembers = result.memberOutcomes.skippedGroupMembersDetail { it }
+                                    result.requireCreatedGroupId()
                                 }
                             },
                             openCurrentChat = {
@@ -161,6 +175,11 @@ class GroupCreationStagesTest {
                                 opens++
                                 if (attempt == 0) error("Projection temporarily unavailable")
                                 assertEquals("accepted", it)
+                                assertEquals(AppText.Plain("bob"), owner.skippedMembers)
+                                assertEquals(
+                                    R.string.toast_couldnt_add_members,
+                                    createdGroupNoticeTitle(showCreatedToast = false, skipped = owner.skippedMembers),
+                                )
                             },
                         )
                     }

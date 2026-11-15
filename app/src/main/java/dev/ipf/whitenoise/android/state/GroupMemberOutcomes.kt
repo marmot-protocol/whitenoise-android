@@ -29,11 +29,12 @@ internal fun GroupCreationResultFfi.requireCreatedGroupId(): String =
     groupIdHex
         ?: throw groupMemberSelectionFailure(memberOutcomes)
 
-/** Reports the skipped recipients using the existing add-members feedback. */
-internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMembersDetail(displayName: (String) -> String): AppText? =
+/** Resolves only skipped recipients and leaves unnamed recipients out of the display list. */
+internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberNames(displayName: (String) -> String): List<String> =
     filter { it.status != MemberResolutionStatusFfi.SELECTED }
         .map { displayName(it.accountIdHex) }
         .filter(String::isNotBlank)
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString()
-        ?.let(AppText::Plain)
+
+/** Reports skipped recipients after a partial commit using the existing add-members feedback. */
+internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMembersDetail(displayName: (String) -> String): AppText? =
+    skippedGroupMemberNames(displayName).takeIf { it.isNotEmpty() }?.joinToString()?.let(AppText::Plain)

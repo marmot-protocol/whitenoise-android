@@ -272,6 +272,8 @@
     <string name="invite_message">Присоединяйтесь ко мне в White Noise. Без номера телефона. Без слежки. Только настоящая приватность. Скачайте здесь: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Этот получатель не является действительным открытым ключом Nostr. Используйте npub, ссылку на профиль или открытый ключ hex.</string>
     <string name="error_group_create_failed_retry">Что-то пошло не так при настройке зашифрованного чата. Проверьте подключение и повторите попытку.</string>
+    <string name="error_no_group_members_selected">Не удалось добавить никого из выбранных. Попросите их проверить настройки чата или измените свой выбор.</string>
+    <string name="error_no_group_members_selected_for">Не удалось добавить %1$s. Попросите проверить настройки чата или измените свой выбор.</string>
     <string name="error_chat_created_not_loaded">Чат создан, но ещё не появился в вашем списке. Повторите попытку через минуту.</string>
     <string name="remove">Удалить</string>
     <string name="group_name">Название Группы</string>
@@ -2488,6 +2490,8 @@
     <string name="group_svg_rejected_detail">Не удалось обработать этот SVG. Выберите простой SVG, PNG или JPEG.</string>
     <string name="error_invalid_key_package">Не удалось проверить опубликованный ключ чата для этого человека. Попросите обновить White Noise и опубликовать новый ключ чата, затем повторите попытку.</string>
     <string name="error_invalid_key_package_for">Не удалось проверить опубликованный ключ чата для %1$s. Попросите обновить White Noise и опубликовать новый ключ чата, затем повторите попытку.</string>
+    <string name="error_incompatible_key_package">Ключ чата этого пользователя несовместим. Попросите его обновить и открыть White Noise, затем попробуйте снова.</string>
+    <string name="error_incompatible_key_package_for">Ключ чата пользователя %1$s несовместим. Попросите этого пользователя обновить и открыть White Noise, затем попробуйте снова.</string>
     <string name="error_missing_member_inbox">Нет пригодного входящего ретранслятора для этого человека. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
     <string name="error_missing_member_inbox_for">Нет пригодного входящего ретранслятора для %1$s. Попросите проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
     <string name="error_invite_welcome_too_large">Это приглашение слишком велико для входящих ретрансляторов получателя. Попросите добавить входящий ретранслятор, который принимает сообщения большего размера.</string>

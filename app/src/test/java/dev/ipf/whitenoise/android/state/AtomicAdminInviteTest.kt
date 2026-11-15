@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -121,6 +122,28 @@ class AtomicAdminInviteTest {
                 assertEquals(1, fixture.invocations.size)
                 assertEquals(2, fixture.snapshotReads)
                 assertEquals(listOf(SELF, PEER), fixture.controller.group.admins)
+                assertNull(fixture.controller.lastMutationError)
+                assertReconciliationOutcomes(listOf("start", "success"))
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
+    /** A partial commit can be observed without retrying or requiring a grant for someone who was skipped. */
+    @Test
+    fun lostReplyAfterPartialCommitKeepsTheObservedMembersAndRoles() =
+        runTest {
+            val fixture = Fixture(loseReply = true, unavailable = setOf(OTHER))
+            try {
+                fixture.controller.refreshManagementState()
+                val recipients = listOf(PEER, OTHER)
+                assertTrue(fixture.controller.inviteMembers(recipients, initialAdminRefs = recipients))
+                assertEquals(1, fixture.invocations.size)
+                assertEquals(2, fixture.snapshotReads)
+                assertEquals(listOf(SELF, PEER), fixture.controller.members.map { it.memberIdHex })
+                assertEquals(listOf(SELF, PEER), fixture.controller.group.admins)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), fixture.state.transientNotice?.title)
+                assertEquals(AppText.Plain(fixture.state.displayName(OTHER)), fixture.state.transientNotice?.detail)
                 assertNull(fixture.controller.lastMutationError)
                 assertReconciliationOutcomes(listOf("start", "success"))
             } finally {
@@ -276,7 +299,7 @@ class AtomicAdminInviteTest {
         }
 
         private var current = snapshot(listOf(SELF), listOf(SELF))
-        private val state: WhiteNoiseAppState =
+        val state: WhiteNoiseAppState =
             WhiteNoiseAppState(
                 context = ApplicationProvider.getApplicationContext(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),

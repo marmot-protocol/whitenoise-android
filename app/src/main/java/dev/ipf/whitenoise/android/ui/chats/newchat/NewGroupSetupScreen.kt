@@ -244,7 +244,7 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
 }
 
 /** Shows the skipped-recipient report even when opening needed a projection retry. */
-private fun createdGroupNoticeTitle(
+internal fun createdGroupNoticeTitle(
     showCreatedToast: Boolean,
     skipped: AppText?,
 ): Int? =
@@ -446,11 +446,17 @@ private fun NewGroupSetupAccountScreen(
                         if (owner.isCurrent() && attempt == submittedAttempt) {
                             val captured = groupCreationRecovery(failure, submittedAttempt, submittedMembers)
                             recovery = captured
-                            error =
+                            val detail =
                                 groupCreateSelectionFailureDetail(
                                     failure,
                                     captured.recipient?.displayName,
-                                ).resolve(context)
+                                ) { ref ->
+                                    submittedMembers
+                                        .firstOrNull { it.accountIdHex.equals(ref, ignoreCase = true) }
+                                        ?.let { selectedMemberDisplayName(it, appState) }
+                                        .orEmpty()
+                                }
+                            error = detail.resolve(context)
                         }
                     },
                     onCreateCompletedOpen = { item, token ->

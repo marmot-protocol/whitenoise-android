@@ -169,22 +169,19 @@ internal fun ConversationController.canReconcileInviteReply(
     failure: Throwable,
 ): Boolean = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
 
-/** Read actual membership after an uncertain reply, without issuing a second invitation. */
+/** Read actual membership after an uncertain reply and return the requested people still absent. */
 internal suspend fun ConversationController.reconcileInitialAdminInvite(
     refs: List<String>,
     admins: List<String>,
-    absentBefore: Boolean,
-    nativeInvoked: Boolean,
-    failure: Throwable,
-): Boolean {
-    val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
-    if (!eligible) return false
+): List<String>? {
     val beforeRead = mutationPresentation.groupAuthorityEpoch
-    val applied = refreshManagementState()
-    val observedMembers =
-        membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
-    val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
-    return applied && mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
+    if (!refreshManagementState() || mutationPresentation.groupAuthorityEpoch == beforeRead || !membersVerified) {
+        return null
+    }
+    val absent = refs.filterNot { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
+    val presentAdmins = admins.filterNot { admin -> absent.any { it.equals(admin, ignoreCase = true) } }
+    val rolesMatch = presentAdmins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
+    return absent.takeIf { it.size < refs.size && rolesMatch }
 }
 
 /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */

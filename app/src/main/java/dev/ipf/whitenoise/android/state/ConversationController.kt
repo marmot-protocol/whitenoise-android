@@ -3786,13 +3786,10 @@ class ConversationController(
                     val activityId = pendingMembershipActivity?.id
                     var nativeInvoked = false
                     var nativeAccepted = false
+                    var absentBefore = false
                     var skippedMembers: AppText? = null
-                    var canonicalAdmins = emptyList<String>()
                     val runtimeGeneration = appState.runtimeGeneration
-                    val absentBefore =
-                        refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
                     try {
-                        canonicalAdmins = adminTargets
                         check(adminTargets.all { admin -> refs.any { it.equals(admin, ignoreCase = true) } }) {
                             "Initial admin selection contains an unselected recipient"
                         }
@@ -3803,6 +3800,8 @@ class ConversationController(
                                 }
                                 val authorityEpoch = mutationPresentation.groupAuthorityEpoch
                                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
+                                absentBefore =
+                                    refs.none { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
                                 nativeInvoked = true
                                 val inviteResult =
                                     initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
@@ -3843,17 +3842,14 @@ class ConversationController(
                         val reconcilable = canReconcileInviteReply(nativeInvoked, absentBefore, throwable)
                         if (reconcilable) {
                             diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.START)
-                            val reconciled =
-                                reconcileInitialAdminInvite(
-                                    refs,
-                                    canonicalAdmins,
-                                    absentBefore,
-                                    nativeInvoked,
-                                    throwable,
-                                )
-                            if (reconciled) {
+                            val absent = reconcileInitialAdminInvite(refs, adminTargets)
+                            if (absent != null) {
                                 diagnostic.record(DmCreationPhase.RECONCILIATION, DmCreationOutcome.SUCCESS)
-                                presentConversationTransient(R.string.toast_invite_sent)
+                                val skipped =
+                                    absent.takeIf { it.isNotEmpty() }
+                                        ?.joinToString(transform = appState::displayName)
+                                        ?.let(AppText::Plain)
+                                presentInviteAccepted(skipped)
                                 return@track true
                             }
                             diagnostic.record(
