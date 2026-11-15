@@ -2665,4 +2665,16 @@
     <string name="android_notification_settings">Android-Benachrichtigungseinstellungen</string>
     <string name="settings_help_support">Hilfe &amp; Support</string>
     <string name="settings_voice_language">Sprache &amp; Stimme</string>
+
+    <string name="emoji_name_marmot_classic">Klassisches Murmeltier</string>
+    <string name="emoji_name_marmot_wave">Winkendes Murmeltier</string>
+    <string name="emoji_name_marmot_yes">Murmeltier mit Daumen hoch</string>
+    <string name="emoji_name_marmot_laugh">Lachendes Murmeltier</string>
+    <string name="emoji_name_marmot_love">Murmeltier mit Herz</string>
+    <string name="emoji_name_marmot_party">Feierndes Murmeltier</string>
+    <string name="emoji_name_marmot_fire">Murmeltier in Flammen</string>
+    <string name="emoji_name_marmot_wow">Überraschtes Murmeltier</string>
+    <string name="emoji_name_marmot_smirk">Verschmitztes Murmeltier</string>
+    <string name="emoji_name_marmot_cry">Weinendes Murmeltier</string>
+    <string name="emoji_name_marmot_angry">Wütendes Murmeltier</string>
 </resources>

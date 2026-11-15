@@ -65,6 +65,15 @@
         "test_ids": [
           "NTF-017"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun builtinName(",
+        "surface": "Localized spoken names for thirteen bundled emoji in search, messages and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
       }
     ]
   },

@@ -2831,4 +2831,16 @@
     <string name="time_format_24_hour">24-hour</string>
     <string name="date_time_format_help">Automatic follows the app language and your region.</string>
     <string name="settings_search_alias_date_time_format">time format|date format|clock|12-hour|24-hour|AM/PM</string>
+
+    <string name="emoji_name_marmot_classic">Classic marmot</string>
+    <string name="emoji_name_marmot_wave">Waving marmot</string>
+    <string name="emoji_name_marmot_yes">Marmot thumbs up</string>
+    <string name="emoji_name_marmot_laugh">Laughing marmot</string>
+    <string name="emoji_name_marmot_love">Marmot with heart</string>
+    <string name="emoji_name_marmot_party">Party marmot</string>
+    <string name="emoji_name_marmot_fire">Marmot on fire</string>
+    <string name="emoji_name_marmot_wow">Surprised marmot</string>
+    <string name="emoji_name_marmot_smirk">Smirking marmot</string>
+    <string name="emoji_name_marmot_cry">Crying marmot</string>
+    <string name="emoji_name_marmot_angry">Angry marmot</string>
 </resources>

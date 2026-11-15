@@ -426,7 +426,7 @@ internal fun EmojiGlyph(
         }
     if (art != null) {
         val artSize =
-            if (fitPickerArtwork && art is EmojiArt.Bundled && art.drawable == R.drawable.builtin_emoji_marmot) {
+            if (fitPickerArtwork && art is EmojiArt.Bundled && art.drawable == R.drawable.builtin_emoji_marmot_classic) {
                 with(LocalDensity.current) { fontSize.toDp() }
             } else {
                 size

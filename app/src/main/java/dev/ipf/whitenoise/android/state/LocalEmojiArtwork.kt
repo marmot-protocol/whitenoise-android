@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.content.Context
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
@@ -72,6 +73,17 @@ private fun readEmojiFile(
     return if (mediaType == null || bytes == null) null else LocalEmojiArtwork(shortcode, file.name, mediaType, bytes)
 }
 
+/** Original bundled PNG bytes bypass drawable decoding and Android resource image processing. */
+internal fun readBuiltinEmojiArtwork(
+    context: Context,
+    shortcodes: List<String>,
+): List<LocalEmojiArtwork> =
+    shortcodes.filter { it in EmojiShortcodes.builtins }.map { code ->
+        val fileName = "${code.trim(':')}.png"
+        val bytes = context.assets.open("builtin-emoji/$fileName").use { it.readBytes() }
+        LocalEmojiArtwork(code, fileName, "image/png", bytes)
+    }
+
 /** Resolves device-local files and MDK-installed artwork for the captured sending account. */
 internal suspend fun WhiteNoiseAppState.emojiArtworkIn(
     account: String,
@@ -81,7 +93,9 @@ internal suspend fun WhiteNoiseAppState.emojiArtworkIn(
     if (shortcodes.isEmpty()) return emptyList()
     val local =
         withContext(Dispatchers.IO) {
-            readLocalEmojiArtwork(File(appContext.filesDir, CustomEmojiStore.DIRECTORY), shortcodes)
+            val bundled = readBuiltinEmojiArtwork(appContext, shortcodes).associateBy { it.shortcode }
+            val deviceLocal = readLocalEmojiArtwork(File(appContext.filesDir, CustomEmojiStore.DIRECTORY), shortcodes)
+            (bundled + deviceLocal.associateBy { it.shortcode }).values.toList()
         }.associateBy { it.shortcode }
     val missing = shortcodes.filter { it !in local && it !in EmojiShortcodes.builtins }
     return if (missing.isEmpty()) {

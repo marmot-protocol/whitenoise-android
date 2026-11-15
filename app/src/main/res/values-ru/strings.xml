@@ -2734,4 +2734,16 @@
     <string name="android_notification_settings">Настройки уведомлений Android</string>
     <string name="settings_help_support">Помощь и поддержка</string>
     <string name="settings_voice_language">Голос и язык</string>
+
+    <string name="emoji_name_marmot_classic">Классический сурок</string>
+    <string name="emoji_name_marmot_wave">Сурок машет лапой</string>
+    <string name="emoji_name_marmot_yes">Сурок с поднятым большим пальцем</string>
+    <string name="emoji_name_marmot_laugh">Смеющийся сурок</string>
+    <string name="emoji_name_marmot_love">Сурок с сердечком</string>
+    <string name="emoji_name_marmot_party">Сурок на вечеринке</string>
+    <string name="emoji_name_marmot_fire">Сурок в огне</string>
+    <string name="emoji_name_marmot_wow">Удивлённый сурок</string>
+    <string name="emoji_name_marmot_smirk">Ухмыляющийся сурок</string>
+    <string name="emoji_name_marmot_cry">Плачущий сурок</string>
+    <string name="emoji_name_marmot_angry">Сердитый сурок</string>
 </resources>

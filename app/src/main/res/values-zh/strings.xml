@@ -2607,4 +2607,16 @@
     <string name="android_notification_settings">Android 通知设置</string>
     <string name="settings_help_support">帮助和支持</string>
     <string name="settings_voice_language">语音和语言</string>
+
+    <string name="emoji_name_marmot_classic">经典土拨鼠</string>
+    <string name="emoji_name_marmot_wave">挥手的土拨鼠</string>
+    <string name="emoji_name_marmot_yes">竖起大拇指的土拨鼠</string>
+    <string name="emoji_name_marmot_laugh">大笑的土拨鼠</string>
+    <string name="emoji_name_marmot_love">抱着爱心的土拨鼠</string>
+    <string name="emoji_name_marmot_party">开派对的土拨鼠</string>
+    <string name="emoji_name_marmot_fire">着火的土拨鼠</string>
+    <string name="emoji_name_marmot_wow">惊讶的土拨鼠</string>
+    <string name="emoji_name_marmot_smirk">坏笑的土拨鼠</string>
+    <string name="emoji_name_marmot_cry">哭泣的土拨鼠</string>
+    <string name="emoji_name_marmot_angry">生气的土拨鼠</string>
 </resources>

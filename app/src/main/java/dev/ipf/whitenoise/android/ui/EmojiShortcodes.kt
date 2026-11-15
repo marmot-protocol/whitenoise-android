@@ -70,7 +70,29 @@ internal val LocalReceivedEmoji = compositionLocalOf { ReceivedEmoji.None }
 internal object EmojiShortcodes {
     const val LITERAL_TAG = "emoji-shortcode-literal"
     const val MAX_CODE_LENGTH = 64
-    val builtins: List<String> = listOf(":marmot:", ":wn:")
+    private class Builtin(
+        @DrawableRes val drawable: Int,
+        @StringRes val name: Int,
+    )
+
+    private val definitions =
+        linkedMapOf(
+            ":marmot:" to Builtin(R.drawable.builtin_emoji_marmot, R.string.emoji_name_marmot),
+            ":wn:" to Builtin(R.drawable.builtin_emoji_wn, R.string.white_noise),
+            ":marmot_classic:" to Builtin(R.drawable.builtin_emoji_marmot_classic, R.string.emoji_name_marmot_classic),
+            ":marmot_wave:" to Builtin(R.drawable.builtin_emoji_marmot_wave, R.string.emoji_name_marmot_wave),
+            ":marmot_yes:" to Builtin(R.drawable.builtin_emoji_marmot_yes, R.string.emoji_name_marmot_yes),
+            ":marmot_laugh:" to Builtin(R.drawable.builtin_emoji_marmot_laugh, R.string.emoji_name_marmot_laugh),
+            ":marmot_love:" to Builtin(R.drawable.builtin_emoji_marmot_love, R.string.emoji_name_marmot_love),
+            ":marmot_party:" to Builtin(R.drawable.builtin_emoji_marmot_party, R.string.emoji_name_marmot_party),
+            ":marmot_fire:" to Builtin(R.drawable.builtin_emoji_marmot_fire, R.string.emoji_name_marmot_fire),
+            ":marmot_wow:" to Builtin(R.drawable.builtin_emoji_marmot_wow, R.string.emoji_name_marmot_wow),
+            ":marmot_smirk:" to Builtin(R.drawable.builtin_emoji_marmot_smirk, R.string.emoji_name_marmot_smirk),
+            ":marmot_cry:" to Builtin(R.drawable.builtin_emoji_marmot_cry, R.string.emoji_name_marmot_cry),
+            ":marmot_angry:" to Builtin(R.drawable.builtin_emoji_marmot_angry, R.string.emoji_name_marmot_angry),
+        )
+
+    val builtins: List<String> = definitions.keys.toList()
 
     private val shortcodePattern = Regex(":[A-Za-z0-9_-]{1,$MAX_CODE_LENGTH}:")
 
@@ -85,13 +107,8 @@ internal object EmojiShortcodes {
 
     fun isShortcode(text: String): Boolean = shortcodePattern.matches(text)
 
-    /** The bundled artwork for `:marmot:` and `:wn:`, or null for any other shortcode. */
-    fun builtinDrawable(shortcode: String): Int? =
-        when (shortcode) {
-            ":marmot:" -> R.drawable.builtin_emoji_marmot
-            ":wn:" -> R.drawable.builtin_emoji_wn
-            else -> null
-        }
+    /** Bundled pixel marmots, the classic marmot and the White Noise mark. */
+    fun builtinDrawable(shortcode: String): Int? = definitions[shortcode]?.drawable
 
     /**
      * The part of a bundled image's canvas that holds its artwork, or null when the artwork fills it.
@@ -100,21 +117,16 @@ internal object EmojiShortcodes {
     fun builtinArtworkRegion(
         @DrawableRes drawable: Int,
     ): IntRect? =
-        // The bundled Marmot's 72px canvas includes padding around its 51px artwork.
-        if (drawable == R.drawable.builtin_emoji_marmot) {
+        // The classic Marmot's 72px canvas includes padding around its 51px artwork.
+        if (drawable == R.drawable.builtin_emoji_marmot_classic) {
             IntRect(IntOffset(x = 11, y = 10), IntSize(width = 51, height = 51))
         } else {
             null
         }
 
-    /** The product name a built-in shortcode stands for, or null for any other shortcode. */
+    /** Localized spoken names, with product names kept untranslated. */
     @StringRes
-    fun builtinName(shortcode: String): Int? =
-        when (shortcode) {
-            ":marmot:" -> R.string.emoji_name_marmot
-            ":wn:" -> R.string.white_noise
-            else -> null
-        }
+    fun builtinName(shortcode: String): Int? = definitions[shortcode]?.name
 
     /**
      * Readable text for [emoji] on surfaces that can only show text, never the raw `:shortcode:`.

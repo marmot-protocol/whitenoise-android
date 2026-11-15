@@ -2653,4 +2653,16 @@
     <string name="android_notification_settings">Ajustes de notificaciones de Android</string>
     <string name="settings_help_support">Ayuda y soporte</string>
     <string name="settings_voice_language">Voz e idioma</string>
+
+    <string name="emoji_name_marmot_classic">Marmota clásica</string>
+    <string name="emoji_name_marmot_wave">Marmota saludando</string>
+    <string name="emoji_name_marmot_yes">Marmota con el pulgar arriba</string>
+    <string name="emoji_name_marmot_laugh">Marmota riendo</string>
+    <string name="emoji_name_marmot_love">Marmota con corazón</string>
+    <string name="emoji_name_marmot_party">Marmota de fiesta</string>
+    <string name="emoji_name_marmot_fire">Marmota en llamas</string>
+    <string name="emoji_name_marmot_wow">Marmota sorprendida</string>
+    <string name="emoji_name_marmot_smirk">Marmota con sonrisa pícara</string>
+    <string name="emoji_name_marmot_cry">Marmota llorando</string>
+    <string name="emoji_name_marmot_angry">Marmota enfadada</string>
 </resources>

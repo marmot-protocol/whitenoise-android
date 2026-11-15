@@ -2646,4 +2646,16 @@
     <string name="android_notification_settings">Android bildirim ayarları</string>
     <string name="settings_help_support">Yardım ve destek</string>
     <string name="settings_voice_language">Ses ve dil</string>
+
+    <string name="emoji_name_marmot_classic">Klasik dağ sıçanı</string>
+    <string name="emoji_name_marmot_wave">El sallayan dağ sıçanı</string>
+    <string name="emoji_name_marmot_yes">Başparmağını kaldıran dağ sıçanı</string>
+    <string name="emoji_name_marmot_laugh">Gülen dağ sıçanı</string>
+    <string name="emoji_name_marmot_love">Kalp tutan dağ sıçanı</string>
+    <string name="emoji_name_marmot_party">Parti yapan dağ sıçanı</string>
+    <string name="emoji_name_marmot_fire">Alevler içinde dağ sıçanı</string>
+    <string name="emoji_name_marmot_wow">Şaşırmış dağ sıçanı</string>
+    <string name="emoji_name_marmot_smirk">Sırıtan dağ sıçanı</string>
+    <string name="emoji_name_marmot_cry">Ağlayan dağ sıçanı</string>
+    <string name="emoji_name_marmot_angry">Kızgın dağ sıçanı</string>
 </resources>
