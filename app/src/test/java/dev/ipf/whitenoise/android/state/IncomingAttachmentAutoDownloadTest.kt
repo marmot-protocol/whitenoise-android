@@ -50,7 +50,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * pipeline and with the conversation never opened.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+// Keep native SQLite on the suite SDK when this fixture shares a JVM with screenshot tests.
+@Config(sdk = [36])
 // Both receipt sources share one notification fixture and its history helpers, so they stay in one class.
 @Suppress("LargeClass")
 class IncomingAttachmentAutoDownloadTest {
