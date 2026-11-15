@@ -30,8 +30,8 @@ internal class PinnedShortcutTapGate(
     ) : this(
         lockDecision = { appState.pinnedShortcutLockDecision() },
         activeAccount = { appState.activeAccountRef },
-        evaluationPending = { appState.appUnlockEvaluationPending },
-        evaluateForeground = { appState.maybeShowAppLockForForeground() },
+        evaluationPending = { appState.appLock.evaluationPending },
+        evaluateForeground = { appState.appLock.maybeShowForForeground() },
         pending = pending,
     )
 

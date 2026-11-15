@@ -64,7 +64,7 @@ class PrivacySecurityScreenBehaviorTest {
         composeRule.onNodeWithText("Immediately").assertExists()
         composeRule.onNodeWithText("Auto-lock").performClick()
         composeRule.onNodeWithText("After 5 minutes").performClick()
-        composeRule.runOnIdle { assertEquals(AppLockDelay.FiveMinutes, state.appLockDelay) }
+        composeRule.runOnIdle { assertEquals(AppLockDelay.FiveMinutes, state.appLock.lockDelay) }
         composeRule.onNodeWithText("After 15 minutes").assertDoesNotExist()
         composeRule.onNodeWithText("After 5 minutes").assertExists()
     }

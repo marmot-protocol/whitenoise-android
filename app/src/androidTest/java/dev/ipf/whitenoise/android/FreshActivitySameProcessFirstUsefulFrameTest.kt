@@ -38,7 +38,7 @@ class FreshActivitySameProcessFirstUsefulFrameTest {
                     appState.phase != AppPhase.Bootstrapping &&
                         (
                             appState.phase != AppPhase.Ready ||
-                                appState.appLockScreenVisible ||
+                                appState.appLock.screenVisible ||
                                 processState.localProjectionAvailable(
                                     activeAccountRef = appState.activeAccountRef,
                                     runtimeGeneration = appState.runtimeGeneration,
@@ -49,7 +49,7 @@ class FreshActivitySameProcessFirstUsefulFrameTest {
                 assumeTrue(
                     "Requires an authenticated local projection on the device fixture",
                     appState.phase == AppPhase.Ready &&
-                        !appState.appLockScreenVisible &&
+                        !appState.appLock.screenVisible &&
                         processState.localProjectionAvailable(
                             activeAccountRef = appState.activeAccountRef,
                             runtimeGeneration = appState.runtimeGeneration,
@@ -101,7 +101,7 @@ class FreshActivitySameProcessFirstUsefulFrameTest {
                 appState.phase != AppPhase.Bootstrapping &&
                     (
                         appState.phase != AppPhase.Ready ||
-                            appState.appLockScreenVisible ||
+                            appState.appLock.screenVisible ||
                             processState.localProjectionAvailable(
                                 activeAccountRef = appState.activeAccountRef,
                                 runtimeGeneration = appState.runtimeGeneration,
@@ -111,7 +111,7 @@ class FreshActivitySameProcessFirstUsefulFrameTest {
             assumeTrue(
                 "Requires an authenticated local projection on the device fixture",
                 appState.phase == AppPhase.Ready &&
-                    !appState.appLockScreenVisible &&
+                    !appState.appLock.screenVisible &&
                     processState.localProjectionAvailable(
                         activeAccountRef = appState.activeAccountRef,
                         runtimeGeneration = appState.runtimeGeneration,

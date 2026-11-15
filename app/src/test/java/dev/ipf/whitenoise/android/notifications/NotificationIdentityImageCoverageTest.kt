@@ -189,7 +189,7 @@ class NotificationIdentityImageCoverageTest {
         val loader = appState.functionBody("encryptedGroupIdentityLoader")
         assertTrue("through the group avatar cache", "GroupAvatarImageLoader" in loader)
         assertTrue("and MDK's encrypted download", "downloadGroupBlossomImage(" in loader)
-        assertTrue("nothing decrypts behind the lock", loader.split("appLockScreenVisible").size - 1 >= 2)
+        assertTrue("nothing decrypts behind the lock", loader.split("appLock.screenVisible").size - 1 >= 2)
         val presenter = source("LocalNotificationPresenter.kt")
         val resolve = presenter.declaration("private suspend fun resolveAvatars(")
         assertTrue(
@@ -256,7 +256,7 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("naming the row's peer", "item.privatePictureContact()" in stored)
         assertFalse("whose private picture is never read here", "contactAvatarOverride(" in stored)
         assertTrue("never acquiring a missing copy", "acquireMissing = false" in stored)
-        assertTrue("nothing starts behind the lock", stored.split("appLockScreenVisible").size - 1 >= 3)
+        assertTrue("nothing starts behind the lock", stored.split("appLock.screenVisible").size - 1 >= 3)
         val presenter = source("LocalNotificationPresenter.kt")
         val resolve = presenter.declaration("private suspend fun resolveAvatars(")
         val storedAt = resolve.indexOf("sources.storedConversationLoader")
@@ -288,7 +288,7 @@ class NotificationIdentityImageCoverageTest {
         val loader = appState.declaration("private fun latePictureLoader(")
         assertTrue(
             "nothing starts behind the lock",
-            "lockCheckedPictureLoader(url, domain, { appLockScreenVisible })" in loader,
+            "lockCheckedPictureLoader(url, domain, { appLock.screenVisible })" in loader,
         )
         val resolve = source("LocalNotificationPresenter.kt").declaration("private suspend fun resolveAvatars(")
         assertTrue(
@@ -445,7 +445,7 @@ class NotificationIdentityImageCoverageTest {
     @Test
     fun clearedPictureShowsWhatTheChatRowShows() {
         val choice = stateSource("AppState.kt").functionBody("contactAvatarOverride")
-        val lock = choice.indexOf("if (appLockScreenVisible) return true to null")
+        val lock = choice.indexOf("if (appLock.screenVisible) return true to null")
         val fallback = choice.indexOf("?: contactRowPicture(account, contact)")
         assertTrue("the row's stored copy follows the public picture", fallback > choice.indexOf("peekBitmap("))
         assertTrue("and only after the lock check", lock in 0 until fallback)

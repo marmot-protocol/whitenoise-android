@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.maestro
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.accountRelayLists
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

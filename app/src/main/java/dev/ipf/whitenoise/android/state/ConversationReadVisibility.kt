@@ -11,7 +11,7 @@ internal fun WhiteNoiseAppState.isConversationReadVisible(
     // so a settled screen retries when navigation/foreground ownership changes.
     val visibility = conversationReadVisibility.value
     return visibility.inForeground &&
-        !appLockScreenVisible &&
+        !appLock.screenVisible &&
         visibility.activeConversationAccountRef == accountRef &&
         visibility.activeConversationGroupIdHex?.equals(groupIdHex, ignoreCase = true) == true
 }

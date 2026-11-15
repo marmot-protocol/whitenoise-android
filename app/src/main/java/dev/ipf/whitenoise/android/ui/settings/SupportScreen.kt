@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.core.SupportContact
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isAcceptableRelayUrl
+import dev.ipf.whitenoise.android.state.loadAccountRelayLists
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.explainOnLongPress

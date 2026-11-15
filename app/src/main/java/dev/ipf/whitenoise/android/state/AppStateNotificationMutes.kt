@@ -62,7 +62,7 @@ internal fun WhiteNoiseAppState.shouldPostNotification(
         appInForeground = appInForeground,
         activeConversationGroupIdHex = activeConversationGroupIdHex,
         activeConversationAccountRef = activeConversationAccountRef,
-        appLockScreenVisible = appLockScreenVisible,
+        appLockScreenVisible = appLock.screenVisible,
         conversationNotifyMode = chatMutePreferences::mode,
         engineMuted = engineMuted,
         senderMutedInGroup = memberMutePreferences::isMuted,

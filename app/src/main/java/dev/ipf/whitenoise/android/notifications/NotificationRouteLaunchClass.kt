@@ -66,6 +66,6 @@ internal fun WhiteNoiseAppState.notificationRouteLaunchClass(
     return classifyNotificationRouteLaunch(
         lifecycle = lifecycle,
         runtimeReady = phase == AppPhase.Ready && targetRunning,
-        appLockPending = appUnlockEvaluationPending || appLockScreenVisible,
+        appLockPending = appLock.evaluationPending || appLock.screenVisible,
     )
 }

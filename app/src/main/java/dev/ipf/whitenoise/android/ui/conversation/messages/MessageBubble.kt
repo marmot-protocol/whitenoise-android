@@ -426,7 +426,7 @@ internal fun MessageBubble(
         rowReactionMotion ?: run {
             val runtime = remember(controller) { appState.runtimeGeneration }
             val currentOwner =
-                !appState.appLockScreenVisible &&
+                !appState.appLock.screenVisible &&
                     controller.isCurrentGroupMutationOwner(appState, runtime) &&
                     controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
             val available = currentOwner && !deleted && !invalidated && !actionsReadOnly

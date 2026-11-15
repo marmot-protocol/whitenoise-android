@@ -112,7 +112,7 @@ class InboundShareTaskReuseDeviceTest {
         }
         assumeTrue(
             "Requires an authenticated, unlocked device fixture",
-            application.appState.phase == AppPhase.Ready && !application.appState.appLockScreenVisible,
+            application.appState.phase == AppPhase.Ready && !application.appState.appLock.screenVisible,
         )
         val priorRoute = application.mainShellProcessState.selectedChat.value
 

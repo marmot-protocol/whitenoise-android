@@ -122,8 +122,8 @@ class PlaybackTransportOwnershipTest {
         setVoice()
         render(appState)
         rule.onNodeWithTag("voice-transport").assertIsDisplayed()
-        rule.runOnIdle { appState.updateRequireAppUnlock(true) }
-        assertTrue(appState.appLockScreenVisible)
+        rule.runOnIdle { appState.appLock.updateRequired(true) }
+        assertTrue(appState.appLock.screenVisible)
         rule.onNodeWithTag("voice-transport").assertDoesNotExist()
     }
 
@@ -420,7 +420,7 @@ class PlaybackTransportOwnershipTest {
                 description = "conversation playbackTransport callback",
             )
         assertTrue(slot.contains("PlaybackTransportBar("))
-        assertTrue(slot.contains("navAccountStable && !appState.appLockScreenVisible"))
+        assertTrue(slot.contains("navAccountStable && !appState.appLock.screenVisible"))
         assertFalse(slot.contains("selectedChat"))
     }
 
