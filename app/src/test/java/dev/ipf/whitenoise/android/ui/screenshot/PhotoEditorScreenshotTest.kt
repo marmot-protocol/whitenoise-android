@@ -4,6 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,10 +14,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
+import dev.ipf.whitenoise.android.media.editor.NormalizedPoint
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -50,6 +56,74 @@ class PhotoEditorScreenshotTest {
 
     @Test
     fun tightLargePhotoCropDark() = captureLargeCrop(dark = true, suffix = "dark")
+
+    @Test
+    fun photoFirstLight() = capturePhotoFirst("light")
+
+    @Test
+    fun photoFirstDark() = capturePhotoFirst("dark")
+
+    @Test
+    fun photoFirstAmoled() = capturePhotoFirst("amoled")
+
+    @Test
+    fun photoFirstDrawOptions() = capturePhotoFirst("amoled", draw = true)
+
+    @Test
+    fun photoFirstRtlLargeText() = capturePhotoFirst("amoled", rtl = true, fontScale = 2f)
+
+    @Test
+    fun photoFirstSquare() = capturePhotoFirst("amoled", photoHeight = 240)
+
+    @Test
+    fun photoFirstWide() = capturePhotoFirst("amoled", photoHeight = 135)
+
+    private fun capturePhotoFirst(
+        theme: String,
+        draw: Boolean = false,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
+        photoHeight: Int = 320,
+    ) {
+        val suffix =
+            when {
+                draw -> "draw"
+                rtl -> "rtl_large"
+                photoHeight == 240 -> "square"
+                photoHeight == 135 -> "wide"
+                else -> "crop"
+            }
+        val bitmap = editorSourceBitmap(height = photoHeight)
+        val size = EditorPixelSize(bitmap.width, bitmap.height)
+        val holder = PhotoEditorStateHolder(PhotoEditRecipe.Original, MediaQuality.Standard, size)
+        if (draw) {
+            // A drawn stroke at Original quality also captures the persistent High-encoding note.
+            holder.selectQuality(MediaQuality.Original)
+            holder.selectTool(PhotoEditorTool.Draw)
+            holder.commitStroke(listOf(NormalizedPoint(0.2f, 0.2f), NormalizedPoint(0.8f, 0.6f)))
+        }
+        try {
+            composeRule.setContent {
+                CompositionLocalProvider(
+                    LocalDensity provides Density(1f, fontScale),
+                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
+                    WhiteNoiseTheme(darkTheme = theme != "light", amoled = theme == "amoled") {
+                        PhotoEditorScreen(
+                            bitmap,
+                            PhotoEditorSourceInfo(size, size, 1, "image/png", false),
+                            holder,
+                            {},
+                            { _, _ -> },
+                        )
+                    }
+                }
+            }
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_${theme}_$suffix.png")
+        } finally {
+            bitmap.recycle()
+        }
+    }
 
     private fun captureLargeCrop(
         dark: Boolean,
@@ -183,7 +257,6 @@ class PhotoEditorScreenshotTest {
             assertTrue(canvas.width > 0f && canvas.height > 0f)
             composeRule
                 .onNodeWithContentDescription(context.getString(R.string.photo_editor_draw))
-                .performScrollTo()
                 .assertIsDisplayed()
                 .performClick()
             assertEquals(PhotoEditorTool.Draw, holder.state.activeTool)
@@ -239,18 +312,56 @@ class PhotoEditorScreenshotTest {
         }
     }
 
-    private fun editorSourceBitmap(): Bitmap {
-        val bitmap = Bitmap.createBitmap(240, 180, Bitmap.Config.ARGB_8888)
+    /** Short landscape keeps all four tools above independently scrolling options. */
+    @Test
+    @Config(qualifiers = "w640dp-h300dp-mdpi")
+    fun shortLandscapeKeepsAllToolsVisible() {
+        val bitmap = editorSourceBitmap()
+        val size = EditorPixelSize(bitmap.width, bitmap.height)
+        val holder = PhotoEditorStateHolder(PhotoEditRecipe.Original, MediaQuality.Standard, size)
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    PhotoEditorScreen(
+                        previewBitmap = bitmap,
+                        sourceInfo = PhotoEditorSourceInfo(size, size, 1, "image/png", false),
+                        stateHolder = holder,
+                        onCancel = {},
+                        onSave = { _, _ -> },
+                    )
+                }
+            }
+            composeRule.onNodeWithText(context.getString(R.string.photo_editor_title)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.save)).assertIsDisplayed()
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_draw)).performClick()
+            assertEquals(PhotoEditorTool.Draw, holder.state.activeTool)
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_crop)).performClick()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.photo_editor_rotate_clockwise))
+                .performClick()
+            assertEquals(1, holder.state.recipe.quarterTurnsClockwise)
+            composeRule.onNodeWithContentDescription(context.getString(R.string.photo_editor_undo)).performClick()
+            assertEquals(PhotoEditRecipe.Original, holder.state.recipe)
+            composeRule.waitForIdle()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/photo_editor_short_landscape.png")
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun editorSourceBitmap(height: Int = 180): Bitmap {
+        val bitmap = Bitmap.createBitmap(240, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.color = Color.rgb(32, 71, 111)
-        canvas.drawRect(0f, 0f, 240f, 180f, paint)
+        canvas.drawRect(0f, 0f, 240f, height.toFloat(), paint)
         paint.color = Color.rgb(226, 172, 84)
         canvas.drawCircle(186f, 48f, 34f, paint)
         paint.color = Color.rgb(53, 126, 82)
-        canvas.drawRect(0f, 118f, 240f, 180f, paint)
+        canvas.drawRect(0f, height * (118f / 180f), 240f, height.toFloat(), paint)
         paint.color = Color.rgb(224, 235, 242)
-        canvas.drawRect(20f, 82f, 112f, 132f, paint)
+        canvas.drawRect(20f, height * (82f / 180f), 112f, height * (132f / 180f), paint)
         return bitmap
     }
 }

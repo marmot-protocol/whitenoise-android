@@ -1506,6 +1506,24 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
+      "symbol": "PhotoEditorTopBar",
+      "bindings": [
+        {
+          "case": "presentation-image-editor-cancel",
+          "selector": {
+            "text": "Edit photo"
+          },
+          "scope": "Editor toolbar title is directly asserted before its Close action; unchanged recipe cancellation only, no save or upload.",
+          "entry_assertion": {
+            "text": "Edit photo"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "Toolbar Save and overflow Reset/Help actions are not asserted by this cancellation fixture; runtime feature qualification remains separate."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
       "symbol": "EditHistoryDialog",
       "bindings": [
