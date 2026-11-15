@@ -182,6 +182,29 @@ class MediaImageBubbleLatencyTest {
         awaitLoaded()
     }
 
+    /** A visible L1 thumbnail settles an already-retained original's intent using metadata alone. */
+    @Test
+    fun memoryThumbnailDoesNotRereadAnOriginalToSettleItsIntent() {
+        fixture.retainNatively(0, imageBytes())
+        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
+        fixture.state.attachmentOpens.setDestination(
+            AttachmentOpenDestination(
+                accountRef = MediaDownloadIntegrationFixture.ACCOUNT,
+                groupIdHex = MediaDownloadIntegrationFixture.GROUP,
+                navigationGeneration = 1L,
+            ),
+        )
+        assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
+        }
+        awaitLoaded()
+        assertEquals(0, fixture.nativeAssetReads.get())
+        assertEquals(0, fixture.calls.size)
+    }
+
     /** A cache-wide fence caused by another attachment restarts this still-current loader. */
     @Test
     fun unrelatedRemovalCannotStrandAnOriginalLoad() {
