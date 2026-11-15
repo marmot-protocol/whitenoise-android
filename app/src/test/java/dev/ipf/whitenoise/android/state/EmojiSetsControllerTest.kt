@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.EmojiSetEmojiFfi
 import dev.ipf.marmotkit.EmojiSetFfi
 import dev.ipf.marmotkit.EmojiSetInstallProgressFfi
 import dev.ipf.marmotkit.EmojiSetInstallResultFfi
+import dev.ipf.marmotkit.EmojiSkipFfi
+import dev.ipf.marmotkit.EmojiSkipReasonFfi
 import dev.ipf.marmotkit.InstalledCustomEmojiFfi
 import dev.ipf.marmotkit.InstalledEmojiSetStateFfi
 import dev.ipf.marmotkit.MarmotKitException
@@ -93,6 +95,40 @@ class EmojiSetsControllerTest {
             assertEquals(2, changes)
         }
 
+    /** A partial current-version install can be replaced directly without uninstalling or changing its event. */
+    @Test
+    fun reinstallCurrentVersionWithoutRemovingTheInstalledSnapshot() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            val previous = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false)
+            val partial = backend.set.copy(installed = previous)
+            backend.install.result.complete(
+                EmojiSetInstallResultFfi(
+                    partial,
+                    1u,
+                    listOf(EmojiSkipFfi(null, "fox", EmojiSkipReasonFfi.DOWNLOAD_FAILED)),
+                ),
+            )
+            var changes = 0
+            val controller = EmojiSetsController(backend) { changes++ }
+            controller.show(backend.set)
+            controller.install()
+            assertEquals(1, controller.state.installedWithSkips)
+            assertEquals(listOf("old"), backend.install.attempts)
+
+            backend.set = partial
+            backend.install = FakeEmojiSetInstall()
+            val complete = partial.copy(installed = previous.copy(emojiCount = 2u))
+            backend.install.result.complete(EmojiSetInstallResultFfi(complete, 2u, emptyList()))
+            controller.install()
+
+            assertEquals(listOf("old"), backend.install.attempts)
+            assertEquals(complete, controller.state.preview)
+            assertEquals(0, backend.removals)
+            assertNull(controller.state.installedWithSkips)
+            assertEquals(2, changes)
+        }
+
     /** Set collisions are deterministic and built-ins cannot be shadowed by relay-provided entries. */
     @Test
     fun installedCodesMatchSendableTagAlphabetAndPrecedence() {
@@ -110,7 +146,8 @@ class EmojiSetsControllerTest {
 
 private class FakeEmojiSetsBackend : EmojiSetsBackend {
     var set = emojiSetFixture()
-    val install = FakeEmojiSetInstall()
+    var install = FakeEmojiSetInstall()
+    var removals = 0
 
     override suspend fun sets(search: String?) = listOf(set)
 
@@ -125,6 +162,7 @@ private class FakeEmojiSetsBackend : EmojiSetsBackend {
     override fun newInstall() = install
 
     override suspend fun remove(coordinate: String) {
+        removals++
         set = set.copy(installed = null)
     }
 }

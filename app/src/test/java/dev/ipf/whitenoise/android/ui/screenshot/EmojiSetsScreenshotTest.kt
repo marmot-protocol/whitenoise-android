@@ -56,6 +56,15 @@ class EmojiSetsScreenshotTest {
     /** The same preview with a mirrored layout and large text. */
     @Test fun previewRtlLarge() = preview("preview_rtl_large", rtl = true)
 
+    /** A current installed version offers direct reinstall alongside update checking and removal. */
+    @Test fun reinstallLight() = preview("reinstall_light", currentInstalled = true)
+
+    /** Current-version reinstall stays legible in dark mode. */
+    @Test fun reinstallDark() = preview("reinstall_dark", dark = true, currentInstalled = true)
+
+    /** Reinstall actions remain reachable with mirrored layout and enlarged text. */
+    @Test fun reinstallRtlLarge() = preview("reinstall_rtl_large", rtl = true, currentInstalled = true)
+
     /** The composer grid with a thumbnail loaded from the installed set. */
     @Test fun pickerLight() = picker("picker_light")
 
@@ -70,10 +79,16 @@ class EmojiSetsScreenshotTest {
         dark: Boolean = false,
         rtl: Boolean = false,
         showPreview: Boolean = true,
+        currentInstalled: Boolean = false,
     ) {
         val set = emojiSetFixture()
         val installed = InstalledEmojiSetStateFfi("previous", 0u, 0u, 1u, 100u, true)
-        val selected = if (dark) set.copy(installed = installed) else set
+        val selected =
+            when {
+                currentInstalled -> set.copy(installed = installed.copy(updateAvailable = false))
+                dark -> set.copy(installed = installed)
+                else -> set
+            }
         setTheme(dark, rtl) {
             EmojiSetsContent(
                 state =

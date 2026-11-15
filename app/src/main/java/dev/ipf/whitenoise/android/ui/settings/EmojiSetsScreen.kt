@@ -353,25 +353,28 @@ private fun EmojiSetActions(
             }
         } else {
             val installed = set.installed
-            if (installed == null || installed.updateAvailable) {
-                val isInstall = installed == null
-                val label =
-                    stringResource(if (isInstall) R.string.emoji_sets_install else R.string.emoji_sets_update)
-                val body =
-                    stringResource(
-                        if (isInstall) {
-                            R.string.explanation_organize_emoji_install
-                        } else {
-                            R.string.explanation_organize_emoji_update
-                        },
-                    )
-                Button(
-                    onClick = onInstall,
-                    modifier = Modifier.explainOnLongPress(Explanation(label, body)),
-                    enabled = !state.busy,
-                ) {
-                    Text(label)
-                }
+            val label =
+                stringResource(
+                    when {
+                        installed == null -> R.string.emoji_sets_install
+                        installed.updateAvailable -> R.string.emoji_sets_update
+                        else -> R.string.emoji_sets_reinstall
+                    },
+                )
+            val body =
+                stringResource(
+                    when {
+                        installed == null -> R.string.explanation_organize_emoji_install
+                        installed.updateAvailable -> R.string.explanation_organize_emoji_update
+                        else -> R.string.explanation_organize_emoji_reinstall
+                    },
+                )
+            Button(
+                onClick = onInstall,
+                modifier = Modifier.explainOnLongPress(Explanation(label, body)),
+                enabled = !state.busy,
+            ) {
+                Text(label)
             }
             if (installed != null && !installed.updateAvailable) {
                 val checkLabel = stringResource(R.string.emoji_sets_check_update)
