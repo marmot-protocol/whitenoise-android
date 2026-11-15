@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
+import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
@@ -250,30 +251,32 @@ class MainActivity : AppCompatActivity() {
                 fontScale = state.fontScale.factor,
                 appFont = state.appFont,
             ) {
-                WhiteNoiseApp(
-                    appState = state,
-                    mainShellStateHolder = mainShellStateHolder,
-                    warmResumeTraceToken = warmResumeTraceToken,
-                    warmResumeEpoch = warmResumeEpoch,
-                    inboundProfilePayload = inboundProfilePayload,
-                    onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
-                    inboundNotificationTarget = inboundNotificationTarget,
-                    inboundNotificationRequestId = inboundNotificationRequestId,
-                    onNotificationTargetHandled = ::handleNotificationTarget,
-                    inboundShareRequest = inboundShareRequest,
-                    onShareRequestHandled = ::handleShareRequest,
-                    onChatLinkResolved = { handled, target ->
-                        if (handled != null && intent?.dataString == handled) {
-                            setIntent(Intent(this@MainActivity, MainActivity::class.java))
-                        }
-                        if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
-                    },
-                    inboundAppUpdateTap = inboundAppUpdateTap,
-                    onAppUpdateTapHandled = { handled ->
-                        if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
-                    },
-                    onRequestAppUnlock = ::requestAppUnlock,
-                )
+                ProvideWindowLayout {
+                    WhiteNoiseApp(
+                        appState = state,
+                        mainShellStateHolder = mainShellStateHolder,
+                        warmResumeTraceToken = warmResumeTraceToken,
+                        warmResumeEpoch = warmResumeEpoch,
+                        inboundProfilePayload = inboundProfilePayload,
+                        onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
+                        inboundNotificationTarget = inboundNotificationTarget,
+                        inboundNotificationRequestId = inboundNotificationRequestId,
+                        onNotificationTargetHandled = ::handleNotificationTarget,
+                        inboundShareRequest = inboundShareRequest,
+                        onShareRequestHandled = ::handleShareRequest,
+                        onChatLinkResolved = { handled, target ->
+                            if (handled != null && intent?.dataString == handled) {
+                                setIntent(Intent(this@MainActivity, MainActivity::class.java))
+                            }
+                            if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
+                        },
+                        inboundAppUpdateTap = inboundAppUpdateTap,
+                        onAppUpdateTapHandled = { handled ->
+                            if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
+                        },
+                        onRequestAppUnlock = ::requestAppUnlock,
+                    )
+                }
             }
         }
     }
