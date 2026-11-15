@@ -1,35 +1,68 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewMode
 
 internal data class NotificationPreviewControlState(
-    val enabled: Boolean,
+    val mode: NotificationPreviewMode,
     val busy: Boolean = false,
     val failed: Boolean = false,
 )
 
-/** One device-wide privacy choice, including before account setup or notification permission. */
+/** The search anchor stays "previews" on the first choice; the other rows use the stored mode value. */
+private fun NotificationPreviewMode.rowKey(): String =
+    when (this) {
+        NotificationPreviewMode.FULL -> "previews"
+        else -> storedValue
+    }
+
+@StringRes
+private fun NotificationPreviewMode.titleRes(): Int =
+    when (this) {
+        NotificationPreviewMode.FULL -> R.string.notification_preview_full
+        NotificationPreviewMode.NAME_ONLY -> R.string.notification_preview_name_only
+        NotificationPreviewMode.NONE -> R.string.notification_preview_none
+    }
+
+@StringRes
+private fun NotificationPreviewMode.detailRes(): Int =
+    when (this) {
+        NotificationPreviewMode.FULL -> R.string.notification_preview_full_detail
+        NotificationPreviewMode.NAME_ONLY -> R.string.notification_preview_name_only_detail
+        NotificationPreviewMode.NONE -> R.string.notification_preview_none_detail
+    }
+
+/** One device-wide privacy choice (#3659), including before account setup or notification permission. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun NotificationPreviewControl(
     state: NotificationPreviewControlState,
-    onChange: (Boolean) -> Unit,
+    onChange: (NotificationPreviewMode) -> Unit,
     onRetry: () -> Unit,
 ) {
-    SettingsGroup {
-        row("previews") { context ->
-            SettingsSwitch(
-                context = context,
-                title = stringResource(R.string.notification_show_previews),
-                subtitle = stringResource(R.string.notification_show_previews_detail),
-                explanation = stringResource(R.string.explanation_privacy_notif_previews),
-                checked = state.enabled,
-                busy = state.busy,
-                onCheckedChange = onChange,
-                leading = { SettingsLeadingIcon(R.drawable.ic_visibility) },
-            )
+    val explanation = stringResource(R.string.explanation_privacy_notif_previews)
+    SettingsSection(stringResource(R.string.notification_show_previews))
+    SettingsGroup(modifier = Modifier.selectableGroup().testTag("notification-preview.choices")) {
+        NotificationPreviewMode.entries.forEach { mode ->
+            row(mode.rowKey()) { context ->
+                SettingsChoice(
+                    context = context,
+                    title = stringResource(mode.titleRes()),
+                    subtitle = stringResource(mode.detailRes()),
+                    explanation = explanation,
+                    selected = state.mode == mode,
+                    enabled = !state.busy,
+                    highlightSelected = false,
+                    modifier = Modifier.testTag("notification-preview.${mode.storedValue}"),
+                    onClick = { if (state.mode != mode) onChange(mode) },
+                )
+            }
         }
         if (state.failed) {
             row("retry") { context ->

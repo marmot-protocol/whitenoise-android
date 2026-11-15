@@ -1316,6 +1316,7 @@
     <string name="voice_message_cancel">Sesli mesajı iptal et</string>
     <string name="notification_reacted_to_message">\"%2$s\" iletisine %1$s ile tepki verdi</string>
     <string name="notification_reacted">%1$s ile tepki verdi</string>
+    <string name="notification_reacted_hidden">bir mesaja tepki verdi</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_video_metadata_not_removable">Bu videodan konum gibi özel bilgiler kaldırılamadı, bu yüzden eklenmedi.</string>
     <string name="profile_picture_hint">Herkese açık HTTPS resim URL\'si</string>
@@ -2409,8 +2410,14 @@
     <string name="error_invite_welcome_too_large">Bu davet, bir alıcının gelen kutusu röleleri için çok büyük. Daha büyük mesajları kabul eden bir gelen kutusu rölesi eklemesini isteyin.</string>
     <string name="error_update_too_large">Bu güncelleme röleleriniz için çok büyük. Hiçbir şey değiştirilmedi.</string>
     <string name="error_group_change_too_large">Bir grup değişikliği grubun röleleri için çok büyüktü, bu yüzden yapılmadı.</string>
-    <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
-    <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplara uygulanır.</string>
+    <string name="notification_show_previews">Bildirim önizlemesi</string>
+    <string name="notification_show_previews_detail">Bildirimlerin ne göstereceğini seç. Tüm hesaplara uygulanır.</string>
+    <string name="notification_preview_full">Ad ve mesaj</string>
+    <string name="notification_preview_full_detail">Göndereni ve mesaj metnini gösterir</string>
+    <string name="notification_preview_name_only">Yalnızca ad</string>
+    <string name="notification_preview_name_only_detail">Göndereni gösterir, mesajı gizler</string>
+    <string name="notification_preview_none">Gizli</string>
+    <string name="notification_preview_none_detail">Yalnızca bir şey geldiğini gösterir</string>
     <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
     <string name="profile_readiness_loading">Profil yükleniyor…</string>
     <string name="profile_readiness_unavailable">Profil durumu kullanılamıyor · Düzenlemek için dokunun</string>

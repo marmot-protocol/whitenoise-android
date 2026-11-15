@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "fun NotificationPreviewControl(",
         "test_ids": [
-          "NTF-030"
+          "NTF-030",
+          "NTF-048"
         ]
       }
     ],
@@ -40,11 +41,57 @@
         ]
       },
       {
-        "surface": "string:notification_show_previews_detail",
+        "surface": "string:notification_preview_full",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
-        "anchor": "R.string.notification_show_previews_detail",
+        "anchor": "R.string.notification_preview_full",
         "test_ids": [
-          "NTF-030"
+          "NTF-030",
+          "NTF-048"
+        ]
+      },
+      {
+        "surface": "string:notification_preview_full_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_full_detail",
+        "test_ids": [
+          "NTF-030",
+          "NTF-048"
+        ]
+      },
+      {
+        "surface": "string:notification_preview_name_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_name_only",
+        "test_ids": [
+          "NTF-030",
+          "NTF-048"
+        ]
+      },
+      {
+        "surface": "string:notification_preview_name_only_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_name_only_detail",
+        "test_ids": [
+          "NTF-030",
+          "NTF-048"
+        ]
+      },
+      {
+        "surface": "string:notification_preview_none",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_none",
+        "test_ids": [
+          "NTF-030",
+          "NTF-048"
+        ]
+      },
+      {
+        "surface": "string:notification_preview_none_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_none_detail",
+        "test_ids": [
+          "NTF-030",
+          "NTF-048"
         ]
       }
     ],

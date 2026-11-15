@@ -10,15 +10,39 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
+/** How much a notification may reveal: sender and message, sender only, or neither. */
+internal enum class NotificationPreviewMode(
+    val storedValue: String,
+) {
+    FULL("full"),
+    NAME_ONLY("name_only"),
+    NONE("none"),
+    ;
+
+    val showsNames: Boolean get() = this != NONE
+    val showsMessageText: Boolean get() = this == FULL
+
+    companion object {
+        /** An unknown stored value fails closed. */
+        fun fromStored(value: String): NotificationPreviewMode = entries.firstOrNull { it.storedValue == value } ?: NONE
+    }
+}
+
+/** [allowed] gates names, pictures and shortcuts; [messageText] additionally gates message content. */
 internal data class NotificationPreviewToken(
     val session: String,
     val revision: Long,
     val allowed: Boolean,
+    val messageText: Boolean = allowed,
 )
 
 /** Device presentation only. One transaction covers the choice and cleanup across every presenter. */
 internal object NotificationPreviewPreferences {
     const val KEY = "show_notification_previews"
+    const val MODE_KEY = "notification_preview_mode"
+
+    /** The epoch [MODE_KEY] was written with; older builds advance only the epoch, which voids the saved mode. */
+    private const val MODE_EPOCH_KEY = "notification_preview_mode_epoch"
     private const val EPOCH_KEY = "notification_preview_epoch"
     const val EXTRA_REVISION = "dev.ipf.whitenoise.android.notify.preview_revision"
     const val EXTRA_SESSION = "dev.ipf.whitenoise.android.notify.preview_session"
@@ -44,17 +68,38 @@ internal object NotificationPreviewPreferences {
         }
     }
 
-    /** Missing keeps current presentation; corrupt or failed preferences fail closed. */
-    fun enabled(context: Context): Boolean =
+    /**
+     * Missing keeps current presentation; corrupt or failed preferences fail closed. The older on/off key stays
+     * authoritative for full previews, and a restricted mode counts only if no older build changed the choice since,
+     * so a choice made after a downgrade survives the next upgrade.
+     */
+    fun mode(context: Context): NotificationPreviewMode =
         synchronized(stateLock) {
             bind(context)
-            !blocked && runCatching { preferences(context).getBoolean(KEY, true) }.getOrDefault(false)
+            if (blocked) {
+                NotificationPreviewMode.NONE
+            } else {
+                runCatching {
+                    val preferences = preferences(context)
+                    if (preferences.getBoolean(KEY, true)) {
+                        NotificationPreviewMode.FULL
+                    } else {
+                        preferences
+                            .getString(MODE_KEY, null)
+                            ?.takeIf { preferences.getLong(MODE_EPOCH_KEY, -1L) == preferences.getLong(EPOCH_KEY, 0L) }
+                            ?.let(NotificationPreviewMode::fromStored)
+                            ?.takeIf { it != NotificationPreviewMode.FULL }
+                            ?: NotificationPreviewMode.NONE
+                    }
+                }.getOrDefault(NotificationPreviewMode.NONE)
+            }
         }
 
     fun capture(context: Context): NotificationPreviewToken =
         synchronized(stateLock) {
             bind(context)
-            NotificationPreviewToken(session, revision, enabled(context))
+            val mode = mode(context)
+            NotificationPreviewToken(session, revision, mode.showsNames, mode.showsMessageText)
         }
 
     fun stamp(
@@ -72,10 +117,13 @@ internal object NotificationPreviewPreferences {
         )
     }
 
-    /** Off-main disk commit, then bounded cleanup, without holding either notification mutation lock. */
-    suspend fun setEnabled(
+    /**
+     * Off-main disk commit, then bounded cleanup, without holding either notification mutation lock. Every change
+     * starts a new revision, so cards prepared under the previous mode can no longer authorize their content.
+     */
+    suspend fun setMode(
         context: Context,
-        value: Boolean,
+        mode: NotificationPreviewMode,
         scrub: suspend () -> Boolean = { redactActiveNotificationPreviews(context) },
     ): Boolean =
         writes.withLock {
@@ -85,7 +133,7 @@ internal object NotificationPreviewPreferences {
                         bind(context)
                         revision++
                         blocked = true
-                        revision + if (value) 1L else 0L
+                        revision + if (mode.showsNames) 1L else 0L
                     }
                 }
             val saved =
@@ -93,27 +141,30 @@ internal object NotificationPreviewPreferences {
                     preferences(context)
                         .edit()
                         .apply {
-                            putBoolean(KEY, value)
+                            putString(MODE_KEY, mode.storedValue)
+                            // Older builds read only this key; anything short of full previews stays hidden there.
+                            putBoolean(KEY, mode == NotificationPreviewMode.FULL)
                             putLong(EPOCH_KEY, savedEpoch)
+                            putLong(MODE_EPOCH_KEY, savedEpoch)
                         }.commit()
                 }.getOrDefault(false)
             synchronized(UserEventNotificationGroup.mutationLock) {
                 synchronized(stateLock) {
-                    if (saved && value) revision++
+                    if (saved && mode.showsNames) revision++
                     blocked = !saved
                 }
             }
-            val cleaned = if (!value || !saved) boundedCleanup(scrub) else true
+            val cleaned = if (!mode.showsMessageText || !saved) boundedCleanup(scrub) else true
             saved && cleaned
         }
 
-    /** Recovers process death after a successful opt-out commit but before the old cards were scrubbed. */
+    /** Recovers process death after a successful restrictive commit but before the old cards were scrubbed. */
     suspend fun recover(
         context: Context,
         scrub: suspend () -> Boolean = { redactActiveNotificationPreviews(context) },
     ): Boolean =
         writes.withLock {
-            if (enabled(context)) true else boundedCleanup(scrub)
+            if (mode(context).showsMessageText) true else boundedCleanup(scrub)
         }
 
     private suspend fun boundedCleanup(scrub: suspend () -> Boolean): Boolean =
@@ -132,7 +183,7 @@ internal object NotificationPreviewPreferences {
         current: Notification? = null,
     ): Boolean {
         if (
-            !enabled(context) ||
+            !mode(context).showsNames ||
             notification.extras.getBoolean(EXTRA_HIDDEN) ||
             notification.extras.getBoolean(EXTRA_CONTENT_REDACTED)
         ) {

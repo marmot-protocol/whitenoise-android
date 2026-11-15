@@ -1306,6 +1306,7 @@
     <string name="voice_message_cancel">取消语音消息</string>
     <string name="notification_reacted_to_message">用 %1$s 回应了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回应</string>
+    <string name="notification_reacted_hidden">回应了一条消息</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_video_metadata_not_removable">无法从此视频中移除位置等隐私信息，因此未添加该视频。</string>
     <string name="profile_picture_hint">公开的 HTTPS 图片网址</string>
@@ -2373,8 +2374,14 @@
     <string name="error_invite_welcome_too_large">此邀请过大，收件人的收件箱中继无法接收。请对方添加可接收更大消息的收件箱中继。</string>
     <string name="error_update_too_large">此更新对你的中继来说过大。未做任何更改。</string>
     <string name="error_group_change_too_large">某项群组更改对该群组的中继来说过大，因此未执行。</string>
-    <string name="notification_show_previews">显示通知预览</string>
-    <string name="notification_show_previews_detail">关闭后会隐藏姓名和消息内容。适用于所有账户。</string>
+    <string name="notification_show_previews">通知预览</string>
+    <string name="notification_show_previews_detail">选择通知显示的内容。适用于所有账户。</string>
+    <string name="notification_preview_full">名称和消息</string>
+    <string name="notification_preview_full_detail">显示发件人和消息内容</string>
+    <string name="notification_preview_name_only">仅名称</string>
+    <string name="notification_preview_name_only_detail">显示发件人，隐藏消息</string>
+    <string name="notification_preview_none">隐藏</string>
+    <string name="notification_preview_none_detail">仅显示有新内容</string>
     <string name="notification_preview_update_failed">重新启动后更改可能会丢失。</string>
     <string name="profile_readiness_loading">正在加载个人资料…</string>
     <string name="profile_readiness_unavailable">个人资料状态不可用 · 点按编辑</string>

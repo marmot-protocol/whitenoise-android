@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Hold-to-explain bodies for privacy controls; titles reuse each control's own label. -->
-    <string name="explanation_privacy_notif_previews">Controla si las notificaciones muestran los nombres de los remitentes y el contenido de los mensajes. Si está desactivado, ambos se ocultan. Se aplica a todas las cuentas de este dispositivo y puedes volver a cambiarlo cuando quieras.</string>
+    <string name="explanation_privacy_notif_previews">Controla qué muestran las notificaciones. «Nombre y mensaje» muestra el remitente y el texto. «Solo el nombre» muestra el remitente y la conversación, pero oculta el texto de los mensajes y las reacciones. «Oculto» no muestra ninguno de los dos. Se aplica a todas las cuentas de este dispositivo y puedes volver a cambiarlo cuando quieras.</string>
     <string name="explanation_privacy_notif_preview_retry">Vuelve a intentar guardar tu elección sobre las vistas previas de notificaciones. Hasta que se guarde, el cambio puede perderse al reiniciar la app.</string>
     <string name="explanation_privacy_notif_sounds">Abre las opciones de sonido y vibración de las notificaciones. Aquí puedes escuchar los tonos de White Noise y abrir los ajustes de Android de cada categoría de alerta.</string>
     <string name="explanation_privacy_notif_delivery">Abre el permiso de notificaciones de Android y la política de batería para White Noise. Estos ajustes influyen en si las alertas te llegan cuando la app está en segundo plano.</string>

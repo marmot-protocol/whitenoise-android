@@ -12,6 +12,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@Suppress("LargeClass") // Every notification kind and preview mode shares the same update/content builders.
 class LocalNotificationFormatterTest {
     @Test
     fun redactedContentDropsSenderBodyAndConversationTitle() {
@@ -34,6 +35,36 @@ class LocalNotificationFormatterTest {
         assertNull(redacted.conversationTitle)
         assertEquals(content.notificationTag, redacted.notificationTag)
         assertEquals(content.notificationId, redacted.notificationId)
+    }
+
+    @Test
+    fun nameOnlyContentKeepsNamesAndHidesMessageText() {
+        val message =
+            update(
+                trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                groupName = "Launch",
+                previewText = "Secret launch window",
+                sender = user(displayName = "Alice"),
+            )
+        val nameOnly = LocalNotificationFormatter.nameOnlyContent(message, content(message)!!, context = null)
+        assertEquals("New message", nameOnly.body)
+        assertEquals("Alice", nameOnly.senderName)
+        assertEquals("Launch", nameOnly.conversationTitle)
+
+        val reaction =
+            update(
+                trigger = NotificationTriggerFfi.NEW_MESSAGE,
+                sender = user(displayName = "Alice"),
+                reactionEmoji = "🔥",
+                reactedToPreview = "Secret launch window",
+            )
+        val reactionContent = LocalNotificationFormatter.nameOnlyContent(reaction, content(reaction)!!, context = null)
+        assertEquals("reacted to a message", reactionContent.body)
+        assertNull(reactionContent.reactionArtworkBody)
+
+        val invite = update(trigger = NotificationTriggerFfi.GROUP_INVITE, sender = user(displayName = "Alice"))
+        val inviteContent = content(invite)!!
+        assertEquals(inviteContent, LocalNotificationFormatter.nameOnlyContent(invite, inviteContent, context = null))
     }
 
     @Test

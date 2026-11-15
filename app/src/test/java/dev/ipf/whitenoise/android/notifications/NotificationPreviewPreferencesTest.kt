@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import android.content.SharedPreferences
 import dev.ipf.whitenoise.android.state.NotificationPreviewSettings
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,9 +25,9 @@ class NotificationPreviewPreferencesTest {
         runBlocking {
             val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
             preferences.edit().remove(NotificationPreviewPreferences.KEY).commit()
-            assertTrue(NotificationPreviewPreferences.enabled(context))
+            assertTrue(NotificationPreviewPreferences.mode(context).showsNames)
             assertTrue(NotificationPreviewPreferences.setEnabled(context, false))
-            assertFalse(NotificationPreviewSettings.forContext(context).enabled)
+            assertEquals(NotificationPreviewMode.NONE, NotificationPreviewSettings.forContext(context).mode)
             assertFalse(preferences.getBoolean(NotificationPreviewPreferences.KEY, true))
         }
 
@@ -38,7 +39,7 @@ class NotificationPreviewPreferencesTest {
             .edit()
             .putString(NotificationPreviewPreferences.KEY, "invalid")
             .commit()
-        assertFalse(NotificationPreviewPreferences.enabled(context))
+        assertFalse(NotificationPreviewPreferences.mode(context).showsNames)
     }
 
     /** Failed disk commits hide content in memory and keep the exact choice available for retry. */
@@ -50,15 +51,15 @@ class NotificationPreviewPreferencesTest {
             var fail = true
             val wrapped = interceptCommits { editor -> !fail && editor.commit() }
             val settings = NotificationPreviewSettings.forContext(wrapped, scrub = { true })
-            assertTrue(settings.enabled)
-            settings.setEnabled(false)
-            assertFalse(settings.enabled)
+            assertEquals(NotificationPreviewMode.FULL, settings.mode)
+            settings.setMode(NotificationPreviewMode.NONE)
+            assertEquals(NotificationPreviewMode.NONE, settings.mode)
             assertTrue(settings.failed)
             assertFalse(settings.busy)
             assertTrue(preferences.getBoolean(NotificationPreviewPreferences.KEY, true))
             fail = false
             settings.retry()
-            assertFalse(settings.enabled)
+            assertEquals(NotificationPreviewMode.NONE, settings.mode)
             assertFalse(settings.failed)
             assertFalse(preferences.getBoolean(NotificationPreviewPreferences.KEY, true))
         }
@@ -141,14 +142,104 @@ class NotificationPreviewPreferencesTest {
                     if (fail) error("simulated platform failure")
                     true
                 })
-            settings.setEnabled(false)
-            assertFalse(settings.enabled)
+            settings.setMode(NotificationPreviewMode.NONE)
+            assertEquals(NotificationPreviewMode.NONE, settings.mode)
             assertTrue(settings.failed)
             assertFalse(settings.busy)
             fail = false
             settings.retry()
-            assertFalse(settings.enabled)
+            assertEquals(NotificationPreviewMode.NONE, settings.mode)
             assertFalse(settings.failed)
+        }
+
+    /** Upgrades keep full previews; only a current-epoch saved choice can narrow an opt-out to name-only. */
+    @Test
+    fun legacyKeyMigratesAndNameOnlyPersists() =
+        runBlocking {
+            val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            preferences
+                .edit()
+                .remove(NotificationPreviewPreferences.KEY)
+                .remove(NotificationPreviewPreferences.MODE_KEY)
+                .commit()
+            assertEquals(NotificationPreviewMode.FULL, NotificationPreviewPreferences.mode(context))
+            preferences.edit().putBoolean(NotificationPreviewPreferences.KEY, false).commit()
+            assertEquals(NotificationPreviewMode.NONE, NotificationPreviewPreferences.mode(context))
+            assertTrue(
+                NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, scrub = { true }),
+            )
+            assertEquals(NotificationPreviewMode.NAME_ONLY, NotificationPreviewPreferences.mode(context))
+            assertFalse(preferences.getBoolean(NotificationPreviewPreferences.KEY, true))
+            assertEquals("name_only", preferences.getString(NotificationPreviewPreferences.MODE_KEY, null))
+            val token = NotificationPreviewPreferences.capture(context)
+            assertTrue(token.allowed)
+            assertFalse(token.messageText)
+        }
+
+    /** An older build's later on/off choice wins over a mode it could not read. */
+    @Test
+    fun olderBuildChoiceAfterDowngradeWinsOnUpgrade() =
+        runBlocking {
+            val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            assertTrue(
+                NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, scrub = { true }),
+            )
+            val epochKey = "notification_preview_epoch"
+            val epoch = preferences.getLong(epochKey, 0L)
+            // The older build turned previews on, then off again, advancing only its epoch.
+            preferences
+                .edit()
+                .putBoolean(NotificationPreviewPreferences.KEY, true)
+                .putLong(epochKey, epoch + 1)
+                .commit()
+            assertEquals(NotificationPreviewMode.FULL, NotificationPreviewPreferences.mode(context))
+            preferences
+                .edit()
+                .putBoolean(NotificationPreviewPreferences.KEY, false)
+                .putLong(epochKey, epoch + 2)
+                .commit()
+            assertEquals(NotificationPreviewMode.NONE, NotificationPreviewPreferences.mode(context))
+        }
+
+    /** A value this build does not know never widens what a card may show. */
+    @Test
+    fun unknownStoredModeFailsClosed() =
+        runBlocking {
+            val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            assertTrue(
+                NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, scrub = { true }),
+            )
+            preferences.edit().putString(NotificationPreviewPreferences.MODE_KEY, "future_mode").commit()
+            assertEquals(NotificationPreviewMode.NONE, NotificationPreviewPreferences.mode(context))
+        }
+
+    /** Every mode change voids older cards, and only modes that hide message text scrub the tray. */
+    @Test
+    fun modeChangesInvalidateCardsAndScrubOnlyWhenTextIsHidden() =
+        runBlocking {
+            assertTrue(NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.FULL, scrub = { true }))
+            val builder =
+                androidx.core.app.NotificationCompat
+                    .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+            NotificationPreviewPreferences.stamp(
+                builder,
+                NotificationPreviewPreferences.capture(context),
+                correction = false,
+            )
+            val fullCard = builder.build()
+            assertTrue(NotificationPreviewPreferences.canExpose(context, fullCard))
+            var scrubs = 0
+            val countScrub: suspend () -> Boolean = {
+                scrubs++
+                true
+            }
+            assertTrue(NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, countScrub))
+            assertEquals(1, scrubs)
+            assertFalse(NotificationPreviewPreferences.canExpose(context, fullCard))
+            assertTrue(NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.FULL, countScrub))
+            assertEquals(1, scrubs)
+            assertTrue(NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NONE, countScrub))
+            assertEquals(2, scrubs)
         }
 
     private fun interceptCommits(commit: (SharedPreferences.Editor) -> Boolean): Context =

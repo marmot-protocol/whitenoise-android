@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewMode
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.redactActiveNotificationPreviews
 import kotlinx.coroutines.CoroutineDispatcher
@@ -17,28 +18,29 @@ internal class NotificationPreviewSettings private constructor(
     private val scrub: suspend () -> Boolean,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    var enabled by mutableStateOf(NotificationPreviewPreferences.enabled(context))
+    var mode by mutableStateOf(NotificationPreviewPreferences.mode(context))
         private set
     var busy by mutableStateOf(false)
         private set
     var failed by mutableStateOf(false)
         private set
-    private var requested = enabled
+    private var requested = mode
 
-    /** A failed opt-out stays fail-closed in this process and keeps the same choice available for Retry. */
-    suspend fun setEnabled(value: Boolean) {
+    /** A failed change stays fail-closed in this process and keeps the same choice available for Retry. */
+    suspend fun setMode(value: NotificationPreviewMode) {
         if (!busy) {
             requested = value
-            update { NotificationPreviewPreferences.setEnabled(context, value, scrub) }
+            update { NotificationPreviewPreferences.setMode(context, value, scrub) }
         }
     }
 
-    suspend fun retry() = setEnabled(requested)
+    suspend fun retry() = setMode(requested)
 
-    /** Resume a saved opt-out after process death, before any account is configured. */
+    /** Resume a saved restrictive choice after process death, before any account is configured. */
     suspend fun recover() {
-        if (!busy && !NotificationPreviewPreferences.enabled(context)) {
-            requested = false
+        val saved = NotificationPreviewPreferences.mode(context)
+        if (!busy && !saved.showsMessageText) {
+            requested = saved
             update { NotificationPreviewPreferences.recover(context, scrub) }
         }
     }
@@ -48,7 +50,7 @@ internal class NotificationPreviewSettings private constructor(
         try {
             withContext(NonCancellable) {
                 val result = withContext(ioDispatcher) { operation() }
-                enabled = NotificationPreviewPreferences.enabled(context)
+                mode = NotificationPreviewPreferences.mode(context)
                 failed = !result
             }
         } finally {
