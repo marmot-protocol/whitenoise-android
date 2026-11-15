@@ -537,6 +537,9 @@ internal fun ConversationScreen(
     chat: ChatListItem,
     controller: ConversationController,
     onBack: () -> Unit,
+    // False beside the chat list at expanded width, where system Back must not close the visible
+    // conversation. Its own inner Back steps and the header arrow still apply (#3685).
+    systemBackClosesConversation: Boolean = true,
     // When opened from a chat-list message-body search hit (issue #290), the
     // matched message id to scroll to and briefly highlight once the timeline
     // has paged it in. Null for every normal open path.
@@ -3093,21 +3096,26 @@ internal fun ConversationScreen(
             options = searchControls.options,
             onStateChange = ::updateConversationSearch,
         )
-        BackHandler(enabled = !conversationSearchState.filterSheetOpen) {
+        fun currentBackAction() =
+            conversationBackAction(
+                textSelectionActive = textSelectionMessageId != null,
+                messageSelectionActive = selectionMode,
+                searchOpen = navigationState.searchOpen,
+                composerFocused = composerFocused,
+                imeIsOpen = imeIsOpen,
+                composerDismissInProgress = composerDismissInProgress,
+            )
+
+        BackHandler(
+            enabled =
+                !conversationSearchState.filterSheetOpen &&
+                    (systemBackClosesConversation || currentBackAction() != ConversationBackAction.NAVIGATE_UP),
+        ) {
             scrollCoordinator.cancelForegroundRestoreForUserIntent()
             dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
                 dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.InputReceived,
             )
-            when (
-                conversationBackAction(
-                    textSelectionActive = textSelectionMessageId != null,
-                    messageSelectionActive = selectionMode,
-                    searchOpen = navigationState.searchOpen,
-                    composerFocused = composerFocused,
-                    imeIsOpen = imeIsOpen,
-                    composerDismissInProgress = composerDismissInProgress,
-                )
-            ) {
+            when (currentBackAction()) {
                 ConversationBackAction.CLEAR_TEXT_SELECTION -> clearTextSelection()
                 ConversationBackAction.CLEAR_MESSAGE_SELECTION -> {
                     openActionMenuId = null

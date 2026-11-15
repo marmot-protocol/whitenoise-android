@@ -2206,6 +2206,7 @@
     <string name="startup_loading_message">正在啟動 White Noise…</string>
     <string name="chat_rows_no_chats_title">尚無聊天</string>
     <string name="chat_rows_no_chats_detail">發起新聊天以傳送訊息。</string>
+    <string name="conversation_pane_placeholder">選擇一個聊天</string>
     <string name="chat_rows_no_unread_title">沒有未讀聊天</string>
     <string name="chat_rows_no_unread_detail">所有訊息都已讀。</string>
     <string name="chat_rows_no_results_detail">檢查拼字或嘗試其他搜尋詞。</string>
