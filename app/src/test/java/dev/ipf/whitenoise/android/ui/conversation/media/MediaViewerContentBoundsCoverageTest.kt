@@ -34,9 +34,10 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 /**
- * Invariant gate: the full-screen viewer fits whole unzoomed media and never lays opaque chrome over it. Every
- * image uses its original-source fit rectangle and videos use fit scaling. The frame gives its body the area chrome and
- * the safe area leave free, and a video page reveals and hides the chrome with its native controller.
+ * Invariant gate: the full-screen viewer fits whole unzoomed media in one fixed safe-area rectangle. Every image uses
+ * its original-source fit rectangle and videos use fit scaling. The frame gives its body the safe area whether or not
+ * the chrome shows, so toggling the chrome or a video's controls never moves or resizes the media (#3801), and a video
+ * page shares one visibility state with the chrome.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
@@ -73,50 +74,49 @@ class MediaViewerContentBoundsCoverageTest {
         assertTrue("pending frames must draw", pendingScales.isNotEmpty())
         assertEquals("pending thumbnails must fit", setOf("Fit"), pendingScales.toSet())
 
-        val video = source("MediaVideo.kt")
-        val factory = video.functionBody("viewerPlayerView")
+        val controls = source("VideoViewerControls.kt")
+        val factory = controls.functionBody("viewerPlayerView")
         assertEquals(listOf("RESIZE_MODE_FIT"), Regex("""RESIZE_MODE_\w+""").findAll(factory).map { it.value }.toList())
-        assertTrue("the native controller owns the time bar", "useController = true" in factory)
+        assertTrue("the viewer's own controls replace the native controller", "useController = false" in factory)
         assertTrue(
-            "the viewer page must build its surface through the shared factory",
-            "viewerPlayerView(ctx, exo)" in video.functionBody("VideoViewerPage"),
+            "the viewer surface must build its player through the shared factory",
+            "viewerPlayerView(ctx, player)" in controls.functionBody("VideoViewerSurface"),
+        )
+        assertTrue(
+            "the viewer page must render the shared surface",
+            "VideoViewerSurface(" in source("MediaVideo.kt").functionBody("VideoViewerPage"),
         )
     }
 
-    /** The frame draws its body once, in the slot its measure policy places between the chrome. */
+    /** The frame draws its body once, padded by the same safe-area sides whether or not the chrome shows. */
     @Test
-    fun frameDrawsItsBodyOnlyBetweenTheChrome() {
+    fun frameDrawsItsBodyOnceInAFixedRectangle() {
         val frame = source("MediaViewer.kt").functionBody("MediaViewerFrame")
         assertEquals("the body must have exactly one slot", 1, Regex("""content\s*=\s*body\b""").findAll(frame).count())
-        assertFalse("the body must not be drawn under the chrome", Regex("""\bbody\(\)""").containsMatchIn(frame))
+        assertFalse("the body must not be drawn twice", Regex("""\bbody\(\)""").containsMatchIn(frame))
         assertTrue(
-            "the frame must use the chrome-aware layout",
-            "measurePolicy = mediaViewerChromeMeasurePolicy" in frame,
-        )
-        assertTrue(
-            "the body must avoid the safe area the visible chrome does not already pad",
-            "contentWindowInsets.only(mediaViewerContentInsetSides(chromeShown))" in frame,
+            "the body must pad every safe-area side regardless of the chrome",
+            "contentWindowInsets.only(MEDIA_VIEWER_CONTENT_INSET_SIDES)" in frame,
         )
     }
 
-    /** A current video page drives the chrome from its controller, reported before the player attaches. */
+    /** A current video page shows and hides its controls with the chrome through one visibility state. */
     @Test
-    fun videoPagesRevealAndHideChromeWithTheirController() {
+    fun videoPagesShareVisibilityWithTheChrome() {
         val viewer = source("MediaViewer.kt").functionBody("FullScreenMediaViewer")
         assertTrue(
-            "only the current video page may drive the chrome",
-            "onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible }" in viewer,
+            "only the current video page shows controls, and only with the chrome",
+            "controlsVisible = isCurrent && chromeVisible" in viewer,
         )
-        val factory = source("MediaVideo.kt").functionBody("viewerPlayerView")
-        val listener = factory.indexOf("setControllerVisibilityListener(")
-        val attach = factory.indexOf("this.player = player")
-        assertTrue("the controller listener must be set", listener >= 0)
-        assertTrue("the listener must precede the player so the first reveal is reported", listener in 0 until attach)
+        assertTrue(
+            "only the current video page may drive the chrome",
+            "onControlsVisibleChange = { visible -> if (isCurrent) chromeVisible = visible }" in viewer,
+        )
     }
 
-    /** Visible chrome and a large font never overlap the body, in portrait or landscape, with or without cutouts. */
+    /** The body fills the safe area with the chrome shown or hidden, in either orientation, with or without cutouts. */
     @Test
-    fun bodyStaysBetweenTheChromeAndInsideTheSafeArea() {
+    fun bodyFillsTheSafeAreaWhetherOrNotTheChromeShows() {
         var width by mutableStateOf(360.dp)
         var height by mutableStateOf(780.dp)
         var insets by mutableStateOf(Insets(0.dp, 42.dp, 0.dp, 28.dp))
@@ -135,15 +135,23 @@ class MediaViewerContentBoundsCoverageTest {
             Triple(780.dp, 360.dp, Insets(56.dp, 18.dp, 28.dp, 22.dp)),
             Triple(780.dp, 360.dp, Insets(0.dp, 24.dp, 48.dp, 0.dp)),
         ).forEach { (frameWidth, frameHeight, frameInsets) ->
+            val safeArea = frameInsets.safeArea(frameWidth, frameHeight)
             composeRule.runOnIdle {
                 width = frameWidth
                 height = frameHeight
                 insets = frameInsets
                 chromeVisible = true
             }
-            assertBodyBetweenChrome(frameInsets.safeArea(frameWidth, frameHeight))
+            assertEquals(
+                "the body fills the safe area under visible chrome",
+                safeArea,
+                bounds(MEDIA_VIEWER_CONTENT_TAG),
+            )
+            assertChromePadsTheSystemBars(safeArea)
             composeRule.runOnIdle { chromeVisible = false }
-            assertEquals(frameInsets.safeArea(frameWidth, frameHeight), bounds(MEDIA_VIEWER_CONTENT_TAG))
+            assertEquals("hiding the chrome must not move the body", safeArea, bounds(MEDIA_VIEWER_CONTENT_TAG))
+            composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertDoesNotExist()
+            composeRule.onNodeWithTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG).assertDoesNotExist()
         }
     }
 
@@ -160,10 +168,12 @@ class MediaViewerContentBoundsCoverageTest {
             }
         }
 
+        val safeArea = Rect(0f, TRANSPORT_HEIGHT.value, 360f, 780f - 48f)
         assertEquals(TRANSPORT_HEIGHT.value, bounds(MEDIA_VIEWER_TOP_CHROME_TAG).top)
-        assertBodyBetweenChrome(Rect(0f, TRANSPORT_HEIGHT.value, 360f, 780f - 48f))
+        assertEquals(safeArea, bounds(MEDIA_VIEWER_CONTENT_TAG))
+        assertChromePadsTheSystemBars(safeArea)
         composeRule.runOnIdle { chromeVisible = false }
-        assertEquals(Rect(0f, TRANSPORT_HEIGHT.value, 360f, 780f - 48f), bounds(MEDIA_VIEWER_CONTENT_TAG))
+        assertEquals(safeArea, bounds(MEDIA_VIEWER_CONTENT_TAG))
     }
 
     /** Renders the production frame with a body that fills whatever slot it is given. */
@@ -185,17 +195,17 @@ class MediaViewerContentBoundsCoverageTest {
         ) {}
     }
 
-    /** Asserts the body touches neither bar and stays inside [safeArea]. */
-    private fun assertBodyBetweenChrome(safeArea: Rect) {
-        val body = bounds(MEDIA_VIEWER_CONTENT_TAG)
+    /** Asserts the bars reach past the system bars, with their controls inside the [safeArea]. */
+    private fun assertChromePadsTheSystemBars(safeArea: Rect) {
         val top = bounds(MEDIA_VIEWER_TOP_CHROME_TAG)
         val bottom = bounds(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
-        assertEquals("the body must start where the top chrome ends", top.bottom, body.top)
-        assertEquals("the body must end where the actions begin", bottom.top, body.bottom)
-        assertTrue("the body $body must leave the side cutouts of $safeArea", body.left >= safeArea.left)
-        assertTrue("the body $body must leave the side cutouts of $safeArea", body.right <= safeArea.right)
-        assertTrue("the top chrome must pad the status area", top.bottom > safeArea.top)
-        assertTrue("the actions must pad the navigation area", bottom.top < safeArea.bottom)
+        assertTrue("the top chrome $top must pad the status area of $safeArea", top.bottom > safeArea.top)
+        assertTrue("the actions $bottom must pad the navigation area of $safeArea", bottom.top < safeArea.bottom)
+        assertEquals(
+            "the actions must reserve exactly the clearance video controls avoid",
+            safeArea.bottom - MEDIA_VIEWER_BOTTOM_ACTIONS_HEIGHT.value,
+            bottom.top,
+        )
     }
 
     /** Root-relative bounds of the tagged node, in dp at this mdpi fixture. */

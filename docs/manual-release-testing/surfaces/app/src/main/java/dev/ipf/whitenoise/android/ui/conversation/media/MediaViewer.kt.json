@@ -126,11 +126,12 @@
         ]
       },
       {
-        "surface": "Video pages reveal and hide viewer chrome with their controller",
+        "surface": "Video pages show and hide viewer chrome with their controls",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "onControllerVisibilityChange =",
+        "anchor": "onControlsVisibleChange = { visible -> if (isCurrent) chromeVisible = visible }",
         "test_ids": [
-          "MED-033"
+          "MED-033",
+          "MED-051"
         ]
       },
       {

@@ -2,11 +2,11 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.MultiContentMeasurePolicy
-import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.dp
 
 internal const val MEDIA_VIEWER_TOP_CHROME_TAG = "conversation.media.viewer.topChrome"
 internal const val MEDIA_VIEWER_BOTTOM_CHROME_TAG = "conversation.media.viewer.bottomChrome"
@@ -28,44 +28,24 @@ internal fun Modifier.viewerTapGestureModifier(
 
 /**
  * Keeps an image-session choice across images while ensuring video controls cannot be stranded. A video page
- * always opens with its chrome, then follows its native controller: both reveal and hide together.
+ * always opens with its chrome, then its playback controls and the chrome reveal and hide together.
  */
 internal fun mediaViewerChromeVisibilityAfterPageChange(
     currentlyVisible: Boolean,
     pageIsVideo: Boolean,
 ): Boolean = currentlyVisible || pageIsVideo
 
-/**
- * Safe-area sides the media body pads itself away from. Visible bars already pad the top and bottom insets, so
- * the body only avoids side cutouts, while hidden chrome leaves the body to avoid every system bar and cutout.
- */
-internal fun mediaViewerContentInsetSides(chromeVisible: Boolean): WindowInsetsSides =
-    if (chromeVisible) {
-        WindowInsetsSides.Horizontal
-    } else {
-        WindowInsetsSides.Horizontal + WindowInsetsSides.Vertical
-    }
+/** Safe-area sides the media body always pads itself away from, whether or not the chrome shows (#3801). */
+internal val MEDIA_VIEWER_CONTENT_INSET_SIDES = WindowInsetsSides.Horizontal + WindowInsetsSides.Vertical
+
+/** One short fade for the chrome and the video controls, so a toggle never flickers. */
+internal const val MEDIA_VIEWER_CHROME_FADE_MILLIS = 200
+
+/** Height of the bottom action row above the bottom safe inset: 48 dp buttons and 8 dp above and below. */
+internal val MEDIA_VIEWER_BOTTOM_ACTIONS_HEIGHT = 64.dp
 
 /**
- * Lays out the viewer's three slots — top chrome, media body and bottom chrome — so the body receives only the
- * rectangle between whichever bars are present. Opaque chrome can then never cover the unzoomed media frame or a
- * player's own time bar, and hidden chrome hands its space back to the media. Each chrome slot emits at most one
- * bar, the body is placed first so the bars draw over anything it overdraws, and the frame is always bounded.
+ * How far the bottom actions overlap the bottom of the media body when they show. Video controls pad themselves by
+ * this much so the seek bar sits just above the actions instead of under them.
  */
-internal val mediaViewerChromeMeasurePolicy =
-    MultiContentMeasurePolicy { (topBars, bodies, bottomBars), constraints ->
-        val width = constraints.maxWidth
-        val height = constraints.maxHeight
-        val barConstraints = Constraints(minWidth = width, maxWidth = width, maxHeight = height)
-        val top = topBars.map { it.measure(barConstraints) }
-        val bottom = bottomBars.map { it.measure(barConstraints) }
-        val topHeight = top.maxOfOrNull { it.height } ?: 0
-        val bottomHeight = bottom.maxOfOrNull { it.height } ?: 0
-        val bodyHeight = (height - topHeight - bottomHeight).coerceAtLeast(0)
-        val body = bodies.map { it.measure(Constraints.fixed(width, bodyHeight)) }
-        layout(width, height) {
-            body.forEach { it.place(0, topHeight) }
-            top.forEach { it.place(0, 0) }
-            bottom.forEach { it.place(0, height - it.height) }
-        }
-    }
+internal val LocalMediaViewerBottomActionsClearance = staticCompositionLocalOf { 0.dp }

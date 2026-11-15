@@ -89,8 +89,13 @@ class VideoPlaybackCoordinationCoverageTest {
             "exo.removeListener(pauseListener)" in observer.substringAfter("onDispose"),
         )
         assertTrue(
+            "the viewer surface must receive the replacement player",
+            "player = exo" in body.substringAfter("VideoViewerSurface("),
+        )
+        val surface = mainSource("ui/conversation/media/VideoViewerControls.kt").functionBody("VideoViewerSurface")
+        assertTrue(
             "the retained view must follow the replacement player",
-            "playerView.player = exo" in body.substringAfter("update ="),
+            "playerView.player = player" in surface.substringAfter("update ="),
         )
         assertFalse(
             "returning to foreground must not play",
