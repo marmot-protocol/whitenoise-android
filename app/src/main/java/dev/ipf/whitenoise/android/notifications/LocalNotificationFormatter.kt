@@ -205,8 +205,10 @@ object LocalNotificationFormatter {
     /**
      * The notification sub-text naming which signed-in identity received the
      * event, or null. Shown only when more than one signed-in identity is
-     * relevant to this conversation; unrelated local accounts do not make the
-     * event ambiguous. Blank labels are dropped.
+     * relevant, and blank labels are dropped. For a group invite every
+     * signed-in account counts, since the receiving account is usually the
+     * group's only local member. For other events unrelated local accounts do
+     * not make the event ambiguous.
      */
     fun recipientAccountSubtext(
         relevantSignedInAccountCount: Int,

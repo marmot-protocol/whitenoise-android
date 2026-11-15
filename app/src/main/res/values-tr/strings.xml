@@ -275,6 +275,7 @@
     <string name="discard_failed_message">Başarısız mesajı sil</string>
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
+    <string name="invited_as_account">Davet edilen hesap: %1$s</string>
     <string name="invited_to_chat_by">%1$s sohbete davet etti</string>
     <string name="someone">Birisi</string>
     <string name="invitation_pending">Davet bekliyor</string>

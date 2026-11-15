@@ -730,15 +730,20 @@ class LocalNotificationPresenterConversationTest {
             presenter.show(
                 invite,
                 senderNameOverride = "npub1alice",
+                recipientAccountSubtext = "Work",
                 shortNpub = { "npub1alice" },
             )
         }
         assertTrue(presenter.isGroupInviteNotificationActive(invite))
+        val initial = manager.activeNotifications.single().notification
+        assertEquals("Work", initial.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
+        assertNull(initial.getLargeIcon())
 
         runBlocking {
             presenter.show(
                 invite,
                 senderNameOverride = "Alice",
+                recipientAccountSubtext = "Work",
                 silentUpdate = true,
                 shortNpub = { "npub1alice" },
             )
@@ -746,6 +751,8 @@ class LocalNotificationPresenterConversationTest {
 
         val active = manager.activeNotifications.single()
         assertEquals(invite.notificationKey, active.tag)
+        assertEquals("Work", active.notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
+        assertNull(active.notification.getLargeIcon())
         assertTrue(active.notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         assertTrue(
             active.notification.extras
