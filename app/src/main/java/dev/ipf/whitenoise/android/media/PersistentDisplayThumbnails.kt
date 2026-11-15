@@ -4,6 +4,8 @@ package dev.ipf.whitenoise.android.media
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -17,6 +19,7 @@ internal data class DisplayThumbnailSource(
     val attachmentKey: String,
     val sourceEpoch: ULong,
     val ciphertextTag: String,
+    val sourceMessageIdHex: String? = null,
 )
 
 /** A source-scoped publication fence retained only while a reader or encoder owns it. */
@@ -39,7 +42,11 @@ internal class DisplayThumbnailToken internal constructor(
  */
 internal class PersistentDisplayThumbnails(
     private val disk: DiskByteCache,
+    private val decodePixels: (ByteArray, Int, Int) -> Bitmap? = { bytes, offset, length ->
+        BitmapFactory.decodeByteArray(bytes, offset, length)
+    },
 ) {
+    private val removalsCompleted = MutableStateFlow(0L)
     private val generation = AtomicLong()
     private val invalidations = AtomicInteger()
     private val requestLock = Any()
@@ -47,6 +54,7 @@ internal class PersistentDisplayThumbnails(
     private val sourceRevisions = mutableMapOf<DisplayThumbnailSource, WeakReference<AtomicLong>>()
     private val removingKeys = mutableMapOf<String, Int>()
     private val removingTags = mutableMapOf<String, Int>()
+    private val removingMessages = mutableMapOf<String, Int>()
 
     /** Captures before an original read; weak revision cells disappear after their last request is released. */
     fun captureGeneration(source: DisplayThumbnailSource): DisplayThumbnailToken =
@@ -63,6 +71,7 @@ internal class PersistentDisplayThumbnails(
                 revision.get(),
                 invalidations.get() == 0 &&
                     source.attachmentKey !in removingKeys &&
+                    removingMessages.keys.none { source.attachmentKey.startsWith(it, ignoreCase = true) } &&
                     source.ciphertextTag !in removingTags,
             )
         }
@@ -82,8 +91,50 @@ internal class PersistentDisplayThumbnails(
     fun isCurrent(token: DisplayThumbnailToken): Boolean =
         token.admitted && invalidations.get() == 0 && token.lifetime == generation.get() && token.sourceCurrent()
 
+    /** Suspends a retired loader until matching cleanup permits a new request, without polling native state. */
+    suspend fun awaitRemovals(source: DisplayThumbnailSource) {
+        removalsCompleted.first { captureGeneration(source).admitted }
+    }
+
     /** Hydrates the authenticated disk index off main. */
-    fun prepare() = disk.prepare()
+    fun prepare() {
+        disk.prepare()
+        storedSources()
+    }
+
+    /** Enumerates only encrypted, authenticated source identities; legacy or malformed derivatives are discarded. */
+    fun storedSources(): Set<DisplayThumbnailSource> {
+        val sources = mutableSetOf<DisplayThumbnailSource>()
+        disk.forEachStoredEntry { slot, bytes ->
+            val header = runCatching { header(bytes) }.getOrNull()
+            if (header == null) disk.discardStoredEntryIfMatches(slot, bytes) else sources += header.source
+        }
+        return sources
+    }
+
+    /** Removes every size/index of a deleted message while fencing writers that have yet to publish a slot. */
+    fun removeMessage(attachmentKeyPrefix: String) =
+        invalidate(messagePrefix = attachmentKeyPrefix) {
+            storedSources()
+                .filter { it.attachmentKey.startsWith(attachmentKeyPrefix, ignoreCase = true) }
+                .forEach { source -> thumbnailDecodeBuckets.forEach { disk.remove(slot(source, it)) } }
+        }
+
+    /** Authenticates source and bounds without allocating another decoded bitmap. */
+    fun hasMatching(
+        source: DisplayThumbnailSource,
+        requestedEdge: Int,
+        token: DisplayThumbnailToken,
+    ): Boolean {
+        if (token.source != source || !isCurrent(token)) return false
+        return thumbnailDecodeBuckets.filter { it >= requestedEdge }.any { edge ->
+            val header = disk.get(slot(source, edge))?.let { runCatching { header(it) }.getOrNull() }
+            header != null &&
+                header.source.copy(sourceMessageIdHex = source.sourceMessageIdHex) == source &&
+                header.edge == edge &&
+                isCurrent(token)
+        }
+    }
 
     /** Includes the encrypted envelopes in Manage Storage's temporary-copy accounting. */
     fun residentBytes(): Long = disk.residentBytes()
@@ -97,10 +148,13 @@ internal class PersistentDisplayThumbnails(
     ): MediaThumbnail? {
         if (token.source != source || !isCurrent(token) || source.ciphertextTag.isBlank()) return null
         for (edge in thumbnailDecodeBuckets.filter { it >= requestedEdge }) {
-            val entry =
-                disk.get(slot(source, edge))?.let { bytes ->
-                    runCatching { decode(bytes, source, edge) }.getOrNull()
-                } ?: continue
+            val key = slot(source, edge)
+            val bytes = disk.get(key) ?: continue
+            val entry = runCatching { decode(bytes, source, edge) }.getOrNull()
+            if (entry == null) {
+                synchronized(publicationLock) { disk.discardIfMatches(key, bytes) }
+                continue
+            }
             if (isCurrent(token)) return entry
             entry.bitmap.recycle()
             return null
@@ -113,11 +167,12 @@ internal class PersistentDisplayThumbnails(
      * queuing retained bitmaps. Invalidation and publication share the lock, so even an absent slot cannot be
      * resurrected by a decode that started before removal. Displayed/shared bitmaps are never recycled here.
      */
-    @Suppress("ReturnCount") // Reject ineligible pixels before encoding or publication.
+    @Suppress("ReturnCount", "LongParameterList") // Source descriptor and independent publication lifetime fences.
     fun write(
         source: DisplayThumbnailSource,
         entry: MediaThumbnail,
         token: DisplayThumbnailToken,
+        sourceMessageIdHex: String? = source.sourceMessageIdHex,
         canPublish: () -> Boolean = { true },
     ) {
         if (token.source != source || !isCurrent(token) || source.ciphertextTag.isBlank()) return
@@ -128,7 +183,7 @@ internal class PersistentDisplayThumbnails(
         ) {
             return
         }
-        val bytes = encode(source, entry) ?: return
+        val bytes = encode(source, entry, sourceMessageIdHex) ?: return
         synchronized(publicationLock) {
             if (isCurrent(token) && canPublish()) {
                 val key = slot(source, entry.maxEdgePx)
@@ -156,11 +211,14 @@ internal class PersistentDisplayThumbnails(
     private fun invalidate(
         attachmentKey: String? = null,
         tags: Set<String> = emptySet(),
+        messagePrefix: String? = null,
         block: () -> Unit,
     ) {
-        val global = attachmentKey == null && tags.isEmpty()
+        val global = attachmentKey == null && tags.isEmpty() && messagePrefix == null
         val matches: (DisplayThumbnailSource) -> Boolean = {
-            it.attachmentKey == attachmentKey || it.ciphertextTag in tags
+            it.attachmentKey == attachmentKey ||
+                it.ciphertextTag in tags ||
+                (messagePrefix != null && it.attachmentKey.startsWith(messagePrefix, ignoreCase = true))
         }
         synchronized(requestLock) {
             if (global) {
@@ -168,6 +226,7 @@ internal class PersistentDisplayThumbnails(
                 generation.incrementAndGet()
             } else {
                 attachmentKey?.let { removingKeys[it] = removingKeys.getOrDefault(it, 0) + 1 }
+                messagePrefix?.let { removingMessages[it] = removingMessages.getOrDefault(it, 0) + 1 }
                 tags.forEach { removingTags[it] = removingTags.getOrDefault(it, 0) + 1 }
                 retireSources(matches)
             }
@@ -182,8 +241,10 @@ internal class PersistentDisplayThumbnails(
                 } else {
                     retireSources(matches)
                     attachmentKey?.let { endRemoval(removingKeys, it) }
+                    messagePrefix?.let { endRemoval(removingMessages, it) }
                     tags.forEach { endRemoval(removingTags, it) }
                 }
+                removalsCompleted.value += 1L
             }
         }
     }
@@ -222,10 +283,13 @@ internal class PersistentDisplayThumbnails(
     private fun encode(
         source: DisplayThumbnailSource,
         entry: MediaThumbnail,
+        sourceMessageIdHex: String?,
     ): ByteArray? {
         val output = ByteArrayOutputStream()
         DataOutputStream(output).apply {
             writeInt(MAGIC)
+            writeUTF(source.attachmentKey)
+            writeUTF(sourceMessageIdHex.orEmpty())
             writeLong(source.sourceEpoch.toLong())
             writeUTF(source.ciphertextTag)
             writeInt(entry.maxEdgePx)
@@ -237,29 +301,52 @@ internal class PersistentDisplayThumbnails(
         return output.toByteArray().takeIf { it.size <= MAX_ENTRY_BYTES }
     }
 
-    /** Validates authenticated provenance and dimensions before allocating a bounded output bitmap. */
-    @Suppress("ReturnCount") // Validate each authenticated field before allocating pixels.
-    private fun decode(bytes: ByteArray, source: DisplayThumbnailSource, edge: Int): MediaThumbnail? {
+    private data class Header(
+        val source: DisplayThumbnailSource,
+        val edge: Int,
+        val offset: Int,
+        val length: Int,
+    )
+
+    /** Parses authenticated provenance and verified codec dimensions without allocating pixel storage. */
+    @Suppress("ReturnCount")
+    private fun header(bytes: ByteArray): Header? {
         val input = ByteArrayInputStream(bytes)
-        val header = DataInputStream(input)
-        if (header.readInt() != MAGIC || header.readLong().toULong() != source.sourceEpoch) return null
-        if (header.readUTF() != source.ciphertextTag || header.readInt() != edge) return null
-        val width = header.readInt()
-        val height = header.readInt()
-        if (width !in 1..edge || height !in 1..edge) return null
+        val fields = DataInputStream(input)
+        if (fields.readInt() != MAGIC) return null
+        val key = fields.readUTF()
+        val sourceId = fields.readUTF().ifEmpty { null }
+        val source = DisplayThumbnailSource(key, fields.readLong().toULong(), fields.readUTF(), sourceId)
+        val edge = fields.readInt()
+        val width = fields.readInt()
+        val height = fields.readInt()
+        if (edge !in thumbnailDecodeBuckets || width !in 1..edge || height !in 1..edge) return null
         val offset = bytes.size - input.available()
         val length = input.available()
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, offset, length, bounds)
         if (bounds.outWidth != width || bounds.outHeight != height) return null
-        val bitmap = BitmapFactory.decodeByteArray(bytes, offset, length) ?: return null
+        return Header(source, edge, offset, length)
+    }
+
+    /** Allocates pixels only after authenticating source identity and the requested decode ceiling. */
+    private fun decode(
+        bytes: ByteArray,
+        source: DisplayThumbnailSource,
+        edge: Int,
+    ): MediaThumbnail? {
+        val header =
+            header(bytes)?.takeIf {
+                it.source.copy(sourceMessageIdHex = source.sourceMessageIdHex) == source && it.edge == edge
+            } ?: return null
+        val bitmap = decodePixels(bytes, header.offset, header.length) ?: return null
         return MediaThumbnail(bitmap, edge)
     }
 
     companion object {
         const val MAX_BYTES = 32L * 1024 * 1024
         const val MAX_ENTRY_BYTES = 8 * 1024 * 1024
-        private const val MAGIC = 0x574e5401
+        private const val MAGIC = 0x574e5402
         private const val QUALITY = 85
     }
 }

@@ -6,8 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.unit.IntSize
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
@@ -43,6 +45,7 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -60,7 +63,7 @@ class MediaDisplayThumbnailPersistenceTest {
     /** Keeps MDK's idle retention feed readable while using the real host cache and bubble. */
     @Before
     fun setUp() {
-        fixture = MediaDownloadIntegrationFixture(retainIdleNativeFeeds = true)
+        fixture = MediaDownloadIntegrationFixture()
         controller =
             ConversationController(
                 appState = fixture.state,
@@ -71,6 +74,25 @@ class MediaDisplayThumbnailPersistenceTest {
     /** Releases this fixture's transfers and private cached bytes. */
     @After
     fun tearDown() = fixture.close()
+
+    /** A non-active account reuses its existing L1 pixels before any native metadata or original read. */
+    @Test
+    fun nonActiveAccountUsesItsMemoryThumbnailOnTheFirstFrame() {
+        controller =
+            ConversationController(
+                appState = fixture.state,
+                initialGroup = conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
+                accountRefOverride = MediaDownloadIntegrationFixture.ACCOUNT,
+            )
+        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
+        fixture.activateAccount("another-synthetic-account")
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        composeRule.onNodeWithContentDescription(reference(0).fileName).assertIsDisplayed()
+        assertEquals(0, fixture.nativeAssetReads.get())
+        assertEquals(0, fixture.calls.size)
+        composeRule.mainClock.autoAdvance = true
+    }
 
     /** A still-visible L1 image waits for an occupied encoder and persists when that encoder becomes free. */
     @Test
@@ -123,7 +145,7 @@ class MediaDisplayThumbnailPersistenceTest {
 
     /** Cleanup retires the previous oversized-source affordance before offering a fresh download. */
     @Test
-    fun nativeCleanupClearsTheOversizedPreviewState() {
+    fun aNewDownloadClearsTheOversizedStateForACleanedOriginal() {
         fixture.retainNatively(0, imageBytes())
         fixture.nativeAssetDeclaredBytes = Long.MAX_VALUE.toULong()
         var loadState: ImageLoadState? = null
@@ -137,11 +159,13 @@ class MediaDisplayThumbnailPersistenceTest {
             composeRule.waitForIdle()
             loadState?.tooLargeToPreview == true
         }
-        composeRule.runOnIdle { fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING) }
+        composeRule.runOnIdle {
+            fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
+            armOriginalDownload()
+        }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()
-            loadState?.transfer?.progress?.phase == AttachmentTransferStateFfi.CLEANED_BY_SETTING &&
-                loadState?.tooLargeToPreview == false
+            loadState?.tooLargeToPreview == false
         }
         assertEquals(0, fixture.calls.size)
         assertEquals(0, fixture.nativeAssetReads.get())
@@ -162,38 +186,26 @@ class MediaDisplayThumbnailPersistenceTest {
         assertEquals(0, fixture.nativeAssetReads.get())
     }
 
-    /** Leaving while original eviction is non-cancellable cannot restore a reader's revoked download. */
+    /** A revoked metadata-read owner cannot restore durable demand after its native call returns. */
     @Test
-    fun cancelledCleanupCannotReenqueueTheOriginalDownload() {
+    fun cancelledMetadataCheckCannotReenqueueTheOriginalDownload() {
         fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
         val transfer = armOriginalDownload()
-        var shown by mutableStateOf(true)
-        var loadState: ImageLoadState? = null
-        composeRule.setContent { WhiteNoiseTheme { if (shown) loadState = ObserveLoad() } }
-        // Hold layout admission until the persisted reader intent has reached the mounted loader.
-        composeRule.waitUntil(10_000) {
-            composeRule.waitForIdle()
-            loadState?.startDownload == true
-        }
-        fixture.disk.put(request(0).cacheKey(), imageBytes())
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
-        val cleanupOwners = ConcurrentHashMap.newKeySet<Job>()
-        fixture.onNativeSnapshot = { cleanupOwners += effectJobs.currentMainOwner() }
-        fixture.onBeforeOriginalRemoval = {
+        val owners = ConcurrentHashMap.newKeySet<Job>()
+        fixture.onNativeSnapshot = {
+            owners += effectJobs.currentMainOwner()
             entered.countDown()
-            check(release.await(10, TimeUnit.SECONDS)) { "Synthetic original removal was not released" }
+            check(release.await(10, TimeUnit.SECONDS))
         }
+        var shown by mutableStateOf(true)
         try {
-            composeRule.runOnIdle { checkNotNull(loadState).decodeRequest.onSizeChanged(IntSize(128, 128)) }
-            composeRule.waitUntil(10_000) {
-                composeRule.waitForIdle()
-                entered.count == 0L
-            }
-            assertTrue(cleanupOwners.isNotEmpty())
+            composeRule.setContent { WhiteNoiseTheme { if (shown) ObserveLoad() } }
+            composeRule.waitUntil(10_000) { entered.count == 0L }
             composeRule.runOnIdle {
-                val openRequest = checkNotNull(fixture.state.attachmentOpens.openRequest(transfer))
-                fixture.state.attachmentOpens.cancelOpen(openRequest)
+                val request = checkNotNull(fixture.state.attachmentOpens.openRequest(transfer))
+                fixture.state.attachmentOpens.cancelOpen(request)
                 fixture.state.clearInteractiveAttachmentDownloadIntent(transfer)
                 shown = false
             }
@@ -201,16 +213,43 @@ class MediaDisplayThumbnailPersistenceTest {
             release.countDown()
             composeRule.waitUntil(10_000) {
                 composeRule.waitForIdle()
-                cleanupOwners.all { it.isCompleted }
+                owners.all { it.isCompleted }
             }
-            composeRule.runOnIdle {
-                assertTrue(!controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
-                assertTrue(!fixture.state.hasInteractive(transfer))
-            }
+            assertTrue(!fixture.state.hasInteractive(transfer))
             assertEquals(0, fixture.calls.size)
         } finally {
             release.countDown()
         }
+    }
+
+    /** Re-arming an intent after availability changes cannot cancel its already-running visual producer. */
+    @Test
+    fun durableAvailabilityDoesNotRestartAnInFlightOriginalLoad() {
+        val transfer = armOriginalDownload()
+        var state: ImageLoadState? = null
+        composeRule.setContent { WhiteNoiseTheme { state = ObserveLoad() } }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            state?.startDownload == true && state?.downloadActionReady == true && fixture.state.hasInteractive(transfer)
+        }
+        val producer = AtomicReference<Job>()
+        fixture.onNativeSnapshot = { producer.compareAndSet(null, effectJobs.currentMainOwner()) }
+        composeRule.runOnIdle { checkNotNull(state).decodeRequest.onSizeChanged(IntSize(128, 128)) }
+        composeRule.waitUntil(10_000) { fixture.calls.size == 1 && producer.get() != null }
+        composeRule.runOnIdle { fixture.state.cacheMediaPlaintext(request(0).cacheKey(), imageBytes()) }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
+        }
+        composeRule.runOnIdle {
+            assertTrue(checkNotNull(producer.get()).isActive)
+            fixture.calls.single().succeed(imageBytes())
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            state?.presentation != null
+        }
+        assertEquals(1, fixture.calls.size)
     }
 
     /** Preserves foreground demand while modeling scheduler registration that must be restored by the loader. */

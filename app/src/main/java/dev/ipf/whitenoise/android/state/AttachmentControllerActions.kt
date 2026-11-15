@@ -81,12 +81,11 @@ internal fun ConversationController.attachmentRetryPending(
 internal fun ConversationController.attachmentNativeProgress(
     messageIdHex: String,
     attachmentIndex: Int,
-    observeRetention: Boolean = false,
 ): Flow<NativeAttachmentProgress?> {
     val request =
         attachmentTransferRequest(messageIdHex, attachmentIndex)
             ?.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)) ?: return emptyFlow()
-    return appState.nativeProgress(request, observeRetention).onEach { progress ->
+    return appState.nativeProgress(request).onEach { progress ->
         if (progress?.phase == dev.ipf.marmotkit.AttachmentTransferStateFfi.READY) {
             refreshAttachmentTransferState(messageIdHex, attachmentIndex)
         }

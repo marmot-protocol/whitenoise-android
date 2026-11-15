@@ -52,6 +52,7 @@ internal fun ConversationController.displayThumbnailRequest(
             mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex),
             reference.sourceEpoch,
             reference.ciphertextSha256,
+            nativeAttachmentSourceId(messageIdHex),
         )
     return DisplayThumbnailRequest(
         source,
@@ -105,15 +106,22 @@ internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
         if (!displayThumbnailRequestCurrent(request)) return@withPermit
         withContext(Dispatchers.IO) {
             runCatchingCancellable {
-                val existing = displayThumbnails.read(request.source, maxEdgePx, request.generation)
-                if (existing != null) {
-                    existing.bitmap.recycle()
+                if (displayThumbnails.hasMatching(request.source, maxEdgePx, request.generation)) {
                     return@runCatchingCancellable
                 }
+                val transfer = request.source.transferRequest() ?: return@runCatchingCancellable
+                val target = resolveNativeAttachmentTarget(transfer) ?: return@runCatchingCancellable
+                val phase = nativeAttachmentState(transfer.copy(sourceMessageIdHex = target.sourceMessageIdHex))
+                if (phase == null || phase in REMOVED_DISPLAY_THUMBNAIL_SOURCES) return@runCatchingCancellable
                 val bitmap = pixels.get()?.takeUnless { it.isRecycled } ?: return@runCatchingCancellable
                 recordDisplayThumbnailEvent(DisplayThumbnailEvent.WRITE_ATTEMPT)
                 displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.write") {
-                    displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation) {
+                    displayThumbnails.write(
+                        request.source,
+                        MediaThumbnail(bitmap, maxEdgePx),
+                        request.generation,
+                        sourceMessageIdHex = target.sourceMessageIdHex,
+                    ) {
                         owner.isActive
                     }
                 }

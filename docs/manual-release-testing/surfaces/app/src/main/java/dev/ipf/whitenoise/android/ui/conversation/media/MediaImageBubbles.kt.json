@@ -119,9 +119,9 @@
         ]
       },
       {
-        "surface": "Native retention revokes visible display thumbnails",
+        "surface": "Persistent image fallback validates native retention",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
-        "anchor": "val nativeRemoved =",
+        "anchor": "val nativeState = controller.displayAttachmentNativeState(",
         "test_ids": [
           "MED-023"
         ]

@@ -20,8 +20,6 @@ private const val NATIVE_ATTACHMENT_TARGET_LIMIT = 64
 private val nativeAttachmentLeaseCounter = AtomicLong()
 private val preparedNativeAttachmentRoots = mutableSetOf<String>()
 
-private val attachmentMaterializationTracer = MarmotBridgeTracer()
-
 /** Exact native identity for an attachment displayed in a projected timeline row. */
 internal data class NativeAttachmentTarget(
     val displayMessageIdHex: String,
@@ -164,16 +162,14 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachment(
             marmotIo { attachmentLocalAssets(request.accountRef, request.groupIdHex, targets) }
         },
         readAsset = { reference, offset, limit ->
-            marmotIo("WhiteNoise.attachment.original.chunk") {
+            marmotIo {
                 recordDisplayThumbnailEvent(DisplayThumbnailEvent.ORIGINAL_CHUNK)
                 readAttachmentAsset(request.accountRef, reference, offset, limit)
             }
         },
     ).let { access ->
-        attachmentMaterializationTracer.trace("WhiteNoise.attachment.original.materialize") {
-            recordDisplayThumbnailEvent(DisplayThumbnailEvent.ORIGINAL_MATERIALIZE)
-            access.open(listOf(target), maxBytes).single()
-        }
+        recordDisplayThumbnailEvent(DisplayThumbnailEvent.ORIGINAL_MATERIALIZE)
+        access.open(listOf(target), maxBytes).single()
     }
 }
 

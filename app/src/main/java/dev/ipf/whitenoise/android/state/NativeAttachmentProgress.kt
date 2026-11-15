@@ -54,13 +54,10 @@ internal class NativeAttachmentProgressReducer {
     }
 }
 
-/** Observes presentation without acquisition; [observeRetention] keeps native cleanup visible even with HOST copies. */
-internal fun WhiteNoiseAppState.nativeProgress(
-    request: AttachmentTransferRequest,
-    observeRetention: Boolean = false,
-): Flow<NativeAttachmentProgress?> =
+/** Observes presentation without requesting, restarting or cancelling acquisition. */
+internal fun WhiteNoiseAppState.nativeProgress(request: AttachmentTransferRequest): Flow<NativeAttachmentProgress?> =
     nativeAttachmentProgressFlow {
-        if (!observeRetention && hasHostCachedAttachmentAfterHydration(request)) {
+        if (hasHostCachedAttachmentAfterHydration(request)) {
             null
         } else {
             resolveNativeAttachmentTarget(request)?.let { openNativeAttachmentFeed(request, it) }

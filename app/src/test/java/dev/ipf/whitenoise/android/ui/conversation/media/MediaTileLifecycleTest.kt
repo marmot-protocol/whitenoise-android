@@ -151,9 +151,9 @@ class MediaTileLifecycleTest {
         assertEquals(0, fixture.calls.size)
     }
 
-    /** Confirmed cached pixels wait for fresh MDK retention after recreation, then return without a transfer. */
+    /** Decoded memory pixels survive recreation before another rendered frame or native lookup. */
     @Test
-    fun recreatedPixelsWaitForFreshRetentionMetadata() {
+    fun decodedPixelsAreOnTheFirstFrameAfterRecreation() {
         show()
         awaitTilesShown()
         composeRule.mainClock.autoAdvance = false
@@ -161,7 +161,7 @@ class MediaTileLifecycleTest {
         scenario.recreate()
         show()
 
-        composeRule.onNodeWithContentDescription(reference(0).fileName).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(reference(0).fileName).assertIsDisplayed()
         composeRule.mainClock.autoAdvance = true
         awaitTilesShown()
         assertEquals(0, fixture.calls.size)

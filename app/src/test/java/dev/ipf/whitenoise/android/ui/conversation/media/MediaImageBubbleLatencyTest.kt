@@ -81,7 +81,7 @@ class MediaImageBubbleLatencyTest {
     /** Uses the real controller with only its native download boundary replaced. */
     @Before
     fun setUp() {
-        fixture = MediaDownloadIntegrationFixture(retainIdleNativeFeeds = true)
+        fixture = MediaDownloadIntegrationFixture()
         controller =
             ConversationController(
                 appState = fixture.state,
@@ -97,15 +97,15 @@ class MediaImageBubbleLatencyTest {
         fixture.close()
     }
 
-    /** Confirmed L1 pixels wait for a fresh native retention answer before their first displayed frame. */
+    /** A confirmed L1 image paints before follow-up layout, IO, or native work. */
     @Test
-    fun decodedThumbnailWaitsForNativeRetentionBeforeDisplay() {
+    fun decodedThumbnailIsVisibleBeforeAnyFollowUpFrame() {
         val bitmap = Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
         composeRule.mainClock.autoAdvance = false
         controller.cacheThumbnail(request(0).messageIdHex, 0, bitmap)
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
 
-        composeRule.onNodeWithContentDescription(reference(0).fileName).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(reference(0).fileName).assertIsDisplayed()
         composeRule.mainClock.autoAdvance = true
         awaitLoaded()
         assertEquals(0, fixture.calls.size)
@@ -261,7 +261,6 @@ class MediaImageBubbleLatencyTest {
     @Test
     fun cleanedOriginalCannotRenderItsPersistedDerivative() {
         seedDisplayThumbnail()
-        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
         fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
         composeRule.waitUntil(10_000) {
@@ -272,20 +271,18 @@ class MediaImageBubbleLatencyTest {
         assertEquals(0, fixture.calls.size)
     }
 
-    /** MDK's later age sweep revokes pixels already displayed by a visible bubble. */
+    /** Already-painted memory pixels preserve master's behavior while offscreen maintenance owns disk cleanup. */
     @Test
-    fun visibleDerivativeIsRevokedWhenMdkCleansTheOriginal() {
-        seedDisplayThumbnail()
+    fun visibleMemoryPixelsDoNotSubscribeToNativeRetention() {
+        controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
         awaitLoaded()
         composeRule.runOnIdle { fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING) }
-        composeRule.waitUntil(10_000) {
-            composeRule.waitForIdle()
-            fixture.thumbnails.residentBytes() == 0L &&
-                composeRule.onAllNodesWithContentDescription(reference(0).fileName).fetchSemanticsNodes().isEmpty()
-        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(reference(0).fileName).assertIsDisplayed()
         assertEquals(0, fixture.nativeAssetReads.get())
         assertEquals(0, fixture.calls.size)
+        assertEquals(0, fixture.nativeSubscriptions.get())
     }
 
     /** Writes only a synthetic derivative; no full-size encrypted/native fixture is seeded. */

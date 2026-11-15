@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -220,6 +221,45 @@ class PersistentDisplayThumbnailsTest {
         val newest = source.copy(attachmentKey = "attachment-29")
         assertNull(cache.read(oldest, 128, cache.captureGeneration(oldest)))
         assertNotNull(cache.read(newest, 128, cache.captureGeneration(newest)))
+    }
+
+    /** Existence probes allocate no pixels, and a rejected codec result cannot block regeneration forever. */
+    @Test
+    fun rejectedPayloadCanBeRegeneratedWithoutDecodingDuringTheExistenceProbe() {
+        val disk =
+            DiskByteCache(
+                directory,
+                PersistentDisplayThumbnails.MAX_BYTES,
+                DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") },
+            )
+        var decodeCalls = 0
+        var rejectPixels = true
+        val cache =
+            PersistentDisplayThumbnails(disk) { bytes, offset, length ->
+                decodeCalls++
+                if (rejectPixels) null else BitmapFactory.decodeByteArray(bytes, offset, length)
+            }
+        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration(source))
+        assertTrue(cache.hasMatching(source, 128, cache.captureGeneration(source)))
+        assertEquals(0, decodeCalls)
+        assertNull(cache.read(source, 128, cache.captureGeneration(source)))
+        assertEquals(1, decodeCalls)
+        assertTrue(!cache.hasMatching(source, 128, cache.captureGeneration(source)))
+        rejectPixels = false
+        cache.write(source, MediaThumbnail(bitmap, 128), cache.captureGeneration(source))
+        assertTrue(cache.hasMatching(source, 128, cache.captureGeneration(source)))
+        assertNotNull(cache.read(source, 128, cache.captureGeneration(source)))
+        assertEquals(2, decodeCalls)
+    }
+
+    /** Deletion fences even a producer whose first derivative was not yet present on disk. */
+    @Test
+    fun deletedMessageCannotBeResurrectedByALateFirstWrite() {
+        val cache = cache()
+        val pending = cache.captureGeneration(source)
+        cache.removeMessage("account:chat:message:")
+        cache.write(source, MediaThumbnail(bitmap, 128), pending)
+        assertEquals(0L, cache.residentBytes())
     }
 
     /** Independent instances share encrypted bytes and a test-only key, as across process restart. */

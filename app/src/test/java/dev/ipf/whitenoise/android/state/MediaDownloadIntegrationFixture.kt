@@ -51,21 +51,12 @@ import javax.crypto.spec.SecretKeySpec
 internal class MediaDownloadIntegrationFixture(
     accounts: List<AccountSummaryFfi> = emptyList(),
     preferences: android.content.SharedPreferences? = null,
-    private val retainIdleNativeFeeds: Boolean = false,
 ) : AutoCloseable {
     private val root = Files.createTempDirectory("media-host-regression").toFile()
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
     private val diskRoot = java.io.File(root, "encrypted")
 
-    /** Holds a test-owned original removal after its index entry has been retired. */
-    var onBeforeOriginalRemoval: () -> Unit = {}
-    val disk =
-        DiskByteCache(
-            diskRoot,
-            maxBytes = 4L * 1024 * 1024,
-            keyProvider = keyProvider,
-            beforeStaleFilesDeleted = { onBeforeOriginalRemoval() },
-        )
+    val disk = DiskByteCache(diskRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider)
     val thumbnailRoot = java.io.File(root, "thumbnails")
     val thumbnails =
         PersistentDisplayThumbnails(
@@ -93,6 +84,9 @@ internal class MediaDownloadIntegrationFixture(
     }
 
     val nativeAssetReads = AtomicInteger()
+
+    /** Native progress feeds actually opened, distinct from one-shot metadata probes. */
+    val nativeSubscriptions = AtomicInteger()
 
     /** Overrides retained-asset length to exercise bounded presentation without allocating a large fixture. */
     var nativeAssetDeclaredBytes: ULong? = null
@@ -243,10 +237,10 @@ internal class MediaDownloadIntegrationFixture(
                         },
                     )
                 }
-                "subscribeAttachmentTransfers" ->
-                    subscription(
-                        key(args!![0] as String, args[1] as String, targets(args).single()),
-                    )
+                "subscribeAttachmentTransfers" -> {
+                    nativeSubscriptions.incrementAndGet()
+                    subscription(key(args!![0] as String, args[1] as String, targets(args).single()))
+                }
                 "requestAutomaticAttachment", "requestExplicitAttachment", "downloadAttachmentAgain" -> {
                     val key = key(args!![0] as String, args[1] as String, args[2] as AttachmentLocalTargetFfi)
                     val automatic = method.name.substringBefore('-') == "requestAutomaticAttachment"
@@ -393,7 +387,6 @@ internal class MediaDownloadIntegrationFixture(
      * job is reported once per subscription, then the feed waits for the job to end.
      */
     private fun subscription(key: String): AttachmentTransferSubscription {
-        if (retainIdleNativeFeeds) return retentionSubscription(key)
         val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
         return nativeStub(FixtureTransferFeed::class.java).also {
             var initial = true
@@ -421,22 +414,6 @@ internal class MediaDownloadIntegrationFixture(
             }
         }
     }
-
-    /** Models a native retention subscription that can observe cleanup while no acquisition owns the body. */
-    private fun retentionSubscription(key: String): AttachmentTransferSubscription =
-        nativeStub(FixtureTransferFeed::class.java).also {
-            var previous: AttachmentTransferStatusFfi? = null
-            it.nextSnapshot = {
-                var current = status(key)
-                while (current == previous) {
-                    jobs[key]?.observed?.complete(Unit)
-                    delay(10)
-                    current = status(key)
-                }
-                previous = current
-                AttachmentTransferSnapshotFfi(listOf(current))
-            }
-        }
 
     /** Scripted feed allocated without running UniFFI's Android native-cleaner constructor. */
     private class FixtureTransferFeed : AttachmentTransferSubscription(NoPointer) {

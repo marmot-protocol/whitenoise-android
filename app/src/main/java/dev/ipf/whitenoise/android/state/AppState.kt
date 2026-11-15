@@ -1579,6 +1579,9 @@ class WhiteNoiseAppState private constructor(
 
     /** Serializes presentation-owned encoders whose queued bitmap references are weak and cancellable. */
     internal val displayThumbnailWritePermit = kotlinx.coroutines.sync.Semaphore(1)
+    internal val displayThumbnailReconciliationMutex = kotlinx.coroutines.sync.Mutex()
+    internal var displayThumbnailReconciliationJob: Job? = null
+    internal var displayThumbnailReconciliationRequested = false
 
     @Volatile
     private var marmotRuntime: AppMarmotRuntime? = initialMarmotRuntime
@@ -5541,6 +5544,7 @@ class WhiteNoiseAppState private constructor(
                 check(activated || accountSetup.controller != null) { "startup account activation did not complete" }
             }
             bootstrapCompleted = true
+            scheduleDisplayThumbnailReconciliation()
         } catch (error: Throwable) {
             if (error is CancellationException) {
                 // The process-owned listener keeps retrying independently, but
@@ -9834,6 +9838,7 @@ class WhiteNoiseAppState private constructor(
             localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
             notificationScope.launch { catchUpAfterForegroundActivation() }
+            scheduleDisplayThumbnailReconciliation()
         }
         if (shouldStartBackgroundConnectionForForeground(foreground)) {
             startBackgroundConnectionService()
@@ -10019,6 +10024,7 @@ class WhiteNoiseAppState private constructor(
             currentCoroutineContext().ensureActive()
             runRetentionSweep(account.label, System.currentTimeMillis())
         }
+        scheduleDisplayThumbnailReconciliation().join()
     }
 
     /**
@@ -14048,6 +14054,9 @@ class WhiteNoiseAppState private constructor(
     ) {
         removedNotificationMessages(event).forEach { message ->
             recordNotificationContentRemoval(message)
+            launch {
+                removeMessageDisplayThumbnails(message.accountRef, message.groupIdHex, message.messageIdHex)
+            }
             launch {
                 runCatchingCancellable { retractNotificationContent(message) }
                     .onFailure { appStateDebug(it) { "notification retraction failed" } }

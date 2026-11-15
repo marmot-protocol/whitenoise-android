@@ -26,6 +26,39 @@ class DisplayThumbnailInvalidationCoverageTest {
         }
     }
 
+    /** Guards both mutation/event entry points and the lifecycle paths that reconcile missed native cleanup. */
+    @Test
+    fun deletionAndBackgroundMaintenanceReachDerivativeCleanup() {
+        val root = "src/main/java/dev/ipf/whitenoise/android/state/"
+        val controller = appModuleSource(root + "ConversationController.kt")
+        val appState = appModuleSource(root + "AppState.kt")
+        assertTrue(
+            controller
+                .substringAfter("internal suspend fun deleteMessageResult(")
+                .substringBefore("internal fun")
+                .contains("removeMessageDisplayThumbnails("),
+        )
+        assertTrue(
+            appState
+                .substringAfter("private fun CoroutineScope.handleNotificationContentEvent(")
+                .substringBefore("private suspend fun reconcileConversationNotificationCards(")
+                .contains("removeMessageDisplayThumbnails("),
+        )
+        assertTrue(
+            appState
+                .substringAfter("suspend fun sweepExpiredDisappearingMessages()")
+                .substringBefore("internal suspend fun runRetentionSweep(")
+                .contains("scheduleDisplayThumbnailReconciliation().join()"),
+        )
+        assertTrue(appState.contains("bootstrapCompleted = true\n            scheduleDisplayThumbnailReconciliation()"))
+        assertTrue(
+            appState
+                .substringAfter("fun setAppInForeground(")
+                .substringBefore("fun ")
+                .contains("scheduleDisplayThumbnailReconciliation()"),
+        )
+    }
+
     /** A decoder may still read an original until its removal finishes, so derivatives must be fenced last. */
     @Test
     fun originalCleanupCompletesBeforeTheDerivativeFence() {

@@ -4685,6 +4685,7 @@ class ConversationController(
                 try {
                     appState.withGroupCommitLock(account, group.groupIdHex) {
                         appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+                        appState.removeMessageDisplayThumbnails(account, group.groupIdHex, target)
                     }
                     Result.success(Unit)
                 } catch (throwable: Throwable) {
