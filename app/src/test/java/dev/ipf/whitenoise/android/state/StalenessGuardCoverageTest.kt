@@ -74,6 +74,7 @@ class StalenessGuardCoverageTest {
     @Test
     fun awaitThenPublishPathsAreGuardedOrExplicitlyExempt() {
         val appState = productionSource("AppState.kt")
+        val notificationContent = productionSource("AppStateNotificationContent.kt")
         val notificationDelivery = productionSource("NotificationDeliveryController.kt")
         val chats = productionSource("ChatsController.kt")
         val conversation = productionSource("ConversationController.kt")
@@ -112,14 +113,14 @@ class StalenessGuardCoverageTest {
                     listOf("profileCacheLifetime.capture", "profileCacheLifetime.isCurrent"),
                 "AppState.kt:materializeProfileLocally" to
                     listOf("profileCacheLifetime.capture", "profileCacheLifetime.isCurrent"),
-                "AppState.kt:processNotificationUpdate" to
+                "AppStateNotificationContent.kt:processNotificationUpdate" to
                     listOf(
                         "notificationPostEpoch.capture",
                         "resolveNotificationFirstPost",
                         "postEpoch,",
                         "postInitialNotificationUpdate",
                     ),
-                "AppState.kt:resolveNotificationFirstPost" to
+                "AppStateNotificationContent.kt:resolveNotificationFirstPost" to
                     listOf("postEpoch: Long", "epoch = postEpoch"),
                 "NotificationDeliveryController.kt:reconcileUnavailableNativePushFallback" to
                     listOf(
@@ -235,6 +236,7 @@ class StalenessGuardCoverageTest {
             val source =
                 when (fileName) {
                     "AppState.kt" -> appState
+                    "AppStateNotificationContent.kt" -> notificationContent
                     "NotificationDeliveryController.kt" -> notificationDelivery
                     "NativePushFallbackRuntime.kt" -> nativePushFallback
                     "DirectChatResolution.kt" -> directChatResolution
@@ -366,6 +368,11 @@ class StalenessGuardCoverageTest {
         val guardedNames = guardedPaths.keys
         val candidates =
             asyncPublicationCandidates("AppState.kt", appState) +
+                asyncPublicationCandidates(
+                    "AppStateNotificationContent.kt",
+                    appState,
+                    notificationContent.functionSections(indentation = ""),
+                ) +
                 asyncPublicationCandidates("NotificationDeliveryController.kt", notificationDelivery) +
                 asyncPublicationCandidates(
                     "ChatsController.kt",

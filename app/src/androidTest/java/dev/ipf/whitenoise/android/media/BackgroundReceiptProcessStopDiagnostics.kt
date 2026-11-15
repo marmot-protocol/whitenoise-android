@@ -6,6 +6,7 @@ import androidx.work.WorkManager
 import dev.ipf.whitenoise.android.media.BackgroundReceiptFixtureSupport.permissions
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.automaticAttachmentPolicy
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout

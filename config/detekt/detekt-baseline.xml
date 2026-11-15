@@ -340,8 +340,8 @@
     <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$5_000</ID>
     <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$64</ID>
     <ID>MagicNumber:AppSelfUpdateStorageTest.kt:AppSelfUpdateStorageTest$1_000L</ID>
-    <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$30u</ID>
     <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$8</ID>
+    <ID>MagicNumber:AppStateNotificationContent.kt:30u</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$0xFF</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$128</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$128f</ID>
@@ -569,9 +569,10 @@
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun launchVerifiedAppSelfUpdate: Boolean</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private fun cachedUserProfile: UserProfileMetadataFfi?</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private val notificationDrainSignals = MutableSharedFlow&lt;Long&gt;(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)</ID>
+    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$internal val notificationDrainSignals = MutableSharedFlow&lt;Long&gt;(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suspend</ID>
+    <ID>MaxLineLength:AppStateNotificationContent.kt:private suspend</ID>
     <ID>MaxLineLength:AppStateRelayLists.kt:suspend fun WhiteNoiseAppState.accountRelayLists: AccountRelayListsFfi?</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"auto-chain should skip invisible edit and group-system rows before checking the immediate visible voice neighbor"</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"paginate guard must serialize paginate against close and re-check the active timeline subscription identity"</ID>
@@ -1134,6 +1135,7 @@
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppStateForwarding.kt:throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppStateNotificationContent.kt:throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppUpdateWorker.kt:AppUpdateWorker$error: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$throwable: Throwable</ID>
@@ -1172,6 +1174,7 @@
     <ID>TooManyFunctions:AppLockController.kt:AppLockController</ID>
     <ID>TooManyFunctions:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest</ID>
     <ID>TooManyFunctions:AppState.kt:WhiteNoiseAppState</ID>
+    <ID>TooManyFunctions:AppStateNotificationContent.kt:dev.ipf.whitenoise.android.state.AppStateNotificationContent.kt</ID>
     <ID>TooManyFunctions:AttachmentCachePublication.kt:AttachmentCachePublication</ID>
     <ID>TooManyFunctions:AudioWaveformExtractor.kt:AndroidAudioDecoderCodec : AudioDecoderCodec</ID>
     <ID>TooManyFunctions:AudioWaveformExtractor.kt:AudioDecoderCodec&lt;FormatT&gt;</ID>
