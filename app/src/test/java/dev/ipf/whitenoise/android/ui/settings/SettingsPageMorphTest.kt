@@ -222,7 +222,7 @@ class SettingsPageMorphTest {
     }
 
     @Test fun backAndForwardRetargetFreezeTheCurrentOutlineIncludingCornersAndSeams() {
-        for (time in listOf(0.2f, 0.4f, 0.65f, 0.9f)) {
+        for (time in listOf(0.2f, 0.4f, 0.6f, 0.65f, 0.84f, 0.9f)) {
             for (reverse in listOf(false, true)) {
                 val page = departing()
                 reportGroup(page, Rect(16f, 120f, 344f, 300f), radius = 8f, seamFraction = 0.3f)
@@ -242,6 +242,11 @@ class SettingsPageMorphTest {
                 if (!reverse) page.pendingOrigin = first
                 assertTrue(page.begin(if (reverse) "parent" else "other", !reverse, true, host, time))
                 assertEquals(before, page.renderedContours(0f))
+                if (time > 0.4f) {
+                    // No active body is captured: only the live body settles, never its outline.
+                    assertEquals(1f, page.incomingPresence(0f), 0f)
+                    assertEquals(0, page.keptPictures)
+                }
                 reportGroup(page, second, radius = 32f, seamFraction = 0.75f)
                 page.admitDestination()
                 assertEquals(before, page.renderedContours(0f))

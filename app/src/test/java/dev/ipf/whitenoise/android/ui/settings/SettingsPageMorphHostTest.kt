@@ -821,19 +821,19 @@ class SettingsPageMorphHostTest {
         }
     }
 
-    @Test fun visibleIncomingBodySettlesOnReverseAtPointSix() = assertInterruptedBodySettles(0.6f, false, true)
+    @Test fun visibleIncomingBodyRevealsOnReverseAtPointSix() = assertInterruptedBodyReveals(0.6f, false, true)
 
-    @Test fun visibleIncomingBodySettlesOnReverseAtPointEightFour() = assertInterruptedBodySettles(0.84f, false, true)
+    @Test fun visibleIncomingBodyRevealsOnReverseAtPointEightFour() = assertInterruptedBodyReveals(0.84f, false, true)
 
-    @Test fun visibleIncomingBodySettlesOnForwardAtPointSix() = assertInterruptedBodySettles(0.6f, true, true)
+    @Test fun visibleIncomingBodyRevealsOnForwardAtPointSix() = assertInterruptedBodyReveals(0.6f, true, true)
 
-    @Test fun visibleIncomingBodySettlesOnForwardAtPointEightFour() = assertInterruptedBodySettles(0.84f, true, true)
+    @Test fun visibleIncomingBodyRevealsOnForwardAtPointEightFour() = assertInterruptedBodyReveals(0.84f, true, true)
 
-    @Test fun uncapturedIncomingBodySettlesOnReverse() = assertInterruptedBodySettles(0.6f, false, false)
+    @Test fun uncapturedIncomingBodyRevealsOnReverse() = assertInterruptedBodyReveals(0.6f, false, false)
 
-    @Test fun uncapturedIncomingBodySettlesOnForward() = assertInterruptedBodySettles(0.84f, true, false)
+    @Test fun uncapturedIncomingBodyRevealsOnForward() = assertInterruptedBodyReveals(0.84f, true, false)
 
-    private fun assertInterruptedBodySettles(
+    private fun assertInterruptedBodyReveals(
         interruption: Float,
         forward: Boolean,
         capture: Boolean,
@@ -868,11 +868,11 @@ class SettingsPageMorphHostTest {
         assertTrue("incoming body is visible before interruption", before[100, 150].blue > 0.3f)
         rule.runOnIdle {
             page.pendingOrigin = body
-            assertFalse(
-                "no coherent active-body frame: settle immediately",
+            assertTrue(
+                "missing outgoing body must not cancel the outline clock",
                 page.begin(if (forward) "grandchild" else null, forward, true, host, interruption),
             )
-            assertFalse(page.active)
+            assertTrue(page.active)
             assertEquals(0, page.keptPictures)
             color.value = Color.Green
             time.value = 0f
@@ -880,7 +880,7 @@ class SettingsPageMorphHostTest {
         for (fraction in listOf(0f, 0.2f, 0.4f)) {
             rule.runOnIdle { time.value = fraction }
             val pixels = rule.onRoot().captureToImage().toPixelMap()
-            assertEquals("settled body at $fraction", 1f, pixels[100, 150].green, 0.01f)
+            assertEquals("live destination body at $fraction", 1f, pixels[100, 150].green, 0.01f)
             assertEquals("fixed header at $fraction", 1f, pixels[100, 50].green, 0.01f)
         }
         if (!capture) rule.runOnIdle { assertFalse(page.hasSettledPicture) }

@@ -240,10 +240,10 @@ internal class SettingsPageMorph {
         val current = if (interrupted) renderedContours(currentTime) else frame?.contours ?: nativeContours(host)
         val returnsToVisibleParent = interrupted && oldExit > 0f && next == outgoingTarget
         val retainsOutgoing = interrupted && oldExit > 0f && !returnsToVisibleParent
-        // Active incoming pixels are never recorded. Once they are visible, restarting without
-        // a coherent frame would hide the body until the next incoming phase. Settle instead;
-        // early reversals can still return to their retained parent without capturing active content.
-        val settleInterrupted =
+        // Active incoming pixels are never recorded. Without a coherent outgoing body, reveal
+        // the live destination immediately instead of restarting an empty-body phase. The outline
+        // still freezes its presented geometry and completes the replacement route's own clock.
+        val revealInterruptedBody =
             interrupted &&
                 oldEntry > 0f &&
                 frame == null &&
@@ -269,7 +269,6 @@ internal class SettingsPageMorph {
             if (forward) activatedGroup ?: correspondenceKey else returnTarget?.groupKey ?: correspondenceKey
         val eligible =
             animate &&
-                !settleInterrupted &&
                 !changedHost &&
                 !host.isEmpty &&
                 current != null &&
@@ -312,7 +311,14 @@ internal class SettingsPageMorph {
             } else {
                 1f
             }
-        entryStart = if (returnsToVisibleParent) oldExit else 0f
+        entryStart =
+            if (revealInterruptedBody) {
+                1f
+            } else if (returnsToVisibleParent) {
+                oldExit
+            } else {
+                0f
+            }
         entryOnly = returnsToVisibleParent || (leaving == null && current.isNullOrEmpty())
         if (returnsToVisibleParent) leaving = null
         val anchor = selected ?: returnPoint?.let { Rect(it, it) } ?: host
