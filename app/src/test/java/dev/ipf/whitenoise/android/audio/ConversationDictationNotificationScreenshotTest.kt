@@ -1,15 +1,16 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.app.Activity
+import android.app.Notification
+import android.app.PendingIntent
+import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.RemoteViews
 import com.github.takahirom.roborazzi.captureRoboImage
-import dev.ipf.whitenoise.android.R
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -17,62 +18,63 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The sole dictation notification surface fits its three controls in a compact 48dp row. */
+/** Captures the framework-expanded notification template with the production dictation actions. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class ConversationDictationNotificationScreenshotTest {
+    /** Records the expanded card with Cancel, Paste and Send in the light theme. */
     @Test
-    fun compactActionsLight() {
-        capture("dictation_notification_compact_light")
+    fun nativeActionsLight() {
+        capture("dictation_notification_native_light")
     }
 
-    @Test
-    fun compactOnlyProcessingControls() {
-        capture("dictation_notification_compact_processing", completionEnabled = false)
-    }
-
+    /** Records the same expanded card in the dark theme. */
     @Test
     @Config(qualifiers = "en-rUS-w360dp-h780dp-night-mdpi")
-    fun compactActionsDark() {
-        capture("dictation_notification_compact_dark")
+    fun nativeActionsDark() {
+        capture("dictation_notification_native_dark")
     }
 
+    /** Records the expanded card in Arabic with a right-to-left layout. */
     @Test
     @Config(qualifiers = "ar-rEG-w360dp-h780dp-mdpi")
-    fun compactActionsRtl() {
-        capture("dictation_notification_compact_rtl", rtl = true)
+    fun nativeActionsRtl() {
+        capture("dictation_notification_native_rtl", rtl = true)
     }
 
+    /** Renders the expanded platform template with the requested layout direction. */
     private fun capture(
         name: String,
         rtl: Boolean = false,
-        completionEnabled: Boolean = true,
     ) {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->
             val activity = controller.get()
             val parent = FrameLayout(activity)
             activity.setContentView(parent, ViewGroup.LayoutParams(360, ViewGroup.LayoutParams.WRAP_CONTENT))
-            val notificationView = RemoteViews(activity.packageName, R.layout.notification_dictation_compact)
-            notificationView.setBoolean(R.id.dictation_notification_paste, "setEnabled", completionEnabled)
-            notificationView.setBoolean(R.id.dictation_notification_send, "setEnabled", completionEnabled)
-            val content = notificationView.apply(activity, parent)
-            if (rtl) content.layoutDirection = View.LAYOUT_DIRECTION_RTL
+            val harness = DictationForegroundTestHost()
+            val notification =
+                buildConversationDictationNotification(activity, harness.conversationDictation) { action, _ ->
+                    PendingIntent.getActivity(
+                        activity,
+                        0,
+                        Intent(activity, Activity::class.java).setAction(action),
+                        PendingIntent.FLAG_IMMUTABLE,
+                    )
+                }
+            assertNull(notification.contentView)
+            assertEquals(3, notification.actions.orEmpty().size)
+            val expanded = Notification.Builder.recoverBuilder(activity, notification).createBigContentView()
+            assertNotNull(expanded)
+            val content = requireNotNull(expanded).apply(activity, parent)
+            if (rtl) parent.layoutDirection = View.LAYOUT_DIRECTION_RTL
             parent.addView(content)
+            val width = activity.resources.displayMetrics.widthPixels
             parent.measure(
-                View.MeasureSpec.makeMeasureSpec(360, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(48, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
             )
             parent.layout(0, 0, parent.measuredWidth, parent.measuredHeight)
-            val buttons =
-                listOf(
-                    R.id.dictation_notification_cancel,
-                    R.id.dictation_notification_paste,
-                    R.id.dictation_notification_send,
-                ).map { parent.findViewById<Button>(it) }
-            assertEquals(listOf("Cancel", "Paste", "Send"), buttons.map { it.text.toString() })
-            assertEquals(listOf(true, completionEnabled, completionEnabled), buttons.map { it.isEnabled })
-            assertTrue(buttons.all { it.width > 0 && it.height > 0 && it.isShown })
             parent.captureRoboImage("src/test/snapshots/$name.png")
         }
     }

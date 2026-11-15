@@ -393,8 +393,11 @@ private fun TimelineMessage.toSharedMediaTile(
 
 // Month bucketing keyed off the local-time calendar so the separators match
 // what the user sees on each message. `recordedAt` is epoch SECONDS.
-internal fun monthKeyForMedia(recordedAtSeconds: ULong): Int {
-    val date = IdentityFormatter.clampedLocalDate(recordedAtSeconds, mediaMonthGroupingZone)
+internal fun monthKeyForMedia(
+    recordedAtSeconds: ULong,
+    zone: ZoneId = mediaMonthGroupingZone,
+): Int {
+    val date = IdentityFormatter.clampedLocalDate(recordedAtSeconds, zone)
     // monthLabel() decodes the month with Calendar.MONTH (0-based).
     return date.year * 100 + (date.monthValue - 1)
 }

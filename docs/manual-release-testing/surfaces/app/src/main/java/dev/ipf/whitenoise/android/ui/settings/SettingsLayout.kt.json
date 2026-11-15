@@ -85,7 +85,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
         "anchor": "fun SettingsVersionFooter(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-019"
         ]
       }
     ],
@@ -95,7 +96,24 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
         "anchor": "R.string.settings_version_label",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "SET-019"
+        ]
+      },
+      {
+        "surface": "string:copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "SET-019"
         ]
       }
     ],
