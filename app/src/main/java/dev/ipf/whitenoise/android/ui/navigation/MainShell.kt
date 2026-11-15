@@ -1926,7 +1926,10 @@ internal fun MainShell(
             }
 
             val routeTransition =
-                updateTransition(targetState = transitionContent ?: twoPaneRetainedContent, label = "conversation route")
+                updateTransition(
+                    targetState = transitionContent ?: twoPaneRetainedContent,
+                    label = "conversation route",
+                )
             LaunchedEffect(
                 exitingConversationContent?.chat?.id,
                 selectedChat?.id,
@@ -2214,7 +2217,11 @@ internal fun MainShell(
                                     onBroadenSearch = { request ->
                                         if (content.accountRef == appState.activeAccountRef &&
                                             selectedChat?.id == chat.id &&
-                                            globalSearch.beginConversationSearch(chat.id, request, selectedChatListFolderId)
+                                            globalSearch.beginConversationSearch(
+                                                chat.id,
+                                                request,
+                                                selectedChatListFolderId,
+                                            )
                                         ) {
                                             notificationReadThroughCommitter.commit(commitNotificationReadThrough)
                                             // The global surface now owns this request. Returning to the origin
@@ -2230,8 +2237,9 @@ internal fun MainShell(
                                         }
                                     },
                                     playbackTransport = {
-                                        // Match released read-aloud: retain this screen's chrome until its Back
-                                        // animation disposes it. Route deselection must not collapse the outgoing header.
+                                        // Match released read-aloud: retain this screen's chrome until its
+                                        // Back animation disposes it. Route deselection must not collapse the
+                                        // outgoing header.
                                         if (navAccountStable && !appState.appLock.screenVisible) {
                                             dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
                                                 appState,
@@ -2253,7 +2261,8 @@ internal fun MainShell(
                                     focusMessageRequestId = content.openContext.focusMessageRequestId,
                                     ttsFocusSessionId = content.openContext.ttsFocusSessionId,
                                     notificationOpenRequestId = content.openContext.notificationOpenRequestId,
-                                    notificationReadThroughMessageId = content.openContext.notificationReadThroughMessageId,
+                                    notificationReadThroughMessageId =
+                                        content.openContext.notificationReadThroughMessageId,
                                     notificationLandingTarget = content.openContext.notificationTarget,
                                     onNotificationUnreadBoundaryCaptured = {
                                         notificationReadThroughCommitter.commit(commitNotificationReadThrough)

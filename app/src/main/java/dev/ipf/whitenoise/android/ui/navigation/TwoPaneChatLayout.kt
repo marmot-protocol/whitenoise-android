@@ -1,3 +1,5 @@
+@file:Suppress("FunctionNaming")
+
 package dev.ipf.whitenoise.android.ui.navigation
 
 import androidx.compose.foundation.background
