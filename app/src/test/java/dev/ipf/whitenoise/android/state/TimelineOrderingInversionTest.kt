@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.runCurrent
@@ -14,7 +15,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class TimelineOrderingInversionTest {
     @Test
@@ -129,7 +129,7 @@ class TimelineOrderingInversionTest {
 
     @Test
     fun confirmedSnapshotIsBuiltBeforeOrphanedPreservesAreReleased() {
-        val publishBody = controllersSource().readText().functionBody("publishTimelineFromIndexesInternal")
+        val publishBody = conversationControllerSource().functionBody("publishTimelineFromIndexesInternal")
         val snapshotAssignment = publishBody.indexOf("timeline =")
         val orphanRelease = publishBody.indexOf("releaseOrphanedOptimisticSendPreserves()")
         val settlementSchedule = publishBody.indexOf("scheduleTimelinePositionSettlement()")
@@ -147,7 +147,7 @@ class TimelineOrderingInversionTest {
 
     @Test
     fun mediaBridgeUsesTheTrackedOptimisticPreserveLifecycle() {
-        val uploadBody = controllersSource().readText().functionBody("performMediaUpload")
+        val uploadBody = conversationControllerSource().functionBody("performMediaUpload")
         val bridgeInsert = uploadBody.indexOf("optimisticMessages[\"msg:\$confirmedId\"]")
         val trackedPreserve =
             uploadBody.indexOf(
@@ -169,7 +169,7 @@ class TimelineOrderingInversionTest {
                 trackedPreserve,
         )
 
-        val handoffBody = controllersSource().readText().functionBody("acceptConfirmedMediaHandoff")
+        val handoffBody = conversationControllerSource().functionBody("acceptConfirmedMediaHandoff")
         assertTrue(
             "the receiving controller must prune the exact confirmed bridge",
             "optimisticMessages.remove(\"msg:\$confirmedId\")" in handoffBody,
@@ -322,10 +322,4 @@ class TimelineOrderingInversionTest {
             receivedAt = recordedAt,
             sticker = null,
         )
-
-    private fun controllersSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-        ).firstOrNull(File::exists) ?: error("Missing ConversationController.kt")
 }

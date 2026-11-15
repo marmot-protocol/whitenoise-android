@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertEquals
@@ -115,7 +116,7 @@ class GroupAbandonmentCoverageTest {
     /** Both entry points use the shared journaled forget and none of the departure or receiving-delete paths. */
     @Test
     fun everyEntryPointUsesTheSharedForgetBoundary() {
-        val details = source("state/ConversationController.kt").functionBody("forgetGroupLocal")
+        val details = conversationControllerSource().functionBody("forgetGroupLocal")
         assertTrue("Group Details abandonment uses the shared owner", "forgetGroupLocalWithClientCleanup" in details)
         val chatList = source("state/ChatListAbandonment.kt").extensionBody("abandonChatFromList")
         assertTrue("chat-list abandonment reuses the local-removal path", "deleteGroupLocalFromChatList" in chatList)

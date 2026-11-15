@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.conversationControllerFiles
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -364,7 +366,11 @@ class StalenessGuardCoverageTest {
             asyncPublicationCandidates("AppState.kt", appState) +
                 asyncPublicationCandidates("NotificationDeliveryController.kt", notificationDelivery) +
                 asyncPublicationCandidates("ChatsController.kt", chats) +
-                asyncPublicationCandidates("ConversationController.kt", conversation) +
+                asyncPublicationCandidates(
+                    "ConversationController.kt",
+                    conversation,
+                    conversationControllerFunctionSections(),
+                ) +
                 asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution) +
                 asyncPublicationCandidates("ConversationTimelineSession.kt", timelineSession) +
                 asyncPublicationCandidates("ConversationMutationPresentation.kt", mutationPresentation)
@@ -502,13 +508,14 @@ class StalenessGuardCoverageTest {
     private fun asyncPublicationCandidates(
         fileName: String,
         source: String,
+        sections: List<Pair<String, String>> = source.functionSections(),
     ): Set<String> {
         val mutableFields =
             Regex("""(?m)^ {4}(?:(?:private|internal|public|protected)\s+)?(?:lateinit\s+)?var\s+(\w+)""")
                 .findAll(source)
                 .map { it.groupValues[1] }
                 .toSet()
-        return source.functionSections().mapNotNullTo(mutableSetOf()) { (name, body) ->
+        return sections.mapNotNullTo(mutableSetOf()) { (name, body) ->
             if ("suspend" !in body.substringBefore('(')) {
                 return@mapNotNullTo null
             }
@@ -526,6 +533,13 @@ class StalenessGuardCoverageTest {
                 }
             if (writesSharedField) "$fileName:$name" else null
         }
+    }
+
+    /** Splits class members, plus the top-level extension functions of each controller topic file. */
+    private fun conversationControllerFunctionSections(): List<Pair<String, String>> {
+        val (classFile, topicFiles) = conversationControllerFiles().let { it.first() to it.drop(1) }
+        return classFile.readText().functionSections() +
+            topicFiles.flatMap { it.readText().functionSections(indentation = "") }
     }
 
     /** Splits functions at one declaration indentation into bounded source-policy windows. */
@@ -570,6 +584,7 @@ class StalenessGuardCoverageTest {
 
     /** Locates one production source from either the module or repository working directory. */
     private fun productionSource(fileName: String): String {
+        if (fileName == "ConversationController.kt") return conversationControllerSource()
         val packages =
             listOf(
                 "state",
