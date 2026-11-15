@@ -215,21 +215,15 @@ class MainActivity : AppCompatActivity() {
             }).also(AndroidFramePerformanceReporter::start)
     }
 
-    private fun syncSystemBarsAndHostReadiness(
-        state: WhiteNoiseAppState,
-        darkTheme: Boolean,
-    ) {
+    private fun syncSystemBarsAndHostReadiness(darkTheme: Boolean) {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = !darkTheme
         controller.isAppearanceLightNavigationBars = !darkTheme
         if (!fontsHostReadyRecorded) {
             fontsHostReadyRecorded = true
-            state.recordHostPerformanceSince(
-                HostPerformanceOperationFfi.FONTS_INIT,
-                activityCreatedAtElapsedMs,
-            )
+            appState.recordHostPerformanceSince(HostPerformanceOperationFfi.FONTS_INIT, activityCreatedAtElapsedMs)
         }
-        if (state.phase == AppPhase.Ready) {
+        if (appState.phase == AppPhase.Ready) {
             foregroundHostReady.success()
         }
     }
@@ -248,7 +242,7 @@ class MainActivity : AppCompatActivity() {
                 applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
-            SideEffect { syncSystemBarsAndHostReadiness(state, darkTheme) }
+            SideEffect { syncSystemBarsAndHostReadiness(darkTheme) }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
