@@ -621,7 +621,6 @@
     <ID>MaxLineLength:ChatsController.kt:ChatsController$val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }</ID>
     <ID>MaxLineLength:ChatsController.kt:internal</ID>
     <ID>MaxLineLength:ChatsControllerListVisibilityTest.kt:ChatsControllerListVisibilityTest$"""if\s*\(\s*visible\s*&amp;&amp;\s*\(\s*pendingRecompute\s*\|\|\s*recomputeScheduled\s*\)\s*\)\s*\{\s*recompute\(\s*\)\s*}"""</ID>
-    <ID>MaxLineLength:ChatsControllerMemberSnapshots.kt:internal</ID>
     <ID>MaxLineLength:ChatsControllerProjection.kt:internal</ID>
     <ID>MaxLineLength:ChatsControllerRows.kt:internal suspend</ID>
     <ID>MaxLineLength:ComposeHotPathCoverageTest.kt:ComposeHotPathCoverageTest$"""remember\(replyingTo,\s*messageTextCopy\)\s*\{\s*MessageProjector\.displayBody\(replyingTo,\s*messageTextCopy\)"""</ID>

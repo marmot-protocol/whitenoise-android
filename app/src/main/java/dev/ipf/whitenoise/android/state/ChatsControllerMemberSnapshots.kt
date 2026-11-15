@@ -37,7 +37,8 @@ internal fun ChatsController.invalidateMemberCacheForGroup(groupIdHex: String) {
     memberCacheLifetime.advance()
 }
 
-internal fun ChatsController.memberSnapshotNeedsFetch(groupIdHex: String): Boolean = !memberCacheByGroup.containsKey(groupIdHex)
+internal fun ChatsController.memberSnapshotNeedsFetch(groupIdHex: String): Boolean =
+    !memberCacheByGroup.containsKey(groupIdHex)
 
 /**
  * Hydrates the open picker's off-window rows through the existing bounded local roster reader.
