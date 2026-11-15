@@ -355,6 +355,7 @@ internal fun MessageBubble(
     onEmojiUsed: (String) -> Unit,
     isActionMenuOpen: Boolean,
     onActionMenuOpenChange: (Boolean) -> Unit,
+    onForwardMenuHandoff: () -> Unit = {},
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
     onBeforeBodyExpand: () -> Unit = {},
@@ -1428,7 +1429,8 @@ internal fun MessageBubble(
     /** Opens the forward sheet on a snapshot of the message's forwardable payload. */
     fun beginForward() {
         if (deleted || actionsReadOnly || forwardPayload == null) return
-        onActionMenuOpenChange(false)
+        // Keep the dimmed menu below the picker until its window is dismissed.
+        onForwardMenuHandoff()
         surfaces.forwardSnapshot = forwardPayload
         surfaces.forwardSheetOpen = true
     }
@@ -2981,7 +2983,7 @@ internal fun MessageBubble(
                             directConversation = controller.isDirectConversation,
                         ),
                     quickReactionEmojis = quickReactionEmojis,
-                    onDismissRequest = { onActionMenuOpenChange(false) },
+                    onDismissRequest = { if (!surfaces.forwardSheetOpen) onActionMenuOpenChange(false) },
                     onReactionOrigin = localReactionMotion::choose,
                     onReact = { emoji ->
                         if (!deleted && !actionsReadOnly) {
@@ -3361,6 +3363,7 @@ internal fun MessageBubble(
                         onDismiss = {
                             surfaces.forwardSheetOpen = false
                             surfaces.forwardSnapshot = null
+                            onActionMenuOpenChange(false)
                         },
                     )
                 }

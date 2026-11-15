@@ -1,0 +1,53 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupProfile.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Group image cleanup failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupProfile.kt",
+        "anchor": "R.string.toast_group_image_uploaded_cleanup_failed",
+        "test_ids": [
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Group avatar update failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupProfile.kt",
+        "anchor": "R.string.toast_couldnt_update_group",
+        "test_ids": [
+          "GRP-025"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Viewer group-picture crop, permission and native commit ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupProfile.kt",
+        "anchor": "admitViewerGroupImageMutation(",
+        "test_ids": [
+          "GRP-003"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Reviewed group action context: R.string.change_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupProfile.kt",
+        "anchor": "R.string.change_photo",
+        "test_ids": [
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "Reviewed group action context: R.string.remove_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerGroupProfile.kt",
+        "anchor": "R.string.remove_photo",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,119 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.conversation_disbanded_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.conversation_disbanded_notice",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_disbanding_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.conversation_disbanding_notice",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.group_leave_blocked_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.group_leave_blocked_hint",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.group_leave_refresh_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.group_leave_refresh_hint",
+        "test_ids": [
+          "GRP-037"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.toast_admin_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_admin_added",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_admin_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_admin_removed",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_group_roster_changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_group_roster_changed",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_couldnt_add_members",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_couldnt_update_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_keep_one_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_keep_one_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.toast_promote_before_removing_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_promote_before_removing_admin",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "surface": "Transfer retry keeps the combined transfer action and affected successor",
+        "anchor": "R.string.transfer_admin",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

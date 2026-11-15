@@ -5051,6 +5051,13 @@ internal fun ConversationScreen(
                                                         openActionMenuId = null
                                                     }
                                                 },
+                                                onForwardMenuHandoff = {
+                                                    menuIme.cancel()
+                                                    menuBackdropImeBottom = 0
+                                                    menuComposerWasEditing = false
+                                                    focusManager.clearFocus(force = true)
+                                                    keyboardController?.hide()
+                                                },
                                                 onQuickReactionsSave = { saveQuickReactionEmojis(it) },
                                                 onReplyPreviewClick = { navigateToReplyTarget(it) },
                                                 composerGate = composerGate,

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -166,7 +167,7 @@ class AttachmentDownloadProductionWiringTest {
     /** Guards foreground enqueueing, source single-flight, budgeted byte reads, and terminal durable cleanup wiring. */
     @Test
     fun everyInteractiveControllerDownloadHasDurableTerminalCleanup() {
-        val controller = projectSource("state/ConversationController.kt").normalized()
+        val controller = conversationControllerSource().normalized()
         val presentation = projectSource("state/ConversationAttachmentPresentation.kt").normalized()
         val sourceController = projectSource("state/AttachmentControllerCache.kt").normalized()
         val appState = projectSource("state/AppState.kt").normalized()

@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSend.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Failed original send precedence for Retry and Discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSend.kt",
+        "anchor": "internal fun ConversationController.failedEditForAction(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-007"
+        ]
+      },
+      {
+        "surface": "Token-aware text admission safely retries an interrupted runtime call",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSend.kt",
+        "anchor": "private fun ConversationController.isRetryableTextAdmissionError(",
+        "test_ids": [
+          "MSG-017"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "Pending edit failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSend.kt",
+        "anchor": "R.string.toast_couldnt_edit_message",
+        "test_ids": [
+          "MSG-007"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

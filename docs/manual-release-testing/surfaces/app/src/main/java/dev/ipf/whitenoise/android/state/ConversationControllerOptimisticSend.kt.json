@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerOptimisticSend.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Pre-admission optimistic send cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerOptimisticSend.kt",
+        "anchor": "internal suspend fun ConversationController.cancelOptimisticSendResult(",
+        "test_ids": [
+          "MSG-019"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "An optimistically published chat-list preview carries no deletion evidence for the message just sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerOptimisticSend.kt",
+        "anchor": "internal fun ConversationController.sentPreview(",
+        "test_ids": [
+          "CON-004",
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "Every discarded optimistic send releases its bubble, upload state and chat-list preview through one shared cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerOptimisticSend.kt",
+        "anchor": "internal fun ConversationController.discardOptimisticSend(",
+        "test_ids": [
+          "MSG-019"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

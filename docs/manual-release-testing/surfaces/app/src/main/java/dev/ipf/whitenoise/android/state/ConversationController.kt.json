@@ -46,14 +46,6 @@
         ]
       },
       {
-        "surface": "Existing conversation group-recovery refresh",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private suspend fun refreshGroupRecoveryStatus(",
-        "test_ids": [
-          "GRP-021"
-        ]
-      },
-      {
         "surface": "Generic retry copy for a failed chat list or conversation load",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.error_try_again",
@@ -87,53 +79,11 @@
         ]
       },
       {
-        "surface": "Group image cleanup failure notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_group_image_uploaded_cleanup_failed",
-        "test_ids": [
-          "GRP-025"
-        ]
-      },
-      {
         "surface": "Group image mutation failure owner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "internal suspend fun updateGroupImage(",
         "test_ids": [
           "GRP-025"
-        ]
-      },
-      {
-        "surface": "Media queue retained-byte limit feedback",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.media_album_too_large",
-        "test_ids": [
-          "MED-003",
-          "MED-009",
-          "MSG-021"
-        ]
-      },
-      {
-        "surface": "Pending edit admission failure feedback",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private fun failPendingEditAdmission(",
-        "test_ids": [
-          "MSG-007"
-        ]
-      },
-      {
-        "surface": "Pending edit failure notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_edit_message",
-        "test_ids": [
-          "MSG-007"
-        ]
-      },
-      {
-        "surface": "Pre-admission optimistic send cancellation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private suspend fun cancelOptimisticSendResult(",
-        "test_ids": [
-          "MSG-019"
         ]
       },
       {
@@ -144,38 +94,6 @@
           "MSG-021",
           "MED-008",
           "MED-009"
-        ]
-      },
-      {
-        "surface": "R.string.conversation_disbanded_notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.conversation_disbanded_notice",
-        "test_ids": [
-          "GRP-037"
-        ]
-      },
-      {
-        "surface": "R.string.conversation_disbanding_notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.conversation_disbanding_notice",
-        "test_ids": [
-          "GRP-037"
-        ]
-      },
-      {
-        "surface": "R.string.group_leave_blocked_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.group_leave_blocked_hint",
-        "test_ids": [
-          "GRP-037"
-        ]
-      },
-      {
-        "surface": "R.string.group_leave_refresh_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.group_leave_refresh_hint",
-        "test_ids": [
-          "GRP-037"
         ]
       },
       {
@@ -216,14 +134,6 @@
         "anchor": "R.string.toast_reaction_failed",
         "test_ids": [
           "MSG-005"
-        ]
-      },
-      {
-        "surface": "Reply refuses a file-backed large attachment",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.media_file_too_large",
-        "test_ids": [
-          "MED-030"
         ]
       },
       {
@@ -314,36 +224,6 @@
         ]
       },
       {
-        "surface": "R.string.media_album_too_large",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.media_album_too_large",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_admin_added",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_admin_added",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_admin_removed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_admin_removed",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_admin_transferred",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_admin_transferred",
@@ -377,26 +257,6 @@
         "surface": "R.string.toast_chat_restored",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_chat_restored",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_accept_invite",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_accept_invite",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_decline_invite",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_couldnt_decline_invite",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -534,29 +394,9 @@
         ]
       },
       {
-        "surface": "R.string.toast_group_roster_changed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_group_roster_changed",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
         "surface": "R.string.toast_invite_accepted",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_invite_accepted",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_invite_declined",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_invite_declined",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -607,16 +447,6 @@
         "surface": "R.string.toast_promote_before_removing_admin",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_promote_before_removing_admin",
-        "test_ids": [
-          "CHL-026",
-          "CHL-027",
-          "CHL-028"
-        ]
-      },
-      {
-        "surface": "R.string.toast_reattach_to_retry_media",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.toast_reattach_to_retry_media",
         "test_ids": [
           "CHL-026",
           "CHL-027",
@@ -740,28 +570,11 @@
     ],
     "source_coverage": [
       {
-        "surface": "Failed original send precedence for Retry and Discard",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private fun failedEditForAction(",
-        "test_ids": [
-          "MSG-004",
-          "MSG-007"
-        ]
-      },
-      {
         "surface": "First settled conversation read at the saved watermark",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private var lastSubmittedReadMessageId: String? = null",
+        "anchor": "internal var lastSubmittedReadMessageId: String? = null",
         "test_ids": [
           "CHL-008"
-        ]
-      },
-      {
-        "surface": "Token-aware text admission safely retries an interrupted runtime call",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private fun isRetryableTextAdmissionError(",
-        "test_ids": [
-          "MSG-017"
         ]
       },
       {
@@ -772,15 +585,6 @@
           "CON-005",
           "MSG-002",
           "MSG-019"
-        ]
-      },
-      {
-        "surface": "An optimistically published chat-list preview carries no deletion evidence for the message just sent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private fun sentPreview(",
-        "test_ids": [
-          "CON-004",
-          "CHL-002"
         ]
       },
       {
@@ -803,27 +607,11 @@
         ]
       },
       {
-        "surface": "Viewer group-picture crop, permission and native commit ownership",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "admitViewerGroupImageMutation(",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
         "surface": "R.string.toast_group_updated",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "anchor": "R.string.toast_group_updated",
         "test_ids": [
           "GRP-003"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "surface": "Retained live timeline consumption during metadata refresh",
-        "anchor": "private suspend fun runConversationSubscriptionIteration(",
-        "test_ids": [
-          "CON-033"
         ]
       },
       {
@@ -836,36 +624,12 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "surface": "Decline a pending invitation with an admin step-down when required",
-        "anchor": "R.string.decline",
-        "test_ids": [
-          "GRP-030"
-        ]
-      },
-      {
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
         "surface": "Coherent group details refresh",
         "anchor": "groupSnapshotReader(account",
         "test_ids": [
           "GRP-001",
           "GRP-030"
         ]
-      },
-      {
-        "surface": "Edit that MarmotKit refuses because the message can no longer be edited",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "R.string.error_message_not_editable",
-        "test_ids": [
-          "MSG-007"
-        ]
-      },
-      {
-        "surface": "A first page naming event cards stays unpublished until their cached state is read, on every open path",
-        "anchor": "private fun releaseInitialPageEventCardHold(",
-        "test_ids": [
-          "STB-002"
-        ],
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
@@ -884,26 +648,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"
       },
       {
-        "surface": "Native peer receipt settles delivery and refreshes reactions in one update",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "record.sourceMessageIdHex == null && !record.recipientConfirmed",
-        "test_ids": [
-          "MSG-017",
-          "MSG-031"
-        ]
-      },
-      {
-        "surface": "Every discarded optimistic send releases its bubble, upload state and chat-list preview through one shared cleanup",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private fun discardOptimisticSend(",
-        "test_ids": [
-          "MSG-019"
-        ]
-      },
-      {
         "surface": "Read anchors, send retention and pending edits drop together when their message leaves the loaded window",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt",
-        "anchor": "private fun MutableMap<String, *>.retainTimelineWindow()",
+        "anchor": "internal fun MutableMap<String, *>.retainTimelineWindow()",
         "test_ids": [
           "CON-003"
         ]

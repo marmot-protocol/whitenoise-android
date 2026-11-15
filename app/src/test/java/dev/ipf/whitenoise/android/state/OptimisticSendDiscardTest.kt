@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.io.File
 
 /**
  * Pins which Android presentation state each discard path releases. Every
@@ -43,7 +43,7 @@ class OptimisticSendDiscardTest {
 
     @Test
     fun everyDiscardSiteUsesTheSharedCleanup() {
-        val source = controllersSource()
+        val source = conversationControllerSource()
         val expectedCalls =
             mapOf(
                 "CANCELLED" to 1,
@@ -61,10 +61,4 @@ class OptimisticSendDiscardTest {
         val dropped = Regex("""PerformanceResult\.DROPPED""").findAll(source).count()
         assertEquals("only the shared cleanup completes a discarded send as dropped", 1, dropped)
     }
-
-    private fun controllersSource(): String =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-        ).first(File::exists).readText()
 }

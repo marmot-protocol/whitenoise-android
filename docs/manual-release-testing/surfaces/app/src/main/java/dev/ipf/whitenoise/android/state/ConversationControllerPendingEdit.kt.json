@@ -1,0 +1,44 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerPendingEdit.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Pending edit admission failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerPendingEdit.kt",
+        "anchor": "private fun ConversationController.failPendingEditAdmission(",
+        "test_ids": [
+          "MSG-007"
+        ]
+      },
+      {
+        "surface": "Pending edit failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerPendingEdit.kt",
+        "anchor": "R.string.toast_couldnt_edit_message",
+        "test_ids": [
+          "MSG-007"
+        ]
+      },
+      {
+        "surface": "Generic retry copy for a failed chat list or conversation load",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerPendingEdit.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "CHL-015",
+          "CON-015"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Edit that MarmotKit refuses because the message can no longer be edited",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerPendingEdit.kt",
+        "anchor": "R.string.error_message_not_editable",
+        "test_ids": [
+          "MSG-007"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
