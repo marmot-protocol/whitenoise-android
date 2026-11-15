@@ -202,8 +202,9 @@ internal class MediaDownloadIntegrationFixture(
                 "attachmentLocalAssets" ->
                     targets(args!!).map { target ->
                         val key = key(args[0] as String, args[1] as String, target)
-                        jobs[key]?.bytes?.let { AttachmentLocalAssetFfi(key, nativeAssetDeclaredBytes ?: it.size.toULong()) }
-                            ?: AttachmentLocalAssetFfi(null, 0u)
+                        jobs[key]?.bytes?.let {
+                            AttachmentLocalAssetFfi(key, nativeAssetDeclaredBytes ?: it.size.toULong())
+                        } ?: AttachmentLocalAssetFfi(null, 0u)
                     }
                 "readAttachmentAsset" -> {
                     nativeAssetReads.incrementAndGet()

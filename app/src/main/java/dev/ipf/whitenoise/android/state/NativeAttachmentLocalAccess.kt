@@ -165,11 +165,13 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachment(
         },
         readAsset = { reference, offset, limit ->
             marmotIo("WhiteNoise.attachment.original.chunk") {
+                recordDisplayThumbnailEvent(DisplayThumbnailEvent.ORIGINAL_CHUNK)
                 readAttachmentAsset(request.accountRef, reference, offset, limit)
             }
         },
     ).let { access ->
         attachmentMaterializationTracer.trace("WhiteNoise.attachment.original.materialize") {
+            recordDisplayThumbnailEvent(DisplayThumbnailEvent.ORIGINAL_MATERIALIZE)
             access.open(listOf(target), maxBytes).single()
         }
     }

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.graphics.Bitmap
+import android.util.Log
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
 import dev.ipf.whitenoise.android.media.DisplayThumbnailToken
@@ -13,6 +14,23 @@ import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
 private val displayThumbnailTracer = MarmotBridgeTracer()
+private const val DISPLAY_THUMBNAIL_STATS_TAG = "DisplayThumbnailStats"
+
+/** Fixed diagnostic categories carry no account, attachment, media or native locator data. */
+internal enum class DisplayThumbnailEvent {
+    HIT,
+    MISS,
+    WRITE_ATTEMPT,
+    ORIGINAL_MATERIALIZE,
+    ORIGINAL_CHUNK,
+}
+
+/** Emits only when the device operator opts in with log.tag.DisplayThumbnailStats=DEBUG. */
+internal fun recordDisplayThumbnailEvent(event: DisplayThumbnailEvent) {
+    if (Log.isLoggable(DISPLAY_THUMBNAIL_STATS_TAG, Log.DEBUG)) {
+        Log.d(DISPLAY_THUMBNAIL_STATS_TAG, event.name)
+    }
+}
 
 /** A producer's immutable account/session and cache-generation fences, captured before any original read. */
 internal data class DisplayThumbnailRequest(
@@ -66,6 +84,7 @@ internal suspend fun WhiteNoiseAppState.readDisplayThumbnail(
         }
     val current = entry?.takeIf { displayThumbnailRequestCurrent(request) }
     if (entry != null && current == null) entry.bitmap.recycle()
+    recordDisplayThumbnailEvent(if (current == null) DisplayThumbnailEvent.MISS else DisplayThumbnailEvent.HIT)
     displayThumbnailTracer.trace(
         if (current == null) "WhiteNoise.displayThumbnail.miss" else "WhiteNoise.displayThumbnail.hit",
     ) {}
@@ -92,6 +111,7 @@ internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
                     return@runCatchingCancellable
                 }
                 val bitmap = pixels.get()?.takeUnless { it.isRecycled } ?: return@runCatchingCancellable
+                recordDisplayThumbnailEvent(DisplayThumbnailEvent.WRITE_ATTEMPT)
                 displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.write") {
                     displayThumbnails.write(request.source, MediaThumbnail(bitmap, maxEdgePx), request.generation) {
                         owner.isActive
