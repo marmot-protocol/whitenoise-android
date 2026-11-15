@@ -2,10 +2,11 @@
 <resources>
     <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
     <string name="explanation_chat_actions_leave_and_delete">Sales de este chat y lo elimina de este dispositivo. Los demás miembros siguen en el chat y solo puedes volver si alguien te añade de nuevo.</string>
-    <string name="explanation_chat_actions_delete">Elimina este chat y sus mensajes de este dispositivo. No te saca del grupo para los demás miembros.</string>
+    <string name="explanation_chat_actions_delete">Elimina este chat y sus mensajes solo de este dispositivo. No cambia nada para las demás personas del chat.</string>
     <string name="explanation_chat_actions_abandon_dm">Abandona este mensaje directo y lo elimina de este dispositivo. La otra persona no recibe aviso.</string>
     <string name="explanation_chat_actions_abandon_group">Abandona este grupo y lo elimina de este dispositivo. Los demás miembros siguen en el grupo.</string>
-    <string name="explanation_chat_info_mute">Detiene las notificaciones de este chat. Sigues recibiendo sus mensajes y puedes volver a activarlas.</string>
+    <string name="explanation_chat_info_mute">Silencia las alertas de mensajes normales de este chat. Las menciones directas aún pueden avisarte, y sigues recibiendo todos los mensajes.</string>
+    <string name="explanation_chat_info_copy_peer_public_key">Copia la clave pública de esta persona al portapapeles. Su clave pública es la dirección que otras personas usan para encontrarla y conectar con ella, así que es seguro compartirla. Nunca incluye su clave privada.</string>
     <string name="explanation_chat_info_unmute">Vuelve a activar las notificaciones de este chat.</string>
     <string name="explanation_chat_info_disappearing">Define si los mensajes nuevos de este chat desaparecen tras un tiempo elegido. Los mensajes ya enviados no cambian.</string>
     <string name="explanation_chat_info_copy_chat_link">Copia un enlace a este chat que puedes compartir para que otros soliciten unirse.</string>

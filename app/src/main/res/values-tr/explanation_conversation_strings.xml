@@ -16,6 +16,7 @@
     <string name="explanation_conversation_dictation_recovery_app_settings">White Noise için Android ayarlarını açar; mikrofon erişimine buradan izin verebilirsiniz.</string>
     <string name="explanation_conversation_dictation_recovery_speech">Android konuşma tanıma ayarlarını açar; buradan bir tanıma hizmeti seçebilir veya yükleyebilirsiniz.</string>
     <string name="explanation_conversation_dictation_recovery_retry">Dinlemeyi yeniden başlatır. Daha önce tanınanlar eklenmez.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_retained">Bu dikteyi daha önce kaydedilen veya tanınan içerikle yeniden dener. Dinlemeyi yeniden başlatmaz.</string>
 
     <!-- Voice message explanations, shown when a recording or review control is held. -->
     <string name="explanation_conversation_voice_discard">Bu kaydı göndermeden siler. Geri alınamaz.</string>

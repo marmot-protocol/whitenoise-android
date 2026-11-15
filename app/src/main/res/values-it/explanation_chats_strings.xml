@@ -2,10 +2,11 @@
 <resources>
     <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
     <string name="explanation_chat_actions_leave_and_delete">Esci da questa chat e la rimuove da questo dispositivo. Gli altri membri restano nella chat e puoi tornare solo se qualcuno ti aggiunge di nuovo.</string>
-    <string name="explanation_chat_actions_delete">Rimuove questa chat e i suoi messaggi da questo dispositivo. Non ti fa uscire dal gruppo per gli altri membri.</string>
+    <string name="explanation_chat_actions_delete">Rimuove questa chat e i suoi messaggi solo da questo dispositivo. Non cambia nulla per gli altri partecipanti.</string>
     <string name="explanation_chat_actions_abandon_dm">Abbandona questo messaggio diretto e lo rimuove da questo dispositivo. L\'altra persona non viene avvisata.</string>
     <string name="explanation_chat_actions_abandon_group">Abbandona questo gruppo e lo rimuove da questo dispositivo. Gli altri membri restano nel gruppo.</string>
-    <string name="explanation_chat_info_mute">Interrompe le notifiche di questa chat. Continui a ricevere i messaggi e puoi riattivarle.</string>
+    <string name="explanation_chat_info_mute">Silenzia gli avvisi dei messaggi ordinari di questa chat. Le menzioni dirette possono comunque avvisarti e continui a ricevere tutti i messaggi.</string>
+    <string name="explanation_chat_info_copy_peer_public_key">Copia la chiave pubblica di questa persona negli appunti. La sua chiave pubblica è l\'indirizzo che gli altri usano per trovarla e connettersi con lei, quindi è sicura da condividere. Non include mai la sua chiave privata.</string>
     <string name="explanation_chat_info_unmute">Riattiva le notifiche di questa chat.</string>
     <string name="explanation_chat_info_disappearing">Imposta se i nuovi messaggi di questa chat scompaiono dopo un tempo scelto. I messaggi già inviati non cambiano.</string>
     <string name="explanation_chat_info_copy_chat_link">Copia un link a questa chat che puoi condividere perché altri chiedano di unirsi.</string>

@@ -2528,6 +2528,7 @@ internal fun GroupDetailsHeader(
                         copiedStateDescription = stringResource(R.string.copied),
                         targetTestTag = "chat_info.copy_public_key",
                         visualTestTag = "chat_info.copy_public_key.visual",
+                        explanationRes = R.string.explanation_chat_info_copy_peer_public_key,
                     )
                 }
             } else if (onAddDescription != null) {

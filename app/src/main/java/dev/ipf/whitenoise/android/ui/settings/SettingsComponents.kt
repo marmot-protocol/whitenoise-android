@@ -180,6 +180,7 @@ internal fun SettingsLink(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     explanation: String? = null,
+    holdToExplain: Boolean = true,
     subtitle: String? = null,
     value: String? = null,
     enabled: Boolean = true,
@@ -197,7 +198,7 @@ internal fun SettingsLink(
             modifier
                 .fillMaxWidth()
                 .settingsRowBorder(context)
-                .explainOnLongPress(explanation, title)
+                .explainOnLongPress(explanation, title, holdToExplain)
                 .semantics {
                     role = Role.Button
                     settingsRow = Unit
@@ -262,7 +263,8 @@ internal fun SettingsAction(
 private fun Modifier.explainOnLongPress(
     explanation: String?,
     title: String,
-): Modifier = explainOnLongPress(explanation?.let { Explanation(title, it) })
+    holdToExplain: Boolean = true,
+): Modifier = explainOnLongPress(explanation?.let { Explanation(title, it) }, holdToExplain = holdToExplain)
 
 /** Keep the group fill identical at rest, checked, and disabled so only the control reports state. */
 @Composable

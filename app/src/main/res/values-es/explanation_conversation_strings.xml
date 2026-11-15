@@ -16,6 +16,7 @@
     <string name="explanation_conversation_dictation_recovery_app_settings">Abre los ajustes de Android para White Noise, donde puedes permitir el acceso al micrófono.</string>
     <string name="explanation_conversation_dictation_recovery_speech">Abre los ajustes de reconocimiento de voz de Android, donde puedes elegir o instalar un servicio de reconocimiento.</string>
     <string name="explanation_conversation_dictation_recovery_retry">Vuelve a empezar a escuchar. Lo reconocido antes no se añade.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_retained">Vuelve a intentar este dictado con lo que ya se grabó o reconoció. No vuelve a empezar a escuchar.</string>
 
     <!-- Voice message explanations, shown when a recording or review control is held. -->
     <string name="explanation_conversation_voice_discard">Elimina esta grabación sin enviarla. No se puede deshacer.</string>

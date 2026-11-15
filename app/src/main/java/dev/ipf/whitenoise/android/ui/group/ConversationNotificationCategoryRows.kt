@@ -20,6 +20,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -27,7 +29,7 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Channel customization and alert delivery are independent actions in one compact row. */
-@Suppress("LongParameterList") // One model with independent platform-navigation and delivery actions.
+@Suppress("LongParameterList", "LongMethod") // One model with independent platform-navigation and delivery actions.
 @Composable
 internal fun ConversationNotificationCategoriesList(
     settings: List<ConversationNotificationCategorySetting>,
@@ -41,6 +43,11 @@ internal fun ConversationNotificationCategoriesList(
         settings.forEach { setting ->
             row(setting.channel.id) { context ->
                 val title = notificationChannelTitle(setting.channel)
+                val categoryExplanation = stringResource(R.string.explanation_privacy_conversation_category)
+                val alertExplanation = stringResource(R.string.explanation_privacy_conversation_alert)
+                // A hold on the row would also win over the switch, so with a switch the row keeps only the
+                // TalkBack action and the chevron carries the category hold.
+                val hasAlertSwitch = alertEnabled[setting.channel] != null
                 SettingsLink(
                     context = context,
                     title = title,
@@ -67,7 +74,8 @@ internal fun ConversationNotificationCategoriesList(
                             alertDetails[setting.channel]?.takeIf { it.isNotBlank() },
                         ).joinToString(" · "),
                     busy = pendingChannel == setting.channel,
-                    explanation = stringResource(R.string.explanation_privacy_conversation_category),
+                    explanation = categoryExplanation,
+                    holdToExplain = !hasAlertSwitch,
                     trailing = {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -81,10 +89,20 @@ internal fun ConversationNotificationCategoriesList(
                                     modifier =
                                         Modifier
                                             .testTag("conversation-alert-${setting.channel.id}")
+                                            .explainOnLongPress(Explanation(title, alertExplanation))
                                             .semantics { contentDescription = title },
                                 )
                             }
-                            Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null)
+                            Icon(
+                                painterResource(R.drawable.ic_chevron_right),
+                                contentDescription = null,
+                                modifier =
+                                    Modifier
+                                        .testTag("conversation-category-chevron-${setting.channel.id}")
+                                        .explainOnLongPress(
+                                            Explanation(title, categoryExplanation).takeIf { hasAlertSwitch },
+                                        ),
+                            )
                         }
                     },
                     leading = { SettingsLeadingIcon(notificationChannelIcon(setting.channel)) },

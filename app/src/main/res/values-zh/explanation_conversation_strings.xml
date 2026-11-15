@@ -16,6 +16,7 @@
     <string name="explanation_conversation_dictation_recovery_app_settings">打开 White Noise 的 Android 设置，你可以在那里允许使用麦克风。</string>
     <string name="explanation_conversation_dictation_recovery_speech">打开 Android 语音识别设置，你可以在那里选择或安装识别服务。</string>
     <string name="explanation_conversation_dictation_recovery_retry">重新开始收听。之前识别出的内容不会被添加。</string>
+    <string name="explanation_conversation_dictation_recovery_retry_retained">用已录制或已识别的内容再次尝试此次听写。不会重新开始收听。</string>
 
     <!-- Voice message explanations, shown when a recording or review control is held. -->
     <string name="explanation_conversation_voice_discard">删除这段录音且不发送。无法撤销。</string>

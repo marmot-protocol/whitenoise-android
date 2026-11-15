@@ -2,10 +2,11 @@
 <resources>
     <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
     <string name="explanation_chat_actions_leave_and_delete">退出此聊天并将其从本设备移除。其他成员仍留在聊天中，只有被他人重新添加后你才能回来。</string>
-    <string name="explanation_chat_actions_delete">从本设备移除此聊天及其消息。对其他成员而言，你不会因此退出群组。</string>
+    <string name="explanation_chat_actions_delete">仅从本设备移除此聊天及其消息。对聊天中的其他人没有任何影响。</string>
     <string name="explanation_chat_actions_abandon_dm">放弃此私信并将其从本设备移除。对方不会收到通知。</string>
     <string name="explanation_chat_actions_abandon_group">放弃此群组并将其从本设备移除。其他成员仍留在群组中。</string>
-    <string name="explanation_chat_info_mute">停止此聊天的通知。你仍会收到其消息，之后可以重新开启通知。</string>
+    <string name="explanation_chat_info_mute">将此聊天中的普通消息提醒静音。直接提及仍可能通知你，你仍会收到所有消息。</string>
+    <string name="explanation_chat_info_copy_peer_public_key">将此人的公钥复制到剪贴板。其公钥是他人用来找到并联系对方的地址，因此可以安全地分享。它绝不包含对方的私钥。</string>
     <string name="explanation_chat_info_unmute">重新开启此聊天的通知。</string>
     <string name="explanation_chat_info_disappearing">设置此聊天中的新消息是否在所选时间后消失。已发送的消息不受影响。</string>
     <string name="explanation_chat_info_copy_chat_link">复制指向此聊天的链接，你可以分享它，让他人申请加入。</string>

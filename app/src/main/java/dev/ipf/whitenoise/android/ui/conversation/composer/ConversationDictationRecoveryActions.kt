@@ -33,6 +33,7 @@ internal fun ConversationDictationFailureAction(
         controller.hasUnrecoveredTranscript(state) ||
             controller.canRetryRetainedAudio ||
             controller.canRetryRecoveredSend
+    val retainedRetry = controller.canRetryRetainedAudio || !state.retainedTranscript.isNullOrBlank()
     val settingsRecoveryAvailable = state.recognitionIncomplete && recovery != ConversationDictationRecovery.Retry
     IconButton(
         enabled =
@@ -46,7 +47,12 @@ internal fun ConversationDictationFailureAction(
                 .explainOnLongPress(
                     composerExplanation(
                         dictationFailureActionLabel(retrySend, state.recognitionIncomplete, recovery),
-                        dictationFailureActionExplanation(retrySend, state.recognitionIncomplete, recovery),
+                        dictationFailureActionExplanation(
+                            retrySend,
+                            state.recognitionIncomplete,
+                            recovery,
+                            retainedRetry,
+                        ),
                     ),
                 ),
     ) {
@@ -97,6 +103,7 @@ private fun dictationFailureActionExplanation(
     retrySend: Boolean,
     recognitionIncomplete: Boolean,
     recovery: ConversationDictationRecovery,
+    retainedRetry: Boolean,
 ): Int =
     when {
         retrySend && recognitionIncomplete -> R.string.explanation_conversation_dictation_recovery_paste
@@ -105,5 +112,6 @@ private fun dictationFailureActionExplanation(
             R.string.explanation_conversation_dictation_recovery_app_settings
         recovery == ConversationDictationRecovery.SpeechProviderSetup ->
             R.string.explanation_conversation_dictation_recovery_speech
+        retainedRetry -> R.string.explanation_conversation_dictation_recovery_retry_retained
         else -> R.string.explanation_conversation_dictation_recovery_retry
     }

@@ -2,10 +2,11 @@
 <resources>
     <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
     <string name="explanation_chat_actions_leave_and_delete">Bu sohbetten ayrılır ve onu bu cihazdan kaldırır. Diğer üyeler sohbette kalır; yalnızca biri seni yeniden eklerse dönebilirsin.</string>
-    <string name="explanation_chat_actions_delete">Bu sohbeti ve mesajlarını bu cihazdan kaldırır. Diğer üyeler için gruptan ayrılmış olmazsın.</string>
+    <string name="explanation_chat_actions_delete">Bu sohbeti ve mesajlarını yalnızca bu cihazdan kaldırır. Sohbetteki diğer kişiler için hiçbir şey değişmez.</string>
     <string name="explanation_chat_actions_abandon_dm">Bu doğrudan mesajdan vazgeçer ve onu bu cihazdan kaldırır. Karşı taraf bilgilendirilmez.</string>
     <string name="explanation_chat_actions_abandon_group">Bu gruptan vazgeçer ve onu bu cihazdan kaldırır. Diğer üyeler grupta kalır.</string>
-    <string name="explanation_chat_info_mute">Bu sohbetin bildirimlerini durdurur. Mesajları almaya devam edersin ve bunu tekrar açabilirsin.</string>
+    <string name="explanation_chat_info_mute">Bu sohbetteki sıradan mesaj uyarılarını sessize alır. Doğrudan bahsetmeler yine de seni uyarabilir ve tüm mesajları almaya devam edersin.</string>
+    <string name="explanation_chat_info_copy_peer_public_key">Bu kişinin genel anahtarını panoya kopyalar. Genel anahtarı, diğer kişilerin onu bulmak ve onunla bağlantı kurmak için kullandığı adrestir; bu yüzden paylaşmak güvenlidir. Özel anahtarını asla içermez.</string>
     <string name="explanation_chat_info_unmute">Bu sohbetin bildirimlerini yeniden açar.</string>
     <string name="explanation_chat_info_disappearing">Bu sohbetteki yeni mesajların seçilen süre sonunda kaybolup kaybolmayacağını belirler. Gönderilmiş mesajlar değişmez.</string>
     <string name="explanation_chat_info_copy_chat_link">Bu sohbetin bağlantısını kopyalar; başkalarının katılma isteği göndermesi için paylaşabilirsin.</string>

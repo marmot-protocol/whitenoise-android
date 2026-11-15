@@ -16,6 +16,7 @@
     <string name="explanation_conversation_dictation_recovery_app_settings">Opens Android settings for White Noise, where you can allow microphone access.</string>
     <string name="explanation_conversation_dictation_recovery_speech">Opens Android speech recognition settings, where you can choose or install a recognition service.</string>
     <string name="explanation_conversation_dictation_recovery_retry">Starts listening again. What was recognized before is not added.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_retained">Tries this dictation again with what was already recorded or recognized. It does not start listening again.</string>
 
     <!-- Voice message explanations, shown when a recording or review control is held. -->
     <string name="explanation_conversation_voice_discard">Deletes this recording without sending it. This cannot be undone.</string>

@@ -16,6 +16,7 @@
     <string name="explanation_conversation_dictation_recovery_app_settings">Открывает настройки Android для White Noise, где можно разрешить доступ к микрофону.</string>
     <string name="explanation_conversation_dictation_recovery_speech">Открывает настройки распознавания речи Android, где можно выбрать или установить службу распознавания.</string>
     <string name="explanation_conversation_dictation_recovery_retry">Снова начинает слушать. Ранее распознанное не добавляется.</string>
+    <string name="explanation_conversation_dictation_recovery_retry_retained">Повторяет эту диктовку с тем, что уже записано или распознано. Прослушивание заново не начинается.</string>
 
     <!-- Voice message explanations, shown when a recording or review control is held. -->
     <string name="explanation_conversation_voice_discard">Удаляет эту запись без отправки. Отменить это нельзя.</string>

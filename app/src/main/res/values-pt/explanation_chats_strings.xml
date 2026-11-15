@@ -2,10 +2,11 @@
 <resources>
     <!-- Hold-to-explain copy for chat list, chat actions, new message, search and group details controls. -->
     <string name="explanation_chat_actions_leave_and_delete">Sai deste chat e o remove deste dispositivo. Os outros membros continuam no chat e só podes voltar se alguém te adicionar de novo.</string>
-    <string name="explanation_chat_actions_delete">Remove este chat e as suas mensagens deste dispositivo. Não te tira do grupo para os outros membros.</string>
+    <string name="explanation_chat_actions_delete">Remove este chat e as suas mensagens apenas deste dispositivo. Nada muda para as outras pessoas nele.</string>
     <string name="explanation_chat_actions_abandon_dm">Abandona esta mensagem direta e remove-a deste dispositivo. A outra pessoa não é avisada.</string>
     <string name="explanation_chat_actions_abandon_group">Abandona este grupo e remove-o deste dispositivo. Os outros membros continuam no grupo.</string>
-    <string name="explanation_chat_info_mute">Pára as notificações deste chat. Continuas a receber as mensagens e podes reativá-las.</string>
+    <string name="explanation_chat_info_mute">Silencia os alertas de mensagens comuns deste chat. Menções diretas ainda podem te avisar, e você continua recebendo todas as mensagens.</string>
+    <string name="explanation_chat_info_copy_peer_public_key">Copia a chave pública desta pessoa para a área de transferência. A chave pública dela é o endereço que outras pessoas usam para encontrá-la e se conectar com ela, então é seguro compartilhá-la. Ela nunca inclui a chave privada.</string>
     <string name="explanation_chat_info_unmute">Volta a ativar as notificações deste chat.</string>
     <string name="explanation_chat_info_disappearing">Define se as novas mensagens deste chat desaparecem após um tempo escolhido. As mensagens já enviadas não mudam.</string>
     <string name="explanation_chat_info_copy_chat_link">Copia uma ligação para este chat que podes partilhar para que outros peçam para entrar.</string>

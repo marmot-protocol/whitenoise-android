@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -104,7 +105,8 @@ private fun IdentityQrCode(
 
 /**
  * 48 dp copy target around a 240 dp capsule that shows a middle-ellipsized identifier and a copy glyph, which turns
- * into a check while [copied]. The whole target is the button; the capsule is the visual.
+ * into a check while [copied]. [explanationRes] defaults to the wording for the user's own key. The whole target is
+ * the button; the capsule is the visual.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -119,6 +121,7 @@ internal fun IdentifierCopyCapsule(
     targetTestTag: String,
     visualTestTag: String,
     modifier: Modifier = Modifier,
+    @StringRes explanationRes: Int = R.string.explanation_organize_copy_public_key,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val actionDescription = if (copied) copiedContentDescription else copyContentDescription
@@ -131,7 +134,7 @@ internal fun IdentifierCopyCapsule(
                 .explainOnLongPress(
                     Explanation(
                         copyContentDescription,
-                        stringResource(R.string.explanation_organize_copy_public_key),
+                        stringResource(explanationRes),
                     ),
                 ).clickable(
                     interactionSource = interactionSource,
