@@ -1,0 +1,135 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+  "legacy_sha256": "2a22b48ea0675dfb147e5319361d8668bb83aa21c2b750e30c4cb0b6721e4dd3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ColorPresetRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "fun ColorPresetRow(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "ColorSlider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "fun ColorSlider(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "ColorSwatch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "fun ColorSwatch(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "FullSpectrumColorPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "fun FullSpectrumColorPicker(",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:color_brightness",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_brightness",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_hex",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_hex",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_hex_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_hex_error",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_hue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_hue",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_saturation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_saturation",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      },
+      {
+        "surface": "string:color_swatch_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.color_swatch_description",
+        "test_ids": [
+          "SET-004",
+          "SET-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_appearance_color_brightness",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.explanation_appearance_color_brightness",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_color_hue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.explanation_appearance_color_hue",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_color_saturation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.explanation_appearance_color_saturation",
+        "test_ids": [
+          "SET-054"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_appearance_color_swatch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullSpectrumColorPicker.kt",
+        "anchor": "R.string.explanation_appearance_color_swatch",
+        "test_ids": [
+          "SET-054"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

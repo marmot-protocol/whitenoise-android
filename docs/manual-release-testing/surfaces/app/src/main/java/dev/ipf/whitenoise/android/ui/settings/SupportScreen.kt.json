@@ -1,0 +1,157 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+  "legacy_sha256": "3862bb013904feb08d8c36e891431d643c55b926eb45ddd8d9667a0ce710cfdd",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "SupportContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "fun SupportContent(",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "SupportScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "fun SupportScreen(",
+        "test_ids": [
+          "SET-018"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.chat_with_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.chat_with_support",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.no_active_account_period",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.no_active_account_period",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.start_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.start_chat",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_contact_explainer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_contact_explainer",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_contact_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_contact_subtitle",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_contact_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_contact_title",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_open_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_open_relays",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_receiving_relay_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_receiving_relay_required",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_relays_attention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_relays_attention",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_relays_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_relays_loading",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_relays_review",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_relays_review",
+        "test_ids": [
+          "SET-018"
+        ]
+      },
+      {
+        "surface": "R.string.support_relays_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.support_relays_unavailable",
+        "test_ids": [
+          "SET-018"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_organize_support_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.explanation_organize_support_relays",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_support_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.explanation_organize_support_retry",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_support_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+        "anchor": "R.string.explanation_organize_support_start",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

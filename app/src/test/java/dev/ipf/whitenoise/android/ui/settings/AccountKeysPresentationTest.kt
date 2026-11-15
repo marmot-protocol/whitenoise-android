@@ -8,9 +8,11 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -18,6 +20,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -27,6 +30,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.ExplanationHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -70,6 +74,74 @@ class AccountKeysPresentationTest {
         composeRule.onNodeWithTag("profile_keys.export_raw").assertExists()
     }
 
+    /** Holding the public key value explains it in a sheet. */
+    @Test
+    fun holdingThePublicKeyExplainsIt() {
+        render()
+        composeRule.onNodeWithTag("profile_keys.public_key_value", useUnmergedTree = true).performTouchInput {
+            longClick()
+        }
+        assertExplanation(R.string.explanation_account_keys_public_key)
+    }
+
+    /** Holding the masked private key, or its Explain action, explains it and leaves the key hidden. */
+    @Test
+    fun holdingThePrivateKeyExplainsItWithoutRevealingIt() {
+        render()
+        val hidden = app.getString(R.string.private_key_hidden)
+        val explain =
+            composeRule
+                .onNodeWithContentDescription(hidden)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single { it.label == app.getString(R.string.explanation_action_explain) }
+        composeRule.runOnIdle { assertTrue(explain.action()) }
+        assertExplanation(R.string.explanation_account_keys_private_key)
+        composeRule.onNodeWithContentDescription(hidden).assertExists()
+        composeRule.onNodeWithTag("profile_keys.private_key_value", useUnmergedTree = true).performTouchInput {
+            longClick()
+        }
+        assertExplanation(R.string.explanation_account_keys_private_key)
+        composeRule.onNodeWithContentDescription(hidden).assertExists()
+    }
+
+    @Test
+    fun privateKeyPurposeFollowsWarningAndPrecedesExports() {
+        render()
+        val warning =
+            composeRule.onNodeWithText(app.getString(R.string.profile_private_key_help)).fetchSemanticsNode()
+        val purpose =
+            composeRule.onNodeWithText(app.getString(R.string.profile_private_key_use_help)).fetchSemanticsNode()
+        val export = composeRule.onNodeWithTag("profile_keys.export_raw").fetchSemanticsNode()
+        assertTrue(warning.boundsInRoot.bottom <= purpose.boundsInRoot.top)
+        assertTrue(purpose.boundsInRoot.bottom <= export.boundsInRoot.top)
+    }
+
+    /** Adding decorative glyphs keeps the labelled backup actions independently clickable. */
+    @Test
+    fun backupActionLabelsKeepTheirCallbacks() {
+        var copies = 0
+        var exports = 0
+        var hides = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                EncryptedBackupResultDialog(
+                    backup = "ncryptsec1syntheticbackup",
+                    copied = true,
+                    onCopy = { copies++ },
+                    onExport = { exports++ },
+                    onHide = { hides++ },
+                )
+            }
+        }
+        composeRule.onNodeWithText(app.getString(R.string.copied)).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.export)).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.hide)).performClick()
+        assertEquals(1, copies)
+        assertEquals(1, exports)
+        assertEquals(1, hides)
+    }
+
     /** The destructive wipe action renders after the export group with visible section separation. */
     @Test
     fun destructiveActionIsRenderedAfterExportsWithSectionSeparation() {
@@ -99,6 +171,7 @@ class AccountKeysPresentationTest {
     @Test
     fun amberAccountsSeeTheCalloutInsteadOfKeyGroups() {
         render(localSigning = false)
+        composeRule.onNodeWithText(app.getString(R.string.profile_private_key_use_help)).assertDoesNotExist()
         composeRule.onNodeWithTag("profile_keys.amber_info").assertExists()
         composeRule.onNodeWithText(app.getString(R.string.copy_private_key)).assertDoesNotExist()
         composeRule.onNodeWithTag("profile_keys.export_raw").assertDoesNotExist()
@@ -166,11 +239,19 @@ class AccountKeysPresentationTest {
                 LocalLayoutDirection provides layoutDirection,
             ) {
                 WhiteNoiseTheme {
-                    AccountKeysScreen(appState = appState, onBack = {}, contentWindowInsets = contentWindowInsets)
+                    ExplanationHost {
+                        AccountKeysScreen(appState = appState, onBack = {}, contentWindowInsets = contentWindowInsets)
+                    }
                 }
             }
         }
         return appState
+    }
+
+    private fun assertExplanation(body: Int) {
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("explanation.sheet").assertIsDisplayed()
+        composeRule.onNodeWithTag("explanation.body").assertTextEquals(app.getString(body))
     }
 
     /** App state with npub. */

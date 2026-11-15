@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">Explain</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">Shows which of your accounts sends messages in this chat. It does not switch accounts.</string>
+    <string name="explanation_composer_more">Opens the actions that are not pinned to the toolbar, including Customize composer.</string>
+    <string name="explanation_composer_emoji">Opens the emoji picker, including your custom emoji.</string>
+    <string name="explanation_composer_paste">Pastes what you copied into the message.</string>
+    <string name="explanation_composer_dictation">Types what you say using Android speech recognition. White Noise asks for offline recognition, but your device may still use an online service.</string>
+    <string name="explanation_composer_translate">Turns translate mode on or off. While it is on, Send delivers the translation shown on the Will send line, and nothing is sent until a translation is ready.</string>
+    <string name="explanation_composer_voice_note">Hold to record a voice message.</string>
+    <string name="explanation_composer_camera">Opens the camera so you can attach a new photo. Android asks for camera access the first time.</string>
+    <string name="explanation_composer_gallery">Opens the Android photo picker. White Noise only receives the photos and videos you choose.</string>
+    <string name="explanation_composer_files">Opens the Android file picker to attach any file.</string>
+    <string name="explanation_composer_location">Sends your current location once, as a map link. It does not keep sharing your location.</string>
+    <string name="explanation_composer_person">Shares a White Noise user\'s public key as text, so others can message them.</string>
+    <string name="explanation_composer_contact">Shares a contact card from your phone\'s contacts.</string>
+    <string name="explanation_composer_poll">Creates a poll that group members can vote in.</string>
+    <string name="explanation_composer_sticker">Opens your stickers so you can send one.</string>
+    <string name="explanation_composer_customize">Choose which shortcuts stay on the toolbar, which side they sit on, and where the voice message button goes.</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">Your profile, the keys that prove who you are, and the relays that carry your messages.</string>
+    <string name="explanation_settings_notifications">Sounds and vibration, background delivery, and Android\'s notification settings for White Noise.</string>
+    <string name="explanation_settings_chats">Folders, swipe actions, the composer, the Enter key, custom emoji and quick account switching.</string>
+    <string name="explanation_settings_appearance">Theme, colors, font, text size, and how dates and times are shown.</string>
+    <string name="explanation_settings_voice_language">App language, Read Aloud, dictation and message translation.</string>
+    <string name="explanation_settings_privacy_security">App lock, screen security, incognito keyboard, blocked users, default disappearing messages and diagnostics sharing.</string>
+    <string name="explanation_settings_data_usage">See what uses storage, and choose when media downloads and the quality it is sent at.</string>
+    <string name="explanation_settings_ai_agents">Connect AI agents that you can chat with in White Noise, or set one up manually.</string>
+    <string name="explanation_settings_help_support">Help articles, chat with support, donations and developer tools.</string>
+</resources>

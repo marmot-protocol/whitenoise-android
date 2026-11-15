@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Lock
 @Composable
 internal fun MicHoldButton(
     controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
+    modifier: Modifier = Modifier,
     slotWidth: Dp = ComposerToolbarSlotWidth,
     canStart: () -> Boolean = { true },
     onHoldStart: () -> Unit = {},
@@ -97,7 +98,7 @@ internal fun MicHoldButton(
                 }
             },
             modifier =
-                Modifier
+                modifier
                     .testTag("composer.voice.launcher")
                     .width(slotWidth)
                     .height(48.dp)

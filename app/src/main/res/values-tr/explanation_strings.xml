@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">Açıkla</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">Bu sohbette mesajları hesaplarından hangisinin gönderdiğini gösterir. Hesap değiştirmez.</string>
+    <string name="explanation_composer_more">Araç çubuğuna sabitlenmemiş eylemleri açar; Mesaj alanını özelleştir de bunların arasındadır.</string>
+    <string name="explanation_composer_emoji">Özel emojilerin dahil olduğu emoji seçiciyi açar.</string>
+    <string name="explanation_composer_paste">Kopyaladığın şeyi mesaja yapıştırır.</string>
+    <string name="explanation_composer_dictation">Söylediklerini Android konuşma tanıma ile yazıya döker. White Noise çevrimdışı tanıma ister, ancak cihazın yine de çevrimiçi bir hizmet kullanabilir.</string>
+    <string name="explanation_composer_translate">Çeviri modunu açar veya kapatır. Açıkken Gönder, Gönderilecek satırında gösterilen çeviriyi gönderir ve bir çeviri hazır olana kadar hiçbir şey gönderilmez.</string>
+    <string name="explanation_composer_voice_note">Sesli mesaj kaydetmek için basılı tut.</string>
+    <string name="explanation_composer_camera">Yeni bir fotoğraf eklemen için kamerayı açar. Android ilk seferde kamera erişimi ister.</string>
+    <string name="explanation_composer_gallery">Android fotoğraf seçiciyi açar. White Noise yalnızca seçtiğin fotoğraf ve videoları alır.</string>
+    <string name="explanation_composer_files">Herhangi bir dosya eklemek için Android dosya seçiciyi açar.</string>
+    <string name="explanation_composer_location">Mevcut konumunu harita bağlantısı olarak bir kez gönderir. Konumunu paylaşmaya devam etmez.</string>
+    <string name="explanation_composer_person">Bir White Noise kullanıcısının genel anahtarını metin olarak paylaşır; böylece diğerleri ona mesaj gönderebilir.</string>
+    <string name="explanation_composer_contact">Telefonunun kişilerinden bir kişi kartı paylaşır.</string>
+    <string name="explanation_composer_poll">Grup üyelerinin oy verebileceği bir anket oluşturur.</string>
+    <string name="explanation_composer_sticker">Göndermen için çıkartmalarını açar.</string>
+    <string name="explanation_composer_customize">Hangi kısayolların araç çubuğunda kalacağını, hangi tarafta duracağını ve sesli mesaj düğmesinin nerede olacağını seç.</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">Profilin, kim olduğunu kanıtlayan anahtarlar ve mesajlarını taşıyan röleler.</string>
+    <string name="explanation_settings_notifications">Sesler ve titreşim, arka planda teslimat ve White Noise için Android bildirim ayarları.</string>
+    <string name="explanation_settings_chats">Klasörler, kaydırma eylemleri, mesaj alanı, Enter tuşu, özel emojiler ve hızlı hesap değiştirme.</string>
+    <string name="explanation_settings_appearance">Tema, renkler, yazı tipi, metin boyutu ve tarih ile saatin nasıl gösterileceği.</string>
+    <string name="explanation_settings_voice_language">Uygulama dili, Yüksek Sesle Oku, dikte ve mesaj çevirisi.</string>
+    <string name="explanation_settings_privacy_security">Uygulama kilidi, ekran güvenliği, gizli klavye, engellenen kullanıcılar, varsayılan kaybolan mesajlar ve tanılama paylaşımı.</string>
+    <string name="explanation_settings_data_usage">Depolamayı neyin kullandığını gör, medyanın ne zaman indirileceğini ve hangi kalitede gönderileceğini seç.</string>
+    <string name="explanation_settings_ai_agents">White Noise içinde sohbet edebileceğin yapay zekâ aracılarını bağla veya birini elle kur.</string>
+    <string name="explanation_settings_help_support">Yardım makaleleri, destekle sohbet, bağışlar ve geliştirici araçları.</string>
+</resources>

@@ -9,6 +9,9 @@ name: nested-diagnostics
     element:
       text: "Privacy & Security"
     direction: DOWN
+- longPressOn: "Privacy & Security"
+- assertVisible: "App lock, screen security, incognito keyboard, blocked users, default disappearing messages and diagnostics sharing."
+- back
 - tapOn: "Privacy & Security"
 - scrollUntilVisible:
     element:

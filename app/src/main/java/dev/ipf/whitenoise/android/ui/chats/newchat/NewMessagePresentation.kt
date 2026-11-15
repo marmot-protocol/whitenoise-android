@@ -211,6 +211,7 @@ private fun NewMessageActionGroup(
                 stringResource(R.string.new_message_talk_to_agent),
                 actions.agentSettings,
                 modifier = Modifier.testTag("new_message.agentSettings"),
+                explanation = stringResource(R.string.explanation_new_message_talk_to_agent),
                 enabled = !busy && !inviteShareInProgress,
                 leading = { SettingsLeadingIcon(R.drawable.ic_ai_agents) },
             )

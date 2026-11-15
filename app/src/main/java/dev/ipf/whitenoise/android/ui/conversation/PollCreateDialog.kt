@@ -53,7 +53,9 @@ import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -242,7 +244,14 @@ internal fun PollCreateForm(
             )
         }
         if (options.size < MAX_POLL_OPTIONS) {
-            TextButton(onClick = onAddOption, enabled = enabled) {
+            TextButton(
+                onClick = onAddOption,
+                enabled = enabled,
+                modifier =
+                    Modifier.explainOnLongPress(
+                        composerExplanation(R.string.poll_add_option, R.string.explanation_poll_add_option),
+                    ),
+            ) {
                 Text(stringResource(R.string.poll_add_option))
             }
         }
@@ -253,12 +262,20 @@ internal fun PollCreateForm(
             FilterChip(
                 selected = !multiple,
                 onClick = { onMultipleChange(false) },
+                modifier =
+                    Modifier.explainOnLongPress(
+                        composerExplanation(R.string.poll_single_choice, R.string.explanation_poll_single_choice),
+                    ),
                 label = { Text(stringResource(R.string.poll_single_choice)) },
                 enabled = enabled,
             )
             FilterChip(
                 selected = multiple,
                 onClick = { onMultipleChange(true) },
+                modifier =
+                    Modifier.explainOnLongPress(
+                        composerExplanation(R.string.poll_multiple_choice, R.string.explanation_poll_multiple_choice),
+                    ),
                 label = { Text(stringResource(R.string.poll_multiple_choice)) },
                 enabled = enabled,
             )

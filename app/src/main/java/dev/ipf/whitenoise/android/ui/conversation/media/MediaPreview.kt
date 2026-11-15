@@ -45,7 +45,9 @@ import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -596,7 +598,13 @@ private fun MediaPreviewTopBar(
     TopAppBar(
         title = { Text(title ?: stringResource(R.string.preview_media)) },
         navigationIcon = {
-            IconButton(onClick = onClose) {
+            IconButton(
+                onClick = onClose,
+                modifier =
+                    Modifier.explainOnLongPress(
+                        composerExplanation(R.string.cancel_media_changes, R.string.explanation_media_preview_cancel),
+                    ),
+            ) {
                 Icon(
                     painterResource(R.drawable.ic_close),
                     contentDescription = stringResource(R.string.cancel_media_changes),
@@ -614,7 +622,17 @@ private fun MediaPreviewTopBar(
                     Text(stringResource(R.string.photo_editor_title))
                 }
             }
-            TextButton(onClick = onDone, enabled = doneEnabled) {
+            TextButton(
+                onClick = onDone,
+                enabled = doneEnabled,
+                modifier =
+                    Modifier.explainOnLongPress(
+                        composerExplanation(
+                            R.string.done,
+                            R.string.explanation_media_preview_done,
+                        ),
+                    ),
+            ) {
                 Text(stringResource(R.string.done))
             }
         },

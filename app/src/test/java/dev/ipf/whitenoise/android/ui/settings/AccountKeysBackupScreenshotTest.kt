@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasScrollAction
@@ -14,17 +15,23 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.WipeFailureItem
+import dev.ipf.whitenoise.android.state.WipeReport
+import dev.ipf.whitenoise.android.state.WipeStage
+import dev.ipf.whitenoise.android.state.WipeStageReport
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -93,6 +100,81 @@ class AccountKeysBackupScreenshotTest {
             largeRtl = true,
         )
 
+    /** The session sheet uses a logout glyph and retains its labelled action. */
+    @Test
+    fun signOutActionsLight() = capture("profile_keys_signout_actions_light", Stage.SignOut)
+
+    /** The wipe sheet retains all review text and its destructive action. */
+    @Test
+    fun wipeSheetLight() = capture("profile_keys_wipe_sheet_light", Stage.WipeSheet)
+
+    /** At 200% RTL the real sheet scrolls to its displayed action. */
+    @Test
+    fun wipeSheetLargeRtl() =
+        capture(
+            "profile_keys_wipe_sheet_large_rtl",
+            Stage.WipeSheet,
+            dark = true,
+            amoled = true,
+            largeRtl = true,
+        )
+
+    /** Feedback dismissal and post-wipe dismissal carry matching close/acknowledgment glyphs. */
+    @Test
+    fun feedbackActionsLight() = captureFeedback(largeRtl = false, outcome = false)
+
+    @Test
+    fun feedbackActionsLargeRtl() = captureFeedback(largeRtl = true, outcome = false)
+
+    @Test
+    fun wipeOutcomeActionsLight() = captureFeedback(largeRtl = false, outcome = true)
+
+    @Test
+    fun wipeOutcomeActionsLargeRtl() = captureFeedback(largeRtl = true, outcome = true)
+
+    private fun captureFeedback(
+        largeRtl: Boolean,
+        outcome: Boolean,
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = largeRtl, amoled = largeRtl, fontScale = if (largeRtl) 2f else 1f) {
+                    if (outcome) {
+                        WipeOutcomeSheet(
+                            report =
+                                WipeReport(
+                                    listOf(
+                                        WipeStageReport(
+                                            WipeStage.WipingLocalData,
+                                            null,
+                                            listOf(WipeFailureItem(null, "Synthetic cleanup failure")),
+                                        ),
+                                    ),
+                                ),
+                            onDismiss = {},
+                        )
+                    } else {
+                        ProfileKeyFeedbackDialogs(
+                            nativeExportError = null,
+                            shareErrorDialog = false,
+                            saveErrorDialog = true,
+                            expiredExportDialog = false,
+                            onNativeErrorDismiss = {},
+                            onShareErrorDismiss = {},
+                            onSaveErrorDismiss = {},
+                            onExpiryDismiss = {},
+                        )
+                    }
+                }
+            }
+        }
+        val surface = if (outcome) "wipe_outcome" else "feedback"
+        val scale = if (largeRtl) "large_rtl" else "light"
+        captureScreenRoboImage("src/test/snapshots/profile_keys_${surface}_actions_$scale.png")
+    }
+
     /** Drives real rows and native output without invoking any external picker, clipboard or chooser. */
     private fun capture(
         name: String,
@@ -111,7 +193,11 @@ class AccountKeysBackupScreenshotTest {
                 }
             }
         }
-        if (stage == Stage.Raw) {
+        if (stage == Stage.SignOut || stage == Stage.WipeSheet) {
+            openSessionStage(stage)
+            captureScreenRoboImage("src/test/snapshots/$name.png")
+            return
+        } else if (stage == Stage.Raw) {
             composeRule.onNode(hasScrollAction()).performScrollToNode(hasTestTag("profile_keys.export_raw"))
             composeRule.onNodeWithTag("profile_keys.export_raw").performClick()
         } else {
@@ -137,6 +223,24 @@ class AccountKeysBackupScreenshotTest {
             }
         }
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Uses displayed controls through the scrollable sheet; keeping the destructive review action reachable. */
+    private fun openSessionStage(stage: Stage) {
+        val tag = if (stage == Stage.SignOut) "profile_keys.sign_out" else WIPE_ACTION_TAG
+        composeRule.onNode(hasScrollAction()).performScrollToNode(hasTestTag(tag))
+        composeRule.onNodeWithTag(tag).performClick()
+        if (stage == Stage.SignOut) {
+            composeRule.onNodeWithTag("profile_keys.signout_invitation_keys").assertIsDisplayed()
+            return
+        }
+        composeRule
+            .onNode(hasText(context.getString(R.string.sign_out_and_wipe_sheet_title)) and !hasClickAction())
+            .assertIsDisplayed()
+        val confirmSheetAction =
+            hasText(context.getString(R.string.sign_out_and_wipe)) and
+                hasClickAction() and !hasTestTag(WIPE_ACTION_TAG)
+        composeRule.onNode(confirmSheetAction).performScrollTo().assertIsDisplayed()
     }
 
     /** Returns only intentionally synthetic public identity and encrypted backup text. */
@@ -176,5 +280,5 @@ class AccountKeysBackupScreenshotTest {
         )
     }
 
-    private enum class Stage { Preview, Raw, Password }
+    private enum class Stage { Preview, Raw, Password, SignOut, WipeSheet }
 }

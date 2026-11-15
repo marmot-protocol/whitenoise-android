@@ -115,6 +115,7 @@ internal fun DiagnosticsImprovementsScreen(
                                 appState.launchMutation { appState.setTelemetryEnabled(enabled) }
                             },
                             subtitle = stringResource(R.string.usage_diagnostics_subtitle),
+                            explanation = stringResource(R.string.explanation_diagnostics_usage),
                             enabled = state.snapshot != null && !state.failed,
                             busy = state.busy,
                             leading = { SettingsLeadingIcon(R.drawable.ic_analytics) },
@@ -137,6 +138,7 @@ internal fun DiagnosticsImprovementsScreen(
                                 }
                             },
                             subtitle = stringResource(R.string.audit_upload_subtitle),
+                            explanation = stringResource(R.string.explanation_diagnostics_logs),
                             enabled = appState.auditLogSettings != null && !auditLogsBusy,
                             busy = auditLogsBusy,
                             leading = { SettingsLeadingIcon(R.drawable.ic_group) },
@@ -176,6 +178,7 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.choose_audit_files_subtitle),
                             onClick = { auditPickerOpen = true },
                             enabled = !auditLogsBusy && !exportInFlight,
+                            explanation = stringResource(R.string.explanation_privacy_audit_choose),
                             leading = { SettingsLeadingIcon(R.drawable.ic_file_open) },
                         )
                     }
@@ -186,6 +189,7 @@ internal fun DiagnosticsImprovementsScreen(
                             onClick = { if (!exportInFlight) exportConfirmOpen = true },
                             subtitle = stringResource(R.string.export_audit_logs_subtitle),
                             enabled = !auditLogsBusy && !exportInFlight,
+                            explanation = stringResource(R.string.explanation_privacy_audit_export),
                             leading = { SettingsLeadingIcon(R.drawable.ic_upload_file) },
                         )
                     }
@@ -198,6 +202,7 @@ internal fun DiagnosticsImprovementsScreen(
                             subtitle = stringResource(R.string.diagnostics_storage_device),
                             enabled = !auditLogsBusy && !exportInFlight,
                             destructive = true,
+                            explanation = stringResource(R.string.explanation_privacy_audit_clear),
                             leading = {
                                 SettingsLeadingIcon(R.drawable.ic_delete, tint = MaterialTheme.colorScheme.error)
                             },

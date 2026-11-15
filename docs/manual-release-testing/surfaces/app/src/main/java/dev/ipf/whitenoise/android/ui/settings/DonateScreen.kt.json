@@ -1,0 +1,82 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+  "legacy_sha256": "c0cf8c1fbc7d7bc0a047f2794266d6346c9e8794e0f215c3d08cedd725aa8454",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DonateScreen",
+        "note": "Donate opens the Android-attributed foundation URL and reports browser refusal with a retryable action.",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "fun DonateScreen(",
+        "test_ids": [
+          "SET-022",
+          "SET-026"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "SET-022"
+        ]
+      },
+      {
+        "surface": "string:donate_open_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.donate_open_failed",
+        "test_ids": [
+          "SET-026"
+        ]
+      },
+      {
+        "surface": "string:settings_donate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.settings_donate",
+        "test_ids": [
+          "SET-022"
+        ]
+      },
+      {
+        "surface": "string:support_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.support_white_noise",
+        "test_ids": [
+          "SET-022"
+        ]
+      },
+      {
+        "surface": "string:support_white_noise_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.support_white_noise_detail",
+        "test_ids": [
+          "SET-022"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: DonateScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_donate_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+        "anchor": "R.string.explanation_organize_donate_open",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

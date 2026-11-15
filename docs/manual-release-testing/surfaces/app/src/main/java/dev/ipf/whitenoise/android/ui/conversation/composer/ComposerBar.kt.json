@@ -60,6 +60,14 @@
           "CON-030",
           "CON-035"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "surface": "Holding a locked recording button explains it",
+        "anchor": "R.string.explanation_conversation_voice_delete",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "settings_controls": [
@@ -187,6 +195,14 @@
         "anchor": "ComposerEmojiLibrary(installedEmoji)",
         "test_ids": [
           "SET-051"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_conversation_voice_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.explanation_conversation_voice_stop",
+        "test_ids": [
+          "CON-049"
         ]
       }
     ],

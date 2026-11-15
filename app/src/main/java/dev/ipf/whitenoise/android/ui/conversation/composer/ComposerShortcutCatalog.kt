@@ -2,8 +2,14 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.ui.common.Explanation
 
 internal val ComposerShortcut.labelRes: Int
     @StringRes get() =
@@ -44,3 +50,48 @@ internal val ComposerShortcut.iconRes: Int
             ComposerShortcut.Poll -> R.drawable.ic_description
             ComposerShortcut.Sticker -> R.drawable.ic_sticker
         }
+
+/** What holding each shortcut explains; every toolbar button and + menu row has one. */
+internal val ComposerShortcut.explanationRes: Int
+    @StringRes get() =
+        when (this) {
+            ComposerShortcut.SendingIdentity -> R.string.explanation_composer_sending_identity
+            ComposerShortcut.More -> R.string.explanation_composer_more
+            ComposerShortcut.Emoji -> R.string.explanation_composer_emoji
+            ComposerShortcut.Paste -> R.string.explanation_composer_paste
+            ComposerShortcut.Dictation -> R.string.explanation_composer_dictation
+            ComposerShortcut.Translate -> R.string.explanation_composer_translate
+            ComposerShortcut.VoiceNote -> R.string.explanation_composer_voice_note
+            ComposerShortcut.Camera -> R.string.explanation_composer_camera
+            ComposerShortcut.Gallery -> R.string.explanation_composer_gallery
+            ComposerShortcut.Files -> R.string.explanation_composer_files
+            ComposerShortcut.Location -> R.string.explanation_composer_location
+            ComposerShortcut.Person -> R.string.explanation_composer_person
+            ComposerShortcut.Contact -> R.string.explanation_composer_contact
+            ComposerShortcut.Poll -> R.string.explanation_composer_poll
+            ComposerShortcut.Sticker -> R.string.explanation_composer_sticker
+        }
+
+/** The shortcut's explanation; Customize composer lives only in the + menu and Settings. */
+@Composable
+internal fun ComposerShortcut.explanation(): Explanation = composerExplanation(labelRes, explanationRes)
+
+@Composable
+internal fun composerExplanation(
+    @StringRes titleRes: Int,
+    @StringRes bodyRes: Int,
+): Explanation = Explanation(title = stringResource(titleRes), body = stringResource(bodyRes))
+
+/** TalkBack keeps a direct Customize composer action on toolbar buttons. */
+@Composable
+internal fun composerCustomizeAccessibilityActions(onCustomize: (() -> Unit)?): List<CustomAccessibilityAction> {
+    val latestCustomize by rememberUpdatedState(onCustomize)
+    val label = stringResource(R.string.composer_customize)
+    if (onCustomize == null) return emptyList()
+    return listOf(
+        CustomAccessibilityAction(label) {
+            latestCustomize?.invoke()
+            true
+        },
+    )
+}

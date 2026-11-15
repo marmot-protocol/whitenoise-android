@@ -51,6 +51,16 @@ internal val AppFontScale.labelRes: Int
             AppFontScale.ExtraLarge -> R.string.font_scale_extra_large
         }
 
+internal val AppFontScale.explanationRes: Int
+    @StringRes
+    get() =
+        when (this) {
+            AppFontScale.Small -> R.string.explanation_appearance_font_size_small
+            AppFontScale.Default -> R.string.explanation_appearance_font_size_default
+            AppFontScale.Large -> R.string.explanation_appearance_font_size_large
+            AppFontScale.ExtraLarge -> R.string.explanation_appearance_font_size_extra_large
+        }
+
 /** The System entry is labelled through resources; every other family shows its proper name. */
 @Composable
 private fun AppFont.pickerLabel(): String =
@@ -147,6 +157,7 @@ internal fun AppearanceScreen(
                             subtitle = if (amoled) stringResource(R.string.appearance_amoled_detail) else null,
                             modifier = Modifier.testTag("appearance.theme.group"),
                             onClick = { themeOpen = true },
+                            explanation = stringResource(R.string.explanation_appearance_theme),
                             leading = { SettingsLeadingIcon(R.drawable.ic_palette) },
                         )
                     }
@@ -156,6 +167,7 @@ internal fun AppearanceScreen(
                                 context = context,
                                 title = stringResource(R.string.action_color),
                                 onClick = onOpenActionColor,
+                                explanation = stringResource(R.string.explanation_appearance_action_color),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_format_color_fill) },
                             )
                         }
@@ -165,6 +177,7 @@ internal fun AppearanceScreen(
                             context = context,
                             title = stringResource(R.string.chat_bubble_colors),
                             onClick = onOpenChatBubbleColors,
+                            explanation = stringResource(R.string.explanation_appearance_chat_bubble_colors),
                             leading = { SettingsLeadingIcon(R.drawable.ic_settings_chat_bubble_outline) },
                         )
                     }
@@ -179,6 +192,7 @@ internal fun AppearanceScreen(
                             title = stringResource(R.string.app_font),
                             value = familyLabels.getValue(appState.appFont),
                             onClick = { fontFamilyOpen = true },
+                            explanation = stringResource(R.string.explanation_appearance_app_font),
                             leading = { SettingsLeadingIcon(R.drawable.ic_font_download) },
                         )
                     }
@@ -188,6 +202,7 @@ internal fun AppearanceScreen(
                             title = stringResource(R.string.font_size),
                             value = fontLabels.getValue(appState.fontScale),
                             onClick = { fontSizeOpen = true },
+                            explanation = stringResource(R.string.explanation_appearance_font_size),
                             leading = { SettingsLeadingIcon(R.drawable.ic_format_size) },
                         )
                     }
@@ -198,6 +213,7 @@ internal fun AppearanceScreen(
                             value = dateTimeSample,
                             modifier = Modifier.testTag("appearance.date_time_format"),
                             onClick = { dateTimeOpen = true },
+                            explanation = stringResource(R.string.explanation_appearance_date_time),
                             leading = { SettingsLeadingIcon(R.drawable.ic_schedule) },
                         )
                     }

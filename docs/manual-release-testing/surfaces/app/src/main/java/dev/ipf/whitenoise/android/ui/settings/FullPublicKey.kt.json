@@ -48,6 +48,16 @@
           "ACC-002"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_organize_copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FullPublicKey.kt",
+        "anchor": "R.string.explanation_organize_copy_public_key",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

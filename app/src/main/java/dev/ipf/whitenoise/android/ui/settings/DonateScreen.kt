@@ -36,9 +36,11 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -108,13 +110,24 @@ internal fun DonateScreen(onBack: () -> Unit) {
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
+                    val donateLabel = stringResource(R.string.settings_donate)
                     WhiteNoiseButton(
                         onClick = {
                             openFailed = runCatching { uriHandler.openUri(WhiteNoiseUrls.DONATE) }.isFailure
                         },
-                        modifier = Modifier.fillMaxWidth().padding(top = DonationTopInset).testTag("donate.open"),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(top = DonationTopInset)
+                                .testTag("donate.open")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        donateLabel,
+                                        stringResource(R.string.explanation_organize_donate_open),
+                                    ),
+                                ),
                     ) {
-                        Text(stringResource(R.string.settings_donate))
+                        Text(donateLabel)
                     }
                     if (openFailed) {
                         Text(

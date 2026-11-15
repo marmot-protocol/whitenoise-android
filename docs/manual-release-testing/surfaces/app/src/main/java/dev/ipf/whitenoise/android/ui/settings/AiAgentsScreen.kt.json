@@ -1,0 +1,251 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+  "legacy_sha256": "c96e3107309b8dd97c6eb06ba48acabe6109912065d034c0f3a4b66061928841",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AgentSetupSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "fun AgentSetupSheet(",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "AiAgentsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "fun AiAgentsContent(",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "AiAgentsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "fun AiAgentsScreen(",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:ai_agents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_clipboard_disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_clipboard_disclosure",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_connector_docs_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_connector_docs_subtitle",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_connector_docs_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_connector_docs_title",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "setting:ai_agents_connectors_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_connectors_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_copy_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_copy_prompt",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_docs_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_docs_failed",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_docs_opened",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_docs_opened",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_project_groups_tip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_project_groups_tip",
+        "test_ids": [
+          "SET-016"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_manual_setup_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_manual_setup_body",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "setting:ai_agents_manual_setup_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_manual_setup_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_prompt_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_prompt_copied",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_public_key_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_public_key_unavailable",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_setup_instruction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_setup_instruction",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:ai_agents_setup_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_setup_title",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.copy_public_key",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:new_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.new_message",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.public_key",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      },
+      {
+        "surface": "string:public_key_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.public_key_copied",
+        "test_ids": [
+          "SET-016",
+          "SET-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: AiAgentsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_ai_connector",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.explanation_organize_ai_connector",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_ai_copy_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.explanation_organize_ai_copy_prompt",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_ai_copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.explanation_organize_ai_copy_public_key",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_ai_docs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.explanation_organize_ai_docs",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

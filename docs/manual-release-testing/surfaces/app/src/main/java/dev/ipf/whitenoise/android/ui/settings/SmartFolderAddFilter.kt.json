@@ -47,6 +47,94 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_accepted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_accepted",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_archived",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_draft",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_mentions",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_muted",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_participants",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_participants",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_pending",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_pinned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_pinned",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_title",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_type",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_type",
+        "test_ids": [
+          "SET-057"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_organize_filter_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "R.string.explanation_organize_filter_unread",
+        "test_ids": [
+          "SET-057"
+        ]
       }
     ]
   },
