@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -75,6 +76,7 @@ class DestinationFolderFilterTest {
         composeRule.onNodeWithText("Alice").assertDoesNotExist()
         composeRule.onNodeWithText("Bob").assertIsDisplayed()
         assertEquals(emptyList<String>(), committed)
+        if (!share) composeRule.onNodeWithContentDescription("Search chats").performClick()
         composeRule.onNode(hasSetTextAction()).performTextInput("Alice")
         composeRule.onNodeWithText("Bob").assertDoesNotExist()
         composeRule.onNode(hasSetTextAction()).performTextClearance()
