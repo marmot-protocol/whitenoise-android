@@ -317,7 +317,10 @@ class AtomicAdminInviteTest {
             )
 
         /** Builds the native report for the requested subset using the fixture's current roster. */
-        private fun nativeInviteResult(members: List<String>, selected: List<String>): GroupInviteResultFfi {
+        private fun nativeInviteResult(
+            members: List<String>,
+            selected: List<String>,
+        ): GroupInviteResultFfi {
             val summary =
                 SendSummaryFfi(
                     1u,
