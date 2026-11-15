@@ -15,7 +15,8 @@ internal data class MediaThumbnail(
 
 private const val PIXEL_ROUNDING_TOLERANCE = 0.001
 
-private val thumbnailDecodeBuckets = intArrayOf(128, 256, 384, 512, 768, 1024, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+/** Shared decode ceilings keep display-thumbnail persistence aligned with requested image sizes. */
+internal val thumbnailDecodeBuckets = intArrayOf(128, 256, 384, 512, 768, 1024, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
 
 /**
  * Selects a bounded decode for physical tile pixels, accounting for the source area cropped out by ContentScale.Crop.

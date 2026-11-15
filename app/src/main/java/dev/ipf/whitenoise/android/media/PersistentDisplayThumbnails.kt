@@ -56,7 +56,7 @@ internal class PersistentDisplayThumbnails(
         token: Long,
     ): MediaThumbnail? {
         if (!isCurrent(token) || source.ciphertextTag.isBlank()) return null
-        for (edge in edges.filter { it >= requestedEdge }) {
+        for (edge in thumbnailDecodeBuckets.filter { it >= requestedEdge }) {
             val entry =
                 disk.get(slot(source, edge))?.let { bytes ->
                     runCatching { decode(bytes, source, edge) }.getOrNull()
@@ -79,7 +79,7 @@ internal class PersistentDisplayThumbnails(
         entry: MediaThumbnail,
         token: Long,
     ) {
-        if (!isCurrent(token) || source.ciphertextTag.isBlank() || entry.maxEdgePx !in edges) return
+        if (!isCurrent(token) || source.ciphertextTag.isBlank() || entry.maxEdgePx !in thumbnailDecodeBuckets) return
         val bitmap = entry.bitmap
         if (bitmap.width !in 1..entry.maxEdgePx || bitmap.height !in 1..entry.maxEdgePx) return
         val bytes = encode(source, entry) ?: return
@@ -95,7 +95,7 @@ internal class PersistentDisplayThumbnails(
     /** Retires every size, including slots hydrated after a process restart and not currently in memory. */
     fun remove(attachmentKey: String) =
         invalidate {
-            edges.forEach { disk.remove(slot(attachmentKey, it)) }
+            thumbnailDecodeBuckets.forEach { disk.remove(slot(attachmentKey, it)) }
         }
 
     /** Uses the persisted ciphertext tags to retire derivatives of unloaded expired messages. */
@@ -174,7 +174,6 @@ internal class PersistentDisplayThumbnails(
         const val MAX_ENTRY_BYTES = 8 * 1024 * 1024
         private const val MAGIC = 0x574e5401
         private const val QUALITY = 85
-        private val edges = intArrayOf(128, 256, 384, 512, 768, 1024, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
     }
 }
 
