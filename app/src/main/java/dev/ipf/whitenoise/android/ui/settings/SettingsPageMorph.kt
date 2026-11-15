@@ -243,8 +243,12 @@ internal class SettingsPageMorph {
         // Active incoming pixels are never recorded. Once they are visible, restarting without
         // a coherent frame would hide the body until the next incoming phase. Settle instead;
         // early reversals can still return to their retained parent without capturing active content.
-        val settleInterrupted = interrupted && oldEntry > 0f && frame == null &&
-            !returnsToVisibleParent && !(retainsOutgoing && leaving != null)
+        val settleInterrupted =
+            interrupted &&
+                oldEntry > 0f &&
+                frame == null &&
+                !returnsToVisibleParent &&
+                !(retainsOutgoing && leaving != null)
         val selected =
             if (pendingEndpoint != null) {
                 pendingEndpoint?.takeIf { it.destination == next }?.bounds
@@ -279,7 +283,8 @@ internal class SettingsPageMorph {
                 ?.copy(key = anchorGroupKeys.getOrPut(next) { nextGroupKey++ }, viewport = host)
         if (anchorSource != null) correspondenceKey = anchorSource.key
         if (forward) {
-            if (eligible && selected != null &&
+            if (eligible &&
+                selected != null &&
                 visibleSelection?.visibleIn(host) == true
             ) {
                 returnTargets[next] = ReturnTarget(selected.center, correspondenceKey)
@@ -705,8 +710,8 @@ private fun Rect.validIn(host: Rect): Boolean =
         right <= host.right &&
         bottom <= host.bottom
 
-private fun Rect.visibleIn(host: Rect): Boolean =
-    listOf(left, top, right, bottom).all { it.isFinite() } && !isEmpty && !intersect(host).isEmpty
+private fun Rect.visibleIn(host: Rect): Boolean = listOf(left, top, right, bottom).all { it.isFinite() } &&
+    !isEmpty && !intersect(host).isEmpty
 
 /** Compatibility facade for existing rectangle-only launchers. */
 @Composable
