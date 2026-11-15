@@ -2654,6 +2654,8 @@
     <string name="android_notification_settings">Impostazioni di notifica Android</string>
     <string name="settings_help_support">Aiuto e supporto</string>
     <string name="settings_voice_language">Voce e lingua</string>
+    <string name="photo_editor_rotate">Ruota</string>
+    <string name="toast_wipe_outcome_unconfirmed">Non è stato possibile confermare il risultato della cancellazione. Controlla i tuoi account prima di continuare.</string>
 
     <string name="emoji_name_marmot_classic">Marmotta classica</string>
     <string name="emoji_name_marmot_wave">Marmotta che saluta</string>
@@ -2666,5 +2668,4 @@
     <string name="emoji_name_marmot_smirk">Marmotta con un sorrisetto</string>
     <string name="emoji_name_marmot_cry">Marmotta che piange</string>
     <string name="emoji_name_marmot_angry">Marmotta arrabbiata</string>
-    <string name="toast_wipe_outcome_unconfirmed">Non è stato possibile confermare il risultato della cancellazione. Controlla i tuoi account prima di continuare.</string>
 </resources>

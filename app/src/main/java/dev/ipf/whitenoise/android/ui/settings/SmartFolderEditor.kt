@@ -32,10 +32,12 @@ import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -170,18 +172,27 @@ private fun SmartFolderGroup(
     Card(Modifier.fillMaxWidth().testTag("folder.group." + path.joinToString("."))) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (path.isNotEmpty()) {
-                TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
-                    FolderButtonLabel(
-                        (if (group.not) stringResource(R.string.smart_folder_not) + " · " else "") +
-                            mode + " · " +
-                            pluralStringResource(
-                                R.plurals.smart_folder_group_items,
-                                group.children.size,
-                                group.children.size,
+                val groupLabel =
+                    (if (group.not) stringResource(R.string.smart_folder_not) + " · " else "") +
+                        mode + " · " +
+                        pluralStringResource(
+                            R.plurals.smart_folder_group_items,
+                            group.children.size,
+                            group.children.size,
+                        )
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .explainOnLongPress(
+                                Explanation(
+                                    groupLabel,
+                                    stringResource(R.string.explanation_organize_group_toggle),
+                                ),
                             ),
-                        R.drawable.ic_expand_more,
-                        expanded,
-                    )
+                ) {
+                    FolderButtonLabel(groupLabel, R.drawable.ic_expand_more, expanded)
                 }
             }
             if (expanded) {
@@ -193,6 +204,7 @@ private fun SmartFolderGroup(
                             false to stringResource(R.string.smart_folder_any),
                         ),
                         "folder.match." + path.joinToString("."),
+                        Explanation(mode, stringResource(R.string.explanation_organize_group_match)),
                     ) {
                         onChange(root.updateAt(path, group.copy(all = it)))
                     }
@@ -220,14 +232,23 @@ private fun SmartFolderGroup(
                                 onEdit,
                             )
                         is SmartFolderFilter.Condition ->
-                            TextButton(
-                                onClick = { onEdit(path + index, false) },
-                                modifier =
-                                    Modifier.fillMaxWidth().testTag(
-                                        "folder.condition." + (path + index).joinToString("."),
-                                    ),
-                            ) {
-                                FolderButtonLabel(conditionSummary(child, people), R.drawable.ic_edit)
+                            {
+                                val summary = conditionSummary(child, people)
+                                TextButton(
+                                    onClick = { onEdit(path + index, false) },
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .testTag("folder.condition." + (path + index).joinToString("."))
+                                            .explainOnLongPress(
+                                                Explanation(
+                                                    summary,
+                                                    stringResource(R.string.explanation_organize_condition_row),
+                                                ),
+                                            ),
+                                ) {
+                                    FolderButtonLabel(summary, R.drawable.ic_edit)
+                                }
                             }
                     }
                 }
@@ -240,7 +261,16 @@ private fun SmartFolderGroup(
                     }
                     TextButton(
                         onClick = { optionsExpanded = !optionsExpanded },
-                        modifier = Modifier.weight(1f).testTag("folder.options." + path.joinToString(".")),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .testTag("folder.options." + path.joinToString("."))
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.smart_folder_group_rules),
+                                        stringResource(R.string.explanation_organize_group_options),
+                                    ),
+                                ),
                     ) {
                         FolderButtonLabel(
                             stringResource(R.string.smart_folder_group_rules),
@@ -250,17 +280,20 @@ private fun SmartFolderGroup(
                     }
                 }
                 if (optionsExpanded) {
-                    FolderChoice(
+                    val notLabel =
                         if (group.not) {
                             stringResource(R.string.smart_folder_not_hint)
                         } else {
                             stringResource(R.string.smart_folder_include_match)
-                        },
+                        }
+                    FolderChoice(
+                        notLabel,
                         listOf(
                             false to stringResource(R.string.smart_folder_include_match),
                             true to stringResource(R.string.smart_folder_not_hint),
                         ),
                         "folder.not." + path.joinToString("."),
+                        Explanation(notLabel, stringResource(R.string.explanation_organize_group_not)),
                     ) { onChange(root.updateAt(path, group.copy(not = it))) }
                     if (path.size < SmartFolderCodec.MAX_DEPTH - 1 &&
                         root.nodeCount() < SmartFolderCodec.MAX_NODES - 1
@@ -274,7 +307,15 @@ private fun SmartFolderGroup(
                                     ),
                                 )
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .explainOnLongPress(
+                                        Explanation(
+                                            stringResource(R.string.smart_folder_group),
+                                            stringResource(R.string.explanation_organize_add_group),
+                                        ),
+                                    ),
                         ) { Text(stringResource(R.string.smart_folder_group)) }
                     }
                 }
@@ -284,6 +325,13 @@ private fun SmartFolderGroup(
                 if (path.isNotEmpty()) {
                     TextButton(
                         onClick = { onChange(root.updateAt(path, null)) },
+                        modifier =
+                            Modifier.explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.smart_folder_remove_group),
+                                    stringResource(R.string.explanation_organize_remove_group),
+                                ),
+                            ),
                     ) { Text(stringResource(R.string.smart_folder_remove_group)) }
                 }
             }
@@ -425,6 +473,10 @@ internal fun SmartFolderConditionDialog(
                                 it to stringResource(conditionModeLabel(field, it))
                             },
                             "folder.mode",
+                            Explanation(
+                                stringResource(conditionModeLabel(field, mode)),
+                                stringResource(R.string.explanation_organize_cond_mode),
+                            ),
                         ) {
                             mode =
                                 it
@@ -447,7 +499,15 @@ internal fun SmartFolderConditionDialog(
                             onClick = {
                                 picking = true
                             },
-                            modifier = Modifier.testTag("folder.choosePeople"),
+                            modifier =
+                                Modifier
+                                    .testTag("folder.choosePeople")
+                                    .explainOnLongPress(
+                                        Explanation(
+                                            stringResource(R.string.smart_folder_select_people),
+                                            stringResource(R.string.explanation_organize_cond_choose_people),
+                                        ),
+                                    ),
                         ) {
                             Text(
                                 stringResource(R.string.smart_folder_select_people) + " (${keys.size})",
@@ -471,6 +531,13 @@ internal fun SmartFolderConditionDialog(
                                 enabled =
                                     !resolving &&
                                         keys.size < SmartFolderCodec.MAX_VALUES,
+                                modifier =
+                                    Modifier.explainOnLongPress(
+                                        Explanation(
+                                            stringResource(R.string.smart_folder_add_key),
+                                            stringResource(R.string.explanation_organize_cond_add_key),
+                                        ),
+                                    ),
                                 onClick = {
                                     resolving = true
                                     val input = publicKey.text.toString()
@@ -521,7 +588,15 @@ internal fun SmartFolderConditionDialog(
                     }
                     TextButton(
                         onClick = { optionsExpanded = !optionsExpanded },
-                        modifier = Modifier.testTag("folder.conditionOptions"),
+                        modifier =
+                            Modifier
+                                .testTag("folder.conditionOptions")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.more_options),
+                                        stringResource(R.string.explanation_organize_cond_options),
+                                    ),
+                                ),
                     ) {
                         FolderButtonLabel(
                             stringResource(R.string.more_options),
@@ -530,24 +605,36 @@ internal fun SmartFolderConditionDialog(
                         )
                     }
                     if (optionsExpanded) {
-                        FolderChoice(
+                        val negateLabel =
                             if (not) {
                                 stringResource(R.string.smart_folder_negate_condition)
                             } else {
                                 stringResource(R.string.smart_folder_include_match)
-                            },
+                            }
+                        FolderChoice(
+                            negateLabel,
                             listOf(
                                 false to stringResource(R.string.smart_folder_include_match),
                                 true to stringResource(R.string.smart_folder_negate_condition),
                             ),
                             "folder.conditionNot",
+                            Explanation(negateLabel, stringResource(R.string.explanation_organize_cond_not)),
                         ) {
                             not =
                                 it
                         }
                     }
                     onRemove?.let { remove ->
-                        TextButton(onClick = remove) { Text(stringResource(R.string.smart_folder_ignore)) }
+                        TextButton(
+                            onClick = remove,
+                            modifier =
+                                Modifier.explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.smart_folder_ignore),
+                                        stringResource(R.string.explanation_organize_cond_remove),
+                                    ),
+                                ),
+                        ) { Text(stringResource(R.string.smart_folder_ignore)) }
                     }
                 }
             },

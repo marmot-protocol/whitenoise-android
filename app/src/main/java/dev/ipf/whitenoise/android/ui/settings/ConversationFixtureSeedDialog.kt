@@ -27,9 +27,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationFixtureSeedProgress
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.seedConversationFixture
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -200,6 +202,13 @@ private fun ConversationFixtureTargetList(
             title = target.title,
             selected = target.groupIdHex == selected,
             onClick = { onSelect(target.groupIdHex) },
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        target.title,
+                        stringResource(R.string.explanation_organize_seed_target),
+                    ),
+                ),
             enabled = enabled,
         )
     }

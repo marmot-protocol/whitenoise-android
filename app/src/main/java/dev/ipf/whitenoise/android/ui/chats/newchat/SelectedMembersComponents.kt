@@ -48,10 +48,12 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
+import dev.ipf.whitenoise.android.ui.chats.chatsExplanation
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
@@ -314,9 +316,11 @@ internal fun SelectedMemberRoleControl(
     onChange: (Boolean) -> Unit,
 ) {
     val adminLabel = stringResource(R.string.admin)
+    val explanation = chatsExplanation(R.string.admin, R.string.explanation_new_message_admin)
     Row(
         (if (compact) Modifier else Modifier.fillMaxWidth())
             .heightIn(min = 48.dp)
+            .explainOnLongPress(explanation)
             .toggleable(value = admin, enabled = enabled, role = Role.Switch, onValueChange = onChange)
             .padding(start = if (compact) 8.dp else inset, end = if (compact) 0.dp else inset)
             .semantics { contentDescription = "$adminLabel, $name" },

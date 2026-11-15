@@ -161,6 +161,22 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "R.string.explanation_relays_group_relay_copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.explanation_relays_group_relay_copy",
+        "test_ids": [
+          "GRP-042"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_group_relay_row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.explanation_relays_group_relay_row",
+        "test_ids": [
+          "GRP-042"
+        ]
       }
     ]
   },

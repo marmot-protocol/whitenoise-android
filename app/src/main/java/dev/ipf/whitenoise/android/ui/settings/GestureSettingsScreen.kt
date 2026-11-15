@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +64,7 @@ internal fun GestureSettingsContent(
                                 subtitle = bindingSummary(state, binding, rtl),
                                 modifier = Modifier.testTag("gestures." + binding.name),
                                 onClick = { picker = binding },
+                                explanation = stringResource(bindingExplanationRes(binding)),
                                 leading = {
                                     SettingsLeadingIcon(
                                         if (binding ==
@@ -90,6 +92,7 @@ internal fun GestureSettingsContent(
                                 subtitle = bindingSummary(state, binding, rtl),
                                 modifier = Modifier.testTag("gestures." + binding.name),
                                 onClick = { picker = binding },
+                                explanation = stringResource(bindingExplanationRes(binding)),
                                 leading = {
                                     SettingsLeadingIcon(
                                         if (binding ==
@@ -115,6 +118,7 @@ internal fun GestureSettingsContent(
                             state.pullUnread,
                             onPullUnreadChange,
                             modifier = Modifier.testTag("gestures.pull_unread"),
+                            explanation = stringResource(R.string.explanation_gestures_pull_unread),
                             leading = { SettingsLeadingIcon(R.drawable.ic_mark_chat_unread) },
                         )
                     }
@@ -131,6 +135,7 @@ internal fun GestureSettingsContent(
                             title = stringResource(R.string.reset_to_default),
                             modifier = Modifier.testTag("gestures.reset"),
                             onClick = onReset,
+                            explanation = stringResource(R.string.explanation_appearance_gesture_reset),
                             leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
                         )
                     }
@@ -187,6 +192,16 @@ internal fun actionTitle(action: SwipeAction): String =
             SwipeAction.PinUnpin -> R.string.gestures_pin_unpin
         },
     )
+
+/** Each physical swipe has its own hold-to-explain body because messages and chats differ in defaults. */
+@StringRes
+private fun bindingExplanationRes(binding: SwipeBinding): Int =
+    when (binding) {
+        SwipeBinding.MessageLeft -> R.string.explanation_appearance_gesture_message_left
+        SwipeBinding.MessageRight -> R.string.explanation_appearance_gesture_message_right
+        SwipeBinding.ChatLeft -> R.string.explanation_appearance_gesture_chat_left
+        SwipeBinding.ChatRight -> R.string.explanation_appearance_gesture_chat_right
+    }
 
 /** Names the movement consistently in both sections, independent of text direction. */
 @Composable

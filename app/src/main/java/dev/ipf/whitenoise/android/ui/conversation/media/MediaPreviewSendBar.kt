@@ -38,7 +38,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerExplanation
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val ADD_MORE_TILE = 56.dp
@@ -77,7 +79,15 @@ internal fun MediaPreviewSendBar(
             FilledIconButton(
                 onClick = { onSend(caption) },
                 enabled = sendEnabled,
-                modifier = Modifier.size(56.dp),
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .explainOnLongPress(
+                            composerExplanation(
+                                R.string.send,
+                                R.string.explanation_media_preview_send,
+                            ),
+                        ),
                 shape = CircleShape,
                 colors =
                     IconButtonDefaults.filledIconButtonColors(
@@ -128,7 +138,13 @@ internal fun AddMoreThumb(
                 Modifier
                     .size(ADD_MORE_TILE)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .explainOnLongPress(
+                        composerExplanation(
+                            R.string.media_attachment_add_more,
+                            R.string.explanation_media_preview_add_more,
+                        ),
+                    ),
         ) {
             Icon(
                 painterResource(R.drawable.ic_add),

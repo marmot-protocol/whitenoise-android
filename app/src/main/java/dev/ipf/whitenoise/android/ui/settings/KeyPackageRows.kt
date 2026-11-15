@@ -21,7 +21,9 @@ import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DateTimeDisplay
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import java.time.format.FormatStyle
 import java.util.Locale
 
@@ -50,6 +52,7 @@ internal fun PublishedKeyPackage(
                 stringResource(R.string.developer_package_id),
                 kp.keyPackageId,
                 R.drawable.ic_fingerprint,
+                stringResource(R.string.explanation_relays_key_package_id),
             )
         }
         row("published") { context ->
@@ -79,6 +82,7 @@ internal fun PublishedKeyPackage(
                 stringResource(R.string.key_package_local_state),
                 stringResource(localState.labelResource()),
                 leading = { SettingsLeadingIcon(R.drawable.ic_lock) },
+                explanation = stringResource(R.string.explanation_relays_key_package_local_state),
             )
         }
         row("relays") { context ->
@@ -87,6 +91,7 @@ internal fun PublishedKeyPackage(
                 stringResource(R.string.developer_seen_on),
                 kp.sourceRelays.joinToString("\n").ifBlank { stringResource(R.string.unknown) },
                 leading = { SettingsLeadingIcon(R.drawable.ic_settings_cell_tower) },
+                explanation = stringResource(R.string.explanation_relays_key_package_seen_on),
             )
         }
         row("event") { context ->
@@ -95,6 +100,7 @@ internal fun PublishedKeyPackage(
                 stringResource(R.string.event),
                 kp.eventIdHex,
                 R.drawable.ic_data_object,
+                stringResource(R.string.explanation_relays_key_package_event),
             )
         }
         row("ref") { context ->
@@ -103,6 +109,7 @@ internal fun PublishedKeyPackage(
                 stringResource(R.string.ref),
                 kp.keyPackageRefHex,
                 R.drawable.ic_link,
+                stringResource(R.string.explanation_relays_key_package_ref),
             )
         }
         row("size") { context ->
@@ -119,7 +126,15 @@ internal fun PublishedKeyPackage(
                     TextButton(
                         onClick = onDelete,
                         enabled = actionsEnabled,
-                        modifier = Modifier.semantics { contentDescription = deleteLabel },
+                        modifier =
+                            Modifier
+                                .semantics { contentDescription = deleteLabel }
+                                .explainOnLongPress(
+                                    Explanation(
+                                        stringResource(R.string.developer_delete_package),
+                                        stringResource(R.string.explanation_relays_key_package_delete),
+                                    ),
+                                ),
                     ) {
                         Text(stringResource(R.string.developer_delete_package), color = MaterialTheme.colorScheme.error)
                     }
@@ -143,6 +158,7 @@ internal fun RetainedKeyPackage(
                 stringResource(R.string.developer_package_id),
                 kp.keyPackageId,
                 R.drawable.ic_fingerprint,
+                stringResource(R.string.explanation_relays_key_package_id),
             )
         }
         row("source") { context ->
@@ -159,6 +175,7 @@ internal fun RetainedKeyPackage(
                 stringResource(R.string.key_package_local_state),
                 stringResource(localState.labelResource()),
                 leading = { SettingsLeadingIcon(R.drawable.ic_lock) },
+                explanation = stringResource(R.string.explanation_relays_key_package_local_state),
             )
         }
         row("size") { context ->
@@ -191,6 +208,7 @@ private fun KeyPackageCopyValue(
     title: String,
     value: String,
     @DrawableRes icon: Int,
+    explanation: String,
 ) {
     val clipboard = LocalClipboardManager.current
     val label = stringResource(R.string.copy)
@@ -203,6 +221,7 @@ private fun KeyPackageCopyValue(
                 clipboard.setText(AnnotatedString(value))
             },
         leading = { SettingsLeadingIcon(icon) },
+        explanation = explanation,
     )
 }
 

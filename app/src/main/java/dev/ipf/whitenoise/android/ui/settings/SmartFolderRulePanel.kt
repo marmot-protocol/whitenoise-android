@@ -34,8 +34,10 @@ import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -87,13 +89,43 @@ internal fun SmartFolderRulePanel(
         if (!state.advanced) {
             TextButton(
                 onClick = { requestRules(defaultSmartFolder()) },
-                modifier = Modifier.testTag("folder.quick.start"),
+                modifier =
+                    Modifier
+                        .testTag("folder.quick.start")
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.smart_folder_quick_start),
+                                stringResource(R.string.explanation_organize_quick_start),
+                            ),
+                        ),
             ) { Text(stringResource(R.string.smart_folder_quick_start)) }
             if (!editSimpleRules) {
-                TextButton(onClick = { applyPreset(true) }, modifier = Modifier.testTag("folder.presetRead")) {
+                TextButton(
+                    onClick = { applyPreset(true) },
+                    modifier =
+                        Modifier
+                            .testTag("folder.presetRead")
+                            .explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.smart_folder_preset_read),
+                                    stringResource(R.string.explanation_organize_preset_read),
+                                ),
+                            ),
+                ) {
                     Text(stringResource(R.string.smart_folder_preset_read))
                 }
-                TextButton(onClick = { applyPreset(false) }, modifier = Modifier.testTag("folder.presetMentions")) {
+                TextButton(
+                    onClick = { applyPreset(false) },
+                    modifier =
+                        Modifier
+                            .testTag("folder.presetMentions")
+                            .explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.smart_folder_preset_mentions),
+                                    stringResource(R.string.explanation_organize_preset_mentions),
+                                ),
+                            ),
+                ) {
                     Text(stringResource(R.string.smart_folder_preset_mentions))
                 }
             }
@@ -104,7 +136,15 @@ internal fun SmartFolderRulePanel(
             if (editSimpleRules) {
                 TextButton(
                     onClick = { legacyExpanded = !legacyExpanded },
-                    modifier = Modifier.testTag("folder.legacyEdit"),
+                    modifier =
+                        Modifier
+                            .testTag("folder.legacyEdit")
+                            .explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.smart_folder_edit_legacy),
+                                    stringResource(R.string.explanation_organize_legacy_edit),
+                                ),
+                            ),
                 ) {
                     val label = stringResource(R.string.smart_folder_edit_legacy)
                     FolderButtonLabel(label, R.drawable.ic_expand_more, legacyExpanded)
@@ -145,7 +185,15 @@ internal fun SmartFolderRulePanel(
                         SmartFolderCodec.decode(payload)?.let(onChange)
                         pendingPayload = null
                     },
-                    modifier = Modifier.testTag("folder.confirmPreset"),
+                    modifier =
+                        Modifier
+                            .testTag("folder.confirmPreset")
+                            .explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.smart_folder_replace),
+                                    stringResource(R.string.explanation_organize_replace_rules),
+                                ),
+                            ),
                 ) { Text(stringResource(R.string.smart_folder_replace)) }
             },
             dismissButton = {
@@ -167,7 +215,16 @@ private fun SmartFolderAutomaticRules(
     var advancedExpanded by rememberSaveable { mutableStateOf(false) }
     if (root == null) {
         Text(stringResource(R.string.smart_folder_invalid), color = MaterialTheme.colorScheme.error)
-        TextButton(onClick = { requestRules(defaultSmartFolder()) }) {
+        TextButton(
+            onClick = { requestRules(defaultSmartFolder()) },
+            modifier =
+                Modifier.explainOnLongPress(
+                    Explanation(
+                        stringResource(R.string.smart_folder_start),
+                        stringResource(R.string.explanation_organize_reset_filters),
+                    ),
+                ),
+        ) {
             Text(stringResource(R.string.smart_folder_start))
         }
     } else {
@@ -185,9 +242,16 @@ private fun SmartFolderAutomaticRules(
             TextButton(
                 onClick = { advancedExpanded = !advancedExpanded },
                 modifier =
-                    Modifier.testTag("folder.quick.advanced").semantics {
-                        stateDescription = advancedState
-                    },
+                    Modifier
+                        .testTag("folder.quick.advanced")
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.advanced),
+                                stringResource(R.string.explanation_organize_quick_advanced),
+                            ),
+                        ).semantics {
+                            stateDescription = advancedState
+                        },
             ) {
                 FolderButtonLabel(
                     stringResource(R.string.advanced),
@@ -204,8 +268,20 @@ private fun SmartFolderAutomaticRules(
 private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
     var open by rememberSaveable { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }, modifier = Modifier.testTag("folder.presets")) {
-            Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.smart_folder_presets))
+        val presetsLabel = stringResource(R.string.smart_folder_presets)
+        IconButton(
+            onClick = { open = true },
+            modifier =
+                Modifier
+                    .testTag("folder.presets")
+                    .explainOnLongPress(
+                        Explanation(
+                            presetsLabel,
+                            stringResource(R.string.explanation_organize_presets_menu),
+                        ),
+                    ),
+        ) {
+            Icon(painterResource(R.drawable.ic_more_vert), presetsLabel)
         }
         val menuScrollState = rememberScrollState()
         DropdownMenu(
@@ -217,6 +293,19 @@ private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
             listOf(true, false).forEach { allRead ->
                 val title = if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
                 DropdownMenuItem(
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                stringResource(title),
+                                stringResource(
+                                    if (allRead) {
+                                        R.string.explanation_organize_preset_read
+                                    } else {
+                                        R.string.explanation_organize_preset_mentions
+                                    },
+                                ),
+                            ),
+                        ),
                     text = { Text(stringResource(title)) },
                     onClick = {
                         open = false

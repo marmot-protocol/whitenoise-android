@@ -2735,6 +2735,8 @@
     <string name="android_notification_settings">Настройки уведомлений Android</string>
     <string name="settings_help_support">Помощь и поддержка</string>
     <string name="settings_voice_language">Голос и язык</string>
+    <string name="photo_editor_rotate">Поворот</string>
+    <string name="toast_wipe_outcome_unconfirmed">Не удалось подтвердить результат удаления. Проверьте свои аккаунты, прежде чем продолжить.</string>
 
     <string name="emoji_name_marmot_classic">Классический сурок</string>
     <string name="emoji_name_marmot_wave">Сурок машет лапой</string>
@@ -2747,5 +2749,4 @@
     <string name="emoji_name_marmot_smirk">Ухмыляющийся сурок</string>
     <string name="emoji_name_marmot_cry">Плачущий сурок</string>
     <string name="emoji_name_marmot_angry">Сердитый сурок</string>
-    <string name="toast_wipe_outcome_unconfirmed">Не удалось подтвердить результат удаления. Проверьте свои аккаунты, прежде чем продолжить.</string>
 </resources>

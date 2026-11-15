@@ -2608,6 +2608,8 @@
     <string name="android_notification_settings">Android 通知设置</string>
     <string name="settings_help_support">帮助和支持</string>
     <string name="settings_voice_language">语音和语言</string>
+    <string name="photo_editor_rotate">旋转</string>
+    <string name="toast_wipe_outcome_unconfirmed">无法确认清除结果。请先检查你的账户，然后再继续。</string>
 
     <string name="emoji_name_marmot_classic">经典土拨鼠</string>
     <string name="emoji_name_marmot_wave">挥手的土拨鼠</string>
@@ -2620,5 +2622,4 @@
     <string name="emoji_name_marmot_smirk">坏笑的土拨鼠</string>
     <string name="emoji_name_marmot_cry">哭泣的土拨鼠</string>
     <string name="emoji_name_marmot_angry">生气的土拨鼠</string>
-    <string name="toast_wipe_outcome_unconfirmed">无法确认清除结果。请先检查你的账户，然后再继续。</string>
 </resources>

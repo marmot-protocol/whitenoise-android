@@ -29,6 +29,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.Explanation
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 
 /** One recognizable add action shared by simple, advanced and nested rules. */
@@ -37,10 +39,22 @@ internal fun FolderAddFilterButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedButton(onClick = onClick, modifier = modifier.heightIn(min = 48.dp)) {
+    val label = stringResource(R.string.smart_folder_add)
+    OutlinedButton(
+        onClick = onClick,
+        modifier =
+            modifier
+                .heightIn(min = 48.dp)
+                .explainOnLongPress(
+                    Explanation(
+                        label,
+                        stringResource(R.string.explanation_organize_add_filter),
+                    ),
+                ),
+    ) {
         Icon(painterResource(R.drawable.ic_add), contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.smart_folder_add))
+        Text(label)
     }
 }
 
@@ -49,11 +63,15 @@ internal fun <T> FolderChoice(
     label: String,
     options: List<Pair<T, String>>,
     tag: String,
+    explanation: Explanation? = null,
     onSelect: (T) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Column {
-        TextButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth().testTag(tag)) {
+        TextButton(
+            onClick = { open = true },
+            modifier = Modifier.fillMaxWidth().testTag(tag).explainOnLongPress(explanation),
+        ) {
             FolderButtonLabel(label, R.drawable.ic_expand_more, open)
         }
         val menuScrollState = rememberScrollState()

@@ -2832,6 +2832,8 @@
     <string name="time_format_24_hour">24-hour</string>
     <string name="date_time_format_help">Automatic follows the app language and your region.</string>
     <string name="settings_search_alias_date_time_format">time format|date format|clock|12-hour|24-hour|AM/PM</string>
+    <string name="photo_editor_rotate">Rotate</string>
+    <string name="toast_wipe_outcome_unconfirmed">The wipe result could not be confirmed. Check your accounts before continuing.</string>
 
     <string name="emoji_name_marmot_classic">Classic marmot</string>
     <string name="emoji_name_marmot_wave">Waving marmot</string>
@@ -2844,5 +2846,4 @@
     <string name="emoji_name_marmot_smirk">Smirking marmot</string>
     <string name="emoji_name_marmot_cry">Crying marmot</string>
     <string name="emoji_name_marmot_angry">Angry marmot</string>
-    <string name="toast_wipe_outcome_unconfirmed">The wipe result could not be confirmed. Check your accounts before continuing.</string>
 </resources>

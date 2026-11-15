@@ -2654,6 +2654,8 @@
     <string name="android_notification_settings">Paramètres de notification Android</string>
     <string name="settings_help_support">Aide et assistance</string>
     <string name="settings_voice_language">Voix et langue</string>
+    <string name="photo_editor_rotate">Pivoter</string>
+    <string name="toast_wipe_outcome_unconfirmed">Le résultat de la suppression n’a pas pu être confirmé. Vérifiez vos comptes avant de continuer.</string>
 
     <string name="emoji_name_marmot_classic">Marmotte classique</string>
     <string name="emoji_name_marmot_wave">Marmotte qui salue</string>
@@ -2666,5 +2668,4 @@
     <string name="emoji_name_marmot_smirk">Marmotte au sourire narquois</string>
     <string name="emoji_name_marmot_cry">Marmotte qui pleure</string>
     <string name="emoji_name_marmot_angry">Marmotte en colère</string>
-    <string name="toast_wipe_outcome_unconfirmed">Le résultat de la suppression n’a pas pu être confirmé. Vérifiez vos comptes avant de continuer.</string>
 </resources>

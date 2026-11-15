@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accessibility action that opens the long-press explanation for a control. -->
+    <string name="explanation_action_explain">說明</string>
+
+    <!-- Composer shortcut explanations, shown when a toolbar button or + menu row is held. -->
+    <string name="explanation_composer_sending_identity">顯示在此聊天中由你的哪個帳號傳送訊息。不會切換帳號。</string>
+    <string name="explanation_composer_more">開啟未固定在工具列上的操作，包括自訂訊息編輯器。</string>
+    <string name="explanation_composer_emoji">開啟表情符號選擇器，包括你的自訂表情符號。</string>
+    <string name="explanation_composer_paste">將你複製的內容貼到訊息中。</string>
+    <string name="explanation_composer_dictation">使用 Android 語音辨識將你說的話轉為文字。White Noise 會要求離線辨識，但你的裝置仍可能使用線上服務。</string>
+    <string name="explanation_composer_translate">開啟或關閉翻譯模式。開啟期間，傳送會傳送「將傳送」列中顯示的譯文，譯文就緒之前不會傳送任何內容。</string>
+    <string name="explanation_composer_voice_note">按住可錄製語音訊息。</string>
+    <string name="explanation_composer_camera">開啟相機，以便你附加新照片。Android 首次會要求相機權限。</string>
+    <string name="explanation_composer_gallery">開啟 Android 照片選擇器。White Noise 只會收到你選擇的照片和影片。</string>
+    <string name="explanation_composer_files">開啟 Android 檔案選擇器，可附加任何檔案。</string>
+    <string name="explanation_composer_location">以地圖連結的形式傳送一次你目前的位置。不會持續分享你的位置。</string>
+    <string name="explanation_composer_person">以文字形式分享 White Noise 使用者的公開金鑰，方便他人傳訊息給對方。</string>
+    <string name="explanation_composer_contact">分享來自你手機通訊錄的聯絡人名片。</string>
+    <string name="explanation_composer_poll">建立一個投票，群組成員可以參與投票。</string>
+    <string name="explanation_composer_sticker">開啟你的貼圖，以便傳送一張。</string>
+    <string name="explanation_composer_customize">選擇哪些捷徑保留在工具列上、放在哪一側，以及語音訊息按鈕的位置。</string>
+
+    <!-- Settings home row explanations. -->
+    <string name="explanation_settings_account">你的個人資料、證明你身分的金鑰，以及傳遞你訊息的中繼。</string>
+    <string name="explanation_settings_notifications">聲音和震動、背景送達，以及 White Noise 的 Android 通知設定。</string>
+    <string name="explanation_settings_chats">資料夾、滑動操作、訊息編輯器、輸入鍵、自訂表情符號和快速切換帳號。</string>
+    <string name="explanation_settings_appearance">主題、顏色、字型、文字大小，以及日期和時間的顯示方式。</string>
+    <string name="explanation_settings_voice_language">應用程式語言、朗讀、聽寫和訊息翻譯。</string>
+    <string name="explanation_settings_privacy_security">應用程式鎖、螢幕安全、無痕鍵盤、已封鎖使用者、預設限時訊息和診斷資訊分享。</string>
+    <string name="explanation_settings_data_usage">查看哪些內容佔用儲存空間，並選擇何時下載媒體以及傳送時的品質。</string>
+    <string name="explanation_settings_ai_agents">連接可在 White Noise 中與你聊天的 AI 代理，或手動設定一個。</string>
+    <string name="explanation_settings_help_support">說明文章、與支援人員聊天、捐贈和開發者工具。</string>
+</resources>

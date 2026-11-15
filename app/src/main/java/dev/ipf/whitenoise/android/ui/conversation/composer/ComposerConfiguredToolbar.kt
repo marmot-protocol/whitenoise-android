@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -189,13 +190,7 @@ internal fun ComposerConfiguredToolbar(
                                 } else {
                                     Modifier
                                 },
-                            ).composerCustomizationEntry(
-                                enabled =
-                                    bindings.enabled &&
-                                        !bindings.transactionActive &&
-                                        shortcut != ComposerShortcut.VoiceNote,
-                                onCustomize = bindings.onCustomize,
-                            )
+                            ).explainComposerShortcut(shortcut, bindings)
                     content(shortcut, actionModifier)
                 }
             }
@@ -233,3 +228,19 @@ private fun composerVoiceBoundsModifier(
     } else {
         Modifier
     }
+
+/** Holding a configured slot explains it; voice note keeps hold-to-record but TalkBack can still explain it. */
+@Composable
+private fun Modifier.explainComposerShortcut(
+    shortcut: ComposerShortcut,
+    bindings: ComposerToolbarBindings,
+): Modifier {
+    val customizable = bindings.enabled && !bindings.transactionActive
+    return explainOnLongPress(
+        explanation = shortcut.explanation(),
+        enabled = customizable,
+        holdToExplain = shortcut != ComposerShortcut.VoiceNote,
+        additionalActions =
+            if (customizable) composerCustomizeAccessibilityActions(bindings.onCustomize) else emptyList(),
+    )
+}

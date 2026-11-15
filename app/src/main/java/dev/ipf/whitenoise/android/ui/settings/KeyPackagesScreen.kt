@@ -35,8 +35,10 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.fetchKeyPackageInventory
 import dev.ipf.whitenoise.android.state.keyPackageRelayHistory
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -218,21 +220,30 @@ private fun KeyPackagesScreenForAccount(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@TextButton
-                    val targetAccount = accountRef ?: return@TextButton
-                    pendingDelete = null
-                    working = true
-                    scope.launch {
-                        try {
-                            if (deleteKeyPackage(targetAccount, target.eventIdHex, target.sourceRelays)) {
-                                reload(refreshFromNetwork = true)
+                TextButton(
+                    onClick = {
+                        val target = pendingDelete?.takeIf { it.isRelayDeletionTarget() } ?: return@TextButton
+                        val targetAccount = accountRef ?: return@TextButton
+                        pendingDelete = null
+                        working = true
+                        scope.launch {
+                            try {
+                                if (deleteKeyPackage(targetAccount, target.eventIdHex, target.sourceRelays)) {
+                                    reload(refreshFromNetwork = true)
+                                }
+                            } finally {
+                                working = false
                             }
-                        } finally {
-                            working = false
                         }
-                    }
-                }) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
+                    },
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.delete),
+                                stringResource(R.string.explanation_relays_key_package_delete_confirm),
+                            ),
+                        ),
+                ) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
@@ -274,7 +285,17 @@ internal fun KeyPackagesContent(
         modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
         topBarActions = {
             SettingsSearchRowReveal("refresh", modifier = Modifier) {
-                TextButton(onClick = onRefresh, enabled = state.actionsEnabled) {
+                TextButton(
+                    onClick = onRefresh,
+                    enabled = state.actionsEnabled,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.refresh),
+                                stringResource(R.string.explanation_relays_key_packages_refresh),
+                            ),
+                        ),
+                ) {
                     Text(stringResource(R.string.refresh))
                 }
             }
@@ -356,7 +377,19 @@ private fun PublishingActions(
     SettingsGroup {
         row("republish") { context ->
             SettingsGroupPanel(context) {
-                TextButton(onClick = onRepublish, enabled = state.actionsEnabled, modifier = Modifier.fillMaxWidth()) {
+                TextButton(
+                    onClick = onRepublish,
+                    enabled = state.actionsEnabled,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .explainOnLongPress(
+                                Explanation(
+                                    stringResource(R.string.republish),
+                                    stringResource(R.string.explanation_relays_key_packages_republish),
+                                ),
+                            ),
+                ) {
                     Text(stringResource(R.string.republish))
                 }
             }
@@ -371,7 +404,13 @@ private fun PublishingActions(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
-                    .testTag("key_packages.publish"),
+                    .testTag("key_packages.publish")
+                    .explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.developer_publish_new),
+                            stringResource(R.string.explanation_relays_key_packages_publish_new),
+                        ),
+                    ),
         ) { Text(stringResource(R.string.developer_publish_new)) }
     }
     SettingsExplainer(stringResource(R.string.developer_rotate_help))

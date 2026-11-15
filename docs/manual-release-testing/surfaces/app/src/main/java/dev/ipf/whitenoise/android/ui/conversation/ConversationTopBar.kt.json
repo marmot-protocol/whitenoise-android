@@ -35,6 +35,14 @@
         "test_ids": [
           "CON-001"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "surface": "Holding the conversation header explains it",
+        "anchor": "R.string.explanation_conversation_header_details",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "source_coverage": [

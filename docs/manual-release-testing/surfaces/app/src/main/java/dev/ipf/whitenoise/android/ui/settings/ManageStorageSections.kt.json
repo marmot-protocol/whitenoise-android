@@ -216,6 +216,56 @@
           "SET-050"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_privacy_storage_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.explanation_privacy_storage_chat",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_storage_clear_cache",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.explanation_privacy_storage_clear_cache",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_storage_keep_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.explanation_privacy_storage_keep_media",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_storage_largest",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.explanation_privacy_storage_largest",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_storage_remove_older",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.explanation_privacy_storage_remove_older",
+        "test_ids": [
+          "SET-055"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_privacy_storage_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageSections.kt",
+        "anchor": "R.string.explanation_privacy_storage_retry",
+        "test_ids": [
+          "SET-055"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

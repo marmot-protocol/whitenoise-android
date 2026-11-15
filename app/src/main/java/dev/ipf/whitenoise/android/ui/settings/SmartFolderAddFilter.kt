@@ -23,9 +23,11 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** Picking and configuring a new filter never changes the draft until the user saves it. */
@@ -77,11 +79,32 @@ private fun FilterChoice(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val label = stringResource(fieldLabel(field))
     TextButton(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("folder.addField." + field.name),
-    ) { FolderButtonLabel(stringResource(fieldLabel(field)), R.drawable.ic_chevron_right) }
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .testTag("folder.addField." + field.name)
+                .explainOnLongPress(Explanation(label, stringResource(fieldExplanation(field)))),
+    ) { FolderButtonLabel(label, R.drawable.ic_chevron_right) }
 }
+
+private fun fieldExplanation(field: FolderField): Int =
+    when (field) {
+        FolderField.UNREAD -> R.string.explanation_organize_filter_unread
+        FolderField.MENTIONS -> R.string.explanation_organize_filter_mentions
+        FolderField.PARTICIPANTS -> R.string.explanation_organize_filter_participants
+        FolderField.DRAFT -> R.string.explanation_organize_filter_draft
+        FolderField.PENDING_SEND -> R.string.explanation_organize_filter_pending
+        FolderField.MUTED -> R.string.explanation_organize_filter_muted
+        FolderField.ARCHIVED -> R.string.explanation_organize_filter_archived
+        FolderField.ACCEPTED -> R.string.explanation_organize_filter_accepted
+        FolderField.TYPE -> R.string.explanation_organize_filter_type
+        FolderField.TITLE -> R.string.explanation_organize_filter_title
+        FolderField.PINNED -> R.string.explanation_organize_filter_pinned
+    }
 
 private fun defaultFolderMode(field: FolderField): FolderMode =
     when (field) {

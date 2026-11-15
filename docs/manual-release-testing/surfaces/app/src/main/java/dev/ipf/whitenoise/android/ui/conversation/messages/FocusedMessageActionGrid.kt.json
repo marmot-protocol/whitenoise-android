@@ -19,6 +19,14 @@
         "test_ids": [
           "MSG-004"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "surface": "Holding a focused message action explains it",
+        "anchor": ".explainOnLongPress(action.explanation)",
+        "test_ids": [
+          "MSG-049"
+        ]
       }
     ],
     "source_coverage": [

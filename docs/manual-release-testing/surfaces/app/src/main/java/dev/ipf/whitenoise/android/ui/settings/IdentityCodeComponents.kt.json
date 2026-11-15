@@ -1,0 +1,46 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+  "legacy_sha256": "21c96f36a3b76d8c9a90127c6d744f09c2c578e3b6b6fbb13b332329a63e4135",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "IdentifierCopyCapsule",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+        "anchor": "fun IdentifierCopyCapsule(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "IdentityQrCode",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+        "anchor": "fun IdentityQrCode(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      },
+      {
+        "surface": "IdentityQrCodeSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+        "anchor": "fun IdentityQrCodeSurface(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_organize_copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/IdentityCodeComponents.kt",
+        "anchor": "R.string.explanation_organize_copy_public_key",
+        "test_ids": [
+          "SET-057"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

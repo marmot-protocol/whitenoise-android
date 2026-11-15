@@ -60,9 +60,11 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.SearchCollapse
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
@@ -105,7 +107,8 @@ internal enum class SettingsHomeSection(
 
 /**
  * Rows of the Settings home in display order, grouped under the [section] each one belongs to. Each row
- * carries its label, Material Symbols icon and test-tag suffix, and the [detail] it opens.
+ * carries its label, Material Symbols icon and test-tag suffix, the [detail] it opens, and the
+ * [explanationRes] shown when the row is held.
  */
 internal enum class SettingsHomeRow(
     @param:StringRes val titleRes: Int,
@@ -113,6 +116,7 @@ internal enum class SettingsHomeRow(
     val iconTag: String,
     val detail: SettingsDetail,
     val section: SettingsHomeSection,
+    @param:StringRes val explanationRes: Int,
 ) {
     Account(
         R.string.account,
@@ -120,6 +124,7 @@ internal enum class SettingsHomeRow(
         "account",
         SettingsDetail.Account,
         SettingsHomeSection.Profile,
+        R.string.explanation_settings_account,
     ),
     Notifications(
         R.string.notifications,
@@ -127,6 +132,7 @@ internal enum class SettingsHomeRow(
         "notifications",
         SettingsDetail.Notifications,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_notifications,
     ),
     Chats(
         R.string.chats,
@@ -134,6 +140,7 @@ internal enum class SettingsHomeRow(
         "chats",
         SettingsDetail.Chats,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_chats,
     ),
     Appearance(
         R.string.appearance,
@@ -141,6 +148,7 @@ internal enum class SettingsHomeRow(
         "appearance",
         SettingsDetail.Appearance,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_appearance,
     ),
     VoiceLanguage(
         R.string.settings_voice_language,
@@ -148,6 +156,7 @@ internal enum class SettingsHomeRow(
         "voice_language",
         SettingsDetail.VoiceLanguage,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_voice_language,
     ),
     PrivacySecurity(
         R.string.settings_privacy_security,
@@ -155,6 +164,7 @@ internal enum class SettingsHomeRow(
         "privacy_security",
         SettingsDetail.DevicePrivacy,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_privacy_security,
     ),
     DataUsage(
         R.string.settings_data_usage,
@@ -162,6 +172,7 @@ internal enum class SettingsHomeRow(
         "data_usage",
         SettingsDetail.Data,
         SettingsHomeSection.AppPreferences,
+        R.string.explanation_settings_data_usage,
     ),
     AiAgents(
         R.string.ai_agents,
@@ -169,6 +180,7 @@ internal enum class SettingsHomeRow(
         "ai_agents",
         SettingsDetail.AiAgents,
         SettingsHomeSection.Assist,
+        R.string.explanation_settings_ai_agents,
     ),
     HelpSupport(
         R.string.settings_help_support,
@@ -176,6 +188,7 @@ internal enum class SettingsHomeRow(
         "help_support",
         SettingsDetail.HelpSupport,
         SettingsHomeSection.Assist,
+        R.string.explanation_settings_help_support,
     ),
 }
 
@@ -978,6 +991,7 @@ private fun SettingsProfileHeader(
                     context = context,
                     title = stringResource(SettingsHomeRow.Account.titleRes),
                     onClick = onOpenAccount,
+                    explanation = stringResource(SettingsHomeRow.Account.explanationRes),
                     leading = {
                         SettingsLeadingIcon(
                             SettingsHomeRow.Account.iconRes,
@@ -1019,7 +1033,7 @@ private fun SettingsProfileHeader(
 /** The active profile as one tappable row: avatar, name, short key that copies the full key, QR glyph and chevron. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 private fun SettingsProfileRow(
     context: SettingsRowContext,
     account: SettingsHomeAccount,
@@ -1028,6 +1042,8 @@ private fun SettingsProfileRow(
 ) {
     val shareDescription = stringResource(R.string.settings_open_share_connect_for, account.title)
     val editPictureDescription = stringResource(R.string.profile_picture_edit)
+    val avatarExplanation = stringResource(R.string.explanation_settings_profile_picture)
+    val profileExplanation = stringResource(R.string.explanation_settings_profile_row)
     Surface(
         color = context.containerColor,
         shape = context.shapes.shape,
@@ -1056,6 +1072,7 @@ private fun SettingsProfileRow(
                     modifier =
                         Modifier
                             .size(SettingsHomeDefaults.ProfileAvatarSize)
+                            .explainOnLongPress(Explanation(editPictureDescription, avatarExplanation))
                             .clickable(role = Role.Button, onClick = onAvatarClick)
                             .testTag("settings.active_profile_avatar")
                             .semantics {
@@ -1077,6 +1094,7 @@ private fun SettingsProfileRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .explainOnLongPress(Explanation(account.title, profileExplanation))
                     .clickable(onClick = onClick)
                     .testTag("settings.active_profile")
                     .semantics {
@@ -1126,6 +1144,7 @@ internal fun SettingsHubSection(
                         context = context,
                         title = stringResource(entry.titleRes),
                         onClick = { onOpenDetail(entry.detail) },
+                        explanation = stringResource(entry.explanationRes),
                         leading = {
                             SettingsLeadingIcon(entry.iconRes, testTag = "settings.icon.${entry.iconTag}")
                         },
@@ -1197,6 +1216,7 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
             SettingsLink(
                 context = context,
                 title = stringResource(R.string.sign_out),
+                explanation = stringResource(R.string.explanation_account_keys_sign_out),
                 onClick = onSignOut,
                 destructive = true,
                 leading = {

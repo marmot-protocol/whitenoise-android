@@ -254,6 +254,14 @@
         "test_ids": [
           "PRO-004"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "surface": "Holding a poll composer control explains it",
+        "anchor": "R.string.explanation_poll_add_option",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "source_coverage": [
@@ -266,6 +274,22 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_poll_multiple_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.explanation_poll_multiple_choice",
+        "test_ids": [
+          "CON-049"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_poll_single_choice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+        "anchor": "R.string.explanation_poll_single_choice",
+        "test_ids": [
+          "CON-049"
         ]
       }
     ]
