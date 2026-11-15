@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Hold-to-explain bodies for privacy controls; titles reuse each control's own label. -->
-    <string name="explanation_privacy_notif_previews">Legt fest, was Benachrichtigungen zeigen. „Name und Nachricht“ zeigt Absender und Text. „Nur Name“ zeigt Absender und Unterhaltung, verbirgt aber Nachrichtentext und Reaktionen. „Ausgeblendet“ zeigt beides nicht. Das gilt für alle Konten auf diesem Gerät, und du kannst es jederzeit wieder ändern.</string>
+    <string name="explanation_privacy_notif_previews">Legt fest, was Benachrichtigungen zeigen. „Name und Nachricht“ zeigt Absender und Text. „Nur Name“ zeigt Absender und Unterhaltung, verbirgt aber Nachrichtentext und Reaktions-Emojis. „Ausgeblendet“ zeigt beides nicht. Das gilt für alle Konten auf diesem Gerät, und du kannst es jederzeit wieder ändern.</string>
     <string name="explanation_privacy_notif_preview_retry">Versucht erneut, deine Auswahl zur Benachrichtigungsvorschau zu speichern. Bis sie gespeichert ist, kann die Änderung nach einem Neustart der App verloren gehen.</string>
     <string name="explanation_privacy_notif_sounds">Öffnet die Optionen für Benachrichtigungstöne und Vibration. Hier kannst du die Töne von White Noise anhören und die Android-Einstellungen für jede Benachrichtigungskategorie öffnen.</string>
     <string name="explanation_privacy_notif_delivery">Öffnet die Android-Benachrichtigungsberechtigung und die Akku-Richtlinie für White Noise. Sie bestimmen, ob dich Hinweise erreichen, wenn die App im Hintergrund ist.</string>
