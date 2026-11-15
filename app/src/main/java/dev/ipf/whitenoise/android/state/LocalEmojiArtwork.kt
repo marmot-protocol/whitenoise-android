@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import android.content.Context
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
@@ -73,18 +72,7 @@ private fun readEmojiFile(
     return if (mediaType == null || bytes == null) null else LocalEmojiArtwork(shortcode, file.name, mediaType, bytes)
 }
 
-/** Original bundled PNG bytes bypass drawable decoding and Android resource image processing. */
-internal fun readBuiltinEmojiArtwork(
-    context: Context,
-    shortcodes: List<String>,
-): List<LocalEmojiArtwork> =
-    shortcodes.filter { it in EmojiShortcodes.builtins }.map { code ->
-        val fileName = "${code.trim(':')}.png"
-        val bytes = context.assets.open("builtin-emoji/$fileName").use { it.readBytes() }
-        LocalEmojiArtwork(code, fileName, "image/png", bytes)
-    }
-
-/** Resolves device-local files and MDK-installed artwork for the captured sending account. */
+/** Resolves bundled, device-local and MDK-installed artwork for the captured sending account. */
 internal suspend fun WhiteNoiseAppState.emojiArtworkIn(
     account: String,
     text: String,

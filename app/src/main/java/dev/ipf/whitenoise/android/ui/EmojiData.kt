@@ -81,7 +81,12 @@ object EmojiData {
             }
             for (shortcode in EmojiShortcodes.builtins) {
                 val name = shortcode.trim(':')
-                val keywords = if (name == "wn") listOf(shortcode, "white noise", "whitenoise") else listOf(shortcode, name.replace('_', ' '))
+                val keywords =
+                    if (name == "wn") {
+                        listOf(shortcode, "white noise", "whitenoise")
+                    } else {
+                        listOf(shortcode, name.replace('_', ' '))
+                    }
                 add(EmojiEntry(shortcode, name, SymbolsGroup, keywords))
             }
         }
