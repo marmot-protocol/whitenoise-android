@@ -317,7 +317,7 @@ internal fun VideoSeekSlider(
                 scrub = it
             },
             onValueChangeFinished = {
-                scrub?.let { player.seekTo((it * duration).toLong()) }
+                scrub?.let { position = (it * duration).toLong().also(player::seekTo) }
                 scrub = null
                 latestOnScrubbingChange(false)
             },

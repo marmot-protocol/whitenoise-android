@@ -396,6 +396,9 @@ class MediaViewerVideoControlsScreenshotTest {
         composeRule.waitForIdle()
         val shown = bar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
         bar.performTouchInput { up() }
+        composeRule.waitForIdle()
+        val held = bar.fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current
+        assertEquals("the thumb must stay at the released position before the next poll", shown, held, 0.001f)
         settle()
         return shown
     }
