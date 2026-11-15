@@ -799,7 +799,9 @@ internal fun ComposerBar(
         mutableStateOf(composerImePaneHeightMemory[windowLayout] ?: 0.dp)
     }
     var lockedComposerEmojiPaneHeight by remember(windowLayout) { mutableStateOf(0.dp) }
-    LaunchedEffect(targetImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen) {
+    // A new window shape resets the remembered height above, so record the
+    // keyboard that is already showing in the new window too.
+    LaunchedEffect(targetImePaneHeight, composerEmojiPickerOpen, attachmentSheetState.isOpen, windowLayout) {
         rememberedImePaneHeight =
             updatedComposerRememberedImeHeight(
                 previousRememberedImeHeight = rememberedImePaneHeight,

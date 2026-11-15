@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -46,6 +47,16 @@ class WindowLayoutTest {
         assertFalse(WindowLayout.fromSize(DpSize(700.dp, 700.dp)).isLandscape)
         assertFalse(WindowLayout.fromSize(DpSize(360.dp, 780.dp)).isLandscape)
         assertTrue(WindowLayout.fromSize(DpSize(780.dp, 360.dp)).isLandscape)
+    }
+
+    /** Rotating a phone still changes the layout, so rotation keeps resetting the composer's keyed state. */
+    @Test
+    fun rotatingAPhoneChangesTheLayout() {
+        val portrait = WindowLayout.fromSize(DpSize(360.dp, 780.dp))
+        val landscape = WindowLayout.fromSize(DpSize(780.dp, 360.dp))
+
+        assertNotEquals(portrait, landscape)
+        assertEquals(WindowLayout(WindowWidthClass.Medium, WindowHeightClass.Compact, isLandscape = true), landscape)
     }
 
     /** The value used outside a provider is what a portrait phone classifies as. */

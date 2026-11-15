@@ -215,6 +215,25 @@ class MainActivity : AppCompatActivity() {
             }).also(AndroidFramePerformanceReporter::start)
     }
 
+    private fun syncSystemBarsAndHostReadiness(
+        state: WhiteNoiseAppState,
+        darkTheme: Boolean,
+    ) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !darkTheme
+        controller.isAppearanceLightNavigationBars = !darkTheme
+        if (!fontsHostReadyRecorded) {
+            fontsHostReadyRecorded = true
+            state.recordHostPerformanceSince(
+                HostPerformanceOperationFfi.FONTS_INIT,
+                activityCreatedAtElapsedMs,
+            )
+        }
+        if (state.phase == AppPhase.Ready) {
+            foregroundHostReady.success()
+        }
+    }
+
     private fun installComposeContent() {
         setContent {
             val state = remember { appState }
@@ -229,21 +248,7 @@ class MainActivity : AppCompatActivity() {
                 applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
-            SideEffect {
-                val controller = WindowCompat.getInsetsController(window, window.decorView)
-                controller.isAppearanceLightStatusBars = !darkTheme
-                controller.isAppearanceLightNavigationBars = !darkTheme
-                if (!fontsHostReadyRecorded) {
-                    fontsHostReadyRecorded = true
-                    state.recordHostPerformanceSince(
-                        HostPerformanceOperationFfi.FONTS_INIT,
-                        activityCreatedAtElapsedMs,
-                    )
-                }
-                if (state.phase == AppPhase.Ready) {
-                    foregroundHostReady.success()
-                }
-            }
+            SideEffect { syncSystemBarsAndHostReadiness(state, darkTheme) }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
