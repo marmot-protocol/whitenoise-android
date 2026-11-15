@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
@@ -226,6 +227,7 @@ internal fun WhiteNoiseAlertDialog(
     onDismissStart: () -> Unit = {},
     ownerKey: Any? = LocalSettingsCardMorph.current,
     source: PopupSourceActivation? = null,
+    properties: DialogProperties = DialogProperties(),
 ) {
     val scheme = MaterialTheme.colorScheme
     val outline = amoledOutlineBorder()
@@ -243,6 +245,7 @@ internal fun WhiteNoiseAlertDialog(
             icon = icon,
             title = title,
             text = text,
+            properties = properties,
             containerColor = scheme.surfaceContainerLow,
             iconContentColor = scheme.onSurfaceVariant,
             titleContentColor = scheme.onSurface,

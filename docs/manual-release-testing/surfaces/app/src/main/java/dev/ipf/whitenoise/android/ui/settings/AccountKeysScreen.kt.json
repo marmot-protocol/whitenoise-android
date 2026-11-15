@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
-  "legacy_sha256": "6f78cf991cbf0af360da68877cc07d54344bbccc041dad8c1a7d98b889b2eb0f",
+  "legacy_sha256": "d7612fd6007b91b023cc53c78a000415744f79ace8bf0f37b0634ebd98a9c4f4",
   "categories": {
     "composable_surfaces": [
       {
@@ -16,7 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "fun AccountWipeFlow(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -33,7 +34,8 @@
         "anchor": "fun EncryptedBackupResultDialog(",
         "test_ids": [
           "ACC-010",
-          "ACC-011"
+          "ACC-011",
+          "ACC-009"
         ]
       },
       {
@@ -43,7 +45,8 @@
         "test_ids": [
           "ACC-010",
           "ACC-011",
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -85,7 +88,8 @@
         "test_ids": [
           "ACC-010",
           "ACC-011",
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -101,7 +105,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "fun ProfileKeysList(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -109,7 +114,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "fun SignOutAndWipeSheet(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -126,7 +132,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "fun SignOutSheet(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -142,7 +149,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "fun WipeOutcomeSheet(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -176,7 +184,8 @@
         "test_ids": [
           "ACC-010",
           "ACC-011",
-          "SET-001"
+          "SET-001",
+          "ACC-009"
         ]
       },
       {
@@ -185,6 +194,22 @@
         "anchor": "internal fun signOutActiveAccount(",
         "test_ids": [
           "ACC-013"
+        ]
+      },
+      {
+        "surface": "ProfileKeyActionLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ProfileKeyActionLabel(",
+        "test_ids": [
+          "ACC-009"
+        ]
+      },
+      {
+        "surface": "ProfileKeyWipeConfirmationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ProfileKeyWipeConfirmationDialog(",
+        "test_ids": [
+          "ACC-009"
         ]
       }
     ],
@@ -766,6 +791,14 @@
         ]
       },
       {
+        "surface": "string:toast_wipe_outcome_unconfirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_wipe_outcome_unconfirmed",
+        "test_ids": [
+          "ACC-009"
+        ]
+      },
+      {
         "surface": "string:toast_signed_out_relay_cleanup_incomplete",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "R.string.toast_signed_out_relay_cleanup_incomplete",
@@ -876,6 +909,14 @@
         "test_ids": [
           "SET-052"
         ]
+      },
+      {
+        "surface": "string:profile_private_key_use_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.profile_private_key_use_help",
+        "test_ids": [
+          "ACC-009"
+        ]
       }
     ],
     "source_coverage": [
@@ -907,7 +948,7 @@
         ]
       },
       {
-        "surface": "button:profile_keys.wipe_confirm",
+        "surface": "button:profile_keys.wipe_confirm; IME-sized typed confirmation with fixed, touch-reachable actions at 200% RTL",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "testTag(\"profile_keys.wipe_confirm\")",
         "test_ids": [

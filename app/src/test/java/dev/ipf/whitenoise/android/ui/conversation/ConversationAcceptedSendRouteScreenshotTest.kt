@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasSetTextAction
@@ -713,6 +714,7 @@ internal fun ComposeContentTestRule.mountSendRouteConversation(
     conversation: ConversationController,
     evidence: ConversationScrollEvidenceSink,
     liveTail: Boolean = false,
+    cursorBlinkEnabled: Boolean = true,
     keyboardClearanceDp: Int = 0,
     onPaintedGeometry: ((ComposerSendFlightGeometry) -> Unit)? = null,
     onMotionOwner: ((ComposerSendMotion) -> Unit)? = null,
@@ -720,6 +722,7 @@ internal fun ComposeContentTestRule.mountSendRouteConversation(
     val historyId = (SEND_ROUTE_HISTORY_ANCHOR_INDEX + 1).toString(16).padStart(64, '0')
     setContent {
         CompositionLocalProvider(
+            LocalCursorBlinkEnabled provides cursorBlinkEnabled,
             LocalConversationScrollEvidenceSink provides evidence,
             LocalComposerSendGeometryObserver provides onPaintedGeometry,
             LocalComposerSendOwnerObserver provides onMotionOwner,

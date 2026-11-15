@@ -37,6 +37,20 @@ class MediaLibraryGroupingTest {
     ): ULong = ZonedDateTime.of(year, month, day, 12, 0, 0, 0, ZoneId.systemDefault()).toEpochSecond().toULong()
 
     @Test
+    fun monthKeysClampAtTheSameLocalBoundaryInBothExtremeZones() {
+        val maximum = 253_402_300_799uL
+        for (zone in listOf(ZoneId.of("Etc/GMT+12"), ZoneId.of("Pacific/Kiritimati"))) {
+            for (seconds in listOf(0uL, maximum, maximum + 1uL, 18_446_744_073_709_552uL, ULong.MAX_VALUE)) {
+                val expected =
+                    java.time.Instant
+                        .ofEpochSecond(seconds.coerceAtMost(maximum).toLong())
+                        .atZone(zone)
+                assertEquals(expected.year * 100 + expected.monthValue - 1, monthKeyForMedia(seconds, zone))
+            }
+        }
+    }
+
+    @Test
     fun unrepresentableStampsGroupAsTheNewestMonthInsteadOfThrowing() {
         val ordinary = epochSeconds(2024, 2, 10)
         val items = listOf(ULong.MAX_VALUE, 40_000_000_000_000_000uL, ordinary)

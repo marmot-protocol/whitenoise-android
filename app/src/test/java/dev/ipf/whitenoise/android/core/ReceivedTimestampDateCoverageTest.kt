@@ -7,36 +7,40 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/**
- * Received timestamps are untrusted unsigned seconds. Converting one past 9999-12-31 to an instant, or its instant to a
- * zoned date, throws during composition, and its millisecond product can wrap into an unrelated date. Every production
- * conversion of a raw stamp is therefore guarded by [IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS] or follows a
- * null-checked [IdentityFormatter.localDate], or goes through [IdentityFormatter.clampedLocalDate].
- *
- * Retention deadlines, local expiries and the local receive stamp come from this device's clock and its own bounded
- * retention arithmetic rather than a sender's stamp, so their millisecond products are outside this gate.
- */
+/** Received timestamp conversion belongs to IdentityFormatter, not to presentation consumers. */
 class ReceivedTimestampDateCoverageTest {
     @Test
-    fun everyRawStampConversionIsBoundedFirst() {
-        val conversions =
+    fun everyRawStampConversionHasAnExplicitOwner() {
+        val violations =
             mainSources().flatMap { file ->
-                val text = file.readText()
-                conversions
-                    .flatMap { it.findAll(text) }
-                    .filterNot { match -> match.groupValues[1].substringAfterLast('.') in LOCAL_CLOCK_STAMPS }
-                    .map { match -> Triple(file, text, match.range.first) }
-                    .toList()
+                val relative = file.invariantSeparatorsPath.substringAfter("android/")
+                if (relative == "core/IdentityFormatter.kt") {
+                    emptyList()
+                } else {
+                    val allowed = OTHER_INPUTS[relative].orEmpty()
+                    rawConversions(file.readText())
+                        .groupingBy { it }
+                        .eachCount()
+                        .filter { (conversion, count) -> conversion !in allowed || count != 1 }
+                        .map { (conversion, count) -> "$relative: $conversion ($count sites)" }
+                }
             }
-        val files = conversions.map { (file, _, _) -> file.name }.toSet()
-        assertTrue("the scan found the search date filter", "ChatListMessageSearch.kt" in files)
-        assertTrue("the scan found instant conversions", "IdentityFormatter.kt" in files)
-        val unguarded =
-            conversions
-                .filterNot { (_, text, at) -> guarded(text, at) }
-                .map { (file, text, at) -> "${file.name}:${text.substring(0, at).count { it == '\n' } + 1}" }
-        assertEquals("raw stamp conversions without the displayable bound", emptyList<String>(), unguarded)
+        assertEquals("received conversions outside IdentityFormatter", emptyList<String>(), violations)
     }
+
+    @Test
+    fun nearbyCommentsAndUnrelatedBoundsCannotAuthorizeAConversion() {
+        val source =
+            "// MAX_DISPLAYABLE_EPOCH_SECONDS\nIdentityFormatter.localDate(other)\n" +
+                "Instant.ofEpochSecond(received.toLong())\nreceived.toLong() * 1000L"
+        assertEquals(2, rawConversions(source).size)
+        assertTrue(rawConversions(source).all { it !in OTHER_INPUTS.values.flatten() })
+    }
+
+    private fun rawConversions(source: String): List<String> =
+        conversions.flatMap { pattern ->
+            pattern.findAll(source).map { it.value }.toList()
+        }
 
     /** Conversation day separators and media grouping use the bounded date helpers. */
     @Test
@@ -48,14 +52,6 @@ class ReceivedTimestampDateCoverageTest {
         assertTrue(media.functionBody("monthKeyForMedia").contains("IdentityFormatter.clampedLocalDate("))
         val global = appModuleSource("src/main/java/dev/ipf/whitenoise/android/core/GlobalAttachmentLibrary.kt")
         assertTrue(globalAttachmentDay.containsMatchIn(global))
-    }
-
-    private fun guarded(
-        text: String,
-        at: Int,
-    ): Boolean {
-        val window = text.substring(maxOf(0, at - GUARD_WINDOW), at)
-        return GUARDS.any(window::contains)
     }
 
     private fun mainSources(): List<File> {
@@ -70,15 +66,25 @@ class ReceivedTimestampDateCoverageTest {
     private companion object {
         val conversions =
             listOf(
-                Regex("""ofEpochSecond\(\s*([\w.]+)\.toLong\(\)"""),
-                Regex("""([\w.]+)\.toLong\(\)\s*\*\s*(?:MILLIS_PER_SECOND\w*|1000L)"""),
+                Regex("""ofEpochSecond\(\s*[\w.]+(?:\.toLong\(\))?\s*\)"""),
+                Regex("""[\w.]+\.toLong\(\)\s*\*\s*(?:MILLIS_PER_SECOND\w*|1000L)"""),
             )
 
-        /** Stamps produced by this device's clock or retention arithmetic, not by a sender. */
-        val LOCAL_CLOCK_STAMPS = setOf("deadline", "expiry", "expirySeconds", "receivedAt")
+        // These are different input classes, reviewed by provenance at their exact production sites.
+        // Device-clock receive time and bounded retention deadlines are not peer-supplied display dates.
+        // Markdown and Nostr cards accept signed event timestamps and own their existing failure fallback.
+        val OTHER_INPUTS =
+            mapOf(
+                "state/AppState.kt" to setOf("message.receivedAt.toLong() * MILLIS_PER_SECOND_LONG"),
+                "state/DisappearingMessageSweep.kt" to setOf("expirySeconds.toLong() * MILLIS_PER_SECOND"),
+                "ui/chats/GlobalSearchResultsSession.kt" to setOf("deadline.toLong() * MILLIS_PER_SECOND"),
+                "ui/chats/GlobalAttachmentLibrarySession.kt" to setOf("deadline.toLong() * MILLIS_PER_SECOND"),
+                "ui/conversation/ForwardEligibilityClock.kt" to setOf("expiry.toLong() * MILLIS_PER_SECOND"),
+                "ui/settings/StorageDialogs.kt" to setOf("ofEpochSecond(cutoffSeconds)"),
+                "ui/MarkdownTimestampFormat.kt" to setOf("ofEpochSecond(seconds)"),
+                "ui/conversation/nostr/NostrEventCardFormatting.kt" to setOf("ofEpochSecond(createdAt)"),
+            )
         val globalAttachmentDay =
             Regex("""fun globalAttachmentDay\([^)]*\): LocalDate = IdentityFormatter\.clampedLocalDate\(""")
-        val GUARDS = listOf("MAX_DISPLAYABLE_EPOCH_SECONDS", "IdentityFormatter.localDate(")
-        const val GUARD_WINDOW = 400
     }
 }

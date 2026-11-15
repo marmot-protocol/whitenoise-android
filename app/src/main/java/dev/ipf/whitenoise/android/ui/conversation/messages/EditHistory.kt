@@ -47,7 +47,6 @@ import dev.ipf.whitenoise.android.ui.common.nativePageBody
 import dev.ipf.whitenoise.android.ui.conversation.MeasuredPlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import java.time.Instant
 import java.time.ZoneId
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -167,10 +166,10 @@ internal fun editHistoryRevisionTime(
     zone: ZoneId,
     display: DateTimeDisplay = DateTimeDisplay.LocaleDefault,
 ): String {
-    if (seconds > IdentityFormatter.MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return ""
+    val instant = IdentityFormatter.instant(seconds) ?: return ""
     return IdentityFormatter
         .dateTime(
-            Instant.ofEpochSecond(seconds.toLong()),
+            instant,
             locale,
             zone,
             display,
