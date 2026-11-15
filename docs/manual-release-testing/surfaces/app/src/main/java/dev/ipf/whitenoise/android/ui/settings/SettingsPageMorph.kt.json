@@ -19,7 +19,8 @@
         "test_ids": [
           "SET-039",
           "CON-037"
-        ]
+        ],
+        "behavior": "Late route interruption keeps the outline clock continuous while revealing the live destination body without retaining active content."
       },
       {
         "surface": "rememberSettingsNativeRow",
