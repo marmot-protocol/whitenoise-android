@@ -88,6 +88,9 @@ internal class SettingsPageMorph {
     private var target: Any? = null
     private var outgoingTarget: Any? = null
     private var origin: Rect? = null
+
+    // An anchor-only source, such as a chat header or composer, has no outlined groups to travel from.
+    private var fanOrigin: Rect? = null
     private var exitStart = 1f
     private var entryStart = 0f
     private var entryOnly = false
@@ -161,6 +164,19 @@ internal class SettingsPageMorph {
             return false
         }
         targetContours = native
+        // Every destination group grows out of the anchor, as Settings groups grow out of the source card.
+        fanOrigin?.let { anchor ->
+            sourceContours =
+                native.map {
+                    it.copy(
+                        bounds = anchor,
+                        corners = RoundRect(anchor, it.corners.topLeftCornerRadius),
+                        viewport = transitionHost,
+                        seams = emptyList(),
+                        rows = emptyList(),
+                    )
+                }
+        }
         return true
     }
 
@@ -274,6 +290,7 @@ internal class SettingsPageMorph {
         if (returnsToVisibleParent) leaving = null
         val anchor = selected ?: returnPoint?.let { Rect(it, it) } ?: host
         origin = anchor.takeIf { eligible }
+        fanOrigin = selected?.takeIf { forward && eligible && sourceContours.isEmpty() && it.validIn(host) }
         transitionHost = host
         target = next
         opening = forward
@@ -354,6 +371,7 @@ internal class SettingsPageMorph {
 
     fun finish() {
         origin = null
+        fanOrigin = null
         leaving = null
         sourceContours = emptyList()
         targetContours = null

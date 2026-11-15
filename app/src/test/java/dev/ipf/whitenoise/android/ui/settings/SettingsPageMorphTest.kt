@@ -102,6 +102,26 @@ class SettingsPageMorphTest {
         assertEquals(second, parent.renderedContours(1f).single().bounds)
     }
 
+    @Test fun anchorWithoutSourceGroupsGrowsEveryDestinationGroupFromItAtFullPresence() {
+        val anchor = Rect(16f, 8f, 344f, 56f)
+        val page = SettingsPageMorph()
+        page.begin("conversation", true, false, host)
+        page.pendingOrigin = anchor
+        assertTrue(page.begin("details", true, true, host))
+        reportGroup(page, first)
+        reportGroup(page, second)
+        assertTrue(page.admitDestination())
+        for (time in listOf(0.05f, 0.3f, 0.6f, 0.9f)) {
+            val frame = page.renderedContours(time)
+            assertEquals(
+                listOf(first, second).map { lerp(anchor, it, AppMotionOpenEasing.transform(time)) },
+                frame.map { it.bounds },
+            )
+            frame.forEach { assertEquals(1f, it.color.alpha, 0f) }
+        }
+        assertEquals(listOf(first, second), page.renderedContours(1f).map { it.bounds })
+    }
+
     @Test fun selectedOutlineStaysOpaqueWhilePeersShrinkFadeAndRemainSeparate() {
         val page = departing()
         val target = Rect(16f, 120f, 344f, 300f)
