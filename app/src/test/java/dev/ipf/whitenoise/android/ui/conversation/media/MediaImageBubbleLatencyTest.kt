@@ -209,10 +209,10 @@ class MediaImageBubbleLatencyTest {
                 accountRefOverride = MediaDownloadIntegrationFixture.ACCOUNT,
             )
         fixture.disk.put(request(0).cacheKey(), imageBytes())
-        fixture.state.activeAccountRef = "another-synthetic-account"
+        fixture.activateAccount("another-synthetic-account")
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
         awaitLoaded()
-        composeRule.runOnIdle { fixture.state.activeAccountRef = MediaDownloadIntegrationFixture.ACCOUNT }
+        composeRule.runOnIdle { fixture.activateAccount(MediaDownloadIntegrationFixture.ACCOUNT) }
         awaitLoaded()
         assertEquals(0, fixture.calls.size)
     }

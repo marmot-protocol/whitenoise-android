@@ -167,7 +167,14 @@ internal fun rememberTileTransfer(
     }.collectAsStateWithLifecycle()
     val materializing = observeNative && !mine
     val observing = observeRetention || tileObservesNative(observeNative, mine, host)
-    val observed by remember(controller, key, reference.ciphertextSha256, reference.sourceEpoch, observing, observeRetention) {
+    val observed by remember(
+        controller,
+        key,
+        reference.ciphertextSha256,
+        reference.sourceEpoch,
+        observing,
+        observeRetention,
+    ) {
         if (observing) {
             controller.attachmentNativeProgress(messageIdHex, attachmentIndex, observeRetention)
         } else {

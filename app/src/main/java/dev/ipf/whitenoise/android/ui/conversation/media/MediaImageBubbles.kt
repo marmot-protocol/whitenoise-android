@@ -110,6 +110,7 @@ internal fun imageBubbleSizing(
 
 /** The prototype dims an album's overflow tile this far before drawing its "+N" label. */
 private const val ALBUM_OVERFLOW_SCRIM_ALPHA = 0.58f
+private const val THUMBNAIL_INVALIDATION_RETRY_MS = 16L
 
 /**
  * Decode an imeta `thumbhash` field into a tiny ARGB ImageBitmap, cached
@@ -807,7 +808,9 @@ internal fun rememberImageLoadState(
     // Animated or byte-sniffed unknown sources always use their existing decoder path.
     var presentation by remember(*keys) {
         val cached =
-            if (reference.sourceEpoch == 0uL && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+            if (reference.sourceEpoch == 0uL &&
+                MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
+            ) {
                 cachedThumbnail?.bitmap
             } else {
                 null
@@ -914,7 +917,16 @@ internal fun rememberImageLoadState(
     val runtime = appState.runtimeGeneration
     val session = appState.mediaUploadSessionEpoch()
 
-    LaunchedEffect(*keys, materializationIntent, reloadToken, requestedMaxEdgePx, activeAccount, runtime, session, nativeRemoved) {
+    LaunchedEffect(
+        *keys,
+        materializationIntent,
+        reloadToken,
+        requestedMaxEdgePx,
+        activeAccount,
+        runtime,
+        session,
+        nativeRemoved,
+    ) {
         if (requestedMaxEdgePx == 0) return@LaunchedEffect
         val fulfillOriginalDownload =
             materializationIntent.readerRequested &&
@@ -934,7 +946,7 @@ internal fun rememberImageLoadState(
             if (sourceCurrent()) return true
             if (appState.activeAccountRef == activeAccount && appState.runtimeGeneration == runtime) {
                 // Let an in-progress removal finish before capturing a replacement source token.
-                kotlinx.coroutines.delay(16)
+                kotlinx.coroutines.delay(THUMBNAIL_INVALIDATION_RETRY_MS)
                 reloadToken++
             }
             return false
@@ -1074,10 +1086,14 @@ internal fun rememberImageLoadState(
     val staticPixels = (presentation as? DecodedAttachmentPresentation.Static)?.takeUnless { it.animationDeferred }
     val pendingPixels = remember(staticPixels) { staticPixels?.bitmap?.let { WeakReference(it) } }
     LaunchedEffect(*keys, pendingPixels, presentationMaxEdgePx, activeAccount, runtime, session, nativeRemoved) {
-        if (pendingPixels == null || nativeRemoved || !MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
+        if (pendingPixels == null ||
+            nativeRemoved ||
+            !MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
+        ) {
             return@LaunchedEffect
         }
-        val request = controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference) ?: return@LaunchedEffect
+        val request =
+            controller.displayThumbnailRequest(messageIdHex, attachmentIndex, reference) ?: return@LaunchedEffect
         val phase = controller.displayAttachmentNativeState(messageIdHex, attachmentIndex)
         if (phase == null || phase in LOCALLY_REMOVED_PHASES) return@LaunchedEffect
         appState.persistDisplayThumbnail(request, pendingPixels, presentationMaxEdgePx)

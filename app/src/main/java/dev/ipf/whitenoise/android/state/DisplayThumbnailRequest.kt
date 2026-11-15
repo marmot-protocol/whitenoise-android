@@ -59,7 +59,9 @@ internal suspend fun WhiteNoiseAppState.readDisplayThumbnail(
     val entry =
         displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.read") {
             withContext(Dispatchers.IO) {
-                runCatchingCancellable { displayThumbnails.read(request.source, maxEdgePx, request.generation) }.getOrNull()
+                runCatchingCancellable {
+                    displayThumbnails.read(request.source, maxEdgePx, request.generation)
+                }.getOrNull()
             }
         }
     val current = entry?.takeIf { displayThumbnailRequestCurrent(request) }
@@ -136,8 +138,8 @@ internal suspend fun ConversationController.displayAttachmentNativeState(
     val target =
         appState.resolveNativeAttachmentTarget(
             request.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)),
-        ) ?: return null
-    return appState.nativeAttachmentState(request.copy(sourceMessageIdHex = target.sourceMessageIdHex))
+        )
+    return target?.let { appState.nativeAttachmentState(request.copy(sourceMessageIdHex = it.sourceMessageIdHex)) }
 }
 
 /** Confirms native original availability using metadata only, including while a thumbnail is already displayed. */
@@ -146,8 +148,10 @@ internal suspend fun ConversationController.hasDisplayAttachmentOriginal(
     attachmentIndex: Int,
 ): Boolean {
     if (hasCachedAttachment(messageIdHex, attachmentIndex)) return true
-    val request = attachmentTransferRequest(messageIdHex, attachmentIndex) ?: return false
-    return runCatchingCancellable {
-        appState.hasNativeAttachment(request.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)))
-    }.getOrDefault(false)
+    val request = attachmentTransferRequest(messageIdHex, attachmentIndex)
+    return request?.let {
+        runCatchingCancellable {
+            appState.hasNativeAttachment(it.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex)))
+        }.getOrDefault(false)
+    } ?: false
 }

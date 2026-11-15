@@ -116,6 +116,13 @@ internal class MediaDownloadIntegrationFixture(
             field("displayThumbnails").set(it, thumbnails)
         }
 
+    /** Models account activation without native sign-in, retaining every test cache and conversation owner. */
+    @Suppress("UNCHECKED_CAST")
+    fun activateAccount(account: String) {
+        val delegate = field("activeAccountRef\$delegate").get(state) as androidx.compose.runtime.MutableState<String?>
+        delegate.value = account
+    }
+
     /** A suspended native result; each test chooses when and whether verified bytes arrive. */
     class Call(
         val account: String,

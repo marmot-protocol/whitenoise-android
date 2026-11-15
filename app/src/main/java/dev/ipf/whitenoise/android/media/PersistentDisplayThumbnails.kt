@@ -61,7 +61,9 @@ internal class PersistentDisplayThumbnails(
                 generation.get(),
                 revision,
                 revision.get(),
-                invalidations.get() == 0 && source.attachmentKey !in removingKeys && source.ciphertextTag !in removingTags,
+                invalidations.get() == 0 &&
+                    source.attachmentKey !in removingKeys &&
+                    source.ciphertextTag !in removingTags,
             )
         }
 
@@ -118,15 +120,14 @@ internal class PersistentDisplayThumbnails(
         token: DisplayThumbnailToken,
         canPublish: () -> Boolean = { true },
     ) {
-        if (token.source != source ||
-            !isCurrent(token) ||
-            source.ciphertextTag.isBlank() ||
-            entry.maxEdgePx !in thumbnailDecodeBuckets
+        if (token.source != source || !isCurrent(token) || source.ciphertextTag.isBlank()) return
+        val bitmap = entry.bitmap
+        if (entry.maxEdgePx !in thumbnailDecodeBuckets ||
+            bitmap.width !in 1..entry.maxEdgePx ||
+            bitmap.height !in 1..entry.maxEdgePx
         ) {
             return
         }
-        val bitmap = entry.bitmap
-        if (bitmap.width !in 1..entry.maxEdgePx || bitmap.height !in 1..entry.maxEdgePx) return
         val bytes = encode(source, entry) ?: return
         synchronized(publicationLock) {
             if (isCurrent(token) && canPublish()) {

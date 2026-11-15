@@ -155,7 +155,9 @@ class PersistentDisplayThumbnailsTest {
     @Test
     fun expiryAndRemovalDeleteAllSizesAfterRestart() {
         val writer = cache()
-        listOf(128, 384, 768).forEach { writer.write(source, MediaThumbnail(bitmap, it), writer.captureGeneration(source)) }
+        listOf(128, 384, 768).forEach {
+            writer.write(source, MediaThumbnail(bitmap, it), writer.captureGeneration(source))
+        }
         val reader = cache()
         reader.removeByCiphertextTags(setOf(source.ciphertextTag))
         assertEquals(0L, reader.residentBytes())
@@ -214,8 +216,10 @@ class PersistentDisplayThumbnailsTest {
             )
         }
         assertTrue(cache.residentBytes() in 1..budget)
-        assertNull(cache.read(source.copy(attachmentKey = "attachment-0"), 128, cache.captureGeneration(source.copy(attachmentKey = "attachment-0"))))
-        assertNotNull(cache.read(source.copy(attachmentKey = "attachment-29"), 128, cache.captureGeneration(source.copy(attachmentKey = "attachment-29"))))
+        val oldest = source.copy(attachmentKey = "attachment-0")
+        val newest = source.copy(attachmentKey = "attachment-29")
+        assertNull(cache.read(oldest, 128, cache.captureGeneration(oldest)))
+        assertNotNull(cache.read(newest, 128, cache.captureGeneration(newest)))
     }
 
     /** Independent instances share encrypted bytes and a test-only key, as across process restart. */
