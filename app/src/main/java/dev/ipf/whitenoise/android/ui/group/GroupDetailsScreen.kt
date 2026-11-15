@@ -170,6 +170,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
+import dev.ipf.whitenoise.android.ui.settings.rememberMeasuredContourClick
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -1890,8 +1891,13 @@ internal fun GroupDetailsScreen(
                             }
                             row("groups_in_common") { rowContext ->
                                 val profileLaunch =
-                                    dev.ipf.whitenoise.android.ui.settings.rememberMeasuredControlClick { origin ->
-                                        appState.presentProfile(dmPeerNpub, groupsInCommon = true, origin = origin)
+                                    rememberMeasuredContourClick { origin, contour ->
+                                        appState.presentProfileWithContour(
+                                            dmPeerNpub,
+                                            groupsInCommon = true,
+                                            origin = origin,
+                                            contour = contour,
+                                        )
                                     }
                                 SettingsAction(
                                     context = rowContext,

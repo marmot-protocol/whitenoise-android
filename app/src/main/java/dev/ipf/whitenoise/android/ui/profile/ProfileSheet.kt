@@ -1022,6 +1022,7 @@ internal fun ProfileSheet(
 
     MeasuredPlaybackDialog(
         origin = appState.pendingProfileOrigin,
+        sourceContour = appState.pendingProfileContour,
         ownerKey = owner to appState.pendingProfilePresentationId,
         dismissEnabled = { !creatingChat && !addingToGroups && !promotingAdmin },
         onDismissStart = owner::dispose,
@@ -1037,11 +1038,16 @@ internal fun ProfileSheet(
                 decorFitsSystemWindows = false,
             ),
     ) {
+        val returnFromGroups: () -> Unit = {
+            if (openGroupsInCommon) dismiss() else page = ProfileSheetPage.PROFILE
+        }
         // Register against the modal dialog's dispatcher, not the activity's;
         // otherwise the dialog consumes Back before this nested route sees it.
         BackHandler {
             if (!creatingChat && !addingToGroups && !promotingAdmin) {
-                if (page == ProfileSheetPage.PROFILE) {
+                if (page == ProfileSheetPage.GROUPS_IN_COMMON) {
+                    returnFromGroups()
+                } else if (page == ProfileSheetPage.PROFILE) {
                     dismiss()
                 } else {
                     page = if (page == ProfileSheetPage.ADD_TO_GROUPS) pickerParent else ProfileSheetPage.PROFILE
@@ -1116,7 +1122,7 @@ internal fun ProfileSheet(
                                 },
                                 rows = sharedRows,
                                 unresolved = shared.incomplete,
-                                onBack = { page = ProfileSheetPage.PROFILE },
+                                onBack = returnFromGroups,
                                 onOpen = { id ->
                                     if (owner.canAct()) {
                                         appState

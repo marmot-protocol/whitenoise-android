@@ -74,6 +74,7 @@ internal class SettingsCardMorph(
      * on their own; going back, that group folds into the outline again.
      */
     var anchor: SettingsMorphAnchor? = null
+    var closingAnchor: SettingsMorphAnchor? = null
 
     /** Linear morph time from 0 to 1; read during draw so each frame follows the animation. */
     var time: () -> Float = { 1f }
@@ -91,6 +92,7 @@ internal class SettingsCardMorph(
 
     init {
         page?.anchorContour = { anchorContour }
+        page?.closingAnchorContour = { closingAnchor?.let(anchorOutlines::get) ?: anchorContour }
     }
 
     private val folding: Boolean get() = gather != null || (!fan && anchorBounds != null && cardTokens.isEmpty())
@@ -123,6 +125,11 @@ internal class SettingsCardMorph(
             releaseParent?.invoke()
         }
     }
+
+    internal fun launchContour(bounds: Rect): SettingsContour? =
+        page?.presentedContours(host, time())?.takeIf { it.isNotEmpty() }?.let {
+            it[nearestSettingsContour(it, bounds.center)]
+        }
 
     fun report(
         token: Any,

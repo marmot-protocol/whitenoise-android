@@ -21,6 +21,8 @@ import dev.ipf.whitenoise.android.ui.common.nativePageBodyPresence
 import dev.ipf.whitenoise.android.ui.design.PopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.design.rememberPopupSurfaceMotion
 import dev.ipf.whitenoise.android.ui.settings.LocalSettingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.SettingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.SettingsContour
 import dev.ipf.whitenoise.android.ui.settings.settingsMorphBounds
 
 /** Opt-in page presentation; thumbnail viewers keep their existing gesture owner. No page is captured. */
@@ -34,8 +36,13 @@ internal fun MeasuredPlaybackDialog(
     ownerKey: Any? = LocalSettingsCardMorph.current,
     onDismissStart: () -> Unit = {},
     dismissEnabled: () -> Boolean = { true },
+    sourceContour: SettingsContour? = null,
     content: @Composable PopupSurfaceMotion.() -> Unit,
 ) {
+    val contourMorph =
+        remember(ownerKey, sourceContour) {
+            sourceContour?.let { SettingsCardMorph(fullScreen = true) }
+        }
     val nativeBody = remember(ownerKey, origin) { NativePageBody() }
     var host by remember(ownerKey) { mutableStateOf(Rect.Zero) }
     var geometryValid by remember(ownerKey, origin) { mutableStateOf(origin != null && !origin.isEmpty) }
@@ -65,24 +72,37 @@ internal fun MeasuredPlaybackDialog(
                 }
             },
         rootModifier = {
-            measuredDialogPageModifier(origin.takeIf { geometryValid }, host, surface, nativeBody) { next ->
+            measuredDialogPageModifier(
+                origin.takeIf { geometryValid },
+                host,
+                surface,
+                nativeBody,
+                sourceContour.takeIf { geometryValid },
+                contourMorph,
+            ) { next ->
                 // Once established, a moved/resized window retires the old launch rectangle.
                 if (measuredOriginRetired(origin, host, next)) geometryValid = false
                 host = next
             }
         },
     ) {
-        CompositionLocalProvider(LocalNativePageBody provides nativeBody) { content(surface) }
+        CompositionLocalProvider(
+            LocalNativePageBody provides nativeBody,
+            LocalSettingsCardMorph provides (contourMorph ?: LocalSettingsCardMorph.current),
+        ) { content(surface) }
     }
 }
 
 /** Coordinates are read inside the real Dialog window, rather than from the launching view. */
 @Composable
+@Suppress("LongParameterList")
 private fun measuredDialogPageModifier(
     origin: Rect?,
     host: Rect,
     surface: PopupSurfaceMotion,
     nativeBody: NativePageBody,
+    sourceContour: SettingsContour?,
+    contourMorph: SettingsCardMorph?,
     onHost: (Rect) -> Unit,
 ): Modifier {
     val view = LocalView.current
@@ -90,7 +110,9 @@ private fun measuredDialogPageModifier(
     return Modifier
         .onGloballyPositioned { onHost(it.settingsMorphBounds(view)) }
         .drawWithContent {
-            if (!measuredOriginUsable(origin, host)) {
+            if (sourceContour != null && contourMorph?.page != null && !host.isEmpty) {
+                with(contourMorph.page) { drawExternal(sourceContour, host, surface.presence.value, background) }
+            } else if (!measuredOriginUsable(origin, host)) {
                 drawContent()
             } else {
                 val presence = surface.presence.value

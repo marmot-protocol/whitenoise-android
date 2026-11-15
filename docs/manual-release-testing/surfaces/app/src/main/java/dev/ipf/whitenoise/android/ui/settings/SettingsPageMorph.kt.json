@@ -11,15 +11,6 @@
           "SET-039",
           "CON-037"
         ]
-      },
-      {
-        "surface": "rememberMeasuredControlClick",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorph.kt",
-        "anchor": "fun rememberMeasuredControlClick(",
-        "test_ids": [
-          "NAV-011",
-          "CON-037"
-        ]
       }
     ]
   },

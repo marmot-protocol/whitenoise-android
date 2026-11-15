@@ -59,6 +59,7 @@ internal fun <T> SettingsRouteMotion(
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
     topLevelBubble: Boolean = false,
     cardMorph: Boolean = false,
+    closingAnchor: SettingsMorphAnchor? = null,
     content: @Composable (T) -> Unit,
 ) {
     if (!contentVisible) return
@@ -66,7 +67,7 @@ internal fun <T> SettingsRouteMotion(
     val morph =
         if (cardMorph) {
             remember(ownerKey, parent) {
-                SettingsCardMorph(fullScreen = true, parent = parent)
+                SettingsCardMorph(fullScreen = true, parent = parent).apply { this.closingAnchor = closingAnchor }
             }
         } else {
             null

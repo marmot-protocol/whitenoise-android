@@ -2419,6 +2419,8 @@ class WhiteNoiseAppState private constructor(
     private var transientNoticeSequence = 0L
 
     /** Launch geometry belongs to this one profile presentation, never the next request. */
+    internal var pendingProfileContour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null
+        private set
     internal var pendingProfileOrigin by mutableStateOf<androidx.compose.ui.geometry.Rect?>(null)
         private set
     internal var pendingProfilePresentationId by mutableLongStateOf(0L)
@@ -12447,6 +12449,7 @@ class WhiteNoiseAppState private constructor(
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
         pendingProfilePresentationId++
+        pendingProfileContour = null
         pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = null
@@ -12463,9 +12466,17 @@ class WhiteNoiseAppState private constructor(
         npub: String,
         groupsInCommon: Boolean = false,
         origin: androidx.compose.ui.geometry.Rect? = null,
+    ) = presentProfileWithContour(npub, groupsInCommon, origin, null)
+
+    internal fun presentProfileWithContour(
+        npub: String,
+        groupsInCommon: Boolean = false,
+        origin: androidx.compose.ui.geometry.Rect? = null,
+        contour: dev.ipf.whitenoise.android.ui.settings.SettingsContour? = null,
     ) {
         pendingProfilePresentationId++
         pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
+        pendingProfileContour = contour
         pendingProfileGroupsInCommon = groupsInCommon
         pendingProfileMetadata = null
         pendingProfileFromDiscovery = false
@@ -12478,6 +12489,7 @@ class WhiteNoiseAppState private constructor(
         origin: androidx.compose.ui.geometry.Rect? = null,
     ) {
         pendingProfilePresentationId++
+        pendingProfileContour = null
         pendingProfileOrigin = origin?.takeUnless { it.isEmpty }
         pendingProfileGroupsInCommon = false
         pendingProfileMetadata = profile
@@ -12583,6 +12595,7 @@ class WhiteNoiseAppState private constructor(
 
     fun clearPresentedProfile() {
         pendingProfilePresentationId++
+        pendingProfileContour = null
         pendingProfileOrigin = null
         pendingProfileGroupsInCommon = false
         pendingProfileNpub = null

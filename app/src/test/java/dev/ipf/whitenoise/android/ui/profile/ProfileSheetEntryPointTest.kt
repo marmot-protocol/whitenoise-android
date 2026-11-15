@@ -5,8 +5,10 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
@@ -107,6 +109,29 @@ class ProfileSheetEntryPointTest {
         renderProfile { it.presentProfile(TARGET_NPROFILE, groupsInCommon = true) }
         composeRule.onNodeWithTag("groups_in_common.list").assertExists()
         composeRule.onNodeWithTag("groups_in_common.add").assertExists()
+    }
+
+    @Test
+    fun directGroupsHeaderBackDismissesToTheCallingSurface() {
+        val state = renderProfile { it.presentProfile(TARGET_NPROFILE, groupsInCommon = true) }
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(null, state.pendingProfileNpub) }
+        composeRule.onNodeWithTag("groups_in_common.list").assertDoesNotExist()
+        composeRule.onNodeWithText(OWNER_SURFACE).assertIsDisplayed()
+    }
+
+    @Test
+    fun inProfileGroupsHeaderBackRetainsTheProfile() {
+        val state = renderProfile { it.presentProfile(TARGET_NPROFILE) }
+        composeRule.onNodeWithTag("person_profile.groups").performScrollTo().performClick()
+        composeRule.onNodeWithTag("groups_in_common.list").assertExists()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(TARGET_NPROFILE, state.pendingProfileNpub) }
+        composeRule.onNodeWithTag("groups_in_common.list").assertDoesNotExist()
+        composeRule.onNodeWithTag(PROFILE_FOLLOW_ACTION_TAG).assertExists()
     }
 
     private fun renderProfile(present: (WhiteNoiseAppState) -> Unit): WhiteNoiseAppState {

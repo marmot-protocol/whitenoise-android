@@ -999,6 +999,161 @@ class SettingsPageMorphHostTest {
         }
     }
 
+    @Test fun closingIntoComposerMasksOnlyItsNativeStrokeUntilHandoff() {
+        val page = SettingsPageMorph()
+        val host = Rect(0f, 0f, 360f, 780f)
+        val composer = Rect(20f, 650f, 340f, 730f)
+        val details = Rect(40f, 150f, 320f, 350f)
+        val closing = mutableStateOf(false)
+        val time = mutableStateOf(1f)
+        val token = Any()
+        val contour = outlinedContour(composer, host)
+        page.anchorContour = { contour }
+        page.closingAnchorContour = { contour }
+        page.begin("chat", true, false, host)
+        page.pendingOrigin = composer
+        assertTrue(page.begin("details", true, true, host))
+        rule.setContent {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        if (!closing.value) {
+                            page.reportOutlinedDestination(token, details)
+                        }
+                        with(page) { draw(host, time.value, true, Color.Black) }
+                    }.drawWithContent {
+                        drawComposerReturnNative(closing.value, if (closing.value) composer else details)
+                    },
+            )
+        }
+        rule.onRoot().captureToImage()
+        rule.runOnIdle {
+            assertTrue(page.begin("chat", false, true, host))
+            closing.value = true
+            assertTrue(page.admitDestination())
+            time.value = 0.5f
+        }
+        val pixels = rule.onRoot().captureToImage().toPixelMap()
+        assertTrue("native composer text stays live", pixels[110, 685].green > 0.99f)
+        assertTrue("settled composer stroke is suppressed", pixels[100, 650].red < 0.01f)
+        assertEquals(
+            1f,
+            page
+                .renderedContours(0.5f)
+                .single()
+                .color.alpha,
+            0f,
+        )
+        rule.runOnIdle { time.value = 1f }
+        assertTrue(
+            "native stroke returns at handoff",
+            rule
+                .onRoot()
+                .captureToImage()
+                .toPixelMap()[100, 650]
+                .red > 0.99f,
+        )
+    }
+
+    @Test fun externalEmptyGroupKeepsOneOpaqueMovingPerimeterAndFixedHeader() {
+        val page = SettingsPageMorph()
+        val host = Rect(0f, 0f, 360f, 780f)
+        val source = Rect(20f, 100f, 340f, 220f)
+        val destination = Rect(40f, 300f, 320f, 460f)
+        val sourceContour = outlinedContour(source, host)
+        val group = Any()
+        rule.setContent {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        page.reportOutlinedDestination(group, destination)
+                        with(page) { drawExternal(sourceContour, host, 0.5f, Color.Black) }
+                    }.drawWithContent {
+                        drawRect(Color.Black)
+                        drawRect(
+                            Color.Green,
+                            androidx.compose.ui.geometry
+                                .Offset(100f, 30f),
+                            androidx.compose.ui.geometry
+                                .Size(20f, 10f),
+                        )
+                        drawRect(
+                            Color.White,
+                            destination.topLeft,
+                            destination.size,
+                            style =
+                                androidx.compose.ui.graphics.drawscope
+                                    .Stroke(2f),
+                        )
+                    },
+            )
+        }
+        val pixels = rule.onRoot().captureToImage().toPixelMap()
+        assertTrue("header retains native coordinates", pixels[110, 35].green > 0.99f)
+        assertTrue("future native border is masked", pixels[100, 300].red < 0.01f)
+        assertTrue("old border is absent", pixels[100, 100].red < 0.01f)
+        assertTrue("one matched midpoint border stays opaque", pixels[100, 200].red > 0.99f)
+    }
+
+    private fun outlinedContour(
+        bounds: Rect,
+        host: Rect,
+    ) = SettingsContour(
+        bounds,
+        androidx.compose.ui.geometry
+            .RoundRect(bounds),
+        host,
+        Color.White,
+        2f,
+    )
+
+    private fun SettingsPageMorph.reportOutlinedDestination(
+        token: Any,
+        bounds: Rect,
+    ) {
+        reportDestination(
+            token,
+            SettingsRouteEndpoint(
+                token,
+                token,
+                bounds,
+                androidx.compose.ui.geometry
+                    .RoundRect(bounds),
+                Color.Black,
+                Color.White,
+                true,
+                true,
+                strokeWidth = 2f,
+            ),
+        )
+    }
+
+    private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawComposerReturnNative(
+        closing: Boolean,
+        bounds: Rect,
+    ) {
+        drawRect(Color.Black)
+        drawRect(
+            Color.White,
+            bounds.topLeft,
+            bounds.size,
+            style =
+                androidx.compose.ui.graphics.drawscope
+                    .Stroke(2f),
+        )
+        if (closing) {
+            drawRect(
+                Color.Green,
+                androidx.compose.ui.geometry
+                    .Offset(100f, 680f),
+                androidx.compose.ui.geometry
+                    .Size(20f, 10f),
+            )
+        }
+    }
+
     @get:Rule val rule = createComposeRule()
 
     @Test fun settledPageReturnsToTheExactClickedRowWithoutKeepingItsControls() {

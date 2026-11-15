@@ -94,6 +94,7 @@ internal class SettingsPageMorph {
 
     /** The live outline of the control an anchor-only route, such as a chat, opens from. */
     internal var anchorContour: (() -> SettingsContour?)? = null
+    internal var closingAnchorContour: (() -> SettingsContour?)? = null
     private var exitStart = 1f
     private var entryStart = 0f
     private var entryOnly = false
@@ -175,7 +176,7 @@ internal class SettingsPageMorph {
         if (opening || native?.isEmpty() != true) {
             native
         } else {
-            anchorContour
+            (closingAnchorContour ?: anchorContour)
                 ?.invoke()
                 ?.takeIf { it.bounds.validIn(transitionHost) }
                 ?.let { listOf(it.copy(key = correspondenceKey ?: 0, viewport = transitionHost)) }
@@ -457,6 +458,45 @@ internal class SettingsPageMorph {
         renderedContours(time).forEach { drawContinuousContour(it, host) }
     }
 
+    /** Cross-window presentation uses the same native contour batch and exclusive stroke mask. */
+    fun ContentDrawScope.drawExternal(
+        source: SettingsContour,
+        host: Rect,
+        presence: Float,
+        backplate: Color,
+    ) {
+        val native = nativeContours(host)
+        if (native == null || native.isEmpty() || presence >= 1f) {
+            drawContent()
+            return
+        }
+        drawRect(backplate)
+        val chrome = nativeChromeMask(native, host)
+        val body = activeNativeBody(native, host)
+        clipPath(body, ClipOp.Difference) {
+            clipPath(chrome, ClipOp.Difference) { this@drawExternal.drawContent() }
+        }
+        val ink = ((presence - 0.75f) / 0.25f).coerceIn(0f, 1f)
+        if (ink > 0f) {
+            clipPath(body) {
+                clipPath(chrome, ClipOp.Difference) {
+                    drawIntoCanvas { it.saveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = ink }) }
+                    this@drawExternal.drawContent()
+                    drawIntoCanvas { it.restore() }
+                }
+            }
+        }
+        val selected = native[nearestSettingsContour(native, source.bounds.center)].key
+        interpolateSettingsContours(
+            listOf(source.copy(key = selected)),
+            native,
+            presence,
+            source.bounds.center,
+            host,
+            selected,
+        ).forEach { drawContinuousContour(it, host) }
+    }
+
     /** Outgoing ink fades at its native coordinates; only the measured chrome changes geometry. */
     private fun ContentDrawScope.drawOutgoingInk(
         host: Rect,
@@ -497,10 +537,11 @@ internal class SettingsPageMorph {
         // Body ink is revealed in place after the contour has nearly settled. No old route
         // picture travels with the outline or covers the destination's fixed header.
         // Headers and other ink outside the measured groups remain live throughout.
-        if (maskFrame != native || maskHost != host) {
+        val chrome = if (!opening && native?.isEmpty() == true) end else native
+        if (maskFrame != chrome || maskHost != host) {
             maskHost = host
-            maskFrame = native
-            mask = nativeChromeMask(native.orEmpty(), host)
+            maskFrame = chrome
+            mask = nativeChromeMask(chrome.orEmpty(), host)
         }
     }
 
@@ -650,16 +691,6 @@ private fun Rect.validIn(host: Rect): Boolean =
         top >= host.top &&
         right <= host.right &&
         bottom <= host.bottom
-
-/** Retain just a control rectangle, never pixels or a long-lived navigation registry. */
-@Composable
-internal fun rememberMeasuredControlClick(onClick: (Rect?) -> Unit): Pair<Modifier, () -> Unit> {
-    val view = LocalView.current
-    val bounds = remember { arrayOf(Rect.Zero) }
-    return Modifier.onGloballyPositioned { bounds[0] = it.settingsMorphBounds(view) } to {
-        onClick(bounds[0].takeUnless { it.isEmpty })
-    }
-}
 
 /** Compatibility facade for existing rectangle-only launchers. */
 @Composable
