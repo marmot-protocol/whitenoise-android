@@ -519,6 +519,7 @@ internal fun ComposerBar(
     // True from the moment Back asks the keyboard to hide until focus clears. The
     // composer collapses in that same frame so height and IME animate together.
     composerDismissInProgress: Boolean = false,
+    preserveComposerEditingLayout: Boolean = false,
     onBottomInputChanged: () -> Unit = {},
     onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
     onKeyboardRestoreFromCustomInput: () -> Unit = {},
@@ -2028,7 +2029,8 @@ internal fun ComposerBar(
                                 replyingTo != null ||
                                 dictationActiveInComposer ||
                                 hasPendingAttachments ||
-                                composerEmojiPickerOpen,
+                                composerEmojiPickerOpen ||
+                                preserveComposerEditingLayout,
                         sendAccessoryContent =
                             if (editingMessageId != null) {
                                 { ComposerEditPill(onCancelEdit = onCancelEdit) }

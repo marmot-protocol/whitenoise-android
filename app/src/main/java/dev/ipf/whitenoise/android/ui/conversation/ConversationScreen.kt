@@ -1724,6 +1724,7 @@ internal fun ConversationScreen(
     // can reuse a menu's pending keyboard restoration.
     val menuIme = remember(controller) { MessageMenuKeyboardPolicy() }
     var menuBackdropImeBottom by remember(controller) { mutableIntStateOf(0) }
+    var menuComposerWasEditing by remember(controller) { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
         if (openActionMenuId != null || menuIme.pendingRestore) {
             menuIme.pause()
@@ -4619,6 +4620,7 @@ internal fun ConversationScreen(
                             ) &&
                                 !freezeRoutePresentation,
                         autoFocusConsumedState = composerAutoFocusConsumed,
+                        preserveComposerEditingLayout = menuBackdropImeBottom > 0 && menuComposerWasEditing,
                         composerFocus = composerFocus,
                         onComposerFocusChanged = { focused ->
                             if (focused) composerDismissInProgress = false
@@ -5037,6 +5039,9 @@ internal fun ConversationScreen(
                                                                     },
                                                             )
                                                         ) {
+                                                            menuComposerWasEditing =
+                                                                composerFocused &&
+                                                                !composerDismissInProgress
                                                             menuBackdropImeBottom = imeInsets.getBottom(density)
                                                             focusManager.clearFocus(force = true)
                                                             keyboardController?.hide()
