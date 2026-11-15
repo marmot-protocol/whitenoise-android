@@ -24,7 +24,7 @@ internal fun PlaybackFlowContent(
         enabled &&
             host != null &&
             host.appState.observePlaybackTransportVisible() &&
-            !host.appState.appLockScreenVisible
+            !host.appState.appLock.screenVisible
     Column(Modifier.fillMaxSize()) {
         if (host != null && visible) {
             Box(Modifier.statusBarsPadding()) {

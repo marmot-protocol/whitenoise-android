@@ -58,7 +58,7 @@ internal fun rememberConversationTranslation(
         }
     val preferencesRevision by preferences.changes.collectAsState()
     var ownedNotice by remember(session) { mutableStateOf<TransientNotice?>(null) }
-    LaunchedEffect(session, preferencesRevision, routeActive, appState.appLockScreenVisible) { session.clear() }
+    LaunchedEffect(session, preferencesRevision, routeActive, appState.appLock.screenVisible) { session.clear() }
     LaunchedEffect(session.failure) {
         ownedNotice?.let { appState.clearTransientNotice(it) }
         ownedNotice = null
@@ -81,7 +81,7 @@ internal fun WhiteNoiseAppState.translationOwnerCurrent(
 ): Boolean =
     activeAccountRef == account &&
         runtimeGeneration == runtime &&
-        !appLockScreenVisible &&
+        !appLock.screenVisible &&
         lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 
 /**

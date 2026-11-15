@@ -52,13 +52,13 @@ class AppLockTimestampPersistenceTest {
                     finished.countDown()
                 }
             try {
-                state.requestAppUnlock()
-                assertTrue(state.appLockScreenVisible)
-                state.appUnlockSessions.clear()
-                state.markAppUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
-                assertFalse(state.appLockScreenVisible)
-                state.maybeShowAppLockForForeground(1_001L)
-                assertFalse(state.appLockScreenVisible)
+                state.appLock.requestUnlock()
+                assertTrue(state.appLock.screenVisible)
+                state.appLock.sessions.clear()
+                state.appLock.markUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
+                assertFalse(state.appLock.screenVisible)
+                state.appLock.maybeShowForForeground(1_001L)
+                assertFalse(state.appLock.screenVisible)
                 runCurrent()
                 assertTrue(started.await(5, TimeUnit.SECONDS))
                 assertNotEquals(caller, writerThreads.single())
@@ -94,10 +94,10 @@ class AppLockTimestampPersistenceTest {
                     if (value == 2_000L) firstFinished.countDown() else secondFinished.countDown()
                 }
             try {
-                state.markAppUnlockSucceeded(2_000L, dismissRetainedVisibleConversation = false)
+                state.appLock.markUnlockSucceeded(2_000L, dismissRetainedVisibleConversation = false)
                 runCurrent()
                 assertTrue(firstStarted.await(5, TimeUnit.SECONDS))
-                state.markAppUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
+                state.appLock.markUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
                 runCurrent()
                 assertTrue(writes.isEmpty())
                 release.countDown()
@@ -136,10 +136,10 @@ class AppLockTimestampPersistenceTest {
                     finished.countDown()
                 }
             try {
-                state.markAppUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
+                state.appLock.markUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
                 runCurrent()
                 assertTrue(started.await(5, TimeUnit.SECONDS))
-                state.markAppUnlockSucceeded(2_000L, dismissRetainedVisibleConversation = false)
+                state.appLock.markUnlockSucceeded(2_000L, dismissRetainedVisibleConversation = false)
                 runCurrent()
                 state.mutationsScope.cancel()
                 release.countDown()
@@ -164,12 +164,12 @@ class AppLockTimestampPersistenceTest {
             val writes = mutableListOf<Long>()
             val state = state(dispatcher) { writes += it }
             try {
-                state.requestAppUnlock()
+                state.appLock.requestUnlock()
                 state.setAppInForeground(false)
                 runCurrent()
                 assertTrue(writes.isEmpty())
-                state.appUnlockSessions.clear()
-                state.markAppUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
+                state.appLock.sessions.clear()
+                state.appLock.markUnlockSucceeded(1_000L, dismissRetainedVisibleConversation = false)
                 runCurrent()
                 assertEquals(listOf(1_000L), writes)
                 val before = System.currentTimeMillis()

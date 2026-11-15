@@ -62,8 +62,8 @@ internal fun settingsSearchEligibilitySnapshot(
             }
             if (!showTtsVoicePicker(appState.ttsVoiceResolution)) add("TextToSpeech.voice")
             if (!mediaMixEnabled) add("TextToSpeech.mix_volume")
-            if (appState.appLockCredentialAvailable) add("Privacy.security_settings")
-            if (!(appState.appLockCredentialAvailable && appState.requireAppUnlock)) add("Privacy.auto_lock")
+            if (appState.appLock.credentialAvailable) add("Privacy.security_settings")
+            if (!(appState.appLock.credentialAvailable && appState.appLock.required)) add("Privacy.auto_lock")
             if (!dictationAutoFinish) add("Dictation.result")
             if (appState.activeAccount?.localSigning != true) {
                 add("Account.private_key")

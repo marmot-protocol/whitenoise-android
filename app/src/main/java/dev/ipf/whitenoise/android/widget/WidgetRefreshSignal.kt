@@ -18,9 +18,9 @@ internal fun widgetRefreshSignals(state: WhiteNoiseAppState): Flow<WidgetRefresh
             privacy =
                 listOf(
                     state.runtimeGeneration,
-                    state.appLockScreenVisible,
-                    state.requireAppUnlock,
-                    state.appUnlockEvaluationPending,
+                    state.appLock.screenVisible,
+                    state.appLock.required,
+                    state.appLock.evaluationPending,
                     state.accounts.map { it.label }.toSet(),
                     state.activeAccountRef,
                 ),

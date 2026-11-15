@@ -15,7 +15,7 @@ internal fun appModuleSource(path: String): String = appModuleFile(path).readTex
 
 internal fun String.functionBody(functionName: String): String {
     val start =
-        Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+        Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(functionName)}\s*\(""")
             .find(this)
             ?.range
             ?.first

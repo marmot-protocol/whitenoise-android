@@ -339,7 +339,6 @@
     <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$5_000</ID>
     <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$64</ID>
     <ID>MagicNumber:AppSelfUpdateStorageTest.kt:AppSelfUpdateStorageTest$1_000L</ID>
-    <ID>MagicNumber:AppState.kt:443</ID>
     <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$30u</ID>
     <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$8</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$0xFF</ID>
@@ -499,6 +498,7 @@
     <ID>MagicNumber:ProfileSanitizer.kt:ProfileSanitizer$0xFEFF</ID>
     <ID>MagicNumber:ProfileSanitizer.kt:ProfileSanitizer$443</ID>
     <ID>MagicNumber:PushServerConfig.kt:PushServerConfig.Companion$64</ID>
+    <ID>MagicNumber:RelayUrlPolicy.kt:443</ID>
     <ID>MagicNumber:ReplySwipe.kt:ReplySwipe$1.2f</ID>
     <ID>MagicNumber:SafeHttpsGet.kt:SafeHttpsGet$200</ID>
     <ID>MagicNumber:SafeHttpsGet.kt:SafeHttpsGet$299</ID>
@@ -561,7 +561,6 @@
     <ID>MaxLineLength:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$assertEquals(TimeUnit.MINUTES.toMillis(AppSelfUpdateDownloader.CALL_TIMEOUT_MINUTES), client.callTimeoutMillis.toLong())</ID>
     <ID>MaxLineLength:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$assertEquals(TimeUnit.SECONDS.toMillis(AppSelfUpdateDownloader.CONNECT_TIMEOUT_SECONDS), client.connectTimeoutMillis.toLong())</ID>
     <ID>MaxLineLength:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$assertEquals(TimeUnit.SECONDS.toMillis(AppSelfUpdateDownloader.READ_TIMEOUT_SECONDS), client.readTimeoutMillis.toLong())</ID>
-    <ID>MaxLineLength:AppState.kt:ChatScreenshotPreferences$fun readAllowChatScreenshots: Boolean</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"accounts loaded count=${accounts.size} active=$activeAccountRef labels=${accounts.map { it.label.take(8) to it.running }}"</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"active conversation=${groupIdHex?.take(8) ?: "&lt;none&gt;"} account=${activeConversationAccountRef?.take(8) ?: "&lt;none&gt;"}"</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$"local notifications account=${account.take(8)} enabled=${settings.localNotificationsEnabled} permission=$localNotificationPermissionGranted"</ID>
@@ -569,21 +568,17 @@
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appStateDebug(it) { "external signer re-register failed for ${account.label.take(8)}: ${it.readableMessage()}" }</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$appStateDebug(it) { "notification reply dedupe probe failed for group=${group.take(8)}: ${it.readableMessage()}" }</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun launchVerifiedAppSelfUpdate: Boolean</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun shouldSecureAppLockWindowWhileBackgrounded: Boolean</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$present(R.string.toast_couldnt_keep_connected, R.string.toast_android_blocked_foreground_service, copyable = true)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private fun cachedUserProfile: UserProfileMetadataFfi?</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private val notificationDrainSignals = MutableSharedFlow&lt;Long&gt;(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suspend fun refreshAppUpdateIfStale: AppUpdateInfo</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suspend</ID>
-    <ID>MaxLineLength:AppState.kt:internal</ID>
-    <ID>MaxLineLength:AppState.kt:private fun resolveRelayHost: Array&lt;InetAddress&gt;?</ID>
+    <ID>MaxLineLength:AppStateRelayLists.kt:suspend fun WhiteNoiseAppState.accountRelayLists: AccountRelayListsFfi?</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"auto-chain should skip invisible edit and group-system rows before checking the immediate visible voice neighbor"</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"paginate guard must serialize paginate against close and re-check the active timeline subscription identity"</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$assertTrue("live timeline updates must prune stale overlays", "pruneMessageOverlaysToWindow()" in applyTimelineChanges)</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$assertTrue("window replacement must prune stale overlays", "pruneMessageOverlaysToWindow()" in applyTimelinePage)</ID>
-    <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$close.indexOf("withContext(NonCancellable)") &lt; close.indexOf("timelineSubscriptionActiveCallMutex.withLock")</ID>
     <ID>MaxLineLength:AppText.kt:AppText.Resource$override fun resolve: String</ID>
     <ID>MaxLineLength:AppUpdateNavigationTest.kt:AppUpdateNavigationTest$Intent(AppUpdateNavigation.ACTION_OPEN_UPDATE, Uri.parse("https://zapstore.dev/apps/org.parres.darkmatter"))</ID>
     <ID>MaxLineLength:AttachmentCachePublicationTest.kt:AttachmentCachePublicationTest$val unrelatedPermit = executor.submit&lt;AttachmentCachePublication.Permit?&gt; { AttachmentCachePublication.capturePermit(unrelatedKey) }</ID>
@@ -601,6 +596,7 @@
     <ID>MaxLineLength:BubbleColorPreferencesTest.kt:BubbleColorPreferencesTest$assertEquals(0xFFABCDEF, BubbleColorPreferences.readChatColor(preferences, "account-a", "group-a", BubbleSide.Mine))</ID>
     <ID>MaxLineLength:BubbleColorPreferencesTest.kt:BubbleColorPreferencesTest$chatOverrideArgb = BubbleColorPreferences.readChatColor(preferences, "account-a", "group-a", BubbleSide.Other)</ID>
     <ID>MaxLineLength:CancellationHandlingTest.kt:CancellationHandlingTest$assertFalse("forwardText must not use plain runCatching around sendText", Regex("""runCatching\s*\{[^}]*sendText""").containsMatchIn(forwardText))</ID>
+    <ID>MaxLineLength:ChatDisplayPreferences.kt:ChatScreenshotPreferences$fun readAllowChatScreenshots: Boolean</ID>
     <ID>MaxLineLength:ChatListItem.kt:ChatListItem$fun</ID>
     <ID>MaxLineLength:ChatListMemberPresentation.kt:GroupMemberSnapshot$fun otherMemberAccount: String?</ID>
     <ID>MaxLineLength:ChatListSelectionBarTest.kt:ChatListSelectionBarTest$)</ID>
@@ -862,6 +858,8 @@
     <ID>MaxLineLength:QrScanResultTest.kt:QrScanResultTest$private fun nsec: String</ID>
     <ID>MaxLineLength:Reactions.kt:val isMine = activeAccountId != null &amp;&amp; participant.sender.equals(activeAccountId, ignoreCase = true)</ID>
     <ID>MaxLineLength:RecentEmojiPreferences.kt:RecentEmojiPreferences$fun resetQuickReactions: List&lt;String&gt;</ID>
+    <ID>MaxLineLength:RelayUrlPolicy.kt:internal</ID>
+    <ID>MaxLineLength:RelayUrlPolicy.kt:private fun resolveRelayHost: Array&lt;InetAddress&gt;?</ID>
     <ID>MaxLineLength:ReplyNavigationTest.kt:ReplyNavigationTest$assertEquals(ReplyNavigation.MaxOlderPages, ReplyNavigation.maxOlderPagesForRecord(message(tags = emptyList(), kind = 9uL)))</ID>
     <ID>MaxLineLength:SafeHttpsGet.kt:SniPinningSslSocketFactory$private fun pinned: Socket</ID>
     <ID>MaxLineLength:ScopedCacheTest.kt:ScopedCacheTest$val collapseLongMessages = ScopedCache&lt;String, Boolean&gt;(registry, name = "collapse-long-messages", maxEntries = 4)</ID>
@@ -908,7 +906,6 @@
     <ID>ReturnCount:AmberSignerRelay.kt:AmberSignerRelay$internal fun prepareSignerLaunch: Intent?</ID>
     <ID>ReturnCount:AmberSignerRelay.kt:AmberSignerRelay$internal suspend fun awaitHandledSignerPackage: String?</ID>
     <ID>ReturnCount:AmberSignerRelayActivity.kt:AmberSignerRelayActivity$override fun onCreate</ID>
-    <ID>ReturnCount:AppState.kt:LongMessageCollapsePreferences$fun preferenceKey: String?</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$fun chatMemberTitle: String</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$fun mentionDisplayName: String?</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$internal suspend fun sendNotificationReply: NotificationReplySendOutcome</ID>
@@ -919,11 +916,6 @@
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun markNotificationMessageRead: Boolean</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun setBackgroundConnectionEnabled: Boolean</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun setLocalNotificationsEnabled: Boolean</ID>
-    <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun setNativePushEnabled: Boolean</ID>
-    <ID>ReturnCount:AppState.kt:internal fun contactNicknameAccountRefForAccess: String?</ID>
-    <ID>ReturnCount:AppState.kt:internal fun conversationOpenDismissalTarget: ConversationNotificationTarget?</ID>
-    <ID>ReturnCount:AppState.kt:internal fun relayUrlResolveTimeCheckResult: RelayResolveTimeCheckResult</ID>
-    <ID>ReturnCount:AppState.kt:private fun String.relayHostCandidate: String?</ID>
     <ID>ReturnCount:AppUpdateNotifier.kt:AppUpdateNavigation$fun isUpdateTap: Boolean</ID>
     <ID>ReturnCount:AppUpdateNotifier.kt:AppUpdateNotifier$@SuppressLint("MissingPermission") fun show: Boolean</ID>
     <ID>ReturnCount:AttachmentCachePublication.kt:AttachmentCachePublication$fun capturePermit: Permit?</ID>
@@ -933,6 +925,7 @@
     <ID>ReturnCount:AvatarImageLoader.kt:AvatarImageLoader$private fun decode: android.graphics.Bitmap?</ID>
     <ID>ReturnCount:BubbleColors.kt:BubbleColorPreferences$internal fun chatKey: String?</ID>
     <ID>ReturnCount:BubbleColors.kt:internal fun contrastRatio: Double</ID>
+    <ID>ReturnCount:ChatDisplayPreferences.kt:LongMessageCollapsePreferences$fun preferenceKey: String?</ID>
     <ID>ReturnCount:ChatListHeadSnap.kt:internal fun canDecideConversationReturnHeadSnap: Boolean</ID>
     <ID>ReturnCount:ChatListHeadSnap.kt:internal fun shouldSnapChatListOnConversationReturn: Boolean</ID>
     <ID>ReturnCount:ChatListIdentifierSearch.kt:ChatListIdentifierSearch$fun classify: Identifier?</ID>
@@ -969,6 +962,7 @@
     <ID>ReturnCount:ConversationController.kt:ConversationController$suspend fun toggleReaction</ID>
     <ID>ReturnCount:ConversationLogic.kt:internal fun isNearBottom: Boolean</ID>
     <ID>ReturnCount:ConversationNotificationChannels.kt:ConversationNotificationChannels$private fun ensureConversationChannel: String?</ID>
+    <ID>ReturnCount:ConversationNotificationLifecycle.kt:internal fun conversationOpenDismissalTarget: ConversationNotificationTarget?</ID>
     <ID>ReturnCount:ConversationStreamPresentation.kt:internal fun streamFinalDisplayPosition: StreamFinalDisplayPosition?</ID>
     <ID>ReturnCount:ConversationTimelineOrdering.kt:internal fun timelineMessageIdsExceedingLiveCap: List&lt;String&gt;</ID>
     <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun firstUnreadReceivedIndex: Int</ID>
@@ -1076,6 +1070,7 @@
     <ID>ReturnCount:ProfileLink.kt:ProfileLink.Companion$private fun isLikelyNpub: Boolean</ID>
     <ID>ReturnCount:ProfileLink.kt:ProfileLink.Companion$private fun parseHttpsProfileUri: ProfileLink?</ID>
     <ID>ReturnCount:ProfileLink.kt:ProfileLink.Companion$private fun parseUri: ProfileLink?</ID>
+    <ID>ReturnCount:ProfilePresentationNames.kt:internal fun contactNicknameAccountRefForAccess: String?</ID>
     <ID>ReturnCount:ProfileRefreshGate.kt:ProfileRefreshGate$@Synchronized fun tryStart: Boolean</ID>
     <ID>ReturnCount:ProfileSheet.kt:internal fun profileSheetContactPrivateDetailsRowValue: String</ID>
     <ID>ReturnCount:PushServerConfig.kt:PushServerConfig.Companion$internal fun fromRaw: PushServerConfig?</ID>
@@ -1090,6 +1085,8 @@
     <ID>ReturnCount:RecipientReference.kt:RecipientReference$fun normalize: String?</ID>
     <ID>ReturnCount:RecipientReference.kt:RecipientReference$fun plausibleClipboardInput: String?</ID>
     <ID>ReturnCount:RecipientResolution.kt:internal fun isPlainNameQuery: Boolean</ID>
+    <ID>ReturnCount:RelayUrlPolicy.kt:internal fun relayUrlResolveTimeCheckResult: RelayResolveTimeCheckResult</ID>
+    <ID>ReturnCount:RelayUrlPolicy.kt:private fun String.relayHostCandidate: String?</ID>
     <ID>ReturnCount:ReplyNavigation.kt:ReplyNavigation$suspend fun loadScrollNavigationTarget: String?</ID>
     <ID>ReturnCount:SafeHttpsGet.kt:SafeHttpsGet$private fun pinnedConnection: HttpsURLConnection?</ID>
     <ID>ReturnCount:SafeHttpsGet.kt:SafeHttpsGet$private fun readBounded: ByteArray?</ID>
@@ -1131,6 +1128,7 @@
     <ID>TooGenericExceptionCaught:AppSelfUpdateDownloader.kt:AppSelfUpdateDownloader$error: Exception</ID>
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppStateForwarding.kt:throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppUpdateWorker.kt:AppUpdateWorker$error: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$throwable: Throwable</ID>
@@ -1159,9 +1157,9 @@
     <ID>TooGenericExceptionThrown:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$throw RuntimeException("simulated Binder rejection")</ID>
     <ID>TooGenericExceptionThrown:MediaPipelineVideoReadTest.kt:MediaPipelineVideoReadTest.ThrowingMetadataRetrieverShadow$throw RuntimeException("setDataSource failed")</ID>
     <ID>TooManyFunctions:AccountKeysScreen.kt:dev.ipf.whitenoise.android.ui.settings.AccountKeysScreen.kt</ID>
+    <ID>TooManyFunctions:AppLockController.kt:AppLockController</ID>
     <ID>TooManyFunctions:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest</ID>
     <ID>TooManyFunctions:AppState.kt:WhiteNoiseAppState</ID>
-    <ID>TooManyFunctions:AppState.kt:dev.ipf.whitenoise.android.state.AppState.kt</ID>
     <ID>TooManyFunctions:AttachmentCachePublication.kt:AttachmentCachePublication</ID>
     <ID>TooManyFunctions:AudioWaveformExtractor.kt:AndroidAudioDecoderCodec : AudioDecoderCodec</ID>
     <ID>TooManyFunctions:AudioWaveformExtractor.kt:AudioDecoderCodec&lt;FormatT&gt;</ID>
@@ -1192,6 +1190,7 @@
     <ID>TooManyFunctions:NotificationReplyWorker.kt:NotificationReplyWorker$Companion</ID>
     <ID>TooManyFunctions:NotificationStreamForegroundService.kt:dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService.kt</ID>
     <ID>TooManyFunctions:PushTokenStore.kt:PushTokenStore</ID>
+    <ID>TooManyFunctions:RelayUrlPolicy.kt:dev.ipf.whitenoise.android.state.RelayUrlPolicy.kt</ID>
     <ID>TooManyFunctions:SafeHttpsGet.kt:SafeHttpsGet</ID>
     <ID>TooManyFunctions:SafeHttpsGet.kt:SniPinnedSslSocket : SSLSocket</ID>
     <ID>TooManyFunctions:TtsPlaybackQueue.kt:TtsPlaybackQueue</ID>

@@ -71,7 +71,7 @@ internal fun PlaybackTransportBar(
     LaunchedEffect(voice.sessionId, ownerAvailable) {
         if (!ownerAvailable) VoicePlaybackController.stopSession(voice.sessionId)
     }
-    if (appState.appLockScreenVisible) return
+    if (appState.appLock.screenVisible) return
     if (useVoiceTransport(voice, speech)) {
         if (!ownerAvailable) return
         VoiceTransportBarContent(

@@ -90,7 +90,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val application = appContext as? WhiteNoiseApplication ?: return
         val notificationActionsAllowed =
             withContext(Dispatchers.Main.immediate) {
-                application.appState.notificationActionsAllowed
+                application.appState.appLock.notificationActionsAllowed
             }
         if (!notificationActionsAllowed) {
             notificationWarning("DMNotifyAction", "notification reply blocked by app lock") {
@@ -142,7 +142,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
                     actionStartedAtMs = actionStartedAtMs,
                     notificationActionsAllowed = {
                         withContext(Dispatchers.Main.immediate) {
-                            application.appState.notificationActionsAllowed
+                            application.appState.appLock.notificationActionsAllowed
                         }
                     },
                     enqueueReaction = { queuedAction, queuedReaction, startedAtMs ->

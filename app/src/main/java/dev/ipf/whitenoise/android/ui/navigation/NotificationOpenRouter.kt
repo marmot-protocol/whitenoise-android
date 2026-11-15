@@ -87,7 +87,7 @@ internal class NotificationOpenRouter(
             // A cold-start pin tap arrives while the App Lock decision still waits for its unlock timestamp. Hold
             // the capability instead of consuming it: this pass re-runs on the decision, and a lock that shows
             // then fails closed through rejectUnavailablePin() while a cleared one opens the conversation.
-            target.shortcutCapability != null && appState.appUnlockEvaluationPending -> Unit
+            target.shortcutCapability != null && appState.appLock.evaluationPending -> Unit
             else -> routeArmed(NotificationOpenAttempt(target, requestId))
         }
     }
