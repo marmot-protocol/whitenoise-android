@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -53,7 +54,7 @@ class DestinationFolderFilterTest {
         composeRule.onNodeWithContentDescription("Search chats").performClick()
         composeRule.onNode(hasSetTextAction()).performTextInput("Bob")
         composeRule.onNodeWithText("Alice").assertDoesNotExist()
-        composeRule.onNodeWithText("Bob").assertIsDisplayed()
+        composeRule.onNode(hasText("Bob") and !hasSetTextAction()).assertIsDisplayed()
         composeRule
             .onNodeWithTag("destination.filters")
             .performScrollToNode(hasTestTag("destination.filter.selected"))
