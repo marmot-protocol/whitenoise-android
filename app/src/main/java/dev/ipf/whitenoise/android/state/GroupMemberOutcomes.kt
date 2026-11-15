@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.GroupCreationResultFfi
+import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
@@ -29,6 +30,12 @@ internal fun groupMemberSelectionFailure(outcomes: List<MemberResolutionOutcomeF
 internal fun GroupCreationResultFfi.requireCreatedGroupId(): String =
     groupIdHex
         ?: throw groupMemberSelectionFailure(memberOutcomes)
+
+/** An absent invite summary means the selection produced no membership commit. */
+internal fun GroupInviteResultFfi.requireAcceptedInvite(): GroupInviteResultFfi {
+    if (invite.summary == null) throw groupMemberSelectionFailure(invite.memberOutcomes)
+    return this
+}
 
 /** Resolves only skipped recipients and leaves unnamed recipients out of the display list. */
 internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberNames(displayName: (String) -> String): List<String> =

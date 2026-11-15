@@ -3805,7 +3805,7 @@ class ConversationController(
                                 nativeInvoked = true
                                 val inviteResult =
                                     initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
-                                checkInviteAccepted(inviteResult)
+                                inviteResult.requireAcceptedInvite()
                                 nativeAccepted = true
                                 skippedMembers =
                                     inviteResult.invite.memberOutcomes.skippedGroupMembersDetail(appState::displayName)

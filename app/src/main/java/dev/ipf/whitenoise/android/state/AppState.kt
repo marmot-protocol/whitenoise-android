@@ -3904,11 +3904,8 @@ class WhiteNoiseAppState private constructor(
                     ) {
                         val result =
                             marmotIo(MarmotTraceSection.INVITE_MEMBERS) {
-                                inviteMembersDetailed(account, groupIdHex, listOf(ref))
+                                inviteMembersDetailed(account, groupIdHex, listOf(ref)).requireAcceptedInvite()
                             }
-                        if (result.invite.summary == null) {
-                            throw groupMemberSelectionFailure(result.invite.memberOutcomes)
-                        }
                         chatsController?.applyProfileGroupDetails(account, result.details)
                     }
                 }

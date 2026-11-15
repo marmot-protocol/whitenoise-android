@@ -143,11 +143,6 @@ internal fun ConversationController.presentInviteAccepted(skipped: AppText?) {
     appState.presentConversationTransient(account, group.groupIdHex, title, skipped)
 }
 
-/** An all-skipped report has no invite to settle or reconcile. */
-internal fun checkInviteAccepted(result: GroupInviteResultFfi) {
-    if (result.invite.summary == null) throw groupMemberSelectionFailure(result.invite.memberOutcomes)
-}
-
 /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */
 private fun ConversationController.inviteReplyNeedsReconciliation(throwable: Throwable): Boolean =
     when (throwable) {

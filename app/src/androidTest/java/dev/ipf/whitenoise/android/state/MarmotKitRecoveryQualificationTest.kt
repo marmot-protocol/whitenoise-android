@@ -306,8 +306,18 @@ class MarmotKitRecoveryQualificationTest {
             repeat(2) { pass ->
                 val active = if (pass == 0) receiver else reopen(receiver)
                 val incoming = "healthy-incoming-$pass"
+                val liveBefore = relay.liveDeliveries[GROUP_MESSAGE_KIND]?.get() ?: 0
                 group.sender.runtime.sendText(group.sender.account.label, group.id, incoming)
-                assertEquals(setOf(incoming), awaitTexts(active, group.id, setOf(incoming), INVITE_TIMEOUT_MILLIS))
+                val expected = setOf(incoming)
+                val observed = awaitTexts(active, group.id, expected, INVITE_TIMEOUT_MILLIS)
+                val detail =
+                    if (observed == expected) {
+                        null
+                    } else {
+                        val liveAttempts = (relay.liveDeliveries[GROUP_MESSAGE_KIND]?.get() ?: 0) - liveBefore
+                        "pass=$pass live_attempts=$liveAttempts ${diagnose(active, group.id)}"
+                    }
+                assertEquals(detail, expected, observed)
                 val outgoing = "healthy-outgoing-$pass"
                 active.runtime.sendText(active.account.label, group.id, outgoing)
                 assertEquals(
