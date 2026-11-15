@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -84,7 +85,13 @@ internal fun ConversationWidgetConfigurationContent(
                 item {
                     SettingsGroup {
                         row("all") { context ->
-                            SettingsSwitch(context, stringResource(R.string.widget_all_accounts), all, { all = it })
+                            SettingsSwitch(
+                                context,
+                                stringResource(R.string.widget_all_accounts),
+                                all,
+                                { all = it },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_manage_accounts) },
+                            )
                         }
                         row("unread") { context ->
                             SettingsSwitch(
@@ -92,6 +99,7 @@ internal fun ConversationWidgetConfigurationContent(
                                 stringResource(R.string.widget_unread_only),
                                 unread,
                                 { unread = it },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_mark_unread) },
                             )
                         }
                     }

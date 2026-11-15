@@ -3,13 +3,10 @@ name: presentation-modal-translation-missing
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    id: translation.form
-- assertVisible:
-    id: translation.confirm
+    id: translation.menu
+- tapOn:
+    id: translation.menu
 - assertVisible: "Install Offline Translator to translate on this device[.]"
-- assertVisible:
-    id: translation.engine
-- assertVisible: Install from GitHub
-- back
+- tapOn: Finish notice check
 - assertVisible:
     id: presentation.complete

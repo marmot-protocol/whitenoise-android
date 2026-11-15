@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -12,7 +13,9 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.cancel
 import org.junit.Rule
@@ -67,14 +70,32 @@ class ChatContextMenuScreenshotTest {
     @Config(sdk = [36], qualifiers = "en-w640dp-h300dp-land-mdpi")
     fun shortLandscapeLargeRtl() = capture("chat_context_menu_landscape_rtl_200", rtl = true)
 
-    /**
-     * #3310: a group whose leave is still queued keeps the reset action, since that leave may never finish, and offers
-     * no history-only delete, which the group's next message would undo.
-     */
+    /** A group whose leave is still queued offers no reset and no history-only delete in the row menu. */
     @Test
-    fun queuedLeaveKeepsTheResetAction() =
+    fun queuedLeaveGroupOffersNeitherResetNorDelete() =
         withOpenMenu(leavePending = true) {
-            composeRule.onNodeWithTag("chat.action.Abandon", useUnmergedTree = true).assertExists()
+            composeRule.onNodeWithTag("chat.action.Abandon", useUnmergedTree = true).assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.action.Delete", useUnmergedTree = true).assertDoesNotExist()
+        }
+
+    /** A group the account is still in offers no reset and no history-only delete in the row menu. */
+    @Test
+    fun activeGroupOffersNeitherResetNorDelete() =
+        withOpenMenu {
+            composeRule.onNodeWithTag("chat.action.Abandon", useUnmergedTree = true).assertDoesNotExist()
+            composeRule.onNodeWithTag("chat.action.Delete", useUnmergedTree = true).assertDoesNotExist()
+        }
+
+    /** A direct chat the account still receives offers only the forget, labelled Delete from this device. */
+    @Test
+    fun activeDirectChatOffersOnlyTheForget() =
+        withOpenMenu(direct = true) {
+            composeRule
+                .onNodeWithTag("chat.action.Abandon")
+                .assertExists()
+                .assertTextContains(
+                    ApplicationProvider.getApplicationContext<Context>().getString(R.string.delete_from_device),
+                )
             composeRule.onNodeWithTag("chat.action.Delete", useUnmergedTree = true).assertDoesNotExist()
         }
 
@@ -110,6 +131,7 @@ class ChatContextMenuScreenshotTest {
         left: Boolean = false,
         folder: Boolean = false,
         leavePending: Boolean = false,
+        direct: Boolean = false,
         check: () -> Unit,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -125,7 +147,15 @@ class ChatContextMenuScreenshotTest {
             app.chatFolderPreferences.setChatInFolder(ChatRowPortFixtures.ACCOUNT_REF, it.id, "Study group", true)
         }
         val membership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER
-        val row = leftScopeRow("Study group", membership, leavePending = leavePending)
+        val groupRow = leftScopeRow("Study group", membership, leavePending = leavePending)
+        val row =
+            if (direct) {
+                groupRow.copy(
+                    projection = groupRow.projection?.copy(conversationKind = ChatConversationKindFfi.DIRECT),
+                )
+            } else {
+                groupRow
+            }
         val controller = leftScopeController(app, listOf(row))
         try {
             composeRule.setContent {

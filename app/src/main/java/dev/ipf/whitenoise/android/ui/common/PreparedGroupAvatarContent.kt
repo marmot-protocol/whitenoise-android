@@ -36,9 +36,10 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
     accountRef: String? = appState.activeAccountRef,
     surfaceIdentity: Any? = null,
     retainedPreparation: RetainedGroupAvatarPreparation? = null,
+    compatibilityId: ((T) -> String)? = null,
     content: @Composable () -> Unit,
 ) {
-    val window by remember(rows, listState, rowKey, assetForRow) {
+    val window by remember(rows, listState, rowKey, assetForRow, compatibilityId) {
         derivedStateOf {
             val visibleKeys =
                 listState.layoutInfo.visibleItemsInfo
@@ -48,6 +49,10 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
             VisibleGroupAvatarAssets(
                 assets = visibleRows.mapNotNull(assetForRow),
                 hasVisibleRows = visibleRows.any { rowKey(it) in visibleKeys },
+                compatibilityRows =
+                    compatibilityId
+                        ?.let { id -> visibleRows.filter { assetForRow(it) == null }.mapTo(mutableSetOf(), id) }
+                        .orEmpty(),
             )
         }
     }
@@ -55,7 +60,12 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
         PreparedGroupAvatarContent(appState, window.assets, accountRef, surfaceIdentity, content)
     } else {
         // A returning LazyColumn has no layout yet. Keep its last real viewport until layout restores it.
-        if (window.hasVisibleRows) SideEffect { retainedPreparation.updateVisible(window.assets) }
+        if (window.hasVisibleRows) {
+            SideEffect {
+                retainedPreparation.updateVisible(window.assets)
+                retainedPreparation.compatibility.select(window.compatibilityRows)
+            }
+        }
         key(accountRef) {
             CompositionLocalProvider(
                 LocalPreparedGroupAvatarPixels provides retainedPreparation.pixels,
@@ -69,12 +79,14 @@ internal fun <T> PreparedVisibleGroupAvatarContent(
 private data class VisibleGroupAvatarAssets(
     val assets: List<AvatarAssetFfi>,
     val hasVisibleRows: Boolean,
+    val compatibilityRows: Set<String>,
 )
 
 /** Transfers the existing bounded preparation between a shell and its disposable chat-list slot. */
 internal class RetainedGroupAvatarPreparation(
     private val readPixels: () -> PreparedGroupAvatarPixels,
     val updateVisible: (List<AvatarAssetFfi>) -> Unit,
+    val compatibility: RetainedGroupCompatibilityPixels,
 ) {
     /** Pixel changes belong to the consuming content's restart scope, never the shell owner factory. */
     val pixels: PreparedGroupAvatarPixels get() = readPixels()
@@ -99,6 +111,7 @@ internal fun rememberRetainedGroupAvatarPreparation(
         }
     PrepareRetainedAvatarWindow(appState, accountRef, window)
     return remember(window) {
+        val compatibility = RetainedGroupCompatibilityPixels()
         RetainedGroupAvatarPreparation(
             readPixels = {
                 PreparedGroupAvatarPixels(
@@ -108,9 +121,11 @@ internal fun rememberRetainedGroupAvatarPreparation(
                     images = window.exactImages(),
                     retained = window.retained,
                     recordLoaded = window::recordLoaded,
+                    compatibility = compatibility,
                 )
             },
             updateVisible = window::select,
+            compatibility = compatibility,
         )
     }
 }

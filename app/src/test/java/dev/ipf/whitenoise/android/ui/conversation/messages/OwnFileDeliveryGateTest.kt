@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
@@ -17,8 +16,6 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companio
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -42,7 +39,6 @@ class OwnFileDeliveryGateTest : MessageBubbleFileAttachmentFixtures() {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
     private lateinit var fixture: MediaDownloadIntegrationFixture
     private lateinit var controller: ConversationController
 
@@ -168,7 +164,6 @@ class OwnFileDeliveryGateTest : MessageBubbleFileAttachmentFixtures() {
             item = item,
             controller = controller,
             appState = fixture.state,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -189,12 +184,6 @@ class OwnFileDeliveryGateTest : MessageBubbleFileAttachmentFixtures() {
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            inviteMutationInFlight = false,
-            onJoinInvite = {},
-            onDeclineInvite = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderAvatar = false,
             parseMarkdown = ::markdown,
         )

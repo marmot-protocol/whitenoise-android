@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,7 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -193,7 +191,7 @@ private fun CustomEmojiAddActions(
                 context = context,
                 title = stringResource(R.string.choose_photos),
                 onClick = onChoosePhoto,
-                leading = { Icon(painterResource(R.drawable.ic_image), contentDescription = null) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_image) },
             )
         }
         if (onOpenSets != null) {
@@ -202,6 +200,7 @@ private fun CustomEmojiAddActions(
                     context = context,
                     title = stringResource(R.string.emoji_sets_title),
                     onClick = onOpenSets,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_add_reaction) },
                 )
             }
         }
@@ -210,7 +209,7 @@ private fun CustomEmojiAddActions(
                 context = context,
                 title = stringResource(R.string.choose_files),
                 onClick = onChooseFile,
-                leading = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_folder) },
             )
         }
     }

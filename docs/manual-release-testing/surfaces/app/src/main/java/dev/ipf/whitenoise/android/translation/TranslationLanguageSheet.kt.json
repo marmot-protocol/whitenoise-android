@@ -1,0 +1,54 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TranslationLanguagePickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+        "anchor": "fun TranslationLanguagePickerSheet(",
+        "test_ids": [
+          "CON-045",
+          "SET-033",
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "TranslationLanguageRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+        "anchor": "private fun TranslationLanguageRow(",
+        "test_ids": [
+          "CON-045",
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "Language search field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+        "anchor": "R.string.translation_search_languages",
+        "test_ids": [
+          "CON-045",
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "No matching languages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "CON-045",
+          "SET-036"
+        ]
+      },
+      {
+        "surface": "TranslationLanguageNoMatches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+        "anchor": "private fun TranslationLanguageNoMatches(",
+        "test_ids": [
+          "CON-045",
+          "SET-036"
+        ]
+      }
+    ]
+  }
+}

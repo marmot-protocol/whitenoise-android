@@ -61,8 +61,7 @@ class ChatsScreenOffWindowActionsTest {
                 model?.controller?.onCleared()
             }
             try {
-                rule.waitUntil(WAIT_MILLIS) {
-                    scope.testScheduler.runCurrent()
+                awaitProgress {
                     model
                         ?.state
                         ?.mutationsScope

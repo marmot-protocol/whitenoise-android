@@ -25,6 +25,7 @@
         "anchor": "fun ChatListTopBar(",
         "test_ids": [
           "CHL-001",
+          "CHL-017",
           "SYS-008",
           "SYS-009",
           "SYS-010"

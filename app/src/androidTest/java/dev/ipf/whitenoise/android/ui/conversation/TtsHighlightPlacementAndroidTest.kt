@@ -21,7 +21,6 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -65,8 +64,6 @@ import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.
 import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.speakableRecord
 import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.text
 import dev.ipf.whitenoise.android.ui.conversation.TtsHighlightPlacementFixtures.translate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudSentenceHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.highlightBoundingBoxes
@@ -104,7 +101,6 @@ class TtsHighlightPlacementAndroidTest {
     private val engine = ReplayEngine()
     private lateinit var appState: WhiteNoiseAppState
     private lateinit var controller: ConversationController
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
 
     @Before
     fun setUp() {
@@ -657,7 +653,6 @@ class TtsHighlightPlacementAndroidTest {
             item = item,
             controller = controller,
             appState = appState,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -678,10 +673,6 @@ class TtsHighlightPlacementAndroidTest {
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            onBack = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderName = false,
             showSenderAvatar = false,
             collapseLongMessages = false,

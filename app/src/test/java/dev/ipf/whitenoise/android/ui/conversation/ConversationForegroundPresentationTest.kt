@@ -24,11 +24,12 @@ import org.robolectric.annotation.Config
 class ConversationForegroundPresentationTest {
     @Test
     fun retainedFrameRequiresCurrentOwnerReadyUnlockedAndAnchoredContent() {
-        assertTrue(canPresentRetainedConversationFrame(true, true, true, false))
-        assertFalse(canPresentRetainedConversationFrame(false, true, true, false))
-        assertFalse(canPresentRetainedConversationFrame(true, false, true, false))
-        assertFalse(canPresentRetainedConversationFrame(true, true, false, false))
-        assertFalse(canPresentRetainedConversationFrame(true, true, true, true))
+        assertTrue(canPresentRetainedConversationFrame(true, true, true, false, true))
+        assertFalse(canPresentRetainedConversationFrame(true, true, true, false, false))
+        assertFalse(canPresentRetainedConversationFrame(false, true, true, false, true))
+        assertFalse(canPresentRetainedConversationFrame(true, false, true, false, true))
+        assertFalse(canPresentRetainedConversationFrame(true, true, false, false, true))
+        assertFalse(canPresentRetainedConversationFrame(true, true, true, true, true))
     }
 
     /** A missing handoff cannot authenticate a replaced owner, locked app or non-Ready frame. */

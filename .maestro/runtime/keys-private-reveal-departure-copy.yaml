@@ -4,6 +4,9 @@ name: keys-private-reveal-departure-copy
 - runFlow: ../fixtures/runtime-profile-keys-ready.yaml
 - runFlow: ../fixtures/reveal-fixture-private-key.yaml
 - tapOn: Back
+- assertVisible:
+    id: settings.account.group
+- tapOn: Back
 - assertVisible: Settings
 - tapOn: Back
 - assertVisible: Maestro group

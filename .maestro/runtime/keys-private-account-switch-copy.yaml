@@ -3,6 +3,9 @@ name: keys-private-account-switch-copy
 ---
 - runFlow: ../fixtures/runtime-profile-keys-ready.yaml
 - tapOn: Back
+- assertVisible:
+    id: settings.account.group
+- tapOn: Back
 - assertVisible: Settings
 - tapOn: Back
 - assertVisible: Maestro group
@@ -14,6 +17,9 @@ name: keys-private-account-switch-copy
 - runFlow: ../fixtures/reveal-fixture-private-key.yaml
 - tapOn: Hide private key
 - assertVisible: Private key hidden
+- tapOn: Back
+- assertVisible:
+    id: settings.account.group
 - tapOn: Back
 - assertVisible: Settings
 - tapOn: Back

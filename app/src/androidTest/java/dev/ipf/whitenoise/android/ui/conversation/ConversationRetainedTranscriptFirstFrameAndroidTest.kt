@@ -10,16 +10,21 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ResponsivenessDeviceAcceptance
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DestructiveAccountWipeRuntimeState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -125,6 +130,12 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
         } finally {
             fixture.close()
         }
+    }
+
+    /** Admission can become safe after ON_RESUME while the local handoff remains unresolved. */
+    @Test
+    fun admissionAfterResumeDrawsAndAcceptsTouchBeforeThePendingHandoff() {
+        assertAdmissionAfterResumeFirstFrame(composeRule, mountFixture(controlledOwner = true))
     }
 
     /** Reconnect's replacement snapshot is sufficient even when no later live update arrives. */
@@ -620,6 +631,65 @@ class ConversationRetainedTranscriptFirstFrameAndroidTest {
     private enum class RouteReplacement { Chat, Account, Runtime }
 
     private enum class UpdateBoundary { Consumed, Queued, Replacement }
+}
+
+/** Drives one late-admission epoch through the existing production-screen fixture. */
+private fun assertAdmissionAfterResumeFirstFrame(
+    composeRule: androidx.compose.ui.test.junit4.AndroidComposeTestRule<*, *>,
+    fixture: RetainedFixture,
+) {
+    val owner = checkNotNull(fixture.owner)
+    val setPhase =
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("setPhase", AppPhase::class.java)
+            .apply { isAccessible = true }
+    try {
+        composeRule.runOnUiThread { owner.moveTo(Lifecycle.State.CREATED) }
+        fixture.dispatcher.hold.set(true)
+        fixture.first.emitWindow(fixture.pageWithB)
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.dispatcher.hasPending }
+        composeRule.runOnUiThread {
+            fixture.draws.clear()
+            fixture.firstDrawAt = 0L
+            fixture.firstBlockedAt = null
+            fixture.gateReleasedAt = null
+            fixture.recording.set(true)
+        }
+        val pausedPreDraws = fixture.preDraws.get()
+        composeRule.runOnUiThread { checkNotNull(fixture.composition).invalidate() }
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) {
+            fixture.preDraws.get() > pausedPreDraws && fixture.firstBlockedAt != null
+        }
+        assertTrue("a paused pre-draw keeps the restore gate closed", fixture.firstBlockedAt != null)
+        assertTrue("pause cannot release the gate before resume admission", fixture.gateReleasedAt == null)
+        composeRule.runOnUiThread {
+            setPhase.invoke(fixture.appState, AppPhase.Bootstrapping)
+            owner.moveTo(Lifecycle.State.RESUMED)
+        }
+        composeRule.waitUntil(timeoutMillis = FIRST_FRAME_TIMEOUT_MS) { fixture.firstBlockedAt != null }
+        composeRule.runOnUiThread { setPhase.invoke(fixture.appState, AppPhase.Ready) }
+        // This is shorter than the 1500ms handoff fallback: readiness must release the frame itself.
+        composeRule.waitUntil(timeoutMillis = 1_000L) { fixture.draws.isNotEmpty() }
+        assertTrue(
+            "readiness releases before the fallback",
+            checkNotNull(fixture.gateReleasedAt) - fixture.lastResumeAt in 0L until 1_000L,
+        )
+        assertTrue(
+            "live drawing precedes the fallback",
+            fixture.firstDrawAt - fixture.lastResumeAt in 0L until 1_000L,
+        )
+        assertFalse(fixture.hasB)
+        assertTrue(fixture.controller.pendingTimelineAtForeground()?.isCompleted == false)
+        composeRule.onNode(hasSetTextAction()).performTouchInput { click() }.assertIsFocused()
+        composeRule.onNode(hasSetTextAction()).performTextInput(" editable")
+        composeRule.onNode(hasSetTextAction()).assertTextContains(" editable", substring = true)
+        assertTrue(
+            "the production composer accepts input before timeline preparation finishes",
+            fixture.dispatcher.hasPending,
+        )
+    } finally {
+        fixture.close()
+    }
 }
 
 private const val FIRST_FRAME_TIMEOUT_MS = 10_000L

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.util.Log
+import dev.ipf.marmotkit.AppMessageRecordFfi
 
 /**
  * Index of the first (oldest) still-unread received message in [timeline]
@@ -21,7 +22,7 @@ internal fun firstUnreadReceivedIndex(
         // an avatar change or in-place edit doesn't inflate the unread
         // badge or shift the "first unread" anchor away from real
         // messages.
-        if (record.direction == "received" && !isDerivedStateKind(record.kind)) {
+        if (record.isUnreadEligible()) {
             seen += 1
             if (seen == unreadCount) return index
         }
@@ -51,7 +52,7 @@ internal fun countUnreadIncoming(
             timeline.indexOfFirst { it.record.messageIdHex == id }
         } ?: -1
     return timeline.drop(anchorIdx + 1).count {
-        it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
+        it.record.isUnreadEligible()
     }
 }
 
@@ -72,7 +73,7 @@ internal fun reconciledConversationEntryUnreadCount(
     } else {
         val loadedReceived =
             timeline.count { message ->
-                message.record.direction == "received" && !isDerivedStateKind(message.record.kind)
+                message.record.isUnreadEligible()
             }
         val anchorLoaded =
             !readAnchorMessageId.isNullOrBlank() &&
@@ -108,7 +109,7 @@ internal fun unreadCountDivergenceReport(
     if (projectionUnread <= timelineUnread) return null
     val loadedReceived =
         timeline.count { row ->
-            row.record.direction == "received" && !isDerivedStateKind(row.record.kind)
+            row.record.isUnreadEligible()
         }
     if (projectionUnread > loadedReceived) return null
     return UnreadCountDivergenceReport(
@@ -134,6 +135,9 @@ internal fun logUnreadCountDivergence(
 // new chat. They never inflate unread counts and never block read-anchor
 // advancement.
 internal fun isDerivedStateKind(kind: ULong): Boolean = kind == 1009uL || kind == 1210uL
+
+/** Only incoming chat rows contribute to unread counts; derived edits and system events do not. */
+internal fun AppMessageRecordFfi.isUnreadEligible(): Boolean = direction == "received" && !isDerivedStateKind(kind)
 
 /**
  * Message ids of unread received mentions in [timeline], oldest first — drives

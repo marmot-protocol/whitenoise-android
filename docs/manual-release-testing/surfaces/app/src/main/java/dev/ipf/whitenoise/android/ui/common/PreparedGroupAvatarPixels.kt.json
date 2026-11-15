@@ -10,6 +10,14 @@
         "test_ids": [
           "CHL-017"
         ]
+      },
+      {
+        "surface": "Keep decoded URL and encrypted avatar pictures in the measured return window",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarPixels.kt",
+        "anchor": "class RetainedGroupCompatibilityPixels",
+        "test_ids": [
+          "CHL-017"
+        ]
       }
     ]
   },

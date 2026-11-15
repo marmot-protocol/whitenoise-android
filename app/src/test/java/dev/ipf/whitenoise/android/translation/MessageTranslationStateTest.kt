@@ -217,17 +217,60 @@ class MessageTranslationStateTest {
             assertEquals(TranslationFailure.INVALID_REQUEST, session.failure)
         }
 
-    /** Only an engine too old for the language swaps the generic notice for the update instruction. */
+    /** Each failure with its own fix names it; anything else asks for a retry from the menu. */
     @Test
-    fun recoveryNoticeNamesAnEngineUpdateOnlyWhenOneIsRequired() {
-        assertEquals(
-            R.string.translation_engine_update_required,
-            recoveryNotice(TranslationFailure.ENGINE_UPDATE_REQUIRED),
-        )
-        for (failure in TranslationFailure.entries - TranslationFailure.ENGINE_UPDATE_REQUIRED + null) {
+    fun recoveryNoticeNamesTheFixWhenOneIsKnown() {
+        val specific =
+            mapOf(
+                TranslationFailure.ENGINE_UPDATE_REQUIRED to R.string.translation_engine_update_required,
+                TranslationFailure.MISSING_ENGINE to R.string.translation_missing_engine,
+                TranslationFailure.SOURCE_MODEL to R.string.translation_source_model_missing,
+            )
+        for ((failure, notice) in specific) assertEquals("$failure", notice, recoveryNotice(failure))
+        for (failure in TranslationFailure.entries - specific.keys + null) {
             assertEquals("$failure", R.string.translation_recovery_notice, recoveryNotice(failure))
         }
     }
+
+    /**
+     * The menu's Translate asks nothing: the engine detects the source, an unusable target becomes the device
+     * language, and a hidden translation is shown again without a second request.
+     */
+    @Test
+    fun menuTranslateDetectsTheSourceAndReusesItsResult() =
+        runTest {
+            val pairs = mutableListOf<Pair<String, String>>()
+            val session =
+                ConversationTranslationSession(backgroundScope, {
+                    object : TranslationEngine {
+                        override val identity = TranslationEngineIdentity("local", "verified", 1)
+                        override val trust = TranslationTrust.LOCAL
+
+                        override suspend fun translate(
+                            text: String,
+                            source: String,
+                            target: String,
+                        ): String {
+                            pairs += source to target
+                            return "rendition"
+                        }
+                    }
+                }, { true })
+            val requested = session.translateMessage(source)
+            runCurrent()
+            assertEquals(source, requested)
+            assertEquals(listOf("" to "de"), pairs)
+            session.toggle(requested)
+            assertEquals(requested, session.translateMessage(source))
+            runCurrent()
+            assertEquals(1, pairs.size)
+            assertTrue(session.renditions.getValue(requested).showTranslation)
+
+            val fallback = session.translateMessage(source.copy(messageId = "unsaved", target = "xx"))
+            runCurrent()
+            assertEquals(OfflineTranslatorLanguageCatalog.systemTarget(), fallback.target)
+            assertEquals("" to fallback.target, pairs.last())
+        }
 
     /** Builds a session over an engine whose every translation runs [translate]. */
     private fun session(

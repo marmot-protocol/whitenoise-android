@@ -64,14 +64,14 @@ internal suspend fun resolveTtsSpeakableDocument(
     return parseMarkdownOrEmptyDocument(source.text, parseMarkdown)
 }
 
-/** Keeps the legacy plain-text fallback when native parsing produced no blocks. */
+/** Uses the same full plain source as the bubble when the native document is missing or only covers a prefix. */
 internal fun speakableProjectionFromDocument(
     source: String,
     document: MarkdownDocumentFfi,
     mentionDisplayName: ((String) -> String?)? = null,
 ): SpeakableTextProjection? {
     if (source.isBlank()) return null
-    return if (document.blocks.isEmpty()) {
+    return if (document.truncated || document.blocks.isEmpty()) {
         legacyTextToSpeakableProjection(source)
     } else {
         markdownDocumentToSpeakableProjection(

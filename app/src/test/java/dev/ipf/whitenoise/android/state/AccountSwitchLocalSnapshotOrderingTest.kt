@@ -549,7 +549,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         assertFalse("stage output must not interpolate an account identifier", "accountRef}" in stageRecorder)
     }
 
-    private fun controllersSource(): File = source("state/Controllers.kt")
+    private fun controllersSource(): File = source("state/ChatsController.kt")
 
     private fun appStateSource(): File = source("state/AppState.kt")
 

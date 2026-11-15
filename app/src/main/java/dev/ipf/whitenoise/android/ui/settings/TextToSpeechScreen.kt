@@ -112,6 +112,7 @@ internal fun TextToSpeechScreen(
                                 title = stringResource(R.string.tts_settings_engine_title),
                                 onClick = { picker = SpeechSetting.Engine },
                                 value = engineLabel ?: stringResource(R.string.theme_system),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_memory) },
                             )
                         }
                     }
@@ -137,6 +138,7 @@ internal fun TextToSpeechScreen(
                                         null
                                     },
                                 enabled = resolvedPackage != null,
+                                leading = { SettingsLeadingIcon(R.drawable.ic_record_voice_over) },
                             )
                         }
                     }
@@ -148,6 +150,7 @@ internal fun TextToSpeechScreen(
                             value =
                                 rateOverride?.let { ttsRateLabel(it, locale) }
                                     ?: stringResource(R.string.tts_settings_rate_system),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_speed) },
                         )
                     }
                 }
@@ -171,6 +174,7 @@ internal fun TextToSpeechScreen(
                             onCheckedChange = { appState.setTtsAutoReadGlobalDefault(it) },
                             modifier = Modifier.testTag(TTS_AUTO_READ_GLOBAL_DEFAULT_ROW_TAG),
                             subtitle = stringResource(R.string.tts_auto_read_default_global_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_text_to_speech) },
                         )
                     }
                     row("header_shortcut") { context ->
@@ -181,6 +185,7 @@ internal fun TextToSpeechScreen(
                             onCheckedChange = appState::setTtsHeaderShortcutVisible,
                             modifier = Modifier.testTag("speech.header_shortcut"),
                             subtitle = stringResource(R.string.tts_header_shortcut_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
                         )
                     }
                     row("media_mix") { context ->
@@ -190,6 +195,7 @@ internal fun TextToSpeechScreen(
                             checked = mediaMix.enabled,
                             onCheckedChange = appState::setTtsMediaMixEnabled,
                             subtitle = stringResource(R.string.tts_media_mix_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
                         )
                     }
                     if (mediaMix.enabled) {
@@ -199,6 +205,7 @@ internal fun TextToSpeechScreen(
                                 title = stringResource(R.string.tts_media_mix_volume_title),
                                 onClick = { picker = SpeechSetting.Volume },
                                 value = stringResource(ttsMediaMixVolumeLabel(mediaMix.volume)),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_volume_down) },
                             )
                         }
                     }
@@ -211,6 +218,7 @@ internal fun TextToSpeechScreen(
                             context = rowContext,
                             title = stringResource(R.string.refresh),
                             onClick = { refreshToken++ },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
                         )
                     }
                     row("android_settings") { rowContext ->
@@ -218,6 +226,7 @@ internal fun TextToSpeechScreen(
                             context = rowContext,
                             title = stringResource(R.string.speech_android_settings),
                             onClick = { settingsFailed = !openSpeechSettings(context) },
+                            leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                         )
                     }
                 }

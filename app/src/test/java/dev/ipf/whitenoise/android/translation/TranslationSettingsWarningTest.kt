@@ -8,18 +8,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -98,7 +103,7 @@ class TranslationSettingsWarningTest {
         composeRule.onNodeWithText(context.getString(R.string.translation_on)).performClick()
         assertEquals(TranslationOverride.ON, preferences.override("account", "group"))
         composeRule.onNodeWithText("Target language: Choose a language").performClick()
-        composeRule.onNodeWithText("Slovak").performScrollTo().performClick()
+        chooseLanguage("Slovak")
         composeRule.onNodeWithText("Target language: Slovak").assertIsDisplayed()
         assertEquals("sk", preferences.targetOverride("account", "group"))
         preferences.close()
@@ -139,7 +144,7 @@ class TranslationSettingsWarningTest {
         preferences.setGlobal(true, "es")
         composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
         composeRule.onNodeWithText("Target language: Spanish").performClick()
-        composeRule.onNodeWithText("Slovak").performScrollTo().performClick()
+        chooseLanguage("Slovak")
         composeRule.onNodeWithText("Target language: Slovak").assertIsDisplayed()
         assertEquals(TranslationChoice(true, "sk"), preferences.global())
         preferences.close()
@@ -158,7 +163,7 @@ class TranslationSettingsWarningTest {
         composeRule.onNodeWithTag("translation.target_recovery").assertIsDisplayed()
         composeRule.onNodeWithText("Target language: English").assertDoesNotExist()
         composeRule.onNodeWithText("Target language: Choose a language").performClick()
-        composeRule.onNodeWithText("Chinese (Traditional)").performScrollTo().performClick()
+        chooseLanguage("Chinese (Traditional)")
         composeRule.onNodeWithTag("translation.target_recovery").assertDoesNotExist()
         assertEquals("zh_hant", preferences.global().target)
         preferences.close()
@@ -177,7 +182,7 @@ class TranslationSettingsWarningTest {
         composeRule.setContent { WhiteNoiseTheme { TranslationChatSettingsDialog("account", "group", {}) } }
         composeRule.onNodeWithTag("translation.target_recovery").assertIsDisplayed()
         composeRule.onNodeWithText("Target language: Choose a language").performClick()
-        composeRule.onNodeWithText("Slovak").performScrollTo().performClick()
+        chooseLanguage("Slovak")
         composeRule.onNodeWithTag("translation.target_recovery").assertDoesNotExist()
         assertEquals(TranslationChoice(true, "sk"), preferences.effective("account", "group"))
         assertEquals(TranslationChoice(true, "de"), preferences.effective("account", "other"))
@@ -192,11 +197,56 @@ class TranslationSettingsWarningTest {
         composeRule.setContent { WhiteNoiseTheme { TranslationGlobalSettingsContent(preferences) } }
         composeRule.onNodeWithText("Target language: English").performClick()
         for (label in listOf("Chinese (Simplified)", "Chinese (Traditional)", "Norwegian", "Norwegian Bokmål")) {
-            composeRule.onNodeWithText(label).performScrollTo().assertIsDisplayed()
+            searchLanguages(label)
+            composeRule.onNode(languageRow(label)).assertIsDisplayed()
         }
         for (sourceOnly in listOf("Belarusian", "Marathi", "Norwegian Nynorsk", "Urdu")) {
-            composeRule.onNodeWithText(sourceOnly).assertDoesNotExist()
+            searchLanguages(sourceOnly)
+            composeRule.onNode(languageRow(sourceOnly)).assertDoesNotExist()
         }
         preferences.close()
     }
+
+    /** The menu's Translate sends nothing until the shared provider notice is accepted, then never asks again. */
+    @Test
+    fun messageTranslateAsksForTheProviderNoticeOnce() {
+        val preferences = TranslationPreferences(context)
+        var translated = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MessageTranslationNotice(
+                    onAccept = {
+                        preferences.acceptProviderNotice()
+                        translated += 1
+                    },
+                    onDismiss = {},
+                )
+            }
+        }
+        assertFalse(preferences.providerNoticeAccepted())
+        composeRule.onNodeWithText(context.getString(R.string.translation_privacy_warning)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.accept)).performClick()
+        assertTrue(preferences.providerNoticeAccepted())
+        assertEquals(1, translated)
+        val bubble =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt")
+        val menuTranslate = bubble.substringAfter("onTranslate = {").substringBefore("},\n")
+        assertTrue(menuTranslate, "providerNoticeAccepted() == true" in menuTranslate)
+        assertTrue(menuTranslate, "translationNoticeOpen = true" in menuTranslate)
+        preferences.close()
+    }
+
+    /** The picker list is lazy, so narrow it with search before addressing a language by label. */
+    private fun searchLanguages(query: String) {
+        composeRule.onNodeWithTag("translation.language.search").performTextReplacement(query)
+        composeRule.waitForIdle()
+    }
+
+    private fun chooseLanguage(label: String) {
+        searchLanguages(label)
+        composeRule.onNode(languageRow(label)).performClick()
+    }
+
+    /** Matches a language row, not the search field that echoes the same text. */
+    private fun languageRow(label: String) = hasText(label) and !hasSetTextAction()
 }

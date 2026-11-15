@@ -4,7 +4,7 @@ The [map dependency decision proposal](map-dependency-decision.md) records the
 current osmdroid boundary, temporary containment, a maintained replacement
 candidate and the product/privacy and qualification gates for #3258.
 
-The local icon source set contains the 108 glyphs currently used by production and
+The local icon source set contains the 105 glyphs currently used by production and
 tests plus AndroidX's vector helper from 1.7.8. The two source archives and their
 SHA-256 values are recorded in `material-icons-provenance.json`. Only package
 and import prefixes changed; paths, dimensions, mirroring, caches and upstream

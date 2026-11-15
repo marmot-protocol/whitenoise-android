@@ -65,6 +65,7 @@ internal fun AuditDeliverySection(
                 context = rowContext,
                 title = stringResource(R.string.audit_delivery_title),
                 value = listOfNotNull(status, delivery?.httpStatus?.let { "HTTP $it" }).joinToString(" · "),
+                leading = { SettingsLeadingIcon(R.drawable.ic_monitor_heart) },
             )
         }
         auditDeliveryMetadata(delivery)
@@ -81,12 +82,19 @@ internal fun AuditDeliverySection(
                             settings.deliveryResumeFailed -> stringResource(R.string.audit_delivery_resume_failed)
                             else -> null
                         },
+                    leading = { SettingsLeadingIcon(R.drawable.ic_play_arrow) },
                 )
             }
         }
         if (settings.delivery != null && delivery?.state != AuditDeliveryState.OFF) {
             row("audit_refresh_delivery") { rowContext ->
-                SettingsAction(rowContext, stringResource(R.string.refresh), onRefresh, enabled = enabled)
+                SettingsAction(
+                    rowContext,
+                    stringResource(R.string.refresh),
+                    onRefresh,
+                    enabled = enabled,
+                    leading = { SettingsLeadingIcon(R.drawable.ic_refresh) },
+                )
             }
         }
     }
@@ -105,7 +113,12 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                         DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME,
                     )
                 } ?: stringResource(R.string.download_never)
-            SettingsValue(rowContext, stringResource(R.string.audit_delivery_last_success), lastCheck)
+            SettingsValue(
+                rowContext,
+                stringResource(R.string.audit_delivery_last_success),
+                lastCheck,
+                leading = { SettingsLeadingIcon(R.drawable.ic_history) },
+            )
         }
     }
     if (delivery.waitingBytes > 0L) {
@@ -114,6 +127,7 @@ private fun SettingsGroupScope.auditDeliveryMetadata(delivery: AuditDeliverySumm
                 rowContext,
                 stringResource(R.string.audit_delivery_waiting),
                 Formatter.formatShortFileSize(LocalContext.current, delivery.waitingBytes),
+                leading = { SettingsLeadingIcon(R.drawable.ic_pending) },
             )
         }
     }
@@ -160,6 +174,7 @@ internal fun AuditRetentionRow(
                 else -> null
             },
         busy = settings.retention == null || settings.savingRetention,
+        leading = { SettingsLeadingIcon(R.drawable.ic_history) },
     )
     if (pickerOpen && current != null) {
         val values = auditRetentionChoices(current)

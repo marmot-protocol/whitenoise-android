@@ -83,6 +83,14 @@
         ]
       },
       {
+        "surface": "Always expanded Send-side shortcuts hug Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "val expandedTrailingWidth =",
+        "test_ids": [
+          "CON-040"
+        ]
+      },
+      {
         "surface": "Voice recording composer outline",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "recordingContent?.invoke(this)",

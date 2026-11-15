@@ -8,7 +8,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -32,8 +31,6 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 
@@ -87,7 +84,6 @@ internal fun SwipeTestBubbleHost(
     collapseLongMessages: Boolean = true,
     isActionMenuOpen: Boolean = false,
     onActionMenuOpenChange: (Boolean) -> Unit = {},
-    composerTextState: ComposerTextState = ComposerTextState(TextFieldValue("")),
 ) {
     val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -98,7 +94,6 @@ internal fun SwipeTestBubbleHost(
                     controller = surface.controller,
                     appState = surface.appState,
                     showSenderAvatar = surface.item.record.direction != "sent",
-                    composerTextState = composerTextState,
                     highlighted = false,
                     readOnly = readOnly,
                     selectionMode = selecting,
@@ -121,12 +116,6 @@ internal fun SwipeTestBubbleHost(
                     collapseLongMessages = collapseLongMessages,
                     onQuickReactionsSave = {},
                     onReplyPreviewClick = {},
-                    composerGate = ComposerGate.COMPOSER,
-                    inviteMutationInFlight = false,
-                    onJoinInvite = {},
-                    onDeclineInvite = {},
-                    mentionCandidates = emptyList(),
-                    mentionPickerEnabled = false,
                 )
             }
         }

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.SavedStateHandle
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -26,6 +27,7 @@ import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
@@ -264,20 +266,25 @@ internal class ReturnFixture(
     avatarAssetForRow: (ChatListRowFfi) -> AvatarAssetFfi? = { null },
     private val readAvatars: suspend (List<String>) -> List<AvatarBytesFfi> = { emptyList() },
     private val unreadTarget: Boolean = false,
+    additionalAccounts: List<AccountSummaryFfi> = emptyList(),
+    customizeRow: (Int, ChatListRowFfi) -> ChatListRowFfi = { _, row -> row },
 ) {
     val unreadSnapshotReads = AtomicInteger()
     val avatarReads = AtomicInteger()
     val avatarRequests = AtomicInteger()
     val rows =
         (0..5).map { index ->
-            notificationChatListRow().copy(
-                groupIdHex =
-                    if (index == 5) ConversationTimelineTestIds.GROUP_ID else "%02x".format(index + 10).repeat(16),
-                title = "Return chat $index",
-                groupName = "Return chat $index",
-                activitySortAt = (10 - index).toULong(),
-                unreadCount = if (unreadTarget && index == 5) 1uL else 0uL,
-                hasUnread = unreadTarget && index == 5,
+            customizeRow(
+                index,
+                notificationChatListRow().copy(
+                    groupIdHex =
+                        if (index == 5) ConversationTimelineTestIds.GROUP_ID else "%02x".format(index + 10).repeat(16),
+                    title = "Return chat $index",
+                    groupName = "Return chat $index",
+                    activitySortAt = (10 - index).toULong(),
+                    unreadCount = if (unreadTarget && index == 5) 1uL else 0uL,
+                    hasUnread = unreadTarget && index == 5,
+                ),
             )
         }
     val target = rows.last()
@@ -288,7 +295,10 @@ internal class ReturnFixture(
             conversationTimelineTestGroup(),
         )
     val appState: WhiteNoiseAppState =
-        conversationTimelineTestAppState(timelines.subscriptions).also { state ->
+        conversationTimelineTestAppState(
+            timelines.subscriptions,
+            additionalAccounts = additionalAccounts,
+        ).also { state ->
             WhiteNoiseAppState::class.java.getDeclaredField("marmotRuntime").apply { isAccessible = true }.set(
                 state,
                 AppMarmotRuntime(rootPath = "test", marmot = runtime()),
@@ -402,16 +412,24 @@ internal class ReturnWindow(
         return snapshot.copy(
             rows =
                 snapshot.rows.map { presented ->
-                    val asset = avatarAssetForRow(presented.row) ?: return@map presented
+                    val row = presented.row
+                    val asset = avatarAssetForRow(row)
+                    val source = if (asset == null) PresentationSourceFfi.GROUP else presented.presentation.avatarSource
+                    val avatar =
+                        when {
+                            asset != null -> SelectedAvatarFfi.RemoteImage("https://example.invalid/avatar", row.title)
+                            row.avatarUrl != null ->
+                                SelectedAvatarFfi.RemoteImage(checkNotNull(row.avatarUrl), row.title)
+                            row.avatar != null ->
+                                SelectedAvatarFfi.EncryptedGroupImage(checkNotNull(row.avatar), row.title)
+                            else -> return@map presented
+                        }
                     presented.copy(
                         avatarAsset = asset,
                         presentation =
                             presented.presentation.copy(
-                                avatar =
-                                    SelectedAvatarFfi.RemoteImage(
-                                        "https://example.invalid/avatar",
-                                        presented.row.title,
-                                    ),
+                                avatar = avatar,
+                                avatarSource = source,
                             ),
                     )
                 },

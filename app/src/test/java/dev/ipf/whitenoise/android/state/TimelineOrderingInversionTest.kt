@@ -325,7 +325,7 @@ class TimelineOrderingInversionTest {
 
     private fun controllersSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-        ).firstOrNull(File::exists) ?: error("Missing Controllers.kt")
+            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing ConversationController.kt")
 }

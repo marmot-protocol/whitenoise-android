@@ -51,6 +51,7 @@ internal fun LazyListScope.storageUsageItems(
                         onClick = onRefresh,
                         enabled = state.available && !state.busy,
                         modifier = Modifier.testTag("storage.retry"),
+                        leading = { SettingsLeadingIcon(R.drawable.ic_replay) },
                     )
                 }
             }
@@ -99,6 +100,7 @@ internal fun LazyListScope.storageFreeUpItems(
                     onClick = { onOpenList(LARGEST_ATTACHMENTS_LIST) },
                     enabled = ready && hasAttachments,
                     modifier = Modifier.testTag("storage.largest"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_sort) },
                 )
             }
             row("older") { context ->
@@ -109,6 +111,7 @@ internal fun LazyListScope.storageFreeUpItems(
                     enabled = ready && hasAttachments,
                     busy = state.action is StorageAction.RemoveOlder,
                     modifier = Modifier.testTag("storage.remove_older"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_auto_delete) },
                 )
             }
             row("cache") { context ->
@@ -127,6 +130,7 @@ internal fun LazyListScope.storageFreeUpItems(
                         )
                     },
                     modifier = Modifier.testTag("storage.clear_cache"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_cleaning_services) },
                 )
             }
         }
@@ -153,6 +157,7 @@ internal fun LazyListScope.storageKeepMediaItems(
                     enabled = state.available && !state.busy && state.keepMedia != null,
                     busy = state.action is StorageAction.SetKeepMedia,
                     modifier = Modifier.testTag("storage.keep_media.action"),
+                    leading = { SettingsLeadingIcon(R.drawable.ic_history) },
                 )
             }
         }

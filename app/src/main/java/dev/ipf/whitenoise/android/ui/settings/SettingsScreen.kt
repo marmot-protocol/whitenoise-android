@@ -979,10 +979,9 @@ private fun SettingsProfileHeader(
                     title = stringResource(SettingsHomeRow.Account.titleRes),
                     onClick = onOpenAccount,
                     leading = {
-                        SettingsHubIcon(
+                        SettingsLeadingIcon(
                             SettingsHomeRow.Account.iconRes,
-                            SettingsHomeRow.Account.iconTag,
-                            MaterialTheme.colorScheme.onSurfaceVariant,
+                            testTag = "settings.icon.${SettingsHomeRow.Account.iconTag}",
                         )
                     },
                 )
@@ -995,7 +994,7 @@ private fun SettingsProfileHeader(
                         onClick = onAddProfile,
                         modifier = Modifier.testTag("settings.add_profile"),
                         leading = {
-                            Icon(painterResource(R.drawable.ic_settings_person_add), contentDescription = null)
+                            SettingsLeadingIcon(R.drawable.ic_settings_person_add)
                         },
                     )
                 }
@@ -1008,7 +1007,7 @@ private fun SettingsProfileHeader(
                         onClick = onSwitchProfile,
                         modifier = Modifier.testTag("settings.switch_profile"),
                         leading = {
-                            Icon(painterResource(R.drawable.ic_settings_account_circle), contentDescription = null)
+                            SettingsLeadingIcon(R.drawable.ic_settings_account_circle)
                         },
                     )
                 }
@@ -1128,29 +1127,13 @@ internal fun SettingsHubSection(
                         title = stringResource(entry.titleRes),
                         onClick = { onOpenDetail(entry.detail) },
                         leading = {
-                            SettingsHubIcon(entry.iconRes, entry.iconTag, MaterialTheme.colorScheme.onSurfaceVariant)
+                            SettingsLeadingIcon(entry.iconRes, testTag = "settings.icon.${entry.iconTag}")
                         },
                     )
                 }
             }
         }
     }
-}
-
-/** 24 dp leading glyph carrying the prototype's `settings.icon.*` test tag. */
-@Composable
-@Suppress("FunctionNaming")
-private fun SettingsHubIcon(
-    @DrawableRes iconRes: Int,
-    iconTag: String,
-    tint: Color,
-) {
-    Icon(
-        painter = painterResource(iconRes),
-        contentDescription = null,
-        modifier = Modifier.size(SettingsHomeDefaults.IconSize).testTag("settings.icon.$iconTag"),
-        tint = tint,
-    )
 }
 
 /** Self-managed distribution only: one row that checks for or installs the latest release. */
@@ -1168,9 +1151,14 @@ private fun AppUpdateGroup(
                 title = stringResource(R.string.app_updates),
                 subtitle = appUpdateSubtitle(info),
                 onClick = onClick,
-                // The emblem announces something to do. Without an update it would be announcing
-                // that there is nothing to announce.
-                leading = if (prominent) ({ AppUpdateEmblem() }) else null,
+                // The filled emblem announces something to do; without an update the row keeps the plain
+                // glyph every other row leads with.
+                leading =
+                    if (prominent) {
+                        { AppUpdateEmblem() }
+                    } else {
+                        { SettingsLeadingIcon(R.drawable.ic_system_update) }
+                    },
             )
         }
     }
@@ -1212,7 +1200,11 @@ private fun SignOutGroup(onSignOut: () -> Unit) {
                 onClick = onSignOut,
                 destructive = true,
                 leading = {
-                    SettingsHubIcon(R.drawable.ic_settings_logout, "sign_out", MaterialTheme.colorScheme.error)
+                    SettingsLeadingIcon(
+                        R.drawable.ic_settings_logout,
+                        tint = MaterialTheme.colorScheme.error,
+                        testTag = "settings.icon.sign_out",
+                    )
                 },
             )
         }

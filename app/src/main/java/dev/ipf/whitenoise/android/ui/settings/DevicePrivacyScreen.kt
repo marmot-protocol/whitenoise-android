@@ -76,6 +76,7 @@ internal fun DevicePrivacyScreen(
                             checked = !appState.allowChatScreenshotsInChats,
                             onCheckedChange = { appState.updateAllowChatScreenshotsInChats(!it) },
                             subtitle = stringResource(R.string.allow_chat_screenshots_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_screenshot_monitor) },
                         )
                     }
                     row("incognito_keyboard") { rowContext ->
@@ -85,6 +86,7 @@ internal fun DevicePrivacyScreen(
                             checked = appState.forceIncognitoKeyboard,
                             onCheckedChange = { appState.updateForceIncognitoKeyboard(it) },
                             subtitle = stringResource(R.string.incognito_keyboard_detail),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_keyboard) },
                         )
                     }
                     row("device_authentication") { rowContext ->
@@ -99,6 +101,7 @@ internal fun DevicePrivacyScreen(
                                     if (secure) R.string.app_lock_enabled_detail else R.string.app_lock_setup_detail,
                                 ),
                             enabled = secure,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_fingerprint) },
                         )
                     }
                     if (!secure) {
@@ -107,6 +110,7 @@ internal fun DevicePrivacyScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.open_android_security_settings),
                                 onClick = { openSecuritySettings(context) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
                             )
                         }
                     }
@@ -117,6 +121,7 @@ internal fun DevicePrivacyScreen(
                                 title = stringResource(R.string.auto_lock),
                                 onClick = { autoLockPicker = true },
                                 value = delayLabels.getValue(appState.appLockDelay),
+                                leading = { SettingsLeadingIcon(R.drawable.ic_lock_clock) },
                             )
                         }
                     }
@@ -133,6 +138,7 @@ internal fun DevicePrivacyScreen(
                             value =
                                 appState.runtimeMirrors.blocks.users.size
                                     .toString(),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_block) },
                         )
                     }
                 }
@@ -148,6 +154,7 @@ internal fun DevicePrivacyScreen(
                             value = disappearingMessagesLabel(defaultDisappearingSeconds),
                             subtitle = stringResource(R.string.default_disappearing_messages_detail),
                             enabled = activeAccountRef != null,
+                            leading = { SettingsLeadingIcon(R.drawable.ic_timer) },
                         )
                     }
                 }
@@ -161,6 +168,7 @@ internal fun DevicePrivacyScreen(
                             title = stringResource(R.string.diagnostics_improvements),
                             onClick = onOpenDiagnostics,
                             value = stringResource(summary),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_monitoring) },
                         )
                     }
                 }

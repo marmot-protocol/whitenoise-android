@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt",
+  "legacy_sha256": "7506d86f6f0bfb4c67d2d69b415876b24d742e5d260d684b21e1ab301169ae9f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Explicit clipboard read with Secure Paste fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt",
+        "anchor": "fun android.content.ClipboardManager?.withPrimaryClipForPaste(",
+        "test_ids": [
+          "ONB-005",
+          "FIND-005",
+          "FIND-006"
+        ]
+      },
+      {
+        "surface": "Copied private key and encrypted backup leave the clipboard after a minute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Clipboard.kt",
+        "anchor": "internal fun copySensitiveToClipboard(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

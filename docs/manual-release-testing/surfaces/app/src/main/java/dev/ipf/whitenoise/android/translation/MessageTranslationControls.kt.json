@@ -4,18 +4,45 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "MessageTranslationDialog",
+        "surface": "Menu Translate detects the source and uses the chat or device language",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "fun MessageTranslationDialog(",
+        "anchor": "fun ConversationTranslationSession.translateMessage(",
         "test_ids": [
           "SET-033",
           "SET-036"
         ]
       },
       {
-        "surface": "MessageTranslationRendition",
+        "surface": "MessageTranslationNotice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "fun MessageTranslationRendition(",
+        "anchor": "fun MessageTranslationNotice(",
+        "test_ids": [
+          "SET-033",
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "R.string.translation_privacy_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_privacy_warning",
+        "test_ids": [
+          "SET-033",
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "R.string.accept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.accept",
+        "test_ids": [
+          "SET-033",
+          "CON-045"
+        ]
+      },
+      {
+        "surface": "MessageTranslationToggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageTranslationToggle(",
         "test_ids": [
           "SET-033"
         ]
@@ -53,22 +80,6 @@
         ]
       },
       {
-        "surface": "R.string.translation_show_original",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_show_original",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
-        "surface": "R.string.translation_show_result",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "R.string.translation_show_result",
-        "test_ids": [
-          "SET-033"
-        ]
-      },
-      {
         "surface": "R.string.translation_source_model_missing",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
         "anchor": "R.string.translation_source_model_missing",
@@ -94,17 +105,17 @@
         ]
       },
       {
-        "surface": "Explicit-source cold engine recovery",
+        "surface": "Menu Translate clears a failure before requesting",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "session.request(it.copy(target = target), from)",
+        "anchor": "retry()\n        request(request)",
         "test_ids": [
           "SET-033"
         ]
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-        "anchor": "if (!pending && rendition == null) return",
-        "surface": "inactive translation contributes no width to message reaction alignment",
+        "anchor": "if (session == null || source == null) return",
+        "surface": "absent translation contributes no toggle slot",
         "test_ids": [
           "SET-033"
         ]
@@ -124,6 +135,49 @@
         "test_ids": [
           "SET-033",
           "SET-036"
+        ]
+      },
+      {
+        "surface": "Translate toggle label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "MessageSidePendingRing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "private fun MessageSidePendingRing(",
+        "test_ids": [
+          "SET-033"
+        ]
+      },
+      {
+        "surface": "MessageSideDisc",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageSideDisc(",
+        "test_ids": [
+          "SET-033",
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "MessageSideDiscIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageSideDiscIcon(",
+        "test_ids": [
+          "SET-033",
+          "MED-038"
+        ]
+      },
+      {
+        "surface": "MessageSideDiscProgress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+        "anchor": "fun MessageSideDiscProgress(",
+        "test_ids": [
+          "SET-033",
+          "MED-038"
         ]
       }
     ]

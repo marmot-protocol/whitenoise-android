@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.group.PinConversationActionRow
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -101,7 +103,14 @@ class PinConversationActionScreenshotTest {
                         Column(Modifier.padding(vertical = 16.dp)) {
                             SettingsGroup {
                                 row("pin_shortcut") { PinConversationActionRow(it, supported, busy(), onPin) }
-                                row("notifications") { SettingsLink(it, "Notifications", onClick = {}) }
+                                row("notifications") {
+                                    SettingsLink(
+                                        it,
+                                        "Notifications",
+                                        onClick = {},
+                                        leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
+                                    )
+                                }
                             }
                         }
                     }

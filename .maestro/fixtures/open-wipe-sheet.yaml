@@ -11,5 +11,5 @@ appId: dev.ipf.whitenoise.android.maestrolab
       text: "Sign Out & Wipe"
     direction: DOWN
 - tapOn: "Sign Out & Wipe"
-- assertVisible: "This permanently removes this account from this device[.]"
+- assertVisible: "Permanently removes this account from this device[.]"
 - assertVisible: "What gets destroyed"

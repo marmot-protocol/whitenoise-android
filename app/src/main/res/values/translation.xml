@@ -2,10 +2,7 @@
     <string name="translation_title">Translate</string>
     <string name="translation_automatic">Automatically translate messages</string>
     <string name="translation_detect_language">Detect language</string>
-    <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
-    <string name="translation_show_original">Show original</string>
-    <string name="translation_show_result">Show translation</string>
     <string name="translation_loading">Translating on device…</string>
     <string name="translation_open_engine">Open engine</string>
     <string name="translation_engine_managed">Recommended engine: Offline Translator. Translation runs on your device; manage language packs in that app.</string>
@@ -14,7 +11,7 @@
     <string name="translation_detection_failed">Choose a source language and retry.</string>
     <string name="translation_source_model_missing">Install the source language pack in the engine.</string>
     <string name="translation_engine_failed">Translation failed. Check language packs in the engine, then retry.</string>
-    <string name="translation_recovery_notice">Translation unavailable. Tap Translate to retry or open the engine.</string>
+    <string name="translation_recovery_notice">Translation unavailable. Tap Translate to try again.</string>
     <string name="translation_inherit">Use global setting</string>
     <string name="translation_on">On</string>
     <string name="translation_off">Off</string>
@@ -32,4 +29,5 @@
     <string name="translation_composer_dictation_off">Translation is off while dictating</string>
     <string name="translation_composer_placeholder">Translation appears here</string>
     <string name="translation_composer_detection_failed">Couldn\'t detect the language. Type a bit more.</string>
+    <string name="translation_search_languages">Search languages</string>
 </resources>

@@ -31,10 +31,13 @@ class StalenessGuardCoverageTest {
                         "notificationPostEpoch",
                     ),
                 "MessageForwarding.kt" to listOf("dismissals"),
-                "Controllers.kt" to
+                "ChatsController.kt" to
                     listOf(
                         "bindLifetime",
                         "memberCacheLifetime",
+                    ),
+                "ConversationController.kt" to
+                    listOf(
                         "memberRosterRefreshGeneration",
                         "timelineWindowGeneration",
                         "managementStateLifetime",
@@ -67,7 +70,8 @@ class StalenessGuardCoverageTest {
     @Test
     fun awaitThenPublishPathsAreGuardedOrExplicitlyExempt() {
         val appState = productionSource("AppState.kt")
-        val controllers = productionSource("Controllers.kt")
+        val chats = productionSource("ChatsController.kt")
+        val conversation = productionSource("ConversationController.kt")
         val nativePushFallback = productionSource("NativePushFallbackRuntime.kt")
         val directChatResolution = productionSource("DirectChatResolution.kt")
         val timelineSession = productionSource("ConversationTimelineSession.kt")
@@ -154,67 +158,67 @@ class StalenessGuardCoverageTest {
                     ),
                 "NativePushFallbackRuntime.kt:disableNativePushAfterFallbackReady" to
                     listOf("recordPendingRegistrationClear", "ensureActive", "ownerIsCurrent", "fallbackIsReady"),
-                "Controllers.kt:bind" to listOf("bindLifetime.advance", "bindEpoch"),
+                "ChatsController.kt:bind" to listOf("bindLifetime.advance", "bindEpoch"),
                 // The captured attempt fences account, bind epoch and runtime before applying native roles.
-                "Controllers.kt:departJoinedChat" to
+                "ChatsController.kt:departJoinedChat" to
                     listOf("attempt.isCurrent()", "resolveAuthoritativeGroupRoster"),
                 // The captured account/bind/runtime/view owner fences both native ordering and complete UI settlement.
-                "Controllers.kt:movePinnedSelection" to
+                "ChatsController.kt:movePinnedSelection" to
                     listOf(
                         "chatListActionIsCurrent(owner)",
                         "authoritativePinOrder(owner)",
                         "val confirmed =",
                         "applyPinState(ChatPinStateFfi(confirmed))",
                     ),
-                "Controllers.kt:schedulePendingMemberFetches" to
+                "ChatsController.kt:schedulePendingMemberFetches" to
                     listOf("bindEpoch", "memberCacheEpoch", "memberCacheLifetime.isCurrent"),
-                "Controllers.kt:applyFetchedMemberSnapshot" to
+                "ChatsController.kt:applyFetchedMemberSnapshot" to
                     listOf("isActiveBindEpoch(epoch)", "memberCacheLifetime.isCurrent"),
                 "DirectChatResolution.kt:resolveDirectChatGroup" to
                     listOf("accountStillBound", "isActiveBindEpoch(epoch)"),
-                "Controllers.kt:refreshCurrentTimeline" to
+                "ConversationController.kt:refreshCurrentTimeline" to
                     listOf("timelineWindowGeneration.advance", "timelineWindowGeneration.isCurrent"),
-                "Controllers.kt:applyTimelinePage" to
+                "ConversationController.kt:applyTimelinePage" to
                     listOf("timelineWindowGeneration.advance", "timelineWindowGeneration.isCurrent"),
-                "Controllers.kt:beginMemberRosterRefresh" to
+                "ConversationController.kt:beginMemberRosterRefresh" to
                     listOf(
                         "accountTeardownRequested",
                         "controllerCleared",
                         "memberRosterRefreshGeneration.advance",
                     ),
-                "Controllers.kt:refreshMembers" to
+                "ConversationController.kt:refreshMembers" to
                     listOf(
                         "beginMemberRosterRefresh",
                         "memberRosterRefreshGeneration.runIfCurrent",
                         "ownsCurrentMemberRead",
                         "readAndApplyMembers",
                     ),
-                "Controllers.kt:readAndApplyMembers" to
+                "ConversationController.kt:readAndApplyMembers" to
                     listOf("memberRosterRefreshGeneration.runIfCurrent", "ownsCurrentMemberRead"),
-                "Controllers.kt:settleMemberReadFailure" to
+                "ConversationController.kt:settleMemberReadFailure" to
                     listOf("memberRosterRefreshGeneration.runIfCurrent", "ownsCurrentMemberRead"),
-                "Controllers.kt:ownsCurrentMemberRead" to
+                "ConversationController.kt:ownsCurrentMemberRead" to
                     listOf(
                         "!controllerCleared",
                         "!accountTeardownRequested",
                         "memberRosterRefreshGeneration.isCurrent",
                         "appState.runtimeGeneration == runtimeGeneration",
                     ),
-                "Controllers.kt:performMediaUpload" to
+                "ConversationController.kt:performMediaUpload" to
                     listOf("shouldAcceptMediaUploadForAccount", "mediaUploadSessionEpoch"),
-                "Controllers.kt:refreshManagementState" to
+                "ConversationController.kt:refreshManagementState" to
                     listOf("managementStateLifetime.advance", "managementStateLifetime.runIfCurrent"),
-                "Controllers.kt:refreshGroupRecoveryStatus" to
+                "ConversationController.kt:refreshGroupRecoveryStatus" to
                     listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
-                "Controllers.kt:confirmGroupRejoin" to
+                "ConversationController.kt:confirmGroupRejoin" to
                     listOf("groupRecoveryLifetime.capture", "groupRecoveryLifetime.runIfCurrent"),
-                "Controllers.kt:dismissGroupHistoryNotices" to
+                "ConversationController.kt:dismissGroupHistoryNotices" to
                     listOf(
                         "groupRecoveryLifetime.capture",
                         "groupRecoveryLifetime.runIfCurrent",
                         "ownsGroupRecoveryGroup",
                     ),
-                "Controllers.kt:declineGroupRejoin" to
+                "ConversationController.kt:declineGroupRejoin" to
                     listOf(
                         "groupRecoveryLifetime.capture",
                         "groupRecoveryLifetime.runIfCurrent",
@@ -228,7 +232,7 @@ class StalenessGuardCoverageTest {
                     "AppState.kt" -> appState
                     "NativePushFallbackRuntime.kt" -> nativePushFallback
                     "DirectChatResolution.kt" -> directChatResolution
-                    else -> controllers
+                    else -> productionSource(fileName)
                 }
             val body = source.functionSection(functionName)
             markers.forEach { marker ->
@@ -238,7 +242,7 @@ class StalenessGuardCoverageTest {
 
         assertTrue(
             "pin movement needs its owner fence after settlement read and before projection",
-            controllers.hasPinMoveSettlementFence(),
+            chats.hasPinMoveSettlementFence(),
         )
 
         val exemptions =
@@ -300,41 +304,49 @@ class StalenessGuardCoverageTest {
                 // Follow/unfollow is an accepted server mutation; the revision only notifies Compose afterward.
                 "AppState.kt:setProfileFollowing" to "authoritative relationship command result",
                 // Search returns a value to its caller and does not publish shared controller state.
-                "Controllers.kt:searchOneChat" to "pure returned search result",
+                "ChatsController.kt:searchOneChat" to "pure returned search result",
                 // Both leave entry points serialize the engine mutation through the group commit lock.
-                "Controllers.kt:leaveGroup" to "serialized authoritative group mutation",
+                "ChatsController.kt:leaveGroup" to "serialized authoritative group mutation",
+                "ConversationController.kt:leaveGroup" to "serialized authoritative group mutation",
                 // One subscription attempt owns its handles and consults account teardown under a monitor.
-                "Controllers.kt:runConversationSubscriptionIteration" to "attempt-owned subscription state machine",
+                "ConversationController.kt:runConversationSubscriptionIteration" to
+                    "attempt-owned subscription state machine",
                 // One admitted timeline subscription consumes and publishes its ordered windows serially.
-                "Controllers.kt:runTimelineSubscriptionPipeline" to "single-owner ordered subscription pipeline",
+                "ConversationController.kt:runTimelineSubscriptionPipeline" to
+                    "single-owner ordered subscription pipeline",
                 // Handle identity is compared under the subscription monitor before clearing.
                 "ConversationTimelineSession.kt:closeTimeline" to "identity-checked handle teardown",
                 // Delete rollback is conditional on its optimistic tombstone and the commit is group-serialized.
-                "Controllers.kt:deleteMessageResult" to "serialized optimistic command with conditional rollback",
+                "ConversationController.kt:deleteMessageResult" to
+                    "serialized optimistic command with conditional rollback",
                 // Retry resumes one retained optimistic mutation; media retries also recheck the account session.
-                "Controllers.kt:retryFailedSend" to "retained optimistic command ownership",
+                "ConversationController.kt:retryFailedSend" to "retained optimistic command ownership",
                 // Sends retain identity across routes; locked admission and caller tokens settle them.
-                "Controllers.kt:send" to "serialized authoritative send with token-bound reconciliation",
+                "ConversationController.kt:send" to "serialized authoritative send with token-bound reconciliation",
                 // The conversation mutation mutex serializes decline and its local projection update.
-                "Controllers.kt:declineInvite" to "conversation mutation mutex",
+                "ConversationController.kt:declineInvite" to "conversation mutation mutex",
                 // Both archive entry points serialize commits and reconcile by optimistic-intent identity.
-                "Controllers.kt:setArchived" to "serialized command with identity reconciliation",
+                "ChatsController.kt:setArchived" to "serialized command with identity reconciliation",
+                "ConversationController.kt:setArchived" to "serialized command with identity reconciliation",
                 // The conversation mutation mutex serializes this group profile command.
-                "Controllers.kt:updateGroupAvatarUrl" to "conversation mutation mutex",
+                "ConversationController.kt:updateGroupAvatarUrl" to "conversation mutation mutex",
                 // The conversation mutation mutex serializes public/encrypted image replacement.
-                "Controllers.kt:updateGroupImage" to "conversation mutation mutex",
+                "ConversationController.kt:updateGroupImage" to "conversation mutation mutex",
                 // Runs inside updateGroupImage's mutation mutex. Native entry rechecks the captured viewer owner.
-                "Controllers.kt:commitGroupImageMutation" to "serialized group command with captured owner checks",
+                "ConversationController.kt:commitGroupImageMutation" to
+                    "serialized group command with captured owner checks",
                 // Retention update and its timeline refresh are one serialized group mutation.
-                "Controllers.kt:updateMessageRetention" to "conversation mutation mutex",
+                "ConversationController.kt:updateMessageRetention" to "conversation mutation mutex",
                 // Export returns a temporary file and does not publish controller state.
-                "Controllers.kt:exportConversationTranscriptFile" to "pure returned export result",
+                "ConversationController.kt:exportConversationTranscriptFile" to "pure returned export result",
                 // MDK advances read state monotonically and rollback only restores the matching read request.
-                "Controllers.kt:submitVisibleReadUpTo" to "monotonic engine cursor with conditional rollback",
+                "ConversationController.kt:submitVisibleReadUpTo" to
+                    "monotonic engine cursor with conditional rollback",
                 // activeStreamIds admits one watcher per stream; removal is a separate terminal tombstone.
-                "Controllers.kt:watchAgentTextStream" to "keyed single-owner stream lifecycle",
+                "ConversationController.kt:watchAgentTextStream" to "keyed single-owner stream lifecycle",
                 // Runs under cancelBlockedLeave's mutation lock and the group commit lock, rechecking the owner first.
-                "Controllers.kt:cancelNativeBlockedLeave" to "serialized group command with captured owner checks",
+                "ConversationController.kt:cancelNativeBlockedLeave" to
+                    "serialized group command with captured owner checks",
             )
         assertTrue(
             "every exemption must explain why no latest-wins guard is required",
@@ -344,7 +356,8 @@ class StalenessGuardCoverageTest {
         val guardedNames = guardedPaths.keys
         val candidates =
             asyncPublicationCandidates("AppState.kt", appState) +
-                asyncPublicationCandidates("Controllers.kt", controllers) +
+                asyncPublicationCandidates("ChatsController.kt", chats) +
+                asyncPublicationCandidates("ConversationController.kt", conversation) +
                 asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution) +
                 asyncPublicationCandidates("ConversationTimelineSession.kt", timelineSession) +
                 asyncPublicationCandidates("ConversationMutationPresentation.kt", mutationPresentation)
@@ -374,13 +387,17 @@ class StalenessGuardCoverageTest {
                         "draftHydrationRevision",
                         "notificationDrainSequence",
                     ),
-                "Controllers.kt" to
+                "ChatsController.kt" to
                     listOf(
                         "retryGeneration",
                         "materializedGroupsRevision",
                         "forwardTargetsRevision",
                         "memberSnapshotsRevision",
                         "nextActivitySequence",
+                    ),
+                "ConversationController.kt" to
+                    listOf(
+                        "retryGeneration",
                         "streamDebugEventSequence",
                     ),
                 "ConversationTimelineSession.kt" to listOf("lastStartedGeneration"),
@@ -527,7 +544,8 @@ class StalenessGuardCoverageTest {
         listOf(
             "StalenessGuard.kt",
             "AppState.kt",
-            "Controllers.kt",
+            "ChatsController.kt",
+            "ConversationController.kt",
             "ConversationTimelineSession.kt",
             "ConversationMutationPresentation.kt",
             "AccountUnreadStore.kt",

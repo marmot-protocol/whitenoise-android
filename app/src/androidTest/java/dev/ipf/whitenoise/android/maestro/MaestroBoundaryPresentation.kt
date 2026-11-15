@@ -1,13 +1,15 @@
 package dev.ipf.whitenoise.android.maestro
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsTrustWarningDialog
+import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.ChatLinkAccountChoice
 import dev.ipf.whitenoise.android.ui.ChatLinkAccountChooserDialog
-import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptDialog
-import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptPhase
-import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscriptUi
-import dev.ipf.whitenoise.android.ui.group.LargeGroupInviteConfirmationDialog
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupMembersReviewDialog
+import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
+import dev.ipf.whitenoise.android.ui.conversation.media.AudioTranscribeDisc
 import dev.ipf.whitenoise.android.ui.navigation.TtsReturnTransitionScreen
 import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateDialog
 
@@ -16,12 +18,15 @@ import dev.ipf.whitenoise.android.ui.settings.TtsCustomRateDialog
 @Suppress("FunctionNaming")
 internal fun MaestroBoundaryPresentation(fixture: MaestroPresentationFixture) {
     when (fixture.scenario) {
-        "audio-transcript-cancel" ->
-            AudioTranscriptDialog(
-                state = AudioTranscriptUi(AudioTranscriptPhase.CONFIRM),
-                onStart = { error("Cancel fixture must not request transcription") },
-                onDismiss = { fixture.finish("dismiss") },
-                onGetProvider = { error("Confirmation must not request provider listing") },
+        "audio-transcript-toggle" ->
+            AudioTranscribeDisc(
+                on = false,
+                working = false,
+                enabled = true,
+                onToggle = { show ->
+                    check(show)
+                    fixture.finish("show")
+                },
             )
         "tts-trust-cancel", "tts-trust-proceed" ->
             TtsTrustWarningDialog(
@@ -39,9 +44,15 @@ internal fun MaestroBoundaryPresentation(fixture: MaestroPresentationFixture) {
             )
         "tts-return" -> TtsReturnTransitionScreen(requestId = 1)
         "group-large-cancel", "group-large-continue" ->
-            LargeGroupInviteConfirmationDialog(
-                onContinue = { fixture.finish("continue") },
+            GroupMembersReviewDialog(
+                appState = fixture.appState,
+                groups = listOf(MemberReviewGroup("fixture-large-group", "Fixture large group")),
+                members = listOf(RecipientSearch.Candidate("b".repeat(64), "Fixture member", "")),
+                busy = false,
                 onDismiss = { fixture.finish("dismiss") },
+                onConfirm = { fixture.finish("continue") },
+                confirmLabel = "Fixture invite",
+                description = stringResource(R.string.large_group_invite_confirm_message),
             )
         "chat-link-choose-cancel", "chat-link-choose-select" ->
             ChatLinkAccountChooserDialog(

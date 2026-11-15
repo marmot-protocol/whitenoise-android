@@ -26,4 +26,21 @@ class ComposerToolbarCompactWidthTest {
     fun unboundedInitialMeasurementRetainsEveryConfiguredTarget() {
         assertEquals(468f, composerToolbarCompactWidth(Float.POSITIVE_INFINITY, 13, 48f, 96f), 0f)
     }
+
+    /** The end group beside Send is exactly as wide as its actions, leaving no gap before Send. */
+    @Test
+    fun expandedEndGroupHugsSendWithOnlyItsOwnColumns() {
+        assertEquals(72f, composerExpandedTrailingWidth(300f, 2, 2), 0f)
+        assertEquals(36f, composerExpandedTrailingWidth(300f, 0, 1), 0f)
+        assertEquals(0f, composerExpandedTrailingWidth(300f, 3, 0), 0f)
+    }
+
+    /** A crowded end group wraps on whole columns, so no partial-column remainder sits before Send. */
+    @Test
+    fun expandedEndGroupWrapsOnWholeColumnsWithinItsShare() {
+        val width = composerExpandedTrailingWidth(200f, 4, 6)
+        assertEquals(108f, width, 0f)
+        assertEquals(0f, width % 36f, 0f)
+        assertEquals(36f, composerExpandedTrailingWidth(40f, 1, 3), 0f)
+    }
 }

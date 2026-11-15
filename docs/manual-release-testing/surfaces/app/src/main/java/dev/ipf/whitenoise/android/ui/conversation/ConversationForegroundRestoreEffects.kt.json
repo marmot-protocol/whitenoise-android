@@ -61,6 +61,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "surface": "Pre-draw release when current safe publication becomes measured after resume",
+        "anchor": "foregroundRestore?.releaseMeasuredFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

@@ -40,9 +40,15 @@ class SettingsRowSeamRenderingTest {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 SettingsGroup(modifier = Modifier.testTag("group")) {
                     row("first") { context ->
-                        SettingsLink(context, "First", onClick = {}, modifier = Modifier.testTag("first"))
+                        SettingsLink(
+                            context,
+                            "First",
+                            onClick = {},
+                            modifier = Modifier.testTag("first"),
+                            leading = null,
+                        )
                     }
-                    row("second") { context -> SettingsLink(context, "Second", onClick = {}) }
+                    row("second") { context -> SettingsLink(context, "Second", onClick = {}, leading = null) }
                 }
             }
         }
@@ -105,10 +111,17 @@ class SettingsRowSeamRenderingTest {
                             onCheckedChange = {},
                             modifier = Modifier.testTag("row0"),
                             busy = true,
+                            leading = null,
                         )
                     }
                     row("link") { context ->
-                        SettingsLink(context, "Enabled link", onClick = {}, modifier = Modifier.testTag("row1"))
+                        SettingsLink(
+                            context,
+                            "Enabled link",
+                            onClick = {},
+                            modifier = Modifier.testTag("row1"),
+                            leading = null,
+                        )
                     }
                     row("action") { context ->
                         SettingsAction(
@@ -117,6 +130,7 @@ class SettingsRowSeamRenderingTest {
                             onClick = {},
                             modifier = Modifier.testTag("row2"),
                             enabled = false,
+                            leading = null,
                         )
                     }
                     row("choice") { context ->

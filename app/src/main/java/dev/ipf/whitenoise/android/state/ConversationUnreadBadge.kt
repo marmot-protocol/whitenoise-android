@@ -176,7 +176,7 @@ private fun receivedRowsBetween(
     val to = timeline.indexOfFirst { it.record.messageIdHex == toMessageId }
     if (from < 0 || to <= from) return 0
     return timeline.subList(from + 1, to + 1).count {
-        it.record.direction == "received" && !isDerivedStateKind(it.record.kind)
+        it.record.isUnreadEligible()
     }
 }
 

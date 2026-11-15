@@ -100,8 +100,8 @@ class GroupDetailsPushDebugCoverageTest {
 
     private fun controllersSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing Controllers.kt source file")
+            ?: error("Missing ConversationController.kt source file")
 }

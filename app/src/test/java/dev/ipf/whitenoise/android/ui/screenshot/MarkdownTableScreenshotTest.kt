@@ -21,7 +21,6 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenBody
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -32,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * Content-sized Markdown table columns (#3562): asymmetric widths, wrapped rows and shared column
- * boundaries across a ragged row, captured in a message bubble and the full-screen reader.
+ * boundaries across a ragged row, captured in message bubbles.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -63,27 +62,6 @@ class MarkdownTableScreenshotTest {
     @Test
     fun bubbleTableLargeRtl() {
         captureBubble("large_rtl", scale = 1.5f, rtl = true)
-    }
-
-    /** The full-screen reader gives the paragraph column the wide remaining budget. */
-    @Test
-    fun readerTableDark() {
-        composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true) {
-                Surface(Modifier.testTag(TAG)) {
-                    MessageFullScreenBody(
-                        body = SOURCE,
-                        markdownDocument = document(),
-                        mentionDisplayName = null,
-                        onNostrProfileTap = null,
-                        onCopyMarkdownLink = {},
-                        modifier = Modifier.width(360.dp).padding(16.dp),
-                    )
-                }
-            }
-        }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/markdown_table_reader_dark.png")
     }
 
     /** Renders the fixture inside an incoming-bubble surface of the conversation's bubble width. */

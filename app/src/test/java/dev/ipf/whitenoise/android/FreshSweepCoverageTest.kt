@@ -165,7 +165,7 @@ class FreshSweepCoverageTest {
 
     @Test
     fun twoStepLeavesAndInviteFailuresStayInsideTheirSafetyBoundaries() {
-        val source = source("state/Controllers.kt")
+        val source = source("state/ChatsController.kt") + "\n" + source("state/ConversationController.kt")
         val chatListLeave =
             source.section("suspend fun leaveGroup(\n        groupIdHex", "suspend fun deleteGroupLocal")
         val conversationLeave = source.section("suspend fun leaveGroup(displayName", "fun dismissConversationNotifications")
@@ -200,8 +200,8 @@ class FreshSweepCoverageTest {
     /** Successful acceptance still settles UI state before best-effort warmup, with account fencing. */
     @Test
     fun acceptInviteAcknowledgesSuccessBeforeLifecycleScopedWarmup() {
-        val body = source("state/Controllers.kt").kotlinFunctionBody("acceptInvite")
-        val resolution = source("state/Controllers.kt").kotlinFunctionBody("resolveInviteAcceptance")
+        val body = source("state/ConversationController.kt").kotlinFunctionBody("acceptInvite")
+        val resolution = source("state/ConversationController.kt").kotlinFunctionBody("resolveInviteAcceptance")
         val optimisticProjection = body.indexOf("group = optimisticGroup")
         val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup")
         val accept = body.indexOf("resolveInviteAcceptance(attempt)")

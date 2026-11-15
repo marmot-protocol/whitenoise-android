@@ -19,7 +19,6 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -43,8 +42,6 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.colorFromArgb
@@ -77,7 +74,6 @@ class TimelineRowTtsReuseBehaviorTest {
     private val engine = FakeTimelineTtsSpeechEngine()
     private lateinit var appState: WhiteNoiseAppState
     private lateinit var controller: ConversationController
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
 
     @Before
     fun setUp() {
@@ -129,7 +125,6 @@ class TimelineRowTtsReuseBehaviorTest {
                             item = item,
                             controller = controller,
                             appState = appState,
-                            composerTextState = composerTextState,
                             highlighted = false,
                             selectionMode = false,
                             textSelectionMode = false,
@@ -150,10 +145,6 @@ class TimelineRowTtsReuseBehaviorTest {
                             onActionMenuOpenChange = {},
                             onQuickReactionsSave = {},
                             onReplyPreviewClick = {},
-                            composerGate = ComposerGate.COMPOSER,
-                            onBack = {},
-                            mentionCandidates = emptyList(),
-                            mentionPickerEnabled = false,
                             showSenderName = false,
                             showSenderAvatar = false,
                             collapseLongMessages = false,

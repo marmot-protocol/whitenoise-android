@@ -113,6 +113,26 @@ internal object OfflineTranslatorLanguageCatalog {
     /** Whether some reviewed release can translate into [code], the rule for every saved or selected target. */
     fun supportsTarget(code: String): Boolean = byCode[code]?.target == true
 
+    /**
+     * The catalog target for [locale]'s language, or null when the engine cannot translate into it. Traditional
+     * Chinese, by script or by a Traditional-script region, maps to `zh_hant`; legacy ISO codes such as `iw` read
+     * as their current form through the language tag, and Android's Filipino `fil` reads as the engine's `tl`.
+     */
+    fun targetFor(locale: Locale): String? {
+        val language = locale.toLanguageTag().substringBefore('-').lowercase(Locale.ROOT)
+        val traditional = locale.script == "Hant" || (locale.script.isEmpty() && locale.country in TRADITIONAL_REGIONS)
+        val code =
+            when {
+                language == "zh" && traditional -> "zh_hant"
+                language == "fil" -> "tl"
+                else -> language
+            }
+        return code.takeIf(::supportsTarget)
+    }
+
+    /** The device language when the engine can translate into it, otherwise English. */
+    fun systemTarget(): String = targetFor(Locale.getDefault()) ?: FALLBACK_TARGET
+
     /** Whether a request may be submitted: detection (`""`) or a reviewed source, and a reviewed target. */
     fun supportsRequest(
         source: String,
@@ -169,6 +189,9 @@ internal object OfflineTranslatorLanguageCatalog {
         val collator = Collator.getInstance(locale)
         return codes.sortedWith(compareBy(collator) { label(it, locale).orEmpty() })
     }
+
+    private const val FALLBACK_TARGET = "en"
+    private val TRADITIONAL_REGIONS = setOf("TW", "HK", "MO")
 
     /** Every reviewed language translates into English; [target] and [since] record the exceptions. */
     private fun language(

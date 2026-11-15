@@ -140,10 +140,12 @@ class PendingSendDiagnosticsTest {
     @Test
     fun textSendAndBothProjectionSurfacesUseTheProcessOwnedTracker() {
         val controllersSource =
-            sequenceOf(
-                File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            ).first(File::isFile).readText()
+            listOf("ChatsController.kt", "ConversationController.kt").joinToString("\n") { name ->
+                sequenceOf(
+                    File("src/main/java/dev/ipf/whitenoise/android/state/$name"),
+                    File("app/src/main/java/dev/ipf/whitenoise/android/state/$name"),
+                ).first(File::isFile).readText()
+            }
         val trackerSource =
             sequenceOf(
                 File("src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt"),

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +45,12 @@ internal fun PublishedKeyPackage(
     val deleteLabel = stringResource(R.string.delete_key_package)
     SettingsGroup(modifier = Modifier.testTag("key_packages.published.${kp.eventIdHex}")) {
         row("id") { context ->
-            KeyPackageCopyValue(context, stringResource(R.string.developer_package_id), kp.keyPackageId)
+            KeyPackageCopyValue(
+                context,
+                stringResource(R.string.developer_package_id),
+                kp.keyPackageId,
+                R.drawable.ic_fingerprint,
+            )
         }
         row("published") { context ->
             SettingsValue(
@@ -56,16 +62,23 @@ internal fun PublishedKeyPackage(
                     LocalConfiguration.current.locales[0],
                     currentDateTimeDisplay(),
                 ),
+                leading = { SettingsLeadingIcon(R.drawable.ic_calendar_month) },
             )
         }
         row("source") { context ->
-            SettingsValue(context, stringResource(R.string.developer_package_source), sources.joinToString(" · "))
+            SettingsValue(
+                context,
+                stringResource(R.string.developer_package_source),
+                sources.joinToString(" · "),
+                leading = { SettingsLeadingIcon(R.drawable.ic_input) },
+            )
         }
         row("local-state") { context ->
             SettingsValue(
                 context,
                 stringResource(R.string.key_package_local_state),
                 stringResource(localState.labelResource()),
+                leading = { SettingsLeadingIcon(R.drawable.ic_lock) },
             )
         }
         row("relays") { context ->
@@ -73,15 +86,31 @@ internal fun PublishedKeyPackage(
                 context,
                 stringResource(R.string.developer_seen_on),
                 kp.sourceRelays.joinToString("\n").ifBlank { stringResource(R.string.unknown) },
+                leading = { SettingsLeadingIcon(R.drawable.ic_settings_cell_tower) },
             )
         }
-        row("event") { context -> KeyPackageCopyValue(context, stringResource(R.string.event), kp.eventIdHex) }
-        row("ref") { context -> KeyPackageCopyValue(context, stringResource(R.string.ref), kp.keyPackageRefHex) }
+        row("event") { context ->
+            KeyPackageCopyValue(
+                context,
+                stringResource(R.string.event),
+                kp.eventIdHex,
+                R.drawable.ic_data_object,
+            )
+        }
+        row("ref") { context ->
+            KeyPackageCopyValue(
+                context,
+                stringResource(R.string.ref),
+                kp.keyPackageRefHex,
+                R.drawable.ic_link,
+            )
+        }
         row("size") { context ->
             SettingsValue(
                 context,
                 stringResource(R.string.size),
                 stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()),
+                leading = { SettingsLeadingIcon(R.drawable.ic_settings_hard_drive) },
             )
         }
         if (kp.isRelayDeletionTarget()) {
@@ -109,16 +138,27 @@ internal fun RetainedKeyPackage(
 ) {
     SettingsGroup(modifier = Modifier.testTag("key_packages.retained.${kp.keyPackageRefHex}")) {
         row("id") { context ->
-            KeyPackageCopyValue(context, stringResource(R.string.developer_package_id), kp.keyPackageId)
+            KeyPackageCopyValue(
+                context,
+                stringResource(R.string.developer_package_id),
+                kp.keyPackageId,
+                R.drawable.ic_fingerprint,
+            )
         }
         row("source") { context ->
-            SettingsValue(context, stringResource(R.string.developer_package_source), stringResource(R.string.local))
+            SettingsValue(
+                context,
+                stringResource(R.string.developer_package_source),
+                stringResource(R.string.local),
+                leading = { SettingsLeadingIcon(R.drawable.ic_input) },
+            )
         }
         row("local-state") { context ->
             SettingsValue(
                 context,
                 stringResource(R.string.key_package_local_state),
                 stringResource(localState.labelResource()),
+                leading = { SettingsLeadingIcon(R.drawable.ic_lock) },
             )
         }
         row("size") { context ->
@@ -126,6 +166,7 @@ internal fun RetainedKeyPackage(
                 context,
                 stringResource(R.string.size),
                 stringResource(R.string.bytes_count, kp.keyPackageBytes.toLong()),
+                leading = { SettingsLeadingIcon(R.drawable.ic_settings_hard_drive) },
             )
         }
     }
@@ -149,6 +190,7 @@ private fun KeyPackageCopyValue(
     context: SettingsRowContext,
     title: String,
     value: String,
+    @DrawableRes icon: Int,
 ) {
     val clipboard = LocalClipboardManager.current
     val label = stringResource(R.string.copy)
@@ -160,6 +202,7 @@ private fun KeyPackageCopyValue(
             Modifier.clickable(onClickLabel = label, role = Role.Button) {
                 clipboard.setText(AnnotatedString(value))
             },
+        leading = { SettingsLeadingIcon(icon) },
     )
 }
 

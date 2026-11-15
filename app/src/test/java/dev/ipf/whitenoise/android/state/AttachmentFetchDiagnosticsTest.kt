@@ -80,7 +80,7 @@ class AttachmentFetchDiagnosticsTest {
 
     @Test
     fun mediaOperationsAreWiredToProductionPaths() {
-        val controller = source("Controllers.kt")
+        val controller = source("ConversationController.kt")
         val resolver = source("AttachmentPlaintextResolver.kt")
         val native = source("NativeAttachmentTransfers.kt")
         val diagnostics = source("AttachmentFetchDiagnostics.kt")

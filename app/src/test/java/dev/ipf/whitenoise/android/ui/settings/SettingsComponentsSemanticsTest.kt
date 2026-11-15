@@ -2,10 +2,12 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -61,6 +63,7 @@ class SettingsComponentsSemanticsTest {
                                 checked.value = it
                             },
                             modifier = Modifier.testTag(SWITCH),
+                            leading = null,
                         )
                     }
                 }
@@ -96,6 +99,7 @@ class SettingsComponentsSemanticsTest {
                             onCheckedChange = { requests++ },
                             enabled = false,
                             modifier = Modifier.testTag("disabled"),
+                            leading = null,
                         )
                     }
                     row("busy") { context ->
@@ -106,6 +110,7 @@ class SettingsComponentsSemanticsTest {
                             onCheckedChange = { requests++ },
                             busy = true,
                             modifier = Modifier.testTag("busy"),
+                            leading = null,
                         )
                     }
                 }
@@ -134,6 +139,7 @@ class SettingsComponentsSemanticsTest {
                             busy = busy.value,
                             modifier = Modifier.testTag(LINK),
                             trailing = { Text("Custom end control", Modifier.testTag("custom-end")) },
+                            leading = null,
                         )
                     }
                 }
@@ -275,6 +281,7 @@ class SettingsComponentsSemanticsTest {
                             modifier = Modifier.testTag("action"),
                             enabled = enabled.value,
                             destructive = true,
+                            leading = null,
                         )
                     }
                 }
@@ -293,8 +300,55 @@ class SettingsComponentsSemanticsTest {
         composeRule.runOnIdle { assertEquals(1, requests) }
     }
 
+    /** Every row type hands its leading slot the row's activation state, so glyphs dim with the title. */
+    @Test
+    fun leadingSlotDimsWheneverTheRowRejectsActivation() {
+        val seen = mutableMapOf<String, Boolean>()
+        val probe: (String) -> @Composable () -> Unit = { key -> { seen[key] = LocalSettingsRowEditable.current } }
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SettingsGroup {
+                    row("switch_enabled") { SettingsSwitch(it, "a", false, {}, leading = probe("switch_enabled")) }
+                    row("switch_disabled") {
+                        SettingsSwitch(it, "b", false, {}, enabled = false, leading = probe("switch_disabled"))
+                    }
+                    row("switch_busy") {
+                        SettingsSwitch(it, "c", false, {}, busy = true, leading = probe("switch_busy"))
+                    }
+                    row("link_busy") { SettingsLink(it, "d", {}, busy = true, leading = probe("link_busy")) }
+                    row("link_disabled") {
+                        SettingsLink(it, "e", {}, enabled = false, leading = probe("link_disabled"))
+                    }
+                    row("action_enabled") { SettingsAction(it, "f", {}, leading = probe("action_enabled")) }
+                    row("action_disabled") {
+                        SettingsAction(it, "g", {}, enabled = false, leading = probe("action_disabled"))
+                    }
+                }
+            }
+        }
+        composeRule.runOnIdle {
+            assertEquals(
+                mapOf(
+                    "switch_enabled" to true,
+                    "switch_disabled" to false,
+                    "switch_busy" to false,
+                    "link_busy" to false,
+                    "link_disabled" to false,
+                    "action_enabled" to true,
+                    "action_disabled" to false,
+                ),
+                seen.toMap(),
+            )
+        }
+        assertEquals(SettingsRowDefaults.DisabledAlpha, Color.Black.dimmedUnless(false).alpha, ALPHA_QUANTUM)
+        assertEquals(1f, Color.Black.dimmedUnless(true).alpha, 0f)
+    }
+
     private companion object {
         const val SWITCH = "settings-switch"
         const val LINK = "settings-link"
+
+        /** Compose stores colour alpha in eight bits, so 0.38 reads back to the nearest 1/255. */
+        const val ALPHA_QUANTUM = 1f / 255f
     }
 }

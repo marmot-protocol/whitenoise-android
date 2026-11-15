@@ -47,7 +47,12 @@ name: speech-invalid-keeps-saved-rate
     id: speech.custom_rate
 - assertVisible: 2\.8×
 - back
-- assertVisible: Settings
+- assertVisible:
+    id: settings.voice_language.group
+- scrollUntilVisible:
+    element:
+      text: Read Aloud
+    direction: DOWN
 - tapOn: Read Aloud
 - assertVisible:
     id: speech.engine.group

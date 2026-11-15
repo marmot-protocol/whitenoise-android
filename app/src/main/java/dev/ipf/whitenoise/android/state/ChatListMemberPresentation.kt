@@ -3,11 +3,13 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
+import java.util.Locale
 
 /** Display-only roster summary; never substitutes for the authoritative member snapshot. */
 internal data class ChatListMemberPresentation(
@@ -144,3 +146,55 @@ internal fun adoptableSelectedAvatarAsset(
                 null -> true
             }
     }
+
+data class GroupMemberSnapshot(
+    val members: List<AppGroupMemberRecordFfi>,
+) {
+    val memberCount: Int = GroupProjector.uniqueMemberCount(members)
+
+    /**
+     * Case-folded member ids for set-membership rules. Folded once per roster
+     * so evaluating F folder rules over this chat stops allocating F lowercase
+     * copies of every member id.
+     */
+    internal val foldedMemberIds: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        members.mapTo(HashSet(members.size)) { it.memberIdHex.lowercase(Locale.ROOT) }
+    }
+
+    fun otherMemberAccount(activeAccountIdHex: String?): String? = GroupProjector.otherMemberAccount(members, activeAccountIdHex)
+
+    fun containsAccount(accountIdHex: String): Boolean {
+        val normalized = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return false
+        return members.any { it.memberIdHex.equals(normalized, ignoreCase = true) }
+    }
+}
+
+internal fun memberRecordsFromIds(
+    memberIdsHex: Iterable<String>,
+    activeAccountIdHex: String?,
+): List<AppGroupMemberRecordFfi> =
+    memberIdsHex
+        .asSequence()
+        .filter { it.isNotBlank() }
+        .distinctBy { it.lowercase() }
+        .map { memberIdHex ->
+            AppGroupMemberRecordFfi(
+                memberIdHex = memberIdHex,
+                account = null,
+                local = memberIdHex.equals(activeAccountIdHex, ignoreCase = true),
+            )
+        }.toList()
+
+/** Shares roster-readiness classification across retained rows and off-window forward targets. */
+internal fun isDirectConversationRosterCandidate(
+    conversationKind: ChatConversationKindFfi?,
+    members: List<AppGroupMemberRecordFfi>,
+    name: String,
+): Boolean {
+    val memberCount = GroupProjector.uniqueMemberCount(members)
+    val unresolvedDirect =
+        conversationKind == ChatConversationKindFfi.UNKNOWN &&
+            memberCount <= 1 &&
+            GroupProjector.isUnnamed(name)
+    return unresolvedDirect || GroupProjector.isDm(conversationKind, memberCount, name)
+}

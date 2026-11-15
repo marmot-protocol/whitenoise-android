@@ -29,8 +29,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.appStateDebug
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.AddToHomeScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
@@ -161,7 +159,7 @@ internal fun PinConversationActionRow(
         enabled = supported,
         busy = busy,
         modifier = Modifier.testTag("chat_info.pin_shortcut"),
-        leading = { SettingsLeadingIcon(Icons.AutoMirrored.Filled.AddToHomeScreen) },
+        leading = { SettingsLeadingIcon(R.drawable.ic_add_to_home_screen) },
     )
 }
 

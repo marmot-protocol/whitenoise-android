@@ -193,12 +193,28 @@ internal fun ConversationForegroundRestoreEffects(
                     ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation,
                     appReady = controller.appState.phase == AppPhase.Ready,
                     lockVisible = controller.appState.appLockScreenVisible,
+                    resumed = lifecycleOwner?.lifecycle?.currentState == Lifecycle.State.RESUMED,
                 )
             },
         )
     ConversationForegroundDrawGateEffect(
         isBlocked = { scrollCoordinator.foregroundRestoreInProgress },
-        onPreDraw = { foregroundPreDrawSignals.trySend(Unit) },
+        onPreDraw = {
+            // Admission or measurement can become ready after ON_RESUME while the
+            // local handoff is still pending. Draw that safe frame now; keep the existing
+            // admission/correction jobs and their user-intent fences.
+            if (scrollCoordinator.foregroundRestoreInProgress) {
+                foregroundRestore?.releaseMeasuredFrame(
+                    ConversationForegroundRestoreBinding.canPresentRetainedFrame(
+                        foregroundRestore,
+                        scrollCoordinator,
+                        currentCanPresentRetainedFrame(),
+                    ),
+                    currentForegroundSettleStateProvider().timelineMeasured,
+                )
+            }
+            foregroundPreDrawSignals.trySend(Unit)
+        },
     )
     val resumeRestoration: (Boolean, () -> Unit) -> Unit = { restoreFocus, restoreComposer ->
         foregroundPreDrawSignals.tryReceive()

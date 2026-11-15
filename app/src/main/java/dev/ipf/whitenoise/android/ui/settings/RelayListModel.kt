@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -118,9 +119,10 @@ internal enum class AccountRelayRole(
     val kind: RelayListKind,
     @param:StringRes val labelRes: Int,
     @param:StringRes val helpRes: Int,
+    @param:DrawableRes val iconRes: Int,
 ) {
-    Profile(RelayListKind.Nip65, R.string.profile, R.string.relay_role_profile_help),
-    Inbox(RelayListKind.Inbox, R.string.relay_role_inbox, R.string.relay_role_inbox_help),
+    Profile(RelayListKind.Nip65, R.string.profile, R.string.relay_role_profile_help, R.drawable.ic_person),
+    Inbox(RelayListKind.Inbox, R.string.relay_role_inbox, R.string.relay_role_inbox_help, R.drawable.ic_inbox),
 }
 
 /** Refresh reloads the projection; PublishMissing asks MarmotKit to publish the lists it reports missing. */

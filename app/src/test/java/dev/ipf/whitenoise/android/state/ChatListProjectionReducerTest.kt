@@ -22,7 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Output-contract tests for the chat-list reducer in `Controllers.kt`
+ * Output-contract tests for the chat-list reducer in `ChatListReadState.kt`
  * (`ChatsController` companion #559). Sibling tests (`ChatListSortingTest`,
  * `ChatListTitleTest`) use [chatListItemFromProjection] only as a *fixture
  * builder* to exercise sorting/titling. This file pins the reducer's own

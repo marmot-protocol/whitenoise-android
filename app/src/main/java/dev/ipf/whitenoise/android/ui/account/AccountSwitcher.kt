@@ -64,6 +64,7 @@ fun AccountAvatarButton(
     touchTargetSize: Dp = 56.dp,
     // Names the tap action for accessibility services when it is not the button's own purpose.
     onClickLabel: String? = null,
+    avatarContent: (@Composable (String?) -> Unit)? = null,
 ) {
     val openSettingsDescription = actionDescription ?: stringResource(R.string.open_settings)
     val accountUnreadDescription =
@@ -91,13 +92,17 @@ fun AccountAvatarButton(
                 },
     ) {
         Box {
-            Avatar(
-                title = title,
-                seed = seed,
-                size = size,
-                pictureUrl = safePictureUrl,
-                pictureDomain = AvatarImageLoader.publicProfiles(),
-            )
+            if (avatarContent != null) {
+                avatarContent(safePictureUrl)
+            } else {
+                Avatar(
+                    title = title,
+                    seed = seed,
+                    size = size,
+                    pictureUrl = safePictureUrl,
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
+                )
+            }
             if (showUnreadDot) {
                 Box(
                     modifier =
@@ -205,6 +210,7 @@ internal fun OtherAccountAvatarsRow(
     // can be narrower than the window, and reserving space against the wrong width can crowd
     // the rest of the bar (#2796 follow-up). Callers measure this with BoxWithConstraints.
     barWidthDp: Dp,
+    retainedAvatars: RetainedAccountAvatarPixels? = null,
 ) {
     // Signed-in accounts other than the active one. Empty while a destructive
     // wipe transiently nulls the active account, so no frame can flash the
@@ -289,12 +295,18 @@ internal fun OtherAccountAvatarsRow(
         shown.forEach { account ->
             OtherAccountAvatar(
                 accountLabel = account.label,
-                title = appState.accountDisplayNameCached(account.accountIdHex),
-                seed = account.accountIdHex,
-                pictureUrl = appState.avatarUrl(account.accountIdHex),
                 showUnreadDot = appState.accountShowsUnreadDot(account.label),
                 unreadDotColor = accountActionColors(appState, account.label).container,
-            )
+            ) { size ->
+                RetainedTopBarAccountAvatar(
+                    appState,
+                    retainedAvatars,
+                    account.accountIdHex,
+                    appState.accountDisplayNameCached(account.accountIdHex),
+                    size,
+                    ProfileSanitizer.protocolImageUrl(appState.avatarUrl(account.accountIdHex)),
+                )
+            }
         }
         if (overflow > 0) {
             OverflowAccountChip(count = overflow)
@@ -306,11 +318,9 @@ internal fun OtherAccountAvatarsRow(
 @Composable
 private fun OtherAccountAvatar(
     accountLabel: String,
-    title: String,
-    seed: String,
-    pictureUrl: String?,
     showUnreadDot: Boolean,
     unreadDotColor: Color,
+    avatarContent: @Composable (Dp) -> Unit,
 ) {
     // The Material-width slot is the account's own tap slice; centring the
     // smaller circle in it leaves visible air on both sides of every neighbour.
@@ -333,13 +343,7 @@ private fun OtherAccountAvatar(
                         .background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center,
             ) {
-                Avatar(
-                    title = title,
-                    seed = seed,
-                    size = TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2,
-                    pictureUrl = pictureUrl,
-                    pictureDomain = AvatarImageLoader.publicProfiles(),
-                )
+                avatarContent(TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2)
             }
             if (showUnreadDot) {
                 // Bottom-center keeps the whole marker on its own avatar, and so

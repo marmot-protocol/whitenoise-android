@@ -1693,6 +1693,13 @@
       "symbol": "MessageActionMenu",
       "bindings": [
         {
+          "case": "reader-back",
+          "selector": {
+            "text": "Show less"
+          },
+          "scope": "Long-press the inline expanded bubble to collapse it back to Read More."
+        },
+        {
           "case": "actions-info-back",
           "selector": {
             "text": "Info"
@@ -1808,25 +1815,6 @@
           },
           "opened_by": {
             "text": "Info"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
-      "symbol": "MessageFullScreenView",
-      "bindings": [
-        {
-          "case": "reader-back",
-          "selector": {
-            "id": "message-full-screen"
-          },
-          "scope": "generated long-message reader opens from Read More and returns to timeline.",
-          "entry_assertion": {
-            "id": "message-full-screen"
-          },
-          "opened_by": {
-            "text": "Read More"
           }
         }
       ]
@@ -2411,23 +2399,6 @@
             "id": "chat_info.members_screen"
           },
           "scope": "six-account native group opens expanded roster, sees sixth member and returns without membership mutation."
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
-      "symbol": "LargeGroupInviteConfirmationDialog",
-      "bindings": [
-        {
-          "case": "presentation-group-large-cancel",
-          "selector": {
-            "text": "Invite to a large group?"
-          },
-          "scope": "large-group warning cancellation; no native invite.",
-          "entry_assertion": {
-            "text": "Invite to a large group?"
-          },
-          "visible_on_entry": true
         }
       ]
     },
@@ -5595,6 +5566,17 @@
       "symbol": "GroupMembersReviewDialog",
       "bindings": [
         {
+          "case": "presentation-group-large-cancel",
+          "selector": {
+            "text": "In groups of 150 or more members.*"
+          },
+          "scope": "large-group warning inside the single member review; cancellation, no native invite.",
+          "entry_assertion": {
+            "text": "In groups of 150 or more members.*"
+          },
+          "visible_on_entry": true
+        },
+        {
           "case": "presentation-surface-contact-group-selected",
           "selector": {
             "id": "group.members.review.dialog"
@@ -6122,14 +6104,14 @@
         {
           "case": "settings-translation",
           "selector": {
-            "text": "Arabic"
+            "text": "German"
           },
           "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
           "opened_by": {
             "text": "Target language: English"
           },
           "entry_assertion": {
-            "text": "Arabic"
+            "text": "Search languages"
           }
         }
       ]
@@ -6152,6 +6134,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
+      "symbol": "MessageTranslationNotice",
+      "bindings": [
+        {
+          "case": "presentation-modal-translation-default",
+          "selector": {
+            "text": "Offline Translator can write message text.*"
+          },
+          "scope": "Audited production notice and distinctive asserted consent text; controlled presentation proves acceptance precedes any engine request, not the real long-press menu entrypoint.",
+          "opened_by": {
+            "id": "translation.menu"
+          },
+          "entry_assertion": {
+            "text": "Offline Translator can write message text.*"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
       "symbol": "ComposerTranslationNotice",
       "bindings": [
@@ -6169,8 +6170,8 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
-      "symbol": "ComposerTranslationPreview",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationLanguageSheet.kt",
+      "symbol": "TranslationLanguagePickerSheet",
       "bindings": [
         {
           "case": "presentation-modal-translation-composer",
@@ -6184,42 +6185,6 @@
           "opened_by": {
             "text": "Accept"
           }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
-      "symbol": "TranslationLanguageRow",
-      "bindings": [
-        {
-          "case": "presentation-modal-translation-source-cancel",
-          "selector": {
-            "text": "Arabic"
-          },
-          "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
-          "opened_by": {
-            "text": "Source language"
-          },
-          "entry_assertion": {
-            "text": "Arabic"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationControls.kt",
-      "symbol": "MessageTranslationDialog",
-      "bindings": [
-        {
-          "case": "presentation-modal-translation-default",
-          "selector": {
-            "id": "translation.form"
-          },
-          "scope": "Audited production owner and distinctive asserted child; controlled presentation and real Android entrypoint/engine/launcher proof remain separately qualified.",
-          "entry_assertion": {
-            "id": "translation.form"
-          },
-          "visible_on_entry": true
         }
       ]
     },
@@ -6329,23 +6294,6 @@
         }
       ],
       "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
-      "symbol": "AudioTranscriptDialog",
-      "bindings": [
-        {
-          "case": "presentation-audio-transcript-cancel",
-          "selector": {
-            "text": "Audio transcript"
-          },
-          "scope": "Production confirmation dialog disclosure and Cancel dispatch only; full received-audio provider/lifecycle behavior remains MED-038/MED-039.",
-          "entry_assertion": {
-            "text": "Audio transcript"
-          },
-          "visible_on_entry": true
-        }
-      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",

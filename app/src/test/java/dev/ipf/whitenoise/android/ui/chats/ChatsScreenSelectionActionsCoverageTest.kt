@@ -173,7 +173,7 @@ class ChatsScreenSelectionActionsCoverageTest {
             "abandonment is hidden beyond loaded chats",
             "!selectionBeyondLoaded && controller.accountRef != null" in flat,
         )
-        val controllers = File(chatsScreenSource().parentFile, "../../state/Controllers.kt").readText()
+        val controllers = File(chatsScreenSource().parentFile, "../../state/ChatsController.kt").readText()
         assertTrue(
             "native complete reads are owner fenced",
             "internal suspend fun completeChatListIds(" in controllers &&
@@ -200,7 +200,7 @@ class ChatsScreenSelectionActionsCoverageTest {
     }
 
     @Test fun batchRunnerRetainsNativeAuthorityAndSingleFlightAcrossFilterRemoval() {
-        val source = File(chatsScreenSource().parentFile, "../../state/Controllers.kt").readText()
+        val source = File(chatsScreenSource().parentFile, "../../state/ChatsController.kt").readText()
         val batch =
             source.requiredSection(
                 "internal suspend fun runChatListBatch(",

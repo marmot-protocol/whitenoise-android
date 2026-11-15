@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.functionBody
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1962,6 +1963,19 @@ class ConversationScrollCoordinatorTest {
                 .count(),
         )
         assertEquals(2, Regex("targetNavigation.cancel\\(\\)").findAll(searchCallbacks).count())
+    }
+
+    /** Expanding a message cancels a reply or search jump still loading before it captures the reading position. */
+    @Test
+    fun messageExpansionCancelsPendingTargetNavigation() {
+        val expansion =
+            sourceFile("ConversationScreen.kt").readText().functionBody("preserveReadingPositionOnExpansion")
+        val cancel = expansion.indexOf("navigationState.targetNavigation.cancel()")
+        assertTrue("expansion must cancel pending reply and search navigation", cancel >= 0)
+        assertTrue(
+            "the cancellation must come before the expansion captures its anchor",
+            cancel < expansion.indexOf("currentScrollAnchor()"),
+        )
     }
 
     @Test

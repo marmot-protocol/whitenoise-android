@@ -34,18 +34,26 @@ internal class MessageRowAction(
     val perform: () -> Unit,
 )
 
+/** A text action forwarded to its row. Actions with the same [key] do the same thing, such as copy one address. */
+internal class ForwardedTextAction(
+    val action: CustomAccessibilityAction,
+    val key: String,
+)
+
 /**
  * Row actions in menu order, followed by the actions forwarded from the message text. Compose refuses a node
  * with 32 or more custom actions by throwing while an accessibility service reads it, and a long message
- * can forward many link actions. So forwarded actions with the same label collapse into the first, as a
- * screen reader could not tell them apart, and the list stops at [MAX_ROW_CUSTOM_ACTIONS]. The row's own
- * actions come first, then the forwarded [leading] actions, so the message's one read-aloud chooser
- * survives the cap however many links register before it.
+ * can forward many link actions, so the list stops at [MAX_ROW_CUSTOM_ACTIONS]. Forwarded actions with the
+ * same key collapse into the first, so an address linked from several paragraphs is copied by one action and
+ * every paragraph's chooser becomes one. The row's own actions come first, then the forwarded [leading]
+ * read-aloud actions, so the message's chooser survives the cap however many links register before it.
+ * Paragraphs number repeated copy-link labels only among themselves, so different addresses that share a
+ * label across paragraphs are numbered again here rather than dropped.
  */
 internal fun messageRowCustomActions(
     actions: List<MessageRowAction>,
-    forwarded: List<CustomAccessibilityAction>,
-    leading: Set<String> = emptySet(),
+    forwarded: List<ForwardedTextAction>,
+    leading: Set<String>,
 ): List<CustomAccessibilityAction> {
     val own =
         actions
@@ -56,13 +64,27 @@ internal fun messageRowCustomActions(
                     true
                 }
             }
-    val ownLabels = own.mapTo(mutableSetOf(), CustomAccessibilityAction::label)
+    val taken = own.mapTo(mutableSetOf(), CustomAccessibilityAction::label)
     val text =
         forwarded
-            .filter { it.label !in ownLabels }
-            .distinctBy(CustomAccessibilityAction::label)
-            .sortedBy { it.label !in leading }
-    return (own + text).take(MAX_ROW_CUSTOM_ACTIONS)
+            .distinctBy(ForwardedTextAction::key)
+            .map(ForwardedTextAction::action)
+            .filter { it.label !in taken }
+    val readAloud = text.filter { it.label in leading }.distinctBy(CustomAccessibilityAction::label)
+    readAloud.mapTo(taken, CustomAccessibilityAction::label)
+    val others =
+        text
+            .filter { it.label !in leading }
+            .map { action ->
+                var label = action.label
+                var copy = 1
+                while (!taken.add(label)) {
+                    copy += 1
+                    label = "${action.label} ($copy)"
+                }
+                if (label == action.label) action else CustomAccessibilityAction(label, action.action)
+            }
+    return (own + readAloud + others).take(MAX_ROW_CUSTOM_ACTIONS)
 }
 
 /** Below Compose's limit of 32 custom actions per accessibility node. */
@@ -120,28 +142,39 @@ internal class MessageRowTextActions {
     private class Leaf(
         val owner: Any,
         val labels: List<String>,
+        val keys: List<String>,
         val perform: (Int) -> Boolean,
     )
 
     private val leaves = mutableStateListOf<Leaf>()
 
-    /** Forwarded actions in leaf registration order, which follows the rendered text order. */
-    val actions: List<CustomAccessibilityAction>
+    /** Forwarded actions with their keys, in leaf registration order, which follows the rendered text order. */
+    val forwarded: List<ForwardedTextAction>
         get() =
             leaves.flatMap { leaf ->
-                leaf.labels.mapIndexed { index, label -> CustomAccessibilityAction(label) { leaf.perform(index) } }
+                leaf.labels.mapIndexed { index, label ->
+                    ForwardedTextAction(CustomAccessibilityAction(label) { leaf.perform(index) }, leaf.keys[index])
+                }
             }
 
+    /** Forwarded actions in leaf registration order, which follows the rendered text order. */
+    val actions: List<CustomAccessibilityAction>
+        get() = forwarded.map(ForwardedTextAction::action)
+
+    /** Registers or replaces [owner]'s [labels], each with its key in [keys]; an empty list registers nothing. */
     internal fun update(
         owner: Any,
         labels: List<String>,
+        keys: List<String> = labels,
         perform: (Int) -> Boolean,
     ) {
+        require(keys.size == labels.size) { "Each forwarded label needs one key" }
         val index = leaves.indexOfFirst { it.owner === owner }
         when {
             index < 0 && labels.isEmpty() -> Unit
-            index < 0 -> leaves += Leaf(owner, labels, perform)
-            leaves[index].labels != labels -> leaves[index] = Leaf(owner, labels, perform)
+            index < 0 -> leaves += Leaf(owner, labels, keys, perform)
+            leaves[index].labels != labels || leaves[index].keys != keys ->
+                leaves[index] = Leaf(owner, labels, keys, perform)
         }
     }
 
@@ -153,10 +186,16 @@ internal class MessageRowTextActions {
 /** The text-action registry of the message row being composed, absent outside a timeline row. */
 internal val LocalMessageRowTextActions = staticCompositionLocalOf<MessageRowTextActions?> { null }
 
-/** Publishes a text leaf's actions to its row; writes only when the labels change. */
+/**
+ * Publishes a text leaf's actions to its row; writes only when the labels or keys change. [keys] names what each
+ * action does, one per action, so the row keeps one action for the same address linked from several leaves.
+ */
 @Suppress("FunctionNaming")
 @Composable
-internal fun ForwardTextActionsToMessageRow(actions: List<CustomAccessibilityAction>) {
+internal fun ForwardTextActionsToMessageRow(
+    actions: List<CustomAccessibilityAction>,
+    keys: List<String> = actions.map(CustomAccessibilityAction::label),
+) {
     val registry = LocalMessageRowTextActions.current ?: return
     val owner = remember { Any() }
     val latest = rememberUpdatedState(actions)
@@ -165,7 +204,7 @@ internal fun ForwardTextActionsToMessageRow(actions: List<CustomAccessibilityAct
         onDispose { registry.remove(owner) }
     }
     SideEffect {
-        registry.update(owner, labels) { index ->
+        registry.update(owner, labels, keys) { index ->
             latest.value
                 .getOrNull(index)
                 ?.action

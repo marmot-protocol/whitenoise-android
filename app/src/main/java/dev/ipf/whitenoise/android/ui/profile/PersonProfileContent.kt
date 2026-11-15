@@ -51,12 +51,11 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.outlined.Block
 import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
@@ -150,7 +149,7 @@ internal fun PersonProfileContent(
                                 stringResource(R.string.person_start_group),
                                 onStartGroup,
                                 enabled = !busy,
-                                leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group_add) },
                                 modifier = Modifier.testTag("person_profile.start_group"),
                             )
                         }
@@ -160,7 +159,7 @@ internal fun PersonProfileContent(
                                 stringResource(R.string.person_add_to_group),
                                 onAddToGroup,
                                 enabled = !busy,
-                                leading = { Icon(painterResource(R.drawable.ic_group_add), null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_group) },
                                 modifier = Modifier.testTag("person_profile.add_to_group"),
                             )
                         }
@@ -184,7 +183,7 @@ internal fun PersonProfileContent(
                                     onNotifications,
                                     value = notificationSummary,
                                     enabled = !busy,
-                                    leading = { Icon(painterResource(R.drawable.ic_settings_notifications), null) },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_settings_notifications) },
                                     modifier = Modifier.testTag("person_profile.notifications"),
                                 )
                             }
@@ -195,7 +194,7 @@ internal fun PersonProfileContent(
                                 stringResource(R.string.profile_nickname_and_notes),
                                 onPrivateDetails,
                                 enabled = !busy,
-                                leading = { Icon(painterResource(R.drawable.ic_edit), null) },
+                                leading = { SettingsLeadingIcon(R.drawable.ic_edit) },
                                 modifier = Modifier.testTag("person_profile.private_details"),
                             )
                         }
@@ -206,7 +205,7 @@ internal fun PersonProfileContent(
                                     stringResource(R.string.person_promote_groups),
                                     onPromote,
                                     enabled = !busy,
-                                    leading = { Icon(painterResource(R.drawable.ic_admin_panel_settings), null) },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_admin_panel_settings) },
                                     modifier = Modifier.testTag("person_profile.promote_groups"),
                                 )
                             }
@@ -223,15 +222,12 @@ internal fun PersonProfileContent(
                                     if (follow.inProgress) {
                                         CircularProgressIndicator(Modifier.size(24.dp))
                                     } else {
-                                        Icon(
-                                            painterResource(
-                                                if (follow.showsUnfollow) {
-                                                    R.drawable.ic_person_remove
-                                                } else {
-                                                    R.drawable.ic_settings_person_add
-                                                },
-                                            ),
-                                            contentDescription = null,
+                                        SettingsLeadingIcon(
+                                            if (follow.showsUnfollow) {
+                                                R.drawable.ic_person_remove
+                                            } else {
+                                                R.drawable.ic_settings_person_add
+                                            },
                                         )
                                     }
                                 },
@@ -245,7 +241,7 @@ internal fun PersonProfileContent(
                                     stringResource(memberMuteActionLabel(memberMute)),
                                     onMemberMute,
                                     enabled = memberMute.enabled,
-                                    leading = { Icon(painterResource(R.drawable.ic_notifications_off), null) },
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_notifications_off) },
                                     modifier = Modifier.testTag(PROFILE_MEMBER_MUTE_ACTION_TAG),
                                 )
                             }
@@ -262,7 +258,7 @@ internal fun PersonProfileContent(
                                         if (block.inProgress) {
                                             CircularProgressIndicator(Modifier.size(24.dp))
                                         } else {
-                                            Icon(Icons.Outlined.Block, contentDescription = null)
+                                            SettingsLeadingIcon(R.drawable.ic_block)
                                         }
                                     },
                                     modifier = Modifier.testTag(PROFILE_BLOCK_ACTION_TAG),

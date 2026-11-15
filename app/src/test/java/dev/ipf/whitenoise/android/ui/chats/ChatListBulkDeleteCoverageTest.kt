@@ -123,10 +123,10 @@ class ChatListBulkDeleteCoverageTest {
 
     private fun controllersSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ChatsController.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing Controllers.kt source file")
+            ?: error("Missing ChatsController.kt source file")
 
     private fun String.requiredSection(
         start: String,

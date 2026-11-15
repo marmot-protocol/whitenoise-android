@@ -10,14 +10,11 @@ import androidx.compose.ui.geometry.Rect
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.LocalMessageRowTextActions
@@ -80,7 +77,6 @@ internal fun TimelineRowMessageBubble(
     onOpenConversationMedia: (ConversationMediaViewerOpenRequest) -> Unit = {},
     eventCardResolver: NostrEventCardResolver? = null,
     documentSaveFallback: DocumentSaveFallback? = null,
-    composerTextState: ComposerTextState,
     highlighted: Boolean,
     selectionMode: Boolean,
     textSelectionMode: Boolean,
@@ -101,13 +97,7 @@ internal fun TimelineRowMessageBubble(
     onActionMenuOpenChange: (Boolean) -> Unit,
     onQuickReactionsSave: (List<String>) -> Unit,
     onReplyPreviewClick: (TimelineMessage) -> Unit,
-    composerGate: ComposerGate,
-    blockedDmUnblockInFlight: Boolean = false,
-    onUnblockBlockedDm: () -> Unit = {},
-    onBack: () -> Unit,
-    mentionCandidates: List<MentionComposer.Candidate>,
-    mentionPickerEnabled: Boolean,
-    onReaderSendAccepted: () -> Unit = {},
+    onBeforeBodyExpand: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
     showSenderName: Boolean,
     showSenderAvatar: Boolean,
@@ -120,8 +110,6 @@ internal fun TimelineRowMessageBubble(
 ) {
     val ttsHighlightState by rememberRowScopedTtsHighlightState(messageIdHex, appState)
     val ttsRowInstance = remember(messageIdHex) { Any() }
-    val renderedInviteGroupIdHex = controller.group.groupIdHex
-    val renderedInviteWelcomeMessageIdHex = controller.group.viaWelcomeMessageIdHex
     DisposableEffect(ttsSentenceLayoutSink, messageIdHex, ttsRowInstance) {
         ttsSentenceLayoutSink?.mountRow(messageIdHex, ttsRowInstance)
         onDispose {
@@ -141,7 +129,6 @@ internal fun TimelineRowMessageBubble(
             onOpenConversationMedia = onOpenConversationMedia,
             eventCardResolver = eventCardResolver,
             documentSaveFallback = documentSaveFallback,
-            composerTextState = composerTextState,
             highlighted = highlighted,
             selectionMode = selectionMode,
             textSelectionMode = textSelectionMode,
@@ -162,26 +149,6 @@ internal fun TimelineRowMessageBubble(
             onActionMenuOpenChange = onActionMenuOpenChange,
             onQuickReactionsSave = onQuickReactionsSave,
             onReplyPreviewClick = onReplyPreviewClick,
-            composerGate = composerGate,
-            blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-            onUnblockBlockedDm = onUnblockBlockedDm,
-            groupDisbanded = controller.group.disbanded,
-            inviteMutationInFlight = controller.mutationInFlight,
-            onJoinInvite = {
-                appState.launchMutation {
-                    controller.acceptInvite(
-                        renderedGroupIdHex = renderedInviteGroupIdHex,
-                        renderedWelcomeMessageIdHex = renderedInviteWelcomeMessageIdHex,
-                    )
-                }
-            },
-            onDeclineInvite = {
-                appState.launchMutation {
-                    if (controller.declineInvite()) onBack()
-                }
-            },
-            mentionCandidates = mentionCandidates,
-            mentionPickerEnabled = mentionPickerEnabled,
             showSenderName = showSenderName,
             showSenderAvatar = showSenderAvatar,
             collapseLongMessages = collapseLongMessages,
@@ -195,7 +162,7 @@ internal fun TimelineRowMessageBubble(
             onTtsSentenceSeek = onTtsSentenceSeek,
             ttsRowInstance = ttsRowInstance,
             parseMarkdown = parseMarkdown,
-            onReaderSendAccepted = onReaderSendAccepted,
+            onBeforeBodyExpand = onBeforeBodyExpand,
             onBeforeBodyCollapse = onBeforeBodyCollapse,
         )
     }

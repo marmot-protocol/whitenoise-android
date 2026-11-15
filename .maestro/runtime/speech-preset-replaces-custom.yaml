@@ -21,7 +21,12 @@ name: speech-preset-replaces-custom
     id: speech.engine.group
 - assertVisible: 0\.5×
 - back
-- assertVisible: Settings
+- assertVisible:
+    id: settings.voice_language.group
+- scrollUntilVisible:
+    element:
+      text: Read Aloud
+    direction: DOWN
 - tapOn: Read Aloud
 - assertVisible:
     id: speech.engine.group

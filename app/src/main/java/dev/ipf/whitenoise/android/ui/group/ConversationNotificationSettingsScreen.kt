@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.state.conversationAlertPreferences
 import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
@@ -169,6 +170,7 @@ internal fun ConversationNotificationSettingsScreen(
                             title = stringResource(R.string.vibration_pattern),
                             onClick = onChooseVibrationPattern,
                             value = effectiveVibrationLabel(effectiveVibration, vibrationPattern),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_vibration) },
                         )
                     }
                 }
@@ -297,6 +299,7 @@ private fun NotificationCategoriesLoadingRow() {
                 onClick = {},
                 enabled = false,
                 busy = true,
+                leading = { SettingsLeadingIcon(R.drawable.ic_pending) },
             )
         }
     }
@@ -468,6 +471,7 @@ internal fun ConversationMuteSettingsSwitch(
                 else -> stringResource(R.string.notification_mute_detail)
             },
         enabled = !muteCommandPending,
+        leading = { SettingsLeadingIcon(R.drawable.ic_notifications_paused) },
     )
 }
 

@@ -2,10 +2,7 @@
     <string name="translation_title">Çevir</string>
     <string name="translation_automatic">Mesajları otomatik çevir</string>
     <string name="translation_detect_language">Dili algıla</string>
-    <string name="translation_source_language">Kaynak dil</string>
     <string name="translation_target_language">Hedef dil</string>
-    <string name="translation_show_original">Orijinali göster</string>
-    <string name="translation_show_result">Çeviriyi göster</string>
     <string name="translation_loading">Cihazda çevriliyor…</string>
     <string name="translation_open_engine">Çeviri uygulamasını aç</string>
     <string name="translation_engine_managed">Önerilen çeviri motoru: Offline Translator. Çeviri cihazınızda yapılır; dil paketlerini bu uygulamada yönetin.</string>
@@ -14,7 +11,7 @@
     <string name="translation_detection_failed">Bir kaynak dil seçip tekrar deneyin.</string>
     <string name="translation_source_model_missing">Kaynak dil paketini çeviri uygulamasında yükleyin.</string>
     <string name="translation_engine_failed">Çeviri başarısız. Dil paketlerini kontrol edip tekrar deneyin.</string>
-    <string name="translation_recovery_notice">Çeviri kullanılamıyor. Tekrar denemek veya uygulamayı açmak için Çevir’e dokunun.</string>
+    <string name="translation_recovery_notice">Çeviri kullanılamıyor. Tekrar denemek için Çevir’e dokunun.</string>
     <string name="translation_inherit">Genel ayarı kullan</string>
     <string name="translation_on">Açık</string>
     <string name="translation_off">Kapalı</string>
@@ -32,4 +29,5 @@
     <string name="translation_composer_dictation_off">Dikte sırasında çeviri kapalı</string>
     <string name="translation_composer_placeholder">Çeviri burada görünür</string>
     <string name="translation_composer_detection_failed">Dil algılanamadı. Biraz daha yazın.</string>
+    <string name="translation_search_languages">Dil ara</string>
 </resources>

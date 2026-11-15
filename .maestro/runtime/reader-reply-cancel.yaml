@@ -10,9 +10,14 @@ name: reader-reply-cancel
     direction: UP
 - tapOn: "Read More"
 - assertVisible:
-    id: "message-full-screen"
+    id: "composer-pill-surface"
+- scrollUntilVisible:
+    element:
+      text: "Maestro reader heading"
+    direction: UP
 - assertVisible: "Maestro reader heading"
-- tapOn: "Message actions"
+- longPressOn:
+    text: "Maestro reader heading"
 - tapOn: "Reply"
 - assertVisible:
     id: "conversation.reply.bar"

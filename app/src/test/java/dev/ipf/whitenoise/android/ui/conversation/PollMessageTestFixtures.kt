@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.EventsSubscription
@@ -27,7 +26,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFileAttachmentFixtures
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -165,7 +163,6 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             groupRosterReader = { _, _ -> authoritativeRoster() },
             clockMillis = { pollClockMillis },
         )
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
 
     protected fun pollMessage(
         closed: Boolean = false,
@@ -247,7 +244,6 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             onMeasured = { _, _ -> },
             controller = controller,
             appState = pollState,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -270,10 +266,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
             composerGate = if (readOnly) ComposerGate.NOTICE else ComposerGate.COMPOSER,
-            onBack = {},
             collapseLongMessages = true,
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
         )
     }
 }

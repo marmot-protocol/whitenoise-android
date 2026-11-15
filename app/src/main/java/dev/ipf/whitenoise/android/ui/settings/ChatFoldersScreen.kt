@@ -309,6 +309,7 @@ private fun ChatFolderRestoreDefaults(
                 title = stringResource(R.string.folder_restore_defaults),
                 onClick = onRestoreDefaults,
                 enabled = defaultsMissing,
+                leading = { SettingsLeadingIcon(R.drawable.ic_settings_backup_restore) },
             )
         }
     }

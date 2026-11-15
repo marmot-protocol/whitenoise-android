@@ -14,7 +14,6 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -41,8 +40,6 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudSentenceHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -80,7 +77,6 @@ class TtsRichLeafPlacementAndroidTest {
     private val engine = ReplayEngine()
     private lateinit var appState: WhiteNoiseAppState
     private lateinit var controller: ConversationController
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
 
     @Before
     fun setUp() {
@@ -291,7 +287,6 @@ class TtsRichLeafPlacementAndroidTest {
             item = item,
             controller = controller,
             appState = appState,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -312,10 +307,6 @@ class TtsRichLeafPlacementAndroidTest {
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            onBack = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderName = false,
             showSenderAvatar = false,
             collapseLongMessages = false,

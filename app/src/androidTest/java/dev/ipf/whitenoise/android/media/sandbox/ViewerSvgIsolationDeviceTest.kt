@@ -27,7 +27,8 @@ class ViewerSvgIsolationDeviceTest {
         val canary = File(context.filesDir, "media-containment-canary")
         check(!canary.exists())
         canary.writeText("synthetic-private-canary")
-        val transport = IsolatedMediaTransport(context)
+        // Each binding below must be the input worker, never an unused prewarmed spare.
+        val transport = IsolatedMediaTransport(context, spares = 0)
         try {
             val source =
                 (

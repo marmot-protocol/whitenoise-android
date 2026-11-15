@@ -20,7 +20,6 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -45,8 +44,6 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.rememberedMessageBubbleTime
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -92,7 +89,6 @@ class MessageBubbleLongPressDragTest {
         val appState = appState()
         val controller = ConversationController(appState = appState, initialGroup = group())
         val item = timelineMessage()
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         var bubbleVisible by mutableStateOf(true)
         var actionMenuOpen by mutableStateOf(false)
         var actionOpens = 0
@@ -105,7 +101,6 @@ class MessageBubbleLongPressDragTest {
                             item = item,
                             controller = controller,
                             appState = appState,
-                            composerTextState = composerTextState,
                             highlighted = false,
                             selectionMode = false,
                             textSelectionMode = false,
@@ -129,12 +124,6 @@ class MessageBubbleLongPressDragTest {
                             },
                             onQuickReactionsSave = {},
                             onReplyPreviewClick = {},
-                            composerGate = ComposerGate.COMPOSER,
-                            inviteMutationInFlight = false,
-                            onJoinInvite = {},
-                            onDeclineInvite = {},
-                            mentionCandidates = emptyList(),
-                            mentionPickerEnabled = false,
                         )
                     }
                 }
@@ -174,7 +163,6 @@ class MessageBubbleLongPressDragTest {
         val appState = appState()
         val controller = ConversationController(appState = appState, initialGroup = group())
         val item = timelineMessage()
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         var selectionMode by mutableStateOf(false)
         var rangeDragActive by mutableStateOf(false)
         var actionMenuOpen by mutableStateOf(false)
@@ -190,7 +178,6 @@ class MessageBubbleLongPressDragTest {
                         item = item,
                         controller = controller,
                         appState = appState,
-                        composerTextState = composerTextState,
                         highlighted = false,
                         selectionMode = selectionMode,
                         textSelectionMode = false,
@@ -224,12 +211,6 @@ class MessageBubbleLongPressDragTest {
                         },
                         onQuickReactionsSave = {},
                         onReplyPreviewClick = {},
-                        composerGate = ComposerGate.COMPOSER,
-                        inviteMutationInFlight = false,
-                        onJoinInvite = {},
-                        onDeclineInvite = {},
-                        mentionCandidates = emptyList(),
-                        mentionPickerEnabled = false,
                     )
                 }
             }
@@ -298,7 +279,6 @@ class MessageBubbleLongPressDragTest {
         if (usableTts) appState.forceUsableTtsResolutionForTests()
         val controller = ConversationController(appState = appState, initialGroup = group())
         val items = List(4) { index -> timelineMessage(index, mine) }
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         val rowBounds = arrayOfNulls<Rect>(items.size)
         var selectedIds by mutableStateOf(emptySet<String>())
         var anchorIndex by mutableIntStateOf(-1)
@@ -321,7 +301,6 @@ class MessageBubbleLongPressDragTest {
                                 item = item,
                                 controller = controller,
                                 appState = appState,
-                                composerTextState = composerTextState,
                                 highlighted = false,
                                 selectionMode = selectedIds.isNotEmpty(),
                                 textSelectionMode = false,
@@ -365,12 +344,6 @@ class MessageBubbleLongPressDragTest {
                                 },
                                 onQuickReactionsSave = {},
                                 onReplyPreviewClick = {},
-                                composerGate = ComposerGate.COMPOSER,
-                                inviteMutationInFlight = false,
-                                onJoinInvite = {},
-                                onDeclineInvite = {},
-                                mentionCandidates = emptyList(),
-                                mentionPickerEnabled = false,
                             )
                         }
                     }
@@ -443,7 +416,6 @@ class MessageBubbleLongPressDragTest {
     private fun renderFileMessage(item: TimelineMessage): String {
         val appState = appState()
         val controller = ConversationController(appState = appState, initialGroup = group())
-        val composerTextState = ComposerTextState(TextFieldValue(""))
         var timestampText = ""
 
         composeRule.setContent {
@@ -453,7 +425,6 @@ class MessageBubbleLongPressDragTest {
                     item = item,
                     controller = controller,
                     appState = appState,
-                    composerTextState = composerTextState,
                     highlighted = false,
                     selectionMode = false,
                     textSelectionMode = false,
@@ -474,12 +445,6 @@ class MessageBubbleLongPressDragTest {
                     onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
                     onReplyPreviewClick = {},
-                    composerGate = ComposerGate.COMPOSER,
-                    inviteMutationInFlight = false,
-                    onJoinInvite = {},
-                    onDeclineInvite = {},
-                    mentionCandidates = emptyList(),
-                    mentionPickerEnabled = false,
                 )
             }
         }

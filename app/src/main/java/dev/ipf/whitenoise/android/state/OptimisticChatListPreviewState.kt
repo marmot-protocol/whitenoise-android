@@ -67,3 +67,15 @@ internal data class ChatListLastMessageActivity(
     val timelineAt: ULong?,
     val messageIdHex: String?,
 )
+
+/** Restores a previous preview only while the optimistic message still owns it. */
+internal fun rollbackOptimisticChatListPreview(
+    current: ChatListRowFfi,
+    previous: ChatListRowFfi,
+    optimisticMessageIdHex: String,
+): ChatListRowFfi =
+    if (current.lastMessage?.messageIdHex == optimisticMessageIdHex) {
+        previous
+    } else {
+        current
+    }

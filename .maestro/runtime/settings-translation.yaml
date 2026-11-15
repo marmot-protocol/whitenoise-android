@@ -20,9 +20,20 @@ name: settings-translation
 - tapOn: "Translate"
 - assertVisible: "Automatically translate messages"
 - tapOn: "Target language: English"
-- assertVisible: Arabic
-- back
+- assertVisible: "Search languages"
+- tapOn: "Search languages"
+- inputText: "ger"
+- assertVisible: German
 - assertNotVisible: Arabic
+# Close the IME first so Back dismisses the picker rather than the keyboard.
+- runFlow:
+    when:
+      visible:
+        id: com\.google\.android\.inputmethod\.latin:id/.*
+    commands:
+      - hideKeyboard
+- back
+- assertNotVisible: "Search languages"
 - tapOn: "Back"
 - assertVisible:
     id: "settings.voice_language.group"

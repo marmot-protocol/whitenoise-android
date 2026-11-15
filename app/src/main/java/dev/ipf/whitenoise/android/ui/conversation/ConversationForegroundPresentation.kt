@@ -21,7 +21,8 @@ internal fun canPresentRetainedConversationFrame(
     ownsCurrentPresentation: Boolean,
     appReady: Boolean,
     lockVisible: Boolean,
-): Boolean = anchored && ownsCurrentPresentation && appReady && !lockVisible
+    resumed: Boolean,
+): Boolean = anchored && ownsCurrentPresentation && appReady && !lockVisible && resumed
 
 /** Distinguishes the lifecycle's one requested focus edge from foreground user focus intent. */
 internal class ConversationForegroundFocusIntent {

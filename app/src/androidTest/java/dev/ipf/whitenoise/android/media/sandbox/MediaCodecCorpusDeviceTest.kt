@@ -292,7 +292,8 @@ class MediaCodecCorpusDeviceTest {
     /**
      * Runs one decoder operation and checks the evidence that operation itself produced (#3722). Every operation
      * here must reach exactly one isolated worker, and any result must carry that worker's own receipt, so a
-     * `null` from an in-process decode cannot pass as a refusal.
+     * `null` from an in-process decode cannot pass as a refusal. The deltas are process-wide, so this assumes no
+     * other still-image work runs in the process meanwhile, and this class launches no activity that would add any.
      */
     private fun <T> contained(
         operation: String,

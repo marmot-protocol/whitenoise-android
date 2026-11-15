@@ -20,14 +20,6 @@
         ]
       },
       {
-        "surface": "NotificationPermissionIcon",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
-        "anchor": "fun NotificationPermissionIcon(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "NotificationsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
         "anchor": "fun NotificationsScreen(",

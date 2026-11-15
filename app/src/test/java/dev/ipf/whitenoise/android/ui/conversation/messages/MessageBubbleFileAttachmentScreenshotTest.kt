@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -35,7 +36,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -78,10 +78,9 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.mediaCacheKey
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.ANDROID_PACKAGE_MIME
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaFileBubbleContent
+import dev.ipf.whitenoise.android.ui.conversation.media.PENDING_FILE_CARD_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.fileAttachmentCardTestTag
 import dev.ipf.whitenoise.android.ui.conversation.media.fileAttachmentFirstFrameVisibility
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
@@ -118,7 +117,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             initialMemberSnapshot = memberSnapshot(),
             groupRosterReader = { _, _ -> authoritativeRoster() },
         )
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
     private var originalTimeFormat: String? = null
 
     /** Pins the 12-hour and UTC clock inputs; each Robolectric config supplies the fixture locale. */
@@ -280,10 +278,16 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertTrue(timestampBounds.right <= cardBounds.right)
         assertTrue(timestampBounds.bottom <= cardBounds.bottom)
         assertTrue(warningBounds.bottom <= timestampBounds.top)
+        // In RTL the bottom-end corner is the card's bottom-left.
+        composeRule.assertFooterAtCardCorner(
+            fileAttachmentCardTestTag(item.record.messageIdHex, 1),
+            ONE_AM_TIMESTAMP,
+            rtl = true,
+        )
         composeRule.onRoot().captureRoboImage(UNCONFIRMED_FILE_SNAPSHOT_PATH)
     }
 
-    /** Covers the real MessageBubble footer contract across captioned, mixed, and failed files. */
+    /** Covers the real MessageBubble footer contract across captioned, mixed, failed and received files. */
     @Test
     fun realMessageBubbleFooterMatrixKeepsMetadataOnOneAccessibleFileCard() {
         val fixtures = footerMatrixFixtures()
@@ -294,6 +298,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
                     FileMessage(fixtures.captionedUnconfirmed)
                     FileMessage(fixtures.mixedDelivered)
                     FileMessage(fixtures.confirmedFailed)
+                    FileMessage(fixtures.received)
                 }
             }
         }
@@ -301,7 +306,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertFooterMatrix(fixtures)
     }
 
-    /** Builds the three production rows whose footer owners differ by message shape and state. */
+    /** Builds the four production rows whose footer owners differ by message shape, state and direction. */
     private fun footerMatrixFixtures(): FooterMatrixFixtures =
         FooterMatrixFixtures(
             captionedUnconfirmed =
@@ -332,6 +337,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
                     mine = true,
                     status = MessageStatus.Failed,
                 ),
+            received = fileTimelineMessage(index = 240, fileName = RECEIVED_FILE, mine = false),
         )
 
     /** Verifies each production row exposes one accessible footer within its owning file card. */
@@ -364,6 +370,11 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertAccessibleFileCardDescriptions(failedCardTag, "Send failed")
         assertNodeInsideCard(failedCardTag, text = CONFIRMED_FAILED_TIME)
         assertDescriptionInsideCard(failedCardTag, description = "Send failed")
+        // Status and time end at the card's bottom-end corner, like every other bubble (#3768).
+        composeRule.assertFooterAtCardCorner(mixedCardTag, MIXED_DELIVERED_TIME, status = "Sent")
+        composeRule.assertFooterAtCardCorner(failedCardTag, CONFIRMED_FAILED_TIME, status = "Send failed")
+        val receivedCardTag = fileAttachmentCardTestTag(fixtures.received.record.messageIdHex, 0)
+        composeRule.assertFooterAtCardCorner(receivedCardTag, RECEIVED_TIME)
 
         // The caption owns one terminal footer; the file card must not duplicate it.
         val warningBounds =
@@ -373,12 +384,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertTrue(warningBounds.bottom <= timestampBounds.bottom)
         assertTrue(warningBounds.bottom <= timestampBounds.top || warningBounds.right <= timestampBounds.left)
     }
-
-    private data class FooterMatrixFixtures(
-        val captionedUnconfirmed: TimelineMessage,
-        val mixedDelivered: TimelineMessage,
-        val confirmedFailed: TimelineMessage,
-    )
 
     /** Replaces one optimistic file row with its canonical projection while retaining display order. */
     @Test
@@ -412,6 +417,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         composeRule.onAllNodesWithText(ONE_AM_TIMESTAMP, useUnmergedTree = true).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sending", useUnmergedTree = true).assertCountEquals(1)
         composeRule.onNodeWithContentDescription("Uploading…").assertExists()
+        composeRule.assertFooterAtCardCorner(PENDING_FILE_CARD_TEST_TAG, ONE_AM_TIMESTAMP, status = "Sending")
 
         composeRule.runOnIdle { presentedItem = optimistic.copy(status = MessageStatus.Failed) }
         composeRule.onNodeWithText(PENDING_FAILED_FILE).assertExists()
@@ -440,6 +446,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertAccessibleFileCardText(confirmedCardTag, PENDING_FAILED_FILE, ONE_AM_TIMESTAMP)
         assertAccessibleFileCardDescriptions(confirmedCardTag, "Sent")
         assertNodeInsideCard(confirmedCardTag, text = ONE_AM_TIMESTAMP)
+        composeRule.assertFooterAtCardCorner(confirmedCardTag, ONE_AM_TIMESTAMP, status = "Sent")
     }
 
     /** Mirrors the successful upload handoff that publishes every own attachment before its canonical bridge. */
@@ -725,7 +732,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             item = item,
             controller = controller,
             appState = appState,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = selectionMode,
             textSelectionMode = false,
@@ -746,12 +752,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            inviteMutationInFlight = false,
-            onJoinInvite = {},
-            onDeclineInvite = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderAvatar = showSenderAvatar,
             parseMarkdown = ::markdown,
         )
@@ -1072,6 +1072,44 @@ private const val PENDING_FAILED_FILE = "failed-generic-archive.zip"
 private const val PERSISTED_FAILURE_FILE = "persisted-failure.pdf"
 private const val PERSISTED_FAILURE_STATUS = "FutureEngineFailure"
 private const val DELIVERY_NOT_CONFIRMED = "Delivery not confirmed"
+
+/** The production rows whose file-footer owners differ by message shape, state and direction. */
+private data class FooterMatrixFixtures(
+    val captionedUnconfirmed: TimelineMessage,
+    val mixedDelivered: TimelineMessage,
+    val confirmedFailed: TimelineMessage,
+    val received: TimelineMessage,
+)
+
+/**
+ * Verifies the time ends within 1dp of the card's content edge (the card minus its padding) at the
+ * bottom-end corner, with any [status] glyph immediately before it on the same row (#3768).
+ */
+private fun ComposeContentTestRule.assertFooterAtCardCorner(
+    cardTag: String,
+    time: String,
+    status: String? = null,
+    rtl: Boolean = false,
+) {
+    val card = onNodeWithTag(cardTag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+    val timeBounds = onNodeWithText(time, useUnmergedTree = true).getUnclippedBoundsInRoot()
+    val endGap = if (rtl) timeBounds.left - card.left else card.right - timeBounds.right
+    assertEquals("'$time' must end at the card's content edge", FILE_CARD_PADDING_DP, endGap.value, 1f)
+    assertTrue(
+        "'$time' must sit on the card's bottom row",
+        (card.bottom - timeBounds.bottom).value < FILE_CARD_BOTTOM_ROW_DP,
+    )
+    status?.let { description ->
+        val glyph = onNodeWithContentDescription(description, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val gap = if (rtl) glyph.left - timeBounds.right else timeBounds.left - glyph.right
+        assertTrue("'$description' must sit immediately before the time", gap.value in 0f..FILE_FOOTER_GLYPH_GAP_DP)
+        assertTrue(
+            "'$description' must share the time's row",
+            glyph.top < timeBounds.bottom && timeBounds.top < glyph.bottom,
+        )
+    }
+}
+
 private const val ONE_AM_TIMESTAMP = "1:00\u202FAM"
 private const val CAPTIONED_UNCONFIRMED_FILE = "captioned-unconfirmed.pdf"
 private const val CAPTIONED_UNCONFIRMED_TEXT = "Release notes awaiting confirmation"
@@ -1081,6 +1119,11 @@ private const val MIXED_FILE = "mixed-document.pdf"
 private const val MIXED_DELIVERED_TIME = "1:02\u202FAM"
 private const val CONFIRMED_FAILED_FILE = "confirmed-failed.pdf"
 private const val CONFIRMED_FAILED_TIME = "1:03\u202FAM"
+private const val RECEIVED_FILE = "received-notes.pdf"
+private const val RECEIVED_TIME = "1:04\u202FAM"
+private const val FILE_CARD_PADDING_DP = 6f
+private const val FILE_CARD_BOTTOM_ROW_DP = 28f
+private const val FILE_FOOTER_GLYPH_GAP_DP = 6f
 private const val FAR_FUTURE_EPOCH_SECONDS = 4_102_444_800uL
 private const val SELECTED_FILE = "selected-captioned.pdf"
 private const val SELECTED_CAPTION = "Selected constrained attachment"

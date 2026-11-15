@@ -10,9 +10,18 @@ name: reader-back
     direction: UP
 - tapOn: "Read More"
 - assertVisible:
-    id: "message-full-screen"
+    id: "composer-pill-surface"
+- scrollUntilVisible:
+    element:
+      text: "Maestro reader heading"
+    direction: UP
 - assertVisible: "Maestro reader heading"
-- back
-- assertNotVisible:
-    id: "message-full-screen"
+- longPressOn:
+    text: "Maestro reader heading"
+- assertVisible: "Show less"
+- tapOn: "Show less"
+- scrollUntilVisible:
+    element:
+      text: "Read More"
+    direction: DOWN
 - assertVisible: "Read More"

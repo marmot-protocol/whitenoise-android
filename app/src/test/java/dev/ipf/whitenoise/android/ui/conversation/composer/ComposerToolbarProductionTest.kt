@@ -245,6 +245,44 @@ class ComposerToolbarProductionTest {
     }
 
     @Test
+    fun alwaysExpandedEndShortcutsHugSendInLtr() = assertEndShortcutsHugSend(LayoutDirection.Ltr)
+
+    @Test
+    fun alwaysExpandedEndShortcutsHugSendInRtl() = assertEndShortcutsHugSend(LayoutDirection.Rtl)
+
+    /** The group beside Send ends at Send's own inset; spare row width belongs to the start group. */
+    private fun assertEndShortcutsHugSend(direction: LayoutDirection) {
+        render(
+            ComposerToolbarSettings(
+                listOf(
+                    ComposerShortcut.More,
+                    ComposerShortcut.Gallery,
+                    ComposerShortcut.Emoji,
+                    ComposerShortcut.Camera,
+                ),
+                ComposerToolbarLayout.AlwaysExpanded,
+                rightShortcuts = setOf(ComposerShortcut.Emoji, ComposerShortcut.Camera),
+            ),
+            value = TextFieldValue("hello"),
+            direction = direction,
+        )
+        val send =
+            composeRule.onNodeWithContentDescription(context.getString(R.string.send)).fetchSemanticsNode().boundsInRoot
+        val endGroup =
+            if (direction == LayoutDirection.Ltr) listOf("emoji", "camera") else listOf("more", "gallery")
+        val bounds =
+            endGroup.map { composeRule.onNodeWithTag("composer.shortcut.$it").fetchSemanticsNode().boundsInRoot }
+        val gap =
+            if (direction == LayoutDirection.Ltr) {
+                send.left - bounds.maxOf { it.right }
+            } else {
+                bounds.minOf { it.left } - send.right
+            }
+        val limit = with(composeRule.density) { 12.dp.toPx() }
+        assertTrue("end shortcuts sit beside Send, gap was ${gap}px", gap in 0f..limit)
+    }
+
+    @Test
     fun manyShortcutsWrapWithoutOverlappingTheEditorInRtl() {
         extraInventory = true
         render(

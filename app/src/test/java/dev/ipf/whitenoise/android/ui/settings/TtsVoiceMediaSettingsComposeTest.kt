@@ -50,6 +50,7 @@ class TtsVoiceMediaSettingsComposeTest {
                             checked = false,
                             onCheckedChange = { changed = it },
                             subtitle = app.getString(R.string.tts_media_mix_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
                         )
                     }
                 }
@@ -73,6 +74,7 @@ class TtsVoiceMediaSettingsComposeTest {
                             checked = true,
                             onCheckedChange = {},
                             subtitle = app.getString(R.string.tts_media_mix_subtitle),
+                            leading = { SettingsLeadingIcon(R.drawable.ic_volume_up) },
                         )
                     }
                 }

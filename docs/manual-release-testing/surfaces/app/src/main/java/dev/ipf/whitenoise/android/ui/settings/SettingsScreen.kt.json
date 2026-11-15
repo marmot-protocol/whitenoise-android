@@ -70,14 +70,6 @@
         ]
       },
       {
-        "surface": "SettingsHubIcon",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "fun SettingsHubIcon(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "SettingsHubSection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsHubSection(",

@@ -12,7 +12,7 @@ class AccountSwitchPerformanceCoverageTest {
     @Test
     fun everyEmittedStageHasAPhase() {
         val sources =
-            listOf("AppState.kt", "Controllers.kt", "AccountSwitchLocalSnapshot.kt")
+            listOf("AppState.kt", "ChatsController.kt", "ConversationController.kt", "AccountSwitchLocalSnapshot.kt")
                 .joinToString("\n") { File(STATE_SOURCE_DIR, it).readText() }
         val emitted =
             STAGE_CALL.findAll(sources).map { it.groupValues[1] }.toSet() +

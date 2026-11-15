@@ -2,13 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.speech.tts.TextToSpeech
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import java.util.Locale
 
 /** Shared production-row fixture for paint and viewport tests, without a second bubble implementation. */
@@ -17,8 +14,6 @@ internal class PaintTimelineRow(
     private val appState: WhiteNoiseAppState,
     private val sentenceLayouts: ConversationTtsSentenceLayoutRegistry,
 ) {
-    private val composerTextState = ComposerTextState(TextFieldValue(""))
-
     @Composable
     @Suppress("FunctionNaming", "LongMethod")
     fun Render(
@@ -30,7 +25,6 @@ internal class PaintTimelineRow(
             item = item,
             controller = controller,
             appState = appState,
-            composerTextState = composerTextState,
             highlighted = false,
             selectionMode = false,
             textSelectionMode = false,
@@ -51,10 +45,6 @@ internal class PaintTimelineRow(
             onActionMenuOpenChange = {},
             onQuickReactionsSave = {},
             onReplyPreviewClick = {},
-            composerGate = ComposerGate.COMPOSER,
-            onBack = {},
-            mentionCandidates = emptyList(),
-            mentionPickerEnabled = false,
             showSenderName = false,
             showSenderAvatar = false,
             collapseLongMessages = collapseLongMessages,

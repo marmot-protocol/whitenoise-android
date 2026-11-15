@@ -56,7 +56,9 @@ class LoadFailurePlacementTest {
                 File("app/src/main/java/dev/ipf/whitenoise/android"),
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
-        val controllers = File(sourceRoot, "state/Controllers.kt").readText()
+        val controllers =
+            File(sourceRoot, "state/ChatsController.kt").readText() +
+                "\n" + File(sourceRoot, "state/ConversationController.kt").readText()
         val shell = File(sourceRoot, "ui/navigation/MainShell.kt").readText()
 
         assertTrue(controllers.countOccurrences("terminalLoadFailure = true") >= 2)
@@ -75,7 +77,7 @@ class LoadFailurePlacementTest {
                 File("app/src/main/java/dev/ipf/whitenoise/android"),
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
-        val controllers = File(sourceRoot, "state/Controllers.kt").readText()
+        val controllers = File(sourceRoot, "state/ConversationController.kt").readText()
         val screen = File(sourceRoot, "ui/conversation/ConversationScreen.kt").readText()
         val failureResolutionStart = "private fun discardInitialTimelineSeedForFailure"
         val failureResolutionEnd = "private fun publishAuthoritativeEmptyInitialTimeline"
@@ -133,7 +135,7 @@ class LoadFailurePlacementTest {
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
         val runStart =
-            File(sourceRoot, "state/Controllers.kt")
+            File(sourceRoot, "state/ConversationController.kt")
                 .readText()
                 .substringAfter("private suspend fun runStart(account: String)")
                 .substringBefore("private fun discardInitialTimelineSeedForFailure")
