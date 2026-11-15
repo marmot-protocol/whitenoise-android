@@ -149,6 +149,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.withPrimaryClipForPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
+import dev.ipf.whitenoise.android.ui.conversation.ConversationMorphAnchor
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
@@ -159,6 +160,7 @@ import dev.ipf.whitenoise.android.ui.navigation.composerFabGrip
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -1417,7 +1419,13 @@ internal fun ComposerPill(
                         strokeColor = sourceBorder,
                     ).first
             } else {
-                Modifier
+                // Composer settings open from this outline and fold back into it.
+                Modifier.settingsMorphAnchorOutline(
+                    ConversationMorphAnchor.Composer,
+                    RoundedCornerShape(24.dp),
+                    sourceBorder,
+                    ComposerOutlineThickness,
+                )
             }
         Surface(
             color = if (morphing) Color.Transparent else sourceFill,

@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -65,6 +66,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.settings.settingsCardMorph
+import dev.ipf.whitenoise.android.ui.settings.settingsMorphAnchorOutline
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
@@ -245,7 +247,11 @@ internal fun ConversationTopBar(
                                     .heightIn(min = 48.dp)
                                     // Details unfold from this header and fold back into it.
                                     .settingsCardMorph(anchor = ConversationMorphAnchor.Details)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .settingsMorphAnchorOutline(
+                                        ConversationMorphAnchor.Details,
+                                        RoundedCornerShape(12.dp),
+                                        Color.Transparent,
+                                    ).clip(RoundedCornerShape(12.dp))
                                     // The reader speaks the chat name and member line, then offers Details.
                                     .clickable(
                                         onClickLabel = openDetailsDescription,

@@ -13,9 +13,13 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -25,12 +29,17 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_CLOSE_MILLIS
 import dev.ipf.whitenoise.android.ui.common.APP_MOTION_OPEN_MILLIS
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
+import kotlin.math.ceil
 
 internal const val SETTINGS_CARD_MORPH_MILLIS = APP_MOTION_OPEN_MILLIS
 
@@ -50,6 +59,7 @@ internal class SettingsCardMorph(
 ) {
     val page: SettingsPageMorph? = if (fullScreen) SettingsPageMorph() else null
     private val live = LinkedHashMap<Any, Rect>()
+    private val anchorOutlines = HashMap<SettingsMorphAnchor, SettingsContour>()
     private val pictures = HashMap<Any, Picture>()
     private var host = Rect.Zero
     private var from: List<SettingsMorphCard> = emptyList()
@@ -60,8 +70,8 @@ internal class SettingsCardMorph(
 
     /**
      * The control a whole route grows out of, such as a chat header. With an anchor on screen and no
-     * cards, that one shape fans out into every card of the next route; leaving those cards for a
-     * route that shows the anchor, they all fold back into it.
+     * cards, its one outline opens into the nearest group of the next route while the others arrive
+     * on their own; going back, that group folds into the outline again.
      */
     var anchor: SettingsMorphAnchor? = null
 
@@ -76,6 +86,12 @@ internal class SettingsCardMorph(
                 .map { it.key }
 
     private val anchorBounds: Rect? get() = anchor?.let(live::get)?.takeIf(::onScreen)
+
+    private val anchorContour: SettingsContour? get() = anchor?.let(anchorOutlines::get)?.takeIf { onScreen(it.bounds) }
+
+    init {
+        page?.anchorContour = { anchorContour }
+    }
 
     private val folding: Boolean get() = gather != null || (!fan && anchorBounds != null && cardTokens.isEmpty())
 
@@ -113,6 +129,18 @@ internal class SettingsCardMorph(
         bounds: Rect,
     ) {
         live[token] = bounds
+    }
+
+    /** The drawn outline of [anchor], which an opening route grows out of and a closing one folds into. */
+    internal fun reportAnchorOutline(
+        anchor: SettingsMorphAnchor,
+        contour: SettingsContour,
+    ) {
+        anchorOutlines[anchor] = contour
+    }
+
+    internal fun removeAnchorOutline(anchor: SettingsMorphAnchor) {
+        anchorOutlines.remove(anchor)
     }
 
     fun remove(token: Any) {
@@ -232,7 +260,7 @@ internal class SettingsCardMorph(
         forward: Boolean,
         animate: Boolean,
     ): Boolean {
-        if (forward && page?.pendingOrigin == null) page?.pendingOrigin = anchorBounds
+        if (forward && page?.pendingOrigin == null) page?.pendingOrigin = anchorContour?.bounds ?: anchorBounds
         val started = page?.begin(target, forward, animate, host, time()) == true
         from = emptyList()
         fan = false
@@ -300,6 +328,35 @@ internal fun Modifier.settingsCardMorph(anchor: SettingsMorphAnchor? = null): Mo
         positioned
             .graphicsLayer { applySettingsMorphTravel(morph.travel(token)) }
             .drawWithContent { if (morph.recording) drawAndRecord(morph.picture(token)) else drawContent() }
+    }
+}
+
+/**
+ * Reports the outline [anchor] draws, with its [shape], [color] and [width], so a route opens from
+ * that one outline and folds back into it. No effect outside a fullscreen route host.
+ */
+@Composable
+internal fun Modifier.settingsMorphAnchorOutline(
+    anchor: SettingsMorphAnchor,
+    shape: Shape,
+    color: Color,
+    width: Dp = 1.dp,
+): Modifier {
+    val morph = LocalSettingsCardMorph.current
+    if (morph?.page == null) return this
+    val view = LocalView.current
+    val density = LocalDensity.current
+    val direction = LocalLayoutDirection.current
+    DisposableEffect(morph, anchor) { onDispose { morph.removeAnchorOutline(anchor) } }
+    return onGloballyPositioned { coordinates ->
+        val bounds = coordinates.settingsMorphBounds(view)
+        val corners =
+            when (val outline = shape.createOutline(bounds.size, direction, density)) {
+                is Outline.Rounded -> outline.roundRect
+                else -> RoundRect(Rect(Offset.Zero, bounds.size))
+            }
+        val stroke = with(density) { ceil(width.toPx()) }
+        morph.reportAnchorOutline(anchor, SettingsContour(bounds, corners, bounds, color, stroke))
     }
 }
 

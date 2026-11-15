@@ -78,6 +78,9 @@ internal class SettingsPageMorph {
     private val returnTargets = mutableMapOf<Any?, ReturnTarget>()
     private val routeGroupKeys = mutableMapOf<Any?, MutableMap<Any, Int>>()
     private var nextGroupKey = 1
+
+    // A route opened from an anchor keeps one key for it, so its saved group keys still pair on reopening.
+    private val anchorGroupKeys = mutableMapOf<Any?, Int>()
     private var correspondenceKey: Int? = null
     private var sourceContours: List<SettingsContour> = emptyList()
     private var targetContours: List<SettingsContour>? = null
@@ -89,8 +92,8 @@ internal class SettingsPageMorph {
     private var outgoingTarget: Any? = null
     private var origin: Rect? = null
 
-    // An anchor-only source, such as a chat header or composer, has no outlined groups to travel from.
-    private var fanOrigin: Rect? = null
+    /** The live outline of the control an anchor-only route, such as a chat, opens from. */
+    internal var anchorContour: (() -> SettingsContour?)? = null
     private var exitStart = 1f
     private var entryStart = 0f
     private var entryOnly = false
@@ -163,22 +166,21 @@ internal class SettingsPageMorph {
             cancel()
             return false
         }
-        targetContours = native
-        // Every destination group grows out of the anchor, as Settings groups grow out of the source card.
-        fanOrigin?.let { anchor ->
-            sourceContours =
-                native.map {
-                    it.copy(
-                        bounds = anchor,
-                        corners = RoundRect(anchor, it.corners.topLeftCornerRadius),
-                        viewport = transitionHost,
-                        seams = emptyList(),
-                        rows = emptyList(),
-                    )
-                }
-        }
+        targetContours = closingTarget(native)
         return true
     }
+
+    /** Closing to a route without groups folds into the outline it opened from, when that is on screen. */
+    private fun closingTarget(native: List<SettingsContour>?): List<SettingsContour>? =
+        if (opening || native?.isEmpty() != true) {
+            native
+        } else {
+            anchorContour
+                ?.invoke()
+                ?.takeIf { it.bounds.validIn(transitionHost) }
+                ?.let { listOf(it.copy(key = correspondenceKey ?: 0, viewport = transitionHost)) }
+                ?: native
+        }
 
     internal fun outgoingPresence(time: Float): Float =
         if (!active || entryOnly) {
@@ -252,6 +254,14 @@ internal class SettingsPageMorph {
                 !host.isEmpty &&
                 current != null &&
                 (selected?.validIn(host) == true || (!forward && returnPoint != null) || interrupted)
+        // An anchor-only route contributes its one real outline; it pairs with one destination group.
+        val anchorSource =
+            anchorContour
+                ?.takeIf { forward && eligible && current?.isEmpty() == true }
+                ?.invoke()
+                ?.takeIf { it.bounds.validIn(host) }
+                ?.copy(key = anchorGroupKeys.getOrPut(next) { nextGroupKey++ }, viewport = host)
+        if (anchorSource != null) correspondenceKey = anchorSource.key
         if (forward) {
             if (eligible &&
                 selected?.validIn(host) == true
@@ -273,7 +283,7 @@ internal class SettingsPageMorph {
             leaving = settled.takeIf { settledInputs == captureInputs?.invoke() }
             outgoingTarget = target
         }
-        sourceContours = current.orEmpty()
+        sourceContours = anchorSource?.let(::listOf) ?: current.orEmpty()
         targetContours = null
         rebaseTime = 0f
         settled = null
@@ -286,11 +296,10 @@ internal class SettingsPageMorph {
                 1f
             }
         entryStart = if (returnsToVisibleParent) oldExit else 0f
-        entryOnly = returnsToVisibleParent || (leaving == null && sourceContours.isEmpty())
+        entryOnly = returnsToVisibleParent || (leaving == null && current.isNullOrEmpty())
         if (returnsToVisibleParent) leaving = null
         val anchor = selected ?: returnPoint?.let { Rect(it, it) } ?: host
         origin = anchor.takeIf { eligible }
-        fanOrigin = selected?.takeIf { forward && eligible && sourceContours.isEmpty() && it.validIn(host) }
         transitionHost = host
         target = next
         opening = forward
@@ -371,7 +380,6 @@ internal class SettingsPageMorph {
 
     fun finish() {
         origin = null
-        fanOrigin = null
         leaving = null
         sourceContours = emptyList()
         targetContours = null
@@ -385,6 +393,7 @@ internal class SettingsPageMorph {
         clearPictures()
         returnTargets.clear()
         routeGroupKeys.clear()
+        anchorGroupKeys.clear()
         correspondenceKey = null
     }
 
@@ -478,11 +487,12 @@ internal class SettingsPageMorph {
         host: Rect,
         time: Float,
     ) {
-        if (targetContours != null && targetContours != native) {
+        val end = closingTarget(native)
+        if (targetContours != null && targetContours != end) {
             // All layout callbacks precede drawing; one coherent measured batch updates the target.
             sourceContours = renderedContours(time)
             rebaseTime = time.coerceIn(0f, 1f)
-            targetContours = native
+            targetContours = end
         }
         // Body ink is revealed in place after the contour has nearly settled. No old route
         // picture travels with the outline or covers the destination's fixed header.

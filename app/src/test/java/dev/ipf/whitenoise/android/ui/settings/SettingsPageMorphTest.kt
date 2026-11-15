@@ -102,24 +102,73 @@ class SettingsPageMorphTest {
         assertEquals(second, parent.renderedContours(1f).single().bounds)
     }
 
-    @Test fun anchorWithoutSourceGroupsGrowsEveryDestinationGroupFromItAtFullPresence() {
-        val anchor = Rect(16f, 8f, 344f, 56f)
-        val page = SettingsPageMorph()
-        page.begin("conversation", true, false, host)
+    private val anchor = Rect(16f, 8f, 344f, 56f)
+
+    private fun anchorOutline(bounds: Rect = anchor) =
+        SettingsContour(bounds, RoundRect(Rect(0f, 0f, bounds.width, bounds.height), 12f, 12f), bounds, Color.Red, 2f)
+
+    private fun openedFromAnchor(outline: () -> SettingsContour? = { anchorOutline() }): SettingsPageMorph =
+        SettingsPageMorph().also { page ->
+            page.anchorContour = outline
+            page.begin("conversation", true, false, host)
+            page.pendingOrigin = anchor
+            assertTrue(page.begin("details", true, true, host))
+            reportGroup(page, first)
+            reportGroup(page, second)
+            assertTrue(page.admitDestination())
+        }
+
+    @Test fun anchorOutlineOpensOnceIntoTheNearestGroupWhileOthersArriveSeparately() {
+        val page = openedFromAnchor()
+        val start = page.renderedContours(0f)
+        assertEquals(anchor, start.single().bounds)
+        assertEquals(Color.Red, start.single().color)
+        assertEquals(2f, start.single().width, 0f)
+        val selectedKey = page.renderedContours(1f).first { it.bounds == first }.key
+        assertEquals(start.single().key, selectedKey)
+        for (time in listOf(0.05f, 0.3f, 0.6f, 0.9f)) {
+            val frame = page.renderedContours(time)
+            val selected = frame.single { it.key == selectedKey }
+            assertEquals(lerp(anchor, first, AppMotionOpenEasing.transform(time)), selected.bounds)
+            // Only one outline leaves the anchor; the other group never duplicates it.
+            assertTrue(frame.none { it.key != selectedKey && it.bounds == selected.bounds })
+        }
+        assertEquals(listOf(first, second), page.renderedContours(1f).map { it.bounds })
+    }
+
+    @Test fun backFoldsIntoTheAnchorOutline() {
+        val page = openedFromAnchor()
+        page.finish()
+        assertTrue(page.begin("conversation", false, true, host))
+        assertTrue(page.admitDestination())
+        val end = page.renderedContours(1f)
+        assertEquals(anchor, end.single().bounds)
+        assertEquals(Color.Red, end.single().color)
+        assertEquals(
+            12f,
+            end
+                .single()
+                .corners.topLeftCornerRadius.x,
+            0f,
+        )
+    }
+
+    @Test fun reopeningFromTheAnchorPairsWithTheSameGroup() {
+        val page = openedFromAnchor()
+        page.finish()
+        page.begin("conversation", false, false, host)
         page.pendingOrigin = anchor
         assertTrue(page.begin("details", true, true, host))
         reportGroup(page, first)
         reportGroup(page, second)
         assertTrue(page.admitDestination())
-        for (time in listOf(0.05f, 0.3f, 0.6f, 0.9f)) {
-            val frame = page.renderedContours(time)
-            assertEquals(
-                listOf(first, second).map { lerp(anchor, it, AppMotionOpenEasing.transform(time)) },
-                frame.map { it.bounds },
-            )
-            frame.forEach { assertEquals(1f, it.color.alpha, 0f) }
-        }
-        assertEquals(listOf(first, second), page.renderedContours(1f).map { it.bounds })
+        val key = page.renderedContours(0f).single().key
+        assertEquals(first, page.renderedContours(1f).single { it.key == key }.bounds)
+    }
+
+    @Test fun offscreenAnchorOutlineLeavesTheOpeningWithoutDuplicates() {
+        val page = openedFromAnchor { anchorOutline(Rect(16f, -200f, 344f, -150f)) }
+        for (time in listOf(0f, 0.3f)) assertTrue(page.renderedContours(time).none { it.bounds.top < 0f })
     }
 
     @Test fun selectedOutlineStaysOpaqueWhilePeersShrinkFadeAndRemainSeparate() {
