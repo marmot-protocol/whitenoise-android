@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerActions.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Mark all read, mark unread and pin run through one admission check, account recheck and failure path",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerActions.kt",
+        "anchor": "internal suspend fun <T> ChatsController.runAdmittedChatListAction(",
+        "test_ids": [
+          "CHL-006",
+          "CHL-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

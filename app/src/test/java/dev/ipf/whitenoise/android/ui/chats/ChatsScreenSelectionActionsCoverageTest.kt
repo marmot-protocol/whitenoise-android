@@ -204,7 +204,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         val batch =
             source.requiredSection(
                 "internal suspend fun runChatListBatch(",
-                "private suspend fun applyChatListBatchCommand(",
+                "internal suspend fun reconcileChatListBatch(",
             )
         assertTrue(
             "admission is single flight",

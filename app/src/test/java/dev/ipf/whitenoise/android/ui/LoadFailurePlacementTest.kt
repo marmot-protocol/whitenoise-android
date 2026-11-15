@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationSearchPageDirection
 import dev.ipf.whitenoise.android.state.conversationLoadFailureEdge
@@ -57,7 +58,7 @@ class LoadFailurePlacementTest {
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
         val controllers =
-            File(sourceRoot, "state/ChatsController.kt").readText() +
+            chatsControllerSource() +
                 "\n" + File(sourceRoot, "state/ConversationController.kt").readText()
         val shell = File(sourceRoot, "ui/navigation/MainShell.kt").readText()
 
