@@ -1276,6 +1276,7 @@ dependencies {
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.tracing)
     implementation(libs.okhttp)
+    implementation(libs.jsoup)
     // One profile is generated from the authenticated dev/zapstore fixture and
     // merged into main for every release consumer. Select that producer
     // configuration explicitly so staging/play/production consumers do not
