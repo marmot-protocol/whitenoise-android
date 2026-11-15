@@ -91,15 +91,15 @@ private suspend fun createOrRecoverNewGroup(
         }
         submission
             .createWith { name, members, options ->
-                appState.marmotIo {
-                    owner.ensureCurrent()
-                    createGroupWithOptions(account, name, members, options)
-                }.let { result ->
-                    val groupId = result.requireCreatedGroupId()
-                    owner.ensureCurrent()
-                    owner.skippedMembers = result.memberOutcomes.skippedGroupMembersDetail(appState::displayName)
-                    groupId
-                }
+                val result =
+                    appState.marmotIo {
+                        owner.ensureCurrent()
+                        createGroupWithOptions(account, name, members, options)
+                    }
+                val groupId = result.requireCreatedGroupId()
+                owner.ensureCurrent()
+                owner.skippedMembers = result.memberOutcomes.skippedGroupMembersDetail(appState::displayName)
+                groupId
             }.also {
                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                 if (owner.isCurrent()) {
@@ -244,7 +244,10 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
 }
 
 /** Shows the skipped-recipient report even when opening needed a projection retry. */
-private fun createdGroupNoticeTitle(showCreatedToast: Boolean, skipped: AppText?): Int? =
+private fun createdGroupNoticeTitle(
+    showCreatedToast: Boolean,
+    skipped: AppText?,
+): Int? =
     when {
         skipped != null -> R.string.toast_couldnt_add_members
         showCreatedToast -> R.string.toast_chat_created

@@ -25,8 +25,9 @@ internal fun groupMemberSelectionFailure(outcomes: List<MemberResolutionOutcomeF
 }
 
 /** An absent group ID means the submitted nonempty selection produced no commit. */
-internal fun GroupCreationResultFfi.requireCreatedGroupId(): String =
-    groupIdHex ?: throw groupMemberSelectionFailure(memberOutcomes)
+internal fun GroupCreationResultFfi.requireCreatedGroupId(): String {
+    return groupIdHex ?: throw groupMemberSelectionFailure(memberOutcomes)
+}
 
 /** Reports the skipped recipients using the existing add-members feedback. */
 internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMembersDetail(displayName: (String) -> String): AppText? =
