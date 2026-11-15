@@ -242,6 +242,30 @@ class NotificationPreviewPreferencesTest {
             assertEquals(2, scrubs)
         }
 
+    /** Name-only keeps only cards stamped without message text, so a full card from an earlier process stays hidden. */
+    @Test
+    fun nameOnlyRetainsOnlyCardsPreparedWithoutMessageText() =
+        runBlocking {
+            assertTrue(
+                NotificationPreviewPreferences.setMode(context, NotificationPreviewMode.NAME_ONLY, scrub = { true }),
+            )
+            val current = NotificationPreviewPreferences.capture(context)
+            val earlierFull = current.copy(session = "earlier-process", messageText = true)
+            assertFalse(NotificationPreviewPreferences.canRetainPreview(context, stampedCard(earlierFull)))
+            assertTrue(NotificationPreviewPreferences.canRetainPreview(context, stampedCard(current)))
+            val unstamped =
+                androidx.core.app.NotificationCompat
+                    .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+                    .build()
+            assertFalse(NotificationPreviewPreferences.canRetainPreview(context, unstamped))
+        }
+
+    private fun stampedCard(token: NotificationPreviewToken) =
+        androidx.core.app.NotificationCompat
+            .Builder(context, NotificationChannelSpec.GROUP_MESSAGES.id)
+            .also { NotificationPreviewPreferences.stamp(it, token, correction = false) }
+            .build()
+
     private fun interceptCommits(commit: (SharedPreferences.Editor) -> Boolean): Context =
         object : ContextWrapper(context) {
             override fun getApplicationContext(): Context = this

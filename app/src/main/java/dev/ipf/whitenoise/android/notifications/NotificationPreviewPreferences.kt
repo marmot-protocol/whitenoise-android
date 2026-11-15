@@ -49,6 +49,7 @@ internal object NotificationPreviewPreferences {
     const val EXTRA_ALLOWED = "dev.ipf.whitenoise.android.notify.preview_allowed"
     const val EXTRA_HIDDEN = "dev.ipf.whitenoise.android.notify.preview_hidden"
     const val EXTRA_CORRECTION = "dev.ipf.whitenoise.android.notify.preview_correction"
+    const val EXTRA_MESSAGE_TEXT = "dev.ipf.whitenoise.android.notify.preview_message_text"
     private const val CLEANUP_TIMEOUT_MS = 25_000L
     private val writes = Mutex()
     private val stateLock = Any()
@@ -113,6 +114,7 @@ internal object NotificationPreviewPreferences {
                 putLong(EXTRA_REVISION, token.revision)
                 putBoolean(EXTRA_ALLOWED, token.allowed)
                 putBoolean(EXTRA_CORRECTION, correction)
+                putBoolean(EXTRA_MESSAGE_TEXT, token.messageText)
             },
         )
     }
@@ -207,14 +209,13 @@ internal object NotificationPreviewPreferences {
         notification: Notification,
     ): Boolean {
         val token = capture(context)
-        if (
-            !token.allowed ||
-            notification.extras.getBoolean(EXTRA_HIDDEN) ||
-            notification.extras.getBoolean(EXTRA_CONTENT_REDACTED)
-        ) {
+        val extras = notification.extras
+        // Revisions restart with each process, so only the card's own stamp shows it was prepared without text.
+        val textAllowed = token.messageText || !extras.getBoolean(EXTRA_MESSAGE_TEXT, true)
+        val redacted = extras.getBoolean(EXTRA_HIDDEN) || extras.getBoolean(EXTRA_CONTENT_REDACTED)
+        if (!token.allowed || !textAllowed || redacted) {
             return false
         }
-        val extras = notification.extras
         val legacy = token.revision == 0L && !extras.containsKey(EXTRA_SESSION)
         val allowedEpoch = extras.getBoolean(EXTRA_ALLOWED) && extras.getLong(EXTRA_REVISION, -1L) == token.revision
         return legacy || allowedEpoch
