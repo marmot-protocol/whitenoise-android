@@ -399,10 +399,12 @@ class AppStateSendLockCoverageTest {
     @Test
     fun markLatestVisibleReadDeadPathStaysDeleted() {
         val source = conversationControllerSource()
+        val declaration = Regex("""\bfun\s+(?:\w+\.)?markLatestVisibleRead\s*\(""")
 
+        assertTrue(declaration.containsMatchIn("internal fun ConversationController.markLatestVisibleRead()"))
         assertFalse(
             "markLatestVisibleRead zeroes unread state from a stale open-chat path and should stay deleted",
-            Regex("""\bfun\s+markLatestVisibleRead\s*\(""").containsMatchIn(source),
+            declaration.containsMatchIn(source),
         )
     }
 
