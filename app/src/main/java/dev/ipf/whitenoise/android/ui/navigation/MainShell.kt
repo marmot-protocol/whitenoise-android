@@ -797,16 +797,18 @@ internal fun MainShell(
     // doesn't contend with the conversation's own streams on the heaviest nav
     // path. The subscription keeps draining updates into the controller's maps
     // throughout; one recompute flushes on return.
-    // Search focus returns when the conversation closes. Widening beside an open chat is not a return.
-    LaunchedEffect(chatsController, selectedChat == null) {
-        if (selectedChat == null) globalSearch.viewport.selection.onConversationReturned()
-    }
     LaunchedEffect(chatsController, selectedChat == null || twoPane) {
         val listVisible = selectedChat == null || twoPane
         chatsController.setChatListVisible(listVisible)
         if (listVisible) {
             chatListReturnHeadSnap = onChatListBecameVisible(chatListReturnHeadSnap)
         }
+    }
+    // Search focus returns when the conversation closes. Widening beside an open chat, or
+    // switching chats beside the list, is not a return.
+    val conversationReturned = selectedChat == null && !(twoPane && pendingConversationOpen != null)
+    LaunchedEffect(chatsController, conversationReturned) {
+        if (conversationReturned) globalSearch.viewport.selection.onConversationReturned()
     }
 
     LaunchedEffect(appState.pendingProfileNpub) {
@@ -1800,8 +1802,9 @@ internal fun MainShell(
     // tapped one prepares, instead of flashing the empty pane between them.
     val twoPaneRetainedContent =
         accountOwnedExitingConversationContent.takeIf { twoPane && accountOwnedPendingConversationOpen != null }
-    // The open conversation beside the list owns the one player bar.
-    val conversationBesideList = twoPane && (selectedChat != null || twoPaneRetainedContent != null)
+    // The open or closing conversation beside the list owns the one player bar.
+    val conversationBesideList =
+        twoPane && (selectedChat != null || accountOwnedExitingConversationContent != null)
     // The rendered Chats slot keeps its player during preparation and while AnimatedContent exits it.
     // Promoting a pending tap to the shell would move the player above the account picker for one frame.
     val playbackInChatList = section == MainSection.Chats
