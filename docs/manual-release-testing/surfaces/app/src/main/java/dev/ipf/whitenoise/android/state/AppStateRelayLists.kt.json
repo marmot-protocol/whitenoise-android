@@ -1,0 +1,90 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+  "legacy_sha256": "976415f765e92f80409c2efb69da32dfe05ba31e41a586a6aae554e942afdec7",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:no_active_account_period",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.no_active_account_period",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:no_relay_projection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.no_relay_projection",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:toast_relay_update_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.toast_relay_update_failed",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "setting:error_couldnt_verify_relay_hosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.error_couldnt_verify_relay_hosts",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_relay_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.error_invalid_relay_url",
+        "test_ids": [
+          "SYS-002"
+        ]
+      },
+      {
+        "surface": "setting:error_remove_invalid_relay_urls_first",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.error_remove_invalid_relay_urls_first",
+        "test_ids": [
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "setting:toast_relay_list_updated",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.toast_relay_list_updated",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "setting:toast_relay_update_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "R.string.toast_relay_update_failed",
+        "test_ids": [
+          "SYS-003"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "account_relay_edit_addresses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRelayLists.kt",
+        "anchor": "private suspend fun WhiteNoiseAppState.loadRelayEditAddresses(",
+        "test_ids": [
+          "SYS-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

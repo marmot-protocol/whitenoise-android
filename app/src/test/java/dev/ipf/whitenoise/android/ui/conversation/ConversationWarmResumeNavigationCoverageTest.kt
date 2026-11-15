@@ -142,7 +142,7 @@ class ConversationWarmResumeNavigationCoverageTest {
         assertTrue(
             admissionProvider.contains("ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation"),
         )
-        assertTrue(admissionProvider.contains("lockVisible = controller.appState.appLockScreenVisible"))
+        assertTrue(admissionProvider.contains("lockVisible = controller.appState.appLock.screenVisible"))
         assertTrue(resume.contains("ConversationForegroundRestoreBinding.canPresentRetainedFrame("))
         assertTrue(binding.contains("currentPresentationSafe && (paused == null || paused.owner === currentOwner)"))
         assertTrue(binding.contains("if (!retainedPresentationSafe || !timelineMeasured) return false"))

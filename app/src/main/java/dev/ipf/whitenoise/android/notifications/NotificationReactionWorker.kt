@@ -102,7 +102,7 @@ class NotificationReactionWorker(
     ): Result {
         val actionsAllowed =
             withContext(Dispatchers.Main.immediate) {
-                application.appState.notificationActionsAllowed
+                application.appState.appLock.notificationActionsAllowed
             }
         return when {
             !actionsAllowed -> lockedReactionResult(retryStore, retryKey)
@@ -144,7 +144,7 @@ class NotificationReactionWorker(
         val sendAttempt =
             withContext(Dispatchers.Main.immediate) {
                 attemptNotificationReactionSend(
-                    notificationActionsAllowed = { application.appState.notificationActionsAllowed },
+                    notificationActionsAllowed = { application.appState.appLock.notificationActionsAllowed },
                     sendReaction = {
                         application.appState.sendNotificationReaction(
                             accountRef = input.action.target.accountRef,

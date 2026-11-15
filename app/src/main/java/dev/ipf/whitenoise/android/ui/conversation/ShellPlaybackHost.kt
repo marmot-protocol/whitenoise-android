@@ -20,7 +20,7 @@ internal class ShellPlaybackHost(
         val destination = appState.currentPlaybackConversationDestination() ?: return
         val navigate = {
             val current = destination.matchesPlaybackSession(appState.currentPlaybackConversationDestination())
-            if (current && !appState.appLockScreenVisible) {
+            if (current && !appState.appLock.screenVisible) {
                 beforeNavigate()
                 openSource()
             }

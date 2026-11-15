@@ -231,7 +231,7 @@ internal fun widgetUnlocked(
     keyguard: KeyguardManager?,
 ): Boolean {
     if (state == null) return false
-    val appUnlocked = !state.appLockScreenVisible && !state.requireAppUnlock && !state.appUnlockEvaluationPending
+    val appUnlocked = !state.appLock.screenVisible && !state.appLock.required && !state.appLock.evaluationPending
     return appUnlocked && keyguard?.isDeviceLocked == false
 }
 

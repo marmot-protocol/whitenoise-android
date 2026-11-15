@@ -89,7 +89,7 @@ class NotificationReplyWorker(
             }
             null -> Unit
         }
-        if (!application.appState.notificationActionsAllowed) {
+        if (!application.appState.appLock.notificationActionsAllowed) {
             if (BuildConfig.DEBUG) Log.w(TAG, "reply blocked by app lock group=${action.target.groupIdHex.take(8)}")
             if (containsLegacyPlaintext) {
                 return Result.failure().also { retryStore.clear(retryKey) }

@@ -212,7 +212,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
             "directProfiles + topBarProfiles" in snapshot,
         )
         val seedProjection =
-            source
+            source("state/AccountSwitcherPresentation.kt")
+                .readText()
                 .substringAfter("internal fun accountSwitchProfileSeedIds(")
                 .substringBefore("/**")
         assertTrue(

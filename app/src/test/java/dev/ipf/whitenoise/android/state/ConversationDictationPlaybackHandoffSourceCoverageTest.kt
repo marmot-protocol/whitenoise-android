@@ -12,7 +12,7 @@ class ConversationDictationPlaybackHandoffSourceCoverageTest {
         assertTrue(appState.contains("conversationDictation.interruptForAudioFocusLoss()"))
         assertTrue(
             appState.contains(
-                "writeConversationDictationDraftWhenUnlocked(appLockScreenVisible, appUnlockEvaluationPending)",
+                "writeConversationDictationDraftWhenUnlocked(appLock.screenVisible, appLock.evaluationPending)",
             ),
         )
         assertTrue(appState.contains("initializedConversationDictation()?.onAppForegrounded()"))
