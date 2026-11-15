@@ -791,12 +791,14 @@ class SettingsPageMorphHostTest {
         lateinit var host: Rect
         rule.setContent {
             Box(
-                Modifier.fillMaxSize().drawWithContent {
-                    host = Rect(0f, 0f, size.width, size.height)
-                    page.reportViewport(viewport, host)
-                    reportUnoutlinedBody(page, viewport, group, body)
-                    with(page) { draw(host, time.value, true, Color.Black) }
-                }.drawWithContent { drawRect(if (child.value) Color.Blue else Color.Red) },
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        host = Rect(0f, 0f, size.width, size.height)
+                        page.reportViewport(viewport, host)
+                        reportUnoutlinedBody(page, viewport, group, body)
+                        with(page) { draw(host, time.value, true, Color.Black) }
+                    }.drawWithContent { drawRect(if (child.value) Color.Blue else Color.Red) },
             )
         }
         rule.onRoot().captureToImage()
@@ -831,7 +833,11 @@ class SettingsPageMorphHostTest {
 
     @Test fun uncapturedIncomingBodySettlesOnForward() = assertInterruptedBodySettles(0.84f, true, false)
 
-    private fun assertInterruptedBodySettles(interruption: Float, forward: Boolean, capture: Boolean) {
+    private fun assertInterruptedBodySettles(
+        interruption: Float,
+        forward: Boolean,
+        capture: Boolean,
+    ) {
         val page = SettingsPageMorph()
         val time = mutableStateOf(1f)
         val color = mutableStateOf(Color.Red)
@@ -841,12 +847,14 @@ class SettingsPageMorphHostTest {
         lateinit var host: Rect
         rule.setContent {
             Box(
-                Modifier.fillMaxSize().drawWithContent {
-                    host = Rect(0f, 0f, size.width, size.height)
-                    page.reportViewport(viewport, host)
-                    reportUnoutlinedBody(page, viewport, group, body)
-                    with(page) { draw(host, time.value, capture, Color.Black) }
-                }.drawWithContent { drawRect(color.value) },
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        host = Rect(0f, 0f, size.width, size.height)
+                        page.reportViewport(viewport, host)
+                        reportUnoutlinedBody(page, viewport, group, body)
+                        with(page) { draw(host, time.value, capture, Color.Black) }
+                    }.drawWithContent { drawRect(color.value) },
             )
         }
         rule.onRoot().captureToImage()
@@ -890,6 +898,7 @@ class SettingsPageMorphHostTest {
         val source = Rect(16f, 100f, 344f, 300f)
         val group = Any()
         lateinit var host: Rect
+
         fun report(bounds: Rect) {
             page.reportDestination(
                 group,
@@ -897,7 +906,8 @@ class SettingsPageMorphHostTest {
                     group,
                     "parent",
                     bounds,
-                    androidx.compose.ui.geometry.RoundRect(Rect(0f, 0f, bounds.width, bounds.height), 20f, 20f),
+                    androidx.compose.ui.geometry
+                        .RoundRect(Rect(0f, 0f, bounds.width, bounds.height), 20f, 20f),
                     Color.Black,
                     Color.White,
                     true,
@@ -907,16 +917,22 @@ class SettingsPageMorphHostTest {
         }
         rule.setContent {
             Box(
-                Modifier.fillMaxSize().drawWithContent {
-                    host = Rect(0f, 0f, size.width, size.height)
-                    if (!page.active) report(source)
-                    with(page) { draw(host, time.value, true, Color.Black) }
-                }.background(Color.Red),
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        host = Rect(0f, 0f, size.width, size.height)
+                        if (!page.active) report(source)
+                        with(page) { draw(host, time.value, true, Color.Black) }
+                    }.background(Color.Red),
             )
         }
         rule.onRoot().captureToImage()
         rule.runOnIdle {
-            val moved = source.translate(androidx.compose.ui.geometry.Offset(0f, -60f))
+            val moved =
+                source.translate(
+                    androidx.compose.ui.geometry
+                        .Offset(0f, -60f),
+                )
             report(moved)
             if (changeInputs) inputs++
             page.pendingOrigin = source
