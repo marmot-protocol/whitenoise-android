@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.group
 
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -9,7 +10,7 @@ class GroupDetailsPushDebugCoverageTest {
     @Test
     fun developerModeLoadsGroupPushDiagnosticsThroughController() {
         val screen = groupDetailsSource().readText()
-        val controller = controllersSource().readText()
+        val controller = conversationControllerSource()
 
         assertTrue(
             "group details must load push diagnostics only from the developer-mode refresh path",
@@ -97,11 +98,4 @@ class GroupDetailsPushDebugCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing GroupDetailsScreen.kt source file")
-
-    private fun controllersSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-        ).firstOrNull { it.exists() }
-            ?: error("Missing ConversationController.kt source file")
 }

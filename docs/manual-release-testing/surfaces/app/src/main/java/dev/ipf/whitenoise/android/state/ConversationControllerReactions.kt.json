@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerReactions.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Reaction mutation rejected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerReactions.kt",
+        "anchor": "R.string.toast_reaction_failed",
+        "test_ids": [
+          "MSG-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
