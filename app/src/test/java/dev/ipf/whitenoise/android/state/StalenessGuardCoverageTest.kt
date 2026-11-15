@@ -588,10 +588,16 @@ class StalenessGuardCoverageTest {
             "DirectChatResolution.kt",
         ).associateWith(::productionSource)
 
+    /** Loads one production source; split controllers include their topic files. */
+    private fun productionSource(fileName: String): String =
+        when (fileName) {
+            "ChatsController.kt" -> chatsControllerSource()
+            "ConversationController.kt" -> conversationControllerSource()
+            else -> packageSource(fileName)
+        }
+
     /** Locates one production source from either the module or repository working directory. */
-    private fun productionSource(fileName: String): String {
-        if (fileName == "ChatsController.kt") return chatsControllerSource()
-        if (fileName == "ConversationController.kt") return conversationControllerSource()
+    private fun packageSource(fileName: String): String {
         val packages =
             listOf(
                 "state",
