@@ -4,7 +4,6 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withPermit
 

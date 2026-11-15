@@ -10,7 +10,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 

@@ -10,7 +10,6 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.ui.chats.newchat.directChatPreferenceOrder
-import kotlinx.coroutines.flow.first
 
 internal fun ChatsController.foldGroup(
     record: AppGroupRecordFfi,

@@ -5,7 +5,6 @@ import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withPermit

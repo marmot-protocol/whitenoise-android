@@ -8,7 +8,6 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import java.util.Locale
 
