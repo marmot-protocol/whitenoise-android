@@ -87,6 +87,13 @@ internal class PersistentDisplayThumbnails(
         }
     }
 
+    /** Retires every pending producer before a deleted message's asynchronous disk cleanup is dispatched. */
+    fun retireMessagePending(attachmentKeyPrefix: String) {
+        synchronized(requestLock) {
+            retireSources { it.attachmentKey.startsWith(attachmentKeyPrefix, ignoreCase = true) }
+        }
+    }
+
     /** Matching removals and session teardown fence a reader or encoder; unrelated removals preserve it. */
     fun isCurrent(token: DisplayThumbnailToken): Boolean =
         token.admitted && invalidations.get() == 0 && token.lifetime == generation.get() && token.sourceCurrent()
@@ -149,15 +156,17 @@ internal class PersistentDisplayThumbnails(
         if (token.source != source || !isCurrent(token) || source.ciphertextTag.isBlank()) return null
         for (edge in thumbnailDecodeBuckets.filter { it >= requestedEdge }) {
             val key = slot(source, edge)
-            val bytes = disk.get(key) ?: continue
-            val entry = runCatching { decode(bytes, source, edge) }.getOrNull()
-            if (entry == null) {
-                synchronized(publicationLock) { disk.discardIfMatches(key, bytes) }
-                continue
+            val bytes = disk.get(key)
+            if (bytes != null) {
+                val entry = runCatching { decode(bytes, source, edge) }.getOrNull()
+                if (entry == null) {
+                    synchronized(publicationLock) { disk.discardIfMatches(key, bytes) }
+                } else {
+                    if (isCurrent(token)) return entry
+                    entry.bitmap.recycle()
+                    return null
+                }
             }
-            if (isCurrent(token)) return entry
-            entry.bitmap.recycle()
-            return null
         }
         return null
     }
@@ -330,6 +339,7 @@ internal class PersistentDisplayThumbnails(
     }
 
     /** Allocates pixels only after authenticating source identity and the requested decode ceiling. */
+    @Suppress("ReturnCount") // Each validation boundary rejects before allocating or publishing pixels.
     private fun decode(
         bytes: ByteArray,
         source: DisplayThumbnailSource,

@@ -18,6 +18,7 @@ internal val REMOVED_DISPLAY_THUMBNAIL_SOURCES =
         AttachmentTransferStateFfi.CLEANED_BY_SETTING,
     )
 private const val THUMBNAIL_RECONCILIATION_BATCH = 64
+private const val CACHE_TARGET_COMPONENTS = 3
 
 /** Requests cache maintenance outside rendering; concurrent lifecycle requests coalesce onto the current pass. */
 internal fun WhiteNoiseAppState.scheduleDisplayThumbnailReconciliation(): Job {
@@ -78,9 +79,10 @@ private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
                 engine.attachmentTransferSnapshot(account, groupIdHex, resolved.map { it.second.toFfi() })
             }
         }.getOrNull()?.items ?: return
-    if (states.size != resolved.size) return
-    resolved.indices.filter { states[it].state in REMOVED_DISPLAY_THUMBNAIL_SOURCES }.forEach { index ->
-        evictRemovedDisplaySource(resolved[index].first, tokens[index], stillOwned)
+    if (states.size == resolved.size) {
+        resolved.indices.filter { states[it].state in REMOVED_DISPLAY_THUMBNAIL_SOURCES }.forEach { index ->
+            evictRemovedDisplaySource(resolved[index].first, tokens[index], stillOwned)
+        }
     }
 }
 
@@ -118,6 +120,7 @@ internal suspend fun WhiteNoiseAppState.removeMessageDisplayThumbnails(
     withContext(NonCancellable) {
         runCatching {
             withContext(Dispatchers.Main.immediate) {
+                displayThumbnails.retireMessagePending(prefix)
                 mediaMemoryCacheKeysSnapshot()
                     .filter { it.startsWith(prefix, ignoreCase = true) }
                     .forEach(::removeMediaMemoryCacheEntry)
@@ -130,13 +133,15 @@ internal suspend fun WhiteNoiseAppState.removeMessageDisplayThumbnails(
 /** Recovers only the cache's own encrypted source descriptor; native state remains authoritative. */
 internal fun DisplayThumbnailSource.transferRequest(): AttachmentTransferRequest? {
     val fields = attachmentKey.split('|')
-    if (fields.size < 4) return null
-    val index = fields.last().toIntOrNull()?.takeIf { it >= 0 } ?: return null
-    return AttachmentTransferRequest(
-        fields.dropLast(3).joinToString("|"),
-        fields[fields.size - 3],
-        fields[fields.size - 2],
-        index,
-        sourceMessageIdHex,
-    )
+    if (fields.size <= CACHE_TARGET_COMPONENTS) return null
+    val (groupIdHex, messageIdHex, indexText) = fields.takeLast(CACHE_TARGET_COMPONENTS)
+    return indexText.toIntOrNull()?.takeIf { it >= 0 }?.let { index ->
+        AttachmentTransferRequest(
+            fields.dropLast(CACHE_TARGET_COMPONENTS).joinToString("|"),
+            groupIdHex,
+            messageIdHex,
+            index,
+            sourceMessageIdHex,
+        )
+    }
 }

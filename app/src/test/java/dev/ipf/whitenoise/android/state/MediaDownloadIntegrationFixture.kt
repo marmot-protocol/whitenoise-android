@@ -35,6 +35,9 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.withContext
@@ -63,6 +66,7 @@ internal class MediaDownloadIntegrationFixture(
             DiskByteCache(thumbnailRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider),
         )
     private val jobs = ConcurrentHashMap<String, Call>()
+    private val jobAdmissions = MutableStateFlow(0L)
     val calls = CopyOnWriteArrayList<Call>()
     val entered = Channel<Call>(Channel.UNLIMITED)
     val cancellationObserved = CompletableDeferred<Unit>()
@@ -339,6 +343,7 @@ internal class MediaDownloadIntegrationFixture(
                 .toInt() - 17
         val call = Call(args[0] as String, args[1] as String, reference(index))
         jobs[key] = call
+        jobAdmissions.update { it + 1L }
         calls += call
         val activeNow = active.incrementAndGet()
         peak.updateAndGet { maxOf(it, activeNow) }
@@ -364,6 +369,7 @@ internal class MediaDownloadIntegrationFixture(
             )
         jobs[key(request.accountRef, request.groupIdHex, target)] =
             Call(request.accountRef, request.groupIdHex, reference(index)).also { it.succeed(bytes) }
+        jobAdmissions.update { it + 1L }
     }
 
     /** Returns local-only transfer metadata, never creating a job from a read. */
@@ -398,6 +404,8 @@ internal class MediaDownloadIntegrationFixture(
                     initialSnapshot
                 } else {
                     if (readyDelivered) awaitCancellation()
+                    // Real native observers remain open when subscribed before acquisition is admitted.
+                    jobAdmissions.first { jobs[key] != null }
                     val call = checkNotNull(jobs[key])
                     call.observed.complete(Unit)
                     val deliverPause =

@@ -235,7 +235,10 @@ class MediaDisplayThumbnailPersistenceTest {
         val producer = AtomicReference<Job>()
         fixture.onNativeSnapshot = { producer.compareAndSet(null, effectJobs.currentMainOwner()) }
         composeRule.runOnIdle { checkNotNull(state).decodeRequest.onSizeChanged(IntSize(128, 128)) }
-        composeRule.waitUntil(10_000) { fixture.calls.size == 1 && producer.get() != null }
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            fixture.calls.size == 1 && producer.get() != null
+        }
         composeRule.runOnIdle { fixture.state.cacheMediaPlaintext(request(0).cacheKey(), imageBytes()) }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()

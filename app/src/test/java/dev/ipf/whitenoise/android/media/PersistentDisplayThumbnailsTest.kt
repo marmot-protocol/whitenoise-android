@@ -257,6 +257,9 @@ class PersistentDisplayThumbnailsTest {
     fun deletedMessageCannotBeResurrectedByALateFirstWrite() {
         val cache = cache()
         val pending = cache.captureGeneration(source)
+        cache.retireMessagePending("account:chat:message:")
+        cache.write(source, MediaThumbnail(bitmap, 128), pending)
+        assertEquals(0L, cache.residentBytes())
         cache.removeMessage("account:chat:message:")
         cache.write(source, MediaThumbnail(bitmap, 128), pending)
         assertEquals(0L, cache.residentBytes())

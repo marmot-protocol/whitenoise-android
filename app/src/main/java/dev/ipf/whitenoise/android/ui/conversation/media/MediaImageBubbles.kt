@@ -895,6 +895,9 @@ internal fun rememberImageLoadState(
     ) {
         materializationIntent = materializationIntent.afterParkedDownloadFound()
     }
+    val downloadRevision = appState.attachmentOpens.revision
+    val originalDownloadRequested = controller.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)
+    val needsPixels = presentation == null || presentationMaxEdgePx < requestedMaxEdgePx
     val transfer =
         rememberTileTransfer(
             controller,
@@ -903,13 +906,12 @@ internal fun rememberImageLoadState(
             reference,
             mine,
             cancelledByReader,
-            startDownload,
+            observeNative = startDownload && (needsPixels || originalDownloadRequested),
         )
     val owner = Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.mediaUploadSessionEpoch())
     val ownerCurrent = {
         owner == Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.mediaUploadSessionEpoch())
     }
-    val downloadRevision = appState.attachmentOpens.revision
     var downloadReady by remember(*keys, downloadRevision) { mutableStateOf(false) }
     var availabilityProbe by remember(*keys) { mutableIntStateOf(0) }
     var awaitingOriginal by remember(*keys) { mutableStateOf(false) }
