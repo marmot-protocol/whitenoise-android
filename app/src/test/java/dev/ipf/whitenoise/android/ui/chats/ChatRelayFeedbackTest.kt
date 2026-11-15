@@ -9,7 +9,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -28,9 +28,6 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -46,11 +43,8 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Real native restore failure must remain visible over the FAB's full-screen child and preserve safe-report policy. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
-@OptIn(ExperimentalCoroutinesApi::class)
 class ChatRelayFeedbackTest {
-    private val scheduler = TestCoroutineScheduler()
-
-    @get:Rule val composeRule = createComposeRule(effectContext = StandardTestDispatcher(scheduler))
+    @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     /** Failed native restore shows persistent copyable feedback above relays. */

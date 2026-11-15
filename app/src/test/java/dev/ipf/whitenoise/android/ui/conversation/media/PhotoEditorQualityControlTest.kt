@@ -3,7 +3,9 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -70,9 +72,11 @@ class PhotoEditorQualityControlTest {
         render(onSave = { recipe, quality -> saved = recipe to quality })
 
         composeRule
-            .onNodeWithText(
+            .onNodeWithTag("photo.editor.quality")
+            .assertIsDisplayed()
+            .assertContentDescriptionEquals(
                 string(R.string.photo_editor_quality) + ": " + string(R.string.photo_editor_quality_standard),
-            ).assertIsDisplayed()
+            ).assertTextEquals(string(R.string.photo_editor_quality_standard))
         composeRule.onNodeWithTag("photo.editor.quality").performClick()
         composeRule.onNodeWithText(string(R.string.photo_editor_quality_explanation)).assertIsDisplayed()
         listOf(
@@ -93,6 +97,23 @@ class PhotoEditorQualityControlTest {
 
         composeRule.onNodeWithContentDescription(string(R.string.save)).performClick()
         assertEquals(MediaQuality.High, saved?.second)
+    }
+
+    /** The High-encoding note stays visible only while Original quality applies to an edited recipe. */
+    @Test
+    fun originalQualityNoteFollowsRecipeEditsNotQualityChanges() {
+        val note = string(R.string.photo_editor_original_edited)
+        render()
+
+        composeRule.runOnIdle { holder.selectQuality(MediaQuality.Original) }
+        assertTrue(holder.hasUnsavedChanges)
+        composeRule.onNodeWithText(note).assertDoesNotExist()
+
+        composeRule.runOnIdle { holder.rotateClockwise() }
+        composeRule.onNodeWithText(note).assertIsDisplayed()
+
+        composeRule.runOnIdle { holder.undo() }
+        composeRule.onNodeWithText(note).assertDoesNotExist()
     }
 
     /** Corner selection uses the initial press even when the slop-crossing move is far away. */

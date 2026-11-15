@@ -20,6 +20,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
+import dev.ipf.whitenoise.android.media.editor.NormalizedPoint
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -95,7 +96,12 @@ class PhotoEditorScreenshotTest {
         val bitmap = editorSourceBitmap(height = photoHeight)
         val size = EditorPixelSize(bitmap.width, bitmap.height)
         val holder = PhotoEditorStateHolder(PhotoEditRecipe.Original, MediaQuality.Standard, size)
-        if (draw) holder.selectTool(PhotoEditorTool.Draw)
+        if (draw) {
+            // A drawn stroke at Original quality also captures the persistent High-encoding note.
+            holder.selectQuality(MediaQuality.Original)
+            holder.selectTool(PhotoEditorTool.Draw)
+            holder.commitStroke(listOf(NormalizedPoint(0.2f, 0.2f), NormalizedPoint(0.8f, 0.6f)))
+        }
         try {
             composeRule.setContent {
                 CompositionLocalProvider(

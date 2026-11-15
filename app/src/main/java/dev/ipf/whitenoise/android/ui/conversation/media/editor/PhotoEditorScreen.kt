@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.systemGestureExclusion
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -41,13 +42,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +66,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -74,6 +80,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.ActiveStrokeBuffer
@@ -147,6 +154,8 @@ internal fun PhotoEditorScreen(
     var showCoordinates by remember { mutableStateOf(false) }
     var showQuality by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
+    // Edits are encoded at High, so Original only keeps its meaning while the recipe is untouched.
+    val originalEdited = state.quality == MediaQuality.Original && state.recipe != stateHolder.initialRecipe
 
     fun requestCancel() {
         if (state.isSaving) return
@@ -161,11 +170,11 @@ internal fun PhotoEditorScreen(
             // App banners sit below this screen's bar rather than over it (#3312).
             Column {
                 PhotoEditorTopBar(
-                    saving = state.isSaving,
+                    state = state,
+                    holder = stateHolder,
                     frameIndex = frameIndex,
                     frameCount = frameCount,
-                    onReset = stateHolder::reset,
-                    canReset = stateHolder.hasUnsavedChanges,
+                    onQuality = { showQuality = true },
                     onHelp = { showHelp = true },
                     onCancel = ::requestCancel,
                     onSave = {
@@ -178,7 +187,6 @@ internal fun PhotoEditorScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            PhotoEditorHistoryActions(state, stateHolder) { showQuality = true }
             if (state.isSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val wide = maxWidth >= 600.dp || maxHeight < 360.dp
@@ -217,6 +225,14 @@ internal fun PhotoEditorScreen(
                         )
                     }
                 }
+            }
+            if (originalEdited) {
+                Text(
+                    text = stringResource(R.string.photo_editor_original_edited),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
             EditorStatus(state)
         }
@@ -287,7 +303,7 @@ internal fun PhotoEditorScreen(
             supportingText =
                 buildString {
                     append(stringResource(R.string.photo_editor_quality_explanation))
-                    if (state.quality == MediaQuality.Original && stateHolder.hasUnsavedChanges) {
+                    if (originalEdited) {
                         append("\n\n")
                         append(stringResource(R.string.photo_editor_original_edited))
                     }
@@ -296,32 +312,60 @@ internal fun PhotoEditorScreen(
     }
 }
 
-/** Keeps cancel/save on the app bar while the existing holder owns save acceptance. */
+/** Keeps cancel, history, quality and save on the app bar while the existing holder owns save acceptance. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongParameterList")
+@Suppress("LongMethod", "LongParameterList")
 private fun PhotoEditorTopBar(
-    saving: Boolean,
+    state: PhotoEditorUiState,
+    holder: PhotoEditorStateHolder,
     frameIndex: Int,
     frameCount: Int,
-    onReset: () -> Unit,
-    canReset: Boolean,
+    onQuality: () -> Unit,
     onHelp: () -> Unit,
     onCancel: () -> Unit,
     onSave: () -> Unit,
 ) {
+    val saving = state.isSaving
     var expanded by remember { mutableStateOf(false) }
     val resetLabel = stringResource(R.string.photo_editor_reset)
     val menuScrollState = rememberScrollState()
     TopAppBar(
         title = {
-            Column {
-                Text(stringResource(R.string.photo_editor_title), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (frameCount > 1) {
-                    Text(
-                        stringResource(R.string.photo_editor_frame, frameIndex + 1),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
+            // The title slot receives only the width left after Close, More and Save, so the
+            // history and quality actions sit here to give up the title's space before their own.
+            CompositionLocalProvider(LocalContentColor provides TopAppBarDefaults.topAppBarColors().actionIconContentColor) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // A lone ellipsis beside More reads as another control, so the title stays
+                    // in semantics but is not drawn until at least one whole word fits.
+                    Column(
+                        Modifier.weight(1f).layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            val wordFits = constraints.maxWidth >= measurable.minIntrinsicWidth(constraints.maxHeight)
+                            layout(placeable.width, placeable.height) {
+                                if (wordFits) placeable.place(0, 0) else placeable.placeWithLayer(0, 0) { alpha = 0f }
+                            }
+                        },
+                    ) {
+                        Text(
+                            stringResource(R.string.photo_editor_title),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (frameCount > 1) {
+                            Text(
+                                stringResource(R.string.photo_editor_frame, frameIndex + 1),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    EditorIconAction(R.drawable.ic_editor_undo, stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
+                    EditorIconAction(R.drawable.ic_editor_redo, stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
+                    PhotoEditorQualityAction(state.quality, !saving, onQuality)
                 }
             }
         },
@@ -343,11 +387,11 @@ private fun PhotoEditorTopBar(
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.photo_editor_reset)) },
-                        enabled = canReset && !saving,
+                        enabled = holder.hasUnsavedChanges && !saving,
                         modifier = Modifier.semantics { contentDescription = resetLabel },
                         onClick = {
                             expanded = false
-                            onReset()
+                            holder.reset()
                         },
                     )
                     DropdownMenuItem(
@@ -359,27 +403,14 @@ private fun PhotoEditorTopBar(
                     )
                 }
             }
-            EditorTextAction(
+            EditorIconAction(
+                R.drawable.ic_check,
                 stringResource(if (saving) R.string.photo_editor_saving_action else R.string.save),
                 !saving,
                 onSave,
             )
         },
     )
-}
-
-/** Icon history actions share a compact row with the existing quality dialog. */
-@Composable
-private fun PhotoEditorHistoryActions(
-    state: PhotoEditorUiState,
-    holder: PhotoEditorStateHolder,
-    onQuality: () -> Unit,
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        EditorIconAction(R.drawable.ic_editor_undo, stringResource(R.string.photo_editor_undo), state.canUndo, holder::undo)
-        EditorIconAction(R.drawable.ic_editor_redo, stringResource(R.string.photo_editor_redo), state.canRedo, holder::redo)
-        PhotoEditorQualityAction(state.quality, !state.isSaving, onQuality, Modifier.weight(1f))
-    }
 }
 
 @Composable
@@ -392,20 +423,6 @@ private fun EditorIconAction(
     IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
         Icon(painterResource(icon), contentDescription = label)
     }
-}
-
-/** Retains the named native action and its accessible minimum touch target. */
-@Composable
-private fun EditorTextAction(
-    description: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    TextButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = description },
-    ) { Text(description) }
 }
 
 /** Two compact bands: active-tool options and the four main icon-labelled actions. */
@@ -585,25 +602,35 @@ private fun EditorToolButton(
     }
 }
 
-/** Output quality remains available beside the history actions. */
+/**
+ * Output quality beside the history actions. The chip shows only the level; its accessible name keeps
+ * the full "Photo quality: level" label. At large font scales the level text shrinks to fit the app
+ * bar instead of clipping.
+ */
 @Composable
 private fun PhotoEditorQualityAction(
     quality: MediaQuality,
     enabled: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier,
 ) {
-    val label = stringResource(R.string.photo_editor_quality) + ": " + photoQualityLevelLabel(quality)
+    val level = photoQualityLevelLabel(quality)
+    val label = stringResource(R.string.photo_editor_quality) + ": " + level
     TextButton(
         onClick = onClick,
         enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 4.dp),
         modifier =
-            modifier
+            Modifier
                 .heightIn(min = 48.dp)
                 .semantics { contentDescription = label }
                 .testTag("photo.editor.quality"),
     ) {
-        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(
+            level,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = LocalTextStyle.current.fontSize),
+            modifier = Modifier.weight(1f, fill = false),
+        )
         Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null, modifier = Modifier.size(18.dp))
     }
 }
