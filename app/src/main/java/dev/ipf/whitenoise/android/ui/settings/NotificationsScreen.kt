@@ -121,8 +121,8 @@ internal fun NotificationsScreen(
             item(key = "search.Notifications.1") {
                 val previews = appState.notificationPreviewSettings
                 NotificationPreviewControl(
-                    state = NotificationPreviewControlState(previews.enabled, previews.busy, previews.failed),
-                    onChange = { value -> appState.launchMutation { previews.setEnabled(value) } },
+                    state = NotificationPreviewControlState(previews.mode, previews.busy, previews.failed),
+                    onChange = { mode -> appState.launchMutation { previews.setMode(mode) } },
                     onRetry = { appState.launchMutation { previews.retry() } },
                 )
             }

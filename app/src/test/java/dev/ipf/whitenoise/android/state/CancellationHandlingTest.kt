@@ -45,7 +45,7 @@ class CancellationHandlingTest {
     @Test
     fun issue1457FallbackSitesUseCancellationSafeWrappers() {
         val appState = appStateSource().readText()
-        val forwardText = appState.functionBody("forwardText")
+        val forwardText = sourceFile("AppStateForwarding.kt").readText().functionBody("forwardText")
         val wrapperStart = forwardText.indexOf("runCatchingCancellable {")
         assertTrue("forwardText must use cancellation-safe result handling", wrapperStart >= 0)
         val wrapperBrace = forwardText.indexOf('{', wrapperStart)
@@ -57,7 +57,7 @@ class CancellationHandlingTest {
         assertFalse("forwardText must not use plain runCatching around sendText", Regex("""runCatching\s*\{[^}]*sendText""").containsMatchIn(forwardText))
 
         val compactAppState =
-            appState
+            (appState + sourceFile("AppStateRelayLists.kt").readText())
                 .replace(Regex("""\s+"""), " ")
                 .replace(Regex("""\s+\."""), ".")
         listOf(

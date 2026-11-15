@@ -209,6 +209,14 @@
           "represented_by": "Notifications.previews"
         },
         {
+          "declaration": "\"name_only\"",
+          "represented_by": "Notifications.previews"
+        },
+        {
+          "declaration": "\"none\"",
+          "represented_by": "Notifications.previews"
+        },
+        {
           "declaration": "\"retry\"",
           "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
         }

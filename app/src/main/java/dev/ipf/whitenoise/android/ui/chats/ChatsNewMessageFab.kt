@@ -35,6 +35,7 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.loadAccountRelayLists
 import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.chats.newchat.newMessagePenOrigin
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent

@@ -441,6 +441,8 @@ class LocalNotificationPresenter(
                     appName = context.getString(R.string.app_name),
                     body = context.getString(R.string.notification_hidden_content),
                 )
+            } else if (!previewToken.messageText) {
+                LocalNotificationFormatter.nameOnlyContent(update, rawNotificationContent, context)
             } else {
                 rawNotificationContent
             }
@@ -457,7 +459,8 @@ class LocalNotificationPresenter(
                     ConversationCardScope(update.accountRef, update.groupIdHex),
                 ) { showToken ->
                     // Capture dismissal ownership before optional image I/O can suspend.
-                    if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+                    val richText = !redactContent && previewToken.messageText
+                    if (richText && decision.style == NotificationStyleChoice.Messaging) {
                         emojiPreparationAttempted = true
                         emojiArtifact =
                             prepareNotificationEmojiArtwork(

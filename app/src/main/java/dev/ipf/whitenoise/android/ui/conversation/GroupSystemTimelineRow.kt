@@ -127,7 +127,7 @@ private fun rememberActivityReactionMotion(
     readOnly: Boolean,
 ): LocalReactionMotion {
     val runtime = remember(controller) { appState.runtimeGeneration }
-    val currentOwner = !appState.appLockScreenVisible && controller.isCurrentGroupMutationOwner(appState, runtime)
+    val currentOwner = !appState.appLock.screenVisible && controller.isCurrentGroupMutationOwner(appState, runtime)
     val targetAvailable = !readOnly && currentGroupSystemReactionTarget(controller, owner) != null
     return rememberLocalReactionMotion(
         controller to owner,

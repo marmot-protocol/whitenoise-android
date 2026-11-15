@@ -258,7 +258,7 @@ internal fun rememberComposerTranslation(
                 onNoticeAccepted = preferences::acceptProviderNotice,
             )
         }
-    LaunchedEffect(state, appState.appLockScreenVisible) { state.invalidate() }
+    LaunchedEffect(state, appState.appLock.screenVisible) { state.invalidate() }
     TranslationOwnerResetEffect(state, onReset = state::invalidate, onDispose = state::close)
     return state
 }

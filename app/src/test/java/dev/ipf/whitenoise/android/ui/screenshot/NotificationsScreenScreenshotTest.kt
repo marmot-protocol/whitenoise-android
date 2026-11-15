@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewMode
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -24,6 +26,7 @@ import dev.ipf.whitenoise.android.ui.settings.NotificationsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,7 +45,7 @@ class NotificationsScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private var previews = true
+    private var previews = NotificationPreviewMode.FULL
     private val app = ApplicationProvider.getApplicationContext<Context>()
 
     /** Light theme. */
@@ -83,8 +86,15 @@ class NotificationsScreenScreenshotTest {
     /** Opted-out previews remain a clear independent choice without an account. */
     @Test
     fun notificationsPreviewsHidden() {
-        previews = false
+        previews = NotificationPreviewMode.NONE
         capture("notifications_previews_hidden", darkTheme = false)
+    }
+
+    /** Name-only previews keep the sender visible and hide message text. */
+    @Test
+    fun notificationsPreviewsNameOnly() {
+        previews = NotificationPreviewMode.NAME_ONLY
+        capture("notifications_previews_name_only", darkTheme = false)
     }
 
     /** A failed save exposes one retry row next to the same privacy choice. */
@@ -96,7 +106,11 @@ class NotificationsScreenScreenshotTest {
                     SettingsList {
                         item {
                             NotificationPreviewControl(
-                                state = NotificationPreviewControlState(enabled = false, failed = true),
+                                state =
+                                    NotificationPreviewControlState(
+                                        mode = NotificationPreviewMode.NONE,
+                                        failed = true,
+                                    ),
                                 onChange = {},
                                 onRetry = {},
                             )
@@ -117,11 +131,7 @@ class NotificationsScreenScreenshotTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         scrollToToneScope: Boolean = false,
     ) {
-        app
-            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("show_notification_previews", previews)
-            .commit()
+        check(runBlocking { NotificationPreviewPreferences.setMode(app, previews, scrub = { true }) })
         val appState =
             WhiteNoiseAppState(
                 context = app,

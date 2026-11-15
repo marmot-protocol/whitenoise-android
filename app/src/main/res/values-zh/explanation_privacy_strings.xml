@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Hold-to-explain bodies for privacy controls; titles reuse each control's own label. -->
-    <string name="explanation_privacy_notif_previews">控制通知是否显示发件人姓名和消息内容。关闭后，两者都会隐藏。此设置适用于此设备上的所有账户，你可以随时改回。</string>
+    <string name="explanation_privacy_notif_previews">控制通知显示的内容。“名称和消息”显示发件人和消息内容。“仅名称”显示发件人和对话，但隐藏消息内容和回应表情符号。“隐藏”两者都不显示。此设置适用于此设备上的所有账户，你可以随时改回。</string>
     <string name="explanation_privacy_notif_preview_retry">重新尝试保存你对通知预览的选择。在保存成功之前，重启应用后该更改可能会丢失。</string>
     <string name="explanation_privacy_notif_sounds">打开通知声音和振动选项。你可以在这里试听 White Noise 的提示音，并打开 Android 中每个提醒类别的设置。</string>
     <string name="explanation_privacy_notif_delivery">打开 White Noise 的 Android 通知权限和电池策略。这些设置会影响应用在后台时提醒能否送达你。</string>

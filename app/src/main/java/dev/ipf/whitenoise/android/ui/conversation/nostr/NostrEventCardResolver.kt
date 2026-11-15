@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.NostrEventReference
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.accountRelayLists
 import dev.ipf.whitenoise.android.state.normalizeRelayUrls
 import dev.ipf.whitenoise.android.state.relayUrlPassesResolveTimeCheck
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardState.Loaded

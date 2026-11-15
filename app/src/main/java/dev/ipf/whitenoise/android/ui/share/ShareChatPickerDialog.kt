@@ -54,7 +54,7 @@ internal fun ShareChatPickerFullScreen(
     var setAccount by rememberSaveable(requestId, appState.activeAccountRef) { mutableStateOf<String?>(null) }
     val pickerState = rememberSaveableStateHolder()
     val protectedContent =
-        appState.appLockScreenVisible || appState.signOutInProgress || !appState.allowChatScreenshotsInChats
+        appState.appLock.screenVisible || appState.signOutInProgress || !appState.allowChatScreenshotsInChats
     MeasuredPlaybackDialog(
         origin = null,
         // This completion retires the share request, including a successful cross-account stage.
@@ -84,7 +84,7 @@ internal fun ShareChatPickerFullScreen(
                     protectedContent,
                 ),
             suppressMotion = protectedContent,
-            contentVisible = !appState.appLockScreenVisible,
+            contentVisible = !appState.appLock.screenVisible,
             cardMorph = !protectedContent,
         ) { targetAccount ->
             if (targetAccount != null && setAddress != null) {

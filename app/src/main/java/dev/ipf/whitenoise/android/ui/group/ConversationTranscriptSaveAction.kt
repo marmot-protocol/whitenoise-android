@@ -65,7 +65,7 @@ internal fun rememberConversationTranscriptSave(
                         controller.boundAccountRef == accountRef &&
                         appState.activeAccountRef == accountRef &&
                         appState.runtimeGeneration == runtimeGeneration &&
-                        !appState.appLockScreenVisible &&
+                        !appState.appLock.screenVisible &&
                         !appState.signOutInProgress &&
                         !appState.wipeInProgress
                 },
@@ -84,8 +84,8 @@ internal fun rememberConversationTranscriptSave(
                 resultReady = true
             }
         }
-    LaunchedEffect(resultReady, appState.appLockScreenVisible, origin) {
-        if (!resultReady || appState.appLockScreenVisible) return@LaunchedEffect
+    LaunchedEffect(resultReady, appState.appLock.screenVisible, origin) {
+        if (!resultReady || appState.appLock.screenVisible) return@LaunchedEffect
         val requestedOrigin = pendingOrigin
         val requestedAccount = pendingAccount
         val uri = acceptedDestination?.let(Uri::parse)

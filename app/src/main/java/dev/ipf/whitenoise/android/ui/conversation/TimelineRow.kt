@@ -297,7 +297,7 @@ private fun rememberTimelineReactionMotion(
                     !MessageProjector.isDeleted(item.record.messageIdHex, controller.deletedMessageIds)
         }
     val currentOwner =
-        !appState.appLockScreenVisible &&
+        !appState.appLock.screenVisible &&
             controller.isCurrentGroupMutationOwner(appState, runtime) &&
             controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
     val readOnly =

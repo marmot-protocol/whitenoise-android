@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
@@ -86,11 +87,39 @@ class NotificationFirstPostRecipientTest {
             assertNull(content.recipientAccountSubtext)
         }
 
+    /** An invite identifies its recipient before any other local account joins the group. */
+    @Test
+    fun groupInviteNamesRecipientWithoutOtherSignedInMembers() =
+        runBlocking {
+            val content =
+                resolve(
+                    signedInAccountIds = setOf("recipient", "unrelated"),
+                    memberIds = listOf("recipient", "peer"),
+                    trigger = NotificationTriggerFfi.GROUP_INVITE,
+                    onGroupMembersRead = { error("invite recipient subtext must not read the roster") },
+                ) { "Work" }
+            assertEquals("Work", content.recipientAccountSubtext)
+        }
+
+    /** A single signed-in identity needs no recipient label on a group invite. */
+    @Test
+    fun groupInviteWithSingleSignedInAccountSkipsRecipientSubtext() =
+        runBlocking {
+            val content =
+                resolve(
+                    signedInAccountIds = setOf("recipient"),
+                    memberIds = listOf("recipient", "peer"),
+                    trigger = NotificationTriggerFfi.GROUP_INVITE,
+                ) { error("single-account invite must not read the recipient label") }
+            assertNull(content.recipientAccountSubtext)
+        }
+
     /** Uses the production projection graph with only external data reads replaced. */
     private suspend fun resolve(
         signedInAccountIds: Set<String>,
         memberIds: List<String>,
         recipientAccountId: String? = "recipient",
+        trigger: NotificationTriggerFfi = NotificationTriggerFfi.NEW_MESSAGE,
         onGroupMembersRead: () -> Unit = {},
         recipient: (String) -> String?,
     ): NotificationFirstPostContent {
@@ -107,7 +136,7 @@ class NotificationFirstPostRecipientTest {
                         onGroupMembersRead,
                         recipient,
                     ),
-            ).firstPost.resolve(fixture.update, localOnly = true)
+            ).firstPost.resolve(fixture.update.copy(trigger = trigger, groupName = "Fixture group"), localOnly = true)
         } finally {
             fixture.close()
         }

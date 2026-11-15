@@ -29,7 +29,7 @@ internal class ShellPlaybackHost(
         val account = appState.activeAccountRef
 
         @Suppress("MaxLineLength")
-        fun privacyAllowed(): Boolean = !appState.appLockScreenVisible && !appState.signOutInProgress && !appState.wipeInProgress
+        fun privacyAllowed(): Boolean = !appState.appLock.screenVisible && !appState.signOutInProgress && !appState.wipeInProgress
 
         fun isCurrent(): Boolean {
             val identityCurrent = runtime == appState.runtimeGeneration && account == appState.activeAccountRef

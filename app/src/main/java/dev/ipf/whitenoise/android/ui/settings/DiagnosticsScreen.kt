@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.bootstrapRelayCount
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState

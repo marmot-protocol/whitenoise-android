@@ -1,5 +1,9 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +15,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -51,7 +56,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -99,6 +103,7 @@ import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
 import dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail
+import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -462,7 +467,7 @@ internal fun FullScreenMediaViewer(
         )
 
     @Suppress("MaxLineLength")
-    fun viewerPrivacyBlocked(): Boolean = appState.appLockScreenVisible || appState.signOutInProgress || appState.wipeInProgress
+    fun viewerPrivacyBlocked(): Boolean = appState.appLock.screenVisible || appState.signOutInProgress || appState.wipeInProgress
 
     /** Rejects exports after the opening account, runtime, or retained conversation controller loses ownership. */
     fun exportOwnerIsCurrent(): Boolean {
@@ -940,9 +945,10 @@ internal fun FullScreenMediaViewer(
                             mine = pageDescriptor.mine,
                             onPlayerChanged = onVideoPlayerChanged,
                             videoFileResolver = videoFileResolver,
-                            // One tap reveals or hides Media3's controls and the viewer chrome together, and they
-                            // time out together while playing, so the frame and time bar are never covered.
-                            onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible },
+                            // The viewer chrome owns one visibility: a tap reveals or hides the playback controls
+                            // and the bars together, and they time out together while playing.
+                            controlsVisible = isCurrent && chromeVisible,
+                            onControlsVisibleChange = { visible -> if (isCurrent) chromeVisible = visible },
                         )
                     } else {
                         ViewerPage(
@@ -1000,8 +1006,9 @@ internal fun FullScreenMediaViewer(
 
 /**
  * Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. The media
- * [body] gets only the space the visible chrome and safe insets leave free, so opaque bars never cover the frame
- * or a player's time bar, and hiding the chrome gives that space back to the media.
+ * [body] always fills the safe area, whether or not the chrome shows, so toggling the chrome never resizes or moves
+ * the media (#3801). The bars fade in and out above the body on a translucent scrim, and the body learns how far the
+ * bottom actions reach into it through [LocalMediaViewerBottomActionsClearance].
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod")
@@ -1038,15 +1045,22 @@ internal fun MediaViewerFrame(
         } else {
             WindowInsetsSides.Top + WindowInsetsSides.Horizontal
         }
-    val topChrome: @Composable () -> Unit = {
-        if (chromeShown) {
+    val hasBottomActions = hasViewerBottomActions(onShare, onForwardMessage)
+    val scrim = MaterialTheme.colorScheme.background.copy(alpha = ScrimAlpha.HEAVY)
+    val topChrome: @Composable BoxScope.() -> Unit = {
+        AnimatedVisibility(
+            visible = chromeShown,
+            modifier = Modifier.align(Alignment.TopCenter),
+            enter = fadeIn(tween(MEDIA_VIEWER_CHROME_FADE_MILLIS)),
+            exit = fadeOut(tween(MEDIA_VIEWER_CHROME_FADE_MILLIS)),
+        ) {
             Surface(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .onSizeChanged { topChromeHeight = it.height }
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
-                color = MaterialTheme.colorScheme.background,
+                color = scrim,
                 contentColor = MaterialTheme.colorScheme.onBackground,
             ) {
                 Row(
@@ -1116,27 +1130,19 @@ internal fun MediaViewerFrame(
             }
         }
     }
-    // The body keeps one composition slot whether or not chrome shows, so toggling chrome resizes the pager
-    // and player instead of recreating them.
-    val content: @Composable () -> Unit = {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(contentWindowInsets.only(mediaViewerContentInsetSides(chromeShown)))
-                    .then(bodyModifier)
-                    .testTag(MEDIA_VIEWER_CONTENT_TAG),
-            content = body,
-        )
-    }
-    val bottomChrome: @Composable () -> Unit = {
-        if (chromeShown && hasViewerBottomActions(onShare, onForwardMessage)) {
+    val bottomChrome: @Composable BoxScope.() -> Unit = {
+        AnimatedVisibility(
+            visible = chromeShown && hasBottomActions,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = fadeIn(tween(MEDIA_VIEWER_CHROME_FADE_MILLIS)),
+            exit = fadeOut(tween(MEDIA_VIEWER_CHROME_FADE_MILLIS)),
+        ) {
             Surface(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .testTag(MEDIA_VIEWER_BOTTOM_CHROME_TAG),
-                color = MaterialTheme.colorScheme.background,
+                color = scrim,
                 contentColor = MaterialTheme.colorScheme.onBackground,
             ) {
                 Row(
@@ -1145,7 +1151,8 @@ internal fun MediaViewerFrame(
                             .windowInsetsPadding(
                                 contentWindowInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
                             ).fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .height(MEDIA_VIEWER_BOTTOM_ACTIONS_HEIGHT)
+                            .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -1175,11 +1182,24 @@ internal fun MediaViewerFrame(
         }
     }
     Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        Layout(
-            contents = listOf(topChrome, content, bottomChrome),
-            modifier = Modifier.fillMaxSize(),
-            measurePolicy = mediaViewerChromeMeasurePolicy,
-        )
+        // The body keeps one composition slot and one rectangle whatever the chrome does, so a toggle only changes
+        // what is drawn above the pager and player.
+        CompositionLocalProvider(
+            LocalMediaViewerBottomActionsClearance provides
+                if (hasBottomActions) MEDIA_VIEWER_BOTTOM_ACTIONS_HEIGHT else 0.dp,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(contentWindowInsets.only(MEDIA_VIEWER_CONTENT_INSET_SIDES))
+                        .then(bodyModifier)
+                        .testTag(MEDIA_VIEWER_CONTENT_TAG),
+                content = body,
+            )
+        }
+        topChrome()
+        bottomChrome()
         if (groupPictureBusy) {
             Surface(
                 Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),

@@ -39,7 +39,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun forwardTextsLocksEachTargetsOrderedMessageBatch() {
-        val body = appStateFunctionBody("forwardTexts")
+        val body = functionBodyIn(forwardingSource().readText(), "forwardTexts")
 
         assertTrue(
             "forwardTexts must serialize each target's ordered message batch through the per-group commit lock",
@@ -67,7 +67,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun singleMessageForwardKeepsSingleMessageResultCopy() {
-        val body = appStateFunctionBody("forwardText")
+        val body = functionBodyIn(forwardingSource().readText(), "forwardText")
 
         assertTrue(
             "forwardText must keep its single-message target breakdown instead of using batch result copy",
@@ -116,19 +116,25 @@ class AppStateSendLockCoverageTest {
     @Test
     fun visibleConversationDismissalStaysWiredToResumeAndUnlock() {
         val foregroundBody = appStateFunctionBody("setAppInForeground")
-        val foregroundLockGate = foregroundBody.indexOf("maybeShowAppLockForForeground()")
+        val foregroundLockGate = foregroundBody.indexOf("appLock.onAppForegrounded()")
         val foregroundDismissal = foregroundBody.indexOf("dismissVisibleConversationNotifications()")
         assertTrue(
             "foreground resume must dismiss only after deciding whether app lock covers the conversation",
             foregroundLockGate >= 0 && foregroundDismissal > foregroundLockGate,
         )
 
-        val unlockBody = appStateFunctionBody("markAppUnlockSucceeded")
-        val hideLock = unlockBody.indexOf("appLockScreenVisible = false")
-        val unlockedDismissal = unlockBody.indexOf("dismissVisibleConversationNotifications()")
+        val controllerSource = appStateSource().resolveSibling("AppLockController.kt").readText()
+        val unlockStart = controllerSource.indexOf("fun markUnlockSucceeded(")
+        val unlockBody = controllerSource.substring(unlockStart, controllerSource.indexOf("\n    }\n", unlockStart))
+        val hideLock = unlockBody.indexOf("screenVisible = false")
+        val unlockCallback = unlockBody.indexOf("onUnlockSucceeded(dismissRetainedVisibleConversation)")
+        val wiring =
+            appStateSource().readText().substringAfter("onUnlockSucceeded = { dismissRetainedVisibleConversation ->")
         assertTrue(
             "successful unlock must dismiss after revealing the retained conversation",
-            hideLock >= 0 && unlockedDismissal > hideLock,
+            hideLock >= 0 &&
+                unlockCallback > hideLock &&
+                wiring.substringBefore("},").contains("dismissVisibleConversationNotifications()"),
         )
     }
 
@@ -633,6 +639,14 @@ class AppStateSendLockCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    /** The forwarding extensions, which fan one message out under each target's commit lock. */
+    private fun forwardingSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing AppStateForwarding.kt source file")
 
     /** The conversation paging extensions, which own the active-call guard around window pages. */
     private fun pagingSource(): File =

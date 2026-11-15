@@ -1,11 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
@@ -23,7 +20,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.work.NetworkType
 import androidx.work.WorkManager
 import com.google.firebase.messaging.FirebaseMessaging
-import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
@@ -44,12 +40,9 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.marmotkit.NotificationsSubscription
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.ProductAnalyticsActivityFfi
 import dev.ipf.marmotkit.PushPlatformFfi
-import dev.ipf.marmotkit.RelayEndpointClassificationFfi
-import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
@@ -97,7 +90,6 @@ import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MarmotClientRootGate
@@ -196,7 +188,6 @@ import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateFlows
 import dev.ipf.whitenoise.android.updates.AppSelfUpdateState
-import dev.ipf.whitenoise.android.updates.AppUpdateConstants
 import dev.ipf.whitenoise.android.updates.AppUpdateForegroundState
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import dev.ipf.whitenoise.android.updates.AppUpdateNotifier
@@ -234,7 +225,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -244,9 +234,6 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
-import java.net.IDN
-import java.net.InetAddress
-import java.net.URI
 import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -280,267 +267,7 @@ internal data class ProfileGroupInviteOutcome(
     val completedSuccessfully: Boolean = attempted > 0 && failures == 0 && waited == 0
 }
 
-internal object ChatScreenshotPreferences {
-    private const val KEY_ALLOW_CHAT_SCREENSHOTS = "allow_chat_screenshots"
-
-    fun readAllowChatScreenshots(preferences: SharedPreferences): Boolean = preferences.getBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, true)
-
-    fun readAllowChatScreenshots(context: Context): Boolean =
-        readAllowChatScreenshots(
-            context.applicationContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE),
-        )
-
-    fun writeAllowChatScreenshots(
-        preferences: SharedPreferences,
-        enabled: Boolean,
-    ) {
-        editAllowChatScreenshots(preferences.edit(), enabled).apply()
-    }
-
-    /** Adds the screenshot preference to a caller-owned durable editor transaction. */
-    fun editAllowChatScreenshots(
-        editor: SharedPreferences.Editor,
-        enabled: Boolean,
-    ): SharedPreferences.Editor = editor.putBoolean(KEY_ALLOW_CHAT_SCREENSHOTS, enabled)
-}
-
-internal object LongMessageCollapsePreferences {
-    private const val KEY_PREFIX = "collapse_long_messages:"
-
-    fun normalizedAccountRef(accountRef: String?): String? =
-        accountRef
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-
-    fun normalizedGroupId(groupIdHex: String): String? =
-        groupIdHex
-            .trim()
-            .lowercase(Locale.ROOT)
-            .takeIf { it.isNotEmpty() }
-
-    fun preferenceKey(
-        accountRef: String?,
-        groupIdHex: String,
-    ): String? {
-        val account = normalizedAccountRef(accountRef) ?: return null
-        val group = normalizedGroupId(groupIdHex) ?: return null
-        return "$KEY_PREFIX$account:$group"
-    }
-
-    fun readCollapseLongMessages(
-        preferences: SharedPreferences,
-        accountRef: String?,
-        groupIdHex: String,
-    ): Boolean {
-        val key = preferenceKey(accountRef, groupIdHex) ?: return true
-        return readCollapseLongMessagesByKey(preferences, key)
-    }
-
-    fun readCollapseLongMessagesByKey(
-        preferences: SharedPreferences,
-        key: String,
-    ): Boolean = preferences.getBoolean(key, true)
-
-    fun writeCollapseLongMessages(
-        preferences: SharedPreferences,
-        accountRef: String?,
-        groupIdHex: String,
-        enabled: Boolean,
-    ) {
-        val key = preferenceKey(accountRef, groupIdHex) ?: return
-        writeCollapseLongMessagesByKey(preferences, key, enabled)
-    }
-
-    fun writeCollapseLongMessagesByKey(
-        preferences: SharedPreferences,
-        key: String,
-        enabled: Boolean,
-    ) {
-        val edit = preferences.edit()
-        if (enabled) {
-            edit.remove(key)
-        } else {
-            edit.putBoolean(key, false)
-        }
-        edit.apply()
-    }
-}
-
-/** Observable, account-scoped view of the persisted long-message preference. */
-internal class LongMessageCollapseState(
-    registry: ScopedCacheRegistry,
-    private val preferences: SharedPreferences,
-    maxEntries: Int,
-) {
-    private val values =
-        ScopedCache<String, MutableState<Boolean>>(
-            registry = registry,
-            name = "collapse-long-messages",
-            maxEntries = maxEntries,
-            observable = true,
-        )
-
-    fun collapseLongMessages(
-        accountRef: String?,
-        groupIdHex: String,
-    ): Boolean {
-        val key = LongMessageCollapsePreferences.preferenceKey(accountRef, groupIdHex) ?: return true
-        return values
-            .getOrPut(key) {
-                mutableStateOf(LongMessageCollapsePreferences.readCollapseLongMessagesByKey(preferences, key))
-            }.value
-    }
-
-    fun updateCollapseLongMessages(
-        accountRef: String?,
-        groupIdHex: String,
-        enabled: Boolean,
-    ) {
-        val key = LongMessageCollapsePreferences.preferenceKey(accountRef, groupIdHex) ?: return
-        values.getOrPut(key) { mutableStateOf(enabled) }.value = enabled
-        LongMessageCollapsePreferences.writeCollapseLongMessagesByKey(preferences, key, enabled)
-    }
-}
-
-private fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
-
-/**
- * Only proven connect-phase relay failures are safe to resend automatically.
- * Other exceptions may be terminal or may occur after publication.
- */
-internal fun notificationReplySendFailureOutcome(throwable: Throwable): NotificationReplySendOutcome =
-    if (isTransientRelaySendError(throwable)) {
-        NotificationReplySendOutcome.RetryableFailure
-    } else {
-        NotificationReplySendOutcome.NonRetryableFailure
-    }
-
-internal fun notificationReactionSendFailureOutcome(throwable: Throwable): NotificationReactionSendOutcome =
-    if (isTransientRelaySendError(throwable)) {
-        NotificationReactionSendOutcome.RetryableFailure
-    } else {
-        NotificationReactionSendOutcome.NonRetryableFailure
-    }
-
-internal data class ConversationNotificationTarget(
-    val accountRef: String,
-    val groupIdHex: String,
-)
-
-/**
- * The conversation whose pending tray cards should be cleared when a chat is
- * opened, or null when there's nothing concrete to dismiss.
- *
- * Opening a conversation must clear its notifications on the first open,
- * independent of whether the read watermark advances (issue #803). The
- * mark-read path can be deduped/swallowed or race a not-yet-ready read anchor
- * on a cold open, so this gives [WhiteNoiseAppState.setActiveConversation] a
- * target it can dismiss immediately and unconditionally. Returns a target only
- * when both the active account and the opened group are nonblank.
- */
-internal fun conversationOpenDismissalTarget(
-    activeAccountRef: String?,
-    groupIdHex: String?,
-): ConversationNotificationTarget? {
-    val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return null
-    val group = groupIdHex?.takeIf { it.isNotBlank() } ?: return null
-    return ConversationNotificationTarget(account, group)
-}
-
-/**
- * The still-open conversation that becomes visible when the app returns to the
- * foreground. Backgrounding deliberately retains the active conversation, so
- * an unchanged Compose effect does not call [WhiteNoiseAppState.setActiveConversation]
- * again on resume. Do not clear its tray cards while the app lock covers it.
- */
-internal fun visibleConversationDismissalTarget(
-    appInForeground: Boolean,
-    appLockScreenVisible: Boolean,
-    activeAccountRef: String?,
-    groupIdHex: String?,
-): ConversationNotificationTarget? {
-    if (!appInForeground || appLockScreenVisible) return null
-    return conversationOpenDismissalTarget(activeAccountRef, groupIdHex)
-}
-
-internal suspend fun dismissConversationNotificationsOnOpen(
-    activeAccountRef: String?,
-    groupIdHex: String?,
-    dismissConversationNotifications: suspend (String, String) -> Unit,
-) {
-    conversationOpenDismissalTarget(activeAccountRef, groupIdHex)?.let { target ->
-        dismissConversationNotifications(target.accountRef, target.groupIdHex)
-    }
-}
-
-/**
- * A live notification subscription is a healthy local broadcast receiver and
- * survives relay connectivity changes. Reuse the listener job so queued or
- * in-flight updates are never destroyed; if it is backing off, reconnect wakes
- * that same job and awaits the receiver state it owns.
- */
-internal suspend fun awaitActiveNotificationReceiver(
-    isReceiverActive: () -> Boolean,
-    listenerJob: Job,
-    awaitReceiverActive: suspend () -> Unit,
-): Boolean {
-    if (isReceiverActive()) return true
-    return coroutineScope {
-        val ready =
-            async(start = CoroutineStart.UNDISPATCHED) {
-                awaitReceiverActive()
-                true
-            }
-        try {
-            select {
-                ready.onAwait { it }
-                listenerJob.onJoin { isReceiverActive() }
-            }
-        } finally {
-            ready.cancel()
-        }
-    }
-}
-
-/**
- * Establish the process-owned notification receiver at cold startup and wait
- * only for the bounded bootstrap budget. The listener itself outlives this
- * caller: timeout or bootstrap cancellation leaves its existing retry loop in
- * [notificationJob], while repeated startup callers reuse the same job.
- */
-internal suspend fun awaitNotificationReceiverForStartup(
-    notificationJob: NotificationJobSlot,
-    receiverActive: StateFlow<Boolean>,
-    receiverRetryWake: MutableStateFlow<Long>,
-    timeoutMillis: Long,
-    launchListener: () -> Job,
-): Boolean {
-    val listenerJob = notificationJob.currentOrStart(launchListener) ?: return false
-    if (!receiverActive.value) receiverRetryWake.update { it + 1L }
-    return withTimeoutOrNull(timeoutMillis) {
-        awaitActiveNotificationReceiver(
-            isReceiverActive = { receiverActive.value },
-            listenerJob = listenerJob,
-            awaitReceiverActive = { receiverActive.first { it } },
-        )
-    } ?: false
-}
-
-internal suspend fun awaitNotificationRetryWindow(
-    retryWake: StateFlow<Long>,
-    capturedGeneration: Long,
-    backoffMillis: Long,
-) {
-    withTimeoutOrNull(backoffMillis) {
-        retryWake.first { it != capturedGeneration }
-    }
-}
-
-internal interface AppNotificationSubscription {
-    suspend fun next(): NotificationUpdateFfi?
-
-    fun close()
-}
+internal fun Throwable.readableMessage(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
 internal data class AppMarmotRuntime(
     val rootPath: String,
@@ -554,465 +281,6 @@ internal data class HostPerformanceRuntimeOwner(
 )
 
 private fun openMarmotRuntime(context: Context) = MarmotClient(context).let { AppMarmotRuntime(it.rootPath, it.marmot) }
-
-private class NativeNotificationSubscription(
-    private val delegate: NotificationsSubscription,
-) : AppNotificationSubscription {
-    override suspend fun next(): NotificationUpdateFfi? = delegate.next()
-
-    override fun close() = delegate.close()
-}
-
-private suspend fun subscribeToNotifications(marmot: MarmotInterface): AppNotificationSubscription =
-    NativeNotificationSubscription(marmot.subscribeNotifications())
-
-internal class NotificationJobSlot {
-    private val lock = Any()
-    private var job: Job? = null
-    private var cancellation: CompletableDeferred<Unit>? = null
-
-    fun isActive(): Boolean = synchronized(lock) { job?.isActive == true }
-
-    // Called while holding [lock]; [start] must only enqueue work and return promptly.
-    fun startIfInactive(start: () -> Job) {
-        currentOrStart(start)
-    }
-
-    fun currentOrStart(start: () -> Job): Job? =
-        synchronized(lock) {
-            if (cancellation != null) return@synchronized null
-            job?.takeIf { it.isActive } ?: start().also { job = it }
-        }
-
-    suspend fun cancelAndJoin() {
-        var ownsCancellation = false
-        var ownedJob: Job? = null
-        val completion =
-            synchronized(lock) {
-                cancellation
-                    ?: CompletableDeferred<Unit>().also {
-                        cancellation = it
-                        ownsCancellation = true
-                        ownedJob = job
-                        job = null
-                    }
-            }
-        if (!ownsCancellation) {
-            completion.await()
-            return
-        }
-        try {
-            withContext(NonCancellable) {
-                ownedJob?.cancelAndJoin()
-            }
-        } finally {
-            synchronized(lock) {
-                if (cancellation === completion) cancellation = null
-            }
-            completion.complete(Unit)
-        }
-    }
-}
-
-/** Inline account profiles that the chat-list top bar can render at once. */
-internal const val MAX_TOP_BAR_OTHER_ACCOUNTS = 3
-
-/**
- * Signed-in signing accounts other than [activeLabel], for the chat-list top
- * bar's one-tap switcher row. Signed-out, read-only (neither local nor
- * external signer), and blank-label entries are excluded (they are not one-tap
- * switch targets from the chat-list chrome).
- *
- * Returns empty when [activeLabel] is null. A destructive Sign Out & Wipe
- * transiently nulls the active account while it drains the wiped account's
- * streams (#610), *before* [WhiteNoiseAppState.accounts] is refreshed. Without
- * this guard the "other accounts" filter (`label != activeLabel`) would match
- * every entry in the still-stale list and flash the just-wiped account — and
- * any account lingering in that pre-refresh snapshot — until the wipe settles
- * (#809). The row's premise is "accounts other than the active one," which is
- * undefined with no active account, so it must present nothing across that
- * transition.
- */
-
-internal fun otherAccountAvatars(
-    accounts: List<AccountSummaryFfi>,
-    activeLabel: String?,
-): List<AccountSummaryFfi> {
-    if (activeLabel == null) return emptyList()
-    return accounts.filter { account ->
-        account.isSignedInSigningAccount() &&
-            account.label != activeLabel
-    }
-}
-
-/**
- * Profiles that must be materialized before an account-switch composition is
- * published. Direct-chat peers seed the target chat list, while the bounded
- * account ids seed the other-account avatars rendered in its top bar.
- */
-internal fun accountSwitchProfileSeedIds(
-    directPeerIds: List<String>,
-    accounts: List<AccountSummaryFfi>,
-    targetAccountRef: String,
-): List<String> =
-    (
-        directPeerIds +
-            otherAccountAvatars(accounts, targetAccountRef)
-                .take(MAX_TOP_BAR_OTHER_ACCOUNTS)
-                .map(AccountSummaryFfi::accountIdHex)
-    ).distinctBy { it.lowercase(Locale.ROOT) }
-
-enum class RelayListKind {
-    Nip65,
-    Inbox,
-}
-
-internal enum class RelayUrlValidationResult {
-    Acceptable,
-    Invalid,
-}
-
-/**
- * One relay-list replacement. [readOnlyRelays] are canonical NIP-65 entries MarmotKit keeps read-only,
- * so at least one allowed relay outside them must survive for the account to keep a posting relay.
- */
-internal data class RelayListEditPlan(
-    val relays: List<String>,
-    val requiredRelay: String? = null,
-    val readOnlyRelays: Set<String> = emptySet(),
-)
-
-/** The declared addresses one relay edit starts from, with the canonical NIP-65 entries kept read-only. */
-internal class RelayEditAddresses(
-    val relays: List<String>,
-    val readOnly: Set<String> = emptySet(),
-)
-
-private enum class RelayPublishValidationError {
-    Invalid,
-    Blocked,
-    Unavailable,
-}
-
-private sealed interface RelayPublishValidation {
-    data class Ready(
-        val relays: List<String>,
-    ) : RelayPublishValidation
-
-    data class Rejected(
-        val error: RelayPublishValidationError,
-    ) : RelayPublishValidation
-}
-
-/** Canonicalizes secure public relay URLs without restricting them to White Noise-owned hosts. */
-internal fun normalizeRelayUrls(relays: Iterable<String>): List<String> =
-    relays
-        .mapNotNull(::canonicalRelayUrl)
-        .distinct()
-
-internal fun telemetryServiceVersion(
-    versionName: String,
-    versionCode: Int,
-): String = "${versionName.trim()}+$versionCode"
-
-internal fun telemetryDeploymentEnvironment(value: String): String =
-    when (val normalized = value.trim().lowercase(Locale.ROOT)) {
-        "production", "staging", "development", "test" -> normalized
-        "android-release" -> "production"
-        "dev" -> "development"
-        else -> "production"
-    }
-
-internal fun telemetryDeviceModelIdentifier(model: String): String? = model.trim().takeIf { it.isNotEmpty() }
-
-/** Returns whether a relay URL passes the synchronous structural and literal-host checks. */
-internal fun isAcceptableRelayUrl(url: String): Boolean = relayUrlValidationResult(url) == RelayUrlValidationResult.Acceptable
-
-/** Classifies a relay URL for immediate editor feedback; MarmotKit remains the publish boundary. */
-internal fun relayUrlValidationResult(url: String): RelayUrlValidationResult =
-    if (canonicalRelayUrl(url) == null) RelayUrlValidationResult.Invalid else RelayUrlValidationResult.Acceptable
-
-/** Builds an add mutation while preserving every other structurally valid imported relay. */
-internal fun relayListAfterAddition(
-    currentRelays: List<String>,
-    relayToAdd: String,
-): RelayListEditPlan? {
-    val canonicalRelay = canonicalRelayUrl(relayToAdd) ?: return null
-    return RelayListEditPlan(
-        relays = normalizeRelayUrls(currentRelays + canonicalRelay),
-        requiredRelay = canonicalRelay,
-    )
-}
-
-/** Builds a removal mutation that deletes only the selected relay and keeps safe imported siblings. */
-internal fun relayListAfterRemoval(
-    currentRelays: List<String>,
-    relayToRemove: String,
-    fallbackRelays: List<String> = MarmotClient.bootstrapRelays,
-): RelayListEditPlan {
-    val target = relayToRemove.trim()
-    val remaining =
-        currentRelays
-            .map(String::trim)
-            .filter { it.isNotEmpty() && it != target }
-            .distinct()
-    val supported = normalizeRelayUrls(remaining)
-    return RelayListEditPlan(
-        relays = supported.ifEmpty { normalizeRelayUrls(fallbackRelays) },
-    )
-}
-
-/** Prevents removing the final publishable relay while permitting targeted cleanup. */
-internal fun canRemoveRelay(
-    currentRelays: List<String>,
-    relay: String,
-): Boolean = normalizeRelayUrls(currentRelays.filterNot { it.trim() == relay.trim() }).isNotEmpty()
-
-/**
- * Keeps MarmotKit-approved endpoints while requiring a requested addition to survive classification,
- * and refuses a list whose only approved entries are read-only, which would leave no posting relay.
- */
-internal fun allowedRelayUrlsForPublish(
-    plan: RelayListEditPlan,
-    classified: List<RelayEndpointClassificationFfi>,
-): List<String>? {
-    val requiredRelayAllowed =
-        plan.requiredRelay == null ||
-            classified.any {
-                it.policy == RelayEndpointPolicyFfi.ALLOWED && canonicalRelayUrl(it.endpoint) == plan.requiredRelay
-            }
-    val allowedRelays =
-        classified
-            .filter { it.policy == RelayEndpointPolicyFfi.ALLOWED }
-            .mapNotNull(RelayEndpointClassificationFfi::normalizedEndpoint)
-            .mapNotNull(::canonicalRelayUrl)
-            .distinct()
-    return allowedRelays.takeIf { relays -> requiredRelayAllowed && relays.any { it !in plan.readOnlyRelays } }
-}
-
-internal enum class RelayResolveTimeCheckResult {
-    Passed,
-    Blocked,
-    Unavailable,
-}
-
-/** Injectable DNS resolver for relay resolve-time SSRF checks (unit tests). */
-internal typealias RelayHostResolver = (String) -> Array<InetAddress>?
-
-/**
- * Resolve-time SSRF guard for app-owned relay fetches. Call from a background
- * dispatcher after cheap [canonicalRelayUrl] / [normalizeRelayUrls] canonicalization.
- */
-internal fun relayUrlResolveTimeCheckResult(
-    canonicalUrl: String,
-    resolve: RelayHostResolver = ::resolveRelayHost,
-): RelayResolveTimeCheckResult {
-    val host =
-        runCatching { URI(canonicalUrl).host?.removeSurrounding("[", "]") }
-            .getOrNull()
-            ?.takeIf { it.isNotBlank() }
-            ?: return RelayResolveTimeCheckResult.Blocked
-    val resolved = resolve(host) ?: return RelayResolveTimeCheckResult.Unavailable
-    if (resolved.isEmpty()) return RelayResolveTimeCheckResult.Unavailable
-    return if (resolved.none { HostSafety.isPrivateOrLoopbackAddress(it) }) {
-        RelayResolveTimeCheckResult.Passed
-    } else {
-        RelayResolveTimeCheckResult.Blocked
-    }
-}
-
-internal fun relayUrlPassesResolveTimeCheck(
-    canonicalUrl: String,
-    resolve: RelayHostResolver = ::resolveRelayHost,
-): Boolean = relayUrlResolveTimeCheckResult(canonicalUrl, resolve) == RelayResolveTimeCheckResult.Passed
-
-/** Resolve-checks only a newly requested relay; removal plans preserve unreachable imported relays. */
-internal fun requiredRelayResolveTimeCheckResult(
-    plan: RelayListEditPlan,
-    resolve: RelayHostResolver = ::resolveRelayHost,
-): RelayResolveTimeCheckResult =
-    plan.requiredRelay
-        ?.let { relayUrlResolveTimeCheckResult(it, resolve) }
-        ?: RelayResolveTimeCheckResult.Passed
-
-private fun resolveRelayHost(host: String): Array<InetAddress>? = runCatching { InetAddress.getAllByName(host) }.getOrNull()
-
-private fun canonicalRelayUrl(url: String): String? {
-    return runCatching {
-        val uri = URI(url.trim())
-        if (uri.scheme?.equals("wss", ignoreCase = true) != true || uri.userInfo != null) {
-            return@runCatching null
-        }
-        if (uri.port != -1 && uri.port != 443) return@runCatching null
-        val host = uri.host ?: uri.rawAuthority?.relayHostCandidate() ?: return@runCatching null
-        val hostWithoutBrackets = host.removeSurrounding("[", "]")
-        if (hostWithoutBrackets.any { it.isWhitespace() }) return@runCatching null
-        val asciiHost =
-            if (hostWithoutBrackets.contains(":")) {
-                hostWithoutBrackets
-            } else {
-                IDN.toASCII(hostWithoutBrackets)
-            }
-        val canonicalHost =
-            asciiHost.lowercase(Locale.ROOT).takeIf { it.isNotBlank() }
-                ?: return@runCatching null
-        // SSRF guard: relay URLs can arrive from untrusted protocol messages, so
-        // never accept one that points the client at loopback or the local
-        // network. See issue #82.
-        if (HostSafety.isPrivateOrLoopbackHost(canonicalHost)) return@runCatching null
-        val authorityHost = if (canonicalHost.contains(":")) "[$canonicalHost]" else canonicalHost
-        val port =
-            uri.port
-                .takeIf { it >= 0 }
-                ?.let { ":$it" }
-                .orEmpty()
-        val path = uri.rawPath.orEmpty()
-        val query = uri.rawQuery?.let { "?$it" }.orEmpty()
-        "wss://$authorityHost$port$path$query"
-    }.getOrNull()
-}
-
-private fun String.relayHostCandidate(): String? {
-    if (isBlank() || contains("@")) return null
-    if (startsWith("[")) return substringAfter("[", "").substringBefore("]", "").takeIf { it.isNotBlank() }
-    return if (count { it == ':' } == 1) substringBefore(":") else this
-}
-
-/**
- * Access-order conversation-state retention with an optional protected key for
- * the chat currently on screen. The protected key is promoted before overflow
- * pruning so an active controller's optimistic/retry state cannot be aged out
- * by other conversations touching their own state maps.
- * Queued and running uploads also protect their conversation until settlement;
- * pruning then restores the ordinary window and releases inactive private sources.
- */
-internal class ConversationStateRetention(
-    private val maxEntries: Int,
-    private val isProtected: (String) -> Boolean = { false },
-) {
-    private val recentKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
-
-    init {
-        require(maxEntries > 0) { "maxEntries must be positive" }
-    }
-
-    fun retain(
-        key: String,
-        protectedKey: String? = null,
-    ): List<String> {
-        recentKeys[key] = Unit
-        promoteProtected(protectedKey)
-        return evictOverflow(protectedKey)
-    }
-
-    fun promote(
-        key: String,
-        protectedKey: String? = null,
-    ): List<String> {
-        if (recentKeys.containsKey(key)) {
-            recentKeys[key] = Unit
-        }
-        promoteProtected(protectedKey)
-        return evictOverflow(protectedKey)
-    }
-
-    fun keysSnapshot(): List<String> = recentKeys.keys.toList()
-
-    /** Settled uploads return to the ordinary retention window without promoting stale state. */
-    fun prune(protectedKey: String? = null): List<String> = evictOverflow(protectedKey)
-
-    private fun promoteProtected(protectedKey: String?) {
-        if (protectedKey != null && recentKeys.containsKey(protectedKey)) {
-            recentKeys[protectedKey] = Unit
-        }
-    }
-
-    /** Evicts idle conversations only; active uploads may temporarily exceed the ordinary retention window. */
-    private fun evictOverflow(protectedKey: String?): List<String> {
-        val evicted = mutableListOf<String>()
-        while (recentKeys.size > maxEntries) {
-            val staleKey = recentKeys.keys.firstOrNull { it != protectedKey && !isProtected(it) } ?: break
-            recentKeys.remove(staleKey)
-            evicted += staleKey
-        }
-        return evicted
-    }
-}
-
-internal data class ProfilePresentationRevision(
-    val profiles: Int,
-    val contactNicknames: Int,
-)
-
-internal data class ProfileAccountRevision(
-    val epoch: Int,
-    val account: Int,
-)
-
-internal fun contactNicknameAccountRefForAccess(
-    accountRef: String?,
-    accounts: List<AccountSummaryFfi>,
-    contactPubkeyHex: String,
-): String? {
-    val account = accountRef ?: return null
-    if (isLocalContactAccount(accounts, contactPubkeyHex)) return null
-    return account
-}
-
-internal fun isLocalContactAccount(
-    accounts: List<AccountSummaryFfi>,
-    accountIdHex: String,
-): Boolean = accounts.any { it.accountIdHex.equals(accountIdHex, ignoreCase = true) }
-
-internal fun networkDisplayNameFallback(
-    accountLabel: String?,
-    accountIdHex: String,
-    shortNpub: (String) -> String,
-): String {
-    val label = accountLabel?.takeIf { it.isNotBlank() }
-    if (label != null && !IdentityFormatter.isNostrIdentityFallback(label)) {
-        return label
-    }
-    return shortNpub(accountIdHex)
-}
-
-/** The cached or freshly encoded npub for [accountIdHex], or empty rather than a non-npub or the raw hex. */
-internal fun npubPresentation(
-    accountIdHex: String,
-    cachedNpub: String?,
-    encode: (String) -> String?,
-): String {
-    val candidate = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull()
-    return candidate
-        ?.takeIf { it.startsWith("npub1") && !it.equals(accountIdHex, ignoreCase = true) }
-        .orEmpty()
-}
-
-/**
- * Fail-closed npub for visible/copy profile and message surfaces. Keeps an
- * already-canonical [reference] when it is not the raw account hex, lowercasing an
- * all-uppercase key; otherwise derives through [npubForDisplay] from [resolvedAccountIdHex].
- */
-internal fun presentationNpubFromReference(
-    reference: String,
-    resolvedAccountIdHex: String?,
-    npubForDisplay: (String) -> String,
-): String {
-    if (
-        reference.startsWith("npub1", ignoreCase = true) &&
-        resolvedAccountIdHex?.equals(reference, ignoreCase = true) != true
-    ) {
-        // Bech32 allows one case; an all-uppercase key is the same key, so show and copy its canonical lowercase.
-        return if (reference == reference.uppercase(Locale.ROOT)) reference.lowercase(Locale.ROOT) else reference
-    }
-    return resolvedAccountIdHex?.let(npubForDisplay).orEmpty()
-}
-
-internal fun operationalNpub(
-    accountIdHex: String,
-    cachedNpub: String?,
-    encode: (String) -> String?,
-): String = cachedNpub ?: runCatching { encode(accountIdHex) }.getOrNull() ?: accountIdHex
 
 private const val APP_STATE_SCOPE_LOG_TAG = "WhiteNoiseAppState"
 private const val FCM_REGISTRATION_BATCH_SIZE = 3
@@ -2298,42 +1566,6 @@ class WhiteNoiseAppState private constructor(
 
     var onAllowChatScreenshotsChanged: ((Boolean) -> Unit)? = null
 
-    var requireAppUnlock by mutableStateOf(preferences.getBoolean(REQUIRE_APP_UNLOCK_KEY, false))
-        private set
-
-    var appLockDelay by mutableStateOf(AppLockDelay.fromPreference(preferences.getString(APP_LOCK_DELAY_KEY, null)))
-        private set
-
-    var appLockCredentialAvailable by mutableStateOf(isAppLockCredentialAvailable(appContext))
-        private set
-
-    var appLockScreenVisible by mutableStateOf(false)
-        private set
-
-    private var appLockTtsBoundaryJob: Job? = null
-
-    val notificationActionsAllowed: Boolean
-        get() = notificationActionsAllowed(appLockScreenVisible)
-
-    var appUnlockError by mutableStateOf<AppText?>(null)
-        private set
-
-    internal val appUnlockSessions = AppUnlockSessionController()
-    internal val appUnlockPromptRequestId: Long get() = appUnlockSessions.latestSessionId
-
-    // Populated by the off-main pre-warm (or the first unlock/background
-    // write); the getter NEVER reads the Keystore-backed store itself — a
-    // first foreground that beats the pre-warm would otherwise pay the
-    // Tink/Keystore init on Main (or block on its lock), the exact cold-start
-    // cost this replaced. Until the value lands, 0L errs toward showing the
-    // lock prompt — the safe direction for a privacy feature.
-    private var lastAppUnlockAtMillisBacking: Long? = null
-    private var lastAppUnlockAtMillis: Long
-        get() = lastAppUnlockAtMillisBacking ?: 0L
-        set(value) {
-            lastAppUnlockAtMillisBacking = value
-        }
-
     var themeMode by mutableStateOf(AppThemeMode.fromPreference(preferences.getString(THEME_MODE_KEY, null)))
         private set
 
@@ -2750,7 +1982,24 @@ class WhiteNoiseAppState private constructor(
             }
         }
     private val hostPreferenceCommitMutex = Mutex()
-    private val appLockTimestampWriteMutex = Mutex()
+    internal val appLock =
+        AppLockController(
+            context = appContext,
+            preferences = preferences,
+            scope = mutationsScope,
+            persistSetting = ::persistHostSetting,
+            timestampWrite = appLockTimestampWrite,
+            persistenceDispatcher = appLockPersistenceDispatcher,
+            appInForeground = { appInForeground },
+            stopSpeaking = ::stopSpeaking,
+            presentNotice = { present(it) },
+            resumeForegroundWork = { if (appInForeground) initializedConversationDictation()?.onAppForegrounded() },
+            resumeDeferredWork = ::resumePendingInviteNotificationIdentityRefreshes,
+            onUnlockSucceeded = { dismissRetainedVisibleConversation ->
+                resumePushWakeEpisodeFromLifecycle()
+                if (dismissRetainedVisibleConversation) dismissVisibleConversationNotifications()
+            },
+        )
     private val inFlightAttachmentAcquisitions =
         InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
 
@@ -2789,7 +2038,7 @@ class WhiteNoiseAppState private constructor(
             intentStore = attachmentDownloadIntents,
             scope = mutationsScope,
             enqueue = ::enqueueAttachmentDownload,
-            foregroundEligible = { appInForeground && !appLockScreenVisible },
+            foregroundEligible = { appInForeground && !appLock.screenVisible },
         )
     private val forwardTerminalDismiss =
         ForwardTerminalDismissPolicy(
@@ -2949,7 +2198,7 @@ class WhiteNoiseAppState private constructor(
 
     private val notificationAvatarCoordinator by lazy {
         NotificationAvatarCoordinator(
-            appLocked = { appLockScreenVisible },
+            appLocked = { appLock.screenVisible },
             shouldPost = this::shouldPostNotification,
             canPost = localNotificationPresenter::canPostNotifications,
             senderAvatarUrl = { update -> notificationSenderAvatarUrl(update, ::loadUserProfile) },
@@ -3064,7 +2313,7 @@ class WhiteNoiseAppState private constructor(
     ): Boolean =
         conversationDictationOriginVisible(
             appInForeground = appInForeground,
-            appLockScreenVisible = appLockScreenVisible,
+            appLockScreenVisible = appLock.screenVisible,
             pendingProfileNpub = pendingProfileNpub,
             activeAccountRef = activeConversationAccountRef,
             activeGroupIdHex = activeConversationGroupIdHex,
@@ -3167,7 +2416,7 @@ class WhiteNoiseAppState private constructor(
         expectedRevision: Long,
         value: TextFieldValue,
     ): dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite =
-        if (appLockScreenVisible || appUnlockEvaluationPending) {
+        if (appLock.screenVisible || appLock.evaluationPending) {
             dev.ipf.whitenoise.android.audio.ConversationDictationDraftWrite.DeferredByHost
         } else {
             composerDraftExpansionBridge
@@ -3182,7 +2431,7 @@ class WhiteNoiseAppState private constructor(
         expectedRevision: Long,
         value: TextFieldValue,
     ): Long? =
-        writeConversationDictationDraftWhenUnlocked(appLockScreenVisible, appUnlockEvaluationPending) {
+        writeConversationDictationDraftWhenUnlocked(appLock.screenVisible, appLock.evaluationPending) {
             composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
         }
 
@@ -4282,7 +3531,7 @@ class WhiteNoiseAppState private constructor(
         peer: String?,
     ): PinnedConversationPicture {
         val available = accounts.any { it.label == account && !it.signedOut }
-        if (!available || appLockScreenVisible || isContactRefBeingCleared(account)) {
+        if (!available || appLock.screenVisible || isContactRefBeingCleared(account)) {
             return PinnedConversationPicture(null)
         }
         val privatePeer = peer?.takeIf { contactNicknameAccountRefForAccess(account, accounts, it) != null }
@@ -4351,8 +3600,8 @@ class WhiteNoiseAppState private constructor(
     ): Boolean =
         activeAccountRef == account &&
             runtimeGeneration == runtime &&
-            !appLockScreenVisible &&
-            !appUnlockEvaluationPending &&
+            !appLock.screenVisible &&
+            !appLock.evaluationPending &&
             accounts.any { it.label == account && it.isSignedInSigningAccount() }
 
     /** Rebuilds approved pins' labels and cached pixels for one captured account/runtime; no pins means no work. */
@@ -4448,136 +3697,6 @@ class WhiteNoiseAppState private constructor(
             activeForwardTargetTitles = targetTitles
         }
         return started
-    }
-
-    /**
-     * Forward [text] into each of [targetGroupIds] as a fresh send.
-     *
-     * Each target is an independent [sendText] into that group, so the message
-     * is re-encrypted under that group's own MLS state — there is no
-     * cross-group key reuse and no source-group key material leaves the origin
-     * conversation. The plain body is sent verbatim: it carries neither the
-     * original sender's pubkey nor the source group id, so a forward never
-     * leaks cross-group attribution (issue #390 privacy notes). The optional
-     * receiver-visible "Forwarded" label is deliberately *not* embedded here —
-     * the FFI text-send carries no source-free forward marker, so a
-     * receiver-visible label would require either an engine change or a content
-     * marker that crosses the group boundary; that is a separate product/privacy
-     * decision tracked as a follow-up.
-     *
-     * Sends fan out on [launchMutation] so each MLS commit + Nostr publish
-     * survives the picker sheet dismissing immediately after the user confirms.
-     * Per-target failures are counted and surfaced in the result toast rather
-     * than aborting the remaining targets — one unreachable group must not block
-     * delivery to the others. Blank text and an empty target set are no-ops.
-     */
-    fun forwardText(
-        targetGroupIds: List<String>,
-        text: String,
-    ) {
-        val trimmed = text.trim()
-        val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        // Forward eligibility already blocks these, this keeps any other caller from sending one.
-        val tooLong = exceedsOutgoingMessageLimit(trimmed)
-        if (tooLong) present(R.string.toast_message_too_long)
-        if (trimmed.isEmpty() || targets.isEmpty() || tooLong) return
-        val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
-        launchMutation {
-            var failures = 0
-            var firstFailure: Throwable? = null
-            for (groupIdHex in targets) {
-                val result =
-                    runCatchingCancellable {
-                        withGroupCommitLock(account, groupIdHex) {
-                            marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, groupIdHex, trimmed) }
-                        }
-                    }
-                result.onFailure {
-                    failures += 1
-                    if (firstFailure == null) firstFailure = it
-                }
-            }
-            val delivered = targets.size - failures
-            when {
-                failures == 0 ->
-                    presentTransient(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(delivered)))
-                delivered == 0 ->
-                    presentFailure(R.string.toast_forward_failed, "MESSAGE_FORWARD", requireNotNull(firstFailure))
-                else -> {
-                    val partialTitle =
-                        AppText.Resource(
-                            R.string.toast_forwarded_partial,
-                            listOf("$delivered/${targets.size}"),
-                        )
-                    presentFailure(
-                        title = partialTitle,
-                        operationCode = "MESSAGE_FORWARD_PARTIAL",
-                        throwable = requireNotNull(firstFailure),
-                    )
-                }
-            }
-        }
-    }
-
-    /**
-     * Forward multiple text messages to each target chat in their original
-     * timeline order. One target's batch holds the group commit lock for the
-     * complete sequence so another mutation cannot interleave between messages.
-     */
-    @Suppress("CyclomaticComplexMethod") // Fan-out accounting keeps partial-success reporting in one transaction.
-    fun forwardTexts(
-        targetGroupIds: List<String>,
-        texts: List<String>,
-    ) {
-        val bodies = MessageProjector.validatedForwardTextBodies(texts)
-        val targets = MessageProjector.normalizeForwardTargets(targetGroupIds)
-        val tooLong = bodies.any { exceedsOutgoingMessageLimit(it.trim()) }
-        if (tooLong) present(R.string.toast_message_too_long)
-        if (bodies.isEmpty() || targets.isEmpty() || tooLong) return
-        val account = activeAccountRef?.takeIf { it.isNotBlank() } ?: return
-        launchMutation {
-            var completeTargets = 0
-            var successfulSends = 0
-            var firstFailure: Throwable? = null
-            for (groupIdHex in targets) {
-                var targetComplete = true
-                try {
-                    withGroupCommitLock(account, groupIdHex) {
-                        for (body in bodies) {
-                            try {
-                                marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, groupIdHex, body) }
-                                successfulSends += 1
-                            } catch (throwable: Throwable) {
-                                if (throwable is CancellationException) throw throwable
-                                if (firstFailure == null) firstFailure = throwable
-                                targetComplete = false
-                            }
-                        }
-                    }
-                } catch (throwable: Throwable) {
-                    if (throwable is CancellationException) throw throwable
-                    if (firstFailure == null) firstFailure = throwable
-                    targetComplete = false
-                }
-                if (targetComplete) completeTargets += 1
-            }
-            when {
-                completeTargets == targets.size ->
-                    presentTransient(AppText.Resource(R.string.toast_forwarded_to_chats, listOf(completeTargets)))
-                successfulSends == 0 ->
-                    presentFailure(
-                        R.string.toast_forward_batch_failed,
-                        "MESSAGE_FORWARD_BATCH",
-                        requireNotNull(firstFailure),
-                    )
-                else ->
-                    presentFailure(
-                        R.string.toast_forwarded_batch_partial,
-                        "MESSAGE_FORWARD_BATCH_PARTIAL",
-                        requireNotNull(firstFailure),
-                    )
-            }
-        }
     }
 
     fun profileAddableGroups(accountIdHex: String): List<ChatListItem> =
@@ -7947,231 +7066,6 @@ class WhiteNoiseAppState private constructor(
         }.getOrNull()
     }
 
-    suspend fun accountRelayLists(): AccountRelayListsFfi? = activeAccountRef?.let { loadAccountRelayLists(it) }
-
-    /** Adds a relay while preserving the other declared addresses for this list. */
-    suspend fun addAccountRelay(
-        account: String?,
-        kind: RelayListKind,
-        relay: String,
-    ): AccountRelayListsFfi? {
-        val validationError =
-            when (relayUrlValidationResult(relay)) {
-                RelayUrlValidationResult.Acceptable -> null
-                RelayUrlValidationResult.Invalid -> R.string.error_invalid_relay_url
-            }
-        val current = account?.takeIf { validationError == null }?.let { loadRelayEditAddresses(it, kind) }
-        val plan = current?.let { relayListAfterAddition(it.relays, relay)?.copy(readOnlyRelays = it.readOnly) }
-        return when {
-            validationError != null -> {
-                present(R.string.toast_relay_update_failed, validationError)
-                null
-            }
-            account == null -> {
-                present(R.string.toast_relay_update_failed, R.string.no_active_account_period)
-                null
-            }
-            current == null -> {
-                present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
-                null
-            }
-            plan == null -> {
-                present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url)
-                null
-            }
-            else -> publishAccountRelays(account, kind, plan)
-        }
-    }
-
-    /** Removes a relay without truncating the list to its routing projection. */
-    suspend fun removeAccountRelay(
-        account: String?,
-        kind: RelayListKind,
-        relay: String,
-    ): AccountRelayListsFfi? {
-        val current = account?.let { loadRelayEditAddresses(it, kind) }
-        return when {
-            account == null -> {
-                present(R.string.toast_relay_update_failed, R.string.no_active_account_period)
-                null
-            }
-            current == null -> {
-                present(R.string.toast_relay_update_failed, R.string.no_relay_projection)
-                null
-            }
-            else ->
-                publishAccountRelays(
-                    account,
-                    kind,
-                    relayListAfterRemoval(current.relays, relay).copy(readOnlyRelays = current.readOnly),
-                )
-        }
-    }
-
-    /** Validates and publishes one relay-list edit after app-level and MarmotKit policy checks. */
-    internal suspend fun publishAccountRelays(
-        account: String,
-        kind: RelayListKind,
-        plan: RelayListEditPlan,
-    ): AccountRelayListsFfi? =
-        when (val validation = relayPublishValidation(plan)) {
-            is RelayPublishValidation.Rejected -> {
-                when (validation.error) {
-                    RelayPublishValidationError.Invalid ->
-                        present(R.string.toast_relay_update_failed, R.string.error_invalid_relay_url)
-                    RelayPublishValidationError.Blocked ->
-                        present(
-                            R.string.toast_relay_update_failed,
-                            R.string.error_remove_invalid_relay_urls_first,
-                        )
-                    RelayPublishValidationError.Unavailable ->
-                        present(
-                            R.string.toast_relay_update_failed,
-                            R.string.error_couldnt_verify_relay_hosts,
-                        )
-                }
-                null
-            }
-
-            is RelayPublishValidation.Ready ->
-                runCatchingCancellable {
-                    marmotIo {
-                        when (kind) {
-                            RelayListKind.Nip65 ->
-                                setAccountNip65Relays(account, validation.relays, MarmotClient.bootstrapRelays)
-                            RelayListKind.Inbox ->
-                                setAccountInboxRelays(account, validation.relays, MarmotClient.bootstrapRelays)
-                        }
-                    }
-                }.onSuccess {
-                    presentTransient(R.string.toast_relay_list_updated)
-                }.onFailure {
-                    presentFailure(R.string.toast_relay_update_failed, "RELAY_LIST_UPDATE", it)
-                }.getOrNull()
-        }
-
-    internal suspend fun loadAccountRelayLists(account: String): AccountRelayListsFfi? =
-        runCatchingCancellable { marmotIo { accountRelayLists(account) } }.getOrNull()
-
-    /** Applies MarmotKit's shared relay policy and strips only unsafe pre-existing entries. */
-    private suspend fun relayPublishValidation(plan: RelayListEditPlan): RelayPublishValidation =
-        if (plan.relays.isEmpty() || plan.relays.any { !isAcceptableRelayUrl(it) }) {
-            RelayPublishValidation.Rejected(RelayPublishValidationError.Invalid)
-        } else {
-            when (withContext(Dispatchers.IO) { requiredRelayResolveTimeCheckResult(plan) }) {
-                RelayResolveTimeCheckResult.Blocked ->
-                    RelayPublishValidation.Rejected(RelayPublishValidationError.Blocked)
-                RelayResolveTimeCheckResult.Unavailable ->
-                    RelayPublishValidation.Rejected(RelayPublishValidationError.Unavailable)
-                RelayResolveTimeCheckResult.Passed ->
-                    runCatchingCancellable {
-                        marmotIo { classifyRelayEndpoints(plan.relays) }
-                    }.fold(
-                        onSuccess = { classified ->
-                            allowedRelayUrlsForPublish(plan, classified)
-                                ?.let(RelayPublishValidation::Ready)
-                                ?: RelayPublishValidation.Rejected(RelayPublishValidationError.Blocked)
-                        },
-                        onFailure = {
-                            RelayPublishValidation.Rejected(RelayPublishValidationError.Unavailable)
-                        },
-                    )
-            }
-        }
-
-    /**
-     * Reads the addresses an edit starts from: the full NIP-65 list, so the native setter can preserve
-     * read-only roles, or the Inbox list. A NIP-65 read also marks entries outside the posting projection
-     * as read-only, and fails when either list is unavailable.
-     */
-    private suspend fun loadRelayEditAddresses(
-        account: String,
-        kind: RelayListKind,
-    ): RelayEditAddresses? =
-        when (kind) {
-            RelayListKind.Nip65 -> {
-                val declared = runCatchingCancellable { marmotIo { accountNip65Relays(account) } }.getOrNull()
-                val posting = loadAccountRelayLists(account)?.nip65?.relays
-                if (declared == null || posting == null) {
-                    null
-                } else {
-                    val readOnly = normalizeRelayUrls(declared).toSet() - normalizeRelayUrls(posting).toSet()
-                    RelayEditAddresses(declared, readOnly)
-                }
-            }
-            RelayListKind.Inbox -> loadAccountRelayLists(account)?.inbox?.relays?.let { RelayEditAddresses(it) }
-        }
-
-    fun bootstrapRelayCount(): Int = MarmotClient.bootstrapRelays.size
-
-    /** Deletes a KeyPackage only for its still-active account through safe MDK-provided sources. */
-    suspend fun deleteKeyPackage(
-        accountRef: String,
-        eventIdHex: String,
-        sourceRelays: List<String>,
-    ): Boolean =
-        deleteKeyPackageWithDependencies(
-            accountRef = accountRef,
-            eventIdHex = eventIdHex,
-            sourceRelays = sourceRelays,
-            classify = { relays -> marmotIo { classifyRelayEndpoints(relays) } },
-            resolve = { host -> resolveKeyPackageDeletionHost(host) },
-            delete = { account, eventId, relays ->
-                marmotIo { deleteAccountKeyPackage(account, eventId, relays) }
-            },
-        )
-
-    /** Runs the account-fenced deletion route with injectable native and DNS boundaries. */
-    internal suspend fun deleteKeyPackageWithDependencies(
-        accountRef: String,
-        eventIdHex: String,
-        sourceRelays: List<String>,
-        classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
-        resolve: KeyPackageDeletionHostResolver,
-        delete: suspend (accountRef: String, eventIdHex: String, relays: List<String>) -> Unit,
-    ): Boolean {
-        val account = activeAccountRef?.takeIf { it == accountRef }
-        val accountSwitchGeneration = account?.let(accountSwitchHandoff::captureForAccount)
-        if (account == null || accountSwitchGeneration == null) return false
-        val result =
-            deleteKeyPackageThroughSafeSourceRelays(
-                sourceRelays = sourceRelays,
-                classify = classify,
-                resolve = resolve,
-                accountStillActive = {
-                    activeAccountRef == account && isAccountSwitchCurrent(accountSwitchGeneration)
-                },
-                delete = { relays -> delete(account, eventIdHex, relays) },
-            )
-        return presentKeyPackageDeletionResult(result, AppText.Resource(R.string.error_couldnt_verify_relay_hosts))
-    }
-
-    suspend fun publishNewKeyPackage(): Boolean {
-        val account = activeAccountRef ?: return false
-        return runCatching {
-            marmotIo { publishNewKeyPackage(account) }
-            presentTransient(R.string.toast_new_key_package_published)
-            true
-        }.getOrElse {
-            if (it is CancellationException) throw it
-            presentFailure(R.string.toast_couldnt_publish_key_package, "KEY_PACKAGE_PUBLISH", it)
-            false
-        }
-    }
-
-    suspend fun republishKeyPackage(): Boolean {
-        val account = activeAccountRef ?: return false
-        return runCatching {
-            marmotIo { republishKeyPackage(account) }
-            presentTransient(R.string.toast_key_package_republished)
-            true
-        }.getOrElse {
-            if (it is CancellationException) throw it
-            presentFailure(R.string.toast_couldnt_republish_key_package, "KEY_PACKAGE_REPUBLISH", it)
-            false
-        }
-    }
-
     /** Commits one host preference transaction off-main and times actual durable completion. */
     @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
     private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
@@ -8214,169 +7108,6 @@ class WhiteNoiseAppState private constructor(
         allowChatScreenshotsInChats = enabled
         persistHostSetting { ChatScreenshotPreferences.editAllowChatScreenshots(this, enabled) }
         onAllowChatScreenshotsChanged?.invoke(enabled)
-    }
-
-    fun refreshAppLockCredentialAvailability() {
-        appLockCredentialAvailable = isAppLockCredentialAvailable(appContext)
-        if (!appLockCredentialAvailable) {
-            appUnlockSessions.clear()
-            appLockScreenVisible = false
-            appUnlockError = null
-            resumePendingInviteNotificationIdentityRefreshes()
-        }
-    }
-
-    fun updateRequireAppUnlock(enabled: Boolean) {
-        refreshAppLockCredentialAvailability()
-        if (enabled && !appLockCredentialAvailable) {
-            requireAppUnlock = false
-            persistHostSetting { putBoolean(REQUIRE_APP_UNLOCK_KEY, false) }
-            present(R.string.toast_app_lock_screen_lock_required)
-            return
-        }
-        requireAppUnlock = enabled
-        persistHostSetting { putBoolean(REQUIRE_APP_UNLOCK_KEY, enabled) }
-        if (enabled) {
-            requestAppUnlock()
-        } else {
-            appUnlockSessions.clear()
-            appLockScreenVisible = false
-            appUnlockError = null
-            resumePendingInviteNotificationIdentityRefreshes()
-        }
-    }
-
-    fun updateAppLockDelay(delay: AppLockDelay) {
-        appLockDelay = delay
-        persistHostSetting { putString(APP_LOCK_DELAY_KEY, delay.preferenceValue) }
-    }
-
-    fun requestAppUnlock() {
-        refreshAppLockCredentialAvailability()
-        if (!requireAppUnlock || !appLockCredentialAvailable) return
-        showAppLockScreen()
-        if (appUnlockSessions.begin()) appUnlockError = null
-    }
-
-    private fun showAppLockScreen() {
-        appLockScreenVisible = true
-        stopSpeaking()
-    }
-
-    /** Capture on Main; serialize before dispatch so a slower old write cannot overtake a newer event. */
-    private fun persistAppLockTimestamp(value: Long) {
-        mutationsScope.launch {
-            appLockTimestampWriteMutex.withLock {
-                withContext(appLockPersistenceDispatcher) {
-                    val write = appLockTimestampWrite
-                    if (write != null) {
-                        write(value)
-                    } else {
-                        AppLockPreferences.writeLastUnlockedAtMillis(appContext, value)
-                    }
-                }
-            }
-        }
-    }
-
-    /** Publish successful authentication immediately; persist its captured grace baseline asynchronously. */
-    internal fun markAppUnlockSucceeded(
-        nowMillis: Long = System.currentTimeMillis(),
-        dismissRetainedVisibleConversation: Boolean = true,
-    ) {
-        val normalizedNow = nowMillis.coerceAtLeast(0L)
-        lastAppUnlockAtMillis = normalizedNow
-        persistAppLockTimestamp(normalizedNow)
-        appLockScreenVisible = false
-        appUnlockError = null
-        if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
-        resumePendingInviteNotificationIdentityRefreshes()
-        resumePushWakeEpisodeFromLifecycle()
-        if (dismissRetainedVisibleConversation) {
-            dismissVisibleConversationNotifications()
-        }
-    }
-
-    internal fun markAppUnlockFailed(message: AppText = AppText.Resource(R.string.app_lock_auth_cancelled)) {
-        if (!appLockScreenVisible) return
-        appUnlockError = message
-    }
-
-    // True while the foreground lock decision waits for off-main unlock time. The secure scrim remains visible,
-    // and the prompt waits for the real value so the grace period is not falsely treated as expired.
-    var appUnlockEvaluationPending by mutableStateOf(false)
-        private set
-
-    fun maybeShowAppLockForForeground(nowMillis: Long = System.currentTimeMillis()) {
-        refreshAppLockCredentialAvailability()
-        // Skip timestamp work when app lock is disabled or the device credential is unavailable.
-        if (!requireAppUnlock || !appLockCredentialAvailable) return
-        val promptActive = appUnlockSessions.activeSessionId != null
-        if (promptActive) showAppLockScreen()
-        if (promptActive || appUnlockSessions.consumeForegroundReturn(SystemClock.elapsedRealtime())) return
-        val knownLastUnlock = lastAppUnlockAtMillisBacking
-        if (knownLastUnlock == null) {
-            deferAppLockDecisionUntilTimestampLoads(nowMillis)
-        } else if (
-            shouldShowAppLock(
-                requireUnlock = requireAppUnlock,
-                credentialAvailable = appLockCredentialAvailable,
-                lastUnlockedAtMillis = knownLastUnlock,
-                nowMillis = nowMillis,
-                delay = appLockDelay,
-            )
-        ) {
-            requestAppUnlock()
-        }
-    }
-
-    private fun deferAppLockDecisionUntilTimestampLoads(nowMillis: Long) {
-        if (appUnlockEvaluationPending) return
-        appUnlockEvaluationPending = true
-        showAppLockScreen()
-        mutationsScope.launch {
-            val loaded = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
-            if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = loaded
-            appUnlockEvaluationPending = false
-            // Re-read the clock after IO so a grace period that expired during loading cannot dismiss the lock.
-            val decisionNowMillis = maxOf(nowMillis, System.currentTimeMillis())
-            if (
-                shouldShowAppLock(
-                    requireUnlock = requireAppUnlock,
-                    credentialAvailable = appLockCredentialAvailable,
-                    lastUnlockedAtMillis = lastAppUnlockAtMillis,
-                    nowMillis = decisionNowMillis,
-                    delay = appLockDelay,
-                )
-            ) {
-                requestAppUnlock()
-            } else {
-                appLockScreenVisible = false
-                if (appInForeground) initializedConversationDictation()?.onAppForegrounded()
-                resumePendingInviteNotificationIdentityRefreshes()
-            }
-        }
-    }
-
-    fun shouldSecureAppLockWindowWhileBackgrounded(): Boolean = shouldSecureAppLockWindowWhileBackgrounded(requireUnlock = requireAppUnlock)
-
-    /** Start the away-time grace period only for an authenticated, credentialed background transition. */
-    private fun recordAppLockBackgrounded(nowMillis: Long = System.currentTimeMillis()) {
-        refreshAppLockCredentialAvailability()
-        if (
-            !shouldRefreshAppLockDelayBaselineOnBackground(
-                requireUnlock = requireAppUnlock,
-                credentialAvailable = appLockCredentialAvailable,
-                lockScreenVisible = appLockScreenVisible,
-            )
-        ) {
-            return
-        }
-        val normalizedNow = nowMillis.coerceAtLeast(0L)
-        // The delay means time spent away from the app, not time since the
-        // last credential prompt while the user was actively reading chats.
-        lastAppUnlockAtMillis = normalizedNow
-        persistAppLockTimestamp(normalizedNow)
     }
 
     /** Refreshes device-scoped native receipts and the independent diagnostic log choice. */
@@ -8494,96 +7225,6 @@ class WhiteNoiseAppState private constructor(
             presentFailure(R.string.toast_couldnt_update_security_privacy, "SECURITY_PRIVACY_UPDATE", it)
             false
         }
-
-    /** Archives audit, dictation, and performance data; empty or partial exports return null. */
-    @Suppress("ReturnCount") // Each engine/cache failure is a distinct fail-closed export outcome.
-    suspend fun prepareAuditLogArchiveForExport(): java.io.File? {
-        val sourcePaths =
-            runCatching { marmotIo { auditLogFiles().map { it.path } } }
-                .getOrElse {
-                    if (it is CancellationException) throw it
-                    present(R.string.toast_couldnt_export_audit_logs)
-                    return null
-                }
-        return runCatchingCancellable {
-            withContext(Dispatchers.IO) {
-                val nativePerformance =
-                    if (PerformanceDiagnostics.isActive()) {
-                        runCatchingCancellable {
-                            marmotIo {
-                                dev.ipf.whitenoise.android.diagnostics
-                                    .formatNativePerformanceSnapshot(appPerformanceSnapshot())
-                            }.toByteArray(Charsets.UTF_8)
-                        }.getOrNull()
-                    } else {
-                        null
-                    }
-                prepareAuditAndDictationLogArchive(
-                    appContext,
-                    sourcePaths,
-                    nativePerformanceLogBytes = nativePerformance,
-                )
-            }.also { if (it == null) presentTransient(R.string.toast_no_audit_logs_to_export) }
-        }.getOrElse {
-            present(R.string.toast_couldnt_export_audit_logs)
-            return null
-        }
-    }
-
-    /**
-     * Clears audit, dictation, and performance files while surfacing native deletion failures. Every
-     * listed file is attempted, but any failed native deletion makes the result a failure, so a
-     * deleted sibling never reports logs that are still on disk as cleared (#3705).
-     */
-    @Suppress("CyclomaticComplexMethod", "ReturnCount")
-    suspend fun deleteAuditLogs(): Boolean {
-        var engineFailure: Throwable? = null
-        var cacheFailure: Throwable? = null
-        val preparedDeleted =
-            runCatchingCancellable {
-                withContext(Dispatchers.IO) { clearAuditAndDictationLogShares(appContext.cacheDir) }
-            }.onFailure { cacheFailure = it }.getOrDefault(false)
-        val files =
-            runCatching { marmotIo { auditLogFiles() } }
-                .getOrElse {
-                    if (it is CancellationException) throw it
-                    presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
-                    return false
-                }
-        if (files.isEmpty()) {
-            cacheFailure?.let {
-                presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
-                return false
-            }
-            if (preparedDeleted) {
-                presentTransient(R.string.toast_audit_logs_deleted)
-                return true
-            }
-            presentTransient(R.string.toast_no_audit_logs_to_delete)
-            return false
-        }
-        for (file in files) {
-            val outcome =
-                runCatchingCancellable { marmotIo { deleteAuditLogFile(file.path) } }
-                    .onFailure {
-                        if (engineFailure == null) engineFailure = it
-                        appStateDebug { "deleteAuditLogFile failed: ${it.readableMessage()}" }
-                    }.getOrNull() ?: continue
-            appStateDebug { "audit log deleted still_recording=${outcome.stillRecording}" }
-        }
-        cacheFailure?.let {
-            presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", it)
-            return false
-        }
-        // Files were listed, so every one was deleted exactly when no native deletion failed.
-        val failure = engineFailure
-        if (failure == null) {
-            presentTransient(R.string.toast_audit_logs_deleted)
-        } else {
-            presentFailure(R.string.toast_couldnt_delete_audit_logs, "AUDIT_LOG_DELETE", failure)
-        }
-        return failure == null
-    }
 
     fun updateThemeMode(mode: AppThemeMode) {
         themeMode = mode
@@ -8749,45 +7390,6 @@ class WhiteNoiseAppState private constructor(
         longMessageCollapseState.updateCollapseLongMessages(activeAccountRef, groupIdHex, enabled)
     }
 
-    fun isConversationMuted(groupIdHex: String): Boolean {
-        val accountRef = activeAccountRef ?: return false
-        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
-        return chatMuteOwner.muted(key, System.currentTimeMillis()) {
-            engineConversationMuted(groupIdHex)
-        }
-    }
-
-    fun isConversationMutePending(groupIdHex: String): Boolean {
-        val accountRef = activeAccountRef ?: return false
-        return chatMuteOwner.isPending(ChatMutePreferences.compositeKey(accountRef, groupIdHex))
-    }
-
-    /** Group details' muted flag and expiry; [row] and [targeted] are the screen's own MDK reads. */
-    internal fun groupDetailsMuteDisplay(
-        groupIdHex: String,
-        row: ChatListRowFfi?,
-        targeted: dev.ipf.marmotkit.ChatNotificationSettingsFfi?,
-    ): ChatMuteDisplay =
-        chatMuteOwner.display(
-            key = activeAccountRef?.let { ChatMutePreferences.compositeKey(it, groupIdHex) },
-            nowMillis = System.currentTimeMillis(),
-        ) {
-            ChatMuteDisplay(
-                muted = row?.muted ?: targeted?.muted ?: engineConversationMuted(groupIdHex),
-                mutedUntilMs = row?.mutedUntilMs ?: targeted?.mutedUntilMs ?: conversationMuteExpiryMillis(groupIdHex),
-            )
-        }
-
-    fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
-        val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
-        return chatMutePreferences.mode(accountRef, groupIdHex)
-    }
-
-    fun conversationVibrationPattern(groupIdHex: String): ConversationVibrationPattern {
-        val accountRef = activeAccountRef ?: return ConversationVibrationPattern.SYSTEM_DEFAULT
-        return conversationVibrationPreferences.pattern(accountRef, groupIdHex)
-    }
-
     /** Creates the immutable target channel before making it the persisted active choice. */
     fun setConversationVibrationPattern(
         groupIdHex: String,
@@ -8831,48 +7433,11 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** The All/Only-mentions preference to show when the chat isn't muted. */
-    fun conversationRestoreNotifyMode(groupIdHex: String): ChatNotifyMode {
-        val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
-        return chatMutePreferences.restoreNotifyMode(accountRef, groupIdHex)
-    }
-
-    fun setConversationNotifyMode(
-        groupIdHex: String,
-        mode: ChatNotifyMode,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        if (mode == ChatNotifyMode.NONE) {
-            setConversationMuted(groupIdHex, true)
-        } else {
-            chatMutePreferences.setNotifyForMode(accountRef, groupIdHex, mode)
-            setConversationMuted(groupIdHex, false)
-        }
-    }
-
     /** The engine's durable mute projection for the chat, from the live list. */
     fun engineConversationMuted(groupIdHex: String): Boolean =
         (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
             .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
             ?.engineMuted() == true
-
-    internal fun acceptAuthoritativeMuteProjection(
-        accountRef: String?,
-        groupIdHex: String,
-        muted: Boolean,
-        mutedUntilMs: Long?,
-    ) {
-        accountRef ?: return
-        chatMuteOwner.acceptProjection(ChatMutePreferences.compositeKey(accountRef, groupIdHex), muted, mutedUntilMs)
-    }
-
-    fun setConversationNotifyForMode(
-        groupIdHex: String,
-        mode: ChatNotifyMode,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        chatMutePreferences.setNotifyForMode(accountRef, groupIdHex, mode)
-    }
 
     /** Awaitable batch boundary, serialized by the same repository as single-chat mute commands. */
     @Suppress("ReturnCount") // Owner fences bracket the awaited native command and its committed result.
@@ -9806,18 +8371,15 @@ class WhiteNoiseAppState private constructor(
         if (foreground) {
             dictationDiagnosticLifecycle.foreground { conversationDictation }
             NotificationStreamForegroundService.onAppForegrounded(initializedConversationDictation())
-            appLockTtsBoundaryJob?.cancel()
-            appLockTtsBoundaryJob = null
-            maybeShowAppLockForForeground()
+            appLock.onAppForegrounded()
             if (dismissRetainedVisibleConversation) {
                 dismissVisibleConversationNotifications()
             }
         } else {
-            appUnlockSessions.clearForegroundReturn()
-            recordAppLockBackgrounded()
+            appLock.onAppBackgrounded()
             conversationDictation.onAppBackgrounded()
             mutationsScope.launch { draftWriter.flush() }
-            scheduleTtsStopAtAppLockBoundary()
+            appLock.scheduleTtsStopAtLockBoundary()
         }
         if (foreground) {
             refreshLocalNotificationPermission()
@@ -9838,29 +8400,11 @@ class WhiteNoiseAppState private constructor(
     private fun shouldStartBackgroundConnectionForForeground(foreground: Boolean): Boolean =
         foreground && backgroundConnectionEnabled && localNotificationPermissionGranted
 
-    private fun scheduleTtsStopAtAppLockBoundary() {
-        appLockTtsBoundaryJob?.cancel()
-        appLockTtsBoundaryJob = null
-        if (!requireAppUnlock || !appLockCredentialAvailable) return
-        val delayMillis = appLockDelay.delayMillis
-        if (delayMillis == 0L) {
-            stopSpeaking()
-            return
-        }
-        appLockTtsBoundaryJob =
-            mutationsScope.launch {
-                delay(delayMillis)
-                if (!appInForeground && requireAppUnlock && appLockCredentialAvailable) {
-                    stopSpeaking()
-                }
-            }
-    }
-
     private fun dismissVisibleConversationNotifications() {
         val target =
             visibleConversationDismissalTarget(
                 appInForeground = appInForeground,
-                appLockScreenVisible = appLockScreenVisible,
+                appLockScreenVisible = appLock.screenVisible,
                 activeAccountRef = activeConversationAccountRef,
                 groupIdHex = activeConversationGroupIdHex,
             ) ?: return
@@ -10128,37 +8672,6 @@ class WhiteNoiseAppState private constructor(
 
     fun showAppUpdateBannerFromNotification() {
         appUpdateInfo = appUpdateRepository.loadInfo()
-    }
-
-    fun openZapstoreListing(context: Context = appContext) {
-        val intent =
-            Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdateConstants.ZAPSTORE_LISTING_URL)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        try {
-            context.startActivity(intent)
-        } catch (_: ActivityNotFoundException) {
-            present(R.string.toast_zapstore_unavailable)
-        }
-    }
-
-    fun handleAppUpdateAction(context: Context = appContext) {
-        // Builds that don't self-update (the Google Play distribution) leave
-        // updates entirely to the distributing store — no in-app flow and no
-        // off-store listing redirect, which Play policy forbids.
-        val latest = appUpdateInfo.latestVersion
-        if (
-            latest != null &&
-            shouldStartInAppSelfUpdate(
-                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
-                installedVersion = appUpdateInfo.installedVersion,
-                targetVersion = latest,
-            )
-        ) {
-            startAppSelfUpdate(latest)
-            return
-        }
-        if (BuildConfig.SELF_UPDATE_ENABLED && latest == null) openZapstoreListing(context)
     }
 
     fun startAppSelfUpdate(version: String? = appUpdateInfo.latestVersion) {
@@ -12008,7 +10521,7 @@ class WhiteNoiseAppState private constructor(
         ) {
             return false to null
         }
-        if (appLockScreenVisible) return true to null
+        if (appLock.screenVisible) return true to null
         val private = contactPictureStore.reference(account, contact)?.cacheKey?.let(AvatarImageLoader::cachedImage)
         val published = synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
         return true to
@@ -13040,7 +11553,7 @@ class WhiteNoiseAppState private constructor(
         engineMuted: Boolean,
         requireUnlocked: Boolean,
     ): Boolean {
-        val lockAllowsPost = !requireUnlocked || !appLockScreenVisible
+        val lockAllowsPost = !requireUnlocked || !appLock.screenVisible
         val runtimeAllowsPost =
             !networkNotificationRecoverySuppressed &&
                 notificationPostEpoch.isCurrent(postEpoch) &&
@@ -13629,7 +12142,7 @@ class WhiteNoiseAppState private constructor(
         url: String,
         domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): suspend () -> Bitmap? =
-        lockCheckedPictureLoader(url, domain, { appLockScreenVisible }) { target, trust ->
+        lockCheckedPictureLoader(url, domain, { appLock.screenVisible }) { target, trust ->
             AvatarImageLoader.loadBitmap(target, trust)
         }
 
@@ -13669,11 +12182,11 @@ class WhiteNoiseAppState private constructor(
                 null
             } else {
                 {
-                    if (!appLockScreenVisible) contact?.let { warmPrivateContactAvatar(account, it) }
-                    stored?.takeUnless { appLockScreenVisible }?.let { row ->
+                    if (!appLock.screenVisible) contact?.let { warmPrivateContactAvatar(account, it) }
+                    stored?.takeUnless { appLock.screenVisible }?.let { row ->
                         val picture =
                             durableAvatar(row.asset, account, acquireMissing = false, domain = row.domain)
-                                ?.takeUnless { appLockScreenVisible }
+                                ?.takeUnless { appLock.screenVisible }
                         if (picture != null && contact != null) {
                             notificationContactRowPictures.record(account, contact, row.asset)
                         }
@@ -13708,14 +12221,14 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable { marmotIo { groupDetails(update.accountRef, update.groupIdHex) }.group }.getOrNull()
         val key = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) } ?: return null
         return {
-            if (appLockScreenVisible) {
+            if (appLock.screenVisible) {
                 null
             } else {
                 runCatchingCancellable {
                     GroupAvatarImageLoader
                         .load(key) { marmotIo { downloadGroupBlossomImage(update.accountRef, group.groupIdHex) } }
                         ?.asAndroidBitmap()
-                        ?.takeUnless { appLockScreenVisible }
+                        ?.takeUnless { appLock.screenVisible }
                 }.getOrNull()
             }
         }
@@ -13754,7 +12267,7 @@ class WhiteNoiseAppState private constructor(
     ): Boolean {
         appStateDebug {
             "notification eligibility outcome=${if (firstPost.shouldPost) "post" else "skip"} " +
-                "trigger=${update.trigger} app_lock=$appLockScreenVisible engine_muted=${firstPost.engineMuted}"
+                "trigger=${update.trigger} app_lock=${appLock.screenVisible} engine_muted=${firstPost.engineMuted}"
         }
         val gateStartedAt = SystemClock.elapsedRealtime()
         val candidateState =
@@ -13770,7 +12283,7 @@ class WhiteNoiseAppState private constructor(
             return false
         }
 
-        val redactContent = appLockScreenVisible
+        val redactContent = appLock.screenVisible
         val onNotificationWritten = {
             recordNotificationFirstPostTiming(
                 stage = NotificationFirstPostTimingStage.NotifyWritten,
@@ -13782,7 +12295,7 @@ class WhiteNoiseAppState private constructor(
         var postedRedacted = redactContent
         // Lock activation can race the suspending presenter setup. Retry only
         // as a redacted card, under the same generation and eligibility gates.
-        if (!posted && !redactContent && appLockScreenVisible) {
+        if (!posted && !redactContent && appLock.screenVisible) {
             postedRedacted = true
             posted = showRedactedNotificationUpdate(update, firstPost, onNotificationWritten)
         }
@@ -14280,7 +12793,7 @@ class WhiteNoiseAppState private constructor(
     ): NotificationFirstPost {
         val stage = notificationFirstPostContentCoordinator.startStage()
         val result =
-            if (shouldPost && !appLockScreenVisible) {
+            if (shouldPost && !appLock.screenVisible) {
                 notificationFirstPostContentCoordinator.resolve(stage) {
                     // Every card draws its sender, in a group too (#3635), so their private picture is warmed.
                     warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
@@ -14321,7 +12834,7 @@ class WhiteNoiseAppState private constructor(
      * current at each write.
      */
     internal fun readyNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
-        if (appLockScreenVisible) return PreWarmedNotificationAvatars(null, null)
+        if (appLock.screenVisible) return PreWarmedNotificationAvatars(null, null)
         val senderUrl =
             synchronized(profilePresentationLock) {
                 profilePresentations[update.sender.accountIdHex]?.avatarUrl
@@ -14418,7 +12931,7 @@ class WhiteNoiseAppState private constructor(
             !isInviteNotificationRefreshCurrent(candidate, update) ->
                 inviteNotificationIdentityRefreshStore.forget(candidate)
 
-            appLockScreenVisible -> deferInviteNotificationIdentityRefresh(candidate)
+            appLock.screenVisible -> deferInviteNotificationIdentityRefresh(candidate)
 
             !isNotificationEnrichmentAllowed(
                 update,
@@ -14452,7 +12965,7 @@ class WhiteNoiseAppState private constructor(
     /** Releases a locked candidate and closes the unlock/reclaim race. */
     private fun deferInviteNotificationIdentityRefresh(candidate: RefreshCandidate) {
         inviteNotificationIdentityRefreshStore.release(candidate)
-        if (!appLockScreenVisible) resumePendingInviteNotificationIdentityRefreshes()
+        if (!appLock.screenVisible) resumePendingInviteNotificationIdentityRefreshes()
     }
 
     /** Consumes or restores the shared write permit according to the platform result. */
@@ -14495,7 +13008,7 @@ class WhiteNoiseAppState private constructor(
         engineMuted: Boolean,
         isCandidateCurrent: () -> Boolean,
     ): InviteNotificationIdentityRefreshResult {
-        val skipEnrichmentForLock = appLockScreenVisible
+        val skipEnrichmentForLock = appLock.screenVisible
         val resolvedName =
             if (skipEnrichmentForLock) {
                 null
@@ -14506,7 +13019,7 @@ class WhiteNoiseAppState private constructor(
             }
         // A lock can arrive during the suspending lookup above. Re-check after
         // enrichment so the silent update cannot reveal identity behind the lock.
-        val redactContent = skipEnrichmentForLock || appLockScreenVisible
+        val redactContent = skipEnrichmentForLock || appLock.screenVisible
         val displayedName = resolvedName.takeUnless { redactContent }
         val posted =
             localNotificationPresenter.show(
@@ -14793,15 +13306,7 @@ class WhiteNoiseAppState private constructor(
             // can request them, without blocking the main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { conversationNotificationRouting }
             mutationsScope.launch(Dispatchers.IO) { conversationAlertPreferences }
-            if (requireAppUnlock) {
-                // Pre-warm the Keystore-backed unlock timestamp off-main so the
-                // first foreground lock evaluation is a cache hit. Assigned on
-                // Main, and only if an unlock hasn't already stamped a newer value.
-                mutationsScope.launch {
-                    val warmed = withContext(Dispatchers.IO) { AppLockPreferences.readLastUnlockedAtMillis(appContext) }
-                    if (lastAppUnlockAtMillisBacking == null) lastAppUnlockAtMillisBacking = warmed
-                }
-            }
+            appLock.prewarmUnlockTimestamp()
             mutationsScope.launch { refreshTtsAvailability() }
         }
     }
@@ -14811,8 +13316,6 @@ class WhiteNoiseAppState private constructor(
         private const val DEVELOPER_MODE_KEY = "developer_mode"
         private const val STREAMING_DEBUG_MODE_KEY = "streaming_debug_mode"
         private const val FORCE_INCOGNITO_KEYBOARD_KEY = "force_incognito_keyboard"
-        private const val REQUIRE_APP_UNLOCK_KEY = "require_app_unlock"
-        private const val APP_LOCK_DELAY_KEY = "app_lock_delay"
         private const val THEME_MODE_KEY = "theme_mode"
         private const val FONT_SCALE_KEY = "font_scale"
         private const val APP_FONT_KEY = "app_font"

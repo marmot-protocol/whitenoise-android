@@ -1656,7 +1656,7 @@ internal fun ComposerBar(
                 // Receiving draft content does not acquire a recording or send transaction.
                 val canReceiveComposerContent: () -> Boolean = {
                     appState?.runtimeGeneration == toolbarRuntime &&
-                        appState?.appLockScreenVisible != true &&
+                        appState?.appLock?.screenVisible != true &&
                         appState?.signOutInProgress != true &&
                         appState?.wipeInProgress != true
                 }

@@ -42,11 +42,11 @@ internal fun DevicePrivacyScreen(
     val context = LocalContext.current
     LaunchedEffect(Unit) { appState.recordProductObservation(ProductObservation.PRIVACY) }
     LaunchedEffect(appState.runtimeGeneration) {
-        appState.refreshAppLockCredentialAvailability()
+        appState.appLock.refreshCredentialAvailability()
         appState.refreshSecurityPrivacySettings()
     }
-    val secure = credentialAvailableOverride ?: appState.appLockCredentialAvailable
-    val authenticationEnabled = secure && appState.requireAppUnlock
+    val secure = credentialAvailableOverride ?: appState.appLock.credentialAvailable
+    val authenticationEnabled = secure && appState.appLock.required
     var autoLockPicker by rememberSaveable { mutableStateOf(false) }
     var defaultDisappearingPicker by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
     val defaultDisappearingDurations by appState.defaultDisappearingMessagesPreferences.durations.collectAsState()
@@ -102,7 +102,7 @@ internal fun DevicePrivacyScreen(
                             title = stringResource(R.string.require_device_authentication),
                             checked = authenticationEnabled,
                             modifier = Modifier.testTag("privacy.device_authentication"),
-                            onCheckedChange = { appState.updateRequireAppUnlock(it) },
+                            onCheckedChange = { appState.appLock.updateRequired(it) },
                             subtitle =
                                 stringResource(
                                     if (secure) R.string.app_lock_enabled_detail else R.string.app_lock_setup_detail,
@@ -129,7 +129,7 @@ internal fun DevicePrivacyScreen(
                                 context = rowContext,
                                 title = stringResource(R.string.auto_lock),
                                 onClick = { autoLockPicker = true },
-                                value = delayLabels.getValue(appState.appLockDelay),
+                                value = delayLabels.getValue(appState.appLock.lockDelay),
                                 explanation = stringResource(R.string.explanation_privacy_auto_lock),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_lock_clock) },
                             )
@@ -197,11 +197,11 @@ internal fun DevicePrivacyScreen(
         ChoiceDialog(
             title = stringResource(R.string.auto_lock),
             values = AppLockDelay.entries,
-            selected = appState.appLockDelay,
+            selected = appState.appLock.lockDelay,
             label = delayLabels::getValue,
             onDismiss = { autoLockPicker = false },
             onSelect = {
-                appState.updateAppLockDelay(it)
+                appState.appLock.updateDelay(it)
                 autoLockPicker = false
             },
         )

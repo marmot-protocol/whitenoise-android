@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppLockController.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "App-lock terminal cancellation fallback message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppLockController.kt",
+        "anchor": "R.string.app_lock_auth_cancelled",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "Ordered off-main app-lock timestamp persistence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppLockController.kt",
+        "anchor": "private fun persistTimestamp(",
+        "test_ids": [
+          "SEC-002"
+        ]
+      },
+      {
+        "surface": "string:toast_app_lock_screen_lock_required",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppLockController.kt",
+        "anchor": "R.string.toast_app_lock_screen_lock_required",
+        "test_ids": [
+          "SEC-001",
+          "SEC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

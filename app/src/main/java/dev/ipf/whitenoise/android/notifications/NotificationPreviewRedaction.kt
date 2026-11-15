@@ -35,8 +35,11 @@ internal class NotificationPreviewRedactor(
     /** Waits for bounded asynchronous tray visibility, including writes accepted before the toggle. */
     suspend fun redact(): Boolean {
         synchronized(UserEventNotificationGroup.mutationLock) {
-            if (!redactNotificationShortcuts(context)) succeeded = false
-            if (!redactNotificationChannelNames(context)) succeeded = false
+            // Name-only mode keeps conversation identities; only message text leaves the tray.
+            if (!nameOnly()) {
+                if (!redactNotificationShortcuts(context)) succeeded = false
+                if (!redactNotificationChannelNames(context)) succeeded = false
+            }
         }
         val settling =
             synchronized(UserEventNotificationGroup.mutationLock) {
@@ -58,9 +61,16 @@ internal class NotificationPreviewRedactor(
         return confirmed && succeeded
     }
 
+    private fun nameOnly(): Boolean {
+        val token = NotificationPreviewPreferences.capture(context)
+        return token.allowed && !token.messageText
+    }
+
+    /** In name-only mode a card prepared under the current revision already carries no message text. */
     private fun isPrivateCard(card: StatusBarNotification): Boolean =
         UserEventNotificationGroup.isChildCandidate(card) &&
-            !card.notification.extras.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN)
+            !card.notification.extras.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN) &&
+            !(nameOnly() && NotificationPreviewPreferences.canRetainPreview(context, card.notification))
 
     /** A fresh OS read inside both mutation gates prevents resurrecting a dismissed/replaced card. */
     private suspend fun scrub(candidate: StatusBarNotification) {

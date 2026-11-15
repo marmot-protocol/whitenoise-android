@@ -172,14 +172,14 @@ internal fun ChatListTopBar(
     // than the window (#2796 follow-up).
     val searchHandoff =
         rememberMeasuredControlHandoff(
-            Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.appLockScreenVisible),
+            Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.appLock.screenVisible),
             searchOpen,
         )
     val searchCollapse = rememberSearchCollapse(searchOpen)
     MeasuredControlHandoffHost(
         state = searchHandoff,
         destination = searchOpen,
-        allowed = !appState.appLockScreenVisible && !appState.signOutInProgress && !appState.wipeInProgress,
+        allowed = !appState.appLock.screenVisible && !appState.signOutInProgress && !appState.wipeInProgress,
         // The collapsing field is the closing cue; a travelling outline would draw a second pill.
         outlineVisible = { searchOpen },
     ) {

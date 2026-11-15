@@ -245,7 +245,7 @@ internal fun WhiteNoiseApp(
             TopNoticeHost(
                 snackbarHostState = snackbarHostState,
                 notice = { appState.transientNotice },
-                presentationAllowed = { !appState.appLockScreenVisible },
+                presentationAllowed = { !appState.appLock.screenVisible },
             )
         }
     val toast = appState.toast
@@ -295,7 +295,7 @@ internal fun WhiteNoiseApp(
             phase = appState.phase,
             activeAccountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
-            appLockScreenVisible = appState.appLockScreenVisible,
+            appLockScreenVisible = appState.appLock.screenVisible,
         )
     val localProjectionAvailable =
         mainShellStateHolder.localProjectionAvailable(
@@ -309,13 +309,13 @@ internal fun WhiteNoiseApp(
     NotificationRouteAppLockTrace(
         requestId = inboundNotificationRequestId,
         routePending = inboundNotificationTarget != null,
-        locked = appState.appLockScreenVisible,
+        locked = appState.appLock.screenVisible,
     )
     val notificationRouteOwnsShell =
         mainShellStateHolder.notificationRouteOwnsShell(
             activeAccountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
-            appLockScreenVisible = appState.appLockScreenVisible,
+            appLockScreenVisible = appState.appLock.screenVisible,
         )
     val protectedFirstUsefulSurface =
         warmResumeFirstUsefulSurface(
@@ -334,12 +334,12 @@ internal fun WhiteNoiseApp(
         rememberProtectedShellSavedState(
             appState.activeAccountRef,
             appState.runtimeGeneration,
-            suspended = appState.appLockScreenVisible || !protectedPhaseReady || protectedStartupVisible,
+            suspended = appState.appLock.screenVisible || !protectedPhaseReady || protectedStartupVisible,
         )
     val lockDecision =
         when {
-            appState.appUnlockEvaluationPending -> "pending"
-            appState.appLockScreenVisible -> "locked"
+            appState.appLock.evaluationPending -> "pending"
+            appState.appLock.screenVisible -> "locked"
             else -> "unlocked"
         }
     val dictationPermissionLauncher =
@@ -415,7 +415,7 @@ internal fun WhiteNoiseApp(
         appState.backgroundConnectionEnabled,
         appState.localNotificationSettings?.localNotificationsEnabled,
         appState.runtimeGeneration,
-        appState.appLockScreenVisible,
+        appState.appLock.screenVisible,
         diagnosticsPromptOpen,
         appState.diagnostics.requiresChoice,
         appState.auditUploadConsentRequired,
@@ -425,7 +425,7 @@ internal fun WhiteNoiseApp(
             return@LaunchedEffect
         }
         if (appState.diagnostics.snapshot == null) return@LaunchedEffect
-        if (appState.phase != AppPhase.Ready || appState.appLockScreenVisible) return@LaunchedEffect
+        if (appState.phase != AppPhase.Ready || appState.appLock.screenVisible) return@LaunchedEffect
         appState.refreshLocalNotificationPermission()
         appState.refreshLocalNotificationSettings()
         if (appState.shouldRequestDefaultNotificationPermission()) {
@@ -486,7 +486,7 @@ internal fun WhiteNoiseApp(
         remember(appState) {
             InAppLinkHandler(
                 open = open@{ link ->
-                    if (appState.appLockScreenVisible || appState.appUnlockEvaluationPending) return@open
+                    if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return@open
                     val chatLink = ChatLink.parse(link)
                     if (chatLink == ChatLinkParse.NotChatLink) {
                         appState.presentProfilePayload(link)
@@ -495,7 +495,7 @@ internal fun WhiteNoiseApp(
                     scope.launch {
                         val outcome = resolveChatLinkOutcome(chatLink, appState) ?: return@launch
                         // The app may have locked while the accounts holding the chat were read.
-                        if (appState.appLockScreenVisible || appState.appUnlockEvaluationPending) return@launch
+                        if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return@launch
                         showChatLinkOutcome(outcome)
                         (outcome as? ChatLinkOutcome.Open)?.let { currentOnChatLinkResolved(null, it.target) }
                     }
@@ -506,8 +506,8 @@ internal fun WhiteNoiseApp(
     LaunchedEffect(
         inboundProfilePayload,
         appState.phase,
-        appState.appLockScreenVisible,
-        appState.appUnlockEvaluationPending,
+        appState.appLock.screenVisible,
+        appState.appLock.evaluationPending,
     ) {
         val payload = inboundProfilePayload ?: return@LaunchedEffect
         if (appState.phase != AppPhase.Ready) return@LaunchedEffect
@@ -515,7 +515,7 @@ internal fun WhiteNoiseApp(
         if (chatLink != ChatLinkParse.NotChatLink) {
             // A chat link reads which accounts hold the chat and may say so; neither happens under app lock (#3658).
             // A key change cancels this read, so a late result cannot act on a newer link or a locked app.
-            if (appState.appLockScreenVisible || appState.appUnlockEvaluationPending) return@LaunchedEffect
+            if (appState.appLock.screenVisible || appState.appLock.evaluationPending) return@LaunchedEffect
             val outcome = resolveChatLinkOutcome(chatLink, appState) ?: return@LaunchedEffect
             showChatLinkOutcome(outcome)
             onProfilePayloadHandled(payload)
@@ -526,7 +526,7 @@ internal fun WhiteNoiseApp(
             onProfilePayloadHandled(payload)
         }
     }
-    chatLinkChoice?.takeUnless { appState.appLockScreenVisible }?.let { choice ->
+    chatLinkChoice?.takeUnless { appState.appLock.screenVisible }?.let { choice ->
         ChatLinkAccountChooserDialog(
             choice = choice,
             accountLabel = { accountRef ->
@@ -542,13 +542,13 @@ internal fun WhiteNoiseApp(
         )
     }
     LaunchedEffect(
-        appState.appLockScreenVisible,
-        appState.appUnlockPromptRequestId,
-        appState.appUnlockEvaluationPending,
+        appState.appLock.screenVisible,
+        appState.appLock.promptRequestId,
+        appState.appLock.evaluationPending,
     ) {
         // While the unlock-timestamp evaluation is pending, the scrim secures
         // the UI but the biometric sheet waits for the real decision.
-        if (appState.appLockScreenVisible && !appState.appUnlockEvaluationPending) onRequestAppUnlock()
+        if (appState.appLock.screenVisible && !appState.appLock.evaluationPending) onRequestAppUnlock()
     }
     LaunchedEffect(dictationPermissionRequestId) {
         if (dictationPermissionRequestId > 0L && dictation.state is ConversationDictationState.PermissionRequired) {
@@ -582,8 +582,8 @@ internal fun WhiteNoiseApp(
             }
         }
     }
-    LaunchedEffect(appState.appLockScreenVisible) {
-        if (appState.appLockScreenVisible) {
+    LaunchedEffect(appState.appLock.screenVisible) {
+        if (appState.appLock.screenVisible) {
             dictation.cancel()
         }
     }
@@ -602,7 +602,7 @@ internal fun WhiteNoiseApp(
             LocalExplanationHost provides explanationHost.show,
         ) {
             // Holding a control explains it; the lock drops any open explanation.
-            ExplanationSheetHost(explanationHost, visible = !appState.appLockScreenVisible)
+            ExplanationSheetHost(explanationHost, visible = !appState.appLock.screenVisible)
             Scaffold(
                 modifier =
                     Modifier
@@ -614,7 +614,7 @@ internal fun WhiteNoiseApp(
                     // Composed first so every screen's own slot claims after it, and drawn last so a
                     // surface without a slot of its own (onboarding, startup) still shows its banners on top.
                     TopNoticeSlot(Modifier.zIndex(1f).align(Alignment.TopCenter).statusBarsPadding())
-                    if (appState.appLockScreenVisible) {
+                    if (appState.appLock.screenVisible) {
                         // Privacy boundary: the protected shell is not composed
                         // underneath the lock. Its Activity-scoped controllers
                         // remain alive and may refresh the local projection only.
@@ -640,9 +640,9 @@ internal fun WhiteNoiseApp(
                         ) {
                             WarmResumeUsefulSurface {
                                 AppLockScreen(
-                                    error = appState.appUnlockError,
-                                    onRetry = { appState.requestAppUnlock() },
-                                    evaluating = appState.appUnlockEvaluationPending,
+                                    error = appState.appLock.unlockError,
+                                    onRetry = { appState.appLock.requestUnlock() },
+                                    evaluating = appState.appLock.evaluationPending,
                                 )
                             }
                         }
@@ -814,7 +814,7 @@ internal fun WhiteNoiseApp(
                                                                             .isAtLeast(Lifecycle.State.RESUMED)
                                                                     resumed &&
                                                                         appState.phase == phase &&
-                                                                        !appState.appLockScreenVisible
+                                                                        !appState.appLock.screenVisible
                                                                 }
                                                             }
                                                         }
@@ -843,7 +843,7 @@ internal fun WhiteNoiseApp(
             }
         }
     }
-    if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
+    if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.ProviderSelectionRequired) {
         DictationProviderChooser(appState, onSelected = dictation::onProviderSelected, onDismiss = dictation::cancel)
     }
     // A refused group change waits for the user's answer wherever it was started, even after its screen closed, but
@@ -853,10 +853,10 @@ internal fun WhiteNoiseApp(
     LaunchedEffect(groupChangeQuestion, groupChangeQuestionOwned) {
         if (!groupChangeQuestionOwned) groupChangeQuestion?.answer(proceed = false)
     }
-    if (!appState.appLockScreenVisible && groupChangeQuestion != null && groupChangeQuestionOwned) {
+    if (!appState.appLock.screenVisible && groupChangeQuestion != null && groupChangeQuestionOwned) {
         GroupChangeConfirmationDialog(groupChangeQuestion, appState)
     }
-    if (!appState.appLockScreenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
+    if (!appState.appLock.screenVisible && dictationState is ConversationDictationState.DisclosureRequired) {
         DictationDisclosureDialog(
             offlineSpeechToText = dictationState.usesOfflineSpeechToText,
             ownerKey = dictationState,

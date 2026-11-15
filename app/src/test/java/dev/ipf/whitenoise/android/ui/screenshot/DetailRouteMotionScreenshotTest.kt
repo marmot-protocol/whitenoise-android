@@ -519,10 +519,10 @@ class DetailRouteMotionScreenshotTest {
         if (profile) protectedDestination.assertExists() else protectedDestination.assertDoesNotExist()
         // Real observable lock state removes the protected route immediately, even mid-flight.
         rule.runOnIdle {
-            WhiteNoiseAppState::class.java
-                .getDeclaredMethod("setAppLockScreenVisible", Boolean::class.javaPrimitiveType!!)
+            state.appLock.javaClass
+                .getDeclaredMethod("setScreenVisible", Boolean::class.javaPrimitiveType!!)
                 .apply { isAccessible = true }
-                .invoke(state, true)
+                .invoke(state.appLock, true)
         }
         rule.mainClock.advanceTimeByFrame()
         protectedDestination.assertDoesNotExist()

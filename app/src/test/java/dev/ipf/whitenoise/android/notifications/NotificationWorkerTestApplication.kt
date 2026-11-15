@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import android.os.Looper
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.state.AppLockController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -39,10 +40,10 @@ internal class NotificationWorkerTestApplication(
  * state directly.
  */
 internal fun WhiteNoiseAppState.setAppLockScreenVisibleForTest(visible: Boolean) {
-    val delegate = WhiteNoiseAppState::class.java.getDeclaredField("appLockScreenVisible\$delegate")
+    val delegate = AppLockController::class.java.getDeclaredField("screenVisible\$delegate")
     delegate.isAccessible = true
     @Suppress("UNCHECKED_CAST")
-    (delegate.get(this) as androidx.compose.runtime.MutableState<Boolean>).value = visible
+    (delegate.get(appLock) as androidx.compose.runtime.MutableState<Boolean>).value = visible
 }
 
 /**

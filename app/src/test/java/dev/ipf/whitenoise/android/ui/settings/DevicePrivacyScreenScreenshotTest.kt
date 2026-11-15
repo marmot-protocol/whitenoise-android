@@ -65,8 +65,8 @@ class DevicePrivacyScreenScreenshotTest {
         runBlocking { state.refreshSecurityPrivacySettings() }
         val shell = presentBootstrappedApp(state, AppPhase.Ready)
         val setLockVisible =
-            WhiteNoiseAppState::class.java
-                .getDeclaredMethod("setAppLockScreenVisible", Boolean::class.javaPrimitiveType)
+            state.appLock.javaClass
+                .getDeclaredMethod("setScreenVisible", Boolean::class.javaPrimitiveType)
                 .apply { isAccessible = true }
         try {
             composeRule.runOnIdle {
@@ -75,10 +75,10 @@ class DevicePrivacyScreenScreenshotTest {
             }
             composeRule.onNodeWithTag("privacy.device_protection.group").assertIsDisplayed()
             repeat(3) {
-                composeRule.runOnIdle { setLockVisible.invoke(state, true) }
+                composeRule.runOnIdle { setLockVisible.invoke(state.appLock, true) }
                 composeRule.onNodeWithTag("app.lock").assertIsDisplayed()
                 composeRule.onNodeWithTag("privacy.device_protection.group").assertDoesNotExist()
-                composeRule.runOnIdle { setLockVisible.invoke(state, false) }
+                composeRule.runOnIdle { setLockVisible.invoke(state.appLock, false) }
                 composeRule.onNodeWithTag("app.lock").assertDoesNotExist()
                 composeRule.onNodeWithTag("privacy.device_protection.group").assertIsDisplayed()
             }

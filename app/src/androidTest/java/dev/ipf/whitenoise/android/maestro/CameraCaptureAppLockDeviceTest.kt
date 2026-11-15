@@ -35,6 +35,7 @@ import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppLockController
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -142,14 +143,14 @@ class CameraCaptureAppLockDeviceTest {
 
         camera.lockOnNextCapture = true
         capture()
-        compose.waitUntil(WAIT_MILLIS) { state.appLockScreenVisible }
+        compose.waitUntil(WAIT_MILLIS) { state.appLock.screenVisible }
         compose.waitUntil(WAIT_MILLIS) { slotCount() == 0 }
         // Hold the lock across several frames so the result and disposal settle while protected content is gone.
         delay(LOCKED_DWELL_MILLIS)
         compose.waitForIdle()
         assertTrue("protected shelf must stay uncomposed while locked", slotCount() == 0)
         withContext(Dispatchers.Main.immediate) {
-            state.markAppUnlockSucceeded(dismissRetainedVisibleConversation = false)
+            state.appLock.markUnlockSucceeded(dismissRetainedVisibleConversation = false)
         }
 
         awaitSlots(2)
@@ -263,10 +264,10 @@ private fun assertReadableJpeg(
 
 /** Mirrors the unit suite's lock seam — the isolated emulator deliberately has no device credential. */
 private fun WhiteNoiseAppState.setAppLockScreenVisibleForDeviceTest(visible: Boolean) {
-    val delegate = WhiteNoiseAppState::class.java.getDeclaredField("appLockScreenVisible\$delegate")
+    val delegate = AppLockController::class.java.getDeclaredField("screenVisible\$delegate")
     delegate.isAccessible = true
     @Suppress("UNCHECKED_CAST")
-    (delegate.get(this) as MutableState<Boolean>).value = visible
+    (delegate.get(appLock) as MutableState<Boolean>).value = visible
 }
 
 /** Reads the native timeline size so an automatic send cannot hide behind the restored shelf. */

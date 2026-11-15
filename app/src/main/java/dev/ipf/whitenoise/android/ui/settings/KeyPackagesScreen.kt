@@ -33,8 +33,11 @@ import dev.ipf.marmotkit.AccountKeyPackageRelayEventFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.deleteKeyPackage
 import dev.ipf.whitenoise.android.state.fetchKeyPackageInventory
 import dev.ipf.whitenoise.android.state.keyPackageRelayHistory
+import dev.ipf.whitenoise.android.state.publishNewKeyPackage
+import dev.ipf.whitenoise.android.state.republishKeyPackage
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
