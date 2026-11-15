@@ -23,9 +23,9 @@
         ]
       },
       {
-        "surface": "VideoViewerControlsOverlay",
+        "surface": "VideoViewerPlaybackControls",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoViewerControls.kt",
-        "anchor": "fun VideoViewerControlsOverlay(",
+        "anchor": "fun VideoViewerPlaybackControls(",
         "test_ids": [
           "MED-033",
           "MED-051"

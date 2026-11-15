@@ -144,7 +144,7 @@ internal fun VideoViewerSurface(
                 color = Color.White,
             )
         }
-        VideoViewerControlsOverlay(
+        VideoViewerPlaybackControls(
             player = player,
             visible = controlsVisible,
             onScrubbingChange = { scrubbing = it },
@@ -203,7 +203,7 @@ private fun VideoViewerTapLayer(
 /** The fading controls: a centred play/pause and the seek row just above the viewer's bottom actions. */
 @Composable
 @androidx.annotation.OptIn(UnstableApi::class)
-private fun VideoViewerControlsOverlay(
+private fun VideoViewerPlaybackControls(
     player: Player,
     visible: Boolean,
     onScrubbingChange: (Boolean) -> Unit,
