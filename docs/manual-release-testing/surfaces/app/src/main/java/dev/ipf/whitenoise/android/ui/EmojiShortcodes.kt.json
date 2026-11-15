@@ -68,8 +68,98 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
-        "anchor": "fun builtinName(",
-        "surface": "Localized spoken names for thirteen bundled emoji in search, messages and notifications",
+        "anchor": "R.string.emoji_name_marmot_classic",
+        "surface": "Localized spoken name for :marmot_classic: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_wave",
+        "surface": "Localized spoken name for :marmot_wave: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_yes",
+        "surface": "Localized spoken name for :marmot_yes: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_laugh",
+        "surface": "Localized spoken name for :marmot_laugh: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_love",
+        "surface": "Localized spoken name for :marmot_love: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_party",
+        "surface": "Localized spoken name for :marmot_party: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_fire",
+        "surface": "Localized spoken name for :marmot_fire: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_wow",
+        "surface": "Localized spoken name for :marmot_wow: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_smirk",
+        "surface": "Localized spoken name for :marmot_smirk: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_cry",
+        "surface": "Localized spoken name for :marmot_cry: in picker search and notifications",
+        "test_ids": [
+          "MSG-023",
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot_angry",
+        "surface": "Localized spoken name for :marmot_angry: in picker search and notifications",
         "test_ids": [
           "MSG-023",
           "NTF-017"

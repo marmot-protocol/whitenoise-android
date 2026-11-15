@@ -278,6 +278,7 @@ class LocalReactionMotionScreenshotTest {
         val mine = name == "outgoing"
         lateinit var motion: LocalReactionMotion
         var accepted by mutableStateOf(false)
+        var showActions by mutableStateOf(false)
         var animations by mutableStateOf(motionEnabled)
         var bubbleBounds by mutableStateOf(IntRect(16, 260, 300, 330))
         val customBitmap =
@@ -377,7 +378,7 @@ class LocalReactionMotionScreenshotTest {
                                     )
                                 }
                             }
-                            if (!accepted) {
+                            if (showActions && !accepted) {
                                 FocusedMessageActions(
                                     sourceBounds = bubbleBounds,
                                     touchY = bubbleBounds.center.y.toFloat(),
@@ -412,19 +413,18 @@ class LocalReactionMotionScreenshotTest {
             }
         }
         rule.waitForIdle()
-        // Popup placement and the lifted-stack snap complete before measuring/clicking the real rail.
+        // A real long press opens the popup after the original bubble has been laid out and drawn.
         flushQueuedComposition(64)
-        awaitStableFocusedSource()
+        captureReactionBitmap().recycle()
+        flushQueuedComposition(64)
+        rule.runOnIdle { showActions = true }
+        flushQueuedComposition(64)
+        val (destinationBefore, sourceBitmap) = captureStableFocusedSource()
         val folder = File("build/local-reaction-motion/$name").apply { mkdirs() }
         if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
-            captureReactionFrame(File(folder, "frame-000.png").path, FOCUSED_OVERLAY_FRAME_TEST_TAG)
+            sourceBitmap.captureRoboImage(File(folder, "frame-000.png").path)
         }
-        val destinationBefore = captureReactionBitmap()
-        val sourceBitmap =
-            captureReactionFrame(
-                "src/test/snapshots/local_reaction_motion_${name}_first.png",
-                FOCUSED_OVERLAY_FRAME_TEST_TAG,
-            )
+        sourceBitmap.captureRoboImage("src/test/snapshots/local_reaction_motion_${name}_first.png")
         rule
             .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji")
             .performSemanticsAction(SemanticsActions.OnClick) { click -> assertTrue(click()) }
@@ -673,22 +673,34 @@ class LocalReactionMotionScreenshotTest {
         rule.waitForIdle()
     }
 
-    /** Text layout, popup placement and native drawing must settle before the flight's source is recorded. */
-    private fun awaitStableFocusedSource() {
-        var previous: Bitmap? = null
+    /** Settles both native windows and returns their final captures before any reaction is accepted. */
+    private fun captureStableFocusedSource(): Pair<Bitmap, Bitmap> {
+        var previous: Pair<Bitmap, Bitmap>? = null
         var stableFrames = 0
         try {
             repeat(30) {
                 flushQueuedComposition()
-                val current = captureReactionBitmap(FOCUSED_OVERLAY_FRAME_TEST_TAG)
-                stableFrames = if (previous?.sameAs(current) == true) stableFrames + 1 else 0
-                previous?.recycle()
+                val root = captureReactionBitmap()
+                val focused = captureReactionBitmap(FOCUSED_OVERLAY_FRAME_TEST_TAG)
+                val current = root to focused
+                val unchanged = previous?.let { root.sameAs(it.first) && focused.sameAs(it.second) } == true
+                stableFrames = if (unchanged) stableFrames + 1 else 0
+                previous?.let {
+                    it.first.recycle()
+                    it.second.recycle()
+                }
                 previous = current
-                if (stableFrames >= 3) return
+                if (stableFrames >= 3) {
+                    previous = null
+                    return current
+                }
             }
             error("Focused reaction source did not settle within 30 frames")
         } finally {
-            previous?.recycle()
+            previous?.let {
+                it.first.recycle()
+                it.second.recycle()
+            }
         }
     }
 
