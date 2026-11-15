@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -29,7 +30,7 @@ class BatchDeleteControllerCoverageTest {
 
     @Test
     fun deleteMessageReturnsCommitResultAndBatchUsesIt() {
-        val controllers = source.controllersSource().readText()
+        val controllers = conversationControllerSource()
         val body = source.controllerFunctionBody("deleteMessageResult")
         val conversation = source.conversationScreenSource().readText()
 

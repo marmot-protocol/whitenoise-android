@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.diagnostics.PerformanceAttachmentState
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -80,7 +81,7 @@ class AttachmentFetchDiagnosticsTest {
 
     @Test
     fun mediaOperationsAreWiredToProductionPaths() {
-        val controller = source("ConversationController.kt")
+        val controller = conversationControllerSource()
         val resolver = source("AttachmentPlaintextResolver.kt")
         val native = source("NativeAttachmentTransfers.kt")
         val diagnostics = source("AttachmentFetchDiagnostics.kt")

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.chatsControllerSource
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -215,7 +216,7 @@ class MainThreadConfinementCoverageTest {
     private fun controllerSources(): String =
         listOf(
             chatsControllerSource(),
-            sourceFile("ConversationController.kt").readText(),
+            conversationControllerSource(),
             sourceFile("AttachmentControllerCache.kt").readText(),
             sourceFile("ConversationAttachmentPresentation.kt").readText(),
         ).joinToString(separator = "\n")

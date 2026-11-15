@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
 import dev.ipf.whitenoise.android.chatsControllerSource
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
 import dev.ipf.whitenoise.android.state.ConversationSearchPageDirection
 import dev.ipf.whitenoise.android.state.conversationLoadFailureEdge
@@ -57,9 +58,7 @@ class LoadFailurePlacementTest {
                 File("app/src/main/java/dev/ipf/whitenoise/android"),
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
-        val controllers =
-            chatsControllerSource() +
-                "\n" + File(sourceRoot, "state/ConversationController.kt").readText()
+        val controllers = chatsControllerSource() + "\n" + conversationControllerSource()
         val shell = File(sourceRoot, "ui/navigation/MainShell.kt").readText()
 
         assertTrue(controllers.countOccurrences("terminalLoadFailure = true") >= 2)
@@ -78,10 +77,10 @@ class LoadFailurePlacementTest {
                 File("app/src/main/java/dev/ipf/whitenoise/android"),
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
-        val controllers = File(sourceRoot, "state/ConversationController.kt").readText()
+        val controllers = conversationControllerSource()
         val screen = File(sourceRoot, "ui/conversation/ConversationScreen.kt").readText()
-        val failureResolutionStart = "private fun discardInitialTimelineSeedForFailure"
-        val failureResolutionEnd = "private fun publishAuthoritativeEmptyInitialTimeline"
+        val failureResolutionStart = "private fun ConversationController.discardInitialTimelineSeedForFailure"
+        val failureResolutionEnd = "private fun ConversationController.publishAuthoritativeEmptyInitialTimeline"
         val seededReconciliationStart = "val seededTailAlignmentReady ="
         val seededReconciliationEnd = "// The reversed transcript keeps its newest row"
         val transcriptVisibilityStart = "val transcriptVisibilityCommitted by"
@@ -136,10 +135,9 @@ class LoadFailurePlacementTest {
             )
         val sourceRoot = sourceCandidates.first(File::isDirectory)
         val runStart =
-            File(sourceRoot, "state/ConversationController.kt")
-                .readText()
-                .substringAfter("private suspend fun runStart(account: String)")
-                .substringBefore("private fun discardInitialTimelineSeedForFailure")
+            conversationControllerSource()
+                .substringAfter("internal suspend fun ConversationController.runStart(account: String)")
+                .substringBefore("private fun ConversationController.discardInitialTimelineSeedForFailure")
 
         assertTrue("val foregroundSweepJob = launch" in runStart)
         assertTrue("foregroundSweepJob.cancel()" in runStart)

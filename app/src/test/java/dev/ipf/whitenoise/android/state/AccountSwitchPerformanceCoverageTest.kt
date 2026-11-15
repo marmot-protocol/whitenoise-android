@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.chatsControllerSource
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -13,8 +14,9 @@ class AccountSwitchPerformanceCoverageTest {
     @Test
     fun everyEmittedStageHasAPhase() {
         val sources =
-            listOf("AppState.kt", "ConversationController.kt", "AccountSwitchLocalSnapshot.kt")
-                .joinToString("\n") { File(STATE_SOURCE_DIR, it).readText() } + "\n" + chatsControllerSource()
+            listOf("AppState.kt", "AccountSwitchLocalSnapshot.kt")
+                .joinToString("\n") { File(STATE_SOURCE_DIR, it).readText() } +
+                "\n" + chatsControllerSource() + "\n" + conversationControllerSource()
         val emitted =
             STAGE_CALL.findAll(sources).map { it.groupValues[1] }.toSet() +
                 MEMBER_STAGE_RESULT.findAll(sources).map { it.groupValues[1] }.toSet() +
