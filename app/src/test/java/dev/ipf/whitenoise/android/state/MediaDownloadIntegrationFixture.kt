@@ -31,9 +31,11 @@ import dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -49,6 +51,7 @@ import javax.crypto.spec.SecretKeySpec
 internal class MediaDownloadIntegrationFixture(
     accounts: List<AccountSummaryFfi> = emptyList(),
     preferences: android.content.SharedPreferences? = null,
+    private val retainIdleNativeFeeds: Boolean = false,
 ) : AutoCloseable {
     private val root = Files.createTempDirectory("media-host-regression").toFile()
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
@@ -371,7 +374,38 @@ internal class MediaDownloadIntegrationFixture(
      * Emits an initial snapshot; later observation awaits native work without owning or cancelling it. A paused
      * job is reported once per subscription, then the feed waits for the job to end.
      */
-    private fun subscription(key: String): AttachmentTransferSubscription =
+    private fun subscription(key: String): AttachmentTransferSubscription {
+        if (retainIdleNativeFeeds) return retentionSubscription(key)
+        val initialSnapshot = AttachmentTransferSnapshotFfi(listOf(status(key)))
+        return nativeStub(FixtureTransferFeed::class.java).also {
+            var initial = true
+            var pauseDelivered = false
+            var readyDelivered = initialSnapshot.items.single().state == AttachmentTransferStateFfi.READY
+            it.nextSnapshot = {
+                if (initial) {
+                    initial = false
+                    initialSnapshot
+                } else {
+                    if (readyDelivered) awaitCancellation()
+                    val call = checkNotNull(jobs[key])
+                    call.observed.complete(Unit)
+                    val deliverPause =
+                        !pauseDelivered &&
+                            select {
+                                call.result.onJoin { false }
+                                call.pausedSignal.onJoin { true }
+                            }
+                    if (deliverPause) pauseDelivered = true else call.result.await()
+                    AttachmentTransferSnapshotFfi(listOf(status(key))).also { snapshot ->
+                        readyDelivered = snapshot.items.single().state == AttachmentTransferStateFfi.READY
+                    }
+                }
+            }
+        }
+    }
+
+    /** Models a native retention subscription that can observe cleanup while no acquisition owns the body. */
+    private fun retentionSubscription(key: String): AttachmentTransferSubscription =
         nativeStub(FixtureTransferFeed::class.java).also {
             var previous: AttachmentTransferStatusFfi? = null
             it.nextSnapshot = {

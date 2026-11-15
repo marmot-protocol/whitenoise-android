@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaThumbnail
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
@@ -48,6 +49,7 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.hamcrest.CoreMatchers.allOf
 import org.junit.After
@@ -80,7 +82,7 @@ class MediaImageBubbleLatencyTest {
     /** Uses the real controller with only its native download boundary replaced. */
     @Before
     fun setUp() {
-        fixture = MediaDownloadIntegrationFixture()
+        fixture = MediaDownloadIntegrationFixture(retainIdleNativeFeeds = true)
         controller =
             ConversationController(
                 appState = fixture.state,
@@ -167,6 +169,16 @@ class MediaImageBubbleLatencyTest {
         )
         assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
+        awaitLoaded()
+        assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
+        // WorkManager's platform scheduler is absent from this fixture. Run its production transfer entry point.
+        val worker =
+            fixture.state.mutationsScope.async {
+                fixture.state.downloadAttachmentForDurableWork(
+                    MediaDownloadIntegrationFixture.qualifiedRequest(0),
+                    AttachmentDownloadPriority.Interactive,
+                )
+            }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()
             fixture.calls.size == 1
@@ -180,6 +192,12 @@ class MediaImageBubbleLatencyTest {
             !controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0)
         }
         awaitLoaded()
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            worker.isCompleted
+        }
+        assertTrue(runBlocking { worker.await() })
+        assertEquals(1, fixture.nativeAssetReads.get()) // The durable worker's lease, with no second UI read.
     }
 
     /** A visible L1 thumbnail settles an already-retained original's intent using metadata alone. */

@@ -164,13 +164,8 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachment(
             marmotIo { attachmentLocalAssets(request.accountRef, request.groupIdHex, targets) }
         },
         readAsset = { reference, offset, limit ->
-            marmotIo {
-                android.os.Trace.beginSection("WhiteNoise.attachment.original.chunk")
-                try {
-                    readAttachmentAsset(request.accountRef, reference, offset, limit)
-                } finally {
-                    android.os.Trace.endSection()
-                }
+            marmotIo("WhiteNoise.attachment.original.chunk") {
+                readAttachmentAsset(request.accountRef, reference, offset, limit)
             }
         },
     ).let { access ->

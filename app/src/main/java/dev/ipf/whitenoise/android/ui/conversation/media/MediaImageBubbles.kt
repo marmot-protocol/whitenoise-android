@@ -977,13 +977,15 @@ internal fun rememberImageLoadState(
             return@LaunchedEffect
         }
         if (displayReady) return@LaunchedEffect
-        val cached = controller.thumbnailEntryFor(messageIdHex, attachmentIndex, requestedMaxEdgePx)
+        val cached = controller.thumbnailEntryFor(messageIdHex, attachmentIndex)
         if (cached != null && seedStatic && nativeState != null) {
             presentation = DecodedAttachmentPresentation.Static(cached.bitmap)
             presentationMaxEdgePx = cached.maxEdgePx
             decodeRequest.onDecodedSize(cached.bitmap.width, cached.bitmap.height)
-            if (fulfillOriginalDownload) reloadToken++
-            return@LaunchedEffect
+            if (cached.maxEdgePx >= requestedMaxEdgePx) {
+                if (fulfillOriginalDownload) reloadToken++
+                return@LaunchedEffect
+            }
         }
         if (thumbnailRequest != null && seedStatic && nativeState != null) {
             val persisted = appState.readDisplayThumbnail(thumbnailRequest, requestedMaxEdgePx)
