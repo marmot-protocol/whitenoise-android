@@ -159,7 +159,9 @@ class NativeStartupDiagnosticDeviceTest {
                 bootstrap.join()
                 assertEquals(AppPhase.Onboarding, fixture.app.phase)
                 val account = fixture.native.createIdentity(listOf(fixture.relay.url), listOf(fixture.relay.url))
-                fixture.native.createGroup(account.label, "Native diagnostics", emptyList(), null)
+                fixture.native
+                    .createGroup(account.label, "Native diagnostics", emptyList(), null)
+                    .requireCreatedGroupId()
                 val native = fixture.native.startupDiagnosticsSnapshot()
                 assertTrue(native.enabled)
                 assertTrue(native.events.isNotEmpty())

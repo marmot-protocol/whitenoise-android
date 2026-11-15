@@ -2,10 +2,14 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
+import dev.ipf.marmotkit.InviteMembersResultFfi
+import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -79,3 +83,14 @@ internal fun failSuspendedNativeCall(
     continuation.resumeWith(Result.failure(failure))
     return COROUTINE_SUSPENDED
 }
+
+/** Adapts the shared roster fixture to an accepted invite and its resolved members. */
+internal fun GroupMutationResultFfi.asTestInviteResult(members: List<String>): GroupInviteResultFfi =
+    GroupInviteResultFfi(
+        InviteMembersResultFfi(
+            summary,
+            members.map { MemberResolutionOutcomeFfi(it, MemberResolutionStatusFfi.SELECTED, 1u) },
+        ),
+        details,
+        managementState,
+    )

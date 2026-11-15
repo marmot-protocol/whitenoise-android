@@ -5,8 +5,9 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [official 0.16.0 adoption](marmotkit-0.16.0.md) records the current pin: the
-formal `marmotkit-v0.16.0` release, its API compatibility and retained-data qualification.
+The [official 0.17.0 adoption](marmotkit-0.17.0.md) records Android's pin and
+consumer changes. The [official 0.16.0 adoption](marmotkit-0.16.0.md) records the
+populated upgrade baseline.
 
 The [official 0.15.0 release](marmotkit-0.15.0.md) is the populated campaign's
 upgrade baseline. The
@@ -71,12 +72,12 @@ execute: no ignored recovery case can satisfy adoption.
 
 The populated campaign builds current master and the candidate with one disposable
 signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed 0.15.0 source `827687ba`. Qualification
+longer pins the reviewed 0.16.0 source `a2e0558a`. Qualification
 sources must compile against both runtimes: when a MarmotKit type differs, keep the
 candidate's form in the qualification package and the baseline's form under
 `scripts/mdk-baseline-overlay/` as `<File>.kt.txt`, which the staging script copies
-over the candidate file in the baseline checkout. The 0.15.0/0.16.0 pair shares
-every type those sources use, so no overlay is currently needed. Dispatch once on the candidate
+over the candidate file in the baseline checkout. The group creation overlay
+extracts the group ID from the return type each release supplies. Dispatch once on the candidate
 branch and reuse a matching active run:
 
 ```bash

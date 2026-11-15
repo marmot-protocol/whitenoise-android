@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.MarmotKitException
@@ -123,7 +124,7 @@ internal fun ConversationController.presentInviteFailure(
 /** A newer details read requires a fresh native snapshot after this commit, not its older result. */
 internal suspend fun ConversationController.publishInitialAdminInviteResult(
     account: String,
-    result: dev.ipf.marmotkit.GroupMutationResultFfi,
+    result: GroupInviteResultFfi,
     authorityEpoch: Long,
     runtimeGeneration: Int,
 ) {
@@ -135,9 +136,22 @@ internal suspend fun ConversationController.publishInitialAdminInviteResult(
     }
 }
 
+/** A partial invite reports the skipped names after applying the committed roster. */
+internal fun ConversationController.presentInviteAccepted(skipped: AppText?) {
+    val account = conversationAccountRef ?: return
+    val title = if (skipped == null) R.string.toast_invite_sent else R.string.toast_couldnt_add_members
+    appState.presentConversationTransient(account, group.groupIdHex, title, skipped)
+}
+
+/** An all-skipped report has no invite to settle or reconcile. */
+internal fun checkInviteAccepted(result: GroupInviteResultFfi) {
+    if (result.invite.summary == null) throw groupMemberSelectionFailure(result.invite.memberOutcomes)
+}
+
 /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */
 private fun ConversationController.inviteReplyNeedsReconciliation(throwable: Throwable): Boolean =
     when (throwable) {
+        is NoGroupMembersSelectedException,
         is MarmotKitException.MissingKeyPackage,
         is MarmotKitException.MissingMemberInboxRoute,
         is MarmotKitException.InvalidKeyPackageEvent,

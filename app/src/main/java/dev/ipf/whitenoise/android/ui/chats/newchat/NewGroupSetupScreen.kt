@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.ProfilePictureDraftProcessor
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -39,7 +40,9 @@ import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.presentFailure
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
 import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
@@ -91,6 +94,11 @@ private suspend fun createOrRecoverNewGroup(
                 appState.marmotIo {
                     owner.ensureCurrent()
                     createGroupWithOptions(account, name, members, options)
+                }.let { result ->
+                    val groupId = result.requireCreatedGroupId()
+                    owner.ensureCurrent()
+                    owner.skippedMembers = result.memberOutcomes.skippedGroupMembersDetail(appState::displayName)
+                    groupId
                 }
             }.also {
                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
@@ -221,9 +229,12 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
             }
         diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
         onRetryGroupIdCleared()
-        if (showCreatedToast) {
-            appState.presentConversationTransient(accountRef, groupIdHex, R.string.toast_chat_created)
+        val skipped = owner.skippedMembers
+        val title = createdGroupNoticeTitle(showCreatedToast, skipped)
+        if (title != null) {
+            appState.presentConversationTransient(accountRef, groupIdHex, title, skipped)
         }
+        owner.skippedMembers = null
         onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
         diagnostic.failed(DmCreationPhase.PROJECTION, it)
@@ -231,6 +242,14 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
         onAuthoritativeReadFailed(it)
     }
 }
+
+/** Shows the skipped-recipient report even when opening needed a projection retry. */
+private fun createdGroupNoticeTitle(showCreatedToast: Boolean, skipped: AppText?): Int? =
+    when {
+        skipped != null -> R.string.toast_couldnt_add_members
+        showCreatedToast -> R.string.toast_chat_created
+        else -> null
+    }
 
 /** Same authoritative projection mapper, with a captured account and an IO-boundary owner check. */
 private suspend fun loadCreatedGroupForOwner(

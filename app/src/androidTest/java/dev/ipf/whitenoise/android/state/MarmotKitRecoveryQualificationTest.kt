@@ -298,7 +298,10 @@ class MarmotKitRecoveryQualificationTest {
         runBlocking<Unit> {
             val group = establishedGroup()
             val receiver = group.receiver
-            val deleted = receiver.runtime.createGroup(receiver.account.label, "Deleted fixture", emptyList(), null)
+            val deleted =
+                receiver.runtime
+                    .createGroup(receiver.account.label, "Deleted fixture", emptyList(), null)
+                    .requireCreatedGroupId()
             check(receiver.runtime.deleteGroupLocal(receiver.account.label, deleted))
             repeat(2) { pass ->
                 val active = if (pass == 0) receiver else reopen(receiver)
@@ -347,7 +350,7 @@ class MarmotKitRecoveryQualificationTest {
         val receiver = participant("receiver")
         val others = List(extraSenders) { sender.runtime.createIdentity(relays, relays) }
         val members = listOf(receiver.account.accountIdHex) + others.map { it.accountIdHex }
-        val id = sender.runtime.createGroup(sender.account.label, "Recovery", members, null)
+        val id = sender.runtime.createGroup(sender.account.label, "Recovery", members, null).requireCreatedGroupId()
         withTimeout(INVITE_TIMEOUT_MILLIS) {
             while (runCatching { receiver.runtime.acceptGroupInvite(receiver.account.label, id) }.isFailure) {
                 delay(POLL_MILLIS)
@@ -385,7 +388,7 @@ class MarmotKitRecoveryQualificationTest {
         recipient: Participant,
     ): String {
         val members = listOf(recipient.account.accountIdHex)
-        return sender.runtime.createGroup(sender.account.label, "Lookup", members, null)
+        return sender.runtime.createGroup(sender.account.label, "Lookup", members, null).requireCreatedGroupId()
     }
 
     /** True for MDK's refusal of a group change while the device may be behind its group. */

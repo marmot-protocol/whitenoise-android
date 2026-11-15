@@ -20,8 +20,8 @@ import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
+import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
-import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
@@ -700,7 +700,7 @@ class ConversationController(
     private val groupSnapshotReader: suspend (String, String) -> dev.ipf.marmotkit.GroupConversationSnapshotFfi =
         { account, groupId -> appState.marmotIo { groupConversationSnapshot(account, groupId) } },
     private val initialAdminInviteWriter:
-        suspend (String, String, List<String>, List<String>) -> dev.ipf.marmotkit.GroupMutationResultFfi =
+        suspend (String, String, List<String>, List<String>) -> GroupInviteResultFfi =
         { account, groupId, members, admins ->
             appState.runGroupChange(
                 account,
@@ -3786,6 +3786,7 @@ class ConversationController(
                     val activityId = pendingMembershipActivity?.id
                     var nativeInvoked = false
                     var nativeAccepted = false
+                    var skippedMembers: AppText? = null
                     var canonicalAdmins = emptyList<String>()
                     val runtimeGeneration = appState.runtimeGeneration
                     val absentBefore =
@@ -3805,7 +3806,10 @@ class ConversationController(
                                 nativeInvoked = true
                                 val inviteResult =
                                     initialAdminInviteWriter(account, group.groupIdHex, refs, adminTargets)
+                                checkInviteAccepted(inviteResult)
                                 nativeAccepted = true
+                                skippedMembers =
+                                    inviteResult.invite.memberOutcomes.skippedGroupMembersDetail(appState::displayName)
                                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                                 diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
                                 publishInitialAdminInviteResult(
@@ -3831,7 +3835,7 @@ class ConversationController(
                             presentRosterChanged(R.string.toast_couldnt_add_members)
                             return@track false
                         }
-                        presentConversationTransient(R.string.toast_invite_sent)
+                        presentInviteAccepted(skippedMembers)
                         true
                     } catch (throwable: Throwable) {
                         diagnostic.invitationFailed(throwable, nativeInvoked, nativeAccepted)

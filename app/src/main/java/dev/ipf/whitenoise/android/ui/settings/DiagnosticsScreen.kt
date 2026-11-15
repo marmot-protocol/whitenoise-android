@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.bootstrapRelayCount
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -302,7 +303,7 @@ internal fun DiagnosticsScreen(
                                         "diagnostic-${System.currentTimeMillis() / 1000L}",
                                         emptyList(),
                                         null,
-                                    )
+                                    ).requireCreatedGroupId()
                                 }
                             appState.marmotIo { sendText(account, groupId, "ping at ${System.currentTimeMillis() / 1000L}") }
                             // Archive the throwaway group so the chat list doesn't accumulate orphans.

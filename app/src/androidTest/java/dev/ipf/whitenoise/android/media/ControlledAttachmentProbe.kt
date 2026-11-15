@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
 import dev.ipf.whitenoise.android.state.enforceAppOwnedAttachmentAcquisitionPolicy
 import dev.ipf.whitenoise.android.state.openNativeAttachment
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -103,7 +104,10 @@ internal object ControlledAttachmentProbe {
                 val sender = marmot.createIdentity(relays, relays)
                 accounts += sender.label
                 marmot.enforceAppOwnedAttachmentAcquisitionPolicy(listOf(receiver.label, sender.label))
-                val group = marmot.createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
+                val group =
+                    marmot
+                        .createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
+                        .requireCreatedGroupId()
                 awaitReceivedGroup(marmot, receiver.label, group)
                 val bytes = ByteArray(payloadBytes) { (it % 251).toByte() }
                 val reference =

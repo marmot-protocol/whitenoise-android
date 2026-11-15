@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import dev.ipf.whitenoise.android.diagnostics.CreationOperation
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
+import dev.ipf.whitenoise.android.state.AppText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -11,6 +12,9 @@ internal class GroupCreationSession(
     private val currentOwner: () -> Boolean,
 ) {
     private var active = true
+
+    /** Remembers the partial outcome until the newly created group can open. */
+    var skippedMembers: AppText? = null
     val diagnostics = DmCreationInteraction(operation = CreationOperation.GROUP_CREATE)
 
     /** Reads the live account, including changes before Compose disposes the old screen. */

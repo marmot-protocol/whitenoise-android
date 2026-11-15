@@ -62,7 +62,7 @@ class RecipientConfirmationNativeDeviceTest {
                             "",
                             listOf(peer.account.accountIdHex),
                             null,
-                        )
+                        ).requireCreatedGroupId()
                     awaitInvite(peer, group)
                     assertTwoMemberRoster(sender, peer, group)
 

@@ -4,16 +4,17 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
+import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,9 +29,9 @@ class DiscoveryInvitationRejectionFfiTest {
         withFixture { fixture ->
             fixture.discovery.hiddenAuthorsByKind = mapOf(INBOX to setOf(fixture.bob))
             fixture.advertised.hiddenAuthorsByKind = mapOf(INBOX to setOf(fixture.bob))
-            val error = fixture.rejectWithoutMutation()
-            assertTrue("Expected missing inbox, got $error", error is MarmotKitException.MissingMemberInboxRoute)
-            assertEquals(fixture.bob, (error as MarmotKitException.MissingMemberInboxRoute).account)
+            val outcome = fixture.rejectWithoutMutation()
+            assertEquals(MemberResolutionStatusFfi.MISSING_INBOX_ROUTE, outcome.status)
+            assertEquals(fixture.bob, outcome.accountIdHex)
         }
 
     /** An observed signed deletion cannot be bypassed by falling back to the retained package event. */
@@ -110,7 +111,10 @@ class DiscoveryInvitationRejectionFfiTest {
                                 val second = System.currentTimeMillis() / 1000L
                                 while (System.currentTimeMillis() / 1000L <= second) delay(25L)
                                 peer.publishRelayLists(bob, listOf(advertised.url), relays, relays)
-                                val group = sender.createGroup(alice, "Rejected invite fixture", emptyList(), null)
+                                val group =
+                                    sender
+                                        .createGroup(alice, "Rejected invite fixture", emptyList(), null)
+                                        .requireCreatedGroupId()
                                 block(Fixture(sender, peer, discovery, advertised, alice, bob, group))
                             }
                         } finally {
@@ -138,13 +142,18 @@ class DiscoveryInvitationRejectionFfiTest {
         val group: String,
     ) {
         /** A native rejection must preserve the epoch, membership and every attempted Welcome publication. */
-        suspend fun rejectWithoutMutation(): Exception {
+        suspend fun rejectWithoutMutation(): MemberResolutionOutcomeFfi {
             val members = sender.groupMembers(alice, group)
             val epoch = sender.groupMlsState(alice, group).epoch
             val before = discovery.publicationAttempts(GIFT_WRAP).size + advertised.publicationAttempts(GIFT_WRAP).size
             val chats = sender.chatList(alice, true).map { it.groupIdHex }.toSet()
-            val error = rejected { sender.inviteMembersDetailed(alice, group, listOf(bob)) }
-            rejected { sender.createGroup(alice, "Rejected create fixture", listOf(bob), null) }
+            val invite = sender.inviteMembersDetailed(alice, group, listOf(bob)).invite
+            val create = sender.createGroup(alice, "Rejected create fixture", listOf(bob), null)
+            assertNull(invite.summary)
+            assertNull(create.groupIdHex)
+            val outcome = invite.memberOutcomes.single()
+            assertEquals(outcome, create.memberOutcomes.single())
+            assertTrue(outcome.status != MemberResolutionStatusFfi.SELECTED)
             assertEquals(chats, sender.chatList(alice, true).map { it.groupIdHex }.toSet())
             assertEquals(members, sender.groupMembers(alice, group))
             assertEquals(epoch, sender.groupMlsState(alice, group).epoch)
@@ -152,21 +161,7 @@ class DiscoveryInvitationRejectionFfiTest {
                 before,
                 discovery.publicationAttempts(GIFT_WRAP).size + advertised.publicationAttempts(GIFT_WRAP).size,
             )
-            return error
-        }
-
-        /** Treats cancellation as cancellation, and requires an actual native preflight rejection. */
-        private suspend fun rejected(block: suspend () -> Unit): Exception {
-            val failure =
-                try {
-                    block()
-                    null
-                } catch (cancel: CancellationException) {
-                    throw cancel
-                } catch (error: Exception) {
-                    error
-                }
-            return requireNotNull(failure) { "An unsafe recipient must fail preflight" }
+            return outcome
         }
     }
 

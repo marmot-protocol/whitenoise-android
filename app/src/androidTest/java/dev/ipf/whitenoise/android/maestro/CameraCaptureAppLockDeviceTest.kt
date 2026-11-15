@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.page
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -108,7 +109,10 @@ class CameraCaptureAppLockDeviceTest {
             instrumentation.addMonitor(camera)
             try {
                 val account = native.createIdentity(listOf(relay.url), listOf(relay.url))
-                val group = native.createGroup(account.label, "Camera lock fixture", emptyList(), null)
+                val group =
+                    native
+                        .createGroup(account.label, "Camera lock fixture", emptyList(), null)
+                        .requireCreatedGroupId()
                 val state = createState(context, root, native, listOf(account))
                 app = state
                 camera.state = state

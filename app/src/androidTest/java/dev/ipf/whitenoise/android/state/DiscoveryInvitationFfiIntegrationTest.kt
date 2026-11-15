@@ -50,7 +50,10 @@ class DiscoveryInvitationFfiIntegrationTest {
                             val owner = sender.createIdentity(relays, relays)
                             val admin = peer.createIdentity(relays, relays)
                             val member = peer.createIdentity(relays, relays)
-                            val group = sender.createGroup(owner.label, "Initial roles", emptyList(), null)
+                            val group =
+                                sender
+                                    .createGroup(owner.label, "Initial roles", emptyList(), null)
+                                    .requireCreatedGroupId()
                             sender.inviteMembersDetailedWithInitialAdmins(
                                 owner.label,
                                 group,
@@ -138,7 +141,7 @@ class DiscoveryInvitationFfiIntegrationTest {
                                         "Discovery recovery",
                                         listOf(bob.accountIdHex),
                                         null,
-                                    )
+                                    ).requireCreatedGroupId()
                                 awaitInvite(peer, bob.label, group)
                                 sender.inviteMembersDetailed(alice.label, group, listOf(carol.accountIdHex))
                                 awaitInvite(peer, carol.label, group)

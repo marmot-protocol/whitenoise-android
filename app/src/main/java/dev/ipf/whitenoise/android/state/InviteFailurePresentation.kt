@@ -30,6 +30,9 @@ internal fun inviteFailureDetail(
 ): AppText =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
+        is NoGroupMembersSelectedException ->
+            throwable.outcomes.skippedGroupMembersDetail(displayName)
+                ?: AppText.Resource(fallbackResource)
         // Only obsolete KeyPackages means the recipient must update; none at all means they still need setup.
         is MissingKeyPackage ->
             if (throwable.reason == MissingKeyPackageReasonFfi.OBSOLETE_ONLY) {
@@ -108,6 +111,7 @@ internal fun startProfileChatFailureDetail(
 internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> false
+        is NoGroupMembersSelectedException -> false
         is MissingKeyPackage -> false
         is MarmotKitException.InvalidKeyPackageEvent -> false
         is MarmotKitException.MissingMemberInboxRoute -> false
