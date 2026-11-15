@@ -181,8 +181,7 @@ class TwoPaneChatLayoutTest {
     }
 
     /** The conversation composer, never a text field inside the list pane. */
-    private fun composer() =
-        composeRule.onNode(hasSetTextAction() and !hasAnyAncestor(hasTestTag(TWO_PANE_LIST_TAG)))
+    private fun composer() = composeRule.onNode(hasSetTextAction() and !hasAnyAncestor(hasTestTag(TWO_PANE_LIST_TAG)))
 
     private fun pressBack() {
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }

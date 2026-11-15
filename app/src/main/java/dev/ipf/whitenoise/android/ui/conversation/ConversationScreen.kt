@@ -3096,6 +3096,7 @@ internal fun ConversationScreen(
             options = searchControls.options,
             onStateChange = ::updateConversationSearch,
         )
+
         fun currentBackAction() =
             conversationBackAction(
                 textSelectionActive = textSelectionMessageId != null,
