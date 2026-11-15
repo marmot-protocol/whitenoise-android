@@ -114,7 +114,8 @@ class ConversationInlineReadMoreScreenshotTest {
     fun smallExpansionAtNaturalTailKeepsFollowingNewest() {
         val conversation = createConversation(longMessageAtTail = true)
         val evidence = SendRouteEvidence()
-        composeRule.mountSendRouteConversation(conversation, evidence, liveTail = true)
+        // Keep the caret visible: its blink phase is unrelated to Read More geometry.
+        composeRule.mountSendRouteConversation(conversation, evidence, liveTail = true, cursorBlinkEnabled = false)
         composeRule.waitForIdle()
         composeRule.waitUntil(5_000) {
             val viewport = evidence.viewport

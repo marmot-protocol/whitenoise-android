@@ -437,6 +437,23 @@ class IdentityFormatterTest {
     }
 
     @Test
+    fun instantAndMillisecondsPreserveBoundariesBeforeAnyUnsignedNarrowing() {
+        val maximum = 253_402_300_799uL
+        for (seconds in listOf(0uL, maximum, maximum + 1uL, 40_000_000_000_000_000uL, ULong.MAX_VALUE)) {
+            val expected = if (seconds <= maximum) Instant.ofEpochSecond(seconds.toLong()) else null
+            assertEquals(expected, IdentityFormatter.instant(seconds))
+            assertEquals(expected?.toEpochMilli(), IdentityFormatter.epochMillis(seconds))
+            for (zone in listOf(ZoneId.of("Etc/GMT+12"), ZoneId.of("Pacific/Kiritimati"))) {
+                assertEquals(expected?.atZone(zone)?.toLocalDate(), IdentityFormatter.localDate(seconds, zone))
+                assertEquals(
+                    Instant.ofEpochSecond(seconds.coerceAtMost(maximum).toLong()).atZone(zone).toLocalDate(),
+                    IdentityFormatter.clampedLocalDate(seconds, zone),
+                )
+            }
+        }
+    }
+
+    @Test
     fun localDateIsNullForUnrepresentableReceivedStamps() {
         val kiritimati = ZoneId.of("Pacific/Kiritimati")
         val samoaWest = ZoneId.of("Etc/GMT+12")

@@ -6,6 +6,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToNode
@@ -14,6 +15,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BoundedNpubCache
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -60,6 +62,26 @@ class AccountKeysScreenScreenshotTest {
             scrollToWipe = true,
         )
 
+    @Test
+    fun profileKeysPurposeAmoled() =
+        capture(
+            "profile_keys_purpose_amoled",
+            darkTheme = true,
+            amoled = true,
+            scrollToExport = true,
+        )
+
+    /** The purpose and safety explanation must reflow at 200 % in RTL. */
+    @Test
+    fun profileKeysPurposeDarkLargeRtl() =
+        capture(
+            "profile_keys_purpose_dark_large_rtl",
+            darkTheme = true,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            scrollToPurpose = true,
+        )
+
     /** Amber-signed account: the callout replaces the private key and export groups. */
     @Test
     fun profileKeysAmberLight() = capture("profile_keys_amber_light", darkTheme = false, localSigning = false)
@@ -93,6 +115,8 @@ class AccountKeysScreenScreenshotTest {
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         scrollToWipe: Boolean = false,
+        scrollToPurpose: Boolean = false,
+        scrollToExport: Boolean = false,
         localSigning: Boolean = true,
         empty: Boolean = false,
     ) {
@@ -118,6 +142,14 @@ class AccountKeysScreenScreenshotTest {
                     AccountKeysScreen(appState = appState, onBack = {})
                 }
             }
+        }
+        if (scrollToPurpose) {
+            composeRule
+                .onNode(hasScrollAction())
+                .performScrollToNode(hasText(app.getString(R.string.profile_private_key_use_help)))
+        }
+        if (scrollToExport) {
+            composeRule.onNode(hasScrollAction()).performScrollToNode(hasTestTag("profile_keys.export_raw"))
         }
         if (scrollToWipe) composeRule.onNode(hasScrollAction()).performScrollToNode(hasTestTag(WIPE_ACTION_TAG))
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName.png")

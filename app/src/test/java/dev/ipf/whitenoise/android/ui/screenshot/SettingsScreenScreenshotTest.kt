@@ -160,17 +160,35 @@ class SettingsScreenScreenshotTest {
             .captureRoboImage("src/test/snapshots/settings_screen_global_confirmation_dark.png")
     }
 
-    /** Captures the release version footer below the initial settings viewport. */
+    /** Captures the copy action beside the release version below the initial viewport. */
     @Test
     fun settingsScreenVersionFooterDark() {
         render(darkTheme = true)
-        composeRule
-            .onNode(hasScrollToNodeAction())
-            .performScrollToNode(hasText("Version 2026.10.27"))
+        captureVersionFooter("settings_screen_version_footer_dark")
+    }
+
+    @Test
+    fun settingsScreenVersionFooterLight() {
+        render(darkTheme = false)
+        captureVersionFooter("settings_screen_version_footer_light")
+    }
+
+    @Test
+    fun settingsScreenVersionFooterAmoled() {
+        render(darkTheme = true, amoled = true)
+        captureVersionFooter("settings_screen_version_footer_amoled")
+    }
+
+    @Test
+    fun settingsScreenVersionFooterRtlLargeFont() {
+        render(darkTheme = true, amoled = true, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        captureVersionFooter("settings_screen_version_footer_rtl_large_font")
+    }
+
+    private fun captureVersionFooter(name: String) {
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("settings.version_footer"))
         composeRule.onNodeWithText("Version 2026.10.27").assertIsDisplayed()
-        composeRule
-            .onNodeWithTag(SETTINGS_HOME_CONTENT_TAG)
-            .captureRoboImage("src/test/snapshots/settings_screen_version_footer_dark.png")
+        capture(name)
     }
 
     /** Captures the privacy-preserving dictation defaults on the light settings surface. */

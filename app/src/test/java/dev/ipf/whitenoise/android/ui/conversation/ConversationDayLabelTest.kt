@@ -40,6 +40,34 @@ class ConversationDayLabelTest {
     }
 
     @Test
+    fun actualDayGroupingKeepsUnknownDatesDistinctFromEpochInBothExtremeZones() {
+        val maximum = 253_402_300_799uL
+        val stamps = listOf(0uL, maximum, maximum + 1uL, 18_446_744_073_709_552uL, ULong.MAX_VALUE)
+        for (zoneName in listOf("Etc/GMT+12", "Pacific/Kiritimati")) {
+            TimeZone.setDefault(TimeZone.getTimeZone(zoneName))
+            val zone = java.time.ZoneId.of(zoneName)
+            for (a in stamps) {
+                for (b in stamps) {
+                    val expectedA =
+                        a
+                            .takeIf { it <= maximum }
+                            ?.let { Instant.ofEpochSecond(it.toLong()).atZone(zone).toLocalDate() }
+                    val expectedB =
+                        b
+                            .takeIf { it <= maximum }
+                            ?.let { Instant.ofEpochSecond(it.toLong()).atZone(zone).toLocalDate() }
+                    assertEquals(expectedA != expectedB, differentDay(a, b))
+                }
+                if (a == 0uL || a > maximum) {
+                    assertEquals("", messageDayLabel(a, Locale.US))
+                } else {
+                    assertTrue(messageDayLabel(a, Locale.US).isNotEmpty())
+                }
+            }
+        }
+    }
+
+    @Test
     fun unrepresentableStampsHaveAnEmptyLabel() {
         unrepresentable.forEach { assertEquals("", messageDayLabel(it, Locale.US)) }
         assertEquals("", messageDayLabel(0uL, Locale.US))
