@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.app.Notification
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -8,6 +10,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +23,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ConversationDictationNotificationChoiceTest : ConversationDictationForegroundTestCase() {
+    /** The last Paste or Send tap before delivery decides the outcome, whichever silence choice is stored. */
     @Test
     fun latestNotificationChoiceWinsBeforeDeliveryForEitherStoredPreference() =
         runTest {
@@ -33,13 +37,13 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
                         service.onStartCommand(startIntent(service, harness), 0, 1)
                         val first = if (finalChoice == ConversationDictationDeliveryMode.SendOnFinish) 1 else 2
                         service.onStartCommand(actionCommand(service, harness, notificationActions[first]), 0, 2)
-                        assertCompactButtonsEnabled(service, service.foreground.foregroundNotification())
+                        assertNativeNotificationActions(service, harness, service.foreground.foregroundNotification())
                         val last = if (finalChoice == ConversationDictationDeliveryMode.SendOnFinish) 2 else 1
                         val lastIntent = actionCommand(service, harness, notificationActions[last])
                         service.onStartCommand(lastIntent, 0, 3)
                         service.onStartCommand(lastIntent, 0, 4)
                         assertEquals(finalChoice, harness.conversationDictation.processingDeliveryMode)
-                        assertCompactButtonsEnabled(service, service.foreground.foregroundNotification())
+                        assertNativeNotificationActions(service, harness, service.foreground.foregroundNotification())
                         val listener = harness.platform.listener
                         listener.onResult("latest notification choice")
                         runCurrent()
@@ -58,8 +62,9 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
             }
         }
 
+    /** Once delivery is claimed the card drops every action, and replayed taps change nothing until it finishes. */
     @Test
-    fun dispatchClaimDisablesAllNotificationActionsUntilDeliveryCompletes() =
+    fun dispatchClaimOmitsAllNotificationActionsUntilDeliveryCompletes() =
         runTest {
             val delivery = CompletableDeferred<Unit>()
             val harness = DictationForegroundTestHost(scope = this, onDispatchClaimed = { delivery.await() })
@@ -68,13 +73,27 @@ internal class ConversationDictationNotificationChoiceTest : ConversationDictati
             try {
                 val service = lifecycle.get()
                 service.onStartCommand(startIntent(service, harness), 0, 1)
+                val active = service.foreground.foregroundNotification()
+                assertTrue(active.extras.getBoolean(Notification.EXTRA_REQUEST_PROMOTED_ONGOING))
+                assertTrue(active.flags and Notification.FLAG_ONGOING_EVENT != 0)
+                assertEquals(
+                    service.getString(R.string.dictation_notification_title),
+                    active.extras.getCharSequence(Notification.EXTRA_TITLE),
+                )
+                assertNull(active.contentView)
+                assertFalse(active.extras.getBoolean(Notification.EXTRA_COLORIZED))
                 val commands = notificationActions.map { actionCommand(service, harness, it) }
                 service.onStartCommand(commands.last(), 0, 2)
                 harness.platform.listener.onResult("claimed dispatch")
                 runCurrent()
                 assertTrue(harness.conversationDictation.deliveryInProgress)
                 assertFalse(harness.conversationDictation.completionActionsEnabled)
-                assertCompactButtonsDisabled(service, service.foreground.foregroundNotification())
+                assertNativeNotificationActions(
+                    service,
+                    harness,
+                    service.foreground.foregroundNotification(),
+                    expectedCount = 0,
+                )
                 commands.forEachIndexed { index, command -> service.onStartCommand(command, 0, index + 3) }
                 runCurrent()
                 assertTrue(harness.conversationDictation.deliveryInProgress)

@@ -12306,15 +12306,6 @@
         ]
       },
       {
-        "surface": "string:cancel",
-        "source": "app/src/main/res/layout/notification_dictation_compact.xml",
-        "anchor": "@string/cancel",
-        "test_ids": [
-          "DIC-001",
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "Dictation notification completion cleanup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
         "anchor": "private fun removeForegroundNotification()",
@@ -12429,24 +12420,6 @@
         "surface": "string:message_status_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.message_status_pending",
-        "test_ids": [
-          "DIC-001",
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:paste",
-        "source": "app/src/main/res/layout/notification_dictation_compact.xml",
-        "anchor": "@string/paste",
-        "test_ids": [
-          "DIC-001",
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "string:send",
-        "source": "app/src/main/res/layout/notification_dictation_compact.xml",
-        "anchor": "@string/send",
         "test_ids": [
           "DIC-001",
           "DIC-002"
