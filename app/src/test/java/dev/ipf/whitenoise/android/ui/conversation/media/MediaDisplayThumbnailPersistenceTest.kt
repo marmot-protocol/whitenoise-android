@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.graphics.Bitmap
+import android.os.Looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.unit.IntSize
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
+import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -17,11 +19,15 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.clearMediaDiskCaches
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -34,13 +40,20 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 /** Production bubble ownership while the encoder is busy or a cache removal races an original load. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MediaDisplayThumbnailPersistenceTest {
-    @get:Rule val composeRule = createComposeRule()
+    private val effectJobs = MainLooperEffectJobs()
+
+    @get:Rule val composeRule = createComposeRule(effectContext = effectJobs)
     private lateinit var fixture: MediaDownloadIntegrationFixture
     private lateinit var controller: ConversationController
 
@@ -116,20 +129,7 @@ class MediaDisplayThumbnailPersistenceTest {
         var loadState: ImageLoadState? = null
         composeRule.setContent {
             WhiteNoiseTheme {
-                loadState =
-                    rememberImageLoadState(
-                        controller = controller,
-                        appState = fixture.state,
-                        messageIdHex = request(0).messageIdHex,
-                        attachmentIndex = 0,
-                        reference = reference(0),
-                        mine = false,
-                        decodeKeys = listOf(controller, request(0).messageIdHex),
-                        fallbackAspectRatio = 1f,
-                        intentIdentity = "cleaned-oversized-source",
-                        failureLogTag = "ThumbnailPersistenceTest",
-                        failureLogMessage = "synthetic failure",
-                    )
+                loadState = ObserveLoad()
             }
         }
         composeRule.runOnIdle { checkNotNull(loadState).decodeRequest.onSizeChanged(IntSize(128, 128)) }
@@ -151,20 +151,7 @@ class MediaDisplayThumbnailPersistenceTest {
     @Test
     fun cleanedOriginalDownloadIntentEnqueuesInteractiveWork() {
         fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
-        fixture.state.attachmentOpens.setDestination(
-            AttachmentOpenDestination(
-                accountRef = MediaDownloadIntegrationFixture.ACCOUNT,
-                groupIdHex = MediaDownloadIntegrationFixture.GROUP,
-                navigationGeneration = 1L,
-            ),
-        )
-        val transfer = MediaDownloadIntegrationFixture.qualifiedRequest(0)
-        assertTrue(!fixture.state.hasInteractive(transfer))
-        assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
-        // Model scheduler registration lost while the persisted foreground intent still needs fulfillment.
-        fixture.state.clearInteractiveAttachmentDownloadIntent(transfer)
-        assertTrue(!fixture.state.hasInteractive(transfer))
-        assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
+        val transfer = armOriginalDownload()
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
         composeRule.waitUntil(10_000) {
             composeRule.waitForIdle()
@@ -174,6 +161,128 @@ class MediaDisplayThumbnailPersistenceTest {
         assertEquals(0, fixture.calls.size)
         assertEquals(0, fixture.nativeAssetReads.get())
     }
+
+    /** Leaving while original eviction is non-cancellable cannot restore a reader's revoked download. */
+    @Test
+    fun cancelledCleanupCannotReenqueueTheOriginalDownload() {
+        fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
+        val transfer = armOriginalDownload()
+        var shown by mutableStateOf(true)
+        var loadState: ImageLoadState? = null
+        composeRule.setContent { WhiteNoiseTheme { if (shown) loadState = ObserveLoad() } }
+        // Hold layout admission until the persisted reader intent has reached the mounted loader.
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            loadState?.startDownload == true
+        }
+        fixture.disk.put(request(0).cacheKey(), imageBytes())
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val cleanupOwners = ConcurrentHashMap.newKeySet<Job>()
+        fixture.onNativeSnapshot = { cleanupOwners += effectJobs.currentMainOwner() }
+        fixture.onBeforeOriginalRemoval = {
+            entered.countDown()
+            check(release.await(10, TimeUnit.SECONDS)) { "Synthetic original removal was not released" }
+        }
+        try {
+            composeRule.runOnIdle { checkNotNull(loadState).decodeRequest.onSizeChanged(IntSize(128, 128)) }
+            composeRule.waitUntil(10_000) {
+                composeRule.waitForIdle()
+                entered.count == 0L
+            }
+            assertTrue(cleanupOwners.isNotEmpty())
+            composeRule.runOnIdle {
+                val openRequest = checkNotNull(fixture.state.attachmentOpens.openRequest(transfer))
+                fixture.state.attachmentOpens.cancelOpen(openRequest)
+                fixture.state.clearInteractiveAttachmentDownloadIntent(transfer)
+                shown = false
+            }
+            composeRule.waitForIdle()
+            release.countDown()
+            composeRule.waitUntil(10_000) {
+                composeRule.waitForIdle()
+                cleanupOwners.all { it.isCompleted }
+            }
+            composeRule.runOnIdle {
+                assertTrue(!controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
+                assertTrue(!fixture.state.hasInteractive(transfer))
+            }
+            assertEquals(0, fixture.calls.size)
+        } finally {
+            release.countDown()
+        }
+    }
+
+    /** Preserves foreground demand while modeling scheduler registration that must be restored by the loader. */
+    private fun armOriginalDownload(): AttachmentTransferRequest {
+        fixture.state.attachmentOpens.setDestination(
+            AttachmentOpenDestination(
+                accountRef = MediaDownloadIntegrationFixture.ACCOUNT,
+                groupIdHex = MediaDownloadIntegrationFixture.GROUP,
+                navigationGeneration = 1L,
+            ),
+        )
+        val transfer = MediaDownloadIntegrationFixture.qualifiedRequest(0)
+        assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
+        fixture.state.clearInteractiveAttachmentDownloadIntent(transfer)
+        assertTrue(!fixture.state.hasInteractive(transfer))
+        assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
+        return transfer
+    }
+
+    /** Captures the actual Compose owners before native metadata reads dispatch to IO. */
+    private class MainLooperEffectJobs :
+        AbstractCoroutineContextElement(Key),
+        ThreadContextElement<Job?> {
+        private val current = ThreadLocal<Job?>()
+        private val mainJobs = ConcurrentHashMap.newKeySet<Job>()
+
+        /** Remembers jobs executing on Main before their IO children run the fake binding. */
+        override fun updateThreadContext(context: CoroutineContext): Job? {
+            val previous = current.get()
+            val job = context[Job]
+            current.set(job)
+            if (job != null && Looper.myLooper() == Looper.getMainLooper()) mainJobs += job
+            return previous
+        }
+
+        /** Restores the prior coroutine when a dispatcher leaves this thread. */
+        override fun restoreThreadContext(
+            context: CoroutineContext,
+            oldState: Job?,
+        ) {
+            current.set(oldState)
+        }
+
+        /** Finds the nearest captured Main ancestor, the effect that owns this particular native read. */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        fun currentMainOwner(): Job {
+            var job = checkNotNull(current.get()) { "the binding did not inherit its Compose effect context" }
+            while (job !in mainJobs) {
+                job = checkNotNull(job.parent) { "the read has no captured Main effect owner" }
+            }
+            return job
+        }
+
+        private companion object Key : CoroutineContext.Key<MainLooperEffectJobs>
+    }
+
+    /** Mounts the production loader with layout admission controlled separately by the test. */
+    @Composable
+    private fun ObserveLoad(): ImageLoadState =
+        rememberImageLoadState(
+            controller = controller,
+            appState = fixture.state,
+            messageIdHex = request(0).messageIdHex,
+            attachmentIndex = 0,
+            reference = reference(0),
+            mine = false,
+            decodeKeys = listOf(controller, request(0).messageIdHex),
+            fallbackAspectRatio = 1f,
+            intentIdentity = "thumbnail-cleanup-source",
+            failureLogTag = "ThumbnailPersistenceTest",
+            failureLogMessage = "synthetic failure",
+        )
 
     /** Mounts the shipping image path with a synthetic received row. */
     @Composable

@@ -56,7 +56,16 @@ internal class MediaDownloadIntegrationFixture(
     private val root = Files.createTempDirectory("media-host-regression").toFile()
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
     private val diskRoot = java.io.File(root, "encrypted")
-    val disk = DiskByteCache(diskRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider)
+
+    /** Holds a test-owned original removal after its index entry has been retired. */
+    var onBeforeOriginalRemoval: () -> Unit = {}
+    val disk =
+        DiskByteCache(
+            diskRoot,
+            maxBytes = 4L * 1024 * 1024,
+            keyProvider = keyProvider,
+            beforeStaleFilesDeleted = { onBeforeOriginalRemoval() },
+        )
     val thumbnailRoot = java.io.File(root, "thumbnails")
     val thumbnails =
         PersistentDisplayThumbnails(
@@ -87,6 +96,9 @@ internal class MediaDownloadIntegrationFixture(
 
     /** Overrides retained-asset length to exercise bounded presentation without allocating a large fixture. */
     var nativeAssetDeclaredBytes: ULong? = null
+
+    /** Observes a caller's native metadata read without changing the returned transfer state. */
+    var onNativeSnapshot: () -> Unit = {}
 
     /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
     val automaticPolicyBlocks = AtomicInteger()
@@ -223,12 +235,14 @@ internal class MediaDownloadIntegrationFixture(
                         )
                     }
                 }
-                "attachmentTransferSnapshot" ->
+                "attachmentTransferSnapshot" -> {
+                    onNativeSnapshot()
                     AttachmentTransferSnapshotFfi(
                         targets(args!!).map {
                             status(key(args[0] as String, args[1] as String, it))
                         },
                     )
+                }
                 "subscribeAttachmentTransfers" ->
                     subscription(
                         key(args!![0] as String, args[1] as String, targets(args).single()),

@@ -82,6 +82,8 @@ import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
@@ -951,6 +953,14 @@ internal fun rememberImageLoadState(
             }
             return false
         }
+
+        /** Rechecks a user request after metadata or non-cancellable cache cleanup has suspended. */
+        suspend fun enqueueRequestedOriginal() {
+            currentCoroutineContext().ensureActive()
+            if (ownerCurrent() && controller.hasAttachmentDownloadIntent(messageIdHex, attachmentIndex)) {
+                controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
+            }
+        }
         val seedStatic = MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)
         val nativeState =
             if (thumbnailRequest != null && seedStatic) {
@@ -966,9 +976,7 @@ internal fun rememberImageLoadState(
             cachedPlaintextOnEntry = false
             tooLargeToPreview = false
             withContext(NonCancellable) { controller.evictCachedAttachment(messageIdHex, attachmentIndex) }
-            if (fulfillOriginalDownload) {
-                controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
-            }
+            if (fulfillOriginalDownload) enqueueRequestedOriginal()
             return@LaunchedEffect
         }
         val displayReady = presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx
@@ -976,7 +984,7 @@ internal fun rememberImageLoadState(
             if (controller.hasDisplayAttachmentOriginal(messageIdHex, attachmentIndex)) {
                 if (sourceCurrent()) originalMaterialized = true
             } else {
-                controller.enqueueInteractiveAttachmentDownload(messageIdHex, attachmentIndex, reference)
+                enqueueRequestedOriginal()
             }
             return@LaunchedEffect
         }
