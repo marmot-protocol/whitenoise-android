@@ -120,6 +120,16 @@
         "test_ids": [
           "GRP-005"
         ]
+      },
+      {
+        "surface": "R.string.toast_invite_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerAdministration.kt",
+        "anchor": "R.string.toast_invite_sent",
+        "test_ids": [
+          "CHL-026",
+          "CHL-027",
+          "CHL-028"
+        ]
       }
     ]
   },
