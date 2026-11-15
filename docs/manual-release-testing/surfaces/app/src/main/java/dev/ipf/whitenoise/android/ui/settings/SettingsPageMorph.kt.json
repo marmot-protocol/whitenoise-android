@@ -11,6 +11,24 @@
           "SET-039",
           "CON-037"
         ]
+      },
+      {
+        "surface": "rememberSettingsNativeSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorph.kt",
+        "anchor": "fun rememberSettingsNativeSurface(",
+        "test_ids": [
+          "SET-039",
+          "CON-037"
+        ]
+      },
+      {
+        "surface": "rememberSettingsNativeRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsPageMorph.kt",
+        "anchor": "fun rememberSettingsNativeRow(",
+        "test_ids": [
+          "SET-039",
+          "CON-037"
+        ]
       }
     ]
   },

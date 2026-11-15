@@ -740,7 +740,8 @@ internal fun rememberSettingsRouteClick(
             val rect = it.fullSettingsMorphBounds(view)
             val visible = it.settingsMorphBounds(view)
             bounds[0] = rect.takeUnless { visible.isEmpty } ?: Rect.Zero
-            if (context != null && routeKey != null && !rect.isEmpty) {
+            if (context != null && !rect.isEmpty) {
+                val destination = checkNotNull(routeKey)
                 val shape = context.shapes.shape
                 val corners =
                     when (val outline = shape.createOutline(rect.size, direction, density)) {
@@ -749,8 +750,8 @@ internal fun rememberSettingsRouteClick(
                     }
                 val measured =
                     SettingsRouteEndpoint(
-                        routeKey,
-                        routeKey,
+                        destination,
+                        destination,
                         rect,
                         corners,
                         context.containerColor,

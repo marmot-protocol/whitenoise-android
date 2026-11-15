@@ -860,7 +860,10 @@ class SettingsPageMorphHostTest {
         assertTrue("incoming body is visible before interruption", before[100, 150].blue > 0.3f)
         rule.runOnIdle {
             page.pendingOrigin = body
-            assertFalse("no coherent active-body frame: settle immediately", page.begin(if (forward) "grandchild" else null, forward, true, host, interruption))
+            assertFalse(
+                "no coherent active-body frame: settle immediately",
+                page.begin(if (forward) "grandchild" else null, forward, true, host, interruption),
+            )
             assertFalse(page.active)
             assertEquals(0, page.keptPictures)
             color.value = Color.Green

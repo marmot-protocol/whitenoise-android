@@ -82,7 +82,8 @@ class SettingsPageMorphTest {
         val page = SettingsPageMorph()
         page.begin("parent", true, false, host)
         reportGroup(page, first)
-        page.pendingEndpoint = surface(Rect(16f, -120f, 344f, -20f)).copy(destination = "child", visibleBounds = Rect.Zero)
+        page.pendingEndpoint =
+            surface(Rect(16f, -120f, 344f, -20f)).copy(destination = "child", visibleBounds = Rect.Zero)
         assertFalse(page.begin("child", true, true, host))
     }
 
