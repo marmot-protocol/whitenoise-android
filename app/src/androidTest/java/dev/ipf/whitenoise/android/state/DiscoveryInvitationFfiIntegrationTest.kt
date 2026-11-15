@@ -135,13 +135,14 @@ class DiscoveryInvitationFfiIntegrationTest {
                                 }
                                 assertTrue(discovery.recordedEvents(KEY_PACKAGE).isNotEmpty())
                                 val before = discovery.kindReads[KEY_PACKAGE]?.get() ?: 0
-                                val group =
+                                val createdGroup =
                                     sender.createGroup(
                                         alice.label,
                                         "Discovery recovery",
                                         listOf(bob.accountIdHex),
                                         null,
-                                    ).requireCreatedGroupId()
+                                    )
+                                val group = createdGroup.requireCreatedGroupId()
                                 awaitInvite(peer, bob.label, group)
                                 sender.inviteMembersDetailed(alice.label, group, listOf(carol.accountIdHex))
                                 awaitInvite(peer, carol.label, group)
