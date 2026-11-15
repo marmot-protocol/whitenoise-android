@@ -25,4 +25,25 @@ class DisplayThumbnailInvalidationCoverageTest {
             assertTrue("Original $operation missing", "diskMediaCache.$operation(" in boundary)
         }
     }
+
+    /** A decoder may still read an original until its removal finishes, so derivatives must be fenced last. */
+    @Test
+    fun originalCleanupCompletesBeforeTheDerivativeFence() {
+        val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/DisplayThumbnailRequest.kt")
+        val boundaries =
+            mapOf(
+                "removeMediaDiskCacheEntry" to "remove(key)",
+                "removeMediaDiskCacheTags" to "removeByCiphertextTags(tags)",
+                "clearMediaDiskCaches" to "clear()",
+            )
+        boundaries.forEach { (function, operation) ->
+            val body = source.substringAfter("fun WhiteNoiseAppState.$function(").substringBefore("\n}")
+            val original = Regex.escape("diskMediaCache.$operation")
+            val derivative = Regex.escape("displayThumbnails.$operation")
+            assertTrue(
+                "$function must remove originals before its final derivative invalidation",
+                Regex("try\\s*\\{\\s*$original\\s*}\\s*finally\\s*\\{\\s*$derivative").containsMatchIn(body),
+            )
+        }
+    }
 }

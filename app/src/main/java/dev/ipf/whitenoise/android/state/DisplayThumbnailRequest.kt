@@ -78,26 +78,26 @@ internal fun WhiteNoiseAppState.persistDisplayThumbnail(
 /** All original-removal callers also retire every derivative size, including in-flight producers. Run off main. */
 internal fun WhiteNoiseAppState.removeMediaDiskCacheEntry(key: String) {
     try {
-        displayThumbnails.remove(key)
-    } finally {
         diskMediaCache.remove(key)
+    } finally {
+        displayThumbnails.remove(key)
     }
 }
 
 /** Expiry and group cleanup reach unloaded derivatives through the same persisted native ciphertext tags. */
 internal fun WhiteNoiseAppState.removeMediaDiskCacheTags(tags: Set<String>) {
     try {
-        displayThumbnails.removeByCiphertextTags(tags)
-    } finally {
         diskMediaCache.removeByCiphertextTags(tags)
+    } finally {
+        displayThumbnails.removeByCiphertextTags(tags)
     }
 }
 
-/** Clears both encrypted tiers independently, preserving the original cleanup even if derivative I/O fails. */
+/** Removes originals before the final derivative fence, including when original cleanup throws. */
 internal fun WhiteNoiseAppState.clearMediaDiskCaches() {
     try {
-        displayThumbnails.clear()
-    } finally {
         diskMediaCache.clear()
+    } finally {
+        displayThumbnails.clear()
     }
 }
