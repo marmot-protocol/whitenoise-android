@@ -131,3 +131,30 @@ if (cd "$fixture" && bash -ec "$selector_test"); then
   echo 'Ambiguous APKs unexpectedly accepted' >&2
   exit 1
 fi
+
+# The copied staging identity names only one exact merged PR, and a lookup failure never blocks a build.
+staging=.github/workflows/android-staging-apk.yml
+source_pr_step=$(sed -n '/^          source_pr=""$/,/^          echo "APP_SOURCE_PR=/p' "$staging")
+test -n "$source_pr_step"
+grep -Fq 'pull-requests: read' "$staging"
+export GITHUB_REPOSITORY=example/app GITHUB_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+export GITHUB_ENV="$fixture/source-pr.env"
+gh() {
+  if [[ $LOOKUP_STATUS != 0 ]]; then return "$LOOKUP_STATUS"; fi
+  printf '%s' "$LOOKUP_PULLS"
+}
+export -f gh
+check_source_pr() {
+  local expected=$1
+  export LOOKUP_PULLS=$2 LOOKUP_STATUS=${3:-0}
+  bash -euo pipefail -c "$source_pr_step"
+  [[ $(cat "$GITHUB_ENV") == "APP_SOURCE_PR=$expected" ]]
+  : > "$GITHUB_ENV"
+}
+check_source_pr 42 '[{"number":42,"merged_at":"2026-11-12","merge_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]'
+check_source_pr '' '[]'
+check_source_pr '' '[{"number":42,"merged_at":null,"merge_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]'
+check_source_pr '' '[{"number":42,"merged_at":"2026-11-12","merge_commit_sha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]'
+check_source_pr '' '[{"number":42,"merged_at":"2026-11-12","merge_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"number":43,"merged_at":"2026-11-12","merge_commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]'
+check_source_pr '' '[]' 1
+check_source_pr '' 'invalid JSON'

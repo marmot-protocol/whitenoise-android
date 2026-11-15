@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -221,6 +222,7 @@ internal fun WhiteNoiseAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
+    properties: DialogProperties = DialogProperties(),
 ) {
     val scheme = MaterialTheme.colorScheme
     val outline = amoledOutlineBorder()
@@ -235,6 +237,7 @@ internal fun WhiteNoiseAlertDialog(
             icon = icon,
             title = title,
             text = text,
+            properties = properties,
             containerColor = scheme.surfaceContainerLow,
             iconContentColor = scheme.onSurfaceVariant,
             titleContentColor = scheme.onSurface,

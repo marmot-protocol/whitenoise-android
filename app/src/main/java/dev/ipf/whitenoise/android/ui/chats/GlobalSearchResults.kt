@@ -372,13 +372,25 @@ internal object GlobalSearchResultsReducer {
         return state.copy(results = state.results.filter { it.key !in keys }, withdrawn = state.withdrawn + keys)
     }
 
-    /** Lets keys MDK reported live again list on a later page or reread; it lists no row by itself. */
-    fun restore(
+    /** Applies a drained queue once; any removal drops the current row, while the last change controls admission. */
+    fun applyKeyChanges(
         state: GlobalSearchResultsState,
-        keys: Set<String>,
+        changes: Sequence<GlobalSearchKeyChanges>,
     ): GlobalSearchResultsState {
-        if (keys.none { it in state.withdrawn }) return state
-        return state.copy(withdrawn = state.withdrawn - keys)
+        val iterator = changes.iterator()
+        if (!iterator.hasNext()) return state
+        val removed = mutableSetOf<String>()
+        val withdrawn = state.withdrawn.toMutableSet()
+        do {
+            val change = iterator.next()
+            removed.addAll(change.removed)
+            withdrawn.addAll(change.removed)
+            withdrawn.removeAll(change.restored)
+        } while (iterator.hasNext())
+        return state.copy(
+            results = if (removed.isEmpty()) state.results else state.results.filter { it.key !in removed },
+            withdrawn = withdrawn,
+        )
     }
 
     /** Keeps every loaded row and the cursor, and waits for a retry; a stale failure is ignored. */

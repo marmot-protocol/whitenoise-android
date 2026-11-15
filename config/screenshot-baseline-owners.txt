@@ -241,3 +241,7 @@
 *.DictationLauncherEntranceScreenshotTest.reducedMotionStartUsesFinalCapsulePlacement
 *.ComposerToolbarEditorInteractionTest.liftedShortcutPreservesContactAndSettlesIntoTheCommittedSlot
 *.ComposerToolbarEditorInteractionTest.liftedShortcutTracksPhysicalPointerInRtl
+
+# Final typed wipe gate, using the real dialog window with deterministic frames.
+*.ProfileKeyWipeConfirmationTest.wipeConfirmationLight
+*.ProfileKeyWipeConfirmationTest.wipeConfirmationLargeRtl
