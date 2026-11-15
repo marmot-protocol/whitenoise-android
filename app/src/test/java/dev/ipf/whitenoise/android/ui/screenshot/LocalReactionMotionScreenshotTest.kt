@@ -414,8 +414,7 @@ class LocalReactionMotionScreenshotTest {
         rule.waitForIdle()
         // Popup placement and the lifted-stack snap complete before measuring/clicking the real rail.
         flushQueuedComposition(64)
-        rule.onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG).captureToImage()
-        flushQueuedComposition()
+        awaitStableFocusedSource()
         val folder = File("build/local-reaction-motion/$name").apply { mkdirs() }
         if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
             captureReactionFrame(File(folder, "frame-000.png").path, FOCUSED_OVERLAY_FRAME_TEST_TAG)
@@ -672,6 +671,25 @@ class LocalReactionMotionScreenshotTest {
         rule.runOnUiThread { Snapshot.sendApplyNotifications() }
         rule.mainClock.advanceTimeBy(millis)
         rule.waitForIdle()
+    }
+
+    /** Text layout, popup placement and native drawing must settle before the flight's source is recorded. */
+    private fun awaitStableFocusedSource() {
+        var previous: Bitmap? = null
+        var stableFrames = 0
+        try {
+            repeat(30) {
+                flushQueuedComposition()
+                val current = captureReactionBitmap(FOCUSED_OVERLAY_FRAME_TEST_TAG)
+                stableFrames = if (previous?.sameAs(current) == true) stableFrames + 1 else 0
+                previous?.recycle()
+                previous = current
+                if (stableFrames >= 3) return
+            }
+            error("Focused reaction source did not settle within 30 frames")
+        } finally {
+            previous?.recycle()
+        }
     }
 
     /** Capture exactly this native node, avoiding Roborazzi's multiple-popup-window fallback. */
