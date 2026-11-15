@@ -184,7 +184,7 @@ class LocalReactionMotionScreenshotTest {
     @Test fun largeFontRtlTargetsItsGlyph() = record("large_rtl", true, true)
 
     /** Bundled artwork uses the same decoded crop at both ends of the flight. */
-    @Test fun bundledArtworkLandsInBadge() = record("bundled", false, true, ":marmot:")
+    @Test fun bundledArtworkLandsInBadge() = record("bundled", false, true, ":marmot_classic:")
 
     /** Rectangular custom artwork retains its aspect ratio while traveling to the badge. */
     @Test fun rectangularArtworkLandsInBadge() = record("rectangular", false, true, ":flag:")
@@ -278,7 +278,6 @@ class LocalReactionMotionScreenshotTest {
         val mine = name == "outgoing"
         lateinit var motion: LocalReactionMotion
         var accepted by mutableStateOf(false)
-        var showActions by mutableStateOf(false)
         var animations by mutableStateOf(motionEnabled)
         var bubbleBounds by mutableStateOf(IntRect(16, 260, 300, 330))
         val customBitmap =
@@ -378,7 +377,7 @@ class LocalReactionMotionScreenshotTest {
                                     )
                                 }
                             }
-                            if (showActions && !accepted) {
+                            if (!accepted) {
                                 FocusedMessageActions(
                                     sourceBounds = bubbleBounds,
                                     touchY = bubbleBounds.center.y.toFloat(),
@@ -413,18 +412,20 @@ class LocalReactionMotionScreenshotTest {
             }
         }
         rule.waitForIdle()
-        // A real long press opens the popup after the original bubble has been laid out and drawn.
+        // Popup placement and the lifted-stack snap complete before measuring/clicking the real rail.
         flushQueuedComposition(64)
-        captureReactionBitmap().recycle()
-        flushQueuedComposition(64)
-        rule.runOnIdle { showActions = true }
-        flushQueuedComposition(64)
-        val (destinationBefore, sourceBitmap) = captureStableFocusedSource()
+        rule.onNodeWithTag(FOCUSED_OVERLAY_FRAME_TEST_TAG).captureToImage()
+        flushQueuedComposition()
         val folder = File("build/local-reaction-motion/$name").apply { mkdirs() }
         if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
-            sourceBitmap.captureRoboImage(File(folder, "frame-000.png").path)
+            captureReactionFrame(File(folder, "frame-000.png").path, FOCUSED_OVERLAY_FRAME_TEST_TAG)
         }
-        sourceBitmap.captureRoboImage("src/test/snapshots/local_reaction_motion_${name}_first.png")
+        val destinationBefore = captureReactionBitmap()
+        val sourceBitmap =
+            captureReactionFrame(
+                "src/test/snapshots/local_reaction_motion_${name}_first.png",
+                FOCUSED_OVERLAY_FRAME_TEST_TAG,
+            )
         rule
             .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji")
             .performSemanticsAction(SemanticsActions.OnClick) { click -> assertTrue(click()) }
@@ -671,37 +672,6 @@ class LocalReactionMotionScreenshotTest {
         rule.runOnUiThread { Snapshot.sendApplyNotifications() }
         rule.mainClock.advanceTimeBy(millis)
         rule.waitForIdle()
-    }
-
-    /** Settles both native windows and returns their final captures before any reaction is accepted. */
-    private fun captureStableFocusedSource(): Pair<Bitmap, Bitmap> {
-        var previous: Pair<Bitmap, Bitmap>? = null
-        var stableFrames = 0
-        try {
-            repeat(30) {
-                flushQueuedComposition()
-                val root = captureReactionBitmap()
-                val focused = captureReactionBitmap(FOCUSED_OVERLAY_FRAME_TEST_TAG)
-                val current = root to focused
-                val unchanged = previous?.let { root.sameAs(it.first) && focused.sameAs(it.second) } == true
-                stableFrames = if (unchanged) stableFrames + 1 else 0
-                previous?.let {
-                    it.first.recycle()
-                    it.second.recycle()
-                }
-                previous = current
-                if (stableFrames >= 3) {
-                    previous = null
-                    return current
-                }
-            }
-            error("Focused reaction source did not settle within 30 frames")
-        } finally {
-            previous?.let {
-                it.first.recycle()
-                it.second.recycle()
-            }
-        }
     }
 
     /** Capture exactly this native node, avoiding Roborazzi's multiple-popup-window fallback. */
