@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.state.EmojiSetNotice
 import dev.ipf.whitenoise.android.state.EmojiSetsController
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.canRetryPartialInstall
 import dev.ipf.whitenoise.android.state.emojiSetsBackend
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
@@ -369,12 +370,14 @@ private fun EmojiSetActions(
                         else -> R.string.explanation_organize_emoji_reinstall
                     },
                 )
-            Button(
-                onClick = onInstall,
-                modifier = Modifier.explainOnLongPress(Explanation(label, body)),
-                enabled = !state.busy,
-            ) {
-                Text(label)
+            if (installed == null || installed.updateAvailable || set.canRetryPartialInstall()) {
+                Button(
+                    onClick = onInstall,
+                    modifier = Modifier.explainOnLongPress(Explanation(label, body)),
+                    enabled = !state.busy,
+                ) {
+                    Text(label)
+                }
             }
             if (installed != null && !installed.updateAvailable) {
                 val checkLabel = stringResource(R.string.emoji_sets_check_update)

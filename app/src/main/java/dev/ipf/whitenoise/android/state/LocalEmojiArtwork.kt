@@ -23,6 +23,8 @@ class LocalEmojiArtwork(
     val fileName: String,
     val mediaType: String,
     val bytes: ByteArray,
+    val dim: String? = null,
+    val thumbhash: String? = null,
 ) {
     /** Lowercase hex SHA-256 of the image bytes, the identity of an upload. */
     val sha256: String by lazy {
@@ -31,7 +33,7 @@ class LocalEmojiArtwork(
 }
 
 // Keep the aggregate at the existing per-message artwork bound even with larger installed images.
-private const val EMOJI_SEND_MAX_BYTES = 67_108_864uL
+internal const val EMOJI_SEND_MAX_BYTES = 67_108_864uL
 
 internal val EMOJI_MEDIA_TYPES =
     mapOf("png" to "image/png", "gif" to "image/gif", "webp" to "image/webp", "jpg" to "image/jpeg")
@@ -83,7 +85,7 @@ internal suspend fun WhiteNoiseAppState.emojiArtworkIn(
         withContext(Dispatchers.IO) {
             val bundled = readBuiltinEmojiArtwork(appContext, shortcodes).associateBy { it.shortcode }
             val deviceLocal = readLocalEmojiArtwork(File(appContext.filesDir, CustomEmojiStore.DIRECTORY), shortcodes)
-            (bundled + deviceLocal.associateBy { it.shortcode }).values.toList()
+            (deviceLocal.associateBy { it.shortcode } + bundled).values.toList()
         }.associateBy { it.shortcode }
     val missing = shortcodes.filter { it !in local && it !in EmojiShortcodes.builtins }
     return if (missing.isEmpty()) {
@@ -105,13 +107,9 @@ internal suspend fun WhiteNoiseAppState.emojiArtworkIn(
 }
 
 /**
- * Which emoji a send carries: only a plain, non-reply text send does, and only when the app did not
- * inject its own publisher. Replies and injected publishers send plain text.
+ * Composer messages and replies carry artwork unless a test or host injects its own text publisher.
  */
-internal fun emojiSendApplies(
-    replyTarget: String?,
-    customPublisherInjected: Boolean,
-): Boolean = replyTarget == null && !customPublisherInjected
+internal fun emojiSendApplies(customPublisherInjected: Boolean): Boolean = !customPublisherInjected
 
 /**
  * Refuses a send that MDK would reject for its tag rows, before any image is uploaded. The row
@@ -120,6 +118,9 @@ internal fun emojiSendApplies(
 internal fun precheckEmojiSend(artwork: List<LocalEmojiArtwork>) {
     if (artwork.size > Nip30Emoji.MAX_TAGS) {
         throw EmojiSendLimitException("too many custom emoji: ${artwork.size} of ${Nip30Emoji.MAX_TAGS}")
+    }
+    if (artwork.sumOf { it.bytes.size.toULong() } > EMOJI_SEND_MAX_BYTES) {
+        throw EmojiSendLimitException("too much custom emoji artwork for one message")
     }
     artwork.firstOrNull { !Nip30Emoji.isSendable(it.shortcode) }?.let {
         throw EmojiSendLimitException("shortcode cannot be sent as an emoji tag")
@@ -133,6 +134,8 @@ internal fun checkEmojiTagBytes(tags: List<List<String>>) {
         throw EmojiSendLimitException("emoji tag values are $bytes bytes of ${Nip30Emoji.MAX_TAG_VALUE_BYTES}")
     }
 }
+
+private const val REACTION_CONTENT_MAX_CHARS = 64
 
 private data class EmojiUploadKey(
     val account: String,
@@ -230,7 +233,7 @@ internal suspend fun MarmotInterface.uploadEmojiArtwork(
         MediaUploadRequestFfi(
             attachments =
                 artwork.map {
-                    MediaUploadAttachmentRequestFfi(it.fileName, it.mediaType, it.bytes, null, null)
+                    MediaUploadAttachmentRequestFfi(it.fileName, it.mediaType, it.bytes, it.dim, it.thumbhash)
                 },
             caption = null,
             send = false,
@@ -299,22 +302,24 @@ private suspend fun MarmotInterface.uploadStage(
 private suspend fun MarmotInterface.attemptEmojiSend(
     account: String,
     group: String,
-    text: String,
     artwork: List<LocalEmojiArtwork>,
     cache: EmojiUploadCache,
     currentEpoch: suspend () -> ULong,
     ensureCurrent: suspend () -> Unit,
     publishLock: EmojiPublishLock,
+    extraTags: List<List<String>>,
+    publish: suspend (List<MediaAttachmentReferenceFfi>, List<List<String>>) -> SendSummaryFfi,
 ): SendSummaryFfi {
+    ensureCurrent()
     val referenceBySha = uploadStage(cache, account, group, artwork, currentEpoch)
     ensureCurrent()
-    val tags = emojiTags(artwork, referenceBySha)
+    val tags = emojiTags(artwork, referenceBySha) + extraTags
     checkEmojiTagBytes(tags)
     val attachments = artwork.map { it.sha256 }.distinct().map { referenceBySha.getValue(it) }
     return try {
         publishLock {
             ensureCurrent()
-            sendTaggedMedia(account, group, attachments, text, tags)
+            publish(attachments, tags)
         }
     } catch (
         @Suppress("TooGenericExceptionCaught") failure: Exception,
@@ -344,12 +349,80 @@ internal suspend fun MarmotInterface.sendTextWithCustomEmoji(
     currentEpoch: suspend () -> ULong = { groupMlsState(account, group).epoch },
     ensureCurrent: suspend () -> Unit = {},
     publishLock: EmojiPublishLock = { it() },
+    replyTarget: String? = null,
+): SendSummaryFfi =
+    sendCustomEmojiArtwork(
+        account,
+        group,
+        artwork,
+        cache,
+        currentEpoch,
+        ensureCurrent,
+        publishLock,
+        extraTags = replyTarget?.let { listOf(listOf("e", it), listOf("q", it)) }.orEmpty(),
+    ) { attachments, tags -> sendTaggedMedia(account, group, attachments, text, tags) }
+
+/** Carries one reaction's original artwork and emoji tag through MDK's kind-7 media reaction API. */
+@Suppress("LongParameterList")
+internal suspend fun MarmotInterface.sendReactionWithCustomEmoji(
+    account: String,
+    group: String,
+    target: String,
+    emoji: String,
+    artwork: List<LocalEmojiArtwork>,
+    cache: EmojiUploadCache,
+    currentEpoch: suspend () -> ULong = { groupMlsState(account, group).epoch },
+    ensureCurrent: suspend () -> Unit = {},
+    publishLock: EmojiPublishLock = { it() },
+): SendSummaryFfi {
+    if (emoji.length > REACTION_CONTENT_MAX_CHARS) {
+        throw EmojiSendLimitException("reaction content exceeds the native limit")
+    }
+    return sendCustomEmojiArtwork(
+        account,
+        group,
+        artwork,
+        cache,
+        currentEpoch,
+        ensureCurrent,
+        publishLock,
+    ) { attachments, tags ->
+        reactWithMedia(account, group, target, emoji, tags, attachments)
+    }
+}
+
+/** Shares upload identity, epoch recovery and publication fencing between messages and reactions. */
+@Suppress("LongParameterList")
+private suspend fun MarmotInterface.sendCustomEmojiArtwork(
+    account: String,
+    group: String,
+    artwork: List<LocalEmojiArtwork>,
+    cache: EmojiUploadCache,
+    currentEpoch: suspend () -> ULong,
+    ensureCurrent: suspend () -> Unit,
+    publishLock: EmojiPublishLock,
+    extraTags: List<List<String>> = emptyList(),
+    publish: suspend (List<MediaAttachmentReferenceFfi>, List<List<String>>) -> SendSummaryFfi,
 ): SendSummaryFfi {
     precheckEmojiSend(artwork)
+    if (artwork.size + extraTags.size > Nip30Emoji.MAX_TAGS) {
+        throw EmojiSendLimitException("too many emoji and reply tags")
+    }
+    checkEmojiTagBytes(extraTags)
     var attempt = 1
     while (true) {
         try {
-            return attemptEmojiSend(account, group, text, artwork, cache, currentEpoch, ensureCurrent, publishLock)
+            return attemptEmojiSend(
+                account,
+                group,
+                artwork,
+                cache,
+                currentEpoch,
+                ensureCurrent,
+                publishLock,
+                extraTags,
+                publish,
+            )
         } catch (stale: EmojiChatChangedException) {
             if (attempt++ >= 2) throw stale
         }

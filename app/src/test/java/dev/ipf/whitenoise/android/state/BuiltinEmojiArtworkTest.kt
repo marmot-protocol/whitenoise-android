@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.notifications.notificationBuiltinEmojiBitmap
+import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import kotlinx.coroutines.runBlocking
@@ -14,6 +15,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
+import java.security.MessageDigest
 import java.util.Locale
 
 /** Canonical iOS PNG identity survives the normal bundled-artwork send reader. */
@@ -46,6 +49,15 @@ class BuiltinEmojiArtworkTest {
         assertEquals(expected.size, artwork.size)
         artwork.forEach { entry ->
             assertEquals(expected.getValue(entry.shortcode), entry.sha256)
+            val drawable = checkNotNull(EmojiShortcodes.builtinDrawable(entry.shortcode))
+            val drawableName = context.resources.getResourceEntryName(drawable)
+            val displayed = File("src/main/res/drawable-nodpi/$drawableName.png").readBytes()
+            val displaySha =
+                MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(displayed)
+                    .joinToString("") { "%02x".format(it) }
+            assertEquals("display and send artwork for ${entry.shortcode}", entry.sha256, displaySha)
             assertEquals("image/png", entry.mediaType)
             assertEquals("${entry.shortcode.trim(':')}.png", entry.fileName)
         }
@@ -62,6 +74,24 @@ class BuiltinEmojiArtworkTest {
                         EmojiShortcodes.builtins.joinToString(" "),
                     )
                 assertEquals(expected, artwork.associate { it.shortcode to it.sha256 })
+            }
+        }
+
+    /** A same-named user file cannot replace the canonical bytes sent for a built-in shortcode. */
+    @Test
+    fun localFilesCannotOverrideBuiltinSendArtwork() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val directory = File(context.filesDir, CustomEmojiStore.DIRECTORY).apply { mkdirs() }
+            val collision = File(directory, "marmot.png")
+            collision.writeBytes(byteArrayOf(1, 2, 3))
+            try {
+                MediaDownloadIntegrationFixture().use { fixture ->
+                    val artwork = fixture.state.emojiArtworkIn(MediaDownloadIntegrationFixture.ACCOUNT, ":marmot:")
+                    assertEquals(expected.getValue(":marmot:"), artwork.single().sha256)
+                }
+            } finally {
+                collision.delete()
             }
         }
 

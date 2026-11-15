@@ -96,14 +96,19 @@ class EmojiShortcodesTest {
         assertFalse(EmojiShortcodes.isShortcode("party"))
     }
 
+    /** Bundled shortcodes retain canonical artwork when a message supplies a conflicting definition. */
     @Test
-    fun userFileBeatsReceivedArtworkWhichBeatsBuiltIn() {
+    fun builtinArtworkWinsOverAReceivedDefinition() {
         val received = EmojiArt.Bundled(R.drawable.ic_image)
         assertEquals(
             EmojiArt.Bundled(R.drawable.builtin_emoji_wn),
             EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, emptyMap()),
         )
-        assertSame(received, EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, mapOf(":wn:" to received)))
+        assertEquals(
+            EmojiArt.Bundled(R.drawable.builtin_emoji_wn),
+            EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, mapOf(":wn:" to received)),
+        )
+        assertSame(received, EmojiShortcodes.art(":party:", CustomEmojiSet.Empty, mapOf(":party:" to received)))
         assertNull(EmojiShortcodes.art(":party:", CustomEmojiSet.Empty, mapOf(":wn:" to received)))
         assertNull(EmojiShortcodes.art(":WN:", CustomEmojiSet.Empty, emptyMap()))
     }

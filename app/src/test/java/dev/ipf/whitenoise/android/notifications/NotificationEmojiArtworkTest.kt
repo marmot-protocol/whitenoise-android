@@ -216,6 +216,7 @@ class NotificationEmojiArtworkTest {
             assertTrue(artifacts().isEmpty())
         }
 
+    /** Device-local custom codes keep modern-file precedence over legacy artwork. */
     @Test
     fun notificationAndStoreShareModernAndLegacyPrecedence() =
         runBlocking {
@@ -223,13 +224,13 @@ class NotificationEmojiArtworkTest {
             val source = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
             try {
                 // Legacy decodable artwork stays renderable, including names other than .img.
-                File(directory, "wn.bmp").outputStream().use { source.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                File(directory, "party.bmp").outputStream().use { source.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 source.eraseColor(Color.BLUE)
-                File(directory, "wn.PNG").outputStream().use { source.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                File(directory, "party.PNG").outputStream().use { source.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 val store = CustomEmojiStore(directory)
                 store.load()
-                val expected = requireNotNull(store.emoji[":wn:"]).image.asAndroidBitmap().getPixel(16, 16)
-                val artifact = requireNotNull(notificationEmojiArtwork(context, ":wn:"))
+                val expected = requireNotNull(store.emoji[":party:"]).image.asAndroidBitmap().getPixel(16, 16)
+                val artifact = requireNotNull(notificationEmojiArtwork(context, ":party:"))
                 artifact.use {
                     val actual =
                         context.contentResolver

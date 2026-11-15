@@ -116,7 +116,7 @@ class CustomEmojiScreenshotTest {
             listOf(
                 CustomEmoji(":party:", File("party.png"), artwork(0xFFE91E63.toInt(), 0xFFFFEB3B.toInt())),
                 CustomEmoji(":ship_it:", File("ship_it.png"), artwork(0xFF3F51B5.toInt(), 0xFFFFFFFF.toInt())),
-                // A user file overrides the built-in artwork of the same code.
+                // The canonical built-in wins a same-named user file.
                 CustomEmoji(":wn:", File("wn.png"), artwork(0xFF009688.toInt(), 0xFF000000.toInt())),
             ),
         )

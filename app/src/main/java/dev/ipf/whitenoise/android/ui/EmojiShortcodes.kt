@@ -64,7 +64,7 @@ internal class ReceivedEmoji(
 internal val LocalReceivedEmoji = compositionLocalOf { ReceivedEmoji.None }
 
 /**
- * `:shortcode:` emoji: user files, then emoji a message defined, then built-in artwork.
+ * `:shortcode:` emoji: bundled artwork, then user files and emoji a message defined.
  * Alternate text retains authored copy, speech and selection offsets.
  */
 internal object EmojiShortcodes {
@@ -150,12 +150,12 @@ internal object EmojiShortcodes {
             emoji
         }
 
-    /** The artwork [shortcode] renders as: user file, then received attachment, then built-in. */
+    /** Bundled shortcodes keep their canonical artwork across local files and received attachments. */
     fun art(
         shortcode: String,
         custom: CustomEmojiSet,
         received: Map<String, EmojiArt>,
-    ): EmojiArt? = custom[shortcode]?.art ?: received[shortcode] ?: builtinDrawable(shortcode)?.let(EmojiArt::Bundled)
+    ): EmojiArt? = builtinDrawable(shortcode)?.let(EmojiArt::Bundled) ?: custom[shortcode]?.art ?: received[shortcode]
 
     /**
      * Marks every `:shortcode:` outside code as inline content. Codes without artwork have no

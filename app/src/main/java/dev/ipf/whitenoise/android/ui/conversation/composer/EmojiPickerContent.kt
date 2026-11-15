@@ -54,7 +54,7 @@ import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
-import dev.ipf.whitenoise.android.ui.installedEmojiArtwork
+import dev.ipf.whitenoise.android.ui.libraryEmojiArtwork
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -126,7 +126,7 @@ private fun rememberEmojiPickerModel(
     val customEmoji = LocalCustomEmoji.current
     val custom =
         remember(customEmoji, purpose) {
-            if (purpose == EmojiPickerPurpose.GROUP_IMAGE) emptyList() else customEmoji.composerShortcodes
+            emojiPickerShortcodes(customEmoji, purpose)
         }
     val recents =
         remember(recentEmojis, purpose, custom) {
@@ -218,7 +218,9 @@ internal fun EmojiPickerContent(
     val emojiLibrary = LocalCustomEmoji.current
     val pick: (String) -> Unit = { emoji ->
         if (selectionEnabled) {
-            if (purpose != EmojiPickerPurpose.CONFIGURE_QUICK_REACTION && !emojiLibrary.usesInstalledArtwork(emoji)) {
+            if (purpose != EmojiPickerPurpose.CONFIGURE_QUICK_REACTION &&
+                !(emojiLibrary.usesInstalledArtwork(emoji) || emojiLibrary.usesConversationArtwork(emoji))
+            ) {
                 onEmojiUsed(emoji)
             }
             onEmojiPicked(emoji)
@@ -419,8 +421,8 @@ internal fun EmojiGlyph(
         )
     val customEmoji = LocalCustomEmoji.current
     val art =
-        if (customEmoji.usesInstalledArtwork(emoji)) {
-            installedEmojiArtwork(emoji)
+        if (customEmoji.usesInstalledArtwork(emoji) || customEmoji.usesConversationArtwork(emoji)) {
+            libraryEmojiArtwork(emoji)
         } else {
             EmojiShortcodes.art(emoji, customEmoji, emptyMap())
         }

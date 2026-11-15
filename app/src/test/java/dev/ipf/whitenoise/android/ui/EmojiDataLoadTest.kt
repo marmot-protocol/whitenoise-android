@@ -17,6 +17,7 @@ class EmojiDataLoadTest {
         resetEmojiCache()
     }
 
+    /** A transient asset failure remains retryable and successful parsing adds the canonical built-ins. */
     @Test
     fun loadRetriesAfterTransientReadFailure() {
         var reads = 0
@@ -40,6 +41,7 @@ class EmojiDataLoadTest {
         assertEquals(2, reads)
     }
 
+    /** Successful parsing is reused without opening the asset again. */
     @Test
     fun loadCachesSuccessfulParse() {
         var reads = 0
@@ -60,6 +62,7 @@ class EmojiDataLoadTest {
         assertEquals(1, reads)
     }
 
+    /** An empty Unicode dataset still supplies the bundled shortcode registry. */
     @Test
     fun loadCachesSuccessfulEmptyParse() {
         var reads = 0
@@ -80,6 +83,7 @@ class EmojiDataLoadTest {
         assertEquals(1, reads)
     }
 
+    /** Brand, shortcode and localized-name search preserve the literal built-in payload. */
     @Test
     fun builtinsAreSearchableByNameShortcodeAndBrandWithoutChangingPayload() {
         val entries = EmojiData.load { sampleEmojiJson }

@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
+  "legacy_sha256": "c360690e5ebec7513df67f1e000bb95d6ba4351e5e6a149c58e38fe52036f4aa",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerEmojiPickerPane",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
+        "anchor": "fun ComposerEmojiPickerPane(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiPickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
+        "anchor": "fun EmojiPickerSheet(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Keep conversation and account artwork out of global reaction settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
+        "anchor": "fun emojiPickerShortcodes(",
+        "test_ids": [
+          "MSG-023"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

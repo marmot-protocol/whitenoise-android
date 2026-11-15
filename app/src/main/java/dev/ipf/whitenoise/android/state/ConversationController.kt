@@ -3216,9 +3216,14 @@ class ConversationController(
         account: String,
         optimisticKey: String,
         controllerContext: CoroutineContext,
+        uploadJob: Job? = null,
     ): EmojiPublishLock =
         { publish ->
             appState.withGroupCommitLock(account, group.groupIdHex) {
+                // Upload cancellation ends before publication can acquire native ownership.
+                withContext(controllerContext) {
+                    appState.untrackInFlightMediaUpload(account, group.groupIdHex, optimisticKey, uploadJob)
+                }
                 try {
                     publish().also { summary ->
                         withContext(controllerContext) { recordOptimisticSendAcceptance(optimisticKey, summary) }
@@ -3303,19 +3308,19 @@ class ConversationController(
     ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
 
     /**
-     * The user's own emoji a plain, non-reply text send must carry, or none when this send carries none.
+     * Resolves the artwork a composer message or reply carries before any publication.
      * A lookup failure is raised as an [EmojiUploadFailure], a definite pre-publication failure.
      */
     private suspend fun emojiArtworkForSend(
         account: String,
-        replyTarget: String?,
         text: String,
     ): List<LocalEmojiArtwork> {
-        val applies = emojiSendApplies(replyTarget, textPublisher != null)
+        val applies = emojiSendApplies(textPublisher != null)
         if (!applies) return emptyList()
         // The lookup runs before anything is published, so its failure is never an uncertain delivery.
-        return runCatchingCancellable { customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text) }
-            .getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
+        return runCatchingCancellable {
+            customEmojiReader?.invoke(text) ?: emojiArtworkIncludingConversation(account, text)
+        }.getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
     }
 
     /**
@@ -3352,28 +3357,48 @@ class ConversationController(
         // The native calls run on the IO dispatcher, but the send phases belong to this controller's context.
         val controllerContext = currentCoroutineContext()
         val ensureCurrent: suspend () -> Unit = {
-            withContext(controllerContext) { requireOptimisticSendNotCancelled(optimisticKey) }
+            withContext(controllerContext) {
+                requireOptimisticSendNotCancelled(optimisticKey)
+                if (appState.activeAccountRef != account ||
+                    appState.runtimeGeneration != conversationRuntimeGeneration ||
+                    appState.mediaUploadSessionEpoch() != mediaUploadSessionEpoch
+                ) {
+                    throw CancellationException("composer artwork owner changed")
+                }
+            }
         }
         val injected = customEmojiSender
-        return when {
-            emojiArtwork.isEmpty() ->
-                publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
-            injected != null -> {
-                val lock = commitPublishLock(account, optimisticKey, controllerContext)
-                injected(account, text, emojiArtwork, ensureCurrent, lock)
+        if (emojiArtwork.isNotEmpty()) ensureCurrent()
+        val uploadJob =
+            if (emojiArtwork.isEmpty()) {
+                null
+            } else {
+                appState.trackInFlightMediaUpload(account, group.groupIdHex, optimisticKey)
             }
-            else ->
-                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
-                    sendTextWithCustomEmoji(
-                        account,
-                        group.groupIdHex,
-                        text,
-                        emojiArtwork,
-                        appState.emojiUploads,
-                        ensureCurrent = ensureCurrent,
-                        publishLock = commitPublishLock(account, optimisticKey, controllerContext),
-                    )
+        try {
+            return when {
+                emojiArtwork.isEmpty() ->
+                    publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
+                injected != null -> {
+                    val lock = commitPublishLock(account, optimisticKey, controllerContext, uploadJob)
+                    injected(account, text, emojiArtwork, ensureCurrent, lock)
                 }
+                else ->
+                    appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
+                        sendTextWithCustomEmoji(
+                            account,
+                            group.groupIdHex,
+                            text,
+                            emojiArtwork,
+                            appState.emojiUploads,
+                            ensureCurrent = ensureCurrent,
+                            publishLock = commitPublishLock(account, optimisticKey, controllerContext, uploadJob),
+                            replyTarget = replyTarget,
+                        )
+                    }
+            }
+        } finally {
+            appState.untrackInFlightMediaUpload(account, group.groupIdHex, optimisticKey, uploadJob)
         }
     }
 
@@ -3394,11 +3419,10 @@ class ConversationController(
         optimisticKey: String,
     ): dev.ipf.marmotkit.SendSummaryFfi =
         appState.withConversationTextSendOrder(account, group.groupIdHex) {
-            // Replies and injected publishers keep their plain-text path. A message that uses the user's
-            // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
+            // Artwork uploads run outside the commit lock, and only an upload-stage failure is retried.
             // Resolving its artwork inside the text order keeps a later message from publishing first,
             // and inside the attempt lets a transient lookup failure retry before anything is published.
-            val artwork = SendEmojiArtwork { emojiArtworkForSend(account, replyTarget, trimmed) }
+            val artwork = SendEmojiArtwork { emojiArtworkForSend(account, trimmed) }
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 cancellationGeneration = optimisticCancellationGeneration,
@@ -4252,7 +4276,8 @@ class ConversationController(
         return accountRef
     }
 
-    /** Commits an add and retains its exact event id for an immediate queued removal. */
+    /** Carries artwork under the captured reader session and retains the committed event for queued removal. */
+    @Suppress("LongMethod") // Ownership spans resolution, upload and one serialized publication.
     private suspend fun commitReactionAdd(
         owner: ReactionMutationTarget,
         emoji: String,
@@ -4260,18 +4285,63 @@ class ConversationController(
         val account = owner.account
         val target = owner.messageId
         val key = target.lowercase() to emoji
-        val messageIdHex =
-            appState.withGroupCommitLock(account, group.groupIdHex) {
-                owner.requireAvailable()
-                val summary =
-                    appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                        reactToMessage(account, group.groupIdHex, target, emoji)
-                    }
-                summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
+        val ensureCurrent = {
+            owner.requireAvailable()
+            if (appState.activeAccountRef != account ||
+                appState.runtimeGeneration != conversationRuntimeGeneration ||
+                appState.mediaUploadSessionEpoch() != mediaUploadSessionEpoch
+            ) {
+                throw CancellationException("reaction artwork owner changed")
             }
-        // Presence records that the add committed even when older bindings return no event id.
-        // A rapid later removal can then wait for local history instead of mistaking it for a no-op.
-        unprojectedOwnReactionEventIds[key] = messageIdHex.orEmpty()
+        }
+        ensureCurrent()
+        val artwork =
+            if (dev.ipf.whitenoise.android.core.Nip30Emoji
+                    .shortcodesIn(emoji)
+                    .singleOrNull() == emoji
+            ) {
+                emojiArtworkForSend(account, emoji)
+            } else {
+                emptyList()
+            }
+        ensureCurrent()
+        val uploadKey = "reaction:$target:$emoji"
+        val uploadJob =
+            if (artwork.isEmpty()) null else appState.trackInFlightMediaUpload(account, group.groupIdHex, uploadKey)
+        try {
+            val controllerContext = currentCoroutineContext()
+            val publishLock: EmojiPublishLock = { publish ->
+                withContext(controllerContext) {
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        ensureCurrent()
+                        appState.untrackInFlightMediaUpload(account, group.groupIdHex, uploadKey, uploadJob)
+                        appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) { publish() }
+                    }
+                }
+            }
+            val summary =
+                if (artwork.isEmpty()) {
+                    publishLock { appState.marmot().reactToMessage(account, group.groupIdHex, target, emoji) }
+                } else {
+                    appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                        sendReactionWithCustomEmoji(
+                            account,
+                            group.groupIdHex,
+                            target,
+                            emoji,
+                            artwork,
+                            appState.emojiUploads,
+                            ensureCurrent = { withContext(controllerContext) { ensureCurrent() } },
+                            publishLock = publishLock,
+                        )
+                    }
+                }
+            val messageIdHex = summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
+            // A committed add remains present while older bindings/projections have no exact event id yet.
+            unprojectedOwnReactionEventIds[key] = messageIdHex.orEmpty()
+        } finally {
+            appState.untrackInFlightMediaUpload(account, group.groupIdHex, uploadKey, uploadJob)
+        }
     }
 
     /** Commits a removal, using history when a just-added reaction did not return an event id. */

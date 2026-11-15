@@ -56,13 +56,13 @@ class EmojiSetsScreenshotTest {
     /** The same preview with a mirrored layout and large text. */
     @Test fun previewRtlLarge() = preview("preview_rtl_large", rtl = true)
 
-    /** A current installed version offers direct reinstall alongside update checking and removal. */
+    /** A complete current version offers update checking and removal while keeping its installed snapshot. */
     @Test fun reinstallLight() = preview("reinstall_light", currentInstalled = true)
 
-    /** Current-version reinstall stays legible in dark mode. */
+    /** The completed-set actions remain legible in dark mode. */
     @Test fun reinstallDark() = preview("reinstall_dark", dark = true, currentInstalled = true)
 
-    /** Reinstall actions remain reachable with mirrored layout and enlarged text. */
+    /** Completed-set actions remain reachable with mirrored layout and enlarged text. */
     @Test fun reinstallRtlLarge() = preview("reinstall_rtl_large", rtl = true, currentInstalled = true)
 
     /** The composer grid with a thumbnail loaded from the installed set. */
@@ -85,7 +85,8 @@ class EmojiSetsScreenshotTest {
         val installed = InstalledEmojiSetStateFfi("previous", 0u, 0u, 1u, 100u, true)
         val selected =
             when {
-                currentInstalled -> set.copy(installed = installed.copy(updateAvailable = false))
+                currentInstalled ->
+                    set.copy(installed = installed.copy(eventIdHex = set.eventIdHex, updateAvailable = false))
                 dark -> set.copy(installed = installed)
                 else -> set
             }

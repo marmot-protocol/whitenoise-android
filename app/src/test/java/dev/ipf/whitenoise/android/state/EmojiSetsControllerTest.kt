@@ -67,7 +67,7 @@ class EmojiSetsControllerTest {
 
             controller.install()
 
-            assertEquals(listOf("old"), backend.install.attempts)
+            assertTrue(backend.install.attempts.isEmpty())
             assertEquals(newVersion, controller.state.preview)
             assertEquals(EmojiSetNotice.Changed, controller.state.notice)
             assertFalse(controller.state.busy)
@@ -82,11 +82,11 @@ class EmojiSetsControllerTest {
             var changes = 0
             val controller = EmojiSetsController(backend) { changes++ }
             controller.show(backend.set)
-            backend.set = backend.set.copy(installed = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false))
-            backend.install.result.complete(EmojiSetInstallResultFfi(backend.set, 1u, emptyList()))
+            val installed = backend.set.copy(installed = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false))
+            backend.install.result.complete(EmojiSetInstallResultFfi(installed, 1u, emptyList()))
 
             controller.install()
-            assertEquals(backend.set, controller.state.preview)
+            assertEquals(installed, controller.state.preview)
             assertEquals(1, changes)
 
             controller.remove()
@@ -100,6 +100,14 @@ class EmojiSetsControllerTest {
     fun reinstallCurrentVersionWithoutRemovingTheInstalledSnapshot() =
         runTest {
             val backend = FakeEmojiSetsBackend()
+            backend.set =
+                backend.set.copy(
+                    emoji =
+                        backend.set.emoji +
+                            backend.set.emoji
+                                .first()
+                                .copy(shortcode = "forest-bear"),
+                )
             val previous = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false)
             val partial = backend.set.copy(installed = previous)
             backend.install.result.complete(
@@ -142,6 +150,36 @@ class EmojiSetsControllerTest {
             installedEmojiByCode(listOf(first, second, long, builtin)),
         )
     }
+
+    /** A completed current version cannot be replaced by a partial result, even from a stale preview. */
+    @Test
+    fun stalePartialPreviewCannotReinstallACompletedSet() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            val set =
+                backend.set.copy(
+                    emoji =
+                        backend.set.emoji +
+                            backend.set.emoji
+                                .first()
+                                .copy(shortcode = "forest-bear"),
+                )
+            val partial = set.copy(installed = InstalledEmojiSetStateFfi("old", 0u, 0u, 1u, 100u, false))
+            val complete = partial.copy(installed = partial.installed!!.copy(emojiCount = 2u))
+            var changes = 0
+            val controller = EmojiSetsController(backend) { changes++ }
+            controller.show(partial)
+            backend.set = complete
+            backend.install.result.complete(EmojiSetInstallResultFfi(partial, 1u, emptyList()))
+
+            controller.install()
+
+            assertTrue(backend.install.attempts.isEmpty())
+            assertEquals(complete, controller.state.preview)
+            assertEquals(0, changes)
+            assertFalse(complete.canRetryPartialInstall())
+            assertTrue(partial.canRetryPartialInstall())
+        }
 }
 
 private class FakeEmojiSetsBackend : EmojiSetsBackend {
