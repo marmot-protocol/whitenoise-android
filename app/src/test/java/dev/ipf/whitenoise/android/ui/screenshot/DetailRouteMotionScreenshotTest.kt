@@ -155,8 +155,9 @@ class DetailRouteMotionScreenshotTest {
     /** The real protected Members route shares the same measured host as other details children. */
     @Test fun membersAmoled() = capture("members_amoled", dark = true, amoled = true, membersRoute = true)
 
-    @Test fun conversationInterruptedAmoled() =
+    @Test fun conversationInterruptedAmoled() {
         capture("conversation_amoled", dark = true, amoled = true, interruptEntry = true)
+    }
 
     /** The composer unfolds into composer settings and Back folds them into it, on the AMOLED theme. */
     @Test fun composerAmoled() = captureComposer("composer_amoled", dark = true, amoled = true)
@@ -194,7 +195,7 @@ class DetailRouteMotionScreenshotTest {
      * Drives the real route from its source to the notification destination and back, capturing the first, mid and
      * settled frames of each transition. It ends by showing the app lock mid-flight and asserting the route goes away.
      */
-    @Suppress("LongMethod", "CyclomaticComplexMethod")
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")
     private fun capture(
         name: String,
         profile: Boolean = false,
@@ -698,7 +699,6 @@ class DetailRouteMotionScreenshotTest {
         }
     }
 
-    /** Diagnostic frame sets are opt-in; only the three registered goldens participate in CI verification. */
     /** Back while the composer is still unfolding folds the half-grown details cards back into it. */
     private fun captureInterruptedEntry(name: String) {
         val back = "${name}_interrupted_entry_back"
@@ -716,6 +716,7 @@ class DetailRouteMotionScreenshotTest {
         rule.onNodeWithText(app.getString(R.string.sounds_and_notifications)).assertDoesNotExist()
     }
 
+    /** Diagnostic frame sets are opt-in; only the three registered goldens participate in CI verification. */
     private fun captureSource(
         name: String,
         profile: Boolean,
@@ -758,12 +759,12 @@ class DetailRouteMotionScreenshotTest {
         val frames = if (captureFrames) File("build/detail-route-motion/$name").apply { mkdirs() } else null
         var intermediate: Bitmap? = null
         var settled: Bitmap? = null
-        // Composer settings and the details route both grow out of the composer outline. Only AMOLED
-        // cards draw outlines, so only there do the details cards visibly fold back into it, as in Settings.
-        val outlined = !name.contains("_light") && !name.contains("_dark")
+        // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
         val morphs =
-            profile || name.startsWith("composer_") || name.endsWith("_entry") ||
-                (outlined && name.endsWith("_entry_back"))
+            profile ||
+                name.startsWith("composer_") ||
+                name.endsWith("_entry") ||
+                (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name)
         // Ordinary checks retain their timing; private exports include settled frames after preparation.
         for (frame in 0..(if (captureFrames) 31 else 22)) {
             if (captureFrames || frame in listOf(0, 6, 20)) {

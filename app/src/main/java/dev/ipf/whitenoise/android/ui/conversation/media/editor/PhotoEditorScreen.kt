@@ -148,7 +148,7 @@ internal fun PhotoEditorDialog(
 /** Photo editor: canvas, tools and the save flow for a staged photo. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("LongMethod", "LongParameterList") // Screen-level orchestration keeps save/back semantics together.
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod") // Screen-level orchestration keeps save/back semantics together.
 internal fun PhotoEditorScreen(
     previewBitmap: Bitmap,
     sourceInfo: PhotoEditorSourceInfo,

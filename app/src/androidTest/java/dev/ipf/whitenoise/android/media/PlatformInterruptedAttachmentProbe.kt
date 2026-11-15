@@ -160,7 +160,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 val progress = awaitAutomaticProgress(state, request)
                 awaitFirstNativeSnapshot(nativeStates)
                 assertEquals((bytes.size + 16).toULong(), progress.total)
-                HeldAttachmentCancellationProbe.awaitLedger(port, ::currentInitialBodyHeld)
+                awaitInitialAcquisition(port, nativeStates)
                 assertFalse(store.isInteractive(request))
                 assertNull("partial ciphertext must not be published", state.openNativeAttachment(request))
                 assertOrdinaryExecution(context)
@@ -314,6 +314,24 @@ internal object PlatformInterruptedAttachmentProbe {
             if (observedDownloading && currentResumedBodyHeld(events)) {
                 return@withTimeout
             }
+            delay(25L)
+        }
+    }
+
+    /**
+     * A setup GET can drop short of the held prefix; native recovery then retries it after a backoff longer
+     * than the ledger flush wait. Wait for a live held body, failing at once on a terminal native decision.
+     */
+    private suspend fun awaitInitialAcquisition(
+        port: Int,
+        nativeStates: List<NativeResumeSnapshot>,
+    ) = withTimeout(20_000L) {
+        while (true) {
+            val latest = nativeStates.toList().lastOrNull()
+            check(latest?.phase !in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+                "initial native acquisition ended as ${latest?.phase}"
+            }
+            if (currentInitialBodyHeld(HeldAttachmentCancellationProbe.ledger(port))) return@withTimeout
             delay(25L)
         }
     }
