@@ -29,6 +29,14 @@
           "CON-010",
           "MSG-005"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "surface": "Holding an emoji bar button explains it",
+        "anchor": "R.string.explanation_emoji_search",
+        "test_ids": [
+          "CON-049"
+        ]
       }
     ],
     "settings_controls": [
@@ -57,6 +65,16 @@
         "test_ids": [
           "CON-010",
           "MSG-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_emoji_configure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "R.string.explanation_emoji_configure",
+        "test_ids": [
+          "CON-049"
         ]
       }
     ]

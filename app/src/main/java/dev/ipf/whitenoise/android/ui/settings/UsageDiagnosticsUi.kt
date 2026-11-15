@@ -76,6 +76,7 @@ private fun UsageDiagnosticsChoice(
     ConsentSwitchRow(
         title = stringResource(R.string.onboarding_share_usage_title),
         subtitle = stringResource(R.string.onboarding_share_usage_summary),
+        explanation = stringResource(R.string.explanation_diagnostics_usage),
         checked = state.selected,
         enabled = enabled && state.snapshot != null && !state.failed,
         saving = state.busy,
@@ -290,6 +291,7 @@ private fun IndependentAuditLogChoice(
     ConsentSwitchRow(
         title = stringResource(R.string.onboarding_share_logs_title),
         subtitle = stringResource(R.string.onboarding_share_logs_summary),
+        explanation = stringResource(R.string.explanation_diagnostics_logs),
         checked = pendingChoice ?: (appState.auditLogSettings?.enabled == true),
         enabled = enabled && appState.auditLogSettings != null,
         saving = busy,

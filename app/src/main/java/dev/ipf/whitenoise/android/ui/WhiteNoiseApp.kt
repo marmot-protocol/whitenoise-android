@@ -67,7 +67,9 @@ import dev.ipf.whitenoise.android.state.ownsGroupChange
 import dev.ipf.whitenoise.android.state.randomProfilePseudonym
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.ui.common.AppLockScreen
+import dev.ipf.whitenoise.android.ui.common.ExplanationSheetHost
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen
+import dev.ipf.whitenoise.android.ui.common.LocalExplanationHost
 import dev.ipf.whitenoise.android.ui.common.LocalTopNoticeHost
 import dev.ipf.whitenoise.android.ui.common.StartupFailureScreen
 import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
@@ -79,6 +81,7 @@ import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSnackbarTimeoutEffect
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
+import dev.ipf.whitenoise.android.ui.common.rememberExplanationHostState
 import dev.ipf.whitenoise.android.ui.common.rememberTopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPendingCameraCaptureFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
@@ -586,6 +589,7 @@ internal fun WhiteNoiseApp(
     }
 
     val customEmojiStore = rememberCustomEmojiStore(context)
+    val explanationHost = rememberExplanationHostState()
     // Privacy hardening (#405): when "Force incognito keyboard" is on, wrap the
     // whole app UI so every descendant text field requests incognito mode from
     // the IME (no learning / suggestion history / cloud sync of typed content).
@@ -595,7 +599,10 @@ internal fun WhiteNoiseApp(
             LocalTopNoticeHost provides topNoticeHost,
             LocalCustomEmoji provides customEmojiStore.emoji,
             LocalInAppLinkHandler provides inAppLinkHandler,
+            LocalExplanationHost provides explanationHost.show,
         ) {
+            // Holding a control explains it; the lock drops any open explanation.
+            ExplanationSheetHost(explanationHost, visible = !appState.appLockScreenVisible)
             Scaffold(
                 modifier =
                     Modifier

@@ -22,8 +22,10 @@ import androidx.core.net.toUri
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 
 /** Help: the bug report, reviewed before it leaves the app, and the build's own facts. */
 @Suppress("FunctionNaming")
@@ -41,6 +43,7 @@ internal fun HelpScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.report_a_bug),
+                            explanation = stringResource(R.string.explanation_organize_help_bug_report),
                             onClick = onOpenBugReport,
                             modifier = Modifier.testTag("help.report_bug"),
                             subtitle = stringResource(R.string.report_a_bug_subtitle),
@@ -51,6 +54,7 @@ internal fun HelpScreen(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.about_and_licenses),
+                            explanation = stringResource(R.string.explanation_organize_help_about),
                             onClick = onOpenAbout,
                             modifier = Modifier.testTag("help.about"),
                             subtitle = stringResource(R.string.about_and_licenses_subtitle),
@@ -75,7 +79,7 @@ internal fun BugReportScreen(onBack: () -> Unit) {
  * What the hand-off does and what it does not attach, then one action. [onOpenReport] reports whether a
  * browser accepted it; a refusal keeps the screen and offers Retry.
  */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 @Composable
 internal fun BugReportContent(
     onBack: () -> Unit,
@@ -94,10 +98,20 @@ internal fun BugReportContent(
         bottomBar = {
             SettingsBottomAction {
                 SettingsSearchRowReveal("open_github", modifier = Modifier.fillMaxWidth()) {
+                    val openLabel = stringResource(R.string.report_bug_open_github)
                     WhiteNoiseButton(
                         onClick = ::openReport,
-                        modifier = Modifier.fillMaxWidth().testTag("help.bug.open"),
-                    ) { Text(stringResource(R.string.report_bug_open_github)) }
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag("help.bug.open")
+                                .explainOnLongPress(
+                                    Explanation(
+                                        openLabel,
+                                        stringResource(R.string.explanation_organize_help_open_github),
+                                    ),
+                                ),
+                    ) { Text(openLabel) }
                 }
             }
         },
@@ -261,6 +275,7 @@ internal fun AboutContent(
                                 context = context,
                                 title = stringResource(R.string.developer),
                                 subtitle = stringResource(R.string.developer_mode_subtitle),
+                                explanation = stringResource(R.string.explanation_organize_help_developer),
                                 onClick = onOpenDeveloper,
                                 modifier = Modifier.testTag("about.developer"),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_code) },
@@ -276,6 +291,7 @@ internal fun AboutContent(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.open_source_licenses),
+                            explanation = stringResource(R.string.explanation_organize_help_licenses),
                             onClick = ::showLicenses,
                             modifier = Modifier.testTag("about.licenses"),
                             subtitle = stringResource(R.string.open_source_licenses_subtitle),
@@ -286,6 +302,7 @@ internal fun AboutContent(
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.privacy_policy),
+                            explanation = stringResource(R.string.explanation_organize_help_privacy),
                             onClick = ::openPrivacy,
                             modifier = Modifier.testTag("about.privacy_policy"),
                             subtitle = stringResource(R.string.privacy_policy_subtitle),

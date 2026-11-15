@@ -90,6 +90,14 @@
         "test_ids": [
           "CHL-026"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "surface": "Holding chat action Leave and delete, Delete from device or Abandon explains it",
+        "anchor": "R.string.explanation_chat_actions_leave_and_delete,",
+        "test_ids": [
+          "CHL-037"
+        ]
       }
     ],
     "source_coverage": [
@@ -198,6 +206,38 @@
         "anchor": "R.string.select",
         "test_ids": [
           "CHL-011"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_actions_abandon_dm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.explanation_chat_actions_abandon_dm",
+        "test_ids": [
+          "CHL-037"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_actions_abandon_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.explanation_chat_actions_abandon_group",
+        "test_ids": [
+          "CHL-037"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_actions_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.explanation_chat_actions_delete",
+        "test_ids": [
+          "CHL-037"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_chat_actions_leave_and_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.explanation_chat_actions_leave_and_delete",
+        "test_ids": [
+          "CHL-037"
         ]
       }
     ],

@@ -98,6 +98,7 @@ internal fun DictationSettingsScreen(
                                 leading = {
                                     SettingsLeadingIcon(R.drawable.ic_download)
                                 },
+                                explanation = stringResource(R.string.explanation_appearance_dictation_ostt),
                             )
                         }
                     }
@@ -119,6 +120,7 @@ internal fun DictationSettingsScreen(
                             context = context,
                             title = stringResource(R.string.dictation_provider_title),
                             onClick = { providerSheetOpen = true },
+                            explanation = stringResource(R.string.explanation_appearance_dictation_provider),
                             value =
                                 preferences.providerSelection?.let { "${it.appName} — ${it.engineName}" }
                                     ?: stringResource(R.string.dictation_provider_automatic),
@@ -133,6 +135,7 @@ internal fun DictationSettingsScreen(
                             onCheckedChange = appState.conversationDictationPreferences::setPauseOtherAudio,
                             modifier = Modifier.testTag("dictation.pause_other_audio"),
                             subtitle = stringResource(R.string.dictation_pause_other_audio_subtitle),
+                            explanation = stringResource(R.string.explanation_appearance_dictation_pause_other_audio),
                             leading = { SettingsLeadingIcon(R.drawable.ic_pause) },
                         )
                     }
@@ -141,6 +144,7 @@ internal fun DictationSettingsScreen(
                             context = context,
                             title = stringResource(R.string.dictation_finish_title),
                             onClick = { picker = DictationSetting.Finish },
+                            explanation = stringResource(R.string.explanation_appearance_dictation_finish),
                             value = dictationFinishLabel(preferences.finishAfterSilenceMillis),
                             leading = { SettingsLeadingIcon(R.drawable.ic_timer_off) },
                         )
@@ -153,6 +157,7 @@ internal fun DictationSettingsScreen(
                                 context = context,
                                 title = stringResource(R.string.dictation_result_title),
                                 onClick = { picker = DictationSetting.Result },
+                                explanation = stringResource(R.string.explanation_appearance_dictation_result),
                                 value = stringResource(dictationDeliveryLabel(preferences.silenceDeliveryMode)),
                                 leading = { SettingsLeadingIcon(R.drawable.ic_input) },
                             )
@@ -175,6 +180,7 @@ internal fun DictationSettingsScreen(
                             title = stringResource(R.string.speech_android_settings),
                             onClick = { settingsFailed = !openVoiceInputSettings(context) },
                             leading = { SettingsLeadingIcon(R.drawable.ic_open_in_new) },
+                            explanation = stringResource(R.string.explanation_appearance_dictation_android_settings),
                         )
                     }
                 }

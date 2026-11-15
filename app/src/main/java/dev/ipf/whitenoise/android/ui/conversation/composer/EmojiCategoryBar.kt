@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiCategory
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Backspace
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -121,7 +122,18 @@ private fun EmojiCategoryBarLeadingActions(
 ) {
     Spacer(Modifier.width(EmojiCategoryBarEdgeInset))
     if (onSearch != null) {
-        IconButton(onClick = onSearch, modifier = Modifier.testTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)) {
+        IconButton(
+            onClick = onSearch,
+            modifier =
+                Modifier
+                    .testTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)
+                    .explainOnLongPress(
+                        composerExplanation(
+                            R.string.emoji_search_hint,
+                            R.string.explanation_emoji_search,
+                        ),
+                    ),
+        ) {
             Icon(
                 painterResource(R.drawable.ic_search),
                 contentDescription = stringResource(R.string.emoji_search_hint),
@@ -129,7 +141,18 @@ private fun EmojiCategoryBarLeadingActions(
         }
     }
     if (onConfigure != null) {
-        IconButton(onClick = onConfigure, modifier = Modifier.testTag(EMOJI_PICKER_CONFIGURE_TEST_TAG)) {
+        IconButton(
+            onClick = onConfigure,
+            modifier =
+                Modifier
+                    .testTag(EMOJI_PICKER_CONFIGURE_TEST_TAG)
+                    .explainOnLongPress(
+                        composerExplanation(
+                            R.string.configure_reactions,
+                            R.string.explanation_emoji_configure,
+                        ),
+                    ),
+        ) {
             Icon(
                 painterResource(R.drawable.ic_emoji_settings),
                 contentDescription = stringResource(R.string.configure_reactions),

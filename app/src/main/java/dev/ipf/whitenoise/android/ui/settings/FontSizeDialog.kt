@@ -18,8 +18,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppFont
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.BubbleTheme
+import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
+import dev.ipf.whitenoise.android.ui.common.explainOnLongPress
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberedClockTime
 import dev.ipf.whitenoise.android.ui.conversation.messages.resolveBubblePresentationArgb
@@ -53,7 +55,15 @@ internal fun FontSizeDialog(
                             selected = selected == scale,
                             highlightSelected = false,
                             onClick = { if (selected != scale) onSelect(scale) },
-                            modifier = Modifier.testTag("font_size.${scale.name}"),
+                            modifier =
+                                Modifier
+                                    .testTag("font_size.${scale.name}")
+                                    .explainOnLongPress(
+                                        Explanation(
+                                            stringResource(scale.labelRes),
+                                            stringResource(scale.explanationRes),
+                                        ),
+                                    ),
                         )
                     }
                 }
@@ -62,7 +72,16 @@ internal fun FontSizeDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } },
         dismissButton = {
-            TextButton(onClick = { onSelect(AppFontScale.Default) }) {
+            TextButton(
+                onClick = { onSelect(AppFontScale.Default) },
+                modifier =
+                    Modifier.explainOnLongPress(
+                        Explanation(
+                            stringResource(R.string.font_scale_default),
+                            stringResource(R.string.explanation_appearance_font_size_reset),
+                        ),
+                    ),
+            ) {
                 Text(stringResource(R.string.font_scale_default))
             }
         },
@@ -71,7 +90,7 @@ internal fun FontSizeDialog(
 
 /** Font choices reuse the same live theme sample and persistent preference owner as font size. */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod")
 internal fun FontFamilyDialog(
     selected: AppFont,
     label: (AppFont) -> String,
@@ -112,7 +131,21 @@ internal fun FontFamilyDialog(
                             selected = selected == font,
                             highlightSelected = false,
                             onClick = { if (selected != font) onSelect(font) },
-                            modifier = Modifier.testTag("font_family.${font.name}"),
+                            modifier =
+                                Modifier
+                                    .testTag("font_family.${font.name}")
+                                    .explainOnLongPress(
+                                        Explanation(
+                                            label(font),
+                                            stringResource(
+                                                if (font == AppFont.System) {
+                                                    R.string.explanation_appearance_font_system
+                                                } else {
+                                                    R.string.explanation_appearance_font_bundled
+                                                },
+                                            ),
+                                        ),
+                                    ),
                         )
                     }
                 }
@@ -124,7 +157,18 @@ internal fun FontFamilyDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = { onSelect(AppFont.System) }, modifier = Modifier.testTag("font_family.system")) {
+            TextButton(
+                onClick = { onSelect(AppFont.System) },
+                modifier =
+                    Modifier
+                        .testTag("font_family.system")
+                        .explainOnLongPress(
+                            Explanation(
+                                stringResource(R.string.appearance_font_system),
+                                stringResource(R.string.explanation_appearance_font_system),
+                            ),
+                        ),
+            ) {
                 Text(stringResource(R.string.appearance_font_system))
             }
         },

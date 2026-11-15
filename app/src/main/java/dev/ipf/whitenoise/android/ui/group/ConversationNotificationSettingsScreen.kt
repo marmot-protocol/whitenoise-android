@@ -170,6 +170,7 @@ internal fun ConversationNotificationSettingsScreen(
                             title = stringResource(R.string.vibration_pattern),
                             onClick = onChooseVibrationPattern,
                             value = effectiveVibrationLabel(effectiveVibration, vibrationPattern),
+                            explanation = stringResource(R.string.explanation_privacy_conversation_vibration),
                             leading = { SettingsLeadingIcon(R.drawable.ic_vibration) },
                         )
                     }
@@ -471,6 +472,7 @@ internal fun ConversationMuteSettingsSwitch(
                 else -> stringResource(R.string.notification_mute_detail)
             },
         enabled = !muteCommandPending,
+        explanation = stringResource(R.string.explanation_privacy_conversation_mute),
         leading = { SettingsLeadingIcon(R.drawable.ic_notifications_paused) },
     )
 }

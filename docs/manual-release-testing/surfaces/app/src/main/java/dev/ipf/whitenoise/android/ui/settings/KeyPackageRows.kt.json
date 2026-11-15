@@ -1,0 +1,271 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+  "legacy_sha256": "935cbe7a7ea5f4c2aaebb990dbfe3ead14630bc3b0e19f24a9f5c8cb00cee2d4",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Key package typed local state label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package not-local state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_not_local",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package current local state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_current",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package pending replacement state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_pending_replacement",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package retained private material state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_retained",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "Key package other owned material state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.key_package_local_state_other_owned",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "KeyPackageCopyValue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "fun KeyPackageCopyValue(",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "PublishedKeyPackage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "fun PublishedKeyPackage(",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "RetainedKeyPackage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "fun RetainedKeyPackage(",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:bytes_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.bytes_count",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:delete_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.delete_key_package",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:developer_delete_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.developer_delete_package",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:developer_package_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.developer_package_id",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:developer_package_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.developer_package_source",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:developer_seen_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.developer_seen_on",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:event",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.event",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.local",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:published",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.published",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:ref",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.ref",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.relay",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.size",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.unknown",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "string:unknown_publish_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.unknown_publish_time",
+        "test_ids": [
+          "ACC-016",
+          "ACC-018"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.explanation_relays_key_package_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.explanation_relays_key_package_delete",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_key_package_event",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.explanation_relays_key_package_event",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_key_package_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.explanation_relays_key_package_id",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_key_package_local_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.explanation_relays_key_package_local_state",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_key_package_ref",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.explanation_relays_key_package_ref",
+        "test_ids": [
+          "SET-056"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_relays_key_package_seen_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackageRows.kt",
+        "anchor": "R.string.explanation_relays_key_package_seen_on",
+        "test_ids": [
+          "SET-056"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

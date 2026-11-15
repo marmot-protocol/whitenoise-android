@@ -43,6 +43,14 @@
           "SET-001",
           "SYS-003"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsComponents.kt",
+        "surface": "Modifier.explainOnLongPress",
+        "anchor": "private fun Modifier.explainOnLongPress(",
+        "test_ids": [
+          "CON-048"
+        ]
       }
     ]
   },
