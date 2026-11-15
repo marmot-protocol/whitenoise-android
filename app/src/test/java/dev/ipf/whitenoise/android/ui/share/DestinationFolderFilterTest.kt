@@ -42,6 +42,29 @@ class DestinationFolderFilterTest {
     @Test
     fun shareFiltersPreserveAndRevealHiddenSelections() = verifyFilterSelection(share = true)
 
+    /** Selected review reveals recipients hidden by an active search without changing the selection. */
+    @Test
+    fun forwardSelectedReviewClearsAnUnrelatedSearch() {
+        val state = state()
+        folder(state, setOf(GROUP_B))
+        var committed = emptyList<String>()
+        render(state, share = false) { committed = it }
+        composeRule.onNodeWithText("Alice").performClick()
+        composeRule.onNodeWithContentDescription("Search chats").performClick()
+        composeRule.onNode(hasSetTextAction()).performTextInput("Bob")
+        composeRule.onNodeWithText("Alice").assertDoesNotExist()
+        composeRule.onNodeWithText("Bob").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("destination.filters")
+            .performScrollToNode(hasTestTag("destination.filter.selected"))
+        composeRule.onNodeWithTag("destination.filter.selected").performClick()
+        composeRule.onNodeWithText("Alice").assertIsSelected()
+        composeRule.onNodeWithText("Bob").assertDoesNotExist()
+        composeRule.onNodeWithText("Forward to 1 chat").performClick()
+        composeRule.waitUntil(5_000) { committed.isNotEmpty() }
+        assertEquals(listOf(GROUP_A), committed)
+    }
+
     /** Forward folder membership, rename and deletion update in the mounted picker. */
     @Test
     fun forwardFolderUpdatesAndDeletionAreLive() = verifyFolderUpdates(share = false)

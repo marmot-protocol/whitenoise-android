@@ -162,6 +162,14 @@
           "MSG-010",
           "FLD-001"
         ]
+      },
+      {
+        "surface": "Forward selected review clears search without changing recipients",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "onReviewSelected = { query = \"\" }",
+        "test_ids": [
+          "MSG-010"
+        ]
       }
     ],
     "source_coverage": [

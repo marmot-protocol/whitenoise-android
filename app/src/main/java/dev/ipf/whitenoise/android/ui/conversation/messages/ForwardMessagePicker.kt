@@ -511,7 +511,7 @@ internal fun ForwardMessagePickerContent(
                         rows = folderRows,
                         state = filter,
                         selected = selected,
-                        onReviewSelected = {},
+                        onReviewSelected = { query = "" },
                         modifier = Modifier.weight(1f),
                         alwaysShow = true,
                     )
