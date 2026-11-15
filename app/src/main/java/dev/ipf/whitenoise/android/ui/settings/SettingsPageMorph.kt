@@ -710,8 +710,10 @@ private fun Rect.validIn(host: Rect): Boolean =
         right <= host.right &&
         bottom <= host.bottom
 
-private fun Rect.visibleIn(host: Rect): Boolean = listOf(left, top, right, bottom).all { it.isFinite() } &&
-    !isEmpty && !intersect(host).isEmpty
+private fun Rect.visibleIn(host: Rect): Boolean =
+    listOf(left, top, right, bottom).all { it.isFinite() } &&
+        !isEmpty &&
+        !intersect(host).isEmpty
 
 /** Compatibility facade for existing rectangle-only launchers. */
 @Composable
