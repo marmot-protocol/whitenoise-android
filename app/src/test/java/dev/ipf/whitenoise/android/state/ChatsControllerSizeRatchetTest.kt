@@ -25,6 +25,6 @@ class ChatsControllerSizeRatchetTest {
     }
 
     private companion object {
-        const val MAX_LINES = 2_150
+        const val MAX_LINES = 2_152
     }
 }

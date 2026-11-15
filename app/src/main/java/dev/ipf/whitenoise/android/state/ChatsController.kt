@@ -1050,6 +1050,8 @@ class ChatsController private constructor(
         }
     }
 
+    internal fun memberSnapshotNeedsFetch(groupIdHex: String): Boolean = !memberCacheByGroup.containsKey(groupIdHex)
+
     /** Whether an authoritative roster is cached for [groupIdHex], whether or not the window retains its row. */
     internal fun hasMemberSnapshot(groupIdHex: String): Boolean = memberCacheByGroup.containsKey(groupIdHex)
 
