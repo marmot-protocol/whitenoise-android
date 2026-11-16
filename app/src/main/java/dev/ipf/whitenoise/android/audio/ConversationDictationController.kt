@@ -690,14 +690,7 @@ internal class ConversationDictationController internal constructor(
         expected: ConversationDictationState.DisclosureRequired? =
             state as? ConversationDictationState.DisclosureRequired,
     ) {
-        val pending = expected ?: return
-        if (state !== pending) return
-        if (pending.usesOfflineSpeechToText) {
-            markOfflineDisclosureAccepted()
-        } else {
-            markDisclosureAccepted()
-        }
-        startTarget(pending.sessionId, pending.target)
+        acceptPendingDisclosure(expected, markDisclosureAccepted, markOfflineDisclosureAccepted)
     }
 
     /** Resumes recognition after a grant or publishes the appropriate permission failure. */
