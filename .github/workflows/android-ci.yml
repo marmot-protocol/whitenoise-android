@@ -14,7 +14,7 @@ name: Android CI
 # ci:full opts into the complete two-distribution core matrix. Every merge group,
 # master, nightly and dispatch run stays full (docs/ci-request-policy.md).
 #
-# Each full unit suite runs as four hash-selected shards per distribution; the
+# Each full unit suite runs as eight hash-selected shards per distribution; the
 # coverage job merges the Zapstore shards' Kover reports and checks golden
 # ownership across shards. PR, merge-group and master-push lint covers main
 # sources only; nightly and dispatch lint test sources too. Compose compiler reports run on
@@ -680,7 +680,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
   # Prechecks compile every test source set here. Full runs compile main and unit-test
-  # sources once per flavor and hand the new build-cache entries to the four unit shards,
+  # sources once per flavor and hand the new build-cache entries to the eight unit shards,
   # which would otherwise each repeat the same 5-7 minute compilation.
   compile-tests:
     needs: changes
@@ -925,10 +925,10 @@ jobs:
           path: build/reports/dependency-security
           if-no-files-found: ignore
           retention-days: 14
-  # The unit suite runs in four shards per flavor. Each shard runs the test classes whose
+  # The unit suite runs in eight shards per flavor. Each shard runs the test classes whose
   # top-level name hashes to its index (see ciTestShard in build.gradle.kts) and takes
   # its compiled sources from compile-tests' build-cache entries, so it runs about a
-  # quarter of the suite without recompiling. The coverage job below merges every
+  # eighth of the suite without recompiling. The coverage job below merges every
   # shard's screenshot summary and Kover binary report.
   tests:
     needs: [changes, compile-tests]
@@ -940,14 +940,14 @@ jobs:
       # Two test forks leave room for Gradle on 16 GiB hosted runners.
       ORG_GRADLE_PROJECT_ciTestForks: '2'
       ORG_GRADLE_PROJECT_ciTestShard: ${{ matrix.shard }}
-      ORG_GRADLE_PROJECT_ciTestShardCount: '4'
+      ORG_GRADLE_PROJECT_ciTestShardCount: '8'
     strategy:
       # Keep every shard's diagnostics.
       # PRs test Zapstore only; secondary-variant runs Play's flavor-sensitive tests.
       fail-fast: false
       matrix:
         flavor: ${{ fromJSON(github.event_name == 'pull_request' && needs.changes.outputs.full_matrix != 'true' && '["Zapstore"]' || '["Zapstore", "Play"]') }}
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       # Include checkout/setup time; never reset this budget when tests start.
       - name: Reserve unit-test diagnostics and upload time
@@ -973,7 +973,7 @@ jobs:
           java-version: '17'
 
       # Shard 0 retains each flavor's compilation outputs; the other shards restore the
-      # same entry. One writer per flavor keeps four shards from quadrupling cache use.
+      # same entry. One writer per flavor keeps the shards from multiplying cache use.
       # Fork PRs remain read-only.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -1219,12 +1219,12 @@ jobs:
           name: kover-classes-Zapstore
           path: build/kover-classes
 
-      # Name each shard's report uniquely in one directory and require all four.
+      # Name each shard's report uniquely in one directory and require all eight.
       - name: Restore shard coverage inputs
         if: ${{ !github.event.pull_request.draft || needs.changes.outputs.full_matrix == 'true' }}
         run: |
           mkdir -p build/kover-shard-reports
-          for shard in 0 1 2 3; do
+          for shard in 0 1 2 3 4 5 6 7; do
             cp "build/kover-shards/kover-binary-Zapstore-$shard/testDevZapstoreDebugUnitTest.ic" \
               "build/kover-shard-reports/shard-$shard.ic"
           done

@@ -167,7 +167,7 @@ and running the unit tests that read `BuildConfig.SELF_UPDATE_ENABLED`. Play's
 complete unit suite and lint run on every `master` push, nightly, manual dispatch
 and merge-queue run. Every complete unit suite also verifies every committed
 screenshot golden in the same execution; there are no separate screenshot test
-runners. Each suite runs as four parallel hash-selected shards, and the `coverage`
+runners. Each suite runs as eight parallel hash-selected shards, and the `coverage`
 job merges the Zapstore shards' Kover reports and checks that the shards together
 compared every golden. PR, merge-group and `master` push lint checks main sources;
 nightly and manual dispatch also lint unit and Android-test sources.

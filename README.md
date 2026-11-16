@@ -108,7 +108,7 @@ risk-selected supplemental campaign, including on merge groups. Separate release
 conservative qualification policy;
 release qualification remains tied to the exact release candidate.
 
-Each full unit suite runs as four parallel shards per distribution, selected by a
+Each full unit suite runs as eight parallel shards per distribution, selected by a
 hash of the top-level test class name (`-PciTestShard`/`-PciTestShardCount`). A
 separate `coverage` job merges the Zapstore shards' Kover binary reports
 (`kover-binary-Zapstore-<shard>`) with the compiled classes from shard 0

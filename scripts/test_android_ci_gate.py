@@ -303,6 +303,34 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertLess(self.tests_job.index('      - name: Unit tests'),
                         self.tests_job.index('      - name: Upload reports'))
 
+    def test_coverage_restore_requires_every_configured_shard(self):
+        """A missing new shard must fail before coverage can use an incomplete suite."""
+        step = self.named_step(self.coverage, 'Restore shard coverage inputs')
+        script = self.run_block(step)
+        count = int(re.search(r"ciTestShardCount: '(\d+)'", self.tests_job)[1])
+        for missing in (None, *range(count)):
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                for shard in range(count):
+                    if shard != missing:
+                        report = root / f'build/kover-shards/kover-binary-Zapstore-{shard}/testDevZapstoreDebugUnitTest.ic'
+                        report.parent.mkdir(parents=True)
+                        report.write_bytes(bytes([shard]))
+                # Isolate archive unpacking; this probe exercises the actual shell's
+                # mandatory report copies and early-exit behavior without Gradle.
+                binary = root / 'bin/python3'
+                binary.parent.mkdir()
+                binary.write_text('#!/bin/sh\ntouch unpack-reached\n')
+                binary.chmod(0o755)
+                result = subprocess.run(['bash', '-e', '-c', script], cwd=root,
+                                        env={**os.environ, 'PATH': str(binary.parent) + os.pathsep + os.environ['PATH']},
+                                        capture_output=True)
+                self.assertEqual(result.returncode == 0, missing is None, result.stderr)
+                self.assertEqual((root / 'unpack-reached').exists(), missing is None)
+                if missing is None:
+                    for shard in range(count):
+                        self.assertEqual((root / f'build/kover-shard-reports/shard-{shard}.ic').read_bytes(), bytes([shard]))
+
     def test_full_unit_suite_verifies_goldens_and_is_reused_by_coverage(self):
         """Coverage merges every shard's report instead of rerunning the suite."""
         unit_tests = self.named_step(self.tests_job, 'Unit tests')
@@ -315,8 +343,8 @@ class AndroidCiGateTest(unittest.TestCase):
         for name in ('Coverage gate (Kover)', 'Coverage report (Kover)'):
             self.assertNotIn(f'      - name: {name}\n', self.tests_job)
         self.assertIn("ORG_GRADLE_PROJECT_ciTestShard: ${{ matrix.shard }}", self.tests_job)
-        self.assertIn("ORG_GRADLE_PROJECT_ciTestShardCount: '4'", self.tests_job)
-        self.assertIn('        shard: [0, 1, 2, 3]\n', self.tests_job)
+        self.assertIn("ORG_GRADLE_PROJECT_ciTestShardCount: '8'", self.tests_job)
+        self.assertIn('        shard: [0, 1, 2, 3, 4, 5, 6, 7]\n', self.tests_job)
         self.assertIn('kover-binary-Zapstore-${{ matrix.shard }}', self.tests_job)
         self.assertIn('scripts/kover_class_outputs.py pack', self.tests_job)
         header = self.coverage.split('    steps:', 1)[0]
@@ -329,7 +357,7 @@ class AndroidCiGateTest(unittest.TestCase):
                      '-Pwhitenoise.koverShardReportsDir=', '--no-daemon'):
             self.assertIn(task, coverage)
         restore = self.named_step(self.coverage, 'Restore shard coverage inputs')
-        self.assertIn('for shard in 0 1 2 3; do', restore)
+        self.assertIn('for shard in 0 1 2 3 4 5 6 7; do', restore)
         self.assertIn('scripts/kover_class_outputs.py unpack', restore)
         self.assertIn('whitenoise.koverShardReportsDir', self.app_build)
         self.assertIn('scripts/test_kover_class_outputs.py', self.tooling_contracts)
