@@ -95,12 +95,9 @@ import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
-import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
-import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
-import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
@@ -124,7 +121,6 @@ import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
-import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPicture
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
@@ -133,11 +129,6 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
-import dev.ipf.whitenoise.android.notifications.PushWakeAdmission
-import dev.ipf.whitenoise.android.notifications.PushWakeAttemptBudget
-import dev.ipf.whitenoise.android.notifications.PushWakeAttemptClaim
-import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
-import dev.ipf.whitenoise.android.notifications.PushWakeEvent
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
@@ -1407,13 +1398,6 @@ class WhiteNoiseAppState private constructor(
     /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
     private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
 
-    private fun pushWakeAttemptBudget() =
-        PushWakeAttemptBudget(
-            store = pushTokenStore,
-            storageDispatcher = pushWakeStorageDispatcher,
-            nowMs = pushWakeNowMs,
-        )
-
     private val amberSigner = AmberSignerController(appContext)
 
     /** Isolated sign-in tests replace only the signer round trip. */
@@ -1917,7 +1901,7 @@ class WhiteNoiseAppState private constructor(
             resumeForegroundWork = { if (appInForeground) initializedConversationDictation()?.onAppForegrounded() },
             resumeDeferredWork = ::resumePendingInviteNotificationIdentityRefreshes,
             onUnlockSucceeded = { dismissRetainedVisibleConversation ->
-                resumePushWakeEpisodeFromLifecycle()
+                pushWakeRecovery.resumePushWakeEpisodeFromLifecycle()
                 if (dismissRetainedVisibleConversation) dismissVisibleConversationNotifications()
             },
         )
@@ -2063,7 +2047,7 @@ class WhiteNoiseAppState private constructor(
                     override val accountSwitchHandoff get() = this@WhiteNoiseAppState.accountSwitchHandoff
                     override val signOutInProgress get() = this@WhiteNoiseAppState.signOutInProgress
                     override val wipeInProgress get() = this@WhiteNoiseAppState.wipeInProgress
-                    override val pushWakeServiceOwned get() = pushWakeServiceOwner != null
+                    override val pushWakeServiceOwned get() = pushWakeRecovery.pushWakeServiceOwned
 
                     override fun nativePushAccountRefs(): List<String> =
                         accounts
@@ -2203,8 +2187,57 @@ class WhiteNoiseAppState private constructor(
             activation = AccountSessionActivation(),
         )
     }
-    private val accountCatchUpCoordinator =
-        AccountCatchUpCoordinator(notificationScope, localNotificationPresenter.catchUpWindow)
+    internal val pushWakeRecovery: PushWakeRecoveryController =
+        PushWakeRecoveryController(
+            pushTokenStore = pushTokenStore,
+            pushWakeStorageDispatcher = pushWakeStorageDispatcher,
+            pushWakeNowMs = pushWakeNowMs,
+            schedulePushWakeRecovery = schedulePushWakeRecovery,
+            notificationScope = notificationScope,
+            catchUpWindow = localNotificationPresenter.catchUpWindow,
+            host =
+                object : PushWakeRecoveryHost {
+                    override val activeAccountRef get() = this@WhiteNoiseAppState.activeAccountRef
+                    override val runtimeGeneration get() = this@WhiteNoiseAppState.runtimeGeneration
+                    override val phase get() = this@WhiteNoiseAppState.phase
+                    override val appInForeground get() = this@WhiteNoiseAppState.appInForeground
+                    override val bootstrapCompleted get() = this@WhiteNoiseAppState.bootstrapCompleted
+                    override val networkNotificationRecoverySuppressed
+                        get() = this@WhiteNoiseAppState.networkNotificationRecoverySuppressed
+                    override val validatedConnectivityRecoveryGeneration
+                        get() = validatedConnectivityRecoveryGenerationMutable.value
+                    override val networkRecoveryActive get() = notificationNetworkRecovery.isActive()
+
+                    override fun captureNetworkGeneration(): Long = connectivitySignalOwner.captureNetworkGeneration()
+
+                    @Suppress("MaxLineLength")
+                    override fun isNetworkGenerationCurrent(generation: Long): Boolean = connectivitySignalOwner.isNetworkGenerationCurrent(generation)
+
+                    override fun recordStartupRelayCatchUpReady() {
+                        this@WhiteNoiseAppState.recordStartupRelayCatchUpReady()
+                    }
+
+                    override suspend fun <T> marmotIo(
+                        traceSection: String,
+                        block: suspend MarmotInterface.() -> T,
+                    ): T = this@WhiteNoiseAppState.marmotIo(traceSection, block)
+
+                    @Suppress("MaxLineLength")
+                    override fun notificationRuntimeRecoveryGeneration(): Long = this@WhiteNoiseAppState.notificationRuntimeRecoveryGeneration()
+
+                    override fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
+                        this@WhiteNoiseAppState.notificationRuntimeRecoveryAllowed(generation)
+
+                    override suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(): Boolean =
+                        this@WhiteNoiseAppState.ensureNotificationRuntimeStartedAndAwaitPushDrain()
+
+                    @Suppress("MaxLineLength")
+                    override suspend fun ensureNotificationRuntimeStarted(): Boolean = this@WhiteNoiseAppState.ensureNotificationRuntimeStarted()
+
+                    @Suppress("MaxLineLength")
+                    override suspend fun syncNativePushRegistrationIfEnabled(): Boolean = this@WhiteNoiseAppState.syncNativePushRegistrationIfEnabled()
+                },
+        )
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
 
     /** Native identity commands and lifecycle transitions share the account-session owner. */
@@ -2232,8 +2265,6 @@ class WhiteNoiseAppState private constructor(
     internal val profileCacheLifetime = StalenessGuard()
     private val mediaUploadSessionLifetime = StalenessGuard()
     internal val notificationJob = NotificationJobSlot()
-    private val pushWakeCatchUpDrainJob = NotificationJobSlot()
-    private val notificationPushWakeRecoveryCircuit = NotificationPushWakeRecoveryCircuit()
 
     @Volatile
     internal var networkNotificationRecoverySuppressed = false
@@ -2255,9 +2286,6 @@ class WhiteNoiseAppState private constructor(
         UnreadRefreshScheduler(scope = notificationScope) { accountRef ->
             refreshAccountUnreadCount(accountRef)
         }
-
-    @Volatile
-    private var isForegroundCatchUpRunning = false
 
     // Single source of truth for notification suppression: whether an Activity
     // is on screen, plus the conversation that will be suppressed only while it
@@ -3080,7 +3108,7 @@ class WhiteNoiseAppState private constructor(
                 backgroundConnectionEnabled ||
                     notificationJob.isActive() ||
                     notificationNetworkRecovery.isActive() ||
-                    pushWakeCatchUpDrainJob.isActive()
+                    pushWakeRecovery.isDrainActive()
             val oldChats = chatsController
             val oldConversations = conversationControllersForAccountTeardown()
             AccountSessionTeardown(
@@ -3960,224 +3988,17 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /**
-     * Drive Marmot's per-account catch-up so every signed-in account on this
-     * device processes the events its worker has pending — most importantly
-     * the MLS commits / kind-1210 group-system rows that peers (including the
-     * device's *other* local accounts) published while it was inactive.
-     *
-     * The engine owns one SQLite store per account-device identity, so an
-     * inactive account never sees a sibling account's group rename, avatar
-     * change, or membership commit until its own worker ingests that event.
-     * `catchUpAccounts` pumps all running workers, so calling it before we
-     * read an account's projection makes that account's source-of-truth store
-     * current first — rather than caching the change Android-side (which the
-     * repo's source-of-truth rule forbids). See issue #252 (group rename not
-     * propagating to a second same-device account) and the adjacent
-     * convergence cases #107 / #116 / #151.
-     *
-     * Best-effort: catch-up is a relay round-trip that can be slow or fail
-     * offline, and a read surface must still render its last-known projection
-     * in that case. Failures are swallowed (cancellation re-thrown) so a
-     * caller can always `await` this without it becoming a hard gate.
-     */
+    /** Runs one shared account catch-up; see [PushWakeRecoveryController.catchUpAccounts]. */
     suspend fun catchUpAccounts() {
-        launchAccountCatchUp(
-            mustStartAfter = null,
-            trigger = PerformanceTrigger.EXPLICIT,
-        ).await()
+        pushWakeRecovery.catchUpAccounts()
     }
 
-    /**
-     * Starts a process-owned catch-up after a chat list has rendered its local
-     * snapshot. A blocked relay call must not block that controller's live
-     * consumers. Callers for the same account, runtime, and network share one
-     * in-flight result; a newer identity waits instead of overlapping native work.
-     */
-    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> =
-        launchAccountCatchUp(
-            mustStartAfter = null,
-            trigger = PerformanceTrigger.CHAT_LIST_READINESS,
-        )
+    /** Starts the process-owned chat-list catch-up shared by callers for the same identity. */
+    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = pushWakeRecovery.launchCatchUpAccounts()
 
-    /** Builds the current catch-up identity and serializes its native work process-wide. */
-    private fun launchAccountCatchUp(
-        mustStartAfter: Long?,
-        trigger: PerformanceTrigger,
-        publishReadiness: Boolean = true,
-    ): Deferred<AccountCatchUpResult> =
-        AccountCatchUpKey(
-            accountRef = activeAccountRef,
-            runtimeGeneration = runtimeGeneration,
-            networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
-        ).let { key ->
-            val catchUp: suspend () -> Boolean = {
-                performAccountCatchUp(key, trigger).also { succeeded ->
-                    if (succeeded && publishReadiness) recordStartupRelayCatchUpReady()
-                }
-            }
-            if (mustStartAfter == null) {
-                accountCatchUpCoordinator.launch(key, catchUp)
-            } else {
-                accountCatchUpCoordinator.launchAfter(mustStartAfter, key, catchUp)
-            }
-        }
-
-    /** Checks queued work again at native admission and settlement, including destructive teardown. */
-    private fun isCatchUpKeyCurrent(key: AccountCatchUpKey): Boolean =
-        activeAccountRef == key.accountRef &&
-            runtimeGeneration == key.runtimeGeneration &&
-            connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration) &&
-            !networkNotificationRecoverySuppressed
-
-    /** Charges only executed native work; every owner shares this durable failure budget. */
-    private suspend fun performAccountCatchUp(
-        key: AccountCatchUpKey,
-        trigger: PerformanceTrigger,
-    ): Boolean =
-        if (!isCatchUpKeyCurrent(key)) {
-            false
-        } else {
-            val admission =
-                observePushState { pushWakeAttemptBudget().reserve() }
-                    ?: if (trigger == PerformanceTrigger.PUSH_WAKE) {
-                        PushWakeAdmission.Rejected
-                    } else {
-                        // Ordinary foreground/connectivity work is independently bounded
-                        // and cannot settle an unknown wake.
-                        PushWakeAdmission.Admitted(claim = null)
-                    }
-            when (admission) {
-                PushWakeAdmission.Rejected -> false
-                is PushWakeAdmission.Admitted -> {
-                    if (isCatchUpKeyCurrent(key)) {
-                        performAdmittedAccountCatchUp(key, trigger, admission.claim)
-                    } else {
-                        admission.claim?.let { reserved ->
-                            observePushState { pushWakeAttemptBudget().release(reserved) }
-                        }
-                        false
-                    }
-                }
-            }
-        }
-
-    /** Runs native catch-up only after admission and settles the same durable reservation. */
-    private suspend fun performAdmittedAccountCatchUp(
-        key: AccountCatchUpKey,
-        trigger: PerformanceTrigger,
-        claim: PushWakeAttemptClaim?,
-    ): Boolean {
-        val nativeSucceeded = instrumentedCatchUpAccounts(trigger)
-        var settlementSucceeded = nativeSucceeded && isCatchUpKeyCurrent(key)
-        if (claim != null) {
-            settlementSucceeded =
-                observePushState {
-                    pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) }
-                } == true
-        }
-        val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
-        if (claim != null) {
-            PushWakeDiagnostics.event(if (succeeded) PushWakeEvent.AttemptSucceeded else PushWakeEvent.AttemptFailed)
-        }
-        return succeeded
-    }
-
-    /** Runs catch-up work fresh enough to acknowledge the observed push-wake marker. */
-    private suspend fun catchUpAfterObservedPushWake(
-        pendingGeneration: Long,
-        trigger: PerformanceTrigger,
-    ): AccountCatchUpResult {
-        if (pendingGeneration == 0L) {
-            return launchAccountCatchUp(mustStartAfter = null, trigger = trigger).await()
-        }
-        val observedStartSequence = accountCatchUpCoordinator.captureStartSequence()
-        val result =
-            runCatchUpAfterTrigger(
-                observedStartSequence = observedStartSequence,
-                launchAfter = { sequence ->
-                    launchAccountCatchUp(
-                        mustStartAfter = sequence,
-                        trigger = trigger,
-                        publishReadiness = false,
-                    )
-                },
-                onSucceeded = { result ->
-                    observePushState {
-                        result.key?.let { key -> acknowledgePendingPushWakeCatchUp(pendingGeneration, key) } == true
-                    } == true
-                },
-            )
-        if (result.succeeded) recordStartupRelayCatchUpReady()
-        return result
-    }
-
-    /** Measures only native catch-up work admitted by the single-flight coordinator. */
-    private suspend fun instrumentedCatchUpAccounts(trigger: PerformanceTrigger): Boolean {
-        val startedAtMs = SystemClock.elapsedRealtime()
-        val trace = PerformanceDiagnostics.begin(PerformanceOperation.SYNC_CATCH_UP, trigger)
-        PerformanceDiagnostics.record(
-            trace = trace,
-            phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
-            elapsedMs = 0L,
-            result = PerformanceResult.PENDING,
-            layer = PerformanceLayer.MDK,
-        )
-        val succeeded = RecoveryTrace.catchUp(trigger) { catchUpAccountsBestEffort() }
-        val elapsedMs = (SystemClock.elapsedRealtime() - startedAtMs).coerceAtLeast(0L)
-        PerformanceDiagnostics.record(
-            trace = trace,
-            phase =
-                if (succeeded) {
-                    PerformancePhase.ACCOUNT_CATCH_UP_READY
-                } else {
-                    PerformancePhase.ACCOUNT_CATCH_UP_RETRY
-                },
-            elapsedMs = elapsedMs,
-            durationMs = elapsedMs,
-            result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
-            layer = PerformanceLayer.MDK,
-        )
-        return succeeded
-    }
-
-    private suspend fun catchUpAccountsBestEffort(): Boolean =
-        runCatchingCancellable { marmotIo(MarmotTraceSection.CATCH_UP) { catchUpAccounts() } }
-            .onFailure {
-                appStateDebug(it) { "catchUpAccounts failed: ${it.readableMessage()}" }
-            }.isSuccess
-
-    /**
-     * Best-effort account catch-up when the app returns to the foreground.
-     * Mirrors iOS `catchUpAfterForegroundActivation`: pumps every running worker
-     * so relay-ingested commits and projections converge without requiring an
-     * account switch or process restart. Failures are swallowed; cancellation
-     * propagates.
-     */
+    /** Best-effort catch-up when the app returns to the foreground. */
     suspend fun catchUpAfterForegroundActivation() {
-        if (
-            !ForegroundCatchUpPolicy.shouldCatchUp(
-                appPhase = phase,
-                isCatchUpRunning = isForegroundCatchUpRunning,
-                appInForeground = appInForeground,
-            )
-        ) {
-            return
-        }
-        admitPushWakeEpisodeFromLifecycle()
-        val pendingGeneration =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-            } ?: 0L // Unknown storage must not acknowledge a saved generation.
-        isForegroundCatchUpRunning = true
-        try {
-            catchUpAfterObservedPushWake(
-                pendingGeneration = pendingGeneration,
-                trigger = PerformanceTrigger.FOREGROUND,
-            )
-        } finally {
-            isForegroundCatchUpRunning = false
-        }
+        pushWakeRecovery.catchUpAfterForegroundActivation()
     }
 
     /**
@@ -4847,136 +4668,32 @@ class WhiteNoiseAppState private constructor(
             bootstrap()
             val receiverReady = bootstrapCompleted && notificationReceiverActive.value
             if (!receiverReady) throw receiverUnavailable()
-            drainPendingNativePushRegistrationSyncIfNeeded()
-            return drainPendingPushWakeCatchUpIfNeeded()
+            pushWakeRecovery.drainPendingNativePushRegistrationSyncIfNeeded()
+            return pushWakeRecovery.drainPendingPushWakeCatchUpIfNeeded()
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
         if (!awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())) throw receiverUnavailable()
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
-        drainPendingNativePushRegistrationSyncIfNeeded()
-        return drainPendingPushWakeCatchUpIfNeeded()
+        pushWakeRecovery.drainPendingNativePushRegistrationSyncIfNeeded()
+        return pushWakeRecovery.drainPendingPushWakeCatchUpIfNeeded()
     }
-
-    private val pushWakeAttemptMutex = kotlinx.coroutines.sync.Mutex()
-    private var acceptedPushWakeJob: Job? = null
-    private var acceptedPushWakeOwner: Any? = null
-    private var pushWakeServiceOwner: Any? = null
 
     /** Fences teardown while preserving existing screen-lock notification redaction. */
-    internal fun pushWakeRecoveryAllowed(): Boolean = !networkNotificationRecoverySuppressed
+    internal fun pushWakeRecoveryAllowed(): Boolean = pushWakeRecovery.pushWakeRecoveryAllowed()
 
-    /** Keeps storage failure in recovery bookkeeping from interrupting unlock or connectivity handling. */
-    private suspend fun admitPushWakeEpisodeFromLifecycle() {
-        val admitted =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState { pushTokenStore.admitPushWakeEpisode(pushWakeNowMs()) }
-            }
-        if (admitted != true) {
-            PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-        }
-    }
+    /** Acknowledges the foreground-service instance that currently owns background runtime. */
+    internal fun acknowledgePushWakeServiceOwner(owner: Any) = pushWakeRecovery.acknowledgePushWakeServiceOwner(owner)
 
-    /** Acknowledges the concrete foreground-service instance that currently owns background runtime. */
-    internal fun acknowledgePushWakeServiceOwner(owner: Any) {
-        assertMainThread { "acknowledgePushWakeServiceOwner" }
-        pushWakeServiceOwner = owner
-    }
-
-    /** Releases only the matching service lease and hands unresolved foreground work to durable scheduling. */
-    internal fun releasePushWakeServiceOwner(owner: Any) {
-        assertMainThread { "releasePushWakeServiceOwner" }
-        if (pushWakeServiceOwner !== owner) return
-        pushWakeServiceOwner = null
-        transferUnownedPushWakeRecovery()
-    }
+    /** Releases only the matching service lease. */
+    internal fun releasePushWakeServiceOwner(owner: Any) = pushWakeRecovery.releasePushWakeServiceOwner(owner)
 
     /** Accepts a process-owned drain only while an Activity or acknowledged service owns its lifetime. */
-    internal fun acceptPushWakeRecovery(): Boolean {
-        assertMainThread { "acceptPushWakeRecovery" }
-        val ownsRuntime = bootstrapCompleted && (appInForeground || pushWakeServiceOwner != null)
-        return when {
-            !pushWakeRecoveryAllowed() || !ownsRuntime -> false
-            acceptedPushWakeJob?.isActive == true -> acceptedPushWakeOwner != null
-            else -> {
-                val owner = Any()
-                acceptedPushWakeOwner = owner
-                acceptedPushWakeJob =
-                    notificationScope.launch {
-                        try {
-                            runPushWakeRecoveryAttempt()
-                        } finally {
-                            if (acceptedPushWakeOwner === owner) {
-                                acceptedPushWakeOwner = null
-                                withContext(kotlinx.coroutines.NonCancellable + pushWakeStorageDispatcher) {
-                                    schedulePushWakeRecovery()
-                                }
-                            }
-                        }
-                    }
-                true
-            }
-        }
-    }
+    internal fun acceptPushWakeRecovery(): Boolean = pushWakeRecovery.acceptPushWakeRecovery()
 
-    /** Revokes process ownership at its lifecycle boundary and immediately confirms a durable successor. */
-    private fun transferUnownedPushWakeRecovery() {
-        if (appInForeground || pushWakeServiceOwner != null) return
-        acceptedPushWakeOwner = null
-        acceptedPushWakeJob?.cancel()
-        acceptedPushWakeJob = null
-        notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
-    }
-
-    /**
-     * Shares service/worker ownership; cancellation leaves native settlement with AccountCatchUpCoordinator.
-     * Native/platform bootstrap failures preserve the shared retry obligation.
-     */
-    @Suppress("TooGenericExceptionCaught")
-    internal suspend fun runPushWakeRecoveryAttempt() {
-        pushWakeAttemptMutex.lock()
-        try {
-            val recoveryState =
-                withContext(pushWakeStorageDispatcher) {
-                    Triple(
-                        pushTokenStore.pushWakeCatchUpPending(),
-                        pushTokenStore.pushWakeAttempts(),
-                        pushTokenStore.pushWakeRetryDelay(pushWakeNowMs()),
-                    )
-                }
-            if (!pushWakeRecoveryAllowed() || !recoveryState.first) return
-            val generation = notificationRuntimeRecoveryGeneration()
-            val attempts = recoveryState.second
-            if (attempts >= PUSH_WAKE_MAX_ATTEMPTS || recoveryState.third > 0L) return
-            PushWakeDiagnostics.event(PushWakeEvent.AttemptStarted)
-            try {
-                ensureNotificationRuntimeStartedAndAwaitPushDrain()
-                val pending = withContext(pushWakeStorageDispatcher) { pushTokenStore.pushWakeCatchUpPending() }
-                if (notificationRuntimeRecoveryAllowed(generation) && !pending) {
-                    PushWakeDiagnostics.complete()
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                // Receiver/bootstrap failure must also consume this same finite episode.
-                if (notificationRuntimeRecoveryAllowed(generation)) {
-                    withContext(pushWakeStorageDispatcher) {
-                        if (pushTokenStore.pushWakeAttempts() == attempts) {
-                            val reclaimed = pushTokenStore.claimPushWakeAttempt(pushWakeNowMs())
-                            if (reclaimed == null || !pushTokenStore.deferPushWakeRetry(pushWakeNowMs())) {
-                                PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-                            }
-                        }
-                    }
-                }
-                PushWakeDiagnostics.event(PushWakeEvent.AttemptFailed)
-                throw error
-            }
-        } finally {
-            pushWakeAttemptMutex.unlock()
-        }
-    }
+    /** Runs one bounded push-wake recovery attempt shared by the service and worker owners. */
+    internal suspend fun runPushWakeRecoveryAttempt() = pushWakeRecovery.runPushWakeRecoveryAttempt()
 
     /** Captures the active notification-runtime recovery lifetime. */
     internal fun notificationRuntimeRecoveryGeneration(): Long = notificationRuntimeRecovery.capture()
@@ -5003,7 +4720,7 @@ class WhiteNoiseAppState private constructor(
             if (accounts.isEmpty()) refreshAccounts()
             if (!networkNotificationRecoverySuppressed && notificationReceiverActive.value) {
                 refreshLocalNotificationSettings()
-                drainPendingNativePushRegistrationSyncIfNeeded()
+                pushWakeRecovery.drainPendingNativePushRegistrationSyncIfNeeded()
             }
         }
         return receiverReady &&
@@ -5021,69 +4738,6 @@ class WhiteNoiseAppState private constructor(
             startRuntime = ::ensureNotificationRuntimeStarted,
             keepConnected = { backgroundConnectionEnabled },
         )
-
-    /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
-    private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
-        val pending =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState {
-                    pushTokenStore.nativePushRegistrationSyncPending() || pushTokenStore.lastToken() != null
-                }
-            } ?: return
-        if (pending) {
-            syncNativePushRegistrationIfEnabled()
-        }
-    }
-
-    /** Returns fetch success, acknowledging only the matching durable wake after fresh work. */
-    private suspend fun drainPendingPushWakeCatchUpIfNeeded(): Boolean {
-        val pendingGeneration =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-            } ?: return false
-        return pendingGeneration == 0L ||
-            catchUpAfterObservedPushWake(
-                pendingGeneration = pendingGeneration,
-                trigger = PerformanceTrigger.PUSH_WAKE,
-            ).succeeded
-    }
-
-    /**
-     * Clears only work whose recovery identity stays current across the durable acknowledgement commit.
-     * Cancellation is deferred across this bounded transaction so a committed clear cannot skip marker restoration.
-     */
-    private suspend fun acknowledgePendingPushWakeCatchUp(
-        pendingGeneration: Long,
-        key: AccountCatchUpKey,
-    ): Boolean {
-        if (pendingGeneration == 0L || !isCatchUpKeyCurrent(key)) return false
-        val acknowledged =
-            withContext(NonCancellable) {
-                val cleared =
-                    withContext(pushWakeStorageDispatcher) {
-                        pushTokenStore.clearPendingPushWakeCatchUp(pendingGeneration)
-                    }
-                if (!isCatchUpKeyCurrent(key)) {
-                    if (cleared) {
-                        val restored =
-                            withContext(pushWakeStorageDispatcher) {
-                                pushTokenStore.recordPendingPushWakeCatchUp()
-                            }
-                        if (!restored) PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-                    }
-                    false
-                } else {
-                    if (cleared) {
-                        appStateDebug { "pending push wake catch-up drained" }
-                    } else {
-                        appStateDebug { "newer pending push wake catch-up remains queued" }
-                    }
-                    true
-                }
-            }
-        currentCoroutineContext().ensureActive()
-        return acknowledged
-    }
 
     private val profileSignUp =
         AppProfileSignUp(
@@ -7573,17 +7227,7 @@ class WhiteNoiseAppState private constructor(
                 wake.isSuccess
             },
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
-            catchUpAccounts = {
-                val pendingGeneration =
-                    withContext(pushWakeStorageDispatcher) {
-                        observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-                    } ?: 0L
-                // Unknown push storage cannot prevent ordinary relay catch-up or authorize marker acknowledgement.
-                catchUpAfterObservedPushWake(
-                    pendingGeneration = pendingGeneration,
-                    trigger = PerformanceTrigger.NETWORK_RECONNECT,
-                )
-            },
+            catchUpAccounts = { pushWakeRecovery.catchUpAfterNetworkReconnect() },
             awaitRetry = { generation, attempt ->
                 appStateDebug { "notification network recovery pending attempt=$attempt" }
                 awaitNotificationRetryWindow(
@@ -7593,24 +7237,19 @@ class WhiteNoiseAppState private constructor(
                 )
             },
             onRecoveryAttemptStarted = { networkGeneration ->
-                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }?.let { generation ->
-                    notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
-                        networkGeneration = networkGeneration,
-                        pushWakeGeneration = generation,
-                    )
-                }
+                pushWakeRecovery.noteNetworkRecoveryAttempt(networkGeneration)
             },
             onRecoveryExhausted = { networkGeneration, _ ->
-                notificationPushWakeRecoveryCircuit.noteRecoveryExhausted(networkGeneration)
+                pushWakeRecovery.noteNetworkRecoveryExhausted(networkGeneration)
             },
-            onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain,
+            onDrainCompleted = { pushWakeRecovery.schedulePendingPushWakeCatchUpDrain() },
             diagnostics = notificationNetworkRecoveryDiagnostics,
         )
 
     internal val runtimeListenerTeardownOwner =
         AppRuntimeListenerTeardownOwner(
             cancelNetworkRecovery = { notificationNetworkRecovery.cancelAndJoin() },
-            cancelPushWakeDrain = { pushWakeCatchUpDrainJob.cancelAndJoin() },
+            cancelPushWakeDrain = { pushWakeRecovery.cancelDrainAndJoin() },
             cancelListener = { notificationJob.cancelAndJoin() },
             clearUnreadRefresh = { unreadRefreshScheduler.cancelAndClear() },
             receiverActive = notificationReceiverActive,
@@ -7692,7 +7331,7 @@ class WhiteNoiseAppState private constructor(
             )
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
-            if (network != null) schedulePendingPushWakeCatchUpDrain()
+            if (network != null) pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
         }.onFailure {
             // Restricted profiles can throw from the connectivity queries; the
             // empty snapshots are the same conservative offline default the
@@ -7817,7 +7456,7 @@ class WhiteNoiseAppState private constructor(
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
         noteUsableValidatedInternetSnapshot()
-        schedulePendingPushWakeCatchUpDrain()
+        pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
     }
 
     /** Publish aggregate connectivity and wake retry owners on a genuine recovery edge. */
@@ -7833,73 +7472,10 @@ class WhiteNoiseAppState private constructor(
         )
         requestNetworkPermissionRefresh()
         if (!recovery.restored) return
-        resumePushWakeEpisodeFromLifecycle()
+        pushWakeRecovery.resumePushWakeEpisodeFromLifecycle()
         AvatarLoadRecovery.onNetworkRestored()
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
         notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
-    }
-
-    /** Starts push-wake catch-up only when network recovery does not own the receiver. */
-    private fun schedulePendingPushWakeCatchUpDrain() {
-        val pendingPushWakeGeneration =
-            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() } ?: return
-        if (pendingPushWakeGeneration != 0L && !networkNotificationRecoverySuppressed) {
-            notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
-        }
-        val networkGeneration = validatedConnectivityRecoveryGenerationMutable.value
-        val runtimeUnavailable =
-            networkNotificationRecoverySuppressed ||
-                pendingPushWakeGeneration == 0L ||
-                notificationNetworkRecovery.isActive()
-        val triggerAlreadyConsumed =
-            !notificationPushWakeRecoveryCircuit.allowsIndependentDrain(
-                networkGeneration = networkGeneration,
-                pushWakeGeneration = pendingPushWakeGeneration,
-            )
-        if (runtimeUnavailable || triggerAlreadyConsumed) {
-            return
-        }
-        pushWakeCatchUpDrainJob.startIfInactive {
-            notificationScope
-                .launch {
-                    if (
-                        notificationPushWakeRecoveryCircuit.claimIndependentDrain(
-                            networkGeneration = networkGeneration,
-                            pushWakeGeneration = pendingPushWakeGeneration,
-                        )
-                    ) {
-                        ensureNotificationRuntimeStarted()
-                    }
-                }.also { drainJob ->
-                    drainJob.invokeOnCompletion {
-                        val currentPushWakeGeneration =
-                            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-                                ?: return@invokeOnCompletion
-                        val currentNetworkGeneration = validatedConnectivityRecoveryGenerationMutable.value
-                        if (
-                            currentPushWakeGeneration != 0L &&
-                            (
-                                currentPushWakeGeneration != pendingPushWakeGeneration ||
-                                    currentNetworkGeneration != networkGeneration
-                            )
-                        ) {
-                            notificationScope.launch {
-                                // Completion can run inline while the job slot lock is held.
-                                yield()
-                                schedulePendingPushWakeCatchUpDrain()
-                            }
-                        }
-                    }
-                }
-        }
-    }
-
-    /** Reopens an exhausted episode off-main before evaluating process and durable owners. */
-    private fun resumePushWakeEpisodeFromLifecycle() {
-        notificationScope.launch {
-            admitPushWakeEpisodeFromLifecycle()
-            schedulePendingPushWakeCatchUpDrain()
-        }
     }
 
     private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
@@ -7995,7 +7571,7 @@ class WhiteNoiseAppState private constructor(
         // process cannot keep silencing that chat after the UI is gone (#821).
         updateNotificationSuppression(if (foreground) suppression.onForeground() else suppression.onBackground())
         AppUpdateForegroundState.isForeground = foreground
-        if (!foreground) transferUnownedPushWakeRecovery()
+        if (!foreground) pushWakeRecovery.transferUnownedPushWakeRecovery()
         diagnostics.setForeground(foreground)
         marmotRuntime?.marmot?.let { engine ->
             notificationScope.launch {
