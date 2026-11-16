@@ -112,12 +112,6 @@ internal fun settingsContourSeed(
     )
 }
 
-private fun contourRadius(
-    a: CornerRadius,
-    b: CornerRadius,
-    t: Float,
-): CornerRadius = CornerRadius(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
-
 /** An unmatched divider retracts to the real perimeter at its own relative row height. */
 private fun absentSettingsSeam(
     seam: SettingsContourSeam,
@@ -150,7 +144,7 @@ private fun interpolateSettingsContour(
         a: CornerRadius,
         b: CornerRadius,
     ): CornerRadius {
-        val value = contourRadius(a, b, t)
+        val value = CornerRadius(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
         val limit = min(bounds.width, bounds.height) / 2f
         return CornerRadius(min(value.x, limit), min(value.y, limit))
     }
