@@ -34,7 +34,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
         "anchor": "private fun skipsFetch(",
         "test_ids": [
-          "MED-031"
+          "MED-055"
         ]
       }
     ]

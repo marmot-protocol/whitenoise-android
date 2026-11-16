@@ -1,10 +1,14 @@
 package dev.ipf.whitenoise.android.core
 
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -16,110 +20,130 @@ import org.robolectric.RobolectricTestRunner
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Stored avatar decodes nobody waits for any more are skipped, so leaving the chat list starts no workers (#3819). */
+/**
+ * A stored avatar decode that only visible rows asked for is skipped once they all leave, so leaving the chat list
+ * starts no workers (#3819). A caller that stops waiting on purpose, such as a notification warm-up, keeps it.
+ */
 @RunWith(RobolectricTestRunner::class)
 class AvatarStoredDecodeAbandonTest {
-    /** Drops the decoded pixels this test cached. */
+    private val lifetime = AvatarImageLoader.currentCacheLifetime()
+    private val release = CompletableDeferred<Unit>()
+
+    /** Frees the stored lane and drops the decoded pixels this test cached. */
     @After
     fun clearCache() {
+        release.complete(Unit)
         AvatarImageLoader.clear()
     }
 
-    /**
-     * A stored decode still queued when its only caller leaves, such as a chat-list row the user navigated away
-     * from, is skipped instead of starting a worker, and the next request for that avatar reads it normally.
-     */
+    /** A queued decode whose only caller was a row that left is skipped, and the next request reads it normally. */
     @Test
-    fun abandonedQueuedStoredDecodeIsSkippedAndLoadsLater() =
+    fun abandonedRowDecodeIsSkippedAndLoadsLater() =
         runBlocking<Unit> {
-            val lifetime = AvatarImageLoader.currentCacheLifetime()
-            val release = CompletableDeferred<Unit>()
-            val blockersStarted = AtomicInteger()
-            val bothBlocking = CompletableDeferred<Unit>()
-            val blockers =
-                (1..2).map { index ->
-                    async {
-                        AvatarImageLoader.loadStored("marmot-avatar:owner:blocker-$index@1", lifetime) {
-                            if (blockersStarted.incrementAndGet() == 2) bothBlocking.complete(Unit)
-                            release.await()
-                            Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
-                        }
-                    }
-                }
+            val blockers = fillStoredLane()
             val key = "marmot-avatar:owner:abandoned@1"
             val abandonedReads = AtomicInteger()
-            try {
-                withTimeout(5_000) { bothBlocking.await() }
-                val abandoned =
-                    async(start = CoroutineStart.UNDISPATCHED) {
-                        AvatarImageLoader.loadStored(key, lifetime) {
-                            abandonedReads.incrementAndGet()
-                            Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
-                        }
-                    }
-                // Joined, so the caller has left and its waiter count is released before the slots free.
-                abandoned.cancelAndJoin()
-                release.complete(Unit)
-                blockers.awaitAll()
-                kotlinx.coroutines.delay(SETTLE_MS)
-                assertEquals("an abandoned queued decode never reads", 0, abandonedReads.get())
-                val laterReads = AtomicInteger()
-                assertNotNull(
-                    withTimeout(5_000) {
-                        AvatarImageLoader.loadStored(key, lifetime) {
-                            laterReads.incrementAndGet()
-                            Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
-                        }
-                    },
-                )
-                assertEquals(1, laterReads.get())
-            } finally {
-                release.complete(Unit)
-            }
+            val row = async(start = CoroutineStart.UNDISPATCHED) { load(key, abandonable = true) { abandonedReads } }
+            row.cancelAndJoin()
+            release.complete(Unit)
+            blockers.awaitAll()
+            awaitSettled(key)
+            assertEquals("an abandoned queued decode never reads", 0, abandonedReads.get())
+            val laterReads = AtomicInteger()
+            assertNotNull(withTimeout(WAIT_MS) { load(key, abandonable = true) { laterReads } })
+            assertEquals(1, laterReads.get())
         }
 
-    /** A queued stored decode keeps running while any caller still waits, even after another one leaves. */
+    /** A warm-up that stops waiting on purpose still has its queued decode run and cached for the next frame. */
     @Test
-    fun queuedStoredDecodeRunsWhileAnyCallerStillWaits() =
+    fun cancelledWarmUpStillDecodesAndCaches() =
         runBlocking<Unit> {
-            val lifetime = AvatarImageLoader.currentCacheLifetime()
-            val release = CompletableDeferred<Unit>()
-            val blockersStarted = AtomicInteger()
-            val bothBlocking = CompletableDeferred<Unit>()
-            val blockers =
-                (1..2).map { index ->
-                    async {
-                        AvatarImageLoader.loadStored("marmot-avatar:owner:busy-$index@1", lifetime) {
-                            if (blockersStarted.incrementAndGet() == 2) bothBlocking.complete(Unit)
-                            release.await()
-                            Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
-                        }
-                    }
-                }
+            val blockers = fillStoredLane()
+            val key = "marmot-avatar:owner:warmed@1"
+            val reads = AtomicInteger()
+            val warm = async(start = CoroutineStart.UNDISPATCHED) { load(key, abandonable = false) { reads } }
+            warm.cancelAndJoin()
+            release.complete(Unit)
+            blockers.awaitAll()
+            awaitSettled(key)
+            assertEquals(1, reads.get())
+            assertNotNull("the warm-up's pixels are cached", AvatarImageLoader.cachedImage(key))
+        }
+
+    /** A row's queued decode that a warm-up also joined keeps running after both leave. */
+    @Test
+    fun aWarmUpJoiningARowDecodePinsIt() =
+        runBlocking<Unit> {
+            val blockers = fillStoredLane()
+            val key = "marmot-avatar:owner:pinned@1"
+            val reads = AtomicInteger()
+            val row = async(start = CoroutineStart.UNDISPATCHED) { load(key, abandonable = true) { reads } }
+            val warm = async(start = CoroutineStart.UNDISPATCHED) { load(key, abandonable = false) { reads } }
+            row.cancelAndJoin()
+            warm.cancelAndJoin()
+            release.complete(Unit)
+            blockers.awaitAll()
+            awaitSettled(key)
+            assertEquals(1, reads.get())
+            assertNotNull(AvatarImageLoader.cachedImage(key))
+        }
+
+    /** A queued row decode keeps running while any row still waits, even after another one leaves. */
+    @Test
+    fun queuedRowDecodeRunsWhileAnyRowStillWaits() =
+        runBlocking<Unit> {
+            val blockers = fillStoredLane()
             val key = "marmot-avatar:owner:shared@1"
             val reads = AtomicInteger()
-            val read: suspend () -> ByteArray? = {
-                reads.incrementAndGet()
-                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
-            }
-            try {
-                withTimeout(5_000) { bothBlocking.await() }
-                val (leaving, staying) =
-                    List(2) {
-                        async(start = CoroutineStart.UNDISPATCHED) { AvatarImageLoader.loadStored(key, lifetime, read) }
-                    }
-                leaving.cancelAndJoin()
-                release.complete(Unit)
-                assertNotNull(withTimeout(5_000) { staying.await() })
-                assertEquals(1, reads.get())
-                blockers.awaitAll()
-            } finally {
-                release.complete(Unit)
-            }
+            val (leaving, staying) =
+                List(2) { async(start = CoroutineStart.UNDISPATCHED) { load(key, abandonable = true) { reads } } }
+            leaving.cancelAndJoin()
+            release.complete(Unit)
+            assertNotNull(withTimeout(WAIT_MS) { staying.await() })
+            assertEquals(1, reads.get())
+            blockers.awaitAll()
         }
 
+    /** Holds both stored-lane slots until [release], so later stored decodes queue behind them. */
+    private suspend fun CoroutineScope.fillStoredLane(): List<Deferred<Any?>> {
+        val started = AtomicInteger()
+        val bothBlocking = CompletableDeferred<Unit>()
+        val blockers =
+            (1..2).map { index ->
+                async {
+                    AvatarImageLoader.loadStored("marmot-avatar:owner:blocker-$index@1", lifetime) {
+                        if (started.incrementAndGet() == 2) bothBlocking.complete(Unit)
+                        release.await()
+                        onePixelPng()
+                    }
+                }
+            }
+        withTimeout(WAIT_MS) { bothBlocking.await() }
+        return blockers
+    }
+
+    /** Loads [key] as a row ([abandonable]) or a warm-up, counting each actual read in [reads]. */
+    private suspend fun load(
+        key: String,
+        abandonable: Boolean,
+        reads: () -> AtomicInteger,
+    ) = AvatarImageLoader.loadStored(key, lifetime, MediaTrustDomain.Unique, abandonable) {
+        reads().incrementAndGet()
+        onePixelPng()
+    }
+
+    /** Waits until [key]'s detached work has either been skipped or published, with no fixed sleep. */
+    private suspend fun awaitSettled(key: String) =
+        withTimeout(WAIT_MS) {
+            while (AvatarImageLoader.isInFlightForTest(key)) delay(POLL_MS)
+        }
+
+    /** A valid one-pixel PNG, small enough to decode instantly. */
+    private fun onePixelPng(): ByteArray = Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+
     private companion object {
-        const val SETTLE_MS = 300L
+        const val WAIT_MS = 5_000L
+        const val POLL_MS = 5L
         const val ONE_PIXEL_PNG_BASE64 =
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
     }
