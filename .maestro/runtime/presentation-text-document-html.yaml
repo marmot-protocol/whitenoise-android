@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-text-document-html
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Fixture page.html
+- assertVisible:
+    text: Rendered
+- tapOn: Source
+- assertVisible:
+    text: .*Fixture source paragraph.*
+- tapOn: Close
+- assertVisible:
+    id: presentation.complete

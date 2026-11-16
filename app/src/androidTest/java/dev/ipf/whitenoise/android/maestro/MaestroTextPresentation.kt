@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.maestro
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import dev.ipf.whitenoise.android.ui.conversation.media.DocumentAttachmentKind
+import dev.ipf.whitenoise.android.ui.conversation.media.DocumentAttachmentViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentCandidate
 import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentFormat
 import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentNativeActions
@@ -18,6 +20,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentUnavailabl
 internal fun MaestroTextPresentation(fixture: MaestroPresentationFixture) {
     if (fixture.scenario.startsWith("text-dialog-")) {
         NativeReaderDialogPresentation(fixture)
+        return
+    }
+    if (fixture.scenario == "text-document-html") {
+        LocalHtmlDocumentPresentation(fixture)
         return
     }
     val candidate =
@@ -77,6 +83,34 @@ private fun NativeReaderDialogPresentation(fixture: MaestroPresentationFixture) 
             if (fixture.scenario.endsWith("failure")) error("Synthetic reader acquisition failure")
             "Fixture decoded first line\nFixture decoded last line".toByteArray(Charsets.UTF_8)
         },
+        onOpenExternal = { fixture.finish("external-handoff") },
+        onDismiss = { fixture.finish("dismiss") },
+    )
+}
+
+/** The production document reader owns sanitising and the Rendered/Source tabs; the fixture supplies bytes only. */
+@Composable
+@Suppress("FunctionNaming")
+private fun LocalHtmlDocumentPresentation(fixture: MaestroPresentationFixture) {
+    val actions =
+        remember(fixture) {
+            TextAttachmentNativeActions(
+                sourceIsCurrent = { true },
+                saveSource = { fixture.finish("save-handoff") },
+            )
+        }
+    DisposableEffect(actions) { onDispose { actions.release() } }
+    DocumentAttachmentViewer(
+        kind = DocumentAttachmentKind.Html,
+        name = "Fixture page.html",
+        account = "11".repeat(32),
+        source = "22".repeat(32),
+        actions = actions,
+        loadBytes = {
+            fixture.record("load-bytes")
+            "<h1>Fixture heading</h1><p>Fixture source paragraph</p>".toByteArray(Charsets.UTF_8)
+        },
+        loadFile = { null },
         onOpenExternal = { fixture.finish("external-handoff") },
         onDismiss = { fixture.finish("dismiss") },
     )
