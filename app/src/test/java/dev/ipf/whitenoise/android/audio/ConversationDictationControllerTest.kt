@@ -2374,6 +2374,57 @@ class ConversationDictationControllerTest {
             assertEquals(listOf("pause", "resume", "validate"), events)
         }
 
+    /** Real queued PCM captured during decoding survives the next generation without a media restart. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun continuousCallerAudioKeepsSpeechCapturedDuringProviderDecoding() =
+        runTest {
+            val events = mutableListOf<String>()
+            val buffer = ConversationDictationAudioChunkBuffer(1L, chunkBytes = 8, maxBufferedBytes = 24)
+            assertTrue(buffer.append(ByteArray(8) { 1 }, 8, hasSpeech = true))
+            val platform =
+                FakePlatform(callerAudio = ConversationDictationCallerAudioRequirement.Supported).apply {
+                    audioBuffer = buffer
+                    pendingCallerAudio = true
+                    sessionCallerAudioOwnedOverride = true
+                }
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    platform = platform,
+                    targetValidationScope = this,
+                    onBeforeRecognition = { events += "pause" },
+                    onAfterAudioCapture = { events += "resume" },
+                )
+            assertTrue(f.controller.requestStart(ACCOUNT, GROUP, TextFieldValue("")))
+            platform.listener.onReady()
+            f.scheduler.advanceBy(18_000L)
+            platform.listener.onEndOfSpeech()
+            assertTrue(buffer.append(ByteArray(8) { 2 }, 8, hasSpeech = true))
+            f.scheduler.advanceBy(12_000L)
+            assertEquals(listOf("pause"), events)
+            assertTrue(f.controller.ownsMicrophone)
+            platform.listener.onResult("first phrase")
+            f.scheduler.runDelay(500L)
+            platform.listener.onReady()
+            assertEquals(2, platform.claimedChunks.size)
+            assertTrue(
+                platform.claimedChunks
+                    .last()
+                    .pcm
+                    .all { it == 2.toByte() },
+            )
+            assertEquals(listOf("pause"), events)
+            buffer.finish()
+            f.controller.paste()
+            platform.listener.onResult("second phrase")
+            advanceUntilIdle()
+            assertEquals("first phrase second phrase", f.drafts.getValue(key()).text)
+            assertEquals(listOf("pause", "resume"), events)
+            assertTrue(f.controller.state is ConversationDictationState.Idle)
+            assertFalse(buffer.hasPending)
+        }
+
     /** Provider-owned capture has ended before result processing; the next generation pauses media again. */
     @Test
     fun providerEndOfSpeechResumesMediaDuringProcessingAndRepausesOnRestart() {

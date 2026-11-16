@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import dev.ipf.whitenoise.android.chatsControllerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -236,12 +237,12 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
     @Test
     fun initialMemberProjectionDropsResultsInvalidatedWhileTheBatchReadWasInFlight() {
-        val source = controllersSource().readText()
+        val source = chatsControllerSource()
         val body = source.kotlinFunctionBody("seedInitialMemberIdProjection")
         val currentCheck =
             source
-                .substringAfter("private fun initialMemberProjectionIsCurrent(")
-                .substringBefore("private fun initialDirectPeerProfileIds(")
+                .substringAfter("internal fun ChatsController.initialMemberProjectionIsCurrent(")
+                .substringBefore("internal fun ChatsController.initialDirectPeerProfileIds(")
         val loader = source.kotlinFunctionBody("loadInitialMemberIdProjections")
         val publisher = source.kotlinFunctionBody("applyInitialMemberIdProjections")
         val capturedEpoch = body.indexOf("expectedCacheEpoch = memberCacheEpoch")

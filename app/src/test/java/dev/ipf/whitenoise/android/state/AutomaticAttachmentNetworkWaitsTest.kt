@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Waiting automatic work queued on a narrowed network widens in place when a receipt or the policy allows more. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [36])
 class AutomaticAttachmentNetworkWaitsTest {
     private lateinit var context: Context
     private val waits = AutomaticAttachmentNetworkWaits(VolatileAttachmentInstallerHandoffRecordStore())

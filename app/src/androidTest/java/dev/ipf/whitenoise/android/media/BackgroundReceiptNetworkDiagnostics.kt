@@ -7,6 +7,7 @@ import android.net.wifi.WifiManager
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.automaticAttachmentPolicy
 import org.json.JSONArray
 import org.json.JSONObject
 

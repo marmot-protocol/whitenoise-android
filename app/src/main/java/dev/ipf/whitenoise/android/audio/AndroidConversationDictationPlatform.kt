@@ -199,31 +199,34 @@ internal class AndroidConversationDictationPlatform(
         return AndroidConversationDictationRecognitionSession(
             context = context,
             recognitionService = selected,
-            callerAudio = openCallerAudioStreamIfProviderCannotRecord(listener),
+            callerAudio = openCallerAudioStream(selected, listener),
             listener = listener,
         )
     }
 
     /**
-     * Captures in White Noise for an ordinary unselected provider, whose binding lacks the
-     * microphone capability. Selected and preinstalled providers keep their own capture path.
+     * Keeps capture continuous across provider decoding when caller audio is established.
+     * Other selected/preinstalled providers retain their own microphone without a capability probe.
      */
     @Suppress("MaxLineLength")
-    private fun openCallerAudioStreamIfProviderCannotRecord(listener: ConversationDictationRecognitionListener): ConversationDictationCallerAudioStream? {
+    private fun openCallerAudioStream(
+        component: ComponentName,
+        listener: ConversationDictationRecognitionListener,
+    ): ConversationDictationCallerAudioStream? {
         val systemSelected = selectedRecognitionService() != null
         val providerRecords = sessionProviderCanRecord
         val supported = conversationDictationAudioSourceSupported()
+        val provider = providerVersionCode(component.packageName)?.let { ConversationDictationCallerAudioProvider(component, it) }
+        val requirement = knownCallerAudioRequirement(provider)
         val capture =
-            if (providerRecords || !supported) {
-                null
-            } else {
-                callerAudio.acquire()
-            }
+            callerAudio.acquire(
+                allowCreate = conversationDictationUsesCallerAudio(providerRecords, supported, requirement),
+            )
         val source =
             capture?.openProviderStream(mainThreadDictationCallerAudioFailure(listener, capture::acknowledgeFailure))
         conversationDictationDiagnostic(
             "event=caller_audio_mode enabled=${source != null} " +
-                "system_selected=$systemSelected provider_records=$providerRecords supported=$supported",
+                "system_selected=$systemSelected provider_records=$providerRecords supported=$supported requirement=${requirement.name}",
         )
         return source
     }
@@ -298,21 +301,16 @@ internal class AndroidConversationDictationPlatform(
         ).start()
     }
 
-    /**
-     * Answers from installed state alone.
-     *
-     * A selected or preinstalled recognizer opens the microphone for itself, so caller-supplied audio never
-     * applies. Before Tiramisu the platform defines no caller-audio extras at all, so an app-owned
-     * session cannot supply audio and the provider's own UI is genuinely the only surface that can
-     * capture. Otherwise the answer is whatever this provider build has already established.
-     */
+    /** Preflight and stream creation use the same exact-build transport decision. */
     private fun knownCallerAudioRequirement(provider: ConversationDictationCallerAudioProvider?): ConversationDictationCallerAudioRequirement =
-        when {
-            provider != null && sessionProviderCanRecord -> ConversationDictationCallerAudioRequirement.NotNeeded
-            !conversationDictationAudioSourceSupported() -> ConversationDictationCallerAudioRequirement.Unsupported
-            provider == null -> ConversationDictationCallerAudioRequirement.Unknown
-            else -> callerAudioVerdicts.recorded(provider.component, provider.versionCode)
-        }
+        conversationDictationKnownCallerAudioRequirement(
+            provider = provider,
+            audioSourceSupported = conversationDictationAudioSourceSupported(),
+            providerCanRecord = sessionProviderCanRecord,
+            recorded =
+                provider?.let { callerAudioVerdicts.recorded(it.component, it.versionCode) }
+                    ?: ConversationDictationCallerAudioRequirement.Unknown,
+        )
 
     /**
      * Names the provider build a verdict can belong to.

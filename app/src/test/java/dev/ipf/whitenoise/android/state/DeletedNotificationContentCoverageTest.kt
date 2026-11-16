@@ -12,10 +12,11 @@ import java.io.File
  * NotificationReactionRemovalRaceTest; this gate fails when a new write path or removal source bypasses them.
  */
 class DeletedNotificationContentCoverageTest {
-    /** Every content write from AppState rechecks the generation fence that carries the removal mark. */
+    /** Every content write rechecks the generation fence that carries the removal mark. */
     @Test
     fun everyCardWriteRechecksTheContentFence() {
-        val source = source("state/AppState.kt")
+        val content = source("state/AppStateNotificationContent.kt")
+        val source = source("state/AppState.kt") + content
         val shows = callArguments(source, "localNotificationPresenter.show(")
         val refreshes = callArguments(source, "localNotificationPresenter.refreshLateIdentityImage(")
         assertTrue("expected the initial, redacted and enrichment writes", shows.size >= 3)
@@ -30,12 +31,12 @@ class DeletedNotificationContentCoverageTest {
         assertTrue(
             "the generation fence must check the removal mark",
             "notificationContentInvalidations.isRemoved(" in
-                functionBody(source, "isNotificationGenerationPostAllowed"),
+                functionBody(content, "isNotificationGenerationPostAllowed"),
         )
         assertTrue(
             "a reaction's own event id cannot verify its quoted target at the final write",
             "notificationContentInvalidations.hasRemovalInConversation(" in
-                functionBody(source, "isNotificationGenerationPostAllowed"),
+                functionBody(content, "isNotificationGenerationPostAllowed"),
         )
     }
 
@@ -107,19 +108,20 @@ class DeletedNotificationContentCoverageTest {
     @Test
     fun everyRemovalSourceReachesTheRetraction() {
         val source = source("state/AppState.kt")
-        val receiptLoop = functionBody(source, "runMutedChatReceiptLoop")
-        assertTrue("handleNotificationContentEvent(event, readReconciliations)" in receiptLoop)
+        val content = source("state/AppStateNotificationContent.kt")
+        val receiptLoop = functionBody(content, "runMutedChatReceiptLoop")
+        assertTrue("handleNotificationContentEvent(event, readReconciliations, scope = this)" in receiptLoop)
         assertTrue("NotificationReadReconciliationCoordinator(" in receiptLoop)
         assertTrue("scope = this" in receiptLoop)
         assertTrue("followUpMillis = NOTIFICATION_READ_RECONCILE_FOLLOW_UP_MILLIS" in receiptLoop)
         assertTrue("reconcileConversationNotificationCards(account, group, marmot)" in receiptLoop)
         assertTrue("requestActiveCardReconciliation(readReconciliations)" in receiptLoop)
         assertFalse("openReconciliation" in receiptLoop)
-        val onOpen = functionBody(source, "requestActiveCardReconciliation")
+        val onOpen = functionBody(content, "requestActiveCardReconciliation")
         assertTrue("activeConversationCards()" in onOpen)
         assertTrue("coordinator.request(account, group)" in onOpen)
         assertTrue("retractNotificationContent(" in functionBody(source, "hideMessageForMe"))
-        val eventBody = functionBody(source, "handleNotificationContentEvent")
+        val eventBody = functionBody(content, "handleNotificationContentEvent")
         assertTrue("removedNotificationMessages(event)" in eventBody)
         assertTrue("readStateChangedConversation(event)" in eventBody)
         assertTrue("readReconciliations.request(accountRef, groupIdHex)" in eventBody)

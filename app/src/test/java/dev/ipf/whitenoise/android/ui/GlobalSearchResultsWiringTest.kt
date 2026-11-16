@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.chatsControllerSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -9,7 +10,7 @@ class GlobalSearchResultsWiringTest {
     /** The per-chat body scan is gone, so search cost no longer grows with the number of chats. */
     @Test
     fun perChatBodyScanIsGone() {
-        val sources = listOf("ui/chats/ChatsScreen.kt", "state/ChatsController.kt").map { sourceFile(it).readText() }
+        val sources = listOf(sourceFile("ui/chats/ChatsScreen.kt").readText(), chatsControllerSource())
 
         assertTrue(
             "message search must not fan out one timeline scan per chat",

@@ -75,7 +75,7 @@ class ReceivedTimestampDateCoverageTest {
         // Markdown and Nostr cards accept signed event timestamps and own their existing failure fallback.
         val OTHER_INPUTS =
             mapOf(
-                "state/AppState.kt" to setOf("message.receivedAt.toLong() * MILLIS_PER_SECOND_LONG"),
+                "state/AppStateNotificationContent.kt" to setOf("message.receivedAt.toLong() * MILLIS_PER_SECOND_LONG"),
                 "state/DisappearingMessageSweep.kt" to setOf("expirySeconds.toLong() * MILLIS_PER_SECOND"),
                 "ui/chats/GlobalSearchResultsSession.kt" to setOf("deadline.toLong() * MILLIS_PER_SECOND"),
                 "ui/chats/GlobalAttachmentLibrarySession.kt" to setOf("deadline.toLong() * MILLIS_PER_SECOND"),
