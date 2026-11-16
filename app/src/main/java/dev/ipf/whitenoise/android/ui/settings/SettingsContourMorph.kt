@@ -50,9 +50,17 @@ internal data class SettingsContour(
 
 /** Reject layouts outside this solver's vertical, nonoverlapping contract rather than crossing boxes. */
 internal fun orderedSettingsContours(contours: List<SettingsContour>): List<SettingsContour>? {
-    val ordered = contours.distinctBy { it.bounds }.sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
-    if (ordered.any { !it.hasValidGeometry() }) return null
-    return ordered.takeIf { it.zipWithNext().all { (a, b) -> a.bounds.bottom <= b.bounds.top } }
+    if (contours.any { !it.hasValidGeometry() }) return null
+    val ordered =
+        contours
+            .distinctBy { it.bounds to it.viewport }
+            .filter { !it.bounds.intersect(it.viewport).isEmpty }
+            .sortedWith(compareBy({ it.bounds.intersect(it.viewport).top }, { it.bounds.left }))
+    return ordered.takeIf {
+        it.zipWithNext().all { (a, b) ->
+            a.bounds.intersect(a.viewport).bottom <= b.bounds.intersect(b.viewport).top
+        }
+    }
 }
 
 /** Finite native geometry is the solver's admission boundary. */
@@ -201,7 +209,8 @@ internal fun nearestSettingsContour(
     point: Offset,
 ): Int =
     contours.indices.minBy { index ->
-        val b = contours[index].bounds
+        val contour = contours[index]
+        val b = contour.bounds.intersect(contour.viewport).takeUnless { it.isEmpty } ?: contour.bounds
         val dx = point.x - point.x.coerceIn(b.left, b.right)
         val dy = point.y - point.y.coerceIn(b.top, b.bottom)
         dx * dx + dy * dy
@@ -211,7 +220,7 @@ internal fun nearestSettingsContour(
 
 /**
  * The activated group moves 1:1 for the entire clock. Neighbouring groups correspond in order;
- * surplus groups leave through the viewport or contract into an exclusive interior gap.
+ * surplus outlines stay rigid and are clipped into an exclusive gap without travelling.
  * Correspondence is measured once by the presentation owner.
  */
 @Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount", "LongParameterList")
@@ -394,44 +403,26 @@ internal fun matchSettingsContours(
             val slot = own[index]
             val before = pairs.lastOrNull { it.first < index }
             val after = pairs.firstOrNull { it.first > index }
-            val bounds =
+            // Surplus ink never travels or changes shape. Only its visible window closes.
+            // Both window endpoints sit between matched neighbours, so interpolation cannot
+            // expose surplus ink across a moving matched outline, including after a rebase.
+            val edge =
                 when {
-                    before == null -> {
-                        val next = requireNotNull(after)
-                        val edge = min(viewport.top, other[next.second].bounds.top)
-                        slot.bounds.translate(Offset(0f, edge - own[next.first - 1].bounds.bottom - slot.width))
-                    }
-                    after == null -> {
-                        val edge = max(viewport.bottom, other[before.second].bounds.bottom)
-                        slot.bounds.translate(Offset(0f, edge - own[before.first + 1].bounds.top + slot.width))
-                    }
+                    before == null -> min(viewport.top, other[requireNotNull(after).second].bounds.top)
+                    after == null -> max(viewport.bottom, other[before.second].bounds.bottom)
                     else -> {
-                        // Each interior surplus owns a separate position in the destination's empty gap.
                         val low = other[before.second].bounds.bottom
                         val high = other[after.second].bounds.top
                         val rank = (index - before.first).toFloat() / (after.first - before.first)
-                        val y = low + (high - low) * rank
-                        Rect(slot.bounds.left, y, slot.bounds.right, y)
+                        low + (high - low) * rank
                     }
                 }
-            val seams =
-                slot.seams.map { seam ->
-                    fun move(point: Offset): Offset {
-                        val relative =
-                            if (slot.bounds.height == 0f) 0.5f else (point.y - slot.bounds.top) / slot.bounds.height
-                        return Offset(point.x, bounds.top + relative * bounds.height)
-                    }
-                    seam.copy(start = move(seam.start), end = move(seam.end))
-                }
-            val peer =
-                slot.copy(
-                    bounds = bounds,
-                    corners = RoundRect(bounds, slot.corners.topLeftCornerRadius.x, slot.corners.topLeftCornerRadius.y),
-                    seams = seams,
-                    rows = emptyList(),
-                )
+            val clippedEdge = edge.coerceIn(viewport.top, viewport.bottom)
+            val visible = slot.bounds.intersect(slot.viewport).intersect(viewport)
+            val frozen = slot.copy(viewport = visible)
+            val peer = frozen.copy(viewport = Rect(visible.left, clippedEdge, visible.right, clippedEdge), rows = emptyList())
             result +=
-                if (reverse) SettingsContourPair(peer, slot, slot.key) else SettingsContourPair(slot, peer, slot.key)
+                if (reverse) SettingsContourPair(peer, frozen, slot.key) else SettingsContourPair(frozen, peer, slot.key)
         }
     }
     addSurplus(a, b, false)

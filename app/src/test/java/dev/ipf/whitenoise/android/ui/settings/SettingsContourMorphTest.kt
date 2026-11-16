@@ -138,6 +138,59 @@ class SettingsContourMorphTest {
         }
     }
 
+    @Test fun surplusAboveAndBelowMovingAnchorNeverTravelsOrPaintsAcrossIt() {
+        val source = home()
+        val target = listOf(group(90f, 240f, key = 3))
+        val pairs = matchSettingsContours(source, target, 3, null, source[2].bounds.center, viewport)
+        for (step in 1 until 100) {
+            val frame =
+                interpolateSettingsContours(
+                    source,
+                    target,
+                    step / 100f,
+                    source[2].bounds.center,
+                    viewport,
+                    3,
+                    correspondence = pairs,
+                )
+            val anchor = frame.single { it.key == 3 }
+            frame.filter { it.key != 3 }.forEach { surplus ->
+                val native = source.single { it.key == surplus.key }
+                assertBounds(native.bounds, surplus.bounds)
+                assertEquals(native.corners, surplus.corners)
+                assertEquals(native.color, surplus.color)
+                val painted = surplus.bounds.intersect(surplus.viewport)
+                if (!painted.isEmpty) {
+                    assertTrue(painted.top >= viewport.top)
+                    assertTrue(painted.bottom <= anchor.bounds.top || painted.top >= anchor.bounds.bottom)
+                }
+            }
+            assertNotNull(orderedSettingsContours(frame))
+        }
+    }
+
+    @Test fun scrolledSurplusNeverRevealsItsHiddenTopAboveTheBodyViewport() {
+        val source = listOf(group(40f, 100f, 1), group(250f, 100f, 2))
+        val target = listOf(group(40f, 220f, 2))
+        val pairs = matchSettingsContours(source, target, 2, null, source[1].bounds.center, viewport)
+        for (step in 1 until 100) {
+            val frame =
+                interpolateSettingsContours(
+                    source,
+                    target,
+                    step / 100f,
+                    source[1].bounds.center,
+                    viewport,
+                    2,
+                    correspondence = pairs,
+                )
+            val surplus = frame.single { it.key == 1 }
+            assertBounds(source[0].bounds, surplus.bounds)
+            assertTrue(surplus.viewport.top >= viewport.top)
+            assertTrue(surplus.viewport.bottom >= viewport.top)
+        }
+    }
+
     @Test fun trueEmptyPaintFadesAndInvertsIncludingFrozenPartialSeams() {
         val native =
             dividedGroup(100f, 2).let { contour ->
@@ -211,7 +264,9 @@ class SettingsContourMorphTest {
                 val frame = sample(source, target, t)
                 assertNotNull(orderedSettingsContours(frame))
                 frame.zipWithNext().forEachIndexed { index, (a, b) ->
-                    assertTrue(b.bounds.top - a.bounds.bottom >= -0.001f)
+                    val first = a.bounds.intersect(a.viewport)
+                    val second = b.bounds.intersect(b.viewport)
+                    if (!first.isEmpty && !second.isEmpty) assertTrue(second.top - first.bottom >= -0.001f)
                     if (index + 1 < selected || index > selected) {
                         assertEquals(
                             source[index + 1].bounds.center.y - source[index].bounds.center.y,
@@ -264,14 +319,15 @@ class SettingsContourMorphTest {
         assertTrue(matched.none { it.source.key == 2 })
     }
 
-    @Test fun interiorSurplusContractsAtFullWidthIntoExclusiveGapWithoutFadingOrCrossing() {
+    @Test fun interiorSurplusClipsWithoutMovingShrinkingFadingOrCrossing() {
         val source = listOf(group(100f, 60f, 1), group(210f, 60f, 2), group(320f, 60f, 3))
         val target = listOf(group(100f, 60f, 1), group(320f, 60f, 3))
         val pairs = matchSettingsContours(source, target, 1, null, source[0].bounds.center, viewport)
         val surplus = pairs.single { it.source.key == 2 }
-        assertEquals(0f, surplus.target.bounds.height, 0f)
-        assertTrue(surplus.target.bounds.top > target[0].bounds.bottom)
-        assertTrue(surplus.target.bounds.bottom < target[1].bounds.top)
+        assertBounds(source[1].bounds, surplus.target.bounds)
+        assertEquals(0f, surplus.target.viewport.height, 0f)
+        assertTrue(surplus.target.viewport.top > target[0].bounds.bottom)
+        assertTrue(surplus.target.viewport.bottom < target[1].bounds.top)
         for (step in 1 until 100) {
             val t = step / 100f
             val frame =
@@ -285,7 +341,7 @@ class SettingsContourMorphTest {
                     correspondence = pairs,
                 )
             val middle = frame.single { it.key == 2 }
-            assertEquals(source[1].bounds.width, middle.bounds.width, 0.001f)
+            assertBounds(source[1].bounds, middle.bounds)
             assertEquals(1f, middle.color.alpha, 0f)
             assertTrue(middle.bounds.height > 0f)
             assertTrue(middle.corners.topLeftCornerRadius.y <= middle.bounds.height / 2f)
@@ -364,7 +420,13 @@ class SettingsContourMorphTest {
     @Test fun returningFrozenGroupsKeepNativeKeysBeforeNearestSurplus() {
         val source = home()
         val frozen = sample(source, listOf(dividedGroup(90f, 2, 3)), 0.75f)
-        val visible = frozen.filter { !it.bounds.intersect(viewport).isEmpty }
+        val visible =
+            frozen.filter {
+                !it.bounds
+                    .intersect(it.viewport)
+                    .intersect(viewport)
+                    .isEmpty
+            }
         val anchor = frozen.single { it.key == 3 }.bounds.center
         val pairs = matchSettingsContours(frozen, source, 3, null, anchor, viewport)
         visible.forEach { contour ->
@@ -389,8 +451,20 @@ class SettingsContourMorphTest {
                 assertSame(frozen, sample(frozen, target, 0f))
                 assertSame(target, sample(frozen, target, 1f))
                 for (step in 1 until 240) assertNotNull(orderedSettingsContours(sample(frozen, target, step / 240f)))
-                val visibleFrozen = frozen.filter { !it.bounds.intersect(viewport).isEmpty }
-                val visibleNext = sample(frozen, target, 0.00001f).filter { !it.bounds.intersect(viewport).isEmpty }
+                val visibleFrozen =
+                    frozen.filter {
+                        !it.bounds
+                            .intersect(it.viewport)
+                            .intersect(viewport)
+                            .isEmpty
+                    }
+                val visibleNext =
+                    sample(frozen, target, 0.00001f).filter {
+                        !it.bounds
+                            .intersect(it.viewport)
+                            .intersect(viewport)
+                            .isEmpty
+                    }
                 assertEquals(visibleFrozen.size, visibleNext.size)
                 visibleNext.zip(visibleFrozen).forEach { (actual, prior) ->
                     assertBounds(prior.bounds, actual.bounds, 0.02f)
