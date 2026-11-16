@@ -5580,6 +5580,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileTeamReport.kt",
+      "symbol": "ProfileTeamReportSheet",
+      "bindings": [],
+      "remaining": "Report to White Noise team from another person's profile: needs a Maestro fixture whose build reports moderation reporting available, opening the sheet from the profile row and cancelling before submitModerationReport."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
       "symbol": "GroupMembersReviewDialog",
       "bindings": [
