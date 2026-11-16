@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.state.page
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertArrayEquals
@@ -55,11 +56,18 @@ class ForwardMediaReferenceFfiIntegrationTest {
                         )
                     accountRef = account.label
 
-                    val sourceGroup = marmot.createGroup(account.label, "Forward source", emptyList(), null)
+                    val sourceGroup =
+                        marmot
+                            .createGroup(account.label, "Forward source", emptyList(), null)
+                            .requireCreatedGroupId()
                     val destinationGroups =
                         listOf(
-                            marmot.createGroup(account.label, "Forward destination A", emptyList(), null),
-                            marmot.createGroup(account.label, "Forward destination B", emptyList(), null),
+                            marmot
+                                .createGroup(account.label, "Forward destination A", emptyList(), null)
+                                .requireCreatedGroupId(),
+                            marmot
+                                .createGroup(account.label, "Forward destination B", emptyList(), null)
+                                .requireCreatedGroupId(),
                         )
                     val fixtures = forwardableFixtures()
                     val sourceUpload =
@@ -216,8 +224,14 @@ class ForwardMediaReferenceFfiIntegrationTest {
                             MarmotClient.bootstrapRelays,
                         )
                     accountRef = account.label
-                    val sourceGroup = marmot.createGroup(account.label, "Token source", emptyList(), null)
-                    val destinationGroup = marmot.createGroup(account.label, "Token destination", emptyList(), null)
+                    val sourceGroup =
+                        marmot
+                            .createGroup(account.label, "Token source", emptyList(), null)
+                            .requireCreatedGroupId()
+                    val destinationGroup =
+                        marmot
+                            .createGroup(account.label, "Token destination", emptyList(), null)
+                            .requireCreatedGroupId()
                     val fixture =
                         ForwardableFixture(
                             fileName = "note.txt",

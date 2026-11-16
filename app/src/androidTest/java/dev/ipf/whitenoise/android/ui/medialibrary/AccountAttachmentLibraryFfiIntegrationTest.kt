@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.chats.GlobalAttachmentLibraryQuery
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -50,8 +51,14 @@ class AccountAttachmentLibraryFfiIntegrationTest {
                     marmot.start()
                     val account = marmot.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
                     accountRef = account.label
-                    val albums = marmot.createGroup(account.label, "Library albums", emptyList(), null)
-                    val files = marmot.createGroup(account.label, "Library files", emptyList(), null)
+                    val albums =
+                        marmot
+                            .createGroup(account.label, "Library albums", emptyList(), null)
+                            .requireCreatedGroupId()
+                    val files =
+                        marmot
+                            .createGroup(account.label, "Library files", emptyList(), null)
+                            .requireCreatedGroupId()
                     // A second apart, so newest-first order never rests on a same-second tie-break.
                     marmot.uploadMedia(account.label, albums, upload(photo("first.png"), photo("second.png")))
                     delay(SEND_SPACING_MS)

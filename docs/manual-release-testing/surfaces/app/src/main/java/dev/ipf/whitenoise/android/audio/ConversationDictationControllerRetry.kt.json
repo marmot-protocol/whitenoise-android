@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationControllerRetry.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Retained dictation tail retries wait for provider capacity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationControllerRetry.kt",
+        "anchor": "internal fun ConversationDictationController.scheduleRetainedCallerAudioRetry(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Historical-save Retry retains recovery protection while verification is unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationControllerRetry.kt",
+        "anchor": "requireVerifiedRecovery = false,",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Final caller-audio blank decode uses the bounded retained-PCM recovery budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationControllerRetry.kt",
+        "anchor": "internal fun ConversationDictationController.retryRetainedCallerAudioOrFail(",
+        "test_ids": [
+          "DIC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

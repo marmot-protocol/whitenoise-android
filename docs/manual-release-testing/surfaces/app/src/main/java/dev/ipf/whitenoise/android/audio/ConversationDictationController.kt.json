@@ -30,63 +30,6 @@
         ]
       },
       {
-        "surface": "Dictation automatic completion observes captured speech and drains the tail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun finishAfterCallerAudioSilence(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Dictation automatic completion delivers by the stored silence choice only",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun completeAfterSilence(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Retained dictation tail retries wait for provider capacity",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun scheduleRetainedCallerAudioRetry(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Dictation caller-audio capability routing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun probeCallerAudioSupport(",
-        "test_ids": [
-          "DIC-002",
-          "DIC-003"
-        ]
-      },
-      {
-        "surface": "Completed dictation transcript preservation when the origin target is lost",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun preserveTranscriptInLatestDraft(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Dictation capture-close playback restoration",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun sealAndDrainCallerAudio(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Long dictation capture, stop, and caller-audio drain",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun sealAndDrainCallerAudio(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "Dictation reply-origin immutable target",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "replyToMessageIdHex: String?",
@@ -103,14 +46,6 @@
         ]
       },
       {
-        "surface": "Mounted composer refresh after accepted terminal dictation recovery",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "val published = result == ConversationDictationDraftRecovery.Result.Written",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "Saved dictation edits expire silently while unsaved text and audio remain protected",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "val hasUnrecoveredTranscript: Boolean",
@@ -119,33 +54,9 @@
         ]
       },
       {
-        "surface": "Historical-save Retry retains recovery protection while verification is unavailable",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "requireVerifiedRecovery = false,",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Terminal dictation failures and direct replacement retain foreground protection until native capture closes",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "foregroundLease.deferReleaseUntilCaptureClosed(closingCaptureGeneration, notificationSessionToken)",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Dictation recovery releases the ordinary composer and consumes the previous Send",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun handRecoveryToComposer(",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "Explicit Send provenance survives retained-transcript validation and retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private val explicitSendRequested: Boolean",
+        "anchor": "internal val explicitSendRequested: Boolean",
         "test_ids": [
           "DIC-002"
         ]
@@ -169,7 +80,7 @@
       {
         "surface": "Recovery service expiry preserves unresolved data",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private var recoveryProtectionExpired = false",
+        "anchor": "internal var recoveryProtectionExpired = false",
         "test_ids": [
           "DIC-002"
         ]
@@ -188,14 +99,6 @@
         "anchor": "internal fun keepComposerAudioForLater(",
         "test_ids": [
           "DIC-002",
-          "DIC-009"
-        ]
-      },
-      {
-        "surface": "Automatically release a closed failed dictation owner while keeping origin-scoped audio",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun parkClosedRecovery(",
-        "test_ids": [
           "DIC-009"
         ]
       },
@@ -224,22 +127,6 @@
         ]
       },
       {
-        "surface": "Final caller-audio blank decode uses the bounded retained-PCM recovery budget",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun retryRetainedCallerAudioOrFail(",
-        "test_ids": [
-          "DIC-009"
-        ]
-      },
-      {
-        "surface": "Slow caller-audio Send uses one logical drain deadline across provider generations",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun armCallerAudioDrainTimeout(",
-        "test_ids": [
-          "DIC-010"
-        ]
-      },
-      {
         "surface": "Involuntary dictation focus interruption preserves original draft and bounded remaining audio without automatic send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "fun interruptForAudioFocusLoss()",
@@ -248,27 +135,11 @@
         ]
       },
       {
-        "surface": "Send and Paste deliver recognized text past a capture-silent final caller-audio tail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun dropSilentFinalTail(",
-        "test_ids": [
-          "DIC-012"
-        ]
-      },
-      {
         "surface": "Audio focus loss after an explicit Send or Paste continues the chosen completion",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "event=audio_focus_lost_after_finish",
         "test_ids": [
           "DIC-012"
-        ]
-      },
-      {
-        "surface": "Dictation Send on finish sends composer edits made while speaking",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "private fun sendTranscriptOnFinish(",
-        "test_ids": [
-          "DIC-013"
         ]
       }
     ]

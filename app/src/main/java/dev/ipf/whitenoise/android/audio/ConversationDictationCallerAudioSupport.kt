@@ -19,7 +19,7 @@ internal data class ConversationDictationCallerAudioProvider(
 
 /** What is known about the resolved provider's ability to transcribe audio White Noise captures. */
 internal enum class ConversationDictationCallerAudioRequirement {
-    /** Android selected this recognizer, so it opens the microphone itself and this never applies. */
+    /** A selected recognizer without established caller-audio support keeps its own microphone. */
     NotNeeded,
 
     /** The provider read a caller descriptor when asked, so the in-app controls can drive it. */
@@ -31,6 +31,47 @@ internal enum class ConversationDictationCallerAudioRequirement {
     /** Not established yet, or the last answer said nothing about the descriptor. */
     Unknown,
 }
+
+/**
+ * Prefer continuous app capture when the exact provider build is known to accept PCM, even if
+ * Android also lets it record. Selecting a service changes microphone permission, not its audio
+ * transport support. Never probe a selected unknown service: it could ignore the empty descriptor
+ * and open its microphone instead.
+ *
+ * The integrated offline service has a caller-audio contract from version 61. Older installations
+ * and other services still need a recorded verdict; unknown selected services keep native capture.
+ */
+internal fun conversationDictationKnownCallerAudioRequirement(
+    provider: ConversationDictationCallerAudioProvider?,
+    audioSourceSupported: Boolean,
+    providerCanRecord: Boolean,
+    recorded: ConversationDictationCallerAudioRequirement,
+): ConversationDictationCallerAudioRequirement {
+    val integratedCallerAudio =
+        provider != null &&
+            provider.component ==
+            ComponentName(OFFLINE_SPEECH_TO_TEXT_PACKAGE, "dev.notune.transcribe.VoiceRecognitionService") &&
+            provider.versionCode >= 61L
+    return when {
+        provider != null &&
+            audioSourceSupported &&
+            (recorded == ConversationDictationCallerAudioRequirement.Supported || integratedCallerAudio) ->
+            ConversationDictationCallerAudioRequirement.Supported
+        provider != null && providerCanRecord -> ConversationDictationCallerAudioRequirement.NotNeeded
+        !audioSourceSupported -> ConversationDictationCallerAudioRequirement.Unsupported
+        provider == null -> ConversationDictationCallerAudioRequirement.Unknown
+        else -> recorded
+    }
+}
+
+/** Determines whether a new recorder may be opened; an existing capture keeps its original route. */
+internal fun conversationDictationUsesCallerAudio(
+    providerCanRecord: Boolean,
+    audioSourceSupported: Boolean,
+    requirement: ConversationDictationCallerAudioRequirement,
+): Boolean =
+    audioSourceSupported &&
+        (!providerCanRecord || requirement == ConversationDictationCallerAudioRequirement.Supported)
 
 /** Whether this requirement can be served by the in-app controls. */
 internal val ConversationDictationCallerAudioRequirement.allowsInAppCapture: Boolean

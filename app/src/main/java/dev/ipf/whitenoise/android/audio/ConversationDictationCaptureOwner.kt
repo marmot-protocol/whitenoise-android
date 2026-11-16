@@ -19,7 +19,13 @@ internal class ConversationDictationCaptureOwner(
         closing = null
     }
 
-    fun acquire(): ConversationDictationCallerAudio? = current ?: create().also { current = it }
+    /** Preserve a retained recording even if a later provider lookup cannot authorize a new one. */
+    fun acquire(allowCreate: Boolean = true): ConversationDictationCallerAudio? =
+        current ?: if (allowCreate) {
+            create().also { current = it }
+        } else {
+            null
+        }
 
     fun hasPending(): Boolean = current?.hasPending() == true
 

@@ -34,6 +34,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Continuous caller capture for a selected capable speech service",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+        "anchor": "private fun openCallerAudioStream(",
+        "test_ids": [
+          "DIC-014"
+        ]
       }
     ]
   },

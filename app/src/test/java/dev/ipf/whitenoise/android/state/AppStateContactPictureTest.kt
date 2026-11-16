@@ -296,15 +296,10 @@ class AppStateContactPictureTest {
     }
 
     /** The account-scoped choice every notification and shortcut write reads, called as the presenter calls it. */
-    @Suppress("UNCHECKED_CAST")
     private fun WhiteNoiseAppState.contactAvatarChoice(
         account: String,
         contact: String,
-    ): Pair<Boolean, Bitmap?> =
-        WhiteNoiseAppState::class.java
-            .getDeclaredMethod("contactAvatarOverride", String::class.java, String::class.java)
-            .apply { isAccessible = true }
-            .invoke(this, account, contact) as Pair<Boolean, Bitmap?>
+    ): Pair<Boolean, Bitmap?> = contactAvatarOverride(account, contact)
 
     /** MDK's ready stored copy of the peer's picture, under its own [reference]. */
     private fun storedAsset(reference: String) =

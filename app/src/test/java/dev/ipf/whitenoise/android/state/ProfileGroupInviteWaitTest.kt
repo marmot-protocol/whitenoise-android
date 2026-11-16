@@ -134,6 +134,7 @@ class ProfileGroupInviteWaitTest {
                         failSuspendedNativeCall(arguments, MarmotKitException.GroupCatchingUp(group))
                     } else {
                         testGroupMutationResult(listOf(ConversationTimelineTestIds.ACCOUNT_ID, INVITEE), MEMBERS_ADMINS)
+                            .asTestInviteResult(listOf(INVITEE))
                     }
                 }
                 else -> error("Unexpected native call: $name")

@@ -71,6 +71,14 @@
           "NCH-002",
           "ACC-017"
         ]
+      },
+      {
+        "surface": "setting:toast_some_members_not_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupScreen.kt",
+        "anchor": "R.string.toast_some_members_not_added",
+        "test_ids": [
+          "NCH-002"
+        ]
       }
     ],
     "source_coverage": [

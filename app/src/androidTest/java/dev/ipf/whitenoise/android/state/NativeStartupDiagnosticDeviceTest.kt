@@ -135,6 +135,10 @@ class NativeStartupDiagnosticDeviceTest {
             }
         }
 
+    /**
+     * The published runtime records startup diagnostics that share as stable reports, and the audit archive carries
+     * a native performance snapshot only while performance diagnostics are active.
+     */
     @Test
     @Suppress("LongMethod") // Actual native work, immutable share files and active/inactive archives form one flow.
     fun publishedNativeRuntimeFeedsSharesAndOnlyActivePerformanceArchives() =
@@ -159,7 +163,9 @@ class NativeStartupDiagnosticDeviceTest {
                 bootstrap.join()
                 assertEquals(AppPhase.Onboarding, fixture.app.phase)
                 val account = fixture.native.createIdentity(listOf(fixture.relay.url), listOf(fixture.relay.url))
-                fixture.native.createGroup(account.label, "Native diagnostics", emptyList(), null)
+                fixture.native
+                    .createGroup(account.label, "Native diagnostics", emptyList(), null)
+                    .requireCreatedGroupId()
                 val native = fixture.native.startupDiagnosticsSnapshot()
                 assertTrue(native.enabled)
                 assertTrue(native.events.isNotEmpty())

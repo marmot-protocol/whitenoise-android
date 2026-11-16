@@ -50,7 +50,10 @@ class DiscoveryInvitationFfiIntegrationTest {
                             val owner = sender.createIdentity(relays, relays)
                             val admin = peer.createIdentity(relays, relays)
                             val member = peer.createIdentity(relays, relays)
-                            val group = sender.createGroup(owner.label, "Initial roles", emptyList(), null)
+                            val group =
+                                sender
+                                    .createGroup(owner.label, "Initial roles", emptyList(), null)
+                                    .requireCreatedGroupId()
                             sender.inviteMembersDetailedWithInitialAdmins(
                                 owner.label,
                                 group,
@@ -132,13 +135,14 @@ class DiscoveryInvitationFfiIntegrationTest {
                                 }
                                 assertTrue(discovery.recordedEvents(KEY_PACKAGE).isNotEmpty())
                                 val before = discovery.kindReads[KEY_PACKAGE]?.get() ?: 0
-                                val group =
+                                val createdGroup =
                                     sender.createGroup(
                                         alice.label,
                                         "Discovery recovery",
                                         listOf(bob.accountIdHex),
                                         null,
                                     )
+                                val group = createdGroup.requireCreatedGroupId()
                                 awaitInvite(peer, bob.label, group)
                                 sender.inviteMembersDetailed(alice.label, group, listOf(carol.accountIdHex))
                                 awaitInvite(peer, carol.label, group)
