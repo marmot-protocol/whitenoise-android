@@ -80,7 +80,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun notificationReplyLocksSend() {
-        val body = appStateFunctionBody("sendNotificationReply")
+        val body = appStateFunctionBody("sendNotificationReply", notificationReplySource())
 
         assertTrue(
             "notification quick replies must serialize sendText through the per-group commit lock",
@@ -95,7 +95,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun acceptedPendingNotificationReplyPersistsItsCanonicalIdBeforeReturning() {
-        val body = appStateFunctionBody("sendNotificationReply")
+        val body = appStateFunctionBody("sendNotificationReply", notificationReplySource())
         val sendIndex =
             body.indexOf("val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }")
         val persistIndex = body.indexOf("completionStore.markCommittedMessage", startIndex = sendIndex)
@@ -627,10 +627,13 @@ class AppStateSendLockCoverageTest {
         )
     }
 
-    private fun appStateFunctionBody(functionName: String): String {
-        val source = appStateSource().readText()
+    private fun appStateFunctionBody(
+        functionName: String,
+        sourceFile: File = appStateSource(),
+    ): String {
+        val source = sourceFile.readText()
         val start =
-            Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+            Regex("""\bfun\s+(?:WhiteNoiseAppState\.)?${Regex.escape(functionName)}\s*\(""")
                 .find(source)
                 ?.range
                 ?.first
@@ -649,6 +652,14 @@ class AppStateSendLockCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    /** The notification quick-reply extensions, which send under the per-group commit lock. */
+    private fun notificationReplySource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationReply.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationReply.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing AppStateNotificationReply.kt source file")
 
     /** The forwarding extensions, which fan one message out under each target's commit lock. */
     private fun forwardingSource(): File =
