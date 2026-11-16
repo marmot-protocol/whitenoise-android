@@ -148,7 +148,7 @@ class PrivacyGatedAppOps : ShadowAppOpsManager() {
     public override fun noteOpNoThrow(
         op: Int,
         uid: Int,
-        packageName: String,
+        packageName: String?,
         attributionTag: String?,
         message: String?,
     ): Int {

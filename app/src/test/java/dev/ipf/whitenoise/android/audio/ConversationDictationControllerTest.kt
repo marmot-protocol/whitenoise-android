@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -3231,7 +3232,8 @@ class ConversationDictationControllerTest {
     @Test
     fun settingsRecoveryCannotOutliveNotificationOriginSwitchOrTimeout() {
         for (originChanged in listOf(true, false)) {
-            val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+            val platform =
+                FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
             val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.controller.resumeAfterMicrophoneSettings()
