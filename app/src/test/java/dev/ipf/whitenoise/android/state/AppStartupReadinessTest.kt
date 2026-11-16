@@ -8,9 +8,9 @@ class AppStartupReadinessTest {
     /** Pins every startup unread publication to the current account-list lifetime. */
     @Test
     fun staleBackgroundUnreadFoldGuardsAllStatePublication() {
-        val source = appStateSource()
-        val start = source.indexOf("private suspend fun refreshAccountUnreadCounts(")
-        val end = source.indexOf("private suspend fun refreshAccountUnreadFold(", startIndex = start)
+        val source = accountUnreadRefreshSource()
+        val start = source.indexOf("internal suspend fun WhiteNoiseAppState.refreshAccountUnreadCounts(")
+        val end = source.indexOf("private suspend fun WhiteNoiseAppState.refreshAccountUnreadFold(", startIndex = start)
         check(start >= 0 && end > start) { "Missing account unread refresh section" }
         val refresh = source.substring(start, end)
         val revisionGuard = refresh.lastIndexOf("if (!refreshIsCurrent()) return")
@@ -117,6 +117,12 @@ class AppStartupReadinessTest {
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppState.kt")
+
+    private fun accountUnreadRefreshSource(): String =
+        sequenceOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateAccountUnread.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAccountUnread.kt"),
+        ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppStateAccountUnread.kt")
 }
 
 private fun String.functionBody(functionName: String): String {

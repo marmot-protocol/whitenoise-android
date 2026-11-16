@@ -191,7 +191,7 @@ class MarkReadChatListProjectionTest {
         )
 
         val reconcileBody =
-            appStateSource().readText().kotlinFunctionBody("reconcileAccountUnreadAfterNotificationMarkRead")
+            notificationReplySource().readText().kotlinFunctionBody("reconcileAccountUnreadAfterNotificationMarkRead")
         assertTrue(
             "the active account's projection owners must stay its only reconcilers",
             "if (accountRef == activeAccountRef) return" in reconcileBody,
@@ -292,4 +292,11 @@ class MarkReadChatListProjectionTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    private fun notificationReplySource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationReply.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationReply.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing AppStateNotificationReply.kt source file")
 }

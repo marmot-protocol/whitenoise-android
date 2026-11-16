@@ -132,10 +132,10 @@ class CancellationHandlingTest {
 
     /** Pins production adapter wiring while executable tests audit the extracted fallback behavior. */
     private fun assertLocalProfileReadUsesExtractedBoundary(appState: String) {
-        assertTrue("local profile adapter must exist", "private suspend fun loadAccountSwitchProfileSeed(" in appState)
+        assertTrue("local profile adapter must exist", "internal suspend fun loadAccountSwitchProfileSeed(" in appState)
         val adapter =
             appState
-                .substringAfter("private suspend fun loadAccountSwitchProfileSeed(")
+                .substringAfter("internal suspend fun loadAccountSwitchProfileSeed(")
                 .substringBefore("/**")
                 .replace(Regex("""\s+"""), " ")
         assertTrue("local profile reads must use the audited helper", "readLocalAccountProfileSeed(" in adapter)
