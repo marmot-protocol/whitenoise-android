@@ -17,7 +17,7 @@ import java.io.IOException
 
 /** Tests actual worker policy with controlled runtime and durable scheduling boundaries. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = Application::class)
+@Config(sdk = [36], application = Application::class)
 class PushWakeRecoveryWorkerTest {
     private lateinit var store: PushTokenStore
     private var allowed = true
