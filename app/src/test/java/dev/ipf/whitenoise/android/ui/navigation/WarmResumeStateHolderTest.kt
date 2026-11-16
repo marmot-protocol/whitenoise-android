@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
+import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -24,6 +25,12 @@ import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollSnapshot
 import dev.ipf.whitenoise.android.ui.conversation.conversationScrollKey
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -363,6 +370,63 @@ class WarmResumeStateHolderTest {
         holder.release()
         snapshotController.onCleared()
     }
+
+    /** Coalesced account switches retire the old media owner while keeping the visible route and scroll anchor. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun coalescedAccountSwitchesReplaceTheConversationSession() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val accounts =
+                listOf(activeAccount(), activeAccount().copy(label = SECOND_ACCOUNT_REF, accountIdHex = "b".repeat(64)))
+            val state =
+                WhiteNoiseAppState(
+                    context = ApplicationProvider.getApplicationContext<Context>(),
+                    draftStore = DraftStore(InMemoryDraftPersistence()),
+                    accountIdHexResolver = { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex },
+                    accounts = accounts,
+                    activeAccountRef = ACCOUNT_REF,
+                )
+            val holder = MainShellStateHolder(state, SavedStateHandle(), MainShellProcessState(state))
+            val projection = snapshotController(state)
+            try {
+                val chats = holder.chatsController(ACCOUNT_REF, state.runtimeGeneration)
+                val selected = projection.items.single()
+                holder.selectedChat.value = selected
+                val scrollKey = conversationScrollKey(ACCOUNT_REF, GROUP_ID)
+                val scroll =
+                    ConversationScrollSnapshot(
+                        firstVisibleItemIndex = 3,
+                        firstVisibleItemScrollOffset = 11,
+                        anchorItemId = "message:anchor",
+                        anchorMessageIdHex = "anchor",
+                    )
+                holder.conversationScrollSnapshots[scrollKey] = scroll
+                val old =
+                    holder.conversationController(GROUP_ID, ACCOUNT_REF, state.runtimeGeneration, 0) {
+                        ConversationController(state, selected.group)
+                    }
+                val preload = AccountSwitchPreloadPolicy.STARTUP_RESTORATION
+                assertTrue(state.setActiveAccount(SECOND_ACCOUNT_REF, preloadPolicy = preload))
+                assertTrue(state.setActiveAccount(ACCOUNT_REF, preloadPolicy = preload))
+
+                assertSame(chats, holder.chatsController(ACCOUNT_REF, state.runtimeGeneration))
+                val replacement =
+                    holder.conversationController(GROUP_ID, ACCOUNT_REF, state.runtimeGeneration, 0) {
+                        ConversationController(state, selected.group)
+                    }
+                assertNotSame(old, replacement)
+                assertSame(selected, holder.selectedChat.value)
+                assertEquals(scroll, holder.conversationScrollSnapshots[scrollKey])
+            } finally {
+                try {
+                    holder.release()
+                    projection.onCleared()
+                } finally {
+                    Dispatchers.resetMain()
+                }
+            }
+        }
 
     /**
      * The exact early notification route survives its target-account controller
