@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerDocumentReader.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerDocumentReader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerDocumentReader.kt",
+        "anchor": "fun ComposerDocumentReader(",
+        "test_ids": [
+          "MED-052"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Prepared document identity and private PDF lifetime",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerDocumentReader.kt",
+        "anchor": "withComposerPdfFile(",
+        "test_ids": [
+          "MED-052"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

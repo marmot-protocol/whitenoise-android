@@ -52,7 +52,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod") // Optional exports keep both readers explicit.
 internal fun DocumentAttachmentViewer(
     kind: DocumentAttachmentKind,
     name: String,
@@ -61,8 +61,9 @@ internal fun DocumentAttachmentViewer(
     actions: TextAttachmentNativeActions,
     loadBytes: suspend () -> ByteArray,
     loadFile: suspend () -> File?,
-    onOpenExternal: () -> Unit,
+    onOpenExternal: (() -> Unit)?,
     onDismiss: () -> Unit,
+    withFile: (suspend (suspend (File) -> Unit) -> Unit)? = null,
 ) {
     LaunchedEffect(actions) {
         snapshotFlow { actions.isCurrent() }.collect { if (!it) onDismiss() }
@@ -109,13 +110,13 @@ internal fun DocumentAttachmentViewer(
             sourceTab,
             actions.sharing,
             onDismiss,
-            onShare = { scope.launch { actions.share() } },
-            onSave = { scope.launch { actions.save() } },
+            onShare = if (actions.canShare) ({ scope.launch { actions.share() } }) else null,
+            onSave = if (actions.canSave) ({ scope.launch { actions.save() } }) else null,
             onOpenExternal = onOpenExternal,
             onSourceTab = { sourceTab = it },
         ) {
             if (kind == DocumentAttachmentKind.Pdf) {
-                PdfDocumentPages(account, source, actions, loadFile, onOpenExternal)
+                PdfDocumentPages(account, source, actions, loadFile, onOpenExternal, withFile)
             } else if (sourceTab && original != null) {
                 DocumentSource(original!!, name)
             } else if (error) {
@@ -163,9 +164,9 @@ internal fun DocumentViewerFrame(
     sourceTab: Boolean,
     shareBusy: Boolean,
     onDismiss: () -> Unit,
-    onShare: () -> Unit,
-    onSave: () -> Unit,
-    onOpenExternal: () -> Unit,
+    onShare: (() -> Unit)?,
+    onSave: (() -> Unit)?,
+    onOpenExternal: (() -> Unit)?,
     onSourceTab: (Boolean) -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -189,37 +190,45 @@ internal fun DocumentViewerFrame(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                IconButton(
-                    onClick = onShare,
-                    enabled = !shareBusy,
-                ) { Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share), tint = Color.White) }
-                Box {
+                if (onShare != null) {
                     IconButton(
-                        onClick = { more = true },
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_more_vert),
-                            stringResource(R.string.more_options),
-                            tint = Color.White,
+                        onClick = onShare,
+                        enabled = !shareBusy,
+                    ) { Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share), tint = Color.White) }
+                }
+                if (onSave != null || onOpenExternal != null) {
+                    Box {
+                        IconButton(
+                            onClick = { more = true },
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_more_vert),
+                                stringResource(R.string.more_options),
+                                tint = Color.White,
+                            )
+                        }
+
+                        WhiteNoiseDropdownMenu(
+                            expanded = more,
+                            onDismissRequest = { more = false },
+                            items =
+                                listOfNotNull(
+                                    onSave?.let {
+                                        WhiteNoiseMenuItem(
+                                            label = stringResource(R.string.save),
+                                            icon = R.drawable.ic_download,
+                                            onClick = it,
+                                        )
+                                    },
+                                    onOpenExternal?.let {
+                                        WhiteNoiseMenuItem(
+                                            label = stringResource(R.string.text_attachment_open_external),
+                                            onClick = it,
+                                        )
+                                    },
+                                ),
                         )
                     }
-
-                    WhiteNoiseDropdownMenu(
-                        expanded = more,
-                        onDismissRequest = { more = false },
-                        items =
-                            listOf(
-                                WhiteNoiseMenuItem(
-                                    label = stringResource(R.string.save),
-                                    icon = R.drawable.ic_download,
-                                    onClick = onSave,
-                                ),
-                                WhiteNoiseMenuItem(
-                                    label = stringResource(R.string.text_attachment_open_external),
-                                    onClick = onOpenExternal,
-                                ),
-                            ),
-                    )
                 }
             }
             if (kind == DocumentAttachmentKind.Html) {

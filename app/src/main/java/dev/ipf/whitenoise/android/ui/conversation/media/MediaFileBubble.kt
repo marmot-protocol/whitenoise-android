@@ -146,11 +146,12 @@ internal fun MediaFileBubble(
         remember(reference.mediaType, reference.fileName) {
             resolveAttachmentPresentation(reference.mediaType, reference.fileName)
         }
-    val documentKind = documentAttachmentKind(reference.mediaType, reference.fileName)
-    val textCandidate =
+    val readerTarget =
         remember(reference.mediaType, reference.fileName) {
-            textAttachmentCandidate(reference.mediaType, reference.fileName)
+            attachmentReaderTarget(reference.mediaType, reference.fileName)
         }
+    val documentKind = readerTarget?.documentKind
+    val textCandidate = readerTarget?.textCandidate
     val usesDurableInstallerHandoff =
         remember(mine, reference.mediaType, reference.fileName) {
             !mine && isAndroidPackageOpenCandidate(reference.mediaType, reference.fileName)
@@ -515,10 +516,7 @@ internal fun MediaFileBubble(
             actions = readerActions,
             candidate = textCandidate,
             appState = appState,
-            senderKey = senderKey,
-            senderDisplayName = senderDisplayName,
-            messageIdHex = messageIdHex,
-            attachmentIndex = attachmentIndex,
+            speechContext = TextAttachmentSpeechContext(senderKey, senderDisplayName, messageIdHex, attachmentIndex),
             // One byte past the preview limit is enough to tell an over-limit file apart, so the reader never
             // reads the rest of a large file onto the heap.
             loadBytes = {

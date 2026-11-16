@@ -95,6 +95,69 @@ class TextAttachmentReaderSessionTest {
         assertTrue(appState.ttsController.state.value is TtsState.Idle)
     }
 
+    /** The production staged host dismisses both readers on owner invalidation and cannot revive the session. */
+    @Test fun stagedReaderClosesOnRemovalAndDoesNotReopenWhenUriReturns() {
+        val uri = android.net.Uri.parse("content://expired/notes.txt")
+        val artifact = ComposerDocumentReaderTest.prepared("text/plain", "notes.txt")
+        val selected = ComposerDocumentSelection(uri, artifact)
+        var uris by mutableStateOf(listOf(uri))
+        var selectedSession by mutableStateOf<ComposerDocumentSelection?>(selected)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                selectedSession?.let { selection ->
+                    ComposerDocumentReader(
+                        selection,
+                        appState,
+                        "account",
+                        sourceIsCurrent = { selection.isCurrent(uris, mapOf(uri to artifact), false) },
+                        onDismiss = { selectedSession = null },
+                    )
+                }
+            }
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("prepared bytes", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.read_aloud)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.share)).assertDoesNotExist()
+        composeRule.runOnIdle { uris = emptyList() }
+        composeRule.waitUntil(5_000) { selectedSession == null }
+        composeRule.runOnIdle { uris = listOf(uri) }
+        composeRule.onNodeWithText("prepared bytes").assertDoesNotExist()
+        assertTrue(appState.ttsController.state.value is TtsState.Idle)
+    }
+
+    @Test fun stagedReaderClosesWhenSendClaimsTheSource() {
+        val uri = android.net.Uri.parse("content://expired/notes.txt")
+        val artifact = ComposerDocumentReaderTest.prepared("text/plain", "notes.txt")
+        val selection = ComposerDocumentSelection(uri, artifact)
+        val sendClaim =
+            dev.ipf.whitenoise.android.state
+                .StagedAttachmentSendClaim()
+        var attached by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (attached) {
+                    ComposerDocumentReader(
+                        selection,
+                        appState,
+                        "account",
+                        sourceIsCurrent = {
+                            selection.isCurrent(listOf(uri), mapOf(uri to artifact), sendClaim.isHeld)
+                        },
+                        onDismiss = { attached = false },
+                    )
+                }
+            }
+        }
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("prepared bytes", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.runOnIdle { sendClaim.tryClaim() }
+        composeRule.waitUntil(5_000) { !attached }
+        composeRule.onNodeWithText("prepared bytes").assertDoesNotExist()
+    }
+
     /** Opens the production dialog and starts its toolbar action against the fixture foreground host. */
     private fun startReaderSession() {
         appState.ttsController.attachEngine(engine)
@@ -107,10 +170,7 @@ class TextAttachmentReaderSessionTest {
                         actions,
                         candidate,
                         appState,
-                        "alice",
-                        "Alice",
-                        "message",
-                        0,
+                        TextAttachmentSpeechContext("alice", "Alice", "message", 0),
                         loadBytes = { source.toByteArray() },
                         onOpenExternal = {},
                         onDismiss = { visible = false },

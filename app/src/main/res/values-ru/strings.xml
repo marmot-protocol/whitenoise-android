@@ -2798,4 +2798,5 @@
     <string name="document_pdf_unavailable">Не удалось показать PDF. Возможно, файл повреждён, защищён или слишком большой.</string>
     <string name="document_pdf_page">Страница %1$d из %2$d</string>
     <string name="document_zoom_reset">Масштаб / сброс</string>
+    <string name="composer_preview_attachment">Предпросмотр вложения</string>
 </resources>

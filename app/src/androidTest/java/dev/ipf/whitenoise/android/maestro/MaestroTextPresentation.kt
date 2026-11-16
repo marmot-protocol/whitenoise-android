@@ -74,10 +74,13 @@ private fun NativeReaderDialogPresentation(fixture: MaestroPresentationFixture) 
         actions = actions,
         candidate = TextAttachmentCandidate("Fixture decoded.txt", "text/plain", TextAttachmentFormat.PlainText),
         appState = fixture.appState,
-        senderKey = "11".repeat(32),
-        senderDisplayName = "Fixture sender",
-        messageIdHex = "22".repeat(32),
-        attachmentIndex = 0,
+        speechContext =
+            dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentSpeechContext(
+                "11".repeat(32),
+                "Fixture sender",
+                "22".repeat(32),
+                0,
+            ),
         loadBytes = {
             fixture.record("load-bytes")
             if (fixture.scenario.endsWith("failure")) error("Synthetic reader acquisition failure")

@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -65,7 +66,8 @@ internal fun PdfDocumentPages(
     source: String,
     actions: TextAttachmentNativeActions,
     loadFile: suspend () -> File?,
-    onOpenExternal: () -> Unit,
+    onOpenExternal: (() -> Unit)?,
+    withFile: (suspend (suspend (File) -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var retry by remember { mutableIntStateOf(0) }
@@ -104,29 +106,28 @@ internal fun PdfDocumentPages(
             }
         }
         LaunchedEffect(transport) {
+            suspend fun inspect(selected: File) {
+                val info =
+                    withContext(Dispatchers.IO) {
+                        transport.pdf(selected, domain, 0, PdfPagePolicy.MAX_EDGE, false)
+                    } ?: error("PDF unavailable")
+                if (active && actions.isCurrent()) {
+                    file = selected
+                    inspection = info
+                }
+            }
             val result =
                 runCatchingCancellable {
-                    val selected = loadFile() ?: error("Missing document")
-                    val info =
-                        withContext(Dispatchers.IO) {
-                            transport.pdf(
-                                selected,
-                                domain,
-                                0,
-                                PdfPagePolicy.MAX_EDGE,
-                                false,
-                            )
+                    if (withFile == null) {
+                        inspect(loadFile() ?: error("Missing document"))
+                    } else {
+                        withFile { selected ->
+                            inspect(selected)
+                            snapshotFlow { failed }.collect { if (it) error("PDF page unavailable") }
                         }
-                            ?: error("PDF unavailable")
-                    selected to info
+                    }
                 }
-            if (active && actions.isCurrent()) {
-                result
-                    .onSuccess {
-                        file = it.first
-                        inspection = it.second
-                    }.onFailure { failed = true }
-            }
+            if (active && actions.isCurrent()) result.onFailure { failed = true }
         }
         if (failed) {
             DocumentViewerError(R.string.document_pdf_unavailable, { retry++ }, onOpenExternal)

@@ -24,7 +24,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Description
 internal fun TextAttachmentUnavailable(
     reason: TextAttachmentUnavailableReason,
     onRetry: () -> Unit,
-    onOpenExternal: () -> Unit,
+    onOpenExternal: (() -> Unit)?,
 ) {
     Column(
         modifier =
@@ -48,8 +48,10 @@ internal fun TextAttachmentUnavailable(
                 Text(stringResource(R.string.retry))
             }
         }
-        TextButton(onClick = onOpenExternal) {
-            Text(stringResource(R.string.text_attachment_open_external))
+        if (onOpenExternal != null) {
+            TextButton(onClick = onOpenExternal) {
+                Text(stringResource(R.string.text_attachment_open_external))
+            }
         }
     }
 }

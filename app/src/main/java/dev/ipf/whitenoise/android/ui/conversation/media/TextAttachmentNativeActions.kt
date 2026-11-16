@@ -24,9 +24,12 @@ import kotlinx.coroutines.ensureActive
 internal class TextAttachmentNativeActions(
     private val sourceIsCurrent: () -> Boolean,
     val playbackSource: dev.ipf.whitenoise.android.audio.AttachmentSpeechOwner? = null,
-    private val shareSource: suspend () -> Unit = {},
-    private val saveSource: suspend () -> Unit,
+    private val shareSource: (suspend () -> Unit)? = {},
+    private val saveSource: (suspend () -> Unit)?,
 ) {
+    val canShare: Boolean get() = shareSource != null
+    val canSave: Boolean get() = saveSource != null
+
     private var attached = true
     private var saving = false
 
@@ -39,7 +42,7 @@ internal class TextAttachmentNativeActions(
 
     /** Serializes explicit saves and keeps cancellation separate from native export failures. */
     suspend fun save() {
-        if (!isCurrent() || saving) return
+        if (!isCurrent() || saving || saveSource == null) return
         saving = true
         try {
             saveSource()
@@ -50,7 +53,7 @@ internal class TextAttachmentNativeActions(
 
     /** Serializes explicit shares: repeated taps while one is being prepared open a single share sheet. */
     suspend fun share() {
-        if (!isCurrent() || sharing) return
+        if (!isCurrent() || sharing || shareSource == null) return
         sharing = true
         try {
             shareSource()

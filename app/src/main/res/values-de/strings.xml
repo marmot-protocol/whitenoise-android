@@ -2725,4 +2725,5 @@
     <string name="document_pdf_unavailable">Diese PDF-Datei kann nicht angezeigt werden. Sie ist möglicherweise beschädigt, geschützt oder zu groß.</string>
     <string name="document_pdf_page">Seite %1$d von %2$d</string>
     <string name="document_zoom_reset">Vergrößern / zurücksetzen</string>
+    <string name="composer_preview_attachment">Anhang ansehen</string>
 </resources>

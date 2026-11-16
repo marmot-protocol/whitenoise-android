@@ -56,3 +56,18 @@ internal fun documentAttachmentKind(
 }
 
 private fun isUnsupportedXml(mime: String): Boolean = mime.endsWith("+xml") && mime != "application/xhtml+xml"
+
+/** Shared metadata routing: document renderers take precedence over the bounded text reader. */
+internal data class AttachmentReaderTarget(
+    val documentKind: DocumentAttachmentKind? = null,
+    val textCandidate: TextAttachmentCandidate? = null,
+)
+
+internal fun attachmentReaderTarget(
+    mediaType: String,
+    fileName: String,
+): AttachmentReaderTarget? {
+    val document = documentAttachmentKind(mediaType, fileName)
+    if (document != null) return AttachmentReaderTarget(documentKind = document)
+    return textAttachmentCandidate(mediaType, fileName)?.let { AttachmentReaderTarget(textCandidate = it) }
+}

@@ -2713,4 +2713,5 @@
     <string name="document_pdf_unavailable">Impossible de prévisualiser ce PDF. Il est peut-être endommagé, protégé ou trop volumineux.</string>
     <string name="document_pdf_page">Page %1$d sur %2$d</string>
     <string name="document_zoom_reset">Zoom / réinitialiser</string>
+    <string name="composer_preview_attachment">Aperçu de la pièce jointe</string>
 </resources>

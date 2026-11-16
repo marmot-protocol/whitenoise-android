@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
@@ -138,6 +139,32 @@ class DocumentAttachmentViewerScreenshotTest {
         captureScreenRoboImage("src/test/snapshots/document_link_confirm.png")
     }
 
+    @Test fun stagedPdfLoadingLight() =
+        render(
+            "staged_pdf_loading_light",
+            DocumentAttachmentKind.Pdf,
+            dark = false,
+            staged = true,
+        ) { DocumentLoading() }
+
+    @Test fun stagedHtmlSourceAmoledLargeRtl() =
+        render(
+            "staged_html_source_large_rtl",
+            DocumentAttachmentKind.Html,
+            source = true,
+            rtl = true,
+            font = 2f,
+            staged = true,
+            amoled = true,
+        ) { DocumentSource("<h1>Meeting notes</h1>", "meeting.html") }
+
+    @Test fun stagedPdfErrorDark() =
+        render(
+            "staged_pdf_error_dark",
+            DocumentAttachmentKind.Pdf,
+            staged = true,
+        ) { DocumentViewerError(R.string.document_pdf_unavailable, {}) }
+
     private fun render(
         name: String,
         kind: DocumentAttachmentKind,
@@ -145,6 +172,8 @@ class DocumentAttachmentViewerScreenshotTest {
         dark: Boolean = true,
         rtl: Boolean = false,
         font: Float = 1f,
+        staged: Boolean = false,
+        amoled: Boolean = false,
         body: @Composable ColumnScope.() -> Unit,
     ) {
         compose.setContent {
@@ -153,7 +182,7 @@ class DocumentAttachmentViewerScreenshotTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 LocalDensity provides Density(density.density, font),
             ) {
-                WhiteNoiseTheme(darkTheme = dark) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
                     val extension = if (kind == DocumentAttachmentKind.Pdf) "pdf" else "html"
                     PlaybackDialog(
                         {
@@ -171,9 +200,9 @@ class DocumentAttachmentViewerScreenshotTest {
                                 source,
                                 false,
                                 {},
-                                {},
-                                {},
-                                {},
+                                if (staged) null else ({}),
+                                if (staged) null else ({}),
+                                if (staged) null else ({}),
                                 {},
                                 body,
                             )
@@ -183,6 +212,11 @@ class DocumentAttachmentViewerScreenshotTest {
             }
         }
         compose.waitForIdle()
+        if (staged) {
+            compose.onNodeWithContentDescription("Share").assertDoesNotExist()
+            compose.onNodeWithContentDescription("More options").assertDoesNotExist()
+            compose.onNodeWithText("Open in another app").assertDoesNotExist()
+        }
         val extension = if (kind == DocumentAttachmentKind.Pdf) "pdf" else "html"
         compose.onNodeWithText("community-meeting-notes-with-a-long-filename.$extension").assertIsDisplayed()
         compose.onNodeWithTag("document-viewer").captureRoboImage("src/test/snapshots/document_$name.png")
