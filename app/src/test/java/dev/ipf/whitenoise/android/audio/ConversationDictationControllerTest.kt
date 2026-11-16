@@ -3061,6 +3061,7 @@ class ConversationDictationControllerTest {
             val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             val displayed = f.controller.state as ConversationDictationState.Failed
+
             fun replaceFailure() {
                 f.controller.dismissFailure()
                 f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))

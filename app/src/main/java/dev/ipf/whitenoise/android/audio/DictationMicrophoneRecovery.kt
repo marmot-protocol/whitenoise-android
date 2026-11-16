@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
+import dev.ipf.whitenoise.android.audio.ConversationDictationState.PermissionRequired
+
 private const val MICROPHONE_UNBLOCK_TIMEOUT_MS = 30_000L
 
 /** One original failure owns both settings return and the finite native reminder lifetime. */
@@ -81,9 +83,10 @@ internal fun ConversationDictationController.requestNativeMicrophoneUnblock(
     val failed = microphoneSettingsRecovery?.failure ?: return
     val pending = DictationMicrophoneRecovery(failed, native = true, resumed = microphoneHostReady())
     microphoneSettingsRecovery = pending
-    pending.timeout = scheduleTimeout(MICROPHONE_UNBLOCK_TIMEOUT_MS) {
-        if (microphoneSettingsRecovery === pending) clearMicrophoneRecovery()
-    }
+    pending.timeout =
+        scheduleTimeout(MICROPHONE_UNBLOCK_TIMEOUT_MS) {
+            if (microphoneSettingsRecovery === pending) clearMicrophoneRecovery()
+        }
     dispatchNativeMicrophoneUnblock(pending)
 }
 
@@ -114,11 +117,15 @@ private fun ConversationDictationController.registerNativeMicrophoneUnblock(pend
 }
 
 /** A pending prompt belongs to the visible origin, unlike an already running durable capture. */
-internal fun ConversationDictationController.onMicrophoneOriginChanged(accountRef: String?, groupIdHex: String?) {
+internal fun ConversationDictationController.onMicrophoneOriginChanged(
+    accountRef: String?,
+    groupIdHex: String?,
+) {
     val pending = microphoneSettingsRecovery ?: return
     if (!pending.native) return
     if (
-        accountRef == null || groupIdHex == null ||
+        accountRef == null ||
+        groupIdHex == null ||
         !pending.failure.target.matchesConversation(accountRef, groupIdHex)
     ) {
         clearMicrophoneRecovery()
@@ -144,9 +151,7 @@ internal fun ConversationDictationController.onMicrophoneHostResumed() {
     }
 }
 
-internal fun ConversationDictationController.resumeAfterMicrophonePermission(
-    pending: ConversationDictationState.PermissionRequired,
-) {
+internal fun ConversationDictationController.resumeAfterMicrophonePermission(pending: PermissionRequired) {
     when (platform.microphoneAccess()) {
         ConversationDictationMicrophoneAccess.Granted -> startWhenProviderAvailable(pending.sessionId, pending.target)
         ConversationDictationMicrophoneAccess.RuntimePermissionRequired ->

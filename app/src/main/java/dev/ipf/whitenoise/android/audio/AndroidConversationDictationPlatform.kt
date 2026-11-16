@@ -116,16 +116,19 @@ internal class AndroidConversationDictationPlatform(
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
             microphoneAccess() !in
-                setOf(
-                    ConversationDictationMicrophoneAccess.MicrophoneMuted,
-                    ConversationDictationMicrophoneAccess.AppOpDenied,
-                )
+            setOf(
+                ConversationDictationMicrophoneAccess.MicrophoneMuted,
+                ConversationDictationMicrophoneAccess.AppOpDenied,
+            )
         ) {
             return null
         }
         val receiver =
             object : BroadcastReceiver() {
-                override fun onReceive(context: Context, intent: Intent) {
+                override fun onReceive(
+                    context: Context,
+                    intent: Intent,
+                ) {
                     if (intent.action == AudioManager.ACTION_MICROPHONE_MUTE_CHANGED) onChanged()
                 }
             }

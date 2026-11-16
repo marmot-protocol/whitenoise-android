@@ -569,16 +569,17 @@ internal fun WhiteNoiseApp(
                     appState.activeConversationGroupIdHex.orEmpty(),
                 )
         }
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE -> dictation.onMicrophoneHostPaused()
-                Lifecycle.Event.ON_RESUME -> dictation.onMicrophoneHostResumed()
-                Lifecycle.Event.ON_STOP -> {
-                    if (dictation.microphoneSettingsRecovery?.native == true) dictation.clearMicrophoneRecovery()
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_PAUSE -> dictation.onMicrophoneHostPaused()
+                    Lifecycle.Event.ON_RESUME -> dictation.onMicrophoneHostResumed()
+                    Lifecycle.Event.ON_STOP -> {
+                        if (dictation.microphoneSettingsRecovery?.native == true) dictation.clearMicrophoneRecovery()
+                    }
+                    else -> Unit
                 }
-                else -> Unit
             }
-        }
         microphoneLifecycle.addObserver(observer)
         onDispose {
             microphoneLifecycle.removeObserver(observer)
