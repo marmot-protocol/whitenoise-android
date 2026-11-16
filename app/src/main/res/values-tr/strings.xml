@@ -2238,6 +2238,7 @@
     <string name="startup_loading_message">White Noise başlatılıyor…</string>
     <string name="chat_rows_no_chats_title">Sohbet yok</string>
     <string name="chat_rows_no_chats_detail">Mesaj göndermek için yeni bir sohbet başlatın.</string>
+    <string name="conversation_pane_placeholder">Bir sohbet seçin</string>
     <string name="chat_rows_no_unread_title">Okunmamış sohbet yok</string>
     <string name="chat_rows_no_unread_detail">Tüm mesajları okudunuz.</string>
     <string name="chat_rows_no_results_detail">Yazımı kontrol edin veya farklı bir arama deneyin.</string>
