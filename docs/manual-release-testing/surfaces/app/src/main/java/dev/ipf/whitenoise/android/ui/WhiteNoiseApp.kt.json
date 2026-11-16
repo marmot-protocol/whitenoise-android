@@ -150,6 +150,14 @@
         "test_ids": [
           "CON-048"
         ]
+      },
+      {
+        "surface": "Microphone recovery waits for resumed visible conversation origin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "dictation.microphoneHostReady = {",
+        "test_ids": [
+          "DIC-015"
+        ]
       }
     ]
   },

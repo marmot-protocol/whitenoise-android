@@ -55,7 +55,7 @@ class AppStateSizeRatchetTest {
         const val MAX_LINES = 9_464
         const val CHATS_CONTROLLER_MAX_LINES = 2_152
 
-        // Native recovery adds host readiness plus background and explicit replacement cleanup at this owner.
-        const val DICTATION_CONTROLLER_MAX_LINES = 1_455
+        // Recovery adds host readiness, origin validity and lifecycle cleanup wiring at this owner.
+        const val DICTATION_CONTROLLER_MAX_LINES = 1_456
     }
 }

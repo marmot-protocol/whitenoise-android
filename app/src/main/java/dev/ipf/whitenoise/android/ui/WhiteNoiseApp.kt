@@ -555,11 +555,27 @@ internal fun WhiteNoiseApp(
         // the UI but the biometric sheet waits for the real decision.
         if (appState.appLock.screenVisible && !appState.appLock.evaluationPending) onRequestAppUnlock()
     }
-    LaunchedEffect(dictationState, appState.activeAccountRef, appState.activeConversationGroupIdHex) {
+    LaunchedEffect(
+        dictationState,
+        appState.activeAccountRef,
+        appState.activeConversationGroupIdHex,
+        appState.pendingProfileNpub,
+    ) {
+        if (appState.pendingProfileNpub != null) dictation.clearMicrophoneRecovery()
         dictation.onMicrophoneOriginChanged(appState.activeAccountRef, appState.activeConversationGroupIdHex)
     }
     val microphoneLifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(dictation, microphoneLifecycle) {
+        // App lock may defer acceptance, but a profile or replacement conversation consumes the return.
+        dictation.microphoneOriginValid = {
+            val target = dictation.state.target
+            target != null &&
+                appState.pendingProfileNpub == null &&
+                target.matchesConversation(
+                    appState.activeAccountRef.orEmpty(),
+                    appState.activeConversationGroupIdHex.orEmpty(),
+                )
+        }
         dictation.microphoneHostReady = {
             val target = dictation.state.target
             microphoneLifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
@@ -567,7 +583,8 @@ internal fun WhiteNoiseApp(
                 target.matchesConversation(
                     appState.activeAccountRef.orEmpty(),
                     appState.activeConversationGroupIdHex.orEmpty(),
-                )
+                ) &&
+                appState.isConversationDictationOriginVisible(target.accountRef, target.groupIdHex)
         }
         val observer =
             LifecycleEventObserver { _, event ->
@@ -583,6 +600,7 @@ internal fun WhiteNoiseApp(
         microphoneLifecycle.addObserver(observer)
         onDispose {
             microphoneLifecycle.removeObserver(observer)
+            dictation.microphoneOriginValid = { false }
             dictation.microphoneHostReady = { false }
             dictation.clearMicrophoneRecovery()
         }

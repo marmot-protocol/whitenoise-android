@@ -72,14 +72,8 @@ class ConversationDictationMicrophoneAccessTest {
     @Test
     fun appOpDenialsRemainActionableWhenUnmuted() {
         context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
-        for (mode in listOf(AppOpsManager.MODE_IGNORED, AppOpsManager.MODE_ERRORED)) {
-            setMode(mode)
-            assertEquals(
-                "AppOp mode $mode",
-                ConversationDictationMicrophoneAccess.AppOpDenied,
-                platform.microphoneAccess(),
-            )
-        }
+        setMode(AppOpsManager.MODE_ERRORED)
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
     }
 
     @Test
@@ -88,11 +82,12 @@ class ConversationDictationMicrophoneAccessTest {
         context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
         setMode(AppOpsManager.MODE_IGNORED)
 
-        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
         val unregister = platform.requestMicrophoneUnblock {}
         assertNotNull(unregister)
+        assertEquals(1, (shadowOf(appOps) as PrivacyGatedAppOps).notes)
         // Enqueueing the OS reminder is not a grant and must never admit capture.
-        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
         unregister?.invoke()
     }
 
@@ -103,8 +98,31 @@ class ConversationDictationMicrophoneAccessTest {
 
         val unregister = platform.requestMicrophoneUnblock {}
         assertNotNull(unregister)
+        assertEquals(0, (shadowOf(appOps) as PrivacyGatedAppOps).notes)
         assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
         unregister?.invoke()
+    }
+
+    @Test
+    fun audioManagerOnlyMuteDoesNotNoteAnAllowedMicrophoneAccess() {
+        val shadow = shadowOf(appOps) as PrivacyGatedAppOps
+        shadow.privacyOverlayEnabled = false
+        setMode(AppOpsManager.MODE_ALLOWED)
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
+
+        val unregister = platform.requestMicrophoneUnblock {}
+
+        assertNotNull(unregister)
+        assertEquals(0, shadow.notes)
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
+        unregister?.invoke()
+    }
+
+    @Test
+    @Config(sdk = [30])
+    fun ignoredAccessBeforeSensorPrivacyRemainsAppPolicyDenial() {
+        setMode(AppOpsManager.MODE_IGNORED)
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
     }
 
     @Test
@@ -123,6 +141,21 @@ class ConversationDictationMicrophoneAccessTest {
 /** Models the effective privacy denial observed on the physical Android 17 fixture. */
 @Implements(AppOpsManager::class)
 class PrivacyGatedAppOps : ShadowAppOpsManager() {
+    var privacyOverlayEnabled = true
+    var notes = 0
+
+    @Implementation
+    public override fun noteOpNoThrow(
+        op: Int,
+        uid: Int,
+        packageName: String,
+        attributionTag: String?,
+        message: String?,
+    ): Int {
+        notes++
+        return super.noteOpNoThrow(op, uid, packageName, attributionTag, message)
+    }
+
     @Implementation
     @Suppress("OVERRIDE_DEPRECATION")
     public override fun unsafeCheckOpNoThrow(
@@ -131,7 +164,7 @@ class PrivacyGatedAppOps : ShadowAppOpsManager() {
         packageName: String,
     ): Int {
         val context = ApplicationProvider.getApplicationContext<Application>()
-        return if (context.getSystemService(AudioManager::class.java).isMicrophoneMute) {
+        return if (privacyOverlayEnabled && context.getSystemService(AudioManager::class.java).isMicrophoneMute) {
             AppOpsManager.MODE_IGNORED
         } else {
             super.checkOpNoThrow(op, uid, packageName)

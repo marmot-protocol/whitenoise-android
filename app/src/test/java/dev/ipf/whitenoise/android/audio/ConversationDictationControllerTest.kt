@@ -2911,9 +2911,13 @@ class ConversationDictationControllerTest {
         val request = f.controller.permissionRequestId
         assertTrue(f.controller.beginPermissionRequest(request))
         platform.hasPermission = true
-        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted
         f.controller.onPermissionResult(true)
         assertEquals(1, platform.nativeRequests)
+        assertEquals(
+            ConversationDictationFailure.MicrophoneMuted,
+            (f.controller.state as ConversationDictationState.Failed).reason,
+        )
         assertFalse(platform.session.started)
         f.controller.cancel()
         assertEquals(1, platform.nativeCleanup)
@@ -2935,6 +2939,29 @@ class ConversationDictationControllerTest {
         f.controller.onMicrophoneHostResumed()
         assertEquals(1, platform.nativeRequests)
         f.controller.cancel()
+    }
+
+    @Test
+    fun nativeGrantCannotCaptureWhenProfileObscuresOriginOrAfterDeadline() {
+        val platform =
+            FakePlatform(
+                nativeUnblockSupported = true,
+                microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted,
+            )
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.microphoneHostReady = { false } // A profile covers the still-selected chat.
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        val stale = platform.nativeChanged
+        stale?.invoke()
+        assertFalse(platform.session.started)
+        f.scheduler.advanceBy(30_000L)
+        assertEquals(1, platform.nativeCleanup)
+        f.controller.microphoneHostReady = { true }
+        stale?.invoke()
+        f.controller.onMicrophoneHostResumed()
+        f.controller.onAppForegrounded()
+        assertFalse(platform.session.started)
     }
 
     @Test
@@ -3113,6 +3140,116 @@ class ConversationDictationControllerTest {
             assertEquals(launchSucceeds, platform.session.started)
             if (!launchSucceeds) assertTrue(f.controller.state === displayed)
             f.controller.cancel()
+        }
+    }
+
+    @Test
+    fun settingsReturnWaitsForResumedVisibleHostBeforeStartingOnce() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        f.controller.microphoneHostReady = { false }
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded() // Process ON_START precedes Activity resume and notification routing.
+        assertFalse(platform.session.started)
+        f.controller.microphoneHostReady = { true }
+        f.controller.onMicrophoneHostResumed()
+        assertTrue(platform.session.started)
+        val started = f.controller.state.sessionId
+        f.controller.onMicrophoneHostResumed()
+        assertEquals(started, f.controller.state.sessionId)
+        f.controller.cancel()
+    }
+
+    @Test
+    fun settingsGrantedProfileReturnCannotCaptureAfterDismissHomeAndResume() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded() // Outbound settings stop must retain the one return.
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.microphoneOriginValid = { false } // Profile covers the still-selected original chat.
+        f.controller.microphoneHostReady = { false }
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNull(f.controller.microphoneSettingsRecovery)
+        f.controller.microphoneOriginValid = { true }
+        f.controller.microphoneHostReady = { true }
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded()
+        f.scheduler.advanceBy(1_000L)
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+    }
+
+    @Test
+    fun settingsGrantedLockedReturnCannotSurviveAnotherHomeExcursion() {
+        var locked = false
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform, appLocked = { locked })
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded()
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        locked = true
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNotNull(f.controller.microphoneSettingsRecovery)
+        f.controller.onMicrophoneHostPaused()
+        f.controller.onAppBackgrounded()
+        locked = false
+        f.controller.onAppForegrounded()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNull(f.controller.microphoneSettingsRecovery)
+    }
+
+    @Test
+    fun inboundRouteRevokesRecoveryBeforeComposeChangesOriginalConversation() {
+        val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+        val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.resumeAfterMicrophoneSettings()
+        f.controller.onMicrophoneHostPaused()
+        platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+        f.controller.onAppForegrounded()
+        // MainActivity receives B synchronously; Compose still reports A as valid and visible.
+        f.controller.clearMicrophoneRecovery()
+        f.controller.onMicrophoneHostResumed()
+        assertFalse(platform.session.started)
+        assertNull(f.controller.microphoneSettingsRecovery)
+    }
+
+    @Test
+    fun settingsRecoveryCannotOutliveNotificationOriginSwitchOrTimeout() {
+        for (originChanged in listOf(true, false)) {
+            val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+            val f = fixture(draft = TextFieldValue("Keep"), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.resumeAfterMicrophoneSettings()
+            f.controller.onMicrophoneHostPaused()
+            f.controller.microphoneHostReady = { false }
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+            f.controller.onAppForegrounded()
+            assertFalse(platform.session.started)
+            if (originChanged) {
+                f.controller.onMicrophoneOriginChanged(ACCOUNT, "notification-chat")
+            } else {
+                f.scheduler.advanceBy(30_000L)
+            }
+            f.controller.microphoneHostReady = { true }
+            f.controller.onMicrophoneHostResumed()
+            f.controller.onAppForegrounded()
+            assertFalse(platform.session.started)
+            assertEquals(TextFieldValue("Keep"), f.drafts.getValue(key()))
         }
     }
 

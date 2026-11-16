@@ -7,11 +7,12 @@ private const val MICROPHONE_UNBLOCK_TIMEOUT_MS = 30_000L
 /** One original failure owns both settings return and the finite native reminder lifetime. */
 internal class DictationMicrophoneRecovery(
     val failure: ConversationDictationState.Failed,
-    val native: Boolean = false,
+    val native: Boolean,
     var resumed: Boolean = true,
 ) {
     var dispatched = false
     var paused = false
+    var returned = false
     var unregister: (() -> Unit)? = null
     var timeout: ConversationDictationTimeoutHandle? = null
 }
@@ -24,7 +25,7 @@ internal fun ConversationDictationController.clearMicrophoneRecovery() {
 }
 
 /** Arms one return from settings only for the failure whose recovery the user chose. */
-internal fun ConversationDictationController.armMicrophoneSettingsRecovery() {
+internal fun ConversationDictationController.armMicrophoneSettingsRecovery(native: Boolean = false) {
     val failed = state as? ConversationDictationState.Failed ?: return
     if (
         failed.reason !in
@@ -39,23 +40,32 @@ internal fun ConversationDictationController.armMicrophoneSettingsRecovery() {
         return
     }
     clearMicrophoneRecovery()
-    microphoneSettingsRecovery = DictationMicrophoneRecovery(failed)
+    val pending = DictationMicrophoneRecovery(failed, native = native, resumed = microphoneHostReady())
+    microphoneSettingsRecovery = pending
+    pending.timeout =
+        scheduleTimeout(MICROPHONE_UNBLOCK_TIMEOUT_MS) {
+            if (microphoneSettingsRecovery === pending) clearMicrophoneRecovery()
+        }
 }
 
 internal fun ConversationDictationController.resumeMicrophoneSettingsRecovery(): Boolean {
     val pending = microphoneSettingsRecovery ?: return false
     return when {
-        pending.native && !pending.resumed -> true
+        !pending.resumed -> true
         else -> {
             val restored =
                 runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
             // Consume refusal before lock gating: a cancelled return must never arm a later unmute.
             when {
+                !microphoneOriginValid() -> {
+                    clearMicrophoneRecovery()
+                    false
+                }
                 state !== pending.failure || !restored -> {
                     if (!pending.native || pending.paused) clearMicrophoneRecovery()
                     false
                 }
-                !microphoneRecoveryAllowed() || (pending.native && !microphoneHostReady()) -> true
+                !microphoneRecoveryAllowed() || !microphoneHostReady() -> true
                 else -> {
                     clearMicrophoneRecovery()
                     retry()
@@ -79,14 +89,8 @@ internal fun ConversationDictationController.requestNativeMicrophoneUnblock(
         }
     fail(sessionId, target, failure)
     if (!microphoneRecoveryAllowed()) return
-    armMicrophoneSettingsRecovery()
-    val failed = microphoneSettingsRecovery?.failure ?: return
-    val pending = DictationMicrophoneRecovery(failed, native = true, resumed = microphoneHostReady())
-    microphoneSettingsRecovery = pending
-    pending.timeout =
-        scheduleTimeout(MICROPHONE_UNBLOCK_TIMEOUT_MS) {
-            if (microphoneSettingsRecovery === pending) clearMicrophoneRecovery()
-        }
+    armMicrophoneSettingsRecovery(native = true)
+    val pending = microphoneSettingsRecovery ?: return
     dispatchNativeMicrophoneUnblock(pending)
 }
 
@@ -122,7 +126,6 @@ internal fun ConversationDictationController.onMicrophoneOriginChanged(
     groupIdHex: String?,
 ) {
     val pending = microphoneSettingsRecovery ?: return
-    if (!pending.native) return
     if (
         accountRef == null ||
         groupIdHex == null ||
@@ -132,9 +135,16 @@ internal fun ConversationDictationController.onMicrophoneOriginChanged(
     }
 }
 
+/** Keep the outbound settings excursion, but never a second, unrelated foreground entry. */
+internal fun ConversationDictationController.onMicrophoneBackgrounded() {
+    microphoneSettingsRecovery?.let {
+        if (it.native || it.returned) clearMicrophoneRecovery()
+    }
+}
+
 /** A synthetic initial RESUME is not a dialog return; only a real pause can cancel. */
 internal fun ConversationDictationController.onMicrophoneHostPaused() {
-    microphoneSettingsRecovery?.takeIf { it.native }?.let {
+    microphoneSettingsRecovery?.let {
         it.paused = true
         it.resumed = false
     }
@@ -142,11 +152,11 @@ internal fun ConversationDictationController.onMicrophoneHostPaused() {
 
 internal fun ConversationDictationController.onMicrophoneHostResumed() {
     val pending = microphoneSettingsRecovery ?: return
-    if (!pending.native) return
+    pending.returned = pending.returned || pending.paused
     pending.resumed = true
-    if (!pending.dispatched) {
+    if (pending.native && !pending.dispatched) {
         dispatchNativeMicrophoneUnblock(pending)
-    } else if (pending.paused) {
+    } else if (pending.paused || !pending.native) {
         resumeMicrophoneSettingsRecovery()
     }
 }

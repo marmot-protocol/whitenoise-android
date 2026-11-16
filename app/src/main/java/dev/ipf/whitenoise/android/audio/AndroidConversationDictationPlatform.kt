@@ -111,7 +111,7 @@ internal class AndroidConversationDictationPlatform(
     }
 
     // Any platform RuntimeException must release the registered receiver before propagating.
-    @Suppress("TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught", "DEPRECATION")
     override fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? {
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
@@ -142,13 +142,20 @@ internal class AndroidConversationDictationPlatform(
             // Privacy-only mute is hidden by AudioManager and can look like app policy denial.
             // Note this explicit user-owned attempt without opening capture. AOSP shows its
             // reminder only when sensor privacy is enabled; policy denial grants nothing.
-            context.getSystemService(AppOpsManager::class.java).noteOpNoThrow(
-                AppOpsManager.OPSTR_RECORD_AUDIO,
-                Process.myUid(),
-                context.packageName,
-                context.attributionTag,
-                null,
-            )
+            // An allowed app-op with AudioManager-only mute must not record a privacy access.
+            val appOps = context.getSystemService(AppOpsManager::class.java)
+            if (
+                appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName) ==
+                AppOpsManager.MODE_IGNORED
+            ) {
+                appOps.noteOpNoThrow(
+                    AppOpsManager.OPSTR_RECORD_AUDIO,
+                    Process.myUid(),
+                    context.packageName,
+                    context.attributionTag,
+                    null,
+                )
+            }
         } catch (failure: RuntimeException) {
             context.unregisterReceiver(receiver)
             throw failure
@@ -165,10 +172,14 @@ internal class AndroidConversationDictationPlatform(
                 context.packageName,
             )
         val access =
-            if (mode == AppOpsManager.MODE_IGNORED || mode == AppOpsManager.MODE_ERRORED) {
-                ConversationDictationMicrophoneAccess.AppOpDenied
-            } else {
-                ConversationDictationMicrophoneAccess.Granted
+            when {
+                // Android 12+ privacy overlays can hide their mute from AudioManager. Keep the
+                // system-microphone recovery after refusal instead of sending users to app settings.
+                mode == AppOpsManager.MODE_IGNORED && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                    ConversationDictationMicrophoneAccess.MicrophoneMuted
+                mode == AppOpsManager.MODE_IGNORED || mode == AppOpsManager.MODE_ERRORED ->
+                    ConversationDictationMicrophoneAccess.AppOpDenied
+                else -> ConversationDictationMicrophoneAccess.Granted
             }
         conversationDictationDiagnostic("event=app_record_audio_access mode=$mode access=${access.name}")
         return access

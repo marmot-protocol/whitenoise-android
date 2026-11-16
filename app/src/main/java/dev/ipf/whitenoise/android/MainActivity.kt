@@ -32,6 +32,7 @@ import androidx.lifecycle.lifecycleScope
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
+import dev.ipf.whitenoise.android.audio.clearMicrophoneRecovery
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
 import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
@@ -449,6 +450,8 @@ class MainActivity : AppCompatActivity() {
         data: String?,
         lifecycleClass: WarmResumeLifecycleClass,
     ) {
+        // Revoke before ON_RESUME: Compose can still show the old chat when this route arrives.
+        if (target != null || share != null || data != null) appState.conversationDictation.clearMicrophoneRecovery()
         val routing = notificationInboundState.route(target, share, data, inboundProfilePayload, inboundShareRequest)
         if (target != null) {
             foregroundConversationDismissal.onNotificationRouteObserved()

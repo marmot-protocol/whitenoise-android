@@ -96,6 +96,16 @@ class ConversationDictationCompatibilityContractTest {
     }
 
     @Test
+    fun inboundActivityRouteRevokesMicrophoneRecoveryBeforePublishingRoute() {
+        val activity = projectFile("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
+        val routing = activity.substringAfter("private fun applyInboundRouting(")
+        val revoke = routing.indexOf("appState.conversationDictation.clearMicrophoneRecovery()")
+        val publish = routing.indexOf("notificationInboundState.route(")
+        assertTrue(revoke >= 0 && publish > revoke)
+        assertTrue("target != null || share != null || data != null" in routing.substring(0, publish))
+    }
+
+    @Test
     fun productionAndPreviewHaveNoTemporaryStartOrderingSelector() {
         val activity = projectFile("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
         val controller = conversationDictationControllerSource()
