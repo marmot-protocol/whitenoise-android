@@ -2245,6 +2245,7 @@
     <string name="startup_loading_message">Avvio di White Noise…</string>
     <string name="chat_rows_no_chats_title">Nessuna chat</string>
     <string name="chat_rows_no_chats_detail">Avvia una nuova chat per inviare un messaggio.</string>
+    <string name="conversation_pane_placeholder">Seleziona una chat</string>
     <string name="chat_rows_no_unread_title">Nessuna chat non letta</string>
     <string name="chat_rows_no_unread_detail">Hai letto tutto.</string>
     <string name="chat_rows_no_results_detail">Controlla l’ortografia o prova un’altra ricerca.</string>
