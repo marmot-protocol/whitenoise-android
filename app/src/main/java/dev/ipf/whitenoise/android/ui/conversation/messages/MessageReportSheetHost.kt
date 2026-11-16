@@ -84,16 +84,18 @@ internal fun MessageReportSheetHost(
 
 /** What a reopened sheet offers: only the team copy once the group already has this report. */
 internal fun MessageBubbleSurfaceState.effectiveReportAudience(audience: ReportAudience): ReportAudience =
-    if (reportGroupResult != null && !reportCopyPending) ReportAudience.TeamMessage else audience
+    if (reportGroupResult != null && !reportCopyPending || reportGroupRefused) ReportAudience.TeamMessage else audience
 
 /**
- * The group's answer to a report: what it tells the reader, whether the group took the report, and whether the
- * controller [alreadyShown] it on its own, as it does for a failure with its diagnostics.
+ * The group's answer to a report: what it tells the reader, whether the group took the report, whether the controller
+ * [alreadyShown] it on its own, as it does for a failure with its diagnostics, and whether the group will [refuse] any
+ * retry, as when this account is no longer allowed to report there.
  */
 internal data class GroupAnswer(
     @StringRes val message: Int,
     val took: Boolean,
     val alreadyShown: Boolean = false,
+    val refuse: Boolean = false,
 )
 
 /**
@@ -130,11 +132,13 @@ internal suspend fun MessageBubbleSurfaceState.sendReport(
     when (val outcome = sends.team()) {
         is TeamReportOutcome.Accepted -> {
             finishReport()
+            // One notice for both, which replaces a group failure the controller showed but still names it.
             sends.present(answer?.message ?: groupResult, outcome.message)
         }
         is TeamReportOutcome.Failed -> {
             val sameSheet = reportSheetOpen && reportSheetGeneration == sheetGeneration
-            keepTeamCopyForRetry(groupResult, answer?.message, outcome.message, sameSheet, sends.present)
+            if (sameSheet && answer?.refuse == true) reportGroupRefused = true
+            keepTeamCopyForRetry(groupResult, answer, outcome.message, sameSheet, sends.present)
         }
     }
 }
@@ -143,11 +147,12 @@ internal suspend fun MessageBubbleSurfaceState.sendReport(
  * Keeps the report open after the team copy failed. On the sheet that sent it, a recorded group answer locks the
  * form to that report so a retry sends only the copy. When the reader dismissed that sheet meanwhile, even if they
  * reopened one, a single notice says what the group took and that the copy failed, and a reopened sheet stays an
- * unlocked team-only report. The group's answer, taken or refused, is shown once, when it first arrives.
+ * unlocked team-only report. The group's answer, taken or refused, is shown once, when it first arrives, unless the
+ * controller already showed that failure. A group that will refuse any retry leaves the sheet a team-only report.
  */
 private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
     @StringRes groupResult: Int?,
-    @StringRes firstGroupAnswer: Int?,
+    firstGroupAnswer: GroupAnswer?,
     @StringRes failure: Int,
     sameSheet: Boolean,
     present: (Int?, Int?) -> Unit,
@@ -159,11 +164,12 @@ private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
             failure
         }
     if (sameSheet) {
-        firstGroupAnswer?.let { present(it, null) }
+        // A failure the controller already showed keeps its own notice and diagnostics.
+        firstGroupAnswer?.takeUnless { it.alreadyShown }?.let { present(it.message, null) }
         reportCopyPending = groupResult != null
         reportError = error
     } else {
-        present(firstGroupAnswer, error)
+        present(firstGroupAnswer?.message, error)
     }
 }
 
@@ -185,6 +191,6 @@ private fun groupAnswer(outcome: ReportOutcome): GroupAnswer =
     when (outcome) {
         ReportOutcome.Sent -> GroupAnswer(R.string.report_message_sent, took = true)
         ReportOutcome.Queued -> GroupAnswer(R.string.report_message_queued, took = true)
-        ReportOutcome.NotAllowed -> GroupAnswer(R.string.report_message_not_allowed, took = false)
+        ReportOutcome.NotAllowed -> GroupAnswer(R.string.report_message_not_allowed, took = false, refuse = true)
         ReportOutcome.Failed -> GroupAnswer(R.string.report_message_failed, took = false, alreadyShown = true)
     }

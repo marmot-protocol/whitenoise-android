@@ -88,6 +88,52 @@ class MessageReportSendTest {
             assertNull(surfaces.reportGroupResult)
         }
 
+    /** A failed group report with an accepted team copy gives one notice saying both, replacing the controller's. */
+    @Test
+    fun aGroupFailureWithAnAcceptedTeamCopySaysBoth() =
+        runBlocking {
+            teamAnswers += ACCEPTED
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), failingGroup())
+
+            assertEquals(listOf(R.string.report_message_failed to R.string.report_team_sent), presented)
+        }
+
+    /** A failed group report and a failed team copy keep the controller's own notice, with the copy's error inline. */
+    @Test
+    fun aGroupFailureWithAFailedTeamCopyKeepsTheControllersNotice() =
+        runBlocking {
+            teamAnswers += FAILED
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), failingGroup())
+
+            assertTrue(presented.isEmpty())
+            assertEquals(R.string.report_team_failed, surfaces.reportError)
+        }
+
+    /** After the group refuses for good and the copy fails, the retry goes to the White Noise team alone. */
+    @Test
+    fun aRefusedGroupIsNotAskedAgainOnRetry() =
+        runBlocking {
+            var groupAsks = 0
+            val refusing =
+                MessageReportSends(
+                    group = {
+                        groupAsks++
+                        GroupAnswer(R.string.report_message_not_allowed, took = false, refuse = true)
+                    },
+                    team = sends.team,
+                    present = sends.present,
+                )
+            teamAnswers += listOf(FAILED, ACCEPTED)
+
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), refusing)
+            val retry = surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam)
+            surfaces.sendReport(ReportTeamChoice(retry), refusing)
+
+            assertEquals(ReportAudience.TeamMessage, retry)
+            assertEquals(1, groupAsks)
+            assertFalse(surfaces.reportGroupRefused)
+        }
+
     /** A group-only report the controller already reported as failed adds no second notice. */
     @Test
     fun aGroupOnlyFailureIsNotShownTwice() =
@@ -164,6 +210,14 @@ class MessageReportSendTest {
             assertFalse(surfaces.reportCopyPending)
             assertEquals(ReportAudience.TeamMessage, surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam))
         }
+
+    /** Sends whose group report fails in a way the controller already showed with its diagnostics. */
+    private fun failingGroup() =
+        MessageReportSends(
+            group = { GroupAnswer(R.string.report_message_failed, took = false, alreadyShown = true) },
+            team = sends.team,
+            present = sends.present,
+        )
 
     /** Sends one report from the sheet as it stands for [audience], with the team switch on. */
     private suspend fun send(audience: ReportAudience) {

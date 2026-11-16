@@ -108,6 +108,9 @@ internal class MessageBubbleSurfaceState(
             if (value == null) reports.groupResults.remove(reportKey) else reports.groupResults[reportKey] = value
         }
 
+    /** Whether the group refused this report for good, so a retry goes to the White Noise team alone. */
+    var reportGroupRefused by mutableStateOf(false)
+
     /** Whether the open sheet is retrying only a failed team copy, with the group's report already sent. */
     var reportCopyPending by mutableStateOf(false)
     var reportError by mutableStateOf<Int?>(null)
@@ -127,6 +130,7 @@ internal class MessageBubbleSurfaceState(
     fun finishReport() {
         closeReport()
         reportGroupResult = null
+        reportGroupRefused = false
     }
 
     /** Puts an emoji picked for configure [slot] in the draft, replacing that slot or appending the next (#3279). */
