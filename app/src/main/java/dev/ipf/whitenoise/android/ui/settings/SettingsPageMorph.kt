@@ -625,7 +625,7 @@ internal class SettingsPageMorph {
             maskFrame = native
             maskHost = host
             mask = nativeChromeMask(native, host)
-            bodyMask = activeNativeBody(native, host)
+            bodyMask = nativeBodyMask(native, host)
             bodyCoverage = measuredBodyCoverage(native, host)
             externalSource = source
             externalPairs =
@@ -715,7 +715,7 @@ internal class SettingsPageMorph {
             maskHost = host
             maskFrame = chrome
             mask = nativeChromeMask(chrome.orEmpty(), host)
-            bodyMask = activeNativeBody(native.orEmpty(), host)
+            bodyMask = nativeBodyMask(native.orEmpty(), host)
             bodyCoverage = measuredBodyCoverage(native.orEmpty(), host)
             unoutlinedBodyMask =
                 Path().apply {
