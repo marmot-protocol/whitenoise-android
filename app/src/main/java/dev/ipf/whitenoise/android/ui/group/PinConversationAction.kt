@@ -186,8 +186,8 @@ private fun pinActionStillCurrent(
         controller.boundAccountRef == account &&
         controller.group.groupIdHex == group &&
         appState.runtimeGeneration == runtime &&
-        !appState.appLockScreenVisible &&
-        !appState.appUnlockEvaluationPending &&
+        !appState.appLock.screenVisible &&
+        !appState.appLock.evaluationPending &&
         !controller.group.pendingConfirmation &&
         controller.group.selfMembership == SelfMembershipFfi.MEMBER &&
         appState.accounts.any { it.label == account && it.isSignedInSigningAccount() }

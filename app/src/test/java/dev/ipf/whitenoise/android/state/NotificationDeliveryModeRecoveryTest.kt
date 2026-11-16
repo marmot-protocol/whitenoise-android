@@ -1457,11 +1457,8 @@ class NotificationDeliveryModeRecoveryTest {
     }
 
     /** Reads the delivery intent generation so the race test waits for actual supersession. */
-    private fun notificationDeliveryModeGeneration(appState: WhiteNoiseAppState): Long =
-        WhiteNoiseAppState::class.java.getDeclaredField("notificationDeliveryModeIntent").let { field ->
-            field.isAccessible = true
-            (field.get(appState) as StalenessGuard).capture()
-        }
+    @Suppress("MaxLineLength")
+    private fun notificationDeliveryModeGeneration(appState: WhiteNoiseAppState): Long = appState.notificationDelivery.notificationDeliveryModeIntent.capture()
 
     /** Builds a running local-signing account summary for the given ref. */
     private fun account(ref: String) = AccountSummaryFfi(ref, "$ref-id", true, false, false, true, false)

@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.core.graphics.Insets
+import androidx.media3.common.Player
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
@@ -26,15 +27,15 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 /**
- * Device proof for #3307 with real decoding. The production viewer — FullScreenMediaViewer, PlaybackDialog,
- * MediaViewerFrame and VideoViewerPage's own ExoPlayer and PlayerView — plays deterministic edge-marked clips from
- * local assets. Every edge of the portrait, landscape and rotation-tagged frames must land inside the media body,
- * clear of the chrome, in portrait and landscape windows. Media3's time bar, times and play/pause must sit inside the
- * safe area and above Share/Forward; short landscape windows keep Media3's compact time bar and play/pause.
- * A real time-bar drag seeks without paging while a picture drag still pages, one
- * tap hides and restores the controls with the chrome, and simulated cutouts and an active shell transport never
- * cover the controls. Edge positions come from UiAutomation screenshots, since SurfaceView video is absent from
- * Compose captures, and touches go through the platform input pipeline.
+ * Device proof for #3307 and #3801 with real decoding. The production viewer — FullScreenMediaViewer, PlaybackDialog,
+ * MediaViewerFrame and VideoViewerPage's own ExoPlayer, PlayerView and Compose controls — plays deterministic
+ * edge-marked clips from local assets. The media body is always the safe area, so the chrome and the controls fade
+ * over the video and toggling them, by tap or by the playback timeout, never moves or resizes the frame. Every edge
+ * of the portrait, landscape and rotation-tagged frames lands inside the safe area in portrait and landscape windows.
+ * The seek bar, times and play/pause sit inside the safe area, below the top chrome and above Share/Forward. A real
+ * seek drag seeks without paging while a picture drag still pages, and simulated cutouts and an active shell
+ * transport never cover the controls. Edge positions come from UiAutomation screenshots, since SurfaceView video is
+ * absent from Compose captures, and touches go through the platform input pipeline.
  */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
@@ -62,20 +63,51 @@ class MediaViewerVideoControlsAndroidTest {
         }
     }
 
-    /** In a portrait window every clip shows all four edges between the chrome, and in the safe area once hidden. */
+    /** In a portrait window every clip keeps one frame through a chrome toggle and shows all four edges. */
     @Test
     fun portraitWindowShowsEveryEdgeOfEveryClip() {
         requestOrientation(landscape = false)
         EdgeClip.entries.forEach { assertClipFitsWithChromeShownAndHidden(it, "portrait") }
     }
 
-    /** In a landscape window every clip shows all four edges between the chrome, and in the safe area once hidden. */
+    /** In a landscape window every clip keeps one frame through a chrome toggle and shows all four edges. */
     @Test
     fun landscapeWindowShowsEveryEdgeOfEveryClip() {
         requestOrientation(landscape = true)
-        EdgeClip.entries.forEach {
-            assertClipFitsWithChromeShownAndHidden(it, "landscape", allowCompactHeight = true)
+        EdgeClip.entries.forEach { assertClipFitsWithChromeShownAndHidden(it, "landscape") }
+    }
+
+    /**
+     * #3801: while a clip plays, a tap hides the controls and the chrome, a second tap restores them and the playback
+     * timeout hides them again, and the decoded frame keeps the same on-screen rectangle at every step.
+     */
+    @Test
+    fun tapDoesNotResizeVideo() {
+        requestOrientation(landscape = false)
+        val paused = fixture.open(EdgeClipScenario(listOf(EdgeClip.Portrait)))
+        // Looping keeps the clip playing, so the end of playback cannot force the controls back during the wait.
+        fixture.readPlayer {
+            it.repeatMode = Player.REPEAT_MODE_ONE
+            it.play()
         }
+        fixture.awaitCondition("playback to start") { fixture.readPlayer { it.isPlaying } }
+        val playing = fixture.geometry()
+        playing.assertControlsClear("playing")
+        assertEquals("starting playback must not move the video", paused.video, playing.video)
+
+        fixture.tapPicture(playing)
+        fixture.awaitControllerAndChrome(visible = false)
+        assertEquals("a tap that hides the controls must not move the video", playing.video, fixture.geometry().video)
+
+        fixture.tapPicture(playing)
+        fixture.awaitControllerAndChrome(visible = true)
+        val restored = fixture.geometry()
+        restored.assertControlsClear("restored by a tap")
+        assertEquals("a tap that shows the controls must not move the video", playing.video, restored.video)
+
+        fixture.awaitControllerAndChrome(visible = false)
+        assertTrue("the controls must time out while playing", fixture.readPlayer { it.isPlaying })
+        assertEquals("the playback timeout must not move the video", playing.video, fixture.geometry().video)
     }
 
     /**
@@ -92,7 +124,8 @@ class MediaViewerVideoControlsAndroidTest {
         assertTrue("decoded clip duration $durationMs ms", durationMs in CLIP_DURATION_RANGE_MS)
         val targetMs = (durationMs * SEEK_FRACTION).roundToLong()
 
-        fixture.dragTimeBar(opened, SEEK_FRACTION)
+        fixture.awaitSeekBarEnabled()
+        fixture.dragTimeBar(fixture.geometry(), SEEK_FRACTION)
         fixture.awaitCondition("the seek to reach $targetMs ms") {
             abs(fixture.readPlayer { it.currentPosition } - targetMs) <= SEEK_TOLERANCE_MS
         }
@@ -112,7 +145,7 @@ class MediaViewerVideoControlsAndroidTest {
 
     /**
      * Simulated status bars, navigation bars and display cutouts — dispatched to the viewer window, so the result does
-     * not depend on the device having a cutout — keep the frame and Media3's controls inside the safe area, in
+     * not depend on the device having a cutout — keep the frame and the video controls inside the safe area, in
      * portrait with a deep top notch and side cutouts and in landscape with a side cutout and side navigation.
      */
     @Test
@@ -134,16 +167,12 @@ class MediaViewerVideoControlsAndroidTest {
                 navigationBars = Insets.of(0, 0, dp(LANDSCAPE_NAVIGATION_DP), dp(LANDSCAPE_GESTURE_DP)),
                 cutout = Insets.of(dp(LANDSCAPE_CUTOUT_DP), 0, 0, 0),
             )
-        assertClipFitsWithChromeShownAndHidden(
-            EdgeClip.Landscape,
-            "simulated landscape cutout",
-            allowCompactHeight = true,
-        )
+        assertClipFitsWithChromeShownAndHidden(EdgeClip.Landscape, "simulated landscape cutout")
     }
 
     /**
      * With the shell's playback strip showing above the viewer, as PlaybackDialog hosts it in the app, the strip
-     * covers neither the time bar nor any frame edge, and its consumed status-bar inset is subtracted only once.
+     * covers neither the seek bar nor any frame edge, and its consumed status-bar inset is subtracted only once.
      */
     @Test
     fun activeShellTransportCoversNeitherTheTimeBarNorTheFrame() {
@@ -155,34 +184,35 @@ class MediaViewerVideoControlsAndroidTest {
         assertTransportLeavesTheViewerClear(EdgeClip.Landscape, "landscape transport")
     }
 
-    /** Opens [clip] alone, checks fit and controls with chrome shown, hides both with one tap, checks, restores. */
+    /**
+     * Opens [clip] alone and checks the controls over a safe-area body, hides the chrome and controls with one tap,
+     * checks every frame edge, then restores them. The frame keeps one rectangle throughout. Edges are traced with the
+     * chrome hidden, since the shown chrome's scrim deliberately fades over the frame.
+     */
     private fun assertClipFitsWithChromeShownAndHidden(
         clip: EdgeClip,
         window: String,
-        allowCompactHeight: Boolean = false,
     ) {
         val label = "$window ${clip.name}"
         val shown = fixture.open(EdgeClipScenario(listOf(clip)))
-        shown.assertBodyInsideTheSafeSides("$label, chrome shown")
-        shown.assertControlsClear("$label, chrome shown", shown.requiredControls(label, allowCompactHeight))
-        assertFrameFits(clip, "$label, chrome shown")
+        assertRectNear("$label: shown chrome must not shrink the media body", shown.safe, shown.body)
+        shown.assertControlsClear("$label, chrome shown")
 
         fixture.tapPicture(shown)
         fixture.awaitControllerAndChrome(visible = false)
         val hidden = fixture.geometry()
-        assertRectNear("$label: hidden chrome must hand the whole safe area to the media", hidden.safe, hidden.body)
+        assertRectNear("$label: hidden chrome must leave the media body at the safe area", hidden.safe, hidden.body)
+        assertEquals("$label: hiding the chrome must not move the video", shown.video, hidden.video)
         assertFrameFits(clip, "$label, chrome hidden")
 
         fixture.tapPicture(hidden)
         fixture.awaitControllerAndChrome(visible = true)
         val restored = fixture.geometry()
-        restored.assertControlsClear("$label, chrome restored", restored.requiredControls(label, allowCompactHeight))
+        assertEquals("$label: restoring the chrome must not move the video", shown.video, restored.video)
+        restored.assertControlsClear("$label, chrome restored")
     }
 
-    /**
-     * Compares the viewer with and without the shell transport and asserts the strip covers nothing. Media3 may drop
-     * its time row only when the strip shortened the body, and must keep the time bar and play/pause.
-     */
+    /** Compares the viewer with and without the shell transport and asserts the strip covers nothing. */
     private fun assertTransportLeavesTheViewerClear(
         clip: EdgeClip,
         label: String,
@@ -201,17 +231,12 @@ class MediaViewerVideoControlsAndroidTest {
             actual = plainChrome.height() - sharedChrome.height(),
             tolerance = INSET_TOLERANCE_PX,
         )
-        // The strip shortens the media body. In a landscape phone window that leaves Media3 too little height for its
-        // time row, which it drops while keeping the time bar and play/pause, as on any short window.
-        if (!shared.hasTimeLabels) {
-            assertTrue(
-                "$label: Media3 dropped its time row although the transport left the body ${shared.body} as tall as " +
-                    "${plain.body}",
-                shared.body.height() < plain.body.height(),
-            )
-        }
-        shared.assertControlsClear(label, shared.requiredControls(label, allowCompactHeight = true))
-        assertFrameFits(clip, label)
+        shared.assertControlsClear(label)
+
+        fixture.tapPicture(shared)
+        fixture.awaitControllerAndChrome(visible = false)
+        assertEquals("$label: hiding the chrome must not move the video", shared.video, fixture.geometry().video)
+        assertFrameFits(clip, "$label, chrome hidden")
     }
 
     /**
@@ -266,60 +291,22 @@ class MediaViewerVideoControlsAndroidTest {
     private fun dp(value: Int): Int = (value * context.resources.displayMetrics.density).roundToInt()
 }
 
-private val ViewerGeometry.hasTimeLabels: Boolean
-    get() = ELAPSED_TIME in controls && TOTAL_TIME in controls
-
-/** Accepts missing time text only in Media3's observed minimal layout with a measured short controller. */
-private fun ViewerGeometry.requiredControls(
-    label: String,
-    allowCompactHeight: Boolean,
-): Collection<String> {
-    Log.i(
-        TAG,
-        "$label: minimalVisible=$minimalControlsVisible timeLabels=$hasTimeLabels " +
-            "controllerHeight=$controllerContentHeight fullHeight=$fullControllerHeight",
-    )
-    if (hasTimeLabels) return ALL_CONTROLS
-    assertTrue("$label: missing time labels require Media3's minimal controls", minimalControlsVisible)
-    assertTrue("$label: this case requires the full Media3 time row", allowCompactHeight)
-    assertTrue(
-        "$label: compact controls require a short controller: $controllerContentHeight <= $fullControllerHeight",
-        controllerContentHeight > 0 && fullControllerHeight > 0 && controllerContentHeight <= fullControllerHeight,
-    )
-    assertTrue(
-        "$label: minimal layout must hide both time labels",
-        ELAPSED_TIME !in controls && TOTAL_TIME !in controls,
-    )
-    return ESSENTIAL_CONTROLS
-}
-
 /**
- * Asserts the Media3 [required] controls are shown inside the media body and the safe area, below the top chrome or
- * shell transport and above Share/Forward.
+ * Asserts every video control is shown inside the media body and the safe area, below the top chrome or shell
+ * transport and above Share/Forward, with a usable touch target where it takes touches.
  */
-private fun ViewerGeometry.assertControlsClear(
-    label: String,
-    required: Collection<String> = ALL_CONTROLS,
-) {
-    assertTrue("$label: Media3 controls must be showing", controllerVisible)
+private fun ViewerGeometry.assertControlsClear(label: String) {
+    assertTrue("$label: the video controls must be showing", controlsVisible)
     val ceiling = listOfNotNull(topChrome?.bottom, transport?.bottom, body.top).max()
     val floor = listOfNotNull(bottomChrome?.top, body.bottom).min()
     Log.i(TAG, "$label: controls=$controls ceiling=$ceiling floor=$floor body=$body safe=$safe")
-    required.forEach { name ->
-        val bounds = controls[name] ?: throw AssertionError("$label: Media3 $name is not shown")
+    ALL_CONTROLS.forEach { name ->
+        val bounds = controls[name] ?: throw AssertionError("$label: the $name control is not shown")
         assertTrue("$label: $name $bounds is under the top chrome or transport at $ceiling", bounds.top >= ceiling)
         assertTrue("$label: $name $bounds is under Share/Forward at $floor", bounds.bottom <= floor)
         assertTrue("$label: $name $bounds leaves the media body $body", body.contains(bounds))
         assertTrue("$label: $name $bounds leaves the safe area $safe", safe.contains(bounds))
     }
-}
-
-/** Asserts the media body stays inside side cutouts and side bars whether or not the chrome shows. */
-private fun ViewerGeometry.assertBodyInsideTheSafeSides(label: String) {
-    assertTrue(
-        "$label: media body $body crosses a side cutout or bar of $safe",
-        body.left >= safe.left && body.right <= safe.right,
-    )
 }
 
 /** Asserts four on-screen bands trace the whole decoded frame inside the media body and clear of the chrome. */
@@ -384,20 +371,17 @@ private fun assertRectNear(
 
 private const val TAG = "MediaViewerVideoCtl"
 
-/** Every Media3 control the viewer must keep clear of its chrome. */
+/** Every video control the viewer must keep clear of its chrome. */
 private val ALL_CONTROLS = listOf(TIME_BAR, PLAY_PAUSE, ELAPSED_TIME, TOTAL_TIME)
-
-/** The controls Media3 keeps when a short body leaves no room for its time row. */
-private val ESSENTIAL_CONTROLS = listOf(TIME_BAR, PLAY_PAUSE)
 
 /** Released fraction of the time bar's width for the seek. */
 private const val SEEK_FRACTION = 0.6f
 
 /**
- * Seek tolerance. Media3 maps the release point linearly onto the duration, so the error budget is one time-bar pixel
- * (about 6 ms for a 6 s clip on a phone-width bar), the scrubber's symmetric end padding (under 1 % of the duration at
- * 60 %) and exact seeking, which ExoPlayer uses by default. 250 ms leaves room for emulator input timing without
- * accepting a missed or cancelled seek, which would leave the paused player at 0.
+ * Seek tolerance. The seek bar maps the release point linearly onto the duration and seeks once the drag finishes, so
+ * the error budget is one seek-bar pixel (about 6 ms for a 6 s clip on a phone-width bar), the thumb's symmetric end
+ * padding (under 1 % of the duration at 60 %) and exact seeking, which ExoPlayer uses by default. 250 ms leaves room
+ * for emulator input timing without accepting a missed or cancelled seek, which would leave the paused player at 0.
  */
 private const val SEEK_TOLERANCE_MS = 250L
 

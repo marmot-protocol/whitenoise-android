@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.handleAppUpdateAction
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -428,8 +429,8 @@ internal fun SettingsScreen(
         remember(searchConfiguration, eligibility) {
             prepareSettingsSearch(catalog, eligibility, searchResources::getString)
         }
-    LaunchedEffect(appState.appLockScreenVisible, appState.signOutInProgress, appState.wipeInProgress) {
-        if (appState.appLockScreenVisible || appState.signOutInProgress || appState.wipeInProgress) {
+    LaunchedEffect(appState.appLock.screenVisible, appState.signOutInProgress, appState.wipeInProgress) {
+        if (appState.appLock.screenVisible || appState.signOutInProgress || appState.wipeInProgress) {
             searchOpen = false
             searchQuery = ""
             searchOriginId = null
@@ -470,7 +471,7 @@ internal fun SettingsScreen(
         depth = settingsDetailDepth(detail),
         ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
         suppressMotion = suppressMotion,
-        contentVisible = !appState.appLockScreenVisible,
+        contentVisible = !appState.appLock.screenVisible,
         cardMorph = true,
     ) { route ->
         CompositionLocalProvider(
@@ -832,7 +833,7 @@ private fun canActivateSettingsSearchResult(
             appState,
             if (entry.pushRequired) appState.nativePushCapability().isAvailable else pushAvailable,
         )
-    val sessionInteractive = !appState.signOutInProgress && !appState.appLockScreenVisible && !appState.wipeInProgress
+    val sessionInteractive = !appState.signOutInProgress && !appState.appLock.screenVisible && !appState.wipeInProgress
     return current.allows(entry) && sessionInteractive
 }
 

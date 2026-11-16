@@ -37,6 +37,8 @@ import dev.ipf.whitenoise.android.state.AUDIT_LOG_JSONL_MIME_TYPE
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.auditLogExportMimeType
 import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
+import dev.ipf.whitenoise.android.state.deleteAuditLogs
+import dev.ipf.whitenoise.android.state.prepareAuditLogArchiveForExport
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing

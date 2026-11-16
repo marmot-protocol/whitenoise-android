@@ -1,0 +1,103 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Notification permission feedback for delivery-mode activation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_notification_permission_needed",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Notification rendering repair failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_couldnt_enable_notifications",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Local notification rendering toggle feedback (enabled)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_local_notifications_enabled",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002"
+        ]
+      },
+      {
+        "surface": "Local notification rendering toggle feedback (disabled)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_local_notifications_disabled",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002"
+        ]
+      },
+      {
+        "surface": "Notification settings update failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_couldnt_update_notifications",
+        "test_ids": [
+          "NTF-001",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Background delivery change without an active account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_no_active_account",
+        "test_ids": [
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Rejected foreground-service start feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_couldnt_keep_connected",
+        "test_ids": [
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Rejected foreground-service start feedback (Android reason)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_android_blocked_foreground_service",
+        "test_ids": [
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Background connection toggle feedback (enabled)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_background_connection_enabled",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Background connection toggle feedback (disabled)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryController.kt",
+        "anchor": "R.string.toast_background_connection_disabled",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      }
+    ]
+  }
+}

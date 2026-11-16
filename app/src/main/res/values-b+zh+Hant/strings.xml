@@ -262,6 +262,7 @@
     <string name="discard_failed_message">捨棄發送失敗的訊息</string>
     <string name="decline">拒絕</string>
     <string name="accept">接受</string>
+    <string name="invited_as_account">受邀帳號：%1$s</string>
     <string name="invited_to_chat_by">%1$s 邀請你加入聊天</string>
     <string name="someone">某人</string>
     <string name="invitation_pending">邀請待處理</string>
@@ -1306,6 +1307,7 @@
     <string name="voice_message_cancel">取消語音訊息</string>
     <string name="notification_reacted_to_message">用 %1$s 回應了：\"%2$s\"</string>
     <string name="notification_reacted">用 %1$s 回應</string>
+    <string name="notification_reacted_hidden">回應了一則訊息</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
     <string name="toast_video_metadata_not_removable">無法從此影片中移除位置等隱私資訊，因此未附加此影片。</string>
     <string name="profile_picture_hint">公開的 HTTPS 圖片網址</string>
@@ -2374,8 +2376,14 @@
     <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請對方新增可接收較大訊息的收件匣中繼。</string>
     <string name="error_update_too_large">此更新對你的中繼來說過大。未做任何變更。</string>
     <string name="error_group_change_too_large">某項群組變更對該群組的中繼來說過大，因此未執行。</string>
-    <string name="notification_show_previews">顯示通知預覽</string>
-    <string name="notification_show_previews_detail">關閉後會隱藏姓名和訊息內容。適用於所有帳戶。</string>
+    <string name="notification_show_previews">通知預覽</string>
+    <string name="notification_show_previews_detail">選擇通知顯示的內容。適用於所有帳戶。</string>
+    <string name="notification_preview_full">名稱和訊息</string>
+    <string name="notification_preview_full_detail">顯示寄件者和訊息內容</string>
+    <string name="notification_preview_name_only">僅名稱</string>
+    <string name="notification_preview_name_only_detail">顯示寄件者，隱藏訊息</string>
+    <string name="notification_preview_none">隱藏</string>
+    <string name="notification_preview_none_detail">僅顯示有新內容</string>
     <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>
 
     <string name="profile_readiness_loading">正在載入個人檔案…</string>

@@ -25,9 +25,12 @@ class NotificationConversationOpenCoverageTest {
     /** A pin tap waits for the App Lock decision instead of being armed, consumed or routed while it is pending. */
     @Test
     fun pinnedShortcutRouteWaitsForThePendingLockDecision() {
-        assertTrue("the pass must re-run on the lock decision", "appUnlockEvaluationPending" in routeEffectKeys())
+        assertTrue(
+            "the pass must re-run on the lock decision",
+            "appState.appLock.evaluationPending" in routeEffectKeys(),
+        )
         val route = routerSource().between("suspend fun route(", "private fun retireClearedTarget")
-        val wait = route.indexOf("target.shortcutCapability != null && appState.appUnlockEvaluationPending -> Unit")
+        val wait = route.indexOf("target.shortcutCapability != null && appState.appLock.evaluationPending -> Unit")
         val arm = route.indexOf("else -> routeArmed(")
         assertTrue("pins must wait before the request is armed or consumed", wait >= 0 && wait < arm)
         val armed = routerSource().between("private suspend fun routeArmed(", "private fun awaitAccounts")
@@ -37,7 +40,7 @@ class NotificationConversationOpenCoverageTest {
     /** A lock that shows while accounts are still loading consumes the pin before a later unlock could route it. */
     @Test
     fun pinnedShortcutRouteFailsClosedWhenTheLockShowsBeforeAccountsLoad() {
-        assertTrue("the pass must re-run when the lock shows", "appState.appLockScreenVisible" in routeEffectKeys())
+        assertTrue("the pass must re-run when the lock shows", "appState.appLock.screenVisible" in routeEffectKeys())
         val router = routerSource()
         val armed = router.between("private suspend fun routeArmed(", "private fun awaitAccounts")
         assertTrue(
@@ -298,7 +301,7 @@ class NotificationConversationOpenCoverageTest {
     @Test
     fun theRootKeepsTheShellComposedForTheRetainedRouteButNeverUnderLock() {
         val root = rootSource().replace(Regex("\\s+"), " ")
-        val locked = root.substringAfter("if (appState.appLockScreenVisible) {").substringBefore("} else {")
+        val locked = root.substringAfter("if (appState.appLock.screenVisible) {").substringBefore("} else {")
 
         assertTrue(
             "the retained route must count like a pending inbound route when choosing the surface",
@@ -307,7 +310,7 @@ class NotificationConversationOpenCoverageTest {
         val ownerCall = root.substringAfter("val notificationRouteOwnsShell =")
         assertTrue(
             "the owner must be told whether the lock is up",
-            "appLockScreenVisible = appState.appLockScreenVisible" in ownerCall,
+            "appLockScreenVisible = appState.appLock.screenVisible" in ownerCall,
         )
         assertFalse("the locked branch composes no shell", "MainShell(" in locked)
         assertFalse("the locked branch must not consult the route", "notificationRouteOwnsShell" in locked)
@@ -442,8 +445,8 @@ class NotificationConversationOpenCoverageTest {
             "inboundTarget,",
             "inboundRequestId,",
             "inboundTarget?.replyDraft != null && appState.appInForeground",
-            "inboundTarget?.shortcutCapability != null && appState.appUnlockEvaluationPending",
-            "inboundTarget?.shortcutCapability != null && appState.appLockScreenVisible",
+            "inboundTarget?.shortcutCapability != null && appState.appLock.evaluationPending",
+            "inboundTarget?.shortcutCapability != null && appState.appLock.screenVisible",
             "appState.activeAccountRef",
             "appState.runtimeGeneration",
             "appState.accounts",

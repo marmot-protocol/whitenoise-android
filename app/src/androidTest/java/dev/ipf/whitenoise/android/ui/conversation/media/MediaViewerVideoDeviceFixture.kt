@@ -6,7 +6,6 @@ import android.graphics.Rect
 import android.os.SystemClock
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -15,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.core.graphics.Insets
@@ -52,9 +52,9 @@ internal data class EdgeClipScenario(
 )
 
 /**
- * Screen-space layout of the open viewer, measured from its real Compose nodes and Media3 views. [safe] is the
- * window less the insets the viewer window was given, [video] is Media3's aspect-fitted content frame and
- * [controls] holds only the Media3 controls currently shown.
+ * Screen-space layout of the open viewer, measured from its real Compose nodes and PlayerView. [safe] is the window
+ * less the insets the viewer window was given, [video] is Media3's aspect-fitted content frame and [controls] holds
+ * only the viewer's Compose video controls currently shown.
  */
 internal data class ViewerGeometry(
     val window: Rect,
@@ -64,10 +64,7 @@ internal data class ViewerGeometry(
     val bottomChrome: Rect?,
     val transport: Rect?,
     val video: Rect,
-    val controllerVisible: Boolean,
-    val minimalControlsVisible: Boolean,
-    val controllerContentHeight: Int,
-    val fullControllerHeight: Int,
+    val controlsVisible: Boolean,
     val controls: Map<String, Rect>,
 )
 
@@ -232,12 +229,14 @@ internal class EdgeClipViewerFixture(
         val topChrome = nodeRect(MEDIA_VIEWER_TOP_CHROME_TAG)
         val bottomChrome = nodeRect(MEDIA_VIEWER_BOTTOM_CHROME_TAG)
         val transport = nodeRect(SHELL_TRANSPORT_TAG)
+        val controlsVisible = nodeRect(VIDEO_VIEWER_CONTROLS_TAG) != null
+        val controls =
+            VIDEO_CONTROLS
+                .mapNotNull { (label, tag) -> nodeRect(tag)?.takeIf { it.width() > 0 }?.let { label to it } }
+                .toMap()
         return onMain {
             val window = root.screenRect()
             val view = playerViewIn(root, body) ?: error("No PlayerView fills the media body $body")
-            val controller = requireNotNull(view.findViewById<View>(Media3R.id.exo_controller))
-            val center = requireNotNull(view.findViewById<View>(Media3R.id.exo_center_controls))
-            val bottom = requireNotNull(view.findViewById<View>(Media3R.id.exo_bottom_bar))
             ViewerGeometry(
                 window = window,
                 safe = simulatedInsets?.safeArea(window) ?: window.insetBy(realSafeInsets(root)),
@@ -246,26 +245,20 @@ internal class EdgeClipViewerFixture(
                 bottomChrome = bottomChrome,
                 transport = transport,
                 video = view.findViewById<View>(Media3R.id.exo_content_frame).screenRect(),
-                controllerVisible = view.isControllerFullyVisible,
-                minimalControlsVisible =
-                    view.findViewById<View>(Media3R.id.exo_minimal_controls)?.visibility == View.VISIBLE,
-                controllerContentHeight = controller.height - controller.paddingTop - controller.paddingBottom,
-                fullControllerHeight =
-                    center.heightWithMargins() - center.paddingTop - center.paddingBottom +
-                        2 * bottom.heightWithMargins(),
-                controls = shownControls(view),
+                controlsVisible = controlsVisible,
+                controls = controls,
             )
         }
     }
 
-    /** Taps the picture well away from Media3's centre and bottom controls. */
+    /** Taps the picture well away from the top chrome, the centred play/pause and the bottom time row. */
     fun tapPicture(geometry: ViewerGeometry) {
         val point = geometry.body.pointAt(TAP_X_FRACTION, PICTURE_Y_FRACTION)
         injectTouchPath(point, point, steps = 1)
         rule.waitForIdle()
     }
 
-    /** Drags horizontally across the picture, right to left, above Media3's controls. */
+    /** Drags horizontally across the picture, right to left, clear of the video controls. */
     fun swipePicture(geometry: ViewerGeometry) {
         injectTouchPath(
             from = geometry.body.pointAt(SWIPE_START_FRACTION, PICTURE_Y_FRACTION),
@@ -275,7 +268,7 @@ internal class EdgeClipViewerFixture(
         rule.waitForIdle()
     }
 
-    /** Drags the real Media3 time bar along its centre line from near its start to [fraction] of its width. */
+    /** Drags the viewer's seek bar along its centre line from near its start to [fraction] of its width. */
     fun dragTimeBar(
         geometry: ViewerGeometry,
         fraction: Float,
@@ -289,11 +282,10 @@ internal class EdgeClipViewerFixture(
         rule.waitForIdle()
     }
 
-    /** Waits until Media3's controller and both viewer bars agree on [visible]. */
+    /** Waits until the video controls and both viewer bars agree on [visible]. */
     fun awaitControllerAndChrome(visible: Boolean) {
-        awaitCondition("Media3 controls and viewer chrome visible=$visible") {
-            val controller = currentPlayerView()?.let { view -> onMain { view.isControllerFullyVisible } }
-            controller == visible &&
+        awaitCondition("video controls and viewer chrome visible=$visible") {
+            (nodeRect(VIDEO_VIEWER_CONTROLS_TAG) != null) == visible &&
                 (nodeRect(MEDIA_VIEWER_TOP_CHROME_TAG) != null) == visible &&
                 (nodeRect(MEDIA_VIEWER_BOTTOM_CHROME_TAG) != null) == visible
         }
@@ -345,17 +337,36 @@ internal class EdgeClipViewerFixture(
         }
     }
 
-    /** Polls [condition] between idle frames and fails the test with [description] once [timeoutMs] passes. */
+    /**
+     * Polls [condition] between idle frames and fails the test with [description] once [timeoutMs] passes. The test
+     * clock is advanced by the real time spent waiting, so composition delays such as the controls timeout and the
+     * seek bar's position poll run as they would on a device.
+     */
     fun awaitCondition(
         description: String,
         timeoutMs: Long = TIMEOUT_MS,
         condition: () -> Boolean,
     ) {
         val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var last = SystemClock.uptimeMillis()
         while (!condition()) {
             if (SystemClock.uptimeMillis() > deadline) throw AssertionError("Timed out waiting for $description")
             SystemClock.sleep(POLL_MS)
+            val now = SystemClock.uptimeMillis()
+            rule.mainClock.advanceTimeBy(now - last)
+            last = now
             rule.waitForIdle()
+        }
+    }
+
+    /** Waits until the seek bar knows the clip's duration and accepts drags. */
+    fun awaitSeekBarEnabled() {
+        awaitCondition("the seek bar to be enabled") {
+            rule
+                .onAllNodesWithTag(VIDEO_VIEWER_SEEK_TAG)
+                .fetchSemanticsNodes()
+                .singleOrNull()
+                ?.let { SemanticsProperties.Disabled !in it.config } == true
         }
     }
 
@@ -434,19 +445,6 @@ private fun playerViewIn(
         .descendantPlayerViews()
         .filter { it.isShown }
         .firstOrNull { view -> view.screenRect().let { body.contains(it.centerX(), it.centerY()) } }
-
-/** Measured control height including the layout margins Media3 uses for its compact-height decision. */
-private fun View.heightWithMargins(): Int {
-    val margins = layoutParams as? ViewGroup.MarginLayoutParams
-    return height + (margins?.topMargin ?: 0) + (margins?.bottomMargin ?: 0)
-}
-
-/** Screen bounds of each Media3 control [view] currently shows. */
-private fun shownControls(view: PlayerView): Map<String, Rect> =
-    MEDIA3_CONTROLS
-        .mapNotNull { (label, id) ->
-            view.findViewById<View>(id)?.takeIf { it.isShown && it.width > 0 }?.let { label to it.screenRect() }
-        }.toMap()
 
 /** The safe-drawing insets the platform reported to the viewer window. */
 private fun realSafeInsets(root: View): Insets =
@@ -545,13 +543,13 @@ internal const val PLAY_PAUSE = "play/pause"
 internal const val ELAPSED_TIME = "elapsed time"
 internal const val TOTAL_TIME = "total time"
 
-/** Media3 controls whose bounds the tests check, by label. */
-private val MEDIA3_CONTROLS =
+/** Viewer video controls whose bounds the tests check, by label. */
+private val VIDEO_CONTROLS =
     listOf(
-        TIME_BAR to Media3R.id.exo_progress,
-        PLAY_PAUSE to Media3R.id.exo_play_pause,
-        ELAPSED_TIME to Media3R.id.exo_position,
-        TOTAL_TIME to Media3R.id.exo_duration,
+        TIME_BAR to VIDEO_VIEWER_SEEK_TAG,
+        PLAY_PAUSE to VIDEO_VIEWER_PLAY_PAUSE_TAG,
+        ELAPSED_TIME to VIDEO_VIEWER_ELAPSED_TAG,
+        TOTAL_TIME to VIDEO_VIEWER_TOTAL_TAG,
     )
 
 /** Test tag on the shell's voice transport strip. */
@@ -567,7 +565,7 @@ private const val VOICE_DURATION_MS = 12_000
 private const val TIMEOUT_MS = 20_000L
 private const val POLL_MS = 50L
 private const val TAP_X_FRACTION = 0.25f
-private const val PICTURE_Y_FRACTION = 0.2f
+private const val PICTURE_Y_FRACTION = 0.35f
 private const val SWIPE_START_FRACTION = 0.85f
 private const val SWIPE_END_FRACTION = 0.15f
 private const val SWIPE_STEPS = 10

@@ -27,8 +27,8 @@ internal abstract class ConversationVisibleReadTestSupport {
             .extract<ShadowBiometricManager>(
                 context.getSystemService(android.hardware.biometrics.BiometricManager::class.java),
             ).setCanAuthenticate(true)
-        state.updateRequireAppUnlock(true)
-        assertTrue(state.appLockScreenVisible)
+        state.appLock.updateRequired(true)
+        assertTrue(state.appLock.screenVisible)
     }
 
     /** Builds a native row with two unread messages and an older persisted cursor for overlapping requests. */

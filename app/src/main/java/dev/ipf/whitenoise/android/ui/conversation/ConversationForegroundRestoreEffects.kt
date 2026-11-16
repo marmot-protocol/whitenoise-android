@@ -192,7 +192,7 @@ internal fun ConversationForegroundRestoreEffects(
                     anchored = currentInitialTimelineAnchored,
                     ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation,
                     appReady = controller.appState.phase == AppPhase.Ready,
-                    lockVisible = controller.appState.appLockScreenVisible,
+                    lockVisible = controller.appState.appLock.screenVisible,
                     resumed = lifecycleOwner?.lifecycle?.currentState == Lifecycle.State.RESUMED,
                 )
             },

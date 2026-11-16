@@ -1,0 +1,56 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:toast_couldnt_export_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt",
+        "anchor": "R.string.toast_couldnt_export_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_delete_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt",
+        "anchor": "R.string.toast_couldnt_delete_audit_logs",
+        "test_ids": [
+          "SEC-010"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Empty native and dictation diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt",
+        "anchor": "R.string.toast_no_audit_logs_to_export",
+        "test_ids": [
+          "SEC-009"
+        ]
+      },
+      {
+        "surface": "string:toast_audit_logs_deleted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt",
+        "anchor": "R.string.toast_audit_logs_deleted",
+        "test_ids": [
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "string:toast_no_audit_logs_to_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAuditLogs.kt",
+        "anchor": "R.string.toast_no_audit_logs_to_delete",
+        "test_ids": [
+          "SEC-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

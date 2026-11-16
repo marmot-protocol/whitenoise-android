@@ -176,11 +176,7 @@ class PushTokenRefreshIntegrationTest {
                 fixture.appState.syncNativePushRegistrationIfEnabled()
                 fixture.upsertedPushTokens.clear()
                 token = "second-token"
-                val modeMutex =
-                    WhiteNoiseAppState::class.java
-                        .getDeclaredField("notificationDeliveryModeMutex")
-                        .apply { isAccessible = true }
-                        .get(fixture.appState) as kotlinx.coroutines.sync.Mutex
+                val modeMutex = fixture.appState.notificationDelivery.notificationDeliveryModeMutex
                 modeMutex.lock()
                 var ownsModeLock = true
                 try {
@@ -427,10 +423,10 @@ class PushTokenRefreshIntegrationTest {
                                 checkNotNull(fixture.appState.onPushTokenRotated("latest-callback"))
                             }
                         val sequence =
-                            WhiteNoiseAppState::class.java
+                            NotificationDeliveryController::class.java
                                 .getDeclaredField("pushTokenRotationSequence")
                                 .apply { isAccessible = true }
-                                .get(fixture.appState) as java.util.concurrent.atomic.AtomicLong
+                                .get(fixture.appState.notificationDelivery) as java.util.concurrent.atomic.AtomicLong
                         kotlinx.coroutines.withTimeout(5_000L) {
                             while (sequence.get() < 2L) kotlinx.coroutines.yield()
                         }
@@ -562,10 +558,7 @@ class PushTokenRefreshIntegrationTest {
     }
 
     private fun deliveryMutex(fixture: NotificationBootstrapTestFixture): kotlinx.coroutines.sync.Mutex =
-        WhiteNoiseAppState::class.java
-            .getDeclaredField("notificationDeliveryModeMutex")
-            .apply { isAccessible = true }
-            .get(fixture.appState) as kotlinx.coroutines.sync.Mutex
+        fixture.appState.notificationDelivery.notificationDeliveryModeMutex
 
     /** Waits for the durable registration marker to clear. */
     private suspend fun awaitRegistrationSettled() {

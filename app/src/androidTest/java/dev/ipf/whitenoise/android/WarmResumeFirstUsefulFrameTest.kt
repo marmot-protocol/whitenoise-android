@@ -83,7 +83,7 @@ class WarmResumeFirstUsefulFrameTest {
         val application = composeRule.activity.application as WhiteNoiseApplication
         val expected =
             when {
-                application.appState.appLockScreenVisible -> WarmResumeRenderedSurface.AppLock
+                application.appState.appLock.screenVisible -> WarmResumeRenderedSurface.AppLock
                 application.appState.phase == AppPhase.Onboarding -> WarmResumeRenderedSurface.Onboarding
                 application.appState.phase is AppPhase.Failed -> WarmResumeRenderedSurface.Error
                 application.mainShellProcessState.selectedChat.value != null ->
@@ -97,7 +97,7 @@ class WarmResumeFirstUsefulFrameTest {
         val application = composeRule.activity.application as WhiteNoiseApplication
         composeRule.waitUntil(timeoutMillis = 20_000L) {
             when {
-                application.appState.appLockScreenVisible -> true
+                application.appState.appLock.screenVisible -> true
                 application.appState.phase == AppPhase.Bootstrapping -> false
                 application.appState.phase != AppPhase.Ready -> true
                 else ->

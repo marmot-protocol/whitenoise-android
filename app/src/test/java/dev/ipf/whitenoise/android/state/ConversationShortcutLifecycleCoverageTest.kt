@@ -48,7 +48,8 @@ class ConversationShortcutLifecycleCoverageTest {
     /** Causal facade/coordinator tests execute these entrypoints; the registered gate prevents bypassing them. */
     @Test
     fun lifetimeAndNativeFalseRemainAtTheActualOwnershipMutationBoundaries() {
-        val source = appStateSource().readText()
+        val notificationDeliverySource =
+            appStateSource().resolveSibling("NotificationDeliveryController.kt").readText()
         val bootstrap =
             appStateSection(
                 "private suspend fun startBootstrapRuntime()",
@@ -70,7 +71,8 @@ class ConversationShortcutLifecycleCoverageTest {
         )
         assertTrue(
             "explicit settings must durably supersede cleanup before positive write",
-            "pushTokenStore.clearPendingDisable(account)" in source && "setNativePushEnabledLocked" in source,
+            "pushTokenStore.clearPendingDisable(account)" in notificationDeliverySource &&
+                "setNativePushEnabledLocked" in notificationDeliverySource,
         )
     }
 

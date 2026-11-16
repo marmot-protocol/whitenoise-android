@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.SystemClock
 import android.util.Log
-import android.view.Choreographer
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
@@ -12,8 +11,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import dev.ipf.marmotkit.AgentStreamSubscription
-import dev.ipf.marmotkit.AgentStreamUpdateFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -22,28 +19,22 @@ import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
-import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
-import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.marmotkit.GroupRosterFfi
-import dev.ipf.marmotkit.HistoryNoticeCauseFfi
 import dev.ipf.marmotkit.HistoryNoticeFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
@@ -59,7 +50,6 @@ import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MessageAttachments
@@ -67,16 +57,13 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.core.ReplyNavigation
-import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
-import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
 import dev.ipf.whitenoise.android.diagnostics.CreationOperation
-import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
@@ -92,20 +79,15 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.diagnostics.invitationFailed
 import dev.ipf.whitenoise.android.diagnostics.projectionFinished
 import dev.ipf.whitenoise.android.diagnostics.traceInvitation
-import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.OutgoingSend
 import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
-import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
-import dev.ipf.whitenoise.android.media.shouldCommitPrimaryGroupImageMutation
 import dev.ipf.whitenoise.android.ui.conversation.media.isPendingVideo
 import dev.ipf.whitenoise.android.ui.conversation.media.nativeFileBackedSendLimits
 import dev.ipf.whitenoise.android.ui.conversation.media.pendingVideoPosterFrame
-import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
-import dev.ipf.whitenoise.android.ui.conversation.nostr.mayRenderNostrEventCard
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -117,29 +99,18 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.yield
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.coroutineContext
-import kotlin.coroutines.resume
 
 /**
  * The two deletion scopes a user may apply to one message. This is the single
@@ -224,9 +195,9 @@ internal enum class OptimisticSendPhase {
     CANCELLED,
 }
 
-private class OptimisticSendCancelledException : Exception("Optimistic send cancelled before admission")
+internal class OptimisticSendCancelledException : Exception("Optimistic send cancelled before admission")
 
-private const val MAX_CANCELLED_SEND_TOMBSTONES = 64
+internal const val MAX_CANCELLED_SEND_TOMBSTONES = 64
 
 /** Shared membership gate for optimistic work that the engine later validates. */
 private fun canAcceptSeededMemberMutation(
@@ -359,7 +330,7 @@ internal suspend fun removeMediaMemoryCacheKeys(
  * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
  * the file to be materialized and read again (#2732). A photo decodes in [domain]'s worker.
  */
-private suspend fun decodeMediaThumbnailOffMain(
+internal suspend fun decodeMediaThumbnailOffMain(
     attachment: PendingAttachment,
     domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
@@ -408,18 +379,18 @@ internal fun groupStateUpdateRemovesSelf(
 ): Boolean = !previous.hasSettledDeparture() && update.hasSettledDeparture()
 
 /** Pending LEFT can still resolve to a joined account after cancellation. */
-private fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
+internal fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
     selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
 
 /** Distinguishes an actual eviction from a provisional voluntary departure. */
-private fun SelfMembershipFfi.isGroupEviction(): Boolean =
+internal fun SelfMembershipFfi.isGroupEviction(): Boolean =
     when (this) {
         SelfMembershipFfi.REMOVED, SelfMembershipFfi.DEVICE_REMOVED -> true
         SelfMembershipFfi.MEMBER, SelfMembershipFfi.LEFT -> false
     }
 
 /** A readback can rejoin only an active, confirmed group with no outstanding leave request. */
-private fun AppGroupRecordFfi.isJoinedAfterLeave(): Boolean =
+internal fun AppGroupRecordFfi.isJoinedAfterLeave(): Boolean =
     selfMembership == SelfMembershipFfi.MEMBER &&
         !leaveRequestPending &&
         !leaveBlocked &&
@@ -453,11 +424,11 @@ internal fun agentStreamFailureText(
     return copy.streamFailed()
 }
 
-private const val MARMOT_DELETE_EVENT_KIND = 5uL
-private const val MARMOT_REACTION_EVENT_KIND = 7uL
+internal const val MARMOT_DELETE_EVENT_KIND = 5uL
+internal const val MARMOT_REACTION_EVENT_KIND = 7uL
 
 /** Delivery changes can carry the peer reaction that confirms a previously failed send. */
-private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
+internal fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
     when (this) {
         TimelineUpdateTriggerFfi.REACTION_ADDED,
         TimelineUpdateTriggerFfi.REACTION_REMOVED,
@@ -537,7 +508,7 @@ internal fun conversationSearchPageDirection(
 // Cap on the live-projected timeline window (≈4 pages). Bounds memory for a
 // long-open, busy conversation while leaving ample scroll headroom before
 // loadOlder() must re-fetch.
-private const val LIVE_TIMELINE_WINDOW_CAP = 200
+internal const val LIVE_TIMELINE_WINDOW_CAP = 200
 
 // Cap on how many subscription windows one coalesced batch can absorb. A
 // runaway producer shouldn't be able to wedge the UI behind an unbounded
@@ -586,7 +557,7 @@ internal fun conversationIdentityProjection(
     )
 }
 
-private enum class GroupAdministrationCommitOutcome {
+internal enum class GroupAdministrationCommitOutcome {
     COMMITTED,
     ROSTER_CHANGED,
     KEEP_ONE_ADMIN,
@@ -638,7 +609,7 @@ internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFf
 internal typealias MediaThumbnailDecoder =
     suspend (PendingAttachment, dev.ipf.whitenoise.android.media.MediaTrustDomain) -> android.graphics.Bitmap?
 
-private const val MESSAGE_EDIT_EVENT_KIND = 1009uL
+internal const val MESSAGE_EDIT_EVENT_KIND = 1009uL
 
 class ConversationController(
     internal val appState: WhiteNoiseAppState,
@@ -655,57 +626,58 @@ class ConversationController(
     // active account catches up.
     accountRefOverride: String? = null,
     private val startOnConstruction: Boolean = false,
-    private val copy: ConversationControllerCopy = ConversationControllerCopy(),
-    private val groupRosterReader: suspend (String, String) -> GroupRosterFfi = { account, groupIdHex ->
+    internal val copy: ConversationControllerCopy = ConversationControllerCopy(),
+    internal val groupRosterReader: suspend (String, String) -> GroupRosterFfi = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.REFRESH_GROUP_ROSTER) {
             groupRoster(account, groupIdHex)
         }
     },
-    private val groupRecoveryStatusReader: suspend (String, String) -> GroupRecoveryStatusFfi = { account, groupIdHex ->
-        appState.marmotIo {
-            groupRecoveryStatus(account, groupIdHex)
-        }
-    },
+    internal val groupRecoveryStatusReader: suspend (String, String) -> GroupRecoveryStatusFfi =
+        { account, groupIdHex ->
+            appState.marmotIo {
+                groupRecoveryStatus(account, groupIdHex)
+            }
+        },
     // Test seams: whether MDK parked this chat's convergence, the explicit retry, and the raw event stream.
-    private val groupConvergenceParkedReader: suspend (String, String) -> Boolean = { account, groupIdHex ->
+    internal val groupConvergenceParkedReader: suspend (String, String) -> Boolean = { account, groupIdHex ->
         appState.marmotIo { groupMlsState(account, groupIdHex).convergenceParked }
     },
     private val groupConvergenceRetrier: suspend (String, String) -> Unit = { account, groupIdHex ->
         appState.marmotIo { retryGroupConvergence(account, groupIdHex) }
     },
     // MDK's runtime event firehose, the only stream that carries a chat's park and resume edges.
-    private val runtimeEventStreamOpener: suspend () -> RuntimeEventStream = { appState.openRuntimeEventStream() },
+    internal val runtimeEventStreamOpener: suspend () -> RuntimeEventStream = { appState.openRuntimeEventStream() },
     private val historyNoticeDismisser: suspend (String, String) -> Boolean = { account, noticeId ->
         appState.marmotIo { dismissHistoryNotice(account, noticeId) }
     },
-    private val historyNoticesReader: suspend (String) -> List<HistoryNoticeFfi> = { account ->
+    internal val historyNoticesReader: suspend (String) -> List<HistoryNoticeFfi> = { account ->
         appState.marmotIo { historyNotices(account) }
     },
-    private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
+    internal val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     // Test seams: the user's own emoji a text uses, and the send that carries them.
-    private val customEmojiReader: (suspend (String) -> List<LocalEmojiArtwork>)? = null,
-    private val customEmojiSender: CustomEmojiSender? = null,
-    private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
+    internal val customEmojiReader: (suspend (String) -> List<LocalEmojiArtwork>)? = null,
+    internal val customEmojiSender: CustomEmojiSender? = null,
+    internal val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
     },
-    private val pendingMessageEditPublisher: PendingMessageEditPublisher? = null,
-    private val pendingEditStatusReader: suspend (String, String, String) -> dev.ipf.marmotkit.LocalSendStatusFfi? =
+    internal val pendingMessageEditPublisher: PendingMessageEditPublisher? = null,
+    internal val pendingEditStatusReader: suspend (String, String, String) -> dev.ipf.marmotkit.LocalSendStatusFfi? =
         { account, groupId, token -> appState.marmotIo { localSendStatus(account, groupId, token) } },
-    private val mediaUploader: MediaUploader? = null,
-    private val mediaFileUploader: MediaFileUploader? = null,
+    internal val mediaUploader: MediaUploader? = null,
+    internal val mediaFileUploader: MediaFileUploader? = null,
     // The native per-send ciphertext bound for file-backed uploads; null when MarmotKit cannot report it.
-    private val fileBatchCiphertextBytes: () -> Long? = { nativeFileBackedSendLimits()?.batchCiphertextBytes },
-    private val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
+    internal val fileBatchCiphertextBytes: () -> Long? = { nativeFileBackedSendLimits()?.batchCiphertextBytes },
+    internal val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
         appState.marmotIo {
             references.map { reference -> buildMediaImetaTag(account, groupIdHex, reference) }
         }
     },
-    private val mediaPublisher: MediaPublisher? = null,
+    internal val mediaPublisher: MediaPublisher? = null,
     // A just-sent pick decodes in its sent draft's domain, whose worker retires once the send has ended.
-    private val mediaThumbnailDecoder: MediaThumbnailDecoder = { attachment, domain ->
+    internal val mediaThumbnailDecoder: MediaThumbnailDecoder = { attachment, domain ->
         decodeMediaThumbnailOffMain(attachment, domain)
     },
-    private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
+    internal val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
             appState.marmotIo { setGroupArchived(account, groupIdHex, archived) }
@@ -716,8 +688,8 @@ class ConversationController(
                 appState.marmotIo { updateGroupProfile(account, groupIdHex, name, description) }
             }
         },
-    private val clockMillis: () -> Long = System::currentTimeMillis,
-    private val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
+    internal val clockMillis: () -> Long = System::currentTimeMillis,
+    internal val inviteAcceptor: InviteAcceptor = { account, groupIdHex ->
         appState.marmotIo(MarmotTraceSection.ACCEPT_GROUP_INVITE) {
             acceptGroupInvite(account, groupIdHex)
         }
@@ -744,13 +716,13 @@ class ConversationController(
             }
         },
 ) {
-    private val liveSubscriptions = appState.conversationLiveSubscriptions()
+    internal val liveSubscriptions = appState.conversationLiveSubscriptions()
 
-    private var inviteConfirmationUnresolved by mutableStateOf(initialInviteConfirmationUnresolved)
-    private var inviteAuthorityReadInFlight = false
+    internal var inviteConfirmationUnresolved by mutableStateOf(initialInviteConfirmationUnresolved)
+    internal var inviteAuthorityReadInFlight = false
     internal var inviteAcceptanceResolutionState by mutableStateOf(GroupRosterLoadState.LOADING)
-        private set
-    private val inviteConfirmationAuthority = InviteConfirmationAuthority(initialGroup)
+        internal set
+    internal val inviteConfirmationAuthority = InviteConfirmationAuthority(initialGroup)
     var group by mutableStateOf(
         inviteConfirmationAuthority
             .reconcile(
@@ -758,9 +730,9 @@ class ConversationController(
                 establishesAcceptance = !initialInviteConfirmationUnresolved,
             ).let { if (initialInviteConfirmationUnresolved) it.copy(pendingConfirmation = false) else it },
     )
-        private set
+        internal set
 
-    private val mutationPresentation =
+    internal val mutationPresentation =
         ConversationMutationPresentation(
             ownsPresentation = {
                 !controllerCleared &&
@@ -772,16 +744,16 @@ class ConversationController(
     // A typed native refusal proves only that this Welcome is no longer
     // pending. Keep its action retired until an authoritative roster resolves
     // whether the account is already a member or has left/been removed.
-    private var inviteAcceptanceAwaitingAuthority by mutableStateOf<InviteAcceptanceGeneration?>(null)
+    internal var inviteAcceptanceAwaitingAuthority by mutableStateOf<InviteAcceptanceGeneration?>(null)
 
     internal val inviteAcceptanceResolutionPending: Boolean
         get() = inviteConfirmationUnresolved || inviteAcceptanceAwaitingAuthority != null
 
-    private val ownsInviteAcceptanceResult: Boolean
+    internal val ownsInviteAcceptanceResult: Boolean
         get() = !controllerCleared && !isAccountTeardownRequested()
 
     /** Metadata refreshes may cross Join; a different Welcome or terminal observation may not. */
-    private fun ownsInviteAttempt(attempt: InviteAcceptanceAttempt): Boolean =
+    internal fun ownsInviteAttempt(attempt: InviteAcceptanceAttempt): Boolean =
         ownsInviteAcceptanceResult &&
             !inviteConfirmationUnresolved &&
             inviteConfirmationAuthority.revision == attempt.inviteRevision &&
@@ -797,13 +769,13 @@ class ConversationController(
     val presentedArchived: Boolean
         get() = mutationPresentation.presentedArchived(group.archived)
 
-    private var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
+    internal var acceptedInvitePeerAccount by mutableStateOf<String?>(null)
 
     // Retains a locally committed rename against a stale group-state snapshot (#2696).
-    private val localGroupNames = LocalGroupFieldAuthority()
+    internal val localGroupNames = LocalGroupFieldAuthority()
 
     // The same retention for a just-committed description, so a pre-edit snapshot cannot restore it (#3704).
-    private val localGroupDescriptions = LocalGroupFieldAuthority()
+    internal val localGroupDescriptions = LocalGroupFieldAuthority()
 
     /**
      * Latest chat-list projection for this conversation, kept live even while
@@ -828,7 +800,7 @@ class ConversationController(
      * avatar fails. MDK gives URL avatars precedence, so retain this transient
      * retry latch and avoid uploading the same bytes again on the next tap.
      */
-    private var pendingLegacyAvatarClearAfterImageMutationKey: String? = null
+    internal var pendingLegacyAvatarClearAfterImageMutationKey: String? = null
 
     // Hex of the conversation's own account. Captured like
     // conversationAccountRef so display/permission/"is me" helpers stay tied to
@@ -838,7 +810,7 @@ class ConversationController(
     // A pinned controller never falls back to the active account: an override
     // whose label is missing resolves to null, which fails closed ("is me",
     // admin, and composer gates all deny) instead of mixing two accounts.
-    private val conversationAccountIdHex =
+    internal val conversationAccountIdHex =
         if (accountRefOverride != null) {
             appState.accounts.firstOrNull { it.label == accountRefOverride }?.accountIdHex
         } else {
@@ -848,7 +820,7 @@ class ConversationController(
     private val membershipSeed = conversationMembershipSeed(initialGroup, initialMemberSnapshot, conversationAccountIdHex)
 
     var members by mutableStateOf<List<AppGroupMemberRecordFfi>>(membershipSeed.members)
-        private set
+        internal set
 
     internal val membershipTimings = GroupMembershipTimings()
     private val optimisticGroupRosterMutation =
@@ -884,7 +856,7 @@ class ConversationController(
     // Use cached members immediately to avoid a blank composer gap while the
     // first refresh verifies the roster.
     var membersLoaded by mutableStateOf(membershipSeed.membersLoaded)
-        private set
+        internal set
 
     // True when the projected self-membership or cached roster positively places
     // the active account in the group. Lets the bottom bar show the composer
@@ -912,9 +884,9 @@ class ConversationController(
     val seededMembershipKnown: Boolean = membershipSeed.seededMembershipKnown
 
     var membersVerified by mutableStateOf(membershipSeed.membersVerified)
-        private set
+        internal set
 
-    private val memberRosterLoadTracker =
+    internal val memberRosterLoadTracker =
         GroupRosterLoadTracker(
             if (membershipSeed.membersVerified) {
                 GroupRosterLoadState.READY
@@ -928,13 +900,13 @@ class ConversationController(
 
     /** The settled branch that left the roster unverified, cleared by the next verified roster. */
     internal var rosterBlockReason by mutableStateOf<GroupRosterBlockReason?>(null)
-        private set
+        internal set
 
-    private val memberRosterRefreshGeneration = StalenessGuard()
+    internal val memberRosterRefreshGeneration = StalenessGuard()
 
     // Invalidated when a timeline page or live subscription batch lands so an
     // in-flight full-page refresh cannot clobber newer state (#1849).
-    private val timelineWindowGeneration = StalenessGuard()
+    internal val timelineWindowGeneration = StalenessGuard()
     internal val windowPresentationTiming = appState.conversationWindowPresentationTiming()
 
     // Authoritative local self-leave marker (issue #787). Short-lived lifecycle
@@ -958,21 +930,21 @@ class ConversationController(
     // refreshMembers() could re-add self and revert the left state (the exact
     // #787 repro). These seed paths are the same local evidence the composer
     // gate uses for its initial NOTICE.
-    private val selfMembership =
+    internal val selfMembership =
         ConversationSelfLeftState(seededMembershipKnown, seededSelfMember, membershipSeed.accountStaysOnRoster)
 
     // A snapshot map (not mutableStateOf<Map>) so a bubble reading one key isn't
     // recomposed when a different message's reactions change.
-    private val reactionsState = mutableStateMapOf<String, List<ReactionTally>>()
+    internal val reactionsState = mutableStateMapOf<String, List<ReactionTally>>()
     val reactions: Map<String, List<ReactionTally>> get() = reactionsState
     var deletedMessageIds by mutableStateOf<Set<String>>(emptySet())
-        private set
+        internal set
 
     // One-shot invalidation mailbox for UI snapshots held outside the bounded
     // timeline. ConversationScreen acknowledges each batch after reconciliation,
     // so removed IDs do not become a second long-lived message index.
     var pendingTimelineRemovedMessageIds by mutableStateOf<Set<String>>(emptySet())
-        private set
+        internal set
     private var replySelection by mutableStateOf<AppMessageRecordFfi?>(null)
 
     /** Distinguishes a new selection of the same message from the reply an in-flight send captured. */
@@ -1007,10 +979,10 @@ class ConversationController(
      * retry/discard affordance a failed send shows. Mirrors the
      * [optimisticMessages] map: local-first display, reconciled on engine echo.
      */
-    private val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
-    private val pendingMessageEditHandoff: PendingMessageEditHandoff get() = appState.pendingMessageEditHandoff
+    internal val optimisticEdits = mutableStateMapOf<String, OptimisticEdit>()
+    internal val pendingMessageEditHandoff: PendingMessageEditHandoff get() = appState.pendingMessageEditHandoff
 
-    private fun pendingEditKey(token: String): String = "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$token"
+    internal fun pendingEditKey(token: String): String = "${conversationAccountRef.orEmpty()}|${group.groupIdHex}|$token"
 
     /** Set when the user has tapped Edit on a kind-9 they sent — the composer
      * banner reflects this and the next [send] routes through [editMessage]
@@ -1049,7 +1021,7 @@ class ConversationController(
         mutableStateOf(
             conversationStartsLoading(startOnConstruction, accountRefOverride, appState.activeAccountRef),
         )
-        private set
+        internal set
     internal var pageLoadInFlight by mutableStateOf<ConversationSearchPageDirection?>(null)
         internal set
     var hasMoreBefore by mutableStateOf(false)
@@ -1060,10 +1032,10 @@ class ConversationController(
     val mutationInFlight: Boolean get() = mutationPresentation.inFlight
     var lastMutationError: ErrorPresentation?
         get() = mutationPresentation.error
-        private set(value) {
+        internal set(value) {
             if (value == null) mutationPresentation.clearError() else mutationPresentation.recordFailure(value)
         }
-    private var subscriptionError by mutableStateOf<ErrorPresentation?>(null)
+    internal var subscriptionError by mutableStateOf<ErrorPresentation?>(null)
     internal var pageError by mutableStateOf<ErrorPresentation?>(null)
     val error: ErrorPresentation?
         get() = pageError ?: subscriptionError
@@ -1073,7 +1045,7 @@ class ConversationController(
     // staleness-exempt: observable retry trigger; nullable snapshots below retain its value.
     var retryGeneration by mutableLongStateOf(0L)
         private set
-    private var terminalLoadFailure = false
+    internal var terminalLoadFailure = false
     internal var failedPageDirection: ConversationSearchPageDirection? = null
 
     fun clearLastMutationError() {
@@ -1095,18 +1067,18 @@ class ConversationController(
         }
     }
 
-    private fun Throwable.rethrowIfCancellation() {
+    internal fun Throwable.rethrowIfCancellation() {
         if (this is CancellationException) throw this
     }
 
     /** Admits one UI mutation while keeping its execution in the caller/app-owned scope. */
-    private suspend fun <T> withMutationLockResult(
+    internal suspend fun <T> withMutationLockResult(
         defaultValue: T,
         block: suspend () -> T,
     ): T = mutationPresentation.runIfIdle(defaultValue, block)
 
-    private val conversationAccountRef = accountRefOverride ?: appState.activeAccountRef
-    private val conversationRuntimeGeneration = appState.runtimeGeneration
+    internal val conversationAccountRef = accountRefOverride ?: appState.activeAccountRef
+    internal val conversationRuntimeGeneration = appState.runtimeGeneration
     internal val boundAccountRef: String?
         get() = conversationAccountRef
 
@@ -1161,33 +1133,33 @@ class ConversationController(
     internal val boundAccountIdHex: String?
         get() = conversationAccountIdHex
 
-    private fun presentConversationTransient(
+    internal fun presentConversationTransient(
         @StringRes titleRes: Int,
     ) {
         val accountRef = conversationAccountRef ?: return
         appState.presentConversationTransient(accountRef, group.groupIdHex, titleRes)
     }
 
-    private fun presentConversationTransient(title: AppText) {
+    internal fun presentConversationTransient(title: AppText) {
         val accountRef = conversationAccountRef ?: return
         appState.presentConversationTransient(accountRef, group.groupIdHex, title)
     }
 
-    private val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
-    private val messageById = linkedMapOf<String, AppMessageRecordFfi>()
+    internal val mediaUploadSessionEpoch = appState.mediaUploadSessionEpoch()
+    internal val messageById = linkedMapOf<String, AppMessageRecordFfi>()
     internal val timelineRecords = linkedMapOf<String, TimelineMessageRecordFfi>()
 
     /** Whether [messageIdHex] is an authoritative row of the current window rather than a local optimistic id. */
     internal fun retainsTimelineRecord(messageIdHex: String): Boolean = timelineRecords.containsKey(messageIdHex)
 
     internal val timelineItemsById = linkedMapOf<String, TimelineMessage>()
-    private val timelineOrder = mutableListOf<String>()
+    internal val timelineOrder = mutableListOf<String>()
     internal val authoritativeTimelineOrderByMessageId = linkedMapOf<String, ULong>()
-    private val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
-    private val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
-    private val optimisticSendPhases =
+    internal val durableStreamDisplayParentByMessageId = mutableMapOf<String, String>()
+    internal val optimisticMessages = appState.optimisticMessages(conversationAccountRef, initialGroup.groupIdHex)
+    internal val optimisticSendPhases =
         appState.optimisticSendPhases(conversationAccountRef, initialGroup.groupIdHex)
-    private val durableAcceptanceCallbacks =
+    internal val durableAcceptanceCallbacks =
         appState.durableAcceptanceCallbacks(conversationAccountRef, initialGroup.groupIdHex)
     private val initialTimeline =
         initialConversationTimeline(
@@ -1202,20 +1174,20 @@ class ConversationController(
 
     /** True only until MDK's first authoritative page replaces the construction seed. */
     var initialTimelineSeedActive by mutableStateOf(hadInitialTimelineSeed)
-        private set
+        internal set
 
     var timeline by mutableStateOf(initialTimeline)
-        private set
+        internal set
 
     /** UI identity aliases only, bounded to this controller's retained timeline window. */
-    private val timelinePresentationIds = mutableMapOf<String, String>()
+    internal val timelinePresentationIds = mutableMapOf<String, String>()
 
     /** Recovery generation represented by the latest authoritative timeline. */
     var recoveryProjectionGeneration by mutableLongStateOf(0L)
-        private set
+        internal set
 
     var hasPublishedAuthoritativeTimeline by mutableStateOf(false)
-        private set
+        internal set
 
     /**
      * Test-only seam: navigation promotes a chat-list tap only after the authoritative page publishes, and
@@ -1228,7 +1200,7 @@ class ConversationController(
 
     /** Local sender metadata needed for a settled first presentation is ready. */
     var hasPreparedInitialPresentation by mutableStateOf(false)
-        private set
+        internal set
 
     /**
      * True while the first authoritative page names event cards and is held unpublished until their cached state has
@@ -1237,24 +1209,24 @@ class ConversationController(
      * Changes made meanwhile, a send included, publish with the page, at most the card budget after it arrived.
      */
     var isHoldingInitialPageForEventCards by mutableStateOf(false)
-        private set
+        internal set
 
     /** The engine proved this conversation is no longer available to the account. */
     var terminalConversationUnavailable by mutableStateOf(false)
-        private set
+        internal set
 
     /** Current engine-owned recovery evidence for this conversation. */
     var groupRecoveryStatus by mutableStateOf<GroupRecoveryStatusFfi?>(null)
-        private set
-    private val groupRecoveryLifetime = StalenessGuard()
+        internal set
+    internal val groupRecoveryLifetime = StalenessGuard()
 
     /** Whether the latest recovery-status read failed while prior evidence stays inspectable. */
     var groupRecoveryReadFailed by mutableStateOf(false)
-        private set
+        internal set
 
     /** Whether this group's first shown history notice says the account rejoined, so older messages may be missing. */
     var groupHistoryNoticeRejoined by mutableStateOf(false)
-        private set
+        internal set
 
     /** Prevents duplicate accept/decline actions while MDK verifies the selected invitation. */
     var groupRecoveryMutationInFlight by mutableStateOf(false)
@@ -1262,7 +1234,7 @@ class ConversationController(
 
     /** The last answer MDK gave to whether it parked this chat's convergence, kept when a later read fails. */
     var groupConvergenceParked by mutableStateOf(false)
-        private set
+        internal set
 
     /** Whether the user's explicit convergence retry is running. */
     var groupConvergenceRetrying by mutableStateOf(false)
@@ -1271,21 +1243,21 @@ class ConversationController(
     /** Why the latest convergence retry left the chat parked, as a localized message, or null. */
     @get:StringRes
     var groupConvergenceRetryFailure by mutableStateOf<Int?>(null)
-        private set
+        internal set
 
     // Only the newest parked-flag read may publish, so a slow earlier read cannot overwrite a later answer.
-    private val groupConvergenceReads = StalenessGuard()
+    internal val groupConvergenceReads = StalenessGuard()
 
     // One parked-flag read runs at a time, and requests made meanwhile fold into a single read after it.
-    private val groupConvergenceReadGate = Mutex()
-    private val groupConvergenceReadRequested = AtomicBoolean(false)
+    internal val groupConvergenceReadGate = Mutex()
+    internal val groupConvergenceReadRequested = AtomicBoolean(false)
 
     /** Rereads in a row that were scheduled because a group-state edge made the previous answer stale. */
-    private var groupConvergenceStaleRereads = 0
+    internal var groupConvergenceStaleRereads = 0
 
     // Completes once the conversation's first open settles, so the parked read never waits ahead of it.
-    private val groupConvergenceOpenSettled = CompletableDeferred<Unit>()
-    private val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
+    internal val groupConvergenceOpenSettled = CompletableDeferred<Unit>()
+    internal val projectedMessageIds = appState.projectedMessageIds(conversationAccountRef, initialGroup.groupIdHex)
     internal val localTimelineOrderOverrides =
         appState.timelineOrderOverrides(conversationAccountRef, initialGroup.groupIdHex)
     internal val localTimelineTimestampOverrides =
@@ -1296,18 +1268,18 @@ class ConversationController(
     // once their optimistic bubble is gone, so a stale one can't pin a confirmed
     // row above a newer neighbour (#1578). Ownership lives in AppState alongside
     // the overrides so a replacement controller can finish the cleanup.
-    private val optimisticSendPositionPreserves =
+    internal val optimisticSendPositionPreserves =
         appState.optimisticSendPositionPreserves(conversationAccountRef, initialGroup.groupIdHex)
-    private val retentionAtSendByMessageId =
+    internal val retentionAtSendByMessageId =
         appState.retentionAtSend(conversationAccountRef, initialGroup.groupIdHex)
 
     // Unlike immediately published text, accepted-pending text keeps its
     // temporary optimistic id. Retain MDK's canonical id across controller
     // replacement so the eventual projection settles the exact bubble.
-    private val acceptedPendingTextOptimisticIds =
+    internal val acceptedPendingTextOptimisticIds =
         appState.acceptedPendingTextOptimisticIds(conversationAccountRef, initialGroup.groupIdHex)
-    private val preservedTimelinePositionOverrideIds = mutableSetOf<String>()
-    private val durableStreamPositionOverrideIds = mutableSetOf<String>()
+    internal val preservedTimelinePositionOverrideIds = mutableSetOf<String>()
+    internal val durableStreamPositionOverrideIds = mutableSetOf<String>()
 
     // Holding pen for media projection echoes that arrive while their
     // matching bridge is still mid-`sendMediaAttachments`. Shared via
@@ -1317,17 +1289,17 @@ class ConversationController(
     // to (or vice-versa).
     internal val pendingProjectionsAwaitingBridge =
         appState.pendingProjectionsAwaitingBridge(conversationAccountRef, initialGroup.groupIdHex)
-    private val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
-    private val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
-    private val reactionIntentConflator = ReactionIntentConflator()
+    internal val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
+    internal val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
+    internal val reactionIntentConflator = ReactionIntentConflator()
 
     internal val window = ConversationWindowState()
-    private val timelineSession =
+    internal val timelineSession =
         ConversationTimelineSession(onTimelineRetired = { window.readySubscription = null })
-    private val controllerScope = timelineSession.scope
+    internal val controllerScope = timelineSession.scope
 
     /** First-frame snapshots of this conversation's public event cards, read from MDK before rows show (#2238). */
-    private val eventCardPresentation =
+    internal val eventCardPresentation =
         ConversationEventCardPresentation(
             appState = appState,
             conversationAccountRef = conversationAccountRef,
@@ -1337,7 +1309,7 @@ class ConversationController(
             initialPresentationReady = { hasPreparedInitialPresentation },
         )
     internal val eventCardSnapshots get() = eventCardPresentation.eventCardSnapshots
-    private val initialPresentationWarmCoordinator =
+    internal val initialPresentationWarmCoordinator =
         ConversationInitialPresentationWarmCoordinator(
             scope = controllerScope,
             warmProfiles = { senders -> appState.warmProfilePresentationsBlocking(senders) },
@@ -1348,7 +1320,7 @@ class ConversationController(
                 hasPreparedInitialPresentation = true
             },
         )
-    private val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    internal val inviteStreamScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val attachmentPresentation =
         ConversationAttachmentPresentation(
             appState = appState,
@@ -1376,17 +1348,17 @@ class ConversationController(
         get() = timelineSession.timelineSubscription
     internal val liveSubscriptionLock: Any get() = timelineSession.lock
     internal val timelineSubscriptionActiveCallMutex: Mutex get() = timelineSession.activeCallMutex
-    private val conversationScope: CoroutineScope? get() = timelineSession.currentScope
+    internal val conversationScope: CoroutineScope? get() = timelineSession.currentScope
     internal val accountTeardownRequested: Boolean get() = timelineSession.accountTeardownRequested
-    private val controllerCleared: Boolean get() = timelineSession.cleared
+    internal val controllerCleared: Boolean get() = timelineSession.cleared
 
     internal val inboundVisibleHostAttempt = HostPerformanceAttemptSlot()
     internal var inboundVisibleHostGeneration by mutableLongStateOf(0L)
         private set
     private val outboundVisibleHostAttempts = HostPerformanceAttemptRegistry()
-    private val activeStreamIds = mutableSetOf<String>()
-    private val foregroundSweepScheduleSignals = Channel<Unit>(Channel.CONFLATED)
-    private var lastForegroundSweepStartedAtMillis = 0L
+    internal val activeStreamIds = mutableSetOf<String>()
+    internal val foregroundSweepScheduleSignals = Channel<Unit>(Channel.CONFLATED)
+    internal var lastForegroundSweepStartedAtMillis = 0L
 
     // Transient streaming-debug rows keyed by their synthetic timeline id.
     // Lifecycle-scoped UI state for the live agent-stream watch — NOT a
@@ -1394,15 +1366,15 @@ class ConversationController(
     // developer toggle is on, are never written to the White Noise store, and
     // are dropped wholesale when the toggle turns off. Bounded so a long-lived
     // agent-heavy conversation can't grow them without limit.
-    private val streamDebugTimelineItems = linkedMapOf<String, TimelineMessage>()
+    internal val streamDebugTimelineItems = linkedMapOf<String, TimelineMessage>()
 
     // staleness-exempt: ordered synthetic debug-row identifier, not a latest-wins guard.
-    private var streamDebugEventSequence: ULong = 0uL
+    internal var streamDebugEventSequence: ULong = 0uL
 
     // Bounded LRU set: tombstones are capped so an agent-heavy conversation
     // kept open for a long time can't grow memory or per-batch filter cost
     // without bound. See #200.
-    private val removedStreamIds = BoundedStreamTombstones()
+    internal val removedStreamIds = BoundedStreamTombstones()
     internal var hasLoadedOlderPages = false
 
     // Snapshot of message ids in the deliberately-loaded history window after the
@@ -1415,28 +1387,28 @@ class ConversationController(
     // watermark rather than the scroll position.
     var lastReadMessageId: String? by
         mutableStateOf(initialChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() })
-        private set
+        internal set
 
     // A persisted watermark is not a read performed during this visit. The
     // first settled visible message must reach MDK even when the watermark
     // stays unchanged: MDK also clears manual unread attention on that read.
-    private var lastSubmittedReadMessageId: String? = null
-    private var manualUnreadReminderConsumed = false
-    private var nextReadRequestId = 0L
-    private var lastReadRequestId = 0L
-    private val pendingReadRequestIds = mutableSetOf<Long>()
-    private var lastSuccessfulReadRequestId = 0L
-    private var successfulReadWithoutRow: Pair<ChatListRowFfi?, String>? = null
+    internal var lastSubmittedReadMessageId: String? = null
+    internal var manualUnreadReminderConsumed = false
+    internal var nextReadRequestId = 0L
+    internal var lastReadRequestId = 0L
+    internal val pendingReadRequestIds = mutableSetOf<Long>()
+    internal var lastSuccessfulReadRequestId = 0L
+    internal var successfulReadWithoutRow: Pair<ChatListRowFfi?, String>? = null
 
     // Persisted read watermark from the chat-list projection / mark-read FFI.
     // Drives read-anchored disappearing-message deferral (#797).
-    private var persistedLastReadTimelineAt: ULong? = initialChatListRow?.lastReadTimelineAt
+    internal var persistedLastReadTimelineAt: ULong? = initialChatListRow?.lastReadTimelineAt
 
     // Session display/read anchors for received rows and local optimistic
     // sends. They override send-time expiry only when the row also carries
     // its pinned retention duration; projected sends otherwise use MDK's
     // authoritative deadline.
-    private val readAnchoredAtSeconds = mutableMapOf<String, ULong>()
+    internal val readAnchoredAtSeconds = mutableMapOf<String, ULong>()
 
     val title: String
         get() = title()
@@ -1649,186 +1621,6 @@ class ConversationController(
         timelineSession.start(retryGeneration) { runStart(account) }
     }
 
-    /** Presents startup outcomes while the timeline session owns admission and finalization. */
-    private suspend fun runStart(account: String) {
-        isLoading = true
-        terminalConversationUnavailable = false
-        subscriptionError = null
-        pageError = null
-        terminalLoadFailure = false
-        try {
-            timelineSession.runReadScope {
-                // Global relay catch-up is owned by the chat-list/foreground
-                // lifecycle. The timeline and group handles below subscribe to
-                // local projections, so opening them does not need another
-                // account-worker sync; reactions render their optimistic overlay
-                // before any authoritative commit waits for that worker.
-                // Local NIP-40 enforcement (#333) + secure delete (#334): on open
-                // and then at the next loaded row's expiry boundary, securely wipe
-                // plaintext past the retention window via the engine and re-publish
-                // so rows leave the open timeline while the user is still watching.
-                // The timer is lifecycle-bound to this conversation and is
-                // rescheduled by timeline/group-state publishes; when there is no
-                // loaded row near expiry it falls back to the old slow cadence.
-                val foregroundSweepJob = launch { runForegroundDisappearingMessageSweep(account) }
-                val convergenceEventsJob = launch { runGroupConvergenceEventLoop(account) }
-                try {
-                    runConversationSubscriptionLoop(account)
-                } finally {
-                    // A terminal initial-open failure returns normally from
-                    // the subscription loop. Stop its infinite sibling so
-                    // runStart can finish and release its lifecycle state.
-                    foregroundSweepJob.cancel()
-                    convergenceEventsJob.cancel()
-                }
-            }
-        } catch (cancel: CancellationException) {
-            // Expected when the conversation screen leaves the composition.
-            // Re-throw so cancellation propagates and we don't log it as an
-            // error.
-            throw cancel
-        } catch (throwable: Throwable) {
-            windowPresentationTiming.fail()
-            if (throwable.isUseAfterEviction()) {
-                discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
-                markActiveAccountRemovedFromMembers(account)
-                isLoading = false
-                terminalConversationUnavailable = true
-                subscriptionError = null
-                pageError = null
-                return
-            }
-            discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
-            isLoading = false
-            subscriptionError = privacySafeErrorPresentation("CONVERSATION_LOAD", throwable)
-            terminalLoadFailure = true
-        }
-    }
-
-    private fun discardInitialTimelineSeedForFailure(preserveOptimisticMessages: Boolean) {
-        if (!shouldDiscardInitialTimelineSeedForFailure(hasPublishedAuthoritativeTimeline)) return
-        // A failure resolves the first presentation, so a page held for its cards must not stay hidden.
-        isHoldingInitialPageForEventCards = false
-        initialTimelineSeedActive = false
-        if (preserveOptimisticMessages) {
-            publishTimelineFromIndexes()
-        } else {
-            // Use-after-eviction means this account no longer owns the group.
-            // Do not keep any plaintext row visible under an unavailable owner.
-            timeline = emptyList()
-        }
-        // Failure is an authoritative resolution of the initial presentation:
-        // there is no page left to await. Let the route reconcile/reveal the
-        // retained optimistic rows or switch to its terminal-unavailable surface.
-        hasPublishedAuthoritativeTimeline = true
-        hasPreparedInitialPresentation = true
-    }
-
-    /** Publishes an empty first page, which names no card, so any earlier card hold ends with it. */
-    private fun publishAuthoritativeEmptyInitialTimeline() {
-        isHoldingInitialPageForEventCards = false
-        hasPublishedAuthoritativeTimeline = true
-        hasPreparedInitialPresentation = true
-        initialTimelineSeedActive = false
-        publishTimelineFromIndexes()
-        windowPresentationTiming.timelinePublished()
-    }
-
-    /** Runs MDK's authoritative sweep while any loaded row owns a deadline. */
-    private suspend fun runForegroundDisappearingMessageSweep(account: String) {
-        while (coroutineContext.isActive) {
-            val expiryRows = foregroundSweepExpiryRows()
-            if (expiryRows.any(DisappearingMessageSweep::hasLocalExpiry)) {
-                val nowMillis = clockMillis()
-                lastForegroundSweepStartedAtMillis = nowMillis
-                // Engine-owned gate + prune: the account worker runs the
-                // skew/unread deferrals atomically with the prune, serialized
-                // against this conversation's own sends. Android applies the
-                // pruned outcome — tray-card dismissal (#333) and media-cache
-                // eviction (#334) — for this group here, with precise keys
-                // from the loaded timeline; any other pruned group of the
-                // account goes through the shared closed-conversation path.
-                val outcome =
-                    appState.runRetentionSweep(account, nowMillis, handledGroupIdHex = group.groupIdHex)
-                if (outcome != null) {
-                    if (outcome.prunedMessages > 0uL) {
-                        appState.dismissConversationNotifications(account, group.groupIdHex)
-                    }
-                    evictExpiredMediaCaches(account, outcome.mediaCiphertextSha256.toSet())
-                }
-                publishTimelineFromIndexes()
-            }
-            awaitForegroundDisappearingSweepSchedule()
-        }
-    }
-
-    private suspend fun awaitForegroundDisappearingSweepSchedule() {
-        while (coroutineContext.isActive) {
-            while (foregroundSweepScheduleSignals.tryReceive().isSuccess) {
-                // Drop stale self-signals before sleeping; the next timeout is
-                // based on the timeline/group state that is current right now.
-            }
-            val wakeSignalReceived =
-                withTimeoutOrNull(foregroundDisappearingSweepDelayMillis()) {
-                    foregroundSweepScheduleSignals.receive()
-                    true
-                } == true
-            if (shouldRunForegroundSweepAfterWake(wakeSignalReceived)) return
-        }
-    }
-
-    /** Returns the next loaded row deadline, capped to the foreground cadence. */
-    private fun foregroundDisappearingSweepDelayMillis(): Long =
-        DisappearingMessageSweep.nextForegroundSweepDelayMillis(
-            nowMillis = clockMillis(),
-            rows = foregroundSweepExpiryRows(),
-        )
-
-    /** Projects loaded timeline messages into their row-owned expiry inputs. */
-    private fun foregroundSweepExpiryRows(): List<DisappearingMessageSweep.LocalExpiryRow> {
-        val messages = sweepExpiryMessages()
-        val messageOrder = firstMessageOrder(messages.map { it.record.messageIdHex })
-        return messages
-            .filter { shouldApplyLocalDisappearingExpiry(it.record) }
-            .map { localExpiryRow(it, messageOrder) }
-    }
-
-    /** Returns every loaded row so a group-system read anchor keeps its ordering position. */
-    private fun sweepExpiryMessages(): List<TimelineMessage> =
-        buildList {
-            addAll(optimisticMessages.values)
-            timelineOrder.mapNotNullTo(this) { timelineItemsById[it] }
-        }
-
-    /** Builds expiry input without consulting the group's mutable policy. */
-    private fun localExpiryRow(
-        message: TimelineMessage,
-        messageOrder: Map<String, Int>,
-    ): DisappearingMessageSweep.LocalExpiryRow {
-        val record = message.record
-        val authoritativeExpiry = record.retentionExpiresAt?.takeIf { it > 0uL }
-        return DisappearingMessageSweep.LocalExpiryRow(
-            timelineAtSeconds = record.recordedAt,
-            // The engine's authoritative per-message expiry wins over the
-            // send-time + retention arithmetic below when it is projected.
-            // Zero is not a real expiry (the engine emits null when retention
-            // is off); guard like message info does so a zero could never
-            // read as epoch-expired and hide the row instantly.
-            expiresAtLocalSeconds = authoritativeExpiry,
-            retentionAtSendSeconds =
-                record.retentionSeconds?.takeIf { authoritativeExpiry != null && it > 0uL }
-                    ?: message.retentionAtSendSeconds?.takeIf { it > 0uL },
-            readAnchoredAtSeconds = readAnchoredAtSeconds[record.messageIdHex],
-            deferSendTimeExpiry =
-                isDisappearingSendTimeExpiryDeferred(
-                    record = record,
-                    lastReadMessageId = lastReadMessageId,
-                    lastReadTimelineAt = persistedLastReadTimelineAt,
-                    messageOrder = messageOrder,
-                ),
-        )
-    }
-
     /**
      * The retained timeline row for the raw message id [messageId]. The row map is keyed by item id
      * (`msg:<hex>`, or `stream:<id>` for stream starts), so the id is resolved the way [removeProjectedRecord]
@@ -1850,13 +1642,6 @@ class ConversationController(
                 MessageProjector.isDeleted(messageId, deletedMessageIds) ||
                 isTimelineRecordLocallyExpired(clockMillis(), item.record, localExpiryRow(item, order))
         return item.takeUnless { gone }
-    }
-
-    /** The retained row's expiry input, ordered like the timeline filter and the sweep (optimistic ids first). */
-    private fun retainedExpiryRow(messageId: String): Pair<TimelineMessage, DisappearingMessageSweep.LocalExpiryRow>? {
-        val item = retainedTimelineItem(messageId) ?: return null
-        val order = firstMessageOrder(sweepExpiryMessages().map { it.record.messageIdHex })
-        return item to localExpiryRow(item, order)
     }
 
     /**
@@ -1886,20 +1671,8 @@ class ConversationController(
             rememberedDeadlineMillis = rememberedDeadlineMillis,
         )
 
-    /** The wall-clock deadline in milliseconds of the retained row [messageId], or null without a resolved deadline. */
-    private fun retainedRowExpiryDeadlineMillis(messageId: String): Long? {
-        val seconds =
-            retainedExpiryRow(messageId)?.let { (item, row) ->
-                DisappearingMessageSweep
-                    .resolveLocalExpirySeconds(row)
-                    ?.takeIf { shouldApplyLocalDisappearingExpiry(item.record) }
-            } ?: return null
-        return java.util.concurrent.TimeUnit.SECONDS
-            .toMillis(seconds.coerceAtMost(Long.MAX_VALUE.toULong()).toLong())
-    }
-
     /** Distinguishes timeout wakes from publish signals that expose due rows. */
-    private fun shouldRunForegroundSweepAfterWake(wakeSignalReceived: Boolean): Boolean =
+    internal fun shouldRunForegroundSweepAfterWake(wakeSignalReceived: Boolean): Boolean =
         DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(
             wakeSignalReceived = wakeSignalReceived,
             nowMillis = clockMillis(),
@@ -1907,194 +1680,10 @@ class ConversationController(
             rows = foregroundSweepExpiryRows(),
         )
 
-    private fun signalForegroundSweepScheduleChanged() {
-        foregroundSweepScheduleSignals.trySend(Unit)
-    }
-
     /** Retires this account's reads before native teardown; accepted mutations keep their app owner. */
     suspend fun closeLiveSubscriptionsForAccountTeardown(accountRef: String) {
         if (!shouldTeardownLiveSubscriptionsForAccount(accountRef, conversationAccountRef, conversationAccountRef)) return
         timelineSession.closeForAccountTeardown { memberRosterRefreshGeneration.advance() }
-    }
-
-    private fun isAccountTeardownRequested(): Boolean = timelineSession.accountTeardownRequested
-
-    // The initial page is a local read, but it crosses the FFI boundary — a
-    // hung call would leave the chat-list tap permanently inert because
-    // navigation cannot promote until the first page publishes. Bound it, and
-    // convert exhaustion into the ordinary load failure whose surface already
-    // promotes navigation and offers retry. Every subscription open, including
-    // reconnects with a retained window, consumes its one-shot snapshot before
-    // waiting for live updates.
-    private suspend fun publishInitialTimelineSnapshot(
-        account: String,
-        timelineStream: ConversationTimelineSubscriptionHandle,
-    ): List<String> {
-        val snapshot = timelineSession.snapshot(timelineStream)
-        windowPresentationTiming.begin(
-            receivedAtElapsedMs = SystemClock.elapsedRealtime(),
-            ticket = appState.productObservationTicket(),
-        )
-        val recoveryGeneration =
-            appState.recoveryDiagnostics.recordTimelineSubscriptionReceived(
-                count = snapshot?.messages?.size ?: 0,
-            )
-        return if (snapshot == null) {
-            if (timelineRecords.isEmpty()) publishAuthoritativeEmptyInitialTimeline()
-            publishRecoveryTimelineProjection(recoveryGeneration)
-            emptyList()
-        } else {
-            hasLoadedOlderPages = false
-            protectedTimelineMessageIds.clear()
-            // A reconnect's snapshot reads its cards first; a first page has its own hold.
-            val warmedSnapshot = warmLaterPageEventCards(snapshot)
-            val streamIds =
-                appState.measureHostPerformance(HostPerformanceOperationFfi.TIMELINE_APPLY) {
-                    applyTimelinePage(
-                        warmedSnapshot,
-                        replaceWindow = true,
-                        updatePagination = true,
-                    )
-                }
-            initializeReadState(account)
-            publishRecoveryTimelineProjection(recoveryGeneration)
-            publishReadyTimelineSubscription(timelineStream)
-            streamIds
-        }
-    }
-
-    /** Publishes a captured recovery generation only after timeline state changed. */
-    private fun publishRecoveryTimelineProjection(generation: Long?) {
-        if (
-            generation != null &&
-            appState.recoveryDiagnostics.recordTimelineProjectionPublished(generation, timeline.size)
-        ) {
-            recoveryProjectionGeneration = generation
-        }
-    }
-
-    /**
-     * Retry loop for the timeline + group-state live subscriptions. Extracted
-     * from [start] so R8 can compile the smaller suspend entrypoint (the
-     * monolithic method hit an invalid stack-map-table bug in release builds).
-     */
-    private suspend fun runConversationSubscriptionLoop(account: String) {
-        timelineSession.runReconnectLoop { runConversationSubscriptionIteration(account) }
-    }
-
-    /**
-     * One connect/reconnect attempt. Returns whether the caller should exit
-     * until explicit retry (account evicted or a native open timed out) and
-     * whether the subscriptions connected successfully (so the retry backoff
-     * can reset).
-     */
-    private suspend fun runConversationSubscriptionIteration(account: String): Pair<Boolean, Boolean> {
-        val timelineOpen = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_OPEN)
-        var groupSubscription: ConversationGroupStateSubscriptionHandle? = null
-        var timelineStream: ConversationTimelineSubscriptionHandle? = null
-        // A notification-routed group hides its transcript until the roster lands (#586).
-        val rosterPrefetch = conversationScope?.prefetchGroupRoster(group.groupIdHex, account, groupRosterReader)
-        try {
-            timelineStream =
-                timelineSession.openTimeline {
-                    liveSubscriptions.openTimeline(account, group.groupIdHex, ConversationTimelinePageLimit)
-                } ?: return true to false
-            val snapshotStreamIds = publishInitialTimelineSnapshot(account, timelineStream)
-            timelineOpen.success()
-            // Don't blanket-mark the absolute newest as read here — the UI
-            // layer now drives mark-read as the user scrolls so partial-read
-            // sessions retain accurate unread counts on the chat list.
-
-            var connected = false
-            val initialMetadataReady = CompletableDeferred<Unit>()
-
-            coroutineScope {
-                runUntilFirstLiveSubscriptionEndsWithAttemptJobs(
-                    startAttemptJobs = {
-                        // Snapshot-time agent streams are attempt-scoped: cancel them when
-                        // either live subscription ends, but do not join them before
-                        // reconnecting and closing the dropped live subscription handles.
-                        // Batch-time streams below remain timeline-pipeline children.
-                        snapshotStreamIds.forEach { streamId ->
-                            if (activeStreamIds.add(streamId)) {
-                                launch { watchAgentTextStream(account, streamId) }
-                            }
-                        }
-                    },
-                    first = {
-                        runTimelineSubscriptionPipeline(account, timelineStream)
-                        // Normal EOF must not cancel the initial roster before it can settle
-                        // loading/disclosure. Failures still unwind the paired attempt immediately.
-                        initialMetadataReady.await()
-                    },
-                    second = {
-                        // The authoritative timeline is already installed. Keep consuming its
-                        // bounded replacements while independent group/roster reads settle;
-                        // transcript consent and membership presentation retain their own gates.
-                        // Otherwise a slow roster can leave background messages queued until
-                        // well after the retained conversation's first foreground frame (#3178).
-                        val groupStream =
-                            timelineSession.openGroup { liveSubscriptions.openGroupState(account, group.groupIdHex) }
-                                ?: return@runUntilFirstLiveSubscriptionEndsWithAttemptJobs
-                        groupSubscription = groupStream
-                        val groupSnapshot =
-                            withContext(Dispatchers.IO) {
-                                groupStream.snapshot()
-                            }
-                        groupSnapshot?.let(::applyGroupState)
-                        refreshGroupRecoveryStatus()
-                        refreshMembersAfterGroupState(prefetchedRoster = rosterPrefetch)
-                        isLoading = false
-                        groupConvergenceOpenSettled.complete(Unit)
-                        subscriptionError = null
-                        connected = true
-                        initialMetadataReady.complete(Unit)
-                        runGroupStateSubscriptionLoop(groupStream)
-                    },
-                )
-            }
-            return false to connected
-        } catch (cancel: CancellationException) {
-            timelineOpen.cancel()
-            throw cancel
-        } catch (throwable: Throwable) {
-            timelineOpen.failure()
-            windowPresentationTiming.fail()
-            if (throwable.isUseAfterEviction()) {
-                discardInitialTimelineSeedForFailure(preserveOptimisticMessages = false)
-                markActiveAccountRemovedFromMembers(account)
-                isLoading = false
-                terminalConversationUnavailable = true
-                subscriptionError = null
-                return true to false
-            }
-            val initialOpenTimedOut = isTerminalOpenFailure(throwable)
-            discardInitialTimelineSeedForFailure(preserveOptimisticMessages = true)
-            isLoading = false
-            val operationCode = if (timelineRecords.isEmpty()) "CONVERSATION_LOAD" else "CONVERSATION_REFRESH"
-            if (!BuildConfig.DEBUG) Log.e("DMConversation", releaseFailureMarker(operationCode, throwable))
-            subscriptionError =
-                privacySafeErrorPresentation(
-                    operationCode = operationCode,
-                    throwable = throwable,
-                    message = AppText.Resource(conversationLoadFailureMessage(throwable, initialOpenTimedOut)),
-                    retryable = shouldOfferConversationLoadRetry(throwable),
-                )
-            if (initialOpenTimedOut) {
-                // A timed-out FFI call may still occupy its native blocking
-                // worker. Automatic retries would accumulate more stuck calls;
-                // stop here. The user must restart rather than launch another
-                // native open while the single-flight owner is unresolved.
-                timelineSession.cancelInitialOpen()
-                terminalLoadFailure = true
-                return true to false
-            }
-        } finally {
-            timelineOpen.unavailable()
-            rosterPrefetch?.cancel() // A no-op once awaited; an early return must not leave it running.
-            timelineSession.closeHandles(groupSubscription, timelineStream)
-        }
-        return false to false
     }
 
     // Apply a fresh group-state snapshot/update, republishing the timeline when
@@ -2113,121 +1702,6 @@ class ConversationController(
     @VisibleForTesting
     internal fun applyGroupStateForTest(update: AppGroupRecordFfi) = applyGroupState(update)
 
-    /** Applies a canonical group update while retaining only a still-unresolved stale action fence. */
-    private fun applyGroupState(incoming: AppGroupRecordFfi) {
-        val named = localGroupNames.reconciled(incoming)
-        val description = localGroupDescriptions.reconcile(named.groupIdHex, named.description)
-        val update = if (description == named.description) named else named.copy(description = description)
-        val previousGroup = group
-        if (update.leaveBlocked) observedBlockedLeave = true
-        if (update.selfMembership.isGroupEviction()) {
-            observedBlockedLeave = false
-            cancelledLeaveAwaitingRoster = false
-        }
-        groupRecoveryLifetime.advance()
-        val previousRetention = group.disappearingMessageSecs
-        mutationPresentation.authoritativeGroupApplied()
-        val reconciled =
-            reconcileTerminalSelfMembership(
-                update = update,
-                previous = previousGroup,
-            )
-        val confirmed = inviteConfirmationAuthority.reconcile(reconciled)
-        inviteConfirmationUnresolved = false
-        val awaitingAuthority = inviteAcceptanceAwaitingAuthority
-        val freshTerminalReinvite = isDistinctWelcomeReinvite(previousGroup, update)
-        group =
-            if (awaitingAuthority?.matches(confirmed) == true && confirmed.pendingConfirmation) {
-                confirmed.copy(pendingConfirmation = false)
-            } else {
-                inviteAcceptanceAwaitingAuthority = null
-                confirmed
-            }
-        if (!inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.READY
-        if (freshTerminalReinvite) {
-            memberRosterRefreshGeneration.advance()
-            selfMembership.clearSelfLeft()
-            membersVerified = false
-            memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
-        }
-        if (group.selfMembership.isNonMember()) recordSelfLeft()
-        if (previousRetention != update.disappearingMessageSecs) {
-            publishTimelineFromIndexes()
-        }
-    }
-
-    /**
-     * Re-reads group recovery after each authoritative group-state edge. The parked flag is read separately, by the
-     * raw-event loop, so this open-path read stays a single account-worker command.
-     */
-    @Suppress("TooGenericExceptionCaught") // Every non-cancellation native failure is classified for presentation.
-    private suspend fun refreshGroupRecoveryStatus() {
-        val accountRef = conversationAccountRef ?: return
-        val groupIdHex = group.groupIdHex
-        val runtimeGeneration = appState.runtimeGeneration
-        val recoveryEpoch = groupRecoveryLifetime.capture()
-        val status =
-            try {
-                retryTransientGroupRecoveryRead {
-                    groupRecoveryStatusReader(accountRef, groupIdHex)
-                }
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (failure: Throwable) {
-                // An advisory read that has never succeeded for a group this account just created
-                // is not evidence of anything; see groupRecoveryReadFailureIsPresentable.
-                val presentable =
-                    groupRecoveryReadFailureIsPresentable(
-                        lastConfirmedStatus = groupRecoveryStatus,
-                        freshlyCreated = isFreshlyCreatedGroup(groupIdHex),
-                        failure = failure,
-                    )
-                groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
-                    if (ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)) {
-                        groupRecoveryReadFailed = presentable
-                    }
-                }
-                return
-            }
-        val rejoined = firstGroupNoticeRejoined(accountRef, status)
-        groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
-            if (
-                ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration) &&
-                status.groupIdHex == groupIdHex
-            ) {
-                groupRecoveryStatus = status
-                groupHistoryNoticeRejoined = rejoined
-                groupRecoveryReadFailed = false
-                appState.freshGroupCreations.settle(accountRef, groupIdHex, runtimeGeneration)
-            }
-        }
-    }
-
-    /**
-     * Whether the first of [status]'s notice ids is a rejoin notice, the one the card words. The cause lives only in
-     * the account's notice list, and a failed advisory read falls back to the general wording.
-     */
-    @Suppress("TooGenericExceptionCaught") // Any non-cancellation native failure keeps the general wording.
-    private suspend fun firstGroupNoticeRejoined(
-        accountRef: String,
-        status: GroupRecoveryStatusFfi,
-    ): Boolean {
-        val first = status.historyNoticeIds.firstOrNull() ?: return false
-        val notices =
-            try {
-                historyNoticesReader(accountRef)
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (_: Throwable) {
-                emptyList()
-            }
-        return notices.firstOrNull { it.noticeId == first }?.cause == HistoryNoticeCauseFfi.BEFORE_REJOIN
-    }
-
-    /** Whether this conversation is the group whose creation was opened most recently. */
-    private fun isFreshlyCreatedGroup(groupIdHex: String): Boolean =
-        appState.freshGroupCreations.isFresh(conversationAccountRef, groupIdHex, appState.runtimeGeneration)
-
     /** Explicit retry for an advisory recovery-status read failure, which also re-reads the parked flag. */
     suspend fun retryGroupRecoveryStatus() {
         refreshGroupRecoveryStatus()
@@ -2241,115 +1715,6 @@ class ConversationController(
      */
     suspend fun refreshGroupConvergenceOnStart() {
         if (groupConvergenceOpenSettled.isCompleted) requestGroupConvergenceRead()
-    }
-
-    /**
-     * Reads the parked flag now, or, when a read is already running, makes that reader read once more after it
-     * finishes. A burst of events therefore costs at most one read in flight and one after it.
-     */
-    @VisibleForTesting
-    internal suspend fun requestGroupConvergenceRead() {
-        groupConvergenceReadRequested.set(true)
-        while (groupConvergenceReadRequested.get() && groupConvergenceReadGate.tryLock()) {
-            try {
-                while (groupConvergenceReadRequested.getAndSet(false)) refreshGroupConvergenceParked()
-            } finally {
-                groupConvergenceReadGate.unlock()
-            }
-        }
-    }
-
-    /**
-     * Reads the parked flag for Retry through the same gate as event reads, so a reread that a stale answer asks for
-     * still runs. Returns the newest published answer, or null when none was published.
-     */
-    private suspend fun readGroupConvergenceParkedAfterRetry(): Boolean? {
-        val answer =
-            groupConvergenceReadGate.withLock {
-                var latest = refreshGroupConvergenceParked()
-                while (groupConvergenceReadRequested.getAndSet(false)) {
-                    refreshGroupConvergenceParked()?.let { latest = it }
-                }
-                latest
-            }
-        // A request made just as the gate was released still gets its read.
-        if (groupConvergenceReadRequested.get()) requestGroupConvergenceRead()
-        return answer
-    }
-
-    /**
-     * Reads whether MDK parked this chat's convergence and publishes the answer under the recovery guards. Returns
-     * the published answer, or null when the read failed or lost ownership. A failed read keeps the last known
-     * answer, since it says nothing about whether the chat is parked.
-     */
-    private suspend fun refreshGroupConvergenceParked(): Boolean? {
-        val accountRef = conversationAccountRef
-        val groupIdHex = group.groupIdHex
-        val runtimeGeneration = appState.runtimeGeneration
-        val recoveryEpoch = groupRecoveryLifetime.capture()
-        val readEpoch = groupConvergenceReads.advance()
-        // Any non-cancellation native failure keeps the last known answer.
-        val parked =
-            accountRef?.let { account ->
-                runCatchingCancellable { groupConvergenceParkedReader(account, groupIdHex) }.getOrNull()
-            } ?: return null
-        var published = false
-        groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
-            if (
-                groupConvergenceReads.isCurrent(readEpoch) &&
-                accountRef != null &&
-                ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)
-            ) {
-                groupConvergenceParked = parked
-                if (!parked) groupConvergenceRetryFailure = null
-                published = true
-            }
-        }
-        // A group-state edge during the read only made this answer stale, so read again while this chat is still owned.
-        // The rereads are bounded, so a steady stream of edges can't spin; the next event or foreground return reads.
-        if (published) {
-            groupConvergenceStaleRereads = 0
-        } else if (
-            groupConvergenceStaleRereads < MAX_GROUP_CONVERGENCE_STALE_REREADS &&
-            groupConvergenceReads.isCurrent(readEpoch) &&
-            ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)
-        ) {
-            groupConvergenceStaleRereads++
-            groupConvergenceReadRequested.set(true)
-        }
-        return if (published) parked else null
-    }
-
-    /**
-     * Reads the parked flag on entry and on each raw group-state event for this chat, which MDK fires whenever the
-     * group's state changes, parks and resumes included. It starts only after the first open settles, so the open
-     * path never waits on this account-worker read. Every successful open, the first included, reads once, since
-     * an edge may pass before the stream exists. A stream that ends or fails is destroyed and reopened after a pause.
-     */
-    @VisibleForTesting
-    internal suspend fun runGroupConvergenceEventLoop(
-        account: String,
-        awaitOpen: suspend () -> Unit = { groupConvergenceOpenSettled.await() },
-        retryMillis: Long = GROUP_CONVERGENCE_EVENT_RETRY_MILLIS,
-    ) {
-        awaitOpen()
-        while (currentCoroutineContext().isActive) {
-            val stream = runCatchingCancellable { runtimeEventStreamOpener() }.getOrNull()
-            if (stream != null) {
-                try {
-                    requestGroupConvergenceRead()
-                    runCatchingCancellable {
-                        while (true) {
-                            val event = stream.next() ?: break
-                            if (event.isGroupStateUpdateFor(account, group.groupIdHex)) requestGroupConvergenceRead()
-                        }
-                    }
-                } finally {
-                    withContext(NonCancellable + Dispatchers.IO) { runCatching { stream.destroy() } }
-                }
-            }
-            delay(retryMillis)
-        }
     }
 
     /**
@@ -2500,43 +1865,6 @@ class ConversationController(
         }
     }
 
-    /** Whether this controller still owns UI publication for the captured group. */
-    private fun ownsGroupRecoveryGroup(groupIdHex: String): Boolean = !controllerCleared && !isAccountTeardownRequested() && group.groupIdHex == groupIdHex
-
-    /** Whether the captured account, group, and runtime still own recovery-read publication. */
-    private fun ownsGroupRecoveryRead(
-        accountRef: String,
-        groupIdHex: String,
-        runtimeGeneration: Int,
-    ): Boolean =
-        conversationAccountRef == accountRef &&
-            appState.runtimeGeneration == runtimeGeneration &&
-            ownsGroupRecoveryGroup(groupIdHex)
-
-    private suspend fun runGroupStateSubscriptionLoop(groupStream: ConversationGroupStateSubscriptionHandle) {
-        while (coroutineContext.isActive) {
-            val update =
-                withContext(Dispatchers.IO) {
-                    groupStream.next()
-                } ?: break
-            val previousGroup = group
-            applyGroupState(update)
-            refreshGroupRecoveryStatus()
-            if (groupStateUpdateRemovesSelf(previousGroup, update)) {
-                conversationAccountRef?.let(::markActiveAccountRemovedFromMembers)
-            }
-            refreshMembersAfterGroupState()
-        }
-    }
-
-    /** The first snapshot and live updates both require full readback after a blocked leave clears. */
-    @VisibleForTesting
-    internal suspend fun refreshMembersAfterGroupState(prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null) {
-        if (!observedBlockedLeave || group.leaveRequestPending || !refreshManagementState()) {
-            refreshMembers(prefetchedRoster = prefetchedRoster)
-        }
-    }
-
     /**
      * Cancel controller-owned scopes that outlive a single [start] call. The
      * conversation screen calls this once when it disposes the controller.
@@ -2638,7 +1966,7 @@ class ConversationController(
     }
 
     /** Consumes authoritative MDK windows and publishes only the newest coalesced window. */
-    private suspend fun CoroutineScope.runTimelineSubscriptionPipeline(
+    internal suspend fun CoroutineScope.runTimelineSubscriptionPipeline(
         account: String,
         timelineStream: ConversationTimelineSubscriptionHandle,
     ) {
@@ -2769,41 +2097,6 @@ class ConversationController(
             }
         }
         pump.await()
-    }
-
-    /**
-     * Parse the sent text into the same Markdown AST projected records carry
-     * and rebind it onto the already-published optimistic bubble. The chat-list
-     * preview is not published until this attempt finishes, so it never exposes
-     * a raw-Markdown intermediate frame. Native admission runs independently;
-     * only presentation reconciliation waits for this document, so it cannot
-     * overwrite the styled bubble with the pre-parse snapshot.
-     * A parse failure keeps the plain-text presentation. The chat list publishes
-     * that fallback only after the parse attempt completes, so it cannot flash a
-     * raw frame before replacing it with styled content. In either case,
-     * a bubble already reconciled or rolled back is left alone. The parsed
-     * record still backs preview reconciliation when an early echo removed
-     * the optimistic bubble, so the chat list cannot lose its styled tokens.
-     */
-    private suspend fun hydrateOptimisticSendMarkdown(
-        optimisticKey: String,
-        optimistic: AppMessageRecordFfi,
-    ): AppMessageRecordFfi {
-        val tokens =
-            runCatchingCancellable { markdownParser(optimistic.plaintext) }
-                .getOrNull()
-                ?.takeIf { it.blocks.isNotEmpty() }
-                ?: return optimistic
-        val pending = optimisticMessages[optimisticKey]
-        return if (pending == null || pending.record.messageIdHex != optimistic.messageIdHex) {
-            optimistic.copy(contentTokens = tokens)
-        } else {
-            val hydrated = pending.record.copy(contentTokens = tokens)
-            optimisticMessages[optimisticKey] = pending.copy(record = hydrated)
-            messageById[optimistic.messageIdHex] = hydrated
-            publishTimelineFromIndexes()
-            hydrated
-        }
     }
 
     /**
@@ -3198,328 +2491,6 @@ class ConversationController(
     }
 
     /**
-     * Token-aware admission may safely repeat a closed-runtime call because MDK
-     * deduplicates the original client token. The injected legacy publisher
-     * still retries only failures proven to occur before relay publication.
-     */
-    private fun isRetryableTextAdmissionError(throwable: Throwable): Boolean =
-        isTransientRelaySendError(throwable) ||
-            (textPublisher == null && isTransientRuntimeWorkerError(throwable))
-
-    /**
-     * The lock an emoji send takes around its publish only, so uploads never hold up cancel or other
-     * mutations. The acceptance bookkeeping happens inside the same lock, so a cancel waiting for it
-     * sees the send as owned by MDK (or uncertain) and cannot report success for a published send. A
-     * rejection that published nothing, such as a stale epoch, leaves the send pre-acceptance.
-     */
-    private fun commitPublishLock(
-        account: String,
-        optimisticKey: String,
-        controllerContext: CoroutineContext,
-    ): EmojiPublishLock =
-        { publish ->
-            appState.withGroupCommitLock(account, group.groupIdHex) {
-                try {
-                    publish().also { summary ->
-                        withContext(controllerContext) { recordOptimisticSendAcceptance(optimisticKey, summary) }
-                    }
-                } catch (
-                    @Suppress("TooGenericExceptionCaught") failure: Throwable,
-                ) {
-                    withContext(controllerContext) { recordSendAdmissionFailure(optimisticKey, failure) }
-                    throw failure
-                }
-            }
-        }
-
-    /**
-     * Uploads a send with file-backed items through MDK's file path, with the same commit lock,
-     * cancellation check, retry capture and draft/admission rules as the in-memory path. While the
-     * transfer holds the lock, the user's Cancel reaches it through [RetainedMediaUpload.requestTransferCancel].
-     */
-    private suspend fun uploadFileBackedRetained(
-        account: String,
-        key: String,
-        tempId: String,
-        retained: RetainedMediaUpload,
-        startedAtMs: Long,
-    ): MediaUploadResultFfi {
-        val batchCiphertextBytes =
-            checkNotNull(withContext(Dispatchers.IO) { fileBatchCiphertextBytes() }) {
-                "file-backed upload limits unavailable"
-            }
-        val stagingDirectory = uploadSourcesDirectory(appState.appContext.cacheDir)
-        return withFileUploadRequest(
-            retained.attachments,
-            retained.caption,
-            stagingDirectory,
-            batchCiphertextBytes,
-        ) { request ->
-            mediaFileUploader?.invoke(account, group.groupIdHex, request, retained::attachTransferCancel)
-                ?: appState
-                    .withGroupCommitLock(account, group.groupIdHex) {
-                        requireOptimisticSendNotCancelled(key)
-                        val outcome =
-                            withNativeTransferControl(
-                                retained::attachTransferCancel,
-                                onProgress = retained::reportTransferProgress,
-                            ) { control ->
-                                appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                                    uploadOrAdmitComposerMediaFilesWithToken(
-                                        account,
-                                        group.groupIdHex,
-                                        request,
-                                        control,
-                                        tempId,
-                                    )
-                                }
-                            }
-                        outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
-                        outcome
-                    }.also { outcome ->
-                        outcome.captureForRetry(retained, appState.pendingSendDiagnostics, tempId, startedAtMs)
-                    }.upload
-        }
-    }
-
-    /** Retires host cancellation when a failed admission may already have published. */
-    private fun recordSendAdmissionFailure(
-        optimisticKey: String,
-        failure: Throwable,
-    ) {
-        if (failure is OptimisticSendCancelledException || !isAmbiguousRelayDeliveryError(failure)) {
-            return
-        }
-        if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
-            optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
-        }
-    }
-
-    /** Runs [block] under the group commit lock, or directly when [skip] says the block locks its own publish. */
-    private suspend fun <T> commitLockUnless(
-        skip: Boolean,
-        account: String,
-        block: suspend () -> T,
-    ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
-
-    /**
-     * The user's own emoji a plain, non-reply text send must carry, or none when this send carries none.
-     * A lookup failure is raised as an [EmojiUploadFailure], a definite pre-publication failure.
-     */
-    private suspend fun emojiArtworkForSend(
-        account: String,
-        replyTarget: String?,
-        text: String,
-    ): List<LocalEmojiArtwork> {
-        val applies = emojiSendApplies(replyTarget, textPublisher != null)
-        if (!applies) return emptyList()
-        // The lookup runs before anything is published, so its failure is never an uncertain delivery.
-        return runCatchingCancellable { customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text) }
-            .getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
-    }
-
-    /**
-     * Admission failures retry for plain text. An emoji send retries only an upload-stage failure,
-     * because nothing was published then, and never a failure of the publish itself. Null artwork
-     * means its lookup failed, which also published nothing.
-     */
-    private fun isRetryableComposerSend(
-        emojiArtwork: List<LocalEmojiArtwork>?,
-        throwable: Throwable,
-    ): Boolean =
-        if (emojiArtwork?.isEmpty() == true) {
-            isRetryableTextAdmissionError(throwable)
-        } else {
-            isRetryableEmojiUploadFailure(throwable)
-        }
-
-    /**
-     * One native publication of the composer text: the durable token-bound send, or, when the text
-     * uses the user's own emoji, upload-only images followed by one tagged media send. The optimistic
-     * send is re-checked on this controller's context after the upload and again inside the commit
-     * lock right before publishing, so a cancelled send is never published.
-     */
-    @Suppress("LongParameterList")
-    private suspend fun publishComposerTextOnce(
-        account: String,
-        replyTarget: String?,
-        text: String,
-        clientToken: String,
-        probeExistingAdmission: Boolean,
-        emojiArtwork: List<LocalEmojiArtwork>,
-        optimisticKey: String,
-    ): dev.ipf.marmotkit.SendSummaryFfi {
-        // The native calls run on the IO dispatcher, but the send phases belong to this controller's context.
-        val controllerContext = currentCoroutineContext()
-        val ensureCurrent: suspend () -> Unit = {
-            withContext(controllerContext) { requireOptimisticSendNotCancelled(optimisticKey) }
-        }
-        val injected = customEmojiSender
-        return when {
-            emojiArtwork.isEmpty() ->
-                publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
-            injected != null -> {
-                val lock = commitPublishLock(account, optimisticKey, controllerContext)
-                injected(account, text, emojiArtwork, ensureCurrent, lock)
-            }
-            else ->
-                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
-                    sendTextWithCustomEmoji(
-                        account,
-                        group.groupIdHex,
-                        text,
-                        emojiArtwork,
-                        appState.emojiUploads,
-                        ensureCurrent = ensureCurrent,
-                        publishLock = commitPublishLock(account, optimisticKey, controllerContext),
-                    )
-                }
-        }
-    }
-
-    /**
-     * Admits one logical text/reply token to native durable ownership. Proven
-     * pre-admission connectivity failures reuse the token; interrupted admission
-     * queries native status before another call. Acceptance stays pending until
-     * the authoritative projection reports publication. Native convergence owns
-     * accepted delivery; the host never invents another semantic send to retry it.
-     */
-    @Suppress("LongMethod") // Retry admission, tracing, and lock ownership form one atomic policy boundary.
-    private suspend fun publishTextWithRetry(
-        replyTarget: String?,
-        account: String,
-        trimmed: String,
-        trace: PerformanceTrace?,
-        clientToken: String,
-        optimisticKey: String,
-    ): dev.ipf.marmotkit.SendSummaryFfi =
-        appState.withConversationTextSendOrder(account, group.groupIdHex) {
-            // Replies and injected publishers keep their plain-text path. A message that uses the user's
-            // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
-            // Resolving its artwork inside the text order keeps a later message from publishing first,
-            // and inside the attempt lets a transient lookup failure retry before anything is published.
-            val artwork = SendEmojiArtwork { emojiArtworkForSend(account, replyTarget, trimmed) }
-            retryPendingConversationSend(
-                connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
-                cancellationGeneration = optimisticCancellationGeneration,
-                retryableFailure = { isRetryableComposerSend(artwork.value, it) },
-                onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
-            ) { attempt ->
-                // A cancel wakes the retry wait, so check it before a lookup that may fail again and retry forever.
-                requireOptimisticSendNotCancelled(optimisticKey)
-                val emojiArtwork = untilSendCancelled(optimisticKey) { artwork.resolve() }
-                // Serialize only this commit-producing FFI attempt. Releasing the
-                // commit lock before retry backoff keeps reactions and other
-                // mutations usable; the outer text-order lock keeps later text
-                // sends behind this one until its outcome is known.
-                val lockWaitStartMs = trace?.let { traceNowMs() }
-                updatePendingSendStage(clientToken, PerformanceSendStage.WAITING_COMMIT_LOCK, attempt)
-                // An emoji send uploads outside the commit lock and locks only its publish, so a cancel
-                // taking the same lock never waits for a slow upload.
-                commitLockUnless(emojiArtwork.isNotEmpty() && textPublisher == null, account) {
-                    requireOptimisticSendNotCancelled(optimisticKey)
-                    val lockHeldAtMs = trace?.let { traceNowMs() }
-                    sendTrace(
-                        trace,
-                        PerformancePhase.COMMIT_LOCK_ACQUIRED,
-                        durationMs = lockHeldAtMs?.minus(lockWaitStartMs ?: lockHeldAtMs) ?: 0L,
-                        attempt = attempt,
-                    )
-                    updatePendingSendStage(clientToken, PerformanceSendStage.FFI_ADMISSION, attempt)
-                    // Measure admission separately from transport publication.
-                    val ffiStartMs = trace?.let { traceNowMs() }
-                    sendTrace(
-                        trace,
-                        PerformancePhase.FFI_START,
-                        result = PerformanceResult.PENDING,
-                        layer = PerformanceLayer.FFI,
-                        attempt = attempt,
-                    )
-                    try {
-                        val summary =
-                            textPublisher?.invoke(replyTarget, account, group.groupIdHex, trimmed)
-                                ?: publishComposerTextOnce(
-                                    account,
-                                    replyTarget,
-                                    trimmed,
-                                    clientToken,
-                                    attempt > 1,
-                                    emojiArtwork,
-                                    optimisticKey,
-                                )
-                        recordOptimisticSendAcceptance(optimisticKey, summary)
-                        sendTrace(
-                            trace,
-                            PerformancePhase.FFI_RETURN,
-                            durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
-                            layer = PerformanceLayer.FFI,
-                            attempt = attempt,
-                            count = summary.messageIds.size,
-                        )
-                        if (summary.acceptDisposition == SendAcceptDispositionFfi.PUBLISHED) {
-                            sendTrace(
-                                trace,
-                                PerformancePhase.TRANSPORT_COMPLETE,
-                                layer = PerformanceLayer.TRANSPORT,
-                                count = summary.messageIds.size,
-                            )
-                        }
-                        summary
-                    } catch (throwable: Throwable) {
-                        // Presentation may still be parsing when this child
-                        // returns. Retire host cancellation before releasing
-                        // the commit lock if publication may have happened.
-                        recordSendAdmissionFailure(optimisticKey, throwable)
-                        sendTrace(
-                            trace,
-                            PerformancePhase.FFI_ERROR,
-                            durationMs = ffiStartMs?.let { traceNowMs() - it } ?: 0L,
-                            result = PerformanceResult.FAILURE,
-                            layer = PerformanceLayer.FFI,
-                            attempt = attempt,
-                        )
-                        throw throwable
-                    }
-                }
-            }
-        }
-
-    /**
-     * Trace a transient send retry with the current relay-health snapshot.
-     * Aggregate connection-state counts only (no relay URLs, account/group/
-     * message ids, or payload) so the #294 failure window is observable without
-     * violating the repo's privacy posture. Best-effort: a failure to read
-     * health must never escalate a send retry into an error.
-     */
-    private suspend fun logSendRetry(
-        trace: PerformanceTrace?,
-        optimisticId: String,
-        attempt: Int,
-    ) {
-        if (trace == null) return
-        val health = runCatchingCancellable { appState.marmotIo { relayHealth() } }.getOrNull()
-        sendTrace(
-            trace,
-            PerformancePhase.TRANSIENT_RETRY,
-            result = PerformanceResult.FAILURE,
-            layer = PerformanceLayer.TRANSPORT,
-            attempt = attempt,
-            connectedRelays = health?.connected?.toInt(),
-            totalRelays = health?.totalRelays?.toInt(),
-        )
-        updatePendingSendStage(optimisticId, PerformanceSendStage.WAITING_COMMIT_LOCK, attempt)
-    }
-
-    /** Updates the closed stage sampled if this send crosses a pending checkpoint. */
-    private fun updatePendingSendStage(
-        optimisticId: String,
-        stage: PerformanceSendStage,
-        attempt: Int,
-    ) {
-        appState.pendingSendDiagnostics.update(optimisticId, stage, attempt)
-    }
-
-    /**
      * Send one or more attachments as a single kind:9 album. MIME-agnostic:
      * images, documents (PDF/zip/etc.), audio, video — anything the picker
      * surfaces — funnel through this same path. Callers are responsible for
@@ -3678,79 +2649,6 @@ class ConversationController(
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
     }
 
-    /**
-     * Rejects empty payloads before reserving a pending slot and reports the retained-byte limit for
-     * in-memory items. A file-backed item cannot join a reply: native reply drafts carry attachment bytes.
-     */
-    private fun canQueueAttachmentBytes(
-        attachments: List<PendingAttachment>,
-        replyTarget: String?,
-    ): Boolean {
-        if (!canSendMessages || attachments.isEmpty() || attachments.any { !it.hasContent }) return false
-        return if (albumExceedsRetainedCap(attachments)) {
-            appState.present(R.string.media_album_too_large)
-            false
-        } else if (replyTarget != null && attachments.any { it.sourceFile != null }) {
-            appState.present(R.string.media_file_too_large)
-            false
-        } else {
-            true
-        }
-    }
-
-    /** Rechecks presentation eligibility and account generation after asynchronous preparation. */
-    private fun canQueueMediaForAccount(
-        account: String,
-        canQueue: () -> Boolean,
-    ): Boolean =
-        canQueue() &&
-            canSendMessages &&
-            shouldAcceptMediaUploadForAccount(
-                account,
-                mediaUploadSessionEpoch,
-                appState.activeAccountRef,
-                appState.mediaUploadSessionEpoch(),
-            )
-
-    /** A refused native draft write leaves the caller's unsent media and reply selection available. */
-    private suspend fun prepareQueuedMediaReply(
-        account: String,
-        target: String,
-        caption: String?,
-        attachments: List<PendingAttachment>,
-    ): dev.ipf.marmotkit.MessageDraftRevisionFfi? =
-        runCatchingCancellable {
-            appState.marmotIo { stageMediaReply(account, group.groupIdHex, target, caption, attachments) }
-        }.getOrNull()
-
-    /** Builds the optimistic pending record that carries staged attachments until the send confirms. */
-    private suspend fun pendingAttachmentRecord(
-        tempId: String,
-        body: String,
-        attachments: List<PendingAttachment>,
-        now: ULong,
-        replyTarget: String?,
-    ): AppMessageRecordFfi =
-        AppMessageRecordFfi(
-            messageIdHex = tempId,
-            direction = "sent",
-            groupIdHex = group.groupIdHex,
-            sender = conversationAccountIdHex ?: "",
-            plaintext = body,
-            contentTokens = markdownParser(body),
-            kind = 9uL,
-            tags =
-                attachments.map {
-                    MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
-                } + replyTarget?.let { listOf(MessageProjector.eventTag(it), MessageProjector.quoteTag(it)) }.orEmpty(),
-            sourceEpoch = null,
-            retentionSeconds = null,
-            retentionExpiresAt = null,
-            recordedAt = now,
-            receivedAt = now,
-            sticker = null,
-        )
-
     /** Attaches Android source cleanup to a queued item's existing retained-byte owner. */
     internal fun retainQueuedAttachmentSource(
         seeded: QueuedAttachmentSend,
@@ -3770,659 +2668,6 @@ class ConversationController(
         // dispose-time cleanup. Terminal performMediaUpload paths remove the key.
         onDurablyAccepted?.let { durableAcceptanceCallbacks.putIfAbsent(seeded.key, it) }
         performMediaUpload(seeded.account, seeded.key, seeded.tempId, seeded.optimisticOrder, seeded.optimistic)
-    }
-
-    /**
-     * Shared upload→publish path for both first send and retry. Reads the
-     * compressed bytes from [retainedMediaUploads] (keyed by [key]) so it
-     * survives a Failed→retry round-trip. On success: drops the optimistic +
-     * retained entry, then seeds [WhiteNoiseAppState.cacheMediaPlaintext] with the just-uploaded
-     * plaintext so the sender renders its own image without a download. On
-     * failure: flips back to Failed (bytes stay retained for another retry).
-     */
-    private suspend fun performMediaUpload(
-        account: String,
-        key: String,
-        tempId: String,
-        order: ULong,
-        optimistic: AppMessageRecordFfi,
-    ) {
-        val sendHostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.MESSAGE_SEND)
-        val retentionAtSendSeconds = optimisticMessages[key]?.retentionAtSendSeconds
-        val uploadJob = appState.trackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key)
-        val diagnostics = appState.pendingSendDiagnostics
-        try {
-            if (
-                !shouldAcceptMediaUploadForAccount(
-                    account,
-                    mediaUploadSessionEpoch,
-                    appState.activeAccountRef,
-                    appState.mediaUploadSessionEpoch(),
-                )
-            ) {
-                discardOptimisticSend(key, tempId, OptimisticSendDiscard.ABANDONED)
-                return
-            }
-            // queueAttachments and uploadQueued are intentionally separate so
-            // a user can cancel the seeded bubble before this continuation is
-            // scheduled. Honour that tombstone before consulting retained
-            // bytes; otherwise their cancellation cleanup looks like an
-            // eviction and resurrects the row as Failed.
-            if (
-                optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED ||
-                discardedDuringRetry.remove(key)
-            ) {
-                removeCancelledOptimisticSend(key, tempId)
-                trimCancelledSendTombstones()
-                return
-            }
-            val retained =
-                retainedMediaUploads.get(key) ?: run {
-                    // Bytes are gone (evicted under cap, or process death) — can't
-                    // retry without a re-attach. Leave the bubble Failed and drop
-                    // the in-flight marker so a future dispose can clean up.
-                    optimisticMessages[key] =
-                        TimelineMessage(
-                            key,
-                            optimistic,
-                            MessageStatus.Failed,
-                            timelineOrder = order,
-                            retentionAtSendSeconds = retentionAtSendSeconds,
-                        )
-                    optimisticSendPhases[key] = OptimisticSendPhase.FAILED
-                    activeUploadKeys.remove(key)
-                    failOptimisticChatListPreview(tempId)
-                    diagnostics.complete(
-                        tempId,
-                        PerformancePhase.SEND_FAILED,
-                        PerformanceResult.FAILURE,
-                    )
-                    publishTimelineFromIndexes()
-                    appState.present(R.string.toast_reattach_to_retry_media)
-                    return
-                }
-            discardedDuringRetry.remove(key)
-            // Every attempt reports its own transfer from the start, so a Retry never shows the last one's bytes.
-            retained.clearTransferProgress()
-            try {
-                // Reuse the references if a prior attempt already uploaded the
-                // blobs (publish-only failure) — re-uploading would orphan
-                // duplicates on the Blossom server.
-                val request =
-                    MediaUploadRequestFfi(
-                        attachments =
-                            retained.attachments.map { attachment ->
-                                MediaUploadAttachmentRequestFfi(
-                                    fileName = attachment.fileName,
-                                    mediaType = attachment.mediaType,
-                                    plaintext = attachment.plaintextBytes,
-                                    dim = attachment.dim,
-                                    thumbhash = attachment.thumbhash,
-                                )
-                            },
-                        caption = retained.caption,
-                        send = false,
-                        blossomServer = null,
-                    )
-                val references =
-                    retained.uploadedReferences?.also { diagnostics.mediaUploadReused(tempId) }
-                        ?: run {
-                            val startedAtMs = diagnostics.beginMediaUpload(tempId)
-                            val uploaded =
-                                if (retained.isFileBacked) {
-                                    uploadFileBackedRetained(account, key, tempId, retained, startedAtMs)
-                                } else {
-                                    mediaUploader?.invoke(account, group.groupIdHex, request)
-                                        ?: appState
-                                            .withGroupCommitLock(account, group.groupIdHex) {
-                                                requireOptimisticSendNotCancelled(key)
-                                                val outcome =
-                                                    appState.marmotIo(MarmotTraceSection.MEDIA_UPLOAD) {
-                                                        uploadOrAdmitComposerMediaWithToken(
-                                                            account,
-                                                            group.groupIdHex,
-                                                            request,
-                                                            tempId,
-                                                            capturedReply = retained.replyRevision != null,
-                                                        )
-                                                    }
-                                                outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
-                                                outcome
-                                            }.also { outcome ->
-                                                outcome.captureForRetry(
-                                                    retained,
-                                                    diagnostics,
-                                                    tempId,
-                                                    startedAtMs,
-                                                )
-                                            }.upload
-                                }.attachments.map { it.reference }
-                            diagnostics.finishMediaUpload(tempId, startedAtMs)
-                            uploaded
-                                .also {
-                                    if (!retained.recoveredWithoutUpload && it.size != retained.attachments.size) {
-                                        error(
-                                            "media upload returned ${it.size} references for " +
-                                                "${retained.attachments.size} attachments",
-                                        )
-                                    }
-                                }.also { retained.uploadedReferences = it }
-                        }
-                // Stop before publication after a discard; an unreferenced Blossom blob is inert.
-                if (discardedDuringRetry.remove(key)) {
-                    discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)
-                    trimCancelledSendTombstones()
-                    return
-                }
-                val summary =
-                    retained.localAcceptance
-                        ?: run {
-                            val startedAtMs = diagnostics.beginMediaPublish(tempId)
-                            appState
-                                .withGroupCommitLock(account, group.groupIdHex) {
-                                    requireOptimisticSendNotCancelled(key)
-                                    val accepted =
-                                        mediaPublisher?.invoke(account, group.groupIdHex, references, retained.caption)
-                                            ?: appState.marmotIo(MarmotTraceSection.MEDIA_SEND) {
-                                                sendComposerMedia(
-                                                    account,
-                                                    group.groupIdHex,
-                                                    references,
-                                                    retained.caption,
-                                                    tempId,
-                                                    replyRevision = retained.replyRevision,
-                                                )
-                                            }
-                                    recordOptimisticSendAcceptance(key, accepted)
-                                    accepted
-                                }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
-                        }
-                // Once MDK has accepted the send, no retry uploads again, so large snapshots can go now instead of
-                // waiting, possibly offline for hours, for it to settle. Until then a stale-epoch refusal needs them.
-                retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain)
-                completeDurableAcceptance(key)
-                if (retained.replyTarget != null && replySelectionVersion == retained.replyVersion) replyingTo = null
-                sendHostAttempt.success()
-                val canonicalId = summary.messageIds.firstOrNull()
-                diagnostics.alias(tempId, canonicalId)
-                if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
-                    // MDK now owns a durable, unpublished media intent. It still
-                    // returns the canonical app-event id, which lets a later
-                    // projection settle this exact bubble even when other media
-                    // sends are queued at the same time.
-                    val acceptedPendingMessageIdHex =
-                        canonicalId?.takeIf(HEX_MESSAGE_ID::matches)
-                    diagnostics.recordAcceptedPending(tempId, acceptedPending = true)
-                    // A retry can be discarded while the FFI call is suspended.
-                    // MDK cannot retract an accepted intent, but the user chose
-                    // to discard this local bubble, so don't retain its bytes or
-                    // use the canonical id to restore a deferred projection.
-                    if (discardedDuringRetry.remove(key)) {
-                        acceptedPendingMessageIdHex?.let(pendingProjectionsAwaitingBridge::remove)
-                        discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)
-                        trimCancelledSendTombstones()
-                        return
-                    }
-                    // A single-media projection can beat the FFI return and
-                    // reconcile heuristically before its exact MDK id is known.
-                    // Once the return supplies that id, finish the same exact
-                    // chat-list handoff and release the retained upload state.
-                    val acceptedPendingProjectionAlreadyLanded =
-                        acceptedPendingMessageIdHex != null &&
-                            acceptedPendingMessageIdHex in projectedMessageIds
-                    if (acceptedPendingProjectionAlreadyLanded) {
-                        val confirmedMessageIdHex = requireNotNull(acceptedPendingMessageIdHex)
-                        // The early echo may have seeded only L1 before upload supplied the ciphertext tag.
-                        // Register the guarded durable host copy before releasing its retained plaintext.
-                        handoffOwnMediaCacheOnReconcile(key, confirmedMessageIdHex)
-                        appState.commitOptimisticSentPreview(
-                            accountRef = conversationAccountRef,
-                            groupIdHex = group.groupIdHex,
-                            optimisticMessageIdHex = tempId,
-                            confirmedMessageIdHex = confirmedMessageIdHex,
-                        )
-                        optimisticMessages.remove(key)
-                        messageById.remove(tempId)
-                        retainedMediaUploads.remove(key)
-                        activeUploadKeys.remove(key)
-                        diagnostics.recordEchoReconcile(tempId)
-                        publishTimelineFromIndexes()
-                        optimisticSendPhases.remove(key)
-                        return
-                    }
-                    retained.acceptedPending = true
-                    retained.acceptedPendingMessageIdHex = acceptedPendingMessageIdHex
-                    // The local projection can beat the FFI return. It was held
-                    // only because several media optimistics were indistinguishable
-                    // at that instant; now the MDK id gives it an exact owner.
-                    acceptedPendingMessageIdHex
-                        ?.let(pendingProjectionsAwaitingBridge::get)
-                        ?.let { deferredProjection ->
-                            upsertProjectedRecord(
-                                deferredProjection,
-                                reconcileOptimistic = true,
-                                allowDelayedProjection = true,
-                            )
-                        }
-                    publishTimelineFromIndexes()
-                    return
-                }
-                // MarmotKit owns the encrypted-media wire format. Build the
-                // optimistic bridge tags through the same native API that
-                // validates and publishes the projected attachments.
-                val imetaTags = mediaImetaTagsBuilder(account, group.groupIdHex, references)
-                val confirmedId = canonicalId ?: tempId
-                diagnostics.mediaTransportComplete(tempId)
-                transferRetentionAtSend(tempId, confirmedId)
-                appState.commitOptimisticSentPreview(
-                    accountRef = conversationAccountRef,
-                    groupIdHex = group.groupIdHex,
-                    optimisticMessageIdHex = tempId,
-                    confirmedMessageIdHex = confirmedId,
-                )
-                // INVARIANT: the discard re-check must run BEFORE any cache mutation
-                // below, so a mid-flight discard never seeds the just-sent bytes.
-                if (discardedDuringRetry.remove(key)) {
-                    // User discarded after publish committed; drop the local
-                    // optimistic + bytes. The published event may still echo back
-                    // via projection (publish already succeeded — not retractable).
-                    discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_AFTER_PUBLISH)
-                    trimCancelledSendTombstones()
-                    return
-                }
-                // Seed the decrypted-bytes AND decoded-thumbnail caches under the
-                // confirmed id so the sender's own bubble renders instantly — no
-                // Blossom round-trip and no decode spinner. One cache entry per
-                // attachment under `(account, messageId, attachmentIndex)`.
-                //
-                // Re-check the session/account immediately before seeding: the
-                // upload + sendMediaAttachments above are long suspend points, and
-                // a sign-out / account switch in that window runs
-                // `clearInMemoryMediaCaches()` and bumps the upload-session epoch.
-                // Without this guard, the in-memory L1 caches (which are NOT
-                // generation-gated) would be repopulated with the just-signed-out
-                // account's decrypted plaintext, surviving the sign-out clear until
-                // the next `clearInMemoryMediaCaches()`. The L2 disk write below is
-                // already generation-gated, but skipping it too on a stale session
-                // keeps the behaviour consistent (it would no-op anyway). The bridge
-                // insert below is intentionally left running: the publish already
-                // committed, so the timeline state still needs reconciling.
-                val sessionStillValid = mediaUploadSessionStillCurrent(account)
-                if (confirmedId.isNotEmpty() && sessionStillValid) {
-                    retained.attachments.forEachIndexed { index, attachment ->
-                        if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
-                        // MDK retains a file-backed item's own copy; only in-memory bytes seed the host cache.
-                        val bytes = attachment.inMemoryBytes ?: return@forEachIndexed
-                        val confirmedKey = mediaCacheKey(account, confirmedId, index)
-                        appState.cacheUploadedAttachment(
-                            confirmedKey,
-                            bytes,
-                            references.getOrNull(index)?.ciphertextSha256,
-                        )
-                        // Offload the multi-MB ARGB decode to Default; the
-                        // main-confined thumbnail-cache put resumes on Main.
-                        // Mirrors the receive/render path in WhiteNoiseApp.
-                        // The attachment names its sent draft's domain, the one its previews used.
-                        val decoded = mediaThumbnailDecoder(attachment, attachment.outgoingDomain)
-                        if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
-                        if (decoded != null) {
-                            appState.cacheMediaThumbnail(confirmedKey, decoded)
-                        }
-                    }
-                }
-                // Keep the pending row available to exact native reconciliation across thumbnail suspension.
-                // Removing it earlier lets a concurrent echo publish a new presentation identity.
-                optimisticMessages.remove(key)
-                messageById.remove(tempId)
-                retainedMediaUploads.remove(key)
-                activeUploadKeys.remove(key)
-                // Bridge the gap until the published event echoes back via the
-                // projection: insert a confirmed *image* optimistic carrying the
-                // imeta tags (one per uploaded reference), keyed on confirmedId.
-                // Same key as the eventual projected item, so the bubble never
-                // disappears/reappears, and it renders from the seeded thumbnail.
-                // pruneConfirmedOptimisticMessages reconciles it on arrival.
-                val handoffHandled =
-                    if (confirmedId.isNotEmpty()) {
-                        // Always insert the bridge. When the projection has already
-                        // arrived (race-loser), `optimisticMessageIdForProjection`
-                        // refuses to reconcile (no exact-id match + multiple
-                        // `_media_pending` siblings → null), leaving the new
-                        // projection alongside the still-pending optimistic until
-                        // this bridge insert resolves the pairing via id collision
-                        // in `publishTimelineFromIndexes`. The bridge carries the
-                        // real imeta tags so it renders identically to the
-                        // projection it eventually consumes.
-                        val confirmedRecord =
-                            optimistic.copy(
-                                messageIdHex = confirmedId,
-                                // Match what the published event carries (the caption we
-                                // sent), not the "📎 filename" optimistic placeholder, so
-                                // the bridge bubble is identical to the projected one.
-                                plaintext = retained.caption.orEmpty(),
-                                tags =
-                                    imetaTags +
-                                        optimistic.tags.filter {
-                                            it.values.firstOrNull() != "_media_pending"
-                                        },
-                                sourceEpoch = references.firstOrNull()?.sourceEpoch,
-                            )
-                        messageById[confirmedId] = confirmedRecord
-                        optimisticMessages["msg:$confirmedId"] =
-                            TimelineMessage(
-                                "msg:$confirmedId",
-                                confirmedRecord,
-                                MessageStatus.Sent,
-                                timelineOrder = order,
-                                retentionAtSendSeconds = retentionAtSendSeconds,
-                                presentationId = key,
-                            )
-                        // Register the bridge through the same tracked preserve path
-                        // as text sends so orphan cleanup can release its overrides
-                        // after the confirmed handoff. Drain any
-                        // projection echo that arrived while this send was still
-                        // mid-`sendMediaAttachments` — at that point the heuristic
-                        // refused the match and the projection was stashed in
-                        // `pendingProjectionsAwaitingBridge` to avoid a position-0
-                        // render flip. Now that the overrides are stamped, the
-                        // build below will produce a TimelineMessage at the right
-                        // position.
-                        preserveOptimisticDisplayPosition(confirmedId, confirmedId)
-                        val deferredProjection = pendingProjectionsAwaitingBridge[confirmedId]
-                        val deliveredToAttachedController =
-                            appState.deliverConfirmedMediaHandoff(
-                                accountRef = conversationAccountRef,
-                                groupIdHex = group.groupIdHex,
-                                confirmedId = confirmedId,
-                                deferredProjection = deferredProjection,
-                            )
-                        // A controller used outside the composed screen is not in
-                        // AppState's attached set. It may still consume its own
-                        // projection, but a disposed upload owner must leave the
-                        // shared bridge + stash for the next live controller.
-                        deliveredToAttachedController ||
-                            (
-                                !controllerCleared &&
-                                    acceptConfirmedMediaHandoff(confirmedId, deferredProjection)
-                            )
-                    } else {
-                        false
-                    }
-                // The accepting controller owns publication and settlement. A
-                // disposed upload owner must not consume its shared preserve.
-                if (!handoffHandled && !controllerCleared) {
-                    publishTimelineFromIndexes()
-                }
-                optimisticSendPhases.remove(key)
-            } catch (throwable: Throwable) {
-                // Coroutine cancellation (e.g. leaving the screen) is not a send
-                // failure — rethrow so it isn't surfaced as a Failed bubble/toast.
-                if (throwable is CancellationException) {
-                    sendHostAttempt.cancel()
-                    if (optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED) {
-                        discardedDuringRetry.remove(key)
-                        trimCancelledSendTombstones()
-                    }
-                    throw throwable
-                }
-                if (throwable is OptimisticSendCancelledException) {
-                    sendHostAttempt.cancel()
-                    discardedDuringRetry.remove(key)
-                    removeCancelledOptimisticSend(key, tempId)
-                    trimCancelledSendTombstones()
-                    return
-                }
-                // Cancel stopped a file-backed transfer before admission: settle it as cancelled, not failed.
-                if (retained.consumeTransferCancelRequest() && !optimisticSendIsMdkOwnedOrUnknown(key)) {
-                    sendHostAttempt.cancel()
-                    optimisticSendPhases[key] = OptimisticSendPhase.CANCELLED
-                    optimisticCancellationGeneration.value += 1
-                    discardedDuringRetry.remove(key)
-                    removeCancelledOptimisticSend(key, tempId)
-                    trimCancelledSendTombstones()
-                    return
-                }
-                if (discardedDuringRetry.remove(key)) {
-                    sendHostAttempt.cancel()
-                    discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_AFTER_MEDIA_FAILURE)
-                    trimCancelledSendTombstones()
-                    return
-                }
-                if (optimisticSendIsMdkOwnedOrUnknown(key)) {
-                    sendHostAttempt.unavailable()
-                    publishTimelineFromIndexes()
-                    if (BuildConfig.DEBUG) Log.w("DMConversation", "post-acceptance media settlement failed", throwable)
-                    return
-                }
-                // MDK refuses references whose upload epoch or branch is no longer current (mdk#2891), and
-                // reusing them would fail every Retry the same way, so the next attempt uploads again.
-                if (isStaleMediaReferenceEpoch(throwable)) retained.uploadedReferences = null
-                // A failed bubble offers Retry, not the bytes of the attempt that failed.
-                retained.clearTransferProgress()
-                optimisticMessages[key] =
-                    TimelineMessage(
-                        key,
-                        optimistic,
-                        MessageStatus.Failed,
-                        timelineOrder = order,
-                        retentionAtSendSeconds = retentionAtSendSeconds,
-                    )
-                optimisticSendPhases[key] = OptimisticSendPhase.FAILED
-                failOptimisticChatListPreview(tempId)
-                // Failed bubble shown but bytes are retained for a possible
-                // retry — KEEP the key in `activeUploadKeys` so a screen
-                // dispose can't wipe the bytes out from under a retry tap.
-                // The key drains when the user retries (terminal performMediaUpload
-                // path runs) or explicitly discards.
-                publishTimelineFromIndexes()
-                if (BuildConfig.DEBUG) Log.w("DMConversation", "media upload failed", throwable)
-                diagnostics.complete(
-                    tempId,
-                    PerformancePhase.SEND_FAILED,
-                    PerformanceResult.FAILURE,
-                )
-                sendHostAttempt.failure()
-                presentSendFailure(appState, throwable, sendFailureAttempt(key))
-            }
-        } finally {
-            sendHostAttempt.unavailable()
-            appState.untrackInFlightMediaUpload(conversationAccountRef, group.groupIdHex, key, uploadJob)
-        }
-    }
-
-    /** Reactions must wait for a blocked leave to be resolved, even with seeded membership. */
-    private fun reactionAccountIfAccepted(): String? {
-        val accountRef = conversationAccountRef
-        if (
-            showsBlockedLeave ||
-            !canAcceptReaction(
-                accountRef = accountRef,
-                membersVerified = membersVerified,
-                isSelfMember = isSelfMember,
-                seededSelfMember = seededSelfMember,
-                selfLeft = selfMembership.selfLeft,
-                unrecoverable = group.unrecoverable,
-                disbanding = group.disbanding,
-                disbanded = group.disbanded,
-            )
-        ) {
-            appState.present(R.string.toast_reaction_failed)
-            return null
-        }
-        return accountRef
-    }
-
-    /** Commits an add and retains its exact event id for an immediate queued removal. */
-    private suspend fun commitReactionAdd(
-        owner: ReactionMutationTarget,
-        emoji: String,
-    ) {
-        val account = owner.account
-        val target = owner.messageId
-        val key = target.lowercase() to emoji
-        val messageIdHex =
-            appState.withGroupCommitLock(account, group.groupIdHex) {
-                owner.requireAvailable()
-                val summary =
-                    appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                        reactToMessage(account, group.groupIdHex, target, emoji)
-                    }
-                summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
-            }
-        // Presence records that the add committed even when older bindings return no event id.
-        // A rapid later removal can then wait for local history instead of mistaking it for a no-op.
-        unprojectedOwnReactionEventIds[key] = messageIdHex.orEmpty()
-    }
-
-    /** Commits a removal, using history when a just-added reaction did not return an event id. */
-    private suspend fun commitReactionRemoval(
-        owner: ReactionMutationTarget,
-        emoji: String,
-        ownEmojisBeforeMutation: Set<String>,
-        removeBeforeProjection: Boolean,
-    ) {
-        val account = owner.account
-        val target = owner.messageId
-        val key = target.lowercase() to emoji
-        val preferredEventId =
-            if (removeBeforeProjection) {
-                unprojectedOwnReactionEventIds[key]
-            } else {
-                null
-            }
-        if (removeBeforeProjection && preferredEventId.isNullOrBlank()) {
-            // This is only a visibility barrier. retractOwnReaction deliberately rereads history
-            // under the group commit lock before choosing event-scoped delete versus unreact.
-            awaitReactionEventHistory(emoji) {
-                resolveActiveOwnReactionEventIds(account, target, requireNotNull(conversationAccountIdHex))
-            }
-        }
-        appState.withGroupCommitLock(account, group.groupIdHex) {
-            retractOwnReaction(owner, emoji, ownEmojisBeforeMutation, preferredEventId)
-        }
-    }
-
-    /** Resolves active own reaction ids from Marmot's authoritative local event history. */
-    private suspend fun resolveActiveOwnReactionEventIds(
-        account: String,
-        target: String,
-        activeAccountIdHex: String,
-    ): Map<String, String>? =
-        runCatchingCancellable {
-            appState.marmotIo {
-                messages(
-                    account,
-                    group.groupIdHex,
-                    null,
-                    listOf(MARMOT_DELETE_EVENT_KIND, MARMOT_REACTION_EVENT_KIND),
-                )
-            }
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "reaction event lookup failed", it)
-        }.getOrNull()
-            ?.let { records -> activeOwnReactionEventIdsByEmoji(records, activeAccountIdHex, target) }
-
-    /** Removes the tapped own reaction without clearing a different emoji when several are active. */
-    private suspend fun retractOwnReaction(
-        owner: ReactionMutationTarget,
-        emoji: String,
-        ownEmojisBeforeMutation: Set<String>,
-        preferredEventId: String? = null,
-    ) {
-        val account = owner.account
-        val target = owner.messageId
-        // Retract just the tapped emoji by deleting its own reaction event; the
-        // FFI target-only unreact would drop the wrong emoji when the user holds
-        // more than one reaction on the same message.
-        val me = conversationAccountIdHex ?: error("no active account to retract reaction")
-        val projectedEventIdByEmoji = projectedOwnReactionEventIds(timelineRecords[target], me)
-        val preferredReactionEventId = preferredEventId?.takeIf(String::isNotBlank)
-        val requiresAuthoritativeHistory =
-            preferredReactionEventId == null &&
-                (ownEmojisBeforeMutation == setOf(emoji) || projectedEventIdByEmoji[emoji].isNullOrBlank())
-        val authoritativeEventIds =
-            if (requiresAuthoritativeHistory) {
-                resolveActiveOwnReactionEventIds(account, target, me)
-            } else {
-                null
-            }
-        val knownEventIdByEmoji =
-            knownReactionEventIds(
-                projectedEventIds = projectedEventIdByEmoji,
-                emoji = emoji,
-                unprojectedEventId = unprojectedOwnReactionEventIds[target.lowercase() to emoji],
-                authoritativeEventIds = authoritativeEventIds,
-            )
-        val authoritativeOwnEmojis =
-            when {
-                authoritativeEventIds != null -> authoritativeEventIds.keys
-                ownEmojisBeforeMutation.size > 1 -> ownEmojisBeforeMutation
-                else -> null
-            }
-        val plan =
-            planOwnReactionRetraction(
-                emoji = emoji,
-                knownEventIdByEmoji = knownEventIdByEmoji,
-                authoritativeOwnEmojis = authoritativeOwnEmojis,
-                preferredEventId = preferredReactionEventId,
-            )
-        // History reads and lock admission can suspend after the reaction's quiet period.
-        owner.requireAvailable()
-        when (plan) {
-            is OwnReactionRetractionPlan.DeleteReactionMessage -> {
-                appState.marmotIo { deleteMessage(account, group.groupIdHex, plan.messageIdHex) }
-                unprojectedOwnReactionEventIds.remove(target.lowercase() to emoji)
-            }
-            OwnReactionRetractionPlan.UnreactTarget -> {
-                appState.marmotIo { unreactFromMessage(account, group.groupIdHex, target) }
-                unprojectedOwnReactionEventIds.keys.removeAll { (messageId, _) ->
-                    messageId.equals(target, ignoreCase = true)
-                }
-            }
-            OwnReactionRetractionPlan.Unavailable -> error("no reaction event to retract for $emoji")
-        }
-    }
-
-    /** Own reactions known by projection plus locally committed additions awaiting projection. */
-    private fun authoritativeOwnReactionEmojis(target: String): Set<String> =
-        conversationAccountIdHex?.let { me ->
-            projectedOwnReactionEmojis(window.references(target), timelineRecords[target], me)
-                .includeUnprojectedReactionEmojis(target, unprojectedOwnReactionEventIds.keys)
-        } ?: emptySet()
-
-    /** Drives native state toward the newest intent without blocking later optimistic taps. */
-    private suspend fun convergeReactionIntent(
-        owner: ReactionMutationTarget,
-        emoji: String,
-        key: Pair<String, String>,
-    ): ReactionIntentDrainOutcome {
-        val target = owner.messageId
-        val ownEmojis = authoritativeOwnReactionEmojis(target).toMutableSet()
-        var addedBeforeProjection = key in unprojectedOwnReactionEventIds
-        return drainReactionIntent(
-            key = key,
-            conflator = reactionIntentConflator,
-            initialMine = emoji in ownEmojis,
-        ) { commitMine ->
-            retryBusyReactionMutation(
-                stillDesired = { reactionIntentConflator.latest(key)?.desiredMine == commitMine },
-            ) {
-                if (commitMine) {
-                    commitReactionAdd(owner, emoji)
-                    ownEmojis += emoji
-                    addedBeforeProjection = true
-                } else {
-                    commitReactionRemoval(
-                        owner = owner,
-                        emoji = emoji,
-                        ownEmojisBeforeMutation = ownEmojis.toSet(),
-                        removeBeforeProjection = addedBeforeProjection,
-                    )
-                    ownEmojis -= emoji
-                    addedBeforeProjection = false
-                }
-            }
-        }
     }
 
     /** Optimistically adds or removes [emoji], then reconciles the authoritative Marmot mutation. */
@@ -4469,181 +2714,6 @@ class ConversationController(
                 if (outcome.addedReaction) markReactionTargetRead(target)
             }
         }
-    }
-
-    /**
-     * Removes one optimistic send and all Android-owned presentation state.
-     * The phase entry is deliberately retained while cancellation is in
-     * flight so a late parser/upload/retry continuation cannot enter MDK.
-     */
-    private fun removeCancelledOptimisticSend(
-        optimisticKey: String,
-        tempId: String,
-    ) = discardOptimisticSend(optimisticKey, tempId, OptimisticSendDiscard.CANCELLED)
-
-    /**
-     * Drops one optimistic send from Android presentation state. [discard]
-     * names the intended differences between cancellation, abandonment and
-     * the in-flight discard paths; traces, host attempts, membership and
-     * tombstones stay with each caller.
-     */
-    private fun discardOptimisticSend(
-        optimisticKey: String,
-        tempId: String,
-        discard: OptimisticSendDiscard,
-    ) {
-        if (discard.releasesEditsAndFailureNotice) {
-            pendingMessageEditHandoff.abandon(pendingEditKey(tempId))
-            optimisticEdits.remove(tempId)
-        }
-        optimisticMessages.remove(optimisticKey)
-        durableAcceptanceCallbacks.remove(optimisticKey)
-        messageById.remove(tempId)
-        retainedMediaUploads.remove(optimisticKey)
-        activeUploadKeys.remove(optimisticKey)
-        if (discard.rollsBackPreview) {
-            retentionAtSendByMessageId.remove(tempId)
-            rollbackOptimisticChatListPreview(tempId)
-        }
-        if (discard.removesPhase) optimisticSendPhases.remove(optimisticKey)
-        when (discard.diagnostic) {
-            DiscardedSendDiagnostic.FORGET -> appState.pendingSendDiagnostics.forget(tempId)
-            DiscardedSendDiagnostic.COMPLETE_DROPPED ->
-                appState.pendingSendDiagnostics.complete(
-                    tempId,
-                    PerformancePhase.SEND_COMPLETE,
-                    PerformanceResult.DROPPED,
-                )
-            DiscardedSendDiagnostic.LEAVE_TRACKED -> Unit
-        }
-        if (discard.releasesEditsAndFailureNotice) {
-            appState.dismissSendFailureNotice(sendFailureAttempt(optimisticKey))
-        }
-        publishTimelineFromIndexes()
-    }
-
-    /** Resolves a projected row to its local optimistic send token, if still retained. */
-    private fun optimisticSendKey(message: AppMessageRecordFfi): String? {
-        val directKey = "msg:${message.messageIdHex}"
-        if (directKey in optimisticMessages || directKey in optimisticSendPhases) return directKey
-        return optimisticMessages.entries.firstOrNull { (_, item) -> item.record == message }?.key
-    }
-
-    /**
-     * Competes with native admission under the group commit lock. Cancelling
-     * before admission removes the optimistic row and wakes its sleeping retry;
-     * once native owns the send, the canonical pending row remains intact.
-     */
-    @Suppress("ReturnCount") // Distinct unavailable-account/key exits precede the single lock-arbitrated result.
-    private suspend fun cancelOptimisticSendResult(
-        message: AppMessageRecordFfi,
-        optimisticKeyOverride: String? = null,
-    ): Result<Unit> {
-        val account =
-            conversationAccountRef
-                ?: return Result.failure(IllegalStateException("Conversation account unavailable"))
-        val optimisticKey =
-            optimisticKeyOverride
-                ?: optimisticSendKey(message)
-                ?: return Result.failure(IllegalStateException("Message is no longer locally cancellable"))
-        // A running file-backed transfer holds the commit lock for its whole upload; stop it first.
-        retainedMediaUploads.get(optimisticKey)?.requestTransferCancel()
-        return appState.withGroupCommitLock(account, group.groupIdHex) {
-            val current = optimisticMessages[optimisticKey]
-            val tempId = current?.record?.messageIdHex ?: message.messageIdHex
-            val phase = optimisticSendPhases[optimisticKey]
-            when {
-                phase == OptimisticSendPhase.CANCELLED -> Result.success(Unit)
-                current?.status == MessageStatus.Failed || phase == OptimisticSendPhase.PRE_ACCEPTANCE -> {
-                    val retryInFlight = current?.status == MessageStatus.Pending
-                    optimisticSendPhases[optimisticKey] = OptimisticSendPhase.CANCELLED
-                    optimisticCancellationGeneration.value += 1
-                    if (retryInFlight) discardedDuringRetry.add(optimisticKey)
-                    removeCancelledOptimisticSend(optimisticKey, tempId)
-                    if (!retryInFlight) trimCancelledSendTombstones()
-                    Result.success(Unit)
-                }
-                else -> Result.failure(IllegalStateException("Message is already owned by MarmotKit"))
-            }
-        }
-    }
-
-    /**
-     * Runs [block] until it finishes or the send [optimisticKey] is cancelled. A cancel stops [block] at
-     * once, so a slow artwork lookup never holds the text order for later sends, and ends the send with
-     * [OptimisticSendCancelledException], so it can never publish.
-     */
-    private suspend fun <T> untilSendCancelled(
-        optimisticKey: String,
-        block: suspend () -> T,
-    ): T =
-        coroutineScope {
-            // A lookup that never suspends finishes here without yielding the send to anything else.
-            val work = async(start = CoroutineStart.UNDISPATCHED) { block() }
-            if (work.isCompleted) return@coroutineScope work.await()
-            val watcher =
-                launch(start = CoroutineStart.UNDISPATCHED) {
-                    optimisticCancellationGeneration.first {
-                        optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED
-                    }
-                    work.cancel()
-                }
-            try {
-                work.await()
-            } catch (cancel: CancellationException) {
-                requireOptimisticSendNotCancelled(optimisticKey)
-                throw cancel
-            } finally {
-                watcher.cancel()
-            }
-        }
-
-    private fun requireOptimisticSendNotCancelled(optimisticKey: String) {
-        if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.CANCELLED) {
-            throw OptimisticSendCancelledException()
-        }
-    }
-
-    private fun recordOptimisticSendAcceptance(
-        optimisticKey: String,
-        summary: dev.ipf.marmotkit.SendSummaryFfi,
-    ) {
-        optimisticSendPhases[optimisticKey] =
-            if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
-                OptimisticSendPhase.ACCEPTED_PENDING
-            } else {
-                OptimisticSendPhase.SETTLED
-            }
-    }
-
-    private fun optimisticSendIsMdkOwnedOrUnknown(optimisticKey: String): Boolean =
-        when (optimisticSendPhases[optimisticKey]) {
-            OptimisticSendPhase.ACCEPTED_PENDING,
-            OptimisticSendPhase.ACCEPTANCE_UNKNOWN,
-            OptimisticSendPhase.SETTLED,
-            -> true
-            else -> false
-        }
-
-    private fun trimCancelledSendTombstones() {
-        val cancelledKeys =
-            optimisticSendPhases
-                .asSequence()
-                .filter { (key, phase) ->
-                    phase == OptimisticSendPhase.CANCELLED && key !in discardedDuringRetry
-                }.map { (key, _) -> key }
-                .toList()
-        cancelledKeys
-            .take((cancelledKeys.size - MAX_CANCELLED_SEND_TOMBSTONES).coerceAtLeast(0))
-            .forEach(optimisticSendPhases::remove)
-    }
-
-    /** Advances the read marker after any accepted add without coupling it to reaction rollback. */
-    private suspend fun markReactionTargetRead(target: String) {
-        runCatchingCancellable { markReadUpTo(target) }
-            .onFailure {
-                if (BuildConfig.DEBUG) Log.w("DMConversation", "mark-read after reaction failed", it)
-            }
     }
 
     suspend fun deleteMessage(
@@ -4741,307 +2811,13 @@ class ConversationController(
         pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - messageIds
     }
 
-    /**
-     * Publish a kind-1009 edit replacing the body of [targetMessageId] with
-     * [content]. The runtime enforces the wire-level constraint that the
-     * edit's signer matches the original; recipients re-enforce
-     * through MDK’s accepted-edit projection. Trim is applied before send so a
-     * trailing newline from the composer doesn't change the visible body.
-     */
-    suspend fun editMessage(
-        targetMessageId: String,
-        content: String,
-    ) {
-        val account = conversationAccountRef ?: return
-        if (!canSendMessages) return
-        val target = targetMessageId.takeIf { it.isNotBlank() } ?: return
-        val trimmed = content.trim()
-        if (trimmed.isEmpty()) return
-        // Apply the new body locally before the publish round-trips so the
-        // bubble flips to the edited text at once instead of showing the old
-        // text until the kind-1009 echoes back (~1s). Capture the body shown
-        // before this edit (a prior optimistic edit's pre-edit text takes
-        // priority over the now-stale displayed text) so a failure reverts
-        // verbatim. Pending drives a brief sending indicator on the bubble.
-        val preEditText = optimisticEdits[target]?.preEditText ?: currentDisplayedText(target)
-        optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Pending)
-        publishTimelineFromIndexes()
-        try {
-            appState.withGroupCommitLock(account, group.groupIdHex) {
-                messageEditPublisher(account, group.groupIdHex, target, trimmed)
-            }
-            // Publish accepted: drop the Pending indicator but keep the text
-            // overlay so the bubble doesn't flicker back to the old body in the
-            // gap before the kind-1009 lands in the timeline. The overlay is
-            // pruned once MDK reflects the same latest text.
-            // Only act if this attempt still owns the overlay: if the user
-            // re-edited the same target while this publish was in flight, a
-            // newer Pending overlay (different text) has superseded us, and
-            // flipping it to Sent would wrongly confirm the newer attempt.
-            optimisticEdits[target]
-                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
-                ?.let { optimisticEdits[target] = it.copy(status = MessageStatus.Sent) }
-            publishTimelineFromIndexes()
-        } catch (throwable: Throwable) {
-            throwable.rethrowIfCancellation()
-            // Revert the displayed body to the pre-edit text and flip the
-            // bubble to Failed, lighting the same retry/discard affordance a
-            // failed send shows. Retry re-runs this edit; discard clears the
-            // overlay and restores the original body. Guarded the same way as
-            // the success path: a newer in-flight attempt's overlay must not be
-            // clobbered back to this stale attempt's Failed/pre-edit text.
-            // MDK refuses an edit of a message this account cannot edit; retrying could never succeed, so the
-            // original body returns instead of a Failed overlay with Retry.
-            val notEditable = throwable is MarmotKitException.InvalidEditTarget
-            optimisticEdits[target]
-                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
-                ?.let {
-                    if (notEditable) {
-                        optimisticEdits.remove(target)
-                    } else {
-                        optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed)
-                    }
-                }
-            publishTimelineFromIndexes()
-            val detail = if (notEditable) R.string.error_message_not_editable else R.string.error_try_again
-            val title = R.string.toast_couldnt_edit_message
-            appState.presentFailure(title, "MESSAGE_EDIT", throwable, AppText.Resource(detail))
-        }
-    }
-
-    /** Transfers the revision to MDK before dismissing the editor, with immutable tokens for safe retries. */
-    private suspend fun admitPendingEdit(
-        target: String,
-        originalToken: String,
-        text: String,
-        retryIntent: DurablePendingEditIntent? = null,
-        onAttemptStarted: () -> Unit = {},
-    ): Boolean {
-        val account = conversationAccountRef ?: return false
-        val confirmedTarget = pendingMessageEditHandoff.confirmedTarget(pendingEditKey(target))
-        val resolvedTarget =
-            confirmedTarget?.takeIf {
-                it in timelineRecords || "msg:$it" in optimisticMessages
-            } ?: target
-        val retained =
-            optimisticEdits[resolvedTarget]
-                ?.takeIf {
-                    !it.nativeRevisionRejected &&
-                        it.text == text &&
-                        it.durableIntent?.originalClientToken == originalToken
-                }?.durableIntent
-        val intent = retryIntent ?: retained ?: DurablePendingEditIntent(originalToken, UUID.randomUUID().toString())
-        return if (!pendingEditAdmissions.add(intent.editClientToken)) {
-            false
-        } else {
-            onAttemptStarted()
-            performPendingEdit(account, target, resolvedTarget, intent, text)
-        }
-    }
-
-    private suspend fun performPendingEdit(
-        account: String,
-        target: String,
-        resolvedTarget: String,
-        intent: DurablePendingEditIntent,
-        text: String,
-    ): Boolean {
-        val previous = optimisticEdits[resolvedTarget]?.preEditText ?: currentDisplayedText(resolvedTarget)
-        optimisticEdits[resolvedTarget] = OptimisticEdit(text, previous, MessageStatus.Pending, intent)
-        publishTimelineFromIndexes()
-        return try {
-            runCatchingCancellable { publishPendingEdit(account, intent, text) }.fold(
-                onSuccess = { summary -> completePendingEditAdmission(intent, summary, text) },
-                onFailure = { cause ->
-                    if (intent.editClientToken in pendingEditPublicationObserved) {
-                        true
-                    } else {
-                        failPendingEditAdmission(intent, target, account, cause)
-                        // A message MDK will never let this account edit ends the edit too, so the editor closes.
-                        cause is MarmotKitException.InvalidEditTarget
-                    }
-                },
-            )
-        } finally {
-            pendingEditAdmissions.remove(intent.editClientToken)
-            pendingEditPublicationObserved.remove(intent.editClientToken)
-            optimisticEdits.entries
-                .firstOrNull { it.value.durableIntent == intent }
-                ?.key
-                ?.let(::recoverPendingEditStatus)
-        }
-    }
-
-    private suspend fun publishPendingEdit(
-        account: String,
-        intent: DurablePendingEditIntent,
-        text: String,
-    ) = pendingEditAdmissionMutex.withLock {
-        // Preserve this controller's submission order at the local native boundary.
-        // Newer UI revisions already own their overlay while this admission waits.
-        pendingMessageEditPublisher?.invoke(
-            account,
-            group.groupIdHex,
-            intent.originalClientToken,
-            text,
-            intent.editClientToken,
-        ) ?: appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) {
-            admitPendingMessageEdit(account, group.groupIdHex, intent, text)
-        }
-    }
-
-    private fun completePendingEditAdmission(
-        intent: DurablePendingEditIntent,
-        summary: SendSummaryFfi,
-        text: String,
-    ): Boolean {
-        val current = optimisticEdits.entries.firstOrNull { it.value.durableIntent == intent }
-        if (current != null) {
-            optimisticEdits[current.key] = current.value.copy(nativeEditMessageId = summary.messageIds.firstOrNull())
-        }
-        publishTimelineFromIndexes()
-        return current != null ||
-            intent.editClientToken in pendingEditPublicationObserved ||
-            timelineRecords.values.any { record ->
-                record.edit?.latestEditMessageIdHex in summary.messageIds && record.plaintext == text
-            }
-    }
-
-    /** Shows a refused pending edit as Failed with Retry, or restores the original text when MDK says it is final. */
-    private fun failPendingEditAdmission(
-        intent: DurablePendingEditIntent,
-        target: String,
-        account: String,
-        cause: Throwable,
-    ) {
-        val current = optimisticEdits.entries.firstOrNull { it.value.durableIntent == intent }
-        // A message that can no longer be edited gets its original text back; a Retry could never succeed.
-        val notEditable = cause is MarmotKitException.InvalidEditTarget
-        if (current != null) {
-            if (notEditable || optimisticMessages["msg:$target"]?.status == MessageStatus.Failed) {
-                optimisticEdits.remove(current.key)
-            } else {
-                optimisticEdits[current.key] = current.value.copy(status = MessageStatus.Failed)
-            }
-        }
-        publishTimelineFromIndexes()
-        if (current != null && appState.activeAccountRef == account) {
-            val detail = if (notEditable) R.string.error_message_not_editable else R.string.error_try_again
-            val title = R.string.toast_couldnt_edit_message
-            appState.presentFailure(title, "MESSAGE_EDIT", cause, AppText.Resource(detail))
-        }
-    }
-
-    private val pendingEditAdmissions = mutableSetOf<String>()
-    private val pendingEditAdmissionMutex = Mutex()
+    internal val pendingEditAdmissions = mutableSetOf<String>()
+    internal val pendingEditAdmissionMutex = Mutex()
 
     // Only in-flight callbacks retain this proof; finally removes it even on cancellation.
-    private val pendingEditPublicationObserved = mutableSetOf<String>()
-    private val pendingEditStatusReads = mutableSetOf<String>()
-    private val pendingEditStatusRechecks = mutableSetOf<String>()
-
-    /** Edit-event delivery can advance without changing the original row's rendered body. */
-    private fun recoverPendingEditStatusForProjection(record: TimelineMessageRecordFfi) {
-        val targets =
-            optimisticEdits
-                .filterValues { edit ->
-                    edit.nativeEditMessageId == record.messageIdHex ||
-                        (record.clientToken != null && edit.durableIntent?.editClientToken == record.clientToken)
-                }.keys
-                .toList()
-        recoverPendingEditStatus(record)
-        if (record.kind == MESSAGE_EDIT_EVENT_KIND && record.sourceMessageIdHex != null) {
-            targets.forEach { target ->
-                optimisticEdits[target]?.let { edit ->
-                    edit.durableIntent
-                        ?.editClientToken
-                        ?.takeIf { it in pendingEditAdmissions }
-                        ?.let(pendingEditPublicationObserved::add)
-                    optimisticEdits[target] =
-                        edit.copy(
-                            status = MessageStatus.Sent,
-                            nativeEditMessageId = record.messageIdHex,
-                        )
-                }
-            }
-            if (targets.isNotEmpty()) publishTimelineFromIndexes()
-        } else {
-            targets.mapNotNull(timelineRecords::get).forEach(::recoverPendingEditStatus)
-        }
-    }
-
-    /** Recover native engine ownership or terminal rejection when the target reprojects. */
-    private fun recoverPendingEditStatus(record: TimelineMessageRecordFfi) {
-        recoverPendingEditStatus(record.messageIdHex)
-    }
-
-    private fun recoverPendingEditStatus(target: String) {
-        val edit = optimisticEdits[target]
-        val intent = edit?.durableIntent
-        val account = conversationAccountRef
-        if (edit == null || intent == null || account == null) return
-        val unresolvedFailure = edit.status == MessageStatus.Failed && !edit.nativeRevisionRejected
-        val shouldRecover = !controllerCleared && (edit.status == MessageStatus.Pending || unresolvedFailure)
-        if (!shouldRecover || intent.editClientToken in pendingEditAdmissions) {
-            return
-        }
-        if (!pendingEditStatusReads.add(intent.editClientToken)) {
-            pendingEditStatusRechecks.add(intent.editClientToken)
-        } else {
-            controllerScope.launch { readPendingEditStatus(account, intent) }
-        }
-    }
-
-    private suspend fun readPendingEditStatus(
-        account: String,
-        intent: DurablePendingEditIntent,
-    ) {
-        try {
-            val status =
-                runCatchingCancellable {
-                    pendingEditStatusReader(account, group.groupIdHex, intent.editClientToken)
-                }.getOrNull()
-            if (controllerCleared) return
-            val current =
-                optimisticEdits.entries.firstOrNull {
-                    it.value.durableIntent == intent && it.value.status != MessageStatus.Sent
-                }
-            if (current != null) {
-                optimisticEdits[current.key] = current.value.withNativeEditStatus(status)
-                publishTimelineFromIndexes()
-            }
-        } finally {
-            pendingEditStatusReads.remove(intent.editClientToken)
-            // Coalesce native events received during the read, including identical rows.
-            if (pendingEditStatusRechecks.remove(intent.editClientToken) && !controllerCleared) {
-                optimisticEdits.entries
-                    .firstOrNull { it.value.durableIntent == intent }
-                    ?.key
-                    ?.let(::recoverPendingEditStatus)
-            }
-        }
-    }
-
-    private fun handoffPendingMessageEdit(
-        clientToken: String,
-        confirmedId: String,
-        ready: Boolean,
-    ) {
-        val queuedText = pendingMessageEditHandoff.confirm(pendingEditKey(clientToken), confirmedId, ready)
-        if (!ready || confirmedId == clientToken) return
-        optimisticEdits.remove(clientToken)?.let { edit ->
-            // An edit already submitted against the confirmed row is newer than the temporary overlay.
-            if (confirmedId !in optimisticEdits) optimisticEdits[confirmedId] = edit
-        }
-        if (queuedText != null) {
-            // Projection installation can still be mid-batch here. Resume on
-            // the next main turn before publishing and rebuilding the timeline.
-            appState.launchMutation {
-                yield()
-                editMessage(confirmedId, queuedText)
-            }
-        }
-    }
+    internal val pendingEditPublicationObserved = mutableSetOf<String>()
+    internal val pendingEditStatusReads = mutableSetOf<String>()
+    internal val pendingEditStatusRechecks = mutableSetOf<String>()
 
     /**
      * Latest text to display for a kind-9 chat row: the most-recent
@@ -5054,80 +2830,19 @@ class ConversationController(
             ?: editsByTarget[record.messageIdHex]?.latestText
             ?: record.plaintext
 
-    /**
-     * Body shown for [targetId] before any in-flight optimistic edit: the
-     * latest confirmed kind-1009 text if one exists, otherwise the message's
-     * original plaintext. Captured as an optimistic edit's revert target.
-     */
-    private fun currentDisplayedText(targetId: String): String =
-        editsByTarget[targetId]?.latestText
-            ?: messageById[targetId]?.plaintext
-            ?: optimisticMessages["msg:$targetId"]?.record?.plaintext
-            ?: ""
-
     // Tracks optimistic ids the user discarded while a retry was in flight.
     // The retry coroutine consults this set before re-inserting a failed
     // record, so a discard during retry doesn't get clobbered by the catch
     // path putting the message back as Failed.
-    private val discardedDuringRetry = mutableSetOf<String>()
+    internal val discardedDuringRetry = mutableSetOf<String>()
 
     /** Shared wakeup lets a replacement controller release an old controller's retry. */
-    private val optimisticCancellationGeneration =
+    internal val optimisticCancellationGeneration =
         appState.optimisticCancellationGeneration(conversationAccountRef, initialGroup.groupIdHex)
 
-    /**
-     * Settles the durable-acceptance callback for [optimisticKey], and retires the send-failure
-     * notice that attempt raised: once the engine owns the send, the notice is no longer true (#2666).
-     */
-    private fun completeDurableAcceptance(optimisticKey: String) {
-        durableAcceptanceCallbacks.remove(optimisticKey)?.invoke()
-        appState.dismissSendFailureNotice(sendFailureAttempt(optimisticKey))
-    }
-
-    /** Correlation key for a notice raised by the send attempt on optimistic [key]. */
-    private fun sendFailureAttempt(key: String) = SendFailureAttempt(conversationAccountRef, group.groupIdHex, key)
-
-    private fun rollbackOptimisticChatListPreview(optimisticMessageIdHex: String) {
+    internal fun rollbackOptimisticChatListPreview(optimisticMessageIdHex: String) {
         appState.rollbackOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
     }
-
-    private fun failOptimisticChatListPreview(optimisticMessageIdHex: String) {
-        appState.failOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
-    }
-
-    /** The pending chat-list preview an outgoing send bumps its row with. */
-    private fun sentPreview(
-        tempId: String,
-        plaintext: String,
-        contentTokens: MarkdownDocumentFfi,
-        timelineAt: ULong,
-    ): ChatListMessagePreviewFfi =
-        ChatListMessagePreviewFfi(
-            retentionSeconds = null,
-            retentionExpiresAt = null,
-            messageIdHex = tempId,
-            sender = conversationAccountIdHex ?: "",
-            senderDisplayName = null,
-            plaintext = plaintext,
-            contentTokens = contentTokens,
-            kind = 9uL,
-            timelineAt = timelineAt,
-            deleted = false,
-            deletionSource = DeletionSourceFfi.UNKNOWN,
-            attachmentKind = null,
-            attachmentCount = 0u,
-            groupSystem = null,
-            deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
-            sticker = null,
-        )
-
-    // The chat-list preview a manual retry re-applies: same optimistic id so
-    // the row entry flips FAILED → PENDING in place, fresh timestamp so the
-    // row re-bumps to the top like any new send.
-    private fun retryPreview(
-        tempId: String,
-        record: AppMessageRecordFfi,
-    ): ChatListMessagePreviewFfi = sentPreview(tempId, record.plaintext, record.contentTokens, nowSeconds())
 
     /**
      * Compressed bytes for in-flight / failed outgoing attachments, keyed by
@@ -5143,9 +2858,9 @@ class ConversationController(
      * returning user looking at an empty pending bubble — the bytes the
      * bubble preview needs would be on the GC-pending old controller.
      */
-    private val retainedMediaUploads =
+    internal val retainedMediaUploads =
         appState.retainedMediaUploads(conversationAccountRef, initialGroup.groupIdHex)
-    private val activeUploadKeys =
+    internal val activeUploadKeys =
         appState.activeUploadKeys(conversationAccountRef, initialGroup.groupIdHex)
 
     /**
@@ -5155,76 +2870,11 @@ class ConversationController(
      * defense-in-depth against an evicted/rejoined member replaying an old
      * event id to read plaintext it shouldn't.
      */
-    private fun mediaCacheKey(
+    internal fun mediaCacheKey(
         account: String,
         messageIdHex: String,
         attachmentIndex: Int,
     ): String = attachmentPresentation.mediaCacheKey(account, messageIdHex, attachmentIndex)
-
-    private fun mediaUploadSessionStillCurrent(account: String): Boolean =
-        shouldAcceptMediaUploadForAccount(
-            account,
-            mediaUploadSessionEpoch,
-            appState.activeAccountRef,
-            appState.mediaUploadSessionEpoch(),
-        )
-
-    // Evict decrypted media (L1 plaintext, decoded thumbnails, L2 disk) for the
-    // attachments the engine just secure-deleted on expiry, matched by ciphertext
-    // hash through the cached references. Without this the decrypted bytes stay
-    // recoverable from the local caches after the row is gone (#674 review).
-    private suspend fun evictExpiredMediaCaches(
-        account: String,
-        expiredCiphertextSha256: Set<String>,
-    ) {
-        if (expiredCiphertextSha256.isEmpty()) return
-        // Map expired hashes to cache keys via the loaded projected rows.
-        // TimelineMessageRecordFfi.media is authoritative and already carries
-        // each attachment's real source epoch, so this needs no group-wide
-        // listMedia scan or parallel controller cache.
-        val loadedKeys =
-            timelineRecords.values.flatMap { record ->
-                MessageAttachments.accepted(record.media).mapNotNull { (index, reference) ->
-                    if (reference.ciphertextSha256 in expiredCiphertextSha256) {
-                        mediaCacheKey(account, record.messageIdHex, index)
-                    } else {
-                        null
-                    }
-                }
-            }
-        // The bounded window can't map rows it has already trimmed: any L1
-        // key in this group's slice without a loaded or in-flight row is
-        // dropped fail-closed alongside the precise hits, so a pruned old
-        // attachment's decrypted bytes can't outlive the prune.
-        val loadedMessageIds =
-            buildSet {
-                addAll(timelineRecords.keys)
-                optimisticMessages.values.forEach { add(it.record.messageIdHex) }
-                addAll(optimisticMessages.keys)
-            }
-        val staleKeys =
-            withContext(Dispatchers.Main.immediate) {
-                staleGroupMediaCacheKeys(
-                    cachedKeys = appState.mediaMemoryCacheKeysSnapshot(),
-                    account = account,
-                    groupIdHex = group.groupIdHex,
-                    loadedMessageIds = loadedMessageIds,
-                )
-            }
-        val evictedKeys = loadedKeys + staleKeys
-        removeMediaMemoryCacheKeys(
-            cacheKeys = evictedKeys,
-            dispatcher = Dispatchers.Main.immediate,
-            removeEntry = appState::removeMediaMemoryCacheEntry,
-        )
-        withContext(Dispatchers.IO) {
-            loadedKeys.forEach { appState.removeMediaDiskCacheEntry(it) }
-            // Plus any disk entry stamped with an expired ciphertext tag — the
-            // only path that reaches media whose message isn't currently loaded,
-            // including across process restarts. #674 review.
-            appState.removeMediaDiskCacheTags(expiredCiphertextSha256)
-        }
-    }
 
     /** Peeks at the existing cache without starting a native transfer. */
     fun hasCachedAttachment(
@@ -5378,58 +3028,6 @@ class ConversationController(
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
     ): ByteArray = downloadAttachment(messageIdHex, attachmentIndex, reference, AttachmentDownloadPriority.Interactive)
-
-    /**
-     * Race-fix for own-sent media bubbles: when an outgoing media projection
-     * arrives and we reconcile it against the pending `_media_pending`
-     * optimistic, we already hold the JPEG bytes in [retainedMediaUploads].
-     * Seed L1 plaintext + decoded thumbnail under the projection's cache
-     * key so the bubble's `LaunchedEffect` finds bytes immediately —
-     * otherwise it would call `downloadAttachment` → empty L1 → empty L2
-     * (background disk write hasn't flushed yet) → re-download from
-     * Blossom, even though we just uploaded the same bytes.
-     *
-     * L2 (disk) write is scheduled in the background, same pattern as
-     * `downloadAttachment`'s post-fetch path.
-     */
-    private fun handoffOwnMediaCacheOnReconcile(
-        optimisticKey: String,
-        projectedMessageIdHex: String,
-    ) {
-        val retained = retainedMediaUploads.get(optimisticKey) ?: return
-        val account = conversationAccountRef?.takeIf(::mediaUploadSessionStillCurrent) ?: return
-        // Seed every attachment under its own (messageId, attachmentIndex)
-        // key so the projected album bubble's per-tile cache lookups all
-        // hit immediately on reconcile.
-        retained.attachments.forEachIndexed { index, attachment ->
-            if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
-            // MDK retains a file-backed item's own copy; only in-memory bytes seed the host cache.
-            val bytes = attachment.inMemoryBytes ?: return@forEachIndexed
-            val cacheKey = mediaCacheKey(account, projectedMessageIdHex, index)
-            appState.cacheUploadedAttachment(
-                cacheKey,
-                bytes,
-                retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256,
-            )
-            // Register local publication before yielding, including files beyond L1 admission,
-            // so a confirmed card waits for its disk copy instead of re-downloading from Blossom.
-            // Offload the multi-MB ARGB thumbnail decode off this main-thread
-            // reconcile. The main-confined thumbnail-cache put resumes on Main
-            // via launchMutation's Main.immediate scope. Mirrors the
-            // receive/render path in WhiteNoiseApp.
-            val posterSource = attachment
-            appState.launchMutation {
-                val decoded = decodeMediaThumbnailOffMain(posterSource)
-                if (decoded != null && mediaUploadSessionStillCurrent(account)) {
-                    appState.cacheMediaThumbnail(cacheKey, decoded)
-                }
-            }
-        }
-        if (retained.acceptedPending) {
-            retainedMediaUploads.remove(optimisticKey)
-            activeUploadKeys.remove(optimisticKey)
-        }
-    }
 
     /**
      * Every pending attachment in the optimistic album, ordered by attachment
@@ -5680,82 +3278,6 @@ class ConversationController(
         }
     }
 
-    /** Settle a manual text retry without republishing an uncertain delivery. */
-    @Suppress("LongMethod") // Each failure classification owns different cleanup and user-visible recovery state.
-    private fun handleFailedSendRetryFailure(
-        throwable: Throwable,
-        key: String,
-        tempId: String,
-        current: TimelineMessage,
-        refreshedRecord: AppMessageRecordFfi,
-        order: ULong,
-        account: String,
-        retryTrace: PerformanceTrace?,
-    ) {
-        if (throwable is OptimisticSendCancelledException) {
-            discardedDuringRetry.remove(key)
-            removeCancelledOptimisticSend(key, tempId)
-            trimCancelledSendTombstones()
-            return
-        }
-        if (throwable is CancellationException && optimisticSendPhases[key] == OptimisticSendPhase.CANCELLED) {
-            discardedDuringRetry.remove(key)
-            trimCancelledSendTombstones()
-        }
-        throwable.rethrowIfCancellation()
-        if (BuildConfig.DEBUG) Log.w("DMConversation", "retryFailedSend failed", throwable)
-        when {
-            discardedDuringRetry.remove(key) -> {
-                // User discarded mid-flight; don't restore the Failed bubble.
-                discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)
-                trimCancelledSendTombstones()
-            }
-            throwable.isUseAfterEviction() -> {
-                discardOptimisticSend(key, tempId, OptimisticSendDiscard.ABANDONED)
-                markActiveAccountRemovedFromMembers(account)
-            }
-            isAmbiguousRelayDeliveryError(throwable) -> {
-                if (optimisticSendPhases[key] == OptimisticSendPhase.PRE_ACCEPTANCE) {
-                    optimisticSendPhases[key] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
-                }
-                // Publication may already have reached a relay. Keep the
-                // existing row Pending; another high-level send could mint a
-                // duplicate event.
-                sendTrace(
-                    retryTrace,
-                    PerformancePhase.DELIVERY_UNCERTAIN,
-                    result = PerformanceResult.PENDING,
-                    layer = PerformanceLayer.TRANSPORT,
-                )
-                appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.DELIVERY_UNCERTAIN)
-                publishTimelineFromIndexes()
-            }
-            optimisticSendIsMdkOwnedOrUnknown(key) -> {
-                publishTimelineFromIndexes()
-            }
-            else -> {
-                optimisticSendPhases[key] = OptimisticSendPhase.FAILED
-                optimisticMessages[key] =
-                    current.copy(
-                        record = refreshedRecord,
-                        status = MessageStatus.Failed,
-                        timelineOrder = order,
-                    )
-                failOptimisticChatListPreview(tempId)
-                suppressProjectedTimelineItems(
-                    unpublishedProjectionIdsMatchingMessage(
-                        timelineRecords = timelineRecords,
-                        message = refreshedRecord,
-                        activeAccountIdHex = conversationAccountIdHex,
-                    ),
-                )
-                publishTimelineFromIndexes()
-                appState.pendingSendDiagnostics.forget(tempId)
-                presentSendFailure(appState, throwable, sendFailureAttempt(key))
-            }
-        }
-    }
-
     /**
      * Drops a failed outgoing send from the local timeline. Purely client-side
      * cleanup; the message was never accepted by MarmotKit, so there is
@@ -5789,44 +3311,6 @@ class ConversationController(
             .onFailure { failure ->
                 appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_CANCEL", failure)
             }
-    }
-
-    /** Retry and Discard act on a failed original before its dependent durable edit. */
-    private fun failedEditForAction(item: TimelineMessage): OptimisticEdit? =
-        optimisticEdits[item.record.messageIdHex]?.takeIf {
-            it.status == MessageStatus.Failed &&
-                !(it.durableIntent != null && optimisticMessages[item.id]?.status == MessageStatus.Failed)
-        }
-
-    /** An unavailable acknowledgement cannot authorize discarding a durably queued revision. */
-    private suspend fun discardPendingEdit(
-        target: String,
-        intent: DurablePendingEditIntent,
-    ) {
-        val account = conversationAccountRef ?: return
-        val result =
-            runCatchingCancellable {
-                pendingEditStatusReader(account, group.groupIdHex, intent.editClientToken)
-            }
-        val current =
-            optimisticEdits[target]?.takeIf {
-                it.durableIntent == intent && it.status == MessageStatus.Failed
-            } ?: return
-        val status = result.getOrNull()
-        when {
-            result.isFailure -> {
-                if (appState.activeAccountRef == account) {
-                    appState.presentFailure(
-                        R.string.toast_couldnt_edit_message,
-                        "MESSAGE_EDIT",
-                        requireNotNull(result.exceptionOrNull()),
-                    )
-                }
-            }
-            status == null || status == LocalSendStatusFfi.Rejected -> optimisticEdits.remove(target)
-            else -> optimisticEdits[target] = current.withNativeEditStatus(status)
-        }
-        publishTimelineFromIndexes()
     }
 
     /**
@@ -6014,66 +3498,8 @@ class ConversationController(
             true
         }
 
-    /**
-     * Resolves the native Join call while every retry remains fenced to the
-     * same rendered Welcome and controller owner.
-     */
-    private suspend fun resolveInviteAcceptance(attempt: InviteAcceptanceAttempt): AppGroupRecordFfi? =
-        runCatching {
-            retryIdempotentRuntimeMutation(
-                onTransientFailure = { attemptNumber ->
-                    Log.w(
-                        "DMConversation",
-                        "invite acceptance temporarily unavailable; retrying " +
-                            "failedAttempt=$attemptNumber",
-                    )
-                },
-            ) {
-                if (ownsInviteAttempt(attempt)) {
-                    inviteAcceptor(attempt.account, attempt.generation.groupIdHex)
-                } else {
-                    null
-                }
-            }
-        }.getOrElse { failure ->
-            if (failure is MarmotKitException.GroupInviteNotPending) {
-                if (ownsInviteAttempt(attempt)) {
-                    inviteConfirmationAuthority.finish()
-                    group = group.copy(pendingConfirmation = false)
-                    inviteAcceptanceAwaitingAuthority = attempt.generation
-                    appState.applyLocalGroupUpdate(group, attempt.account)
-                    refreshMembers()
-                }
-                return@getOrElse null
-            }
-            val currentGroup = group
-            group = inviteConfirmationAuthority.rollback(currentGroup)
-            val ownsPresentation = ownsInviteAcceptanceResult
-            if (ownsPresentation && group != currentGroup) appState.applyLocalGroupUpdate(group, attempt.account)
-            failure.rethrowIfCancellation()
-            if (ownsPresentation) {
-                appState.presentFailure(R.string.toast_couldnt_accept_invite, "GROUP_INVITE_ACCEPT", failure)
-            }
-            null
-        }
-
-    /** Keeps metadata refreshed during Join while committing confirmation for its current Welcome. */
-    private fun applyAcceptedInviteGroup(
-        acceptedGroup: AppGroupRecordFfi,
-        authorityEpochBefore: Long,
-    ) {
-        val confirmed =
-            if (mutationPresentation.groupAuthorityEpoch == authorityEpochBefore) {
-                acceptedGroup
-            } else {
-                group.copy(pendingConfirmation = false)
-            }
-        group = inviteConfirmationAuthority.reconcile(confirmed)
-        inviteConfirmationAuthority.finish()
-    }
-
     // The invitation whose decline waits for the user to agree to step down as admin first.
-    private var inviteDeclineStepDownRequest by mutableStateOf<InviteAcceptanceGeneration?>(null)
+    internal var inviteDeclineStepDownRequest by mutableStateOf<InviteAcceptanceGeneration?>(null)
 
     /** Whether Decline is waiting for the user to agree to step down as admin, for the invitation still shown. */
     val inviteDeclineStepDownRequested: Boolean
@@ -6102,135 +3528,6 @@ class ConversationController(
         val consent = inviteDeclineStepDownRequest ?: return false
         return declineInviteWithConsent(stepDownConsent = consent)
     }
-
-    /**
-     * Declines the current pending Welcome, stepping down first only when [stepDownConsent] names this invitation.
-     * Without that consent an admin invitee, or a decline MDK refuses for an admin, raises the step-down question.
-     */
-    private suspend fun declineInviteWithConsent(stepDownConsent: InviteAcceptanceGeneration?): Boolean =
-        withMutationLockResult(false) {
-            if (inviteAcceptanceResolutionPending) return@withMutationLockResult false
-            val account = conversationAccountRef ?: return@withMutationLockResult false
-            val invitation = inviteGeneration(group)
-            val stepDownAgreed = stepDownConsent != null
-            if (requestDeclineConsentIfNeeded(invitation, stepDownConsent)) return@withMutationLockResult false
-            val stillPending = {
-                mutationPresentation.ownsCurrentPresentation() &&
-                    !inviteAcceptanceResolutionPending &&
-                    group.pendingConfirmation &&
-                    inviteGeneration(group) == invitation
-            }
-            runCatching {
-                when (declinePendingInvite(account, invitation.groupIdHex, stepDownAgreed, stillPending)) {
-                    InviteDeclineOutcome.DECLINED -> Unit
-                    InviteDeclineOutcome.STALE -> return@runCatching false
-                    InviteDeclineOutcome.NEEDS_STEP_DOWN_CONSENT -> {
-                        inviteDeclineStepDownRequest = invitation
-                        return@runCatching false
-                    }
-                }
-                appState.dismissConversationNotifications(account, invitation.groupIdHex)
-                if (mutationPresentation.ownsCurrentPresentation() && inviteGeneration(group) == invitation) {
-                    group = group.copy(pendingConfirmation = false, archived = true)
-                    appState.applyLocalGroupUpdate(group, account)
-                    presentConversationTransient(R.string.toast_invite_declined)
-                }
-                true
-            }.getOrElse { failure ->
-                failure.rethrowIfCancellation()
-                presentInviteDeclineFailure(failure, invitation)
-                false
-            }
-        }
-
-    /**
-     * Stops Decline for [invitation] when it must not go ahead yet, and returns whether it stopped. Consent counts
-     * only for the invitation it named and is used up here, under the mutation lock. A sole admin cannot step down,
-     * so asking would promise what MDK refuses: they get the existing guidance at once. Any other admin who has not
-     * agreed yet gets the step-down question. MDK's own refusals stay the fallback when this copy of the roles is
-     * stale.
-     */
-    private fun requestDeclineConsentIfNeeded(
-        invitation: InviteAcceptanceGeneration,
-        stepDownConsent: InviteAcceptanceGeneration?,
-    ): Boolean {
-        inviteDeclineStepDownRequest = null
-        val stop =
-            when {
-                stepDownConsent != null -> stepDownConsent != invitation
-                isSoleAdminInvitee() -> {
-                    appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-                    true
-                }
-                isSelfAdmin -> {
-                    inviteDeclineStepDownRequest = invitation
-                    true
-                }
-                else -> false
-            }
-        return stop
-    }
-
-    /**
-     * Whether this account is the invitation's only admin, from MDK's admin list, which a pending invitation has
-     * before its roster loads.
-     */
-    private fun isSoleAdminInvitee(): Boolean = isSelfAdmin && GroupProjector.uniqueAdminCount(group) <= 1
-
-    /** Explains a failed decline, giving a sole admin the same guidance as Leave instead of a generic failure. */
-    private fun presentInviteDeclineFailure(
-        failure: Throwable,
-        invitation: InviteAcceptanceGeneration,
-    ) {
-        if (
-            failure is MarmotKitException.WouldRemoveLastAdmin &&
-            failure.groupIdHex.equals(invitation.groupIdHex, ignoreCase = true)
-        ) {
-            appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
-        } else {
-            appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", failure)
-        }
-    }
-
-    /**
-     * Serializes decline with commits and keeps an admitted step-down and its decline together. MDK refusing an
-     * admin's decline steps down only when [stepDownAgreed], otherwise the caller asks the user first.
-     */
-    private suspend fun declinePendingInvite(
-        account: String,
-        groupIdHex: String,
-        stepDownAgreed: Boolean,
-        stillPending: () -> Boolean,
-    ): InviteDeclineOutcome =
-        appState.withGroupCommitLock(account, groupIdHex) {
-            if (!stillPending()) return@withGroupCommitLock InviteDeclineOutcome.STALE
-            try {
-                appState.marmotIo { declineGroupInvite(account, groupIdHex) }
-            } catch (refusal: MarmotKitException.AdminCannotSelfRemove) {
-                if (!refusal.groupIdHex.equals(groupIdHex, ignoreCase = true)) throw refusal
-                if (!stepDownAgreed) return@withGroupCommitLock InviteDeclineOutcome.NEEDS_STEP_DOWN_CONSENT
-                if (!stillPending()) return@withGroupCommitLock InviteDeclineOutcome.STALE
-                val declineResult =
-                    appState.runGroupChange(
-                        account,
-                        groupIdHex,
-                        stillWanted = stillPending,
-                        actionLabel = R.string.decline,
-                    ) {
-                        withContext(NonCancellable) {
-                            val demotion =
-                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                    selfDemoteAdminDetailed(account, groupIdHex)
-                                }
-                            applyMutationDetails(account, demotion.details)
-                            // Keep a failed decline from retrying a step-down that already succeeded.
-                            runCatchingCancellable { appState.marmotIo { declineGroupInvite(account, groupIdHex) } }
-                        }
-                    }
-                declineResult.getOrThrow()
-            }
-            InviteDeclineOutcome.DECLINED
-        }
 
     /**
      * Archive or restore this conversation with a presentation-only optimistic
@@ -6312,27 +3609,6 @@ class ConversationController(
     }
 
     /**
-     * Shared shape of the two local removals: one mutation slot, a success notice chosen by the removal itself. Both
-     * close this conversation, so the notice is app-wide instead of scoped to the closed route (#3310), and like a
-     * failure it is not shown on a replacement account or runtime.
-     */
-    private suspend fun runLocalGroupRemoval(
-        failureToast: Int,
-        operationCode: String,
-        removal: suspend (account: String) -> Int,
-    ): Boolean =
-        withMutationLockResult(false) {
-            lastMutationError = null
-            val account = conversationAccountRef ?: return@withMutationLockResult false
-            runCatchingCancellable {
-                val success = removal(account)
-                val sameRuntime = appState.runtimeGeneration == conversationRuntimeGeneration
-                if (sameRuntime && appState.activeAccountRef == account) appState.presentTransient(success)
-                true
-            }.onFailure { recordMutationFailure(failureToast, operationCode, it) }.getOrDefault(false)
-        }
-
-    /**
      * Commits the fields the user changed in the group editor, compared with the values it opened
      * with ([openedName] and [openedDescription]). An unchanged field is sent as null, so MDK carries
      * it forward from canonical group state, even if another admin changed it meanwhile. A changed
@@ -6372,35 +3648,6 @@ class ConversationController(
                 recordMutationFailure(R.string.toast_couldnt_update_group, "GROUP_PROFILE_UPDATE", it)
             }.getOrDefault(false)
         }
-
-    /**
-     * Installs a just-committed group profile locally and hands it to the chat list (#2696).
-     *
-     * [LocalGroupFieldAuthority] then retains the new name and description against a pre-edit
-     * snapshot that was already in flight, while a genuinely newer authoritative commit still wins.
-     */
-    private fun applyLocalGroupProfile(
-        before: AppGroupRecordFfi,
-        updatedName: String?,
-        updatedDescription: String?,
-        account: String,
-    ) {
-        // [before] is the record the edit was made against: the subscription may already have applied
-        // the committed profile, and the fences still need the values it replaced. Only the fields
-        // this save changed are fenced; the other one keeps whatever the subscription last applied.
-        val newName = updatedName?.takeIf { it != before.name }
-        val newDescription = updatedDescription?.takeIf { it != before.description }
-        if (newName == null && newDescription == null) return
-        newName?.let { localGroupNames.record(group.groupIdHex, before.name, it) }
-        newDescription?.let { localGroupDescriptions.record(group.groupIdHex, before.description, it) }
-        val clearedName = before.name.takeIf { newName?.isBlank() == true && it.isNotBlank() }
-        group =
-            group.copy(
-                name = updatedName ?: group.name,
-                description = updatedDescription ?: group.description,
-            )
-        appState.applyLocalGroupUpdate(group, account, clearedName = clearedName)
-    }
 
     /**
      * Updates the public avatar and reports failure only while [change] owns the attempt.
@@ -6463,20 +3710,6 @@ class ConversationController(
             }.getOrDefault(false)
         }
 
-    /**
-     * Best-effort clean-up of the encrypted image a public avatar supersedes. The user never asked for it, so when MDK
-     * holds it back nobody is asked: the refusal, like any failure, leaves the encrypted image in place, and the
-     * public avatar still wins for display.
-     */
-    private suspend fun clearSupersededGroupImage(account: String): Boolean =
-        runCatchingCancellable {
-            appState.runGroupChange(account, group.groupIdHex, askUser = false, actionLabel = R.string.remove_photo) {
-                appState.marmotIo { clearGroupImage(account, group.groupIdHex) }
-            }
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
-        }.isSuccess
-
     /** Commits the encrypted image and reports failure only while [change] owns the attempt. */
     internal suspend fun updateGroupImage(change: ScopedGroupImageMutation<ImageUploadDraft?>): Boolean {
         if (change.viewerPermissionCheck && !change.isActive()) return false
@@ -6515,195 +3748,6 @@ class ConversationController(
             committed && (!change.viewerPermissionCheck || change.isActive())
         }
     }
-
-    /** Serializes permission, primary image publication and legacy cleanup, retaining ambiguous cleanup recovery. */
-    private suspend fun commitGroupImageMutation(
-        account: String,
-        capturedGroupId: String,
-        change: ScopedGroupImageMutation<ImageUploadDraft?>,
-        requestedMutationKey: String,
-        onLegacyClearAttempt: () -> Unit,
-    ): Boolean =
-        appState.withGroupCommitLock(account, capturedGroupId) {
-            val admission = admitViewerGroupImageMutation(appState, change, account, capturedGroupId)
-            if (!admission.allowed) return@withGroupCommitLock false
-            val needsPrimary =
-                if (change.viewerPermissionCheck) {
-                    !admission.alreadyCommitted
-                } else {
-                    shouldCommitPrimaryGroupImageMutation(
-                        requestedMutationKey = requestedMutationKey,
-                        pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
-                        hasProjectedEncryptedImage = group.imageHashHex != null,
-                    )
-                }
-            if (needsPrimary) {
-                commitGroupImageBytes(account, capturedGroupId, change.value, change)
-            }
-
-            // URL avatars win; clear the legacy URL only after the encrypted
-            // mutation succeeds so a partial failure never removes both images.
-            if (admission.legacyAvatarPresent ||
-                !group.avatarUrl.isNullOrBlank() ||
-                pendingLegacyAvatarClearAfterImageMutationKey != null
-            ) {
-                pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
-                onLegacyClearAttempt()
-                try {
-                    appState.runGroupChange(
-                        account,
-                        capturedGroupId,
-                        stillWanted = { change.stillOwned() },
-                        actionLabel = R.string.change_photo,
-                    ) {
-                        val admitted = isAdmittedGroupChange()
-                        appState.marmotIo {
-                            if (!admitted && !change.stillOwned()) throw CancellationException("Viewer owner replaced")
-                            updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
-                        }
-                    }
-                } catch (declined: GroupChangeDeclinedException) {
-                    // Waiting after the new image landed must say so, not end quietly behind the old URL avatar.
-                    if (!change.stillOwned()) throw declined
-                    throw declined.refusal
-                }
-                pendingLegacyAvatarClearAfterImageMutationKey = null
-            }
-            true
-        }
-
-    /** Publish the current native group image/roster through the normal conversation and chat-list state path. */
-    private suspend fun refreshViewerGroupImageDetails(
-        account: String,
-        groupId: String,
-        change: ScopedGroupImageMutation<ImageUploadDraft?>,
-    ): Boolean {
-        if (!change.isActive()) return false
-        val details = appState.marmotIo { groupDetails(account, groupId) }
-        val applicable = change.isActive() && details.group.groupIdHex.equals(groupId, ignoreCase = true)
-        if (applicable) {
-            check(applyMutationDetails(account, details)) { "Authoritative group image projection unavailable" }
-        }
-        return applicable
-    }
-
-    /**
-     * Native command entry rechecks viewer ownership after dispatcher/lock suspension, except on the retry of a change
-     * the user continued past, which must reach MDK to spend its acknowledgement.
-     */
-    private suspend fun commitGroupImageBytes(
-        account: String,
-        groupId: String,
-        draft: ImageUploadDraft?,
-        change: ScopedGroupImageMutation<ImageUploadDraft?>,
-    ) {
-        appState.runGroupChange(
-            account,
-            groupId,
-            stillWanted = { change.stillOwned() },
-            actionLabel =
-                if (draft == null) {
-                    R.string.remove_photo
-                } else {
-                    R.string.change_photo
-                },
-        ) {
-            // A retry the user continued past must reach MDK, or its acknowledgement outlives it.
-            val admitted = isAdmittedGroupChange()
-            appState.marmotIo {
-                if (!admitted && !change.stillOwned()) throw CancellationException("Viewer owner replaced")
-                if (draft != null) {
-                    updateGroupImage(account, groupId, draft.plaintext, draft.mediaType)
-                } else {
-                    clearGroupImage(account, groupId)
-                }
-            }
-        }
-    }
-
-    private fun presentGroupImageMutationFailure(
-        throwable: Throwable,
-        requestedMutationKey: String,
-        attemptedLegacyClear: Boolean,
-    ) {
-        val failure =
-            classifyGroupImageMutationFailure(
-                requestedMutationKey = requestedMutationKey,
-                pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
-                attemptedLegacyClear = attemptedLegacyClear,
-            )
-        val title =
-            when (failure) {
-                GroupImageMutationFailure.UploadCleanup -> R.string.toast_group_image_uploaded_cleanup_failed
-                else -> R.string.toast_couldnt_update_group
-            }
-        recordMutationFailure(title, "GROUP_IMAGE_UPDATE", throwable)
-    }
-
-    private fun canAdministerMembersFromAuthoritativeRoster(): Boolean =
-        memberRosterState == GroupRosterLoadState.READY &&
-            !isDm &&
-            isSelfMember &&
-            isSelfAdmin &&
-            !group.pendingConfirmation &&
-            !group.disbanding &&
-            !group.disbanded
-
-    private fun authoritativeAdministrationTarget(targetMemberIdHex: String): AppGroupMemberRecordFfi? {
-        if (!canAdministerMembersFromAuthoritativeRoster() || targetMemberIdHex.isBlank()) return null
-        return members.singleOrNull { member ->
-            member.memberIdHex.equals(targetMemberIdHex, ignoreCase = true)
-        }
-    }
-
-    private fun presentRosterChanged(
-        @StringRes title: Int,
-    ) {
-        lastMutationError =
-            ErrorPresentation(
-                message = AppText.Plain(copy.groupRosterChanged),
-                report = "White Noise error report\noperation=GROUP_ROSTER_UPDATE\nerror=STALE_STATE",
-            )
-        appState.present(title, R.string.toast_group_roster_changed)
-    }
-
-    private suspend fun resolveCanonicalInviteRefs(
-        memberRefs: List<String>,
-        diagnostic: DmCreationAttempt? = null,
-    ): List<String>? =
-        try {
-            canonicalGroupInviteRefs(memberRefs, appState::resolveAccountIdHex)
-        } catch (throwable: Throwable) {
-            diagnostic?.failed(DmCreationPhase.RECIPIENTS, throwable)
-            throwable.rethrowIfCancellation()
-            recordMutationFailure(R.string.toast_couldnt_add_members, "GROUP_INVITE_RESOLVE", throwable)
-            null
-        }
-
-    private fun presentAdminCommitOutcome(
-        outcome: GroupAdministrationCommitOutcome,
-        adminAdded: Boolean,
-    ): Boolean =
-        when (outcome) {
-            GroupAdministrationCommitOutcome.COMMITTED -> {
-                presentConversationTransient(
-                    if (adminAdded) R.string.toast_admin_added else R.string.toast_admin_removed,
-                )
-                true
-            }
-            GroupAdministrationCommitOutcome.ROSTER_CHANGED -> {
-                presentRosterChanged(R.string.toast_couldnt_update_admin)
-                false
-            }
-            GroupAdministrationCommitOutcome.KEEP_ONE_ADMIN -> {
-                appState.present(
-                    R.string.toast_keep_one_admin,
-                    R.string.toast_promote_before_removing_admin,
-                )
-                false
-            }
-            GroupAdministrationCommitOutcome.NO_CHANGE -> false
-        }
 
     /**
      * Invites the captured recipients and their initial admin subset in one native membership commit.
@@ -6822,114 +3866,6 @@ class ConversationController(
         }
     }
 
-    /** Keep error copy independent of native invitation and reconciliation ownership. */
-    private fun presentInviteFailure(
-        throwable: Throwable,
-        refs: List<String>,
-    ): Boolean {
-        val rawMessage = throwable.message.orEmpty()
-        return if (isDuplicateSignatureKeyError(rawMessage)) {
-            // MLS rejected the add commit because the proposed member
-            // already holds a seat (or their signing key collides with
-            // an existing member's). The UI pre-checks membership, but a
-            // race or key collision can still land here — surface plain
-            // language with the resolved name instead of the raw
-            // CreateCommitError(ProposalValidationError(...)) enum (#899).
-            val name = duplicateSignatureKeyDisplayName(refs, appState::displayName)
-            val friendly = copy.couldntAddMemberDuplicate(name)
-            recordMutationFailure(
-                R.string.toast_couldnt_add_members,
-                "GROUP_INVITE_DUPLICATE_MEMBER",
-                throwable,
-                AppText.Plain(friendly),
-            )
-            false
-        } else {
-            recordMutationFailure(
-                R.string.toast_couldnt_add_members,
-                "GROUP_INVITE_MEMBER",
-                throwable,
-                inviteFailureDetail(
-                    throwable,
-                    appState::displayName,
-                    if (throwable is MarmotKitException.InvalidKeyPackageEvent) {
-                        refs.singleOrNull()?.let(appState::displayName)
-                    } else {
-                        null
-                    },
-                ),
-            )
-            false
-        }
-    }
-
-    /** A newer details read requires a fresh native snapshot after this commit, not its older result. */
-    private suspend fun publishInitialAdminInviteResult(
-        account: String,
-        result: dev.ipf.marmotkit.GroupMutationResultFfi,
-        authorityEpoch: Long,
-        runtimeGeneration: Int,
-    ) {
-        if (appState.runtimeGeneration != runtimeGeneration || controllerCleared || isAccountTeardownRequested()) return
-        if (mutationPresentation.groupAuthorityEpoch == authorityEpoch) {
-            applyManagementSnapshot(account, result.details, result.managementState)
-        } else {
-            refreshManagementState()
-        }
-    }
-
-    /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */
-    private fun inviteReplyNeedsReconciliation(throwable: Throwable): Boolean =
-        when (throwable) {
-            is MarmotKitException.MissingKeyPackage,
-            is MarmotKitException.MissingMemberInboxRoute,
-            is MarmotKitException.InvalidKeyPackageEvent,
-            is MarmotKitException.DirectoryLookupIncomplete,
-            is MarmotKitException.GroupCatchingUp,
-            is MarmotKitException.GroupCommitUndelivered,
-            -> false
-            else -> true
-        }
-
-    /** Only an uncertain first invitation for absent recipients may reconcile by reading membership. */
-    private fun canReconcileInviteReply(
-        nativeInvoked: Boolean,
-        absentBefore: Boolean,
-        failure: Throwable,
-    ): Boolean = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
-
-    /** Read actual membership after an uncertain reply, without issuing a second invitation. */
-    private suspend fun reconcileInitialAdminInvite(
-        refs: List<String>,
-        admins: List<String>,
-        absentBefore: Boolean,
-        nativeInvoked: Boolean,
-        failure: Throwable,
-    ): Boolean {
-        val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
-        if (!eligible) return false
-        val beforeRead = mutationPresentation.groupAuthorityEpoch
-        val applied = refreshManagementState()
-        val observedMembers =
-            membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
-        val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
-        return applied && mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
-    }
-
-    /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */
-    private fun applyManagementSnapshot(
-        account: String,
-        details: GroupDetailsFfi,
-        management: GroupManagementStateFfi,
-    ): Boolean =
-        androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-            val applied = applyMutationDetails(account, details, freshLeaveReadback = true)
-            if (applied) {
-                managementState = management.takeIf { group == details.group }
-            }
-            applied && managementState != null
-        }
-
     /** Removes [member] from the group, asking first if MDK holds the change back. True once they are gone. */
     suspend fun removeMember(
         member: AppGroupMemberRecordFfi,
@@ -6998,17 +3934,6 @@ class ConversationController(
                 }
             }
         }
-
-    /** Called inside the existing commit lock; a failed read never reuses the previous permission frontier. */
-    private suspend fun refreshRemovalAuthority(
-        refresh: Boolean,
-        ownsPresentation: () -> Boolean,
-    ): Boolean {
-        if (!refresh) return true
-        val epoch = mutationPresentation.groupAuthorityEpoch
-        val applied = refreshManagementState()
-        return applied && mutationPresentation.groupAuthorityEpoch != epoch && ownsPresentation()
-    }
 
     /** Promotes or demotes [member], asking first if MDK holds the change back. True once committed. */
     suspend fun setMemberAdmin(
@@ -7125,10 +4050,10 @@ class ConversationController(
      * Refreshed on screen entry and after each disband-family mutation.
      */
     var managementState by mutableStateOf<GroupManagementStateFfi?>(null)
-        private set
-    private val managementStateLifetime = StalenessGuard()
-    private var cancelledLeaveAwaitingRoster by mutableStateOf(false)
-    private var observedBlockedLeave by mutableStateOf(initialGroup.leaveBlocked)
+        internal set
+    internal val managementStateLifetime = StalenessGuard()
+    internal var cancelledLeaveAwaitingRoster by mutableStateOf(false)
+    internal var observedBlockedLeave by mutableStateOf(initialGroup.leaveBlocked)
 
     /** A cleared block still needs verification before Android restores membership. */
     internal val blockedLeaveNeedsReadback: Boolean
@@ -7165,53 +4090,6 @@ class ConversationController(
             }
             stayed
         }
-
-    /**
-     * Why ordinary outbound work is refused right now, or null when it may proceed: a blocked leave, or a group that is
-     * disbanding or disbanded, the terminal states [canSendMessages] also refuses. Shared by every send path that does
-     * not pass through the composer gate.
-     */
-    @StringRes
-    private fun outboundRefusal(): Int? =
-        when {
-            showsBlockedLeave -> blockedLeaveHint()
-            group.disbanded -> R.string.conversation_disbanded_notice
-            group.disbanding -> R.string.conversation_disbanding_notice
-            else -> null
-        }
-
-    /** Matches the blocked-leave notice: a cancelled or cleared block that only awaits readback asks for Refresh. */
-    @StringRes
-    private fun blockedLeaveHint(): Int =
-        when {
-            blockedLeaveNeedsReadback -> R.string.group_leave_refresh_hint
-            else -> R.string.group_leave_blocked_hint
-        }
-
-    /** Check the action owner again under the native group lock before canceling or retrying readback. */
-    private suspend fun cancelNativeBlockedLeave(
-        account: String,
-        groupId: String,
-    ): Boolean =
-        appState.withGroupCommitLock(account, groupId) {
-            if (!ownsBlockedLeaveAction(account, groupId) || !canCancelBlockedLeave) return@withGroupCommitLock false
-            if (!blockedLeaveNeedsReadback) {
-                appState.marmotIo { cancelLeave(account, groupId) }
-                memberRosterRefreshGeneration.advance()
-                managementStateLifetime.advance()
-                cancelledLeaveAwaitingRoster = observedBlockedLeave
-            }
-            true
-        }
-
-    /** Reject work from a retired conversation, account or runtime. */
-    private fun ownsBlockedLeaveAction(
-        account: String,
-        groupId: String,
-    ): Boolean =
-        acceptsConversationActionOwner(account, groupId) &&
-            appState.activeAccountRef == account &&
-            appState.runtimeGeneration == conversationRuntimeGeneration
 
     /** Details and capabilities share one native frontier; later group updates supersede this read. */
     suspend fun refreshManagementState(): Boolean {
@@ -7423,32 +4301,6 @@ class ConversationController(
             }.getOrDefault(false)
         }
 
-    /** Finish the already-granted transfer even if its caller is cancelled. */
-    private suspend fun completeAdminTransfer(
-        account: String,
-        target: String,
-    ) {
-        withContext(NonCancellable) {
-            val demoteResult =
-                try {
-                    appState.runGroupChange(
-                        account,
-                        group.groupIdHex,
-                        actionLabel = R.string.transfer_admin,
-                        affectedMemberIds = listOf(target),
-                    ) {
-                        appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                            selfDemoteAdminDetailed(account, group.groupIdHex)
-                        }
-                    }
-                } catch (declined: GroupChangeDeclinedException) {
-                    // Waiting leaves both admins: report the partial transfer, not a quiet cancel.
-                    throw declined.refusal
-                }
-            applyMutationDetails(account, demoteResult.details)
-        }
-    }
-
     fun isAdmin(member: AppGroupMemberRecordFfi): Boolean =
         projectedGroupAdmin(
             authoritativeAdmin = GroupProjector.isAdmin(group, member),
@@ -7636,36 +4488,6 @@ class ConversationController(
             loadUntilMessageAvailable = ::loadUntilMessageAvailable,
         )
 
-    /** Read a raw message record from the in-memory window or recent store tail. */
-    private suspend fun lookupMessageRecord(messageIdHex: String): AppMessageRecordFfi? {
-        messageById[messageIdHex]?.let { return it }
-        val account = conversationAccountRef ?: return null
-        return runCatchingCancellable {
-            withContext(Dispatchers.IO) {
-                appState.marmotIo { messages(account, group.groupIdHex, 120u, null) }
-            }
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "lookup message failed", it)
-        }.getOrNull()
-            ?.firstOrNull { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }
-    }
-
-    /**
-     * Pages the window older, keeping the reader's oldest visible row as the window anchor.
-     *
-     * True only when new rows arrived, so callers that page in a loop still stop on no progress.
-     */
-    private suspend fun loadOlderPage(
-        anchorMessageIdHex: String? = null,
-        origin: PagingOrigin = PagingOrigin.EXPLICIT,
-    ): Boolean = loadOlderPageInternal(anchorMessageIdHex, origin) == ConversationPageLoad.ADVANCED
-
-    /** Pages the window newer for [origin]; true only when new rows arrived. */
-    private suspend fun loadNewerPage(origin: PagingOrigin = PagingOrigin.EXPLICIT): Boolean {
-        val load = loadNewerPageInternal(origin)
-        return load == ConversationPageLoad.ADVANCED
-    }
-
     // Bounds the opportunistic prefetch in each direction once it stops making progress (#2764, #2727).
     internal val automaticPaging = AutomaticPagingGuards()
 
@@ -7712,36 +4534,6 @@ class ConversationController(
         }
     }
 
-    /** Replaces the timeline only when no newer page or live update superseded the read. */
-    private suspend fun refreshCurrentTimeline(
-        account: String,
-        pageLoader: (suspend () -> TimelinePageFfi)? = null,
-    ): List<String> {
-        val refreshGeneration = timelineWindowGeneration.advance()
-        val page =
-            pageLoader?.invoke()
-                ?: appState.marmotIo(MarmotTraceSection.TIMELINE_READ) {
-                    timelineMessages(
-                        account,
-                        TimelineMessageQueryFfi.page(
-                            groupIdHex = group.groupIdHex,
-                            search = null,
-                            before = null,
-                            beforeMessageId = null,
-                            after = null,
-                            afterMessageId = null,
-                            limit = ConversationTimelinePageLimit,
-                        ),
-                    )
-                }
-        if (!timelineWindowGeneration.isCurrent(refreshGeneration)) {
-            return emptyList()
-        }
-        hasLoadedOlderPages = false
-        protectedTimelineMessageIds.clear()
-        return applyTimelinePage(warmLaterPageEventCards(page), replaceWindow = true, updatePagination = true)
-    }
-
     internal suspend fun testRefreshCurrentTimeline(
         account: String,
         pageLoader: suspend () -> TimelinePageFfi,
@@ -7750,14 +4542,6 @@ class ConversationController(
     internal fun testApplyLiveTimelineChangesAndRegisterStreams(changes: List<TimelineMessageChangeFfi>) {
         applyTimelineChanges(changes).forEach(activeStreamIds::add)
     }
-
-    internal fun testActiveStreamIds(): Set<String> = activeStreamIds.toSet()
-
-    /** Returns loaded ordinary-message ids eligible for the foreground expiry sweep. */
-    internal fun testSweepExpiryIds(): List<String> =
-        sweepExpiryMessages()
-            .filter { shouldApplyLocalDisappearingExpiry(it.record) }
-            .map { it.record.messageIdHex }
 
     /**
      * Resolved reply target as (sender pubkey, display body). Returns the raw
@@ -7802,45 +4586,6 @@ class ConversationController(
             mediaFileName = mediaFallback?.filename,
             mediaType = mediaFallback?.mediaType,
         )
-    }
-
-    /**
-     * Retires a stream whose final record arrived in this window.
-     *
-     * Marking it removed stops a late `AgentStreamUpdateFfi.Finished` event recreating the
-     * optimistic preview as a duplicate. See #25.
-     */
-    private fun retireFinishedStream(actionRecord: AppMessageRecordFfi) {
-        if (!MessageProjector.isStreamFinal(actionRecord)) return
-        MessageProjector.streamId(actionRecord)?.let { streamId ->
-            activeStreamIds.remove(streamId)
-            removedStreamIds.add(streamId)
-            optimisticMessages.remove("stream:$streamId")
-        }
-    }
-
-    /** Drops indexes owned by the previous authoritative bounded window. */
-    private fun trimStateForWindowReplacement() {
-        timelineRecords.clear()
-        timelineItemsById.clear()
-        timelineOrder.clear()
-        authoritativeTimelineOrderByMessageId.clear()
-        durableStreamDisplayParentByMessageId.clear()
-        projectedMessageIds.clear()
-        // Drop stale projected records so messageById doesn't grow unbounded
-        // as older pages are loaded; keep in-flight optimistic records so a
-        // pending send still reconciles across a window replacement. See #68.
-        val optimisticIds = optimisticMessages.values.mapTo(mutableSetOf()) { it.record.messageIdHex }
-        messageById.keys.retainAll(optimisticIds)
-        // Same unbounded-growth trim for the optimistic position/timestamp
-        // overrides: the reconcile path below re-adds them for any optimistic
-        // message that reconciles into this page, so scrolled-out entries
-        // don't accumulate for the controller's lifetime.
-        localTimelineOrderOverrides.keys.retainAll(optimisticIds)
-        localTimelineTimestampOverrides.keys.retainAll(optimisticIds)
-        preservedTimelinePositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
-        optimisticSendPositionPreserves.retainAll(localTimelineTimestampOverrides.keys)
-        durableStreamPositionOverrideIds.retainAll(localTimelineTimestampOverrides.keys)
     }
 
     /**
@@ -7977,257 +4722,11 @@ class ConversationController(
         return streamIdsToLaunch
     }
 
-    /**
-     * Warms existing local profile presentation state and, for a page that names
-     * them, cached event cards. MainShell keeps a prepared chat-list tap on its
-     * source page until this initial warm completes, preventing sender metadata
-     * from remeasuring bubbles during the route transition. A page with cards is
-     * also held unpublished until then, so no open path shows a card unwarmed.
-     */
-    private fun scheduleProfilePresentationWarm(
-        records: List<TimelineMessageRecordFfi>,
-        hydratedRecords: Deferred<List<TimelineMessageRecordFfi>>?,
-        markInitialPresentationReady: Boolean,
-    ) {
-        if (!markInitialPresentationReady) return
-        initialPresentationWarmCoordinator.prepare(
-            InitialPresentationWarmWork(
-                senders = initialPresentationProfileSenders(records),
-                eventCardRecords = records.filter(::mayRenderNostrEventCard),
-                hydratedRecords = hydratedRecords,
-            ),
-        )
-    }
-
-    /**
-     * Marks an applied page published, unless it is a first page that names event cards (#2238). That page, and any
-     * page replacing it before readiness, stays held until its cached cards are read, so no row composes unwarmed.
-     */
-    private fun markPagePublishedUnlessHeldForEventCards(
-        preparingInitialPresentation: Boolean,
-        records: List<TimelineMessageRecordFfi>,
-    ) {
-        isHoldingInitialPageForEventCards =
-            preparingInitialPresentation &&
-            (isHoldingInitialPageForEventCards || records.any(::mayRenderNostrEventCard))
-        if (isHoldingInitialPageForEventCards) return
-        hasPublishedAuthoritativeTimeline = true
-        initialTimelineSeedActive = false
-    }
-
-    /**
-     * Suspends until no page is held unpublished for its event cards (#2238). Only a page committed before the first
-     * presentation is ready is held, until readiness, which the card budget bounds, so this returns at once otherwise.
-     */
-    internal suspend fun awaitEventCardHoldReleased() {
-        if (isHoldingInitialPageForEventCards) initialPresentationWarmCoordinator.awaitReady()
-    }
-
-    /** Times the page's publication now, or, for a page held for its event cards, when the hold releases it. */
-    private fun recordPagePublicationUnlessHeld() {
-        if (!isHoldingInitialPageForEventCards) windowPresentationTiming.timelinePublished()
-    }
-
-    /**
-     * Publishes the first page held for its event cards, together with the flags that say it is published. Called
-     * once the card warm settled or its budget ran out, so a held row composes with its snapshot in place, or, past
-     * the budget, as an ordinary unwarmed card.
-     */
-    private fun releaseInitialPageEventCardHold() {
-        if (!isHoldingInitialPageForEventCards) return
-        isHoldingInitialPageForEventCards = false
-        hasPublishedAuthoritativeTimeline = true
-        initialTimelineSeedActive = false
-        publishTimelineFromIndexes()
-        windowPresentationTiming.timelinePublished()
-    }
-
     /** Reads cards through the conversation-owned presentation pipeline before committing later pages. */
     internal suspend fun warmLaterPageEventCards(
         page: TimelinePageFfi,
         anchorMessageId: String? = null,
     ): TimelinePageFfi = eventCardPresentation.warmLaterPageEventCards(page, anchorMessageId)
-
-    /**
-     * Publishes [records], then hydrates their Markdown, and returns that hydration's parsed records when one runs.
-     * With [warmEventCards], cards are read from MDK's cache before the hydrated rows apply. Otherwise the caller's
-     * initial warm reads them from the returned records, so the same messages are never parsed twice. The returned
-     * records complete only after they applied, so a first page held for its cards is released with them in place.
-     */
-    private fun publishTimelinePageBeforeMarkdownHydration(
-        records: List<TimelineMessageRecordFfi>,
-        warmEventCards: Boolean,
-    ): Deferred<List<TimelineMessageRecordFfi>>? {
-        val scope = conversationScope ?: return null.also { publishTimelineFromIndexes() }
-        val hydratedRecords = CompletableDeferred<List<TimelineMessageRecordFfi>>()
-        val hydration =
-            publishTimelineBeforeMarkdownHydration(
-                scope = scope,
-                records = records,
-                publish = ::publishTimelineFromIndexes,
-                // Cards appear once their message's Markdown does, so their cached state is read before it applies.
-                hydrate = { pending ->
-                    hydrateTimelineMarkdown(pending).also { hydrated ->
-                        if (warmEventCards) {
-                            eventCardPresentation.warmEventCardSnapshots(hydrated.filter(::mayRenderNostrEventCard))
-                        }
-                    }
-                },
-                applyHydrated = { hydrated ->
-                    applyHydratedTimelineMarkdown(hydrated)
-                    hydratedRecords.complete(hydrated)
-                },
-            )
-        // A cancelled or failed hydration still releases the warm waiting on it, with nothing parsed.
-        hydration?.invokeOnCompletion { hydratedRecords.complete(emptyList()) }
-        return hydratedRecords.takeIf { hydration != null }
-    }
-
-    /** Applies live timeline changes and invalidates suspended whole-window refreshes. */
-    private fun applyTimelineChanges(changes: List<TimelineMessageChangeFfi>): List<String> {
-        timelineWindowGeneration.advance()
-        val displayedProjectedStreamItemIds =
-            timelineItemsById.keys.filterTo(mutableSetOf()) { it.startsWith("stream:") }
-        val removedIds =
-            changes
-                .filterIsInstance<TimelineMessageChangeFfi.Remove>()
-                .mapTo(mutableSetOf(), TimelineMessageChangeFfi.Remove::messageIdHex)
-        val recordsForStreamPositions =
-            buildList {
-                timelineRecords.values.filterTo(this) { it.messageIdHex !in removedIds }
-                changes.forEach { change ->
-                    if (change is TimelineMessageChangeFfi.Upsert) add(change.message)
-                }
-            }.associateBy(TimelineMessageRecordFfi::messageIdHex)
-                .values
-                .toList()
-        val streamIds = mutableListOf<String>()
-        val reactionTargets = linkedSetOf<String>()
-        changes.forEach { change ->
-            when (change) {
-                is TimelineMessageChangeFfi.Upsert -> {
-                    val record = change.message
-                    recordMembershipProjectionArrival(change)
-                    val actionRecord =
-                        upsertProjectedRecord(
-                            record,
-                            reconcileOptimistic = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                            allowDelayedProjection = change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE,
-                            displayedProjectedStreamItemIds = displayedProjectedStreamItemIds,
-                        )
-                    if (change.trigger.recomputesReactions()) {
-                        reactionTargets.add(record.messageIdHex)
-                    }
-                    appState.requestProfile(record.sender)
-                    record.replyPreview?.let { appState.requestProfile(it.sender) }
-                    appState.requestProfiles(record.reactions.userReactions.map { it.sender })
-                    if (record.deleted) {
-                        deletedMessageIds = deletedMessageIds - record.messageIdHex
-                    }
-                    if (MessageProjector.isStreamStart(actionRecord)) {
-                        MessageProjector.streamId(actionRecord)?.let { streamId ->
-                            removedStreamIds.remove(streamId)
-                            streamIds.add(streamId)
-                        }
-                    }
-                    if (MessageProjector.isStreamFinal(actionRecord)) {
-                        MessageProjector.streamId(actionRecord)?.let { streamId ->
-                            activeStreamIds.remove(streamId)
-                            // Mark removed so a late Finished event can't recreate
-                            // the optimistic preview as a duplicate. See #25.
-                            removedStreamIds.add(streamId)
-                            optimisticMessages.remove("stream:$streamId")
-                        }
-                    }
-                }
-                is TimelineMessageChangeFfi.Remove -> {
-                    pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds + change.messageIdHex
-                    val removed = timelineRecords[change.messageIdHex]
-                    removed
-                        ?.let(TimelineProjector::toAppMessageRecord)
-                        ?.takeIf(MessageProjector::isStreamStart)
-                        ?.let(MessageProjector::streamId)
-                        ?.let { streamId ->
-                            removedStreamIds.add(streamId)
-                            activeStreamIds.remove(streamId)
-                            optimisticMessages.remove("stream:$streamId")
-                        }
-                    removeProjectedRecord(change.messageIdHex)
-                    messageById.remove(change.messageIdHex)
-                    reactionTargets.add(change.messageIdHex)
-                    optimisticMessages.remove("msg:${change.messageIdHex}")
-                }
-            }
-        }
-        applyDurableStreamPositions(durableStreamDisplayPositions(recordsForStreamPositions))
-        pruneConfirmedOptimisticMessages()
-        pruneConfirmedOptimisticReactions()
-        recomputeReactions(reactionTargets)
-        // The engine streams Upserts for new messages but never Removes ones that
-        // scroll out, so the live indexes grow without bound for a conversation
-        // kept open while messages arrive. Cap live rows to the newest entries;
-        // after loadOlder(), deliberately-loaded history is preserved and only
-        // post-pagination live Upserts are trimmed (#1163 / #537).
-        trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)
-        retentionAtSendByMessageId.retainTimelineWindow()
-        // Live Upsert/Projection batches add to messageById but never trim it;
-        // prune to the (now-bounded) window + optimistic records so it doesn't
-        // grow unbounded for an actively-watched conversation (#373).
-        messageById.retainTimelineWindow()
-        optimisticEdits.retainTimelineWindow()
-        pruneMessageOverlaysToWindow()
-        publishTimelineFromIndexes()
-        // Don't relaunch a watcher for a stream finalized in this same batch
-        // (start + final records together) — it was just marked removed. See #25.
-        return streamIds.filterNot { it in removedStreamIds }
-    }
-
-    private suspend fun hydrateTimelineMarkdown(records: List<TimelineMessageRecordFfi>): List<TimelineMessageRecordFfi> {
-        if (records.none(::needsTimelineMarkdownHydration)) return records
-        val parseGate = Semaphore(4)
-        return coroutineScope {
-            records
-                .map { record ->
-                    async {
-                        if (!needsTimelineMarkdownHydration(record)) return@async record
-                        val existingDocument =
-                            timelineRecords[record.messageIdHex]
-                                ?.takeIf { existing -> existing.plaintext == record.plaintext }
-                                ?.contentTokens
-                                ?.takeIf { document -> document.blocks.isNotEmpty() }
-                        val document =
-                            existingDocument
-                                ?: parseGate.withPermit {
-                                    appState.parseMarkdownOrEmpty(record.plaintext)
-                                }
-                        if (document.blocks.isEmpty()) record else record.withMarkdownTokens(document)
-                    }
-                }.awaitAll()
-        }
-    }
-
-    private fun applyHydratedTimelineMarkdown(records: List<TimelineMessageRecordFfi>) {
-        assertMainThread { "applyHydratedTimelineMarkdown" }
-        var changed = false
-        records.forEach { hydrated ->
-            val document = hydrated.contentTokens.takeIf { it.blocks.isNotEmpty() } ?: return@forEach
-            val current = timelineRecords[hydrated.messageIdHex] ?: return@forEach
-            if (!needsTimelineMarkdownHydration(current) || current.plaintext != hydrated.plaintext) {
-                return@forEach
-            }
-            upsertProjectedRecord(current.withMarkdownTokens(document))
-            changed = true
-        }
-        if (changed) publishTimelineFromIndexes()
-    }
-
-    private suspend fun initializeReadState(account: String) {
-        runCatchingCancellable {
-            appState.marmotIo { initializeChatReadState(account, group.groupIdHex) }
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "initialize read state failed", it)
-        }
-    }
 
     /**
      * Advance the per-chat read pointer to [messageId]. Called from the UI
@@ -8250,114 +4749,6 @@ class ConversationController(
     }
 
     /**
-     * Submits the visit's visible cursor to MDK, including a saved cursor with pending manual attention.
-     * Successful rows fold monotonically; after failures, only the latest remaining request restores display state.
-     * A latest failure clears request dedupe for retry, and cancellation is rethrown. A null success acknowledges
-     * this row instance until a new native row arrives. Already-confirmed reads do not restart retention deadlines.
-     */
-    private suspend fun submitVisibleReadUpTo(
-        account: String,
-        trimmed: String,
-    ) {
-        val consumeManualReminder = shouldConsumeManualUnreadReminder(account)
-        if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
-        val readWasAlreadyConfirmed = trimmed == latestChatListRow?.lastReadMessageIdHex
-        val requestId = ++nextReadRequestId
-        lastReadRequestId = requestId
-        pendingReadRequestIds += requestId
-        lastReadMessageId = trimmed
-        lastSubmittedReadMessageId = trimmed
-        val markReadResult =
-            runCatching {
-                appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
-            }
-        pendingReadRequestIds -= requestId
-        val markReadFailure = markReadResult.exceptionOrNull()
-        if (markReadFailure != null) {
-            restoreFailedReadRequest(requestId)
-            if (markReadFailure is CancellationException) throw markReadFailure
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "mark read failed", markReadFailure)
-            return
-        }
-        markReadResult.getOrNull()?.let { row -> foldVisibleReadRow(account, row) }
-        if (requestId > lastSuccessfulReadRequestId) {
-            lastSuccessfulReadRequestId = requestId
-            successfulReadWithoutRow = if (markReadResult.getOrNull() == null) latestChatListRow to trimmed else null
-        }
-        if (lastReadRequestId == requestId) {
-            lastReadMessageId = confirmedReadMessageId()
-            lastSubmittedReadMessageId = trimmed
-            if (consumeManualReminder) manualUnreadReminderConsumed = true
-        }
-        // A visit-level attention acknowledgement must not restart an
-        // already-confirmed message's disappearing deadline after reopening.
-        if (!readWasAlreadyConfirmed) {
-            val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
-            anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
-        }
-        runCatchingCancellable {
-            appState.dismissConversationNotifications(account, group.groupIdHex)
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
-        }
-    }
-
-    /** Restores only the latest failed request; finished requests never regain ownership or suppress retries. */
-    private fun restoreFailedReadRequest(requestId: Long) {
-        if (lastReadRequestId != requestId) return
-        lastReadMessageId = confirmedReadMessageId()
-        manualUnreadReminderConsumed = false
-        lastSubmittedReadMessageId = null
-        lastReadRequestId = pendingReadRequestIds.maxOrNull() ?: 0L
-    }
-
-    /** Uses the native cursor, or a successful null-result cursor only while its original row remains current. */
-    private fun confirmedReadMessageId(): String? =
-        successfulReadWithoutRow?.takeIf { it.first === latestChatListRow }?.second
-            ?: latestChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() }
-
-    /** Folds MDK's read result into the matching list, or monotonically into this conversation if no list is bound. */
-    private fun foldVisibleReadRow(
-        accountRef: String,
-        row: ChatListRowFfi,
-    ) {
-        persistedLastReadTimelineAt =
-            foldMarkReadReturnedRow(row, persistedLastReadTimelineAt) { incoming ->
-                if (!appState.applyChatListRowFromMarkRead(accountRef, incoming)) {
-                    val folded =
-                        latestChatListRow?.let { current ->
-                            reduceSubscriptionChatListRow(current, incoming, ChatListUpdateTriggerFfi.UNREAD_CHANGED)
-                        } ?: incoming
-                    applyAuthoritativeChatListRow(accountRef, folded)
-                }
-            }
-    }
-
-    /** Retries an unconsumed native manual reminder only while this account's conversation is visibly owned. */
-    private fun shouldConsumeManualUnreadReminder(accountRef: String): Boolean =
-        !manualUnreadReminderConsumed &&
-            appState.hasManualUnreadReminder(accountRef, group.groupIdHex, latestChatListRow)
-
-    private fun anchorReadExpiryUpTo(
-        messageId: String,
-        anchoredAtSeconds: ULong,
-    ) {
-        val ordered =
-            buildList {
-                optimisticMessages.values.forEach { add(it.record.messageIdHex) }
-                timelineOrder.mapNotNull { timelineItemsById[it]?.record?.messageIdHex }.forEach(::add)
-            }
-        val upToIdx = ordered.indexOf(messageId)
-        if (upToIdx < 0) {
-            readAnchoredAtSeconds.putIfAbsent(messageId, anchoredAtSeconds)
-            return
-        }
-        for (index in 0..upToIdx) {
-            ordered.getOrNull(index)?.let { readAnchoredAtSeconds.putIfAbsent(it, anchoredAtSeconds) }
-        }
-    }
-
-    /**
      * Returns the timeline index of the FIRST received message that hasn't
      * been read yet, given the chat-list-projection's [unreadCount].
      * Returns -1 when there's nothing unread, the timeline is empty, or
@@ -8366,14 +4757,7 @@ class ConversationController(
      */
     fun firstUnreadTimelineIndex(unreadCount: Int): Int = firstUnreadReceivedIndex(timeline, unreadCount)
 
-    private fun pruneConfirmedOptimisticMessages() {
-        confirmedOptimisticMessageKeys(
-            optimisticKeys = optimisticMessages.keys,
-            projectedMessageIds = timelineRecords.keys,
-        ).forEach(optimisticMessages::remove)
-    }
-
-    private fun acceptedPendingTextOptimisticIdForProjection(projectedMessageIdHex: String): String? {
+    internal fun acceptedPendingTextOptimisticIdForProjection(projectedMessageIdHex: String): String? {
         val optimisticMessageId =
             acceptedPendingTextOptimisticIdForProjection(
                 projectedMessageIdHex = projectedMessageIdHex,
@@ -8388,7 +4772,7 @@ class ConversationController(
             }
     }
 
-    private fun acceptedPendingMediaOptimisticIdForProjection(projectedMessageIdHex: String): String? {
+    internal fun acceptedPendingMediaOptimisticIdForProjection(projectedMessageIdHex: String): String? {
         val acceptedPendingMessageIdsByOptimisticId =
             retainedMediaUploads
                 .keysSnapshot()
@@ -8405,454 +4789,6 @@ class ConversationController(
             projectedMessageIdHex = projectedMessageIdHex,
             acceptedPendingMessageIdsByOptimisticId = acceptedPendingMessageIdsByOptimisticId,
         )
-    }
-
-    /** Settles reaction overlays once the authoritative projection matches their intended state. */
-    private fun pruneConfirmedOptimisticReactions() {
-        confirmedOptimisticReactionKeys(
-            activeAccountIdHex = conversationAccountIdHex,
-            optimisticChanges = optimisticReactionChanges,
-            confirmedSendersByTarget = baseReactionSenders(),
-        ).forEach(optimisticReactionChanges::remove)
-    }
-
-    /** Only newly delivered live events are timed; initial, paging and refresh rows are excluded. */
-    private fun recordMembershipProjectionArrival(change: TimelineMessageChangeFfi.Upsert) {
-        if (change.trigger != TimelineUpdateTriggerFfi.NEW_MESSAGE &&
-            change.trigger != TimelineUpdateTriggerFfi.GROUP_SYSTEM
-        ) {
-            return
-        }
-        val record = change.message
-        val type = record.groupSystem?.systemType
-        val isMembershipEvent = type == "member_added" || type == "member_removed"
-        if (record.messageIdHex !in timelineRecords &&
-            isMembershipEvent &&
-            GroupSystemEvents.resolve(record)?.fromAuthenticatedStateProjection == true
-        ) {
-            membershipTimings.projectionArrived(record.messageIdHex)
-        }
-    }
-
-    /** Installs a native row; peer receipts reconcile only exact send ownership, never same-content legacy guesses. */
-    private fun upsertProjectedRecord(
-        record: TimelineMessageRecordFfi,
-        reconcileOptimistic: Boolean = false,
-        allowDelayedProjection: Boolean = false,
-        displayedProjectedStreamItemIds: Set<String> = emptySet(),
-        preparedAction: AppMessageRecordFfi? = null,
-    ): AppMessageRecordFfi {
-        val reconcilesSend = reconcileOptimistic || record.recipientConfirmed
-        pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - record.messageIdHex
-        // Defensive guard against the Rust core re-emitting an identical
-        // record (own-publish + own-relay-echo both fire
-        // `timeline_changes_for_event` for the same kind-9). Without this,
-        // the remove-then-reinsert pair below briefly empties the bubble
-        // from the timeline and Compose renders the "vanished + reappeared"
-        // frame as a visible duplicate flash on large media bubbles.
-        // Upstream fix tracked separately. See docs/design/white-noise-double-upsert.md.
-        //
-        // Compare on RENDER-RELEVANT fields only. `receivedAt` and other
-        // ephemeral fields differ between the two emits (the Rust core
-        // records them with distinct local timestamps), so full equality
-        // would never fire — but the bubble's content is identical.
-        //
-        // Also require the by-id index to already hold the item: only skip the
-        // re-projection when the bubble is genuinely still on screen. If the
-        // record is held but unprojected, fall through and (re)build it.
-        val existing = timelineRecords[record.messageIdHex]
-        val previousItemId = existing?.let(::projectedItemId)
-        val stillProjected = previousItemId != null && timelineItemsById.containsKey(previousItemId)
-        if (existing != null && stillProjected && timelineRecordsRenderEqual(existing, record)) {
-            recoverPendingEditStatusForProjection(record)
-            return preparedAction ?: TimelineProjector.toAppMessageRecord(record)
-        }
-        var retentionAtSendSeconds =
-            previousItemId?.let { itemId -> timelineItemsById[itemId]?.retentionAtSendSeconds }
-        if (previousItemId != null) {
-            timelineItemsById.remove(previousItemId)
-            timelineOrder.remove(previousItemId)
-        }
-        // If multiple `_media_pending` siblings are in flight AND no exact
-        // bridge has been inserted yet, the projection's owning send is
-        // still mid-`sendMediaAttachments` — writing the bubble visibly now
-        // would put it at timelineOrder=0uL until the bridge insert stamps
-        // the override (visible flip). Stash the record and bail; the
-        // bridge insert path will drain `pendingProjectionsAwaitingBridge`
-        // and write the projection with the override already in place. The
-        // bridge in `optimisticMessages` covers the bubble in the meantime
-        // — same content, same position.
-        val draftAction = preparedAction ?: TimelineProjector.toAppMessageRecord(record)
-        val projectedIsMediaUpsert = draftAction.tags.any { it.values.firstOrNull() == "imeta" }
-        val hasAcceptedPendingTextBridge =
-            reconcilesSend && record.messageIdHex in acceptedPendingTextOptimisticIds
-        val acceptedPendingTextOptimisticId =
-            if (hasAcceptedPendingTextBridge) {
-                acceptedPendingTextOptimisticIdForProjection(record.messageIdHex)
-            } else {
-                null
-            }
-        val acceptedPendingMediaOptimisticId =
-            acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcilesSend }
-        val acceptedPendingOptimisticId =
-            record.clientToken?.takeIf { reconcilesSend && "msg:$it" in optimisticMessages }
-                ?: acceptedPendingTextOptimisticId ?: acceptedPendingMediaOptimisticId
-        val hasExactBridge =
-            optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex } ||
-                hasAcceptedPendingTextBridge ||
-                acceptedPendingOptimisticId != null
-        val reconcileLegacyMedia = projectedIsMediaUpsert && record.clientToken == null && reconcileOptimistic
-        if (reconcileLegacyMedia && !hasExactBridge) {
-            val pendingMediaCount =
-                optimisticMessages.values.count {
-                    isSendableOptimisticStatus(it.status, allowDelayedProjection) &&
-                        it.record.tags.any { tag -> tag.values.firstOrNull() == "_media_pending" }
-                }
-            if (pendingMediaCount > 1) {
-                pendingProjectionsAwaitingBridge[record.messageIdHex] = record
-                return draftAction
-            }
-        }
-        pendingProjectionsAwaitingBridge.remove(record.messageIdHex)
-        val actionRecord = draftAction
-        if (
-            record.clientToken == null &&
-            record.invalidationStatus != null &&
-            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
-        ) {
-            timelineRecords.remove(record.messageIdHex)
-            authoritativeTimelineOrderByMessageId.remove(record.messageIdHex)
-            projectedMessageIds.remove(record.messageIdHex)
-            messageById.remove(record.messageIdHex)
-            if (previousItemId != null) {
-                timelineItemsById.remove(previousItemId)
-                timelineOrder.remove(previousItemId)
-            }
-            return actionRecord
-        }
-        val unownedLegacyRecord =
-            record.clientToken == null && record.sourceMessageIdHex == null && !record.recipientConfirmed
-        if (
-            unownedLegacyRecord &&
-            record.invalidationStatus == null &&
-            failedOptimisticMessageIdForInvalidatedProjection(optimisticMessages.values, actionRecord) != null
-        ) {
-            timelineRecords[record.messageIdHex] = record
-            projectedMessageIds.add(record.messageIdHex)
-            messageById[record.messageIdHex] = actionRecord
-            return actionRecord
-        }
-        if (record.invalidationStatus == null && !record.recipientConfirmed) {
-            invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
-                .filterNot { it == record.messageIdHex }
-                .forEach(::removeProjectedRecord)
-        }
-        timelineRecords[record.messageIdHex] = record
-        projectedMessageIds.add(record.messageIdHex)
-        preserveOptimisticDisplayPosition(record.messageIdHex, record.messageIdHex)
-        preserveStreamFinalDisplayPosition(
-            record.messageIdHex,
-            actionRecord,
-            displayedProjectedStreamItemIds,
-        )
-        // A peer receipt proves delivery of this native row, not ownership of a same-content optimistic send.
-        val reconciledOptimisticId =
-            acceptedPendingOptimisticId
-                ?: if (hasAcceptedPendingTextBridge || record.clientToken != null || record.recipientConfirmed) {
-                    null
-                } else {
-                    optimisticMessageIdForProjection(
-                        optimisticMessages.values,
-                        actionRecord,
-                        allowDelayedProjection = allowDelayedProjection,
-                    ).takeIf { reconcileOptimistic }
-                }
-        acceptedPendingOptimisticId?.let { optimisticId ->
-            appState.commitOptimisticSentPreview(
-                accountRef = conversationAccountRef,
-                groupIdHex = record.groupIdHex,
-                optimisticMessageIdHex = optimisticId,
-                confirmedMessageIdHex = record.messageIdHex,
-            )
-        }
-        retentionAtSendSeconds =
-            retentionAtSendForProjection(
-                messageId = record.messageIdHex,
-                projectedRetentionSeconds = actionRecord.retentionSeconds,
-                optimisticMessageId = reconciledOptimisticId,
-            )
-        reconciledOptimisticId?.let { optimisticId ->
-            handoffPendingMessageEdit(optimisticId, record.messageIdHex, ready = true)
-            preserveOptimisticDisplayPosition(record.messageIdHex, optimisticId)
-            val optimisticKey = "msg:$optimisticId"
-            // An authoritative own-message projection proves the engine has
-            // durably accepted this optimistic send even if the synchronous
-            // FFI response was lost. Clear the captured draft at this point;
-            // a later send exception may be only an ambiguous acknowledgement
-            // failure and must not undo durable acceptance.
-            completeDurableAcceptance(optimisticKey)
-            // Hand off own-sent media bytes from the pending optimistic to
-            // the projection's cache key BEFORE the bubble's LaunchedEffect
-            // can fire and ask Blossom for them. Without this, the projected
-            // bubble starts rendering, finds the thumbnail/plaintext caches
-            // empty for the confirmed messageIdHex, and triggers an FFI
-            // downloadMedia round-trip — re-downloading bytes we literally
-            // just uploaded.
-            handoffOwnMediaCacheOnReconcile(optimisticKey, record.messageIdHex)
-            optimisticMessages.remove(optimisticKey)
-            optimisticSendPhases.remove(optimisticKey)
-            messageById.remove(optimisticId)
-            if (optimisticId == acceptedPendingTextOptimisticId) {
-                acceptedPendingTextOptimisticIds.remove(record.messageIdHex)
-            }
-            // The engine echo just flipped this pending bubble to a
-            // projected record. If we're tracing this send, this is the
-            // "self-echo drives the sent flip" path (issue #913).
-            appState.pendingSendDiagnostics.recordEchoReconcile(optimisticId)
-        }
-        messageById[record.messageIdHex] = actionRecord
-        recoverPendingEditStatusForProjection(record)
-        record.clientToken?.let { clientToken ->
-            // A newly mounted controller may see the native projection after
-            // the editor's original controller was disposed. The process-owned
-            // handoff still knows this token and can publish its queued edit.
-            if (pendingMessageEditHandoff.hasSession(pendingEditKey(clientToken))) {
-                handoffPendingMessageEdit(clientToken, record.messageIdHex, ready = true)
-            }
-        }
-        val item =
-            timelineMessageFromProjection(
-                record = record,
-                actionRecord = actionRecord,
-                retentionAtSendSeconds = retentionAtSendSeconds,
-            )
-        timelineItemsById[item.id] = item
-        insertTimelineItemId(item.id)
-        return actionRecord
-    }
-
-    /** Bridges a newly projected row through the position of its optimistic bubble. */
-    private fun preserveOptimisticDisplayPosition(
-        projectedId: String,
-        optimisticId: String,
-    ) {
-        val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
-        timelinePresentationIds[projectedId] = optimistic.presentationId
-        durableStreamPositionOverrideIds.remove(projectedId)
-        durableStreamDisplayParentByMessageId.remove(projectedId)
-        preservedTimelinePositionOverrideIds.add(projectedId)
-        optimisticSendPositionPreserves.add(projectedId)
-        localTimelineOrderOverrides[projectedId] = optimistic.timelineOrder
-        localTimelineTimestampOverrides[projectedId] = optimistic.record.recordedAt
-    }
-
-    private fun rememberRetentionAtSend(
-        messageId: String,
-        retentionSeconds: ULong?,
-    ): ULong? =
-        retentionSeconds?.takeIf { it > 0uL }?.also { snapshot ->
-            retentionAtSendByMessageId[messageId] = snapshot
-        }
-
-    private fun transferRetentionAtSend(
-        fromMessageId: String,
-        toMessageId: String,
-    ): ULong? {
-        if (fromMessageId == toMessageId) return retentionAtSendByMessageId[toMessageId]
-        val snapshot = retentionAtSendByMessageId.remove(fromMessageId) ?: retentionAtSendByMessageId[toMessageId]
-        if (snapshot != null) retentionAtSendByMessageId[toMessageId] = snapshot
-        return snapshot
-    }
-
-    private fun retentionAtSendForProjection(
-        messageId: String,
-        projectedRetentionSeconds: ULong?,
-        optimisticMessageId: String?,
-    ): ULong? {
-        val optimisticSnapshot =
-            optimisticMessageId?.let { optimisticId ->
-                retentionAtSendByMessageId[optimisticId]
-                    ?: optimisticMessages["msg:$optimisticId"]?.retentionAtSendSeconds
-            }
-        if (optimisticMessageId != null && optimisticMessageId != messageId) {
-            retentionAtSendByMessageId.remove(optimisticMessageId)
-        }
-        val snapshot =
-            retentionHintForProjection(
-                projectedRetentionSeconds = projectedRetentionSeconds,
-                currentGroupRetentionSeconds = group.disappearingMessageSecs,
-                optimisticSnapshot = optimisticSnapshot,
-                rememberedSnapshot = retentionAtSendByMessageId[messageId],
-            )
-        if (snapshot == null) {
-            retentionAtSendByMessageId.remove(messageId)
-        } else {
-            retentionAtSendByMessageId[messageId] = snapshot
-        }
-        return snapshot
-    }
-
-    /** Rebuilds durable stream overrides and their immediate rendered-parent links. */
-    private fun applyDurableStreamPositions(positions: Map<String, StreamFinalDisplayPosition>) {
-        val staleIds = durableStreamPositionOverrideIds + durableStreamDisplayParentByMessageId.keys - positions.keys
-        staleIds.forEach(::clearDurableStreamPosition)
-        positions.forEach { (messageId, position) ->
-            // A live preview is the row the user is already reading. Its
-            // position wins for this controller session; the durable link is
-            // the reload/cold-projection fallback.
-            val parentId = position.afterMessageId ?: return@forEach
-            val parent = timelineRecords[parentId] ?: return@forEach
-            if (
-                messageId in preservedTimelinePositionOverrideIds ||
-                messageId in optimisticSendPositionPreserves
-            ) {
-                durableStreamDisplayParentByMessageId[messageId] = parentId
-                refreshProjectedTimelinePosition(messageId)
-                return@forEach
-            }
-            if (messageId !in timelineRecords) return@forEach
-            val parentRecordedAt = localTimelineTimestampOverrides[parentId] ?: parent.timelineAt
-            val effectivePosition =
-                resolvedDurableStreamDisplayPosition(
-                    candidate = position,
-                    parentRecordedAt = parentRecordedAt,
-                    parentTimelineOrder = localTimelineOrderOverrides[parentId] ?: 0uL,
-                ) ?: run {
-                    clearDurableStreamPosition(messageId)
-                    return@forEach
-                }
-
-            durableStreamDisplayParentByMessageId[messageId] = parentId
-            localTimelineOrderOverrides[messageId] = effectivePosition.timelineOrder
-            localTimelineTimestampOverrides[messageId] = effectivePosition.recordedAt
-            durableStreamPositionOverrideIds.add(messageId)
-            refreshProjectedTimelinePosition(messageId)
-        }
-    }
-
-    /** Releases a durable override and any parent link used only for display ordering. */
-    private fun clearDurableStreamPosition(messageId: String) {
-        val removedOverride = durableStreamPositionOverrideIds.remove(messageId)
-        val removedParent = durableStreamDisplayParentByMessageId.remove(messageId) != null
-        if (!removedOverride && !removedParent) return
-        if (removedOverride) {
-            localTimelineOrderOverrides.remove(messageId)
-            localTimelineTimestampOverrides.remove(messageId)
-        }
-        refreshProjectedTimelinePosition(messageId)
-    }
-
-    /** Reprojects one indexed row after a transient display position changes. */
-    private fun refreshProjectedTimelinePosition(messageId: String) {
-        val projected = timelineRecords[messageId] ?: return
-        val itemId = projectedItemId(projected)
-        val currentItem = timelineItemsById[itemId] ?: return
-        val actionRecord = TimelineProjector.toAppMessageRecord(projected)
-        timelineItemsById[itemId] =
-            timelineMessageFromProjection(
-                record = projected,
-                actionRecord = actionRecord,
-                retentionAtSendSeconds = currentItem.retentionAtSendSeconds,
-            )
-        timelineOrder.remove(itemId)
-        insertTimelineItemId(itemId)
-    }
-
-    /**
-     * Keeps send bridges while media siblings remain pending, then lets projected
-     * rows settle back to their authoritative positions in MDK's bounded window.
-     */
-    private fun releaseOrphanedOptimisticSendPreserves(): Boolean {
-        // Keep completed rows beside their still-pending send siblings. MDK order wins
-        // after the last media handoff, failure or discard removes this transient bridge.
-        val pendingMedia =
-            optimisticMessages.values.any { message ->
-                message.status == MessageStatus.Pending &&
-                    message.record.tags.any { tag -> tag.values.firstOrNull() == "_media_pending" }
-            }
-        if (pendingMedia) return false
-        val orphaned =
-            optimisticSendPositionPreserves.releaseOrphaned(
-                optimisticKeys = optimisticMessages.keys,
-                projectedMessageIds = projectedMessageIds,
-            )
-        orphaned.forEach { id ->
-            localTimelineOrderOverrides.remove(id)
-            localTimelineTimestampOverrides.remove(id)
-            preservedTimelinePositionOverrideIds.remove(id)
-            refreshProjectedTimelinePosition(id)
-        }
-        return orphaned.isNotEmpty()
-    }
-
-    /**
-     * Reports unexpected adjacent fallback-order inversions once per pair in debug
-     * builds; authoritative pairs may intentionally invert wall time for epoch safety.
-     */
-    private fun logTimelineInversionsForDebug(
-        rows: List<TimelineMessage>,
-        expectedHandoffPreserves: Set<String>,
-    ) {
-        if (!BuildConfig.DEBUG) return
-        val inversionsByPair =
-            adjacentTimelineInversions(rows)
-                .filterNot { inversion ->
-                    (inversion.above.authoritativeOrder != null && inversion.below.authoritativeOrder != null) ||
-                        checkNotNull(inversion.above.projected).messageIdHex in expectedHandoffPreserves ||
-                        checkNotNull(inversion.below.projected).messageIdHex in expectedHandoffPreserves
-                }.associateBy { inversion ->
-                    checkNotNull(inversion.above.projected).messageIdHex to
-                        checkNotNull(inversion.below.projected).messageIdHex
-                }
-        // De-dup so a persistent inversion logs once, not every publish.
-        (inversionsByPair.keys - loggedTimelineOrderingInversionPairs).forEach { pair ->
-            Log.w("TimelineOrder", describeTimelineInversion(inversionsByPair.getValue(pair)))
-        }
-        loggedTimelineOrderingInversionPairs = inversionsByPair.keys
-    }
-
-    /** Formats both rows and controller override state for an inversion diagnostic. */
-    private fun describeTimelineInversion(inversion: TimelineAdjacentInversion): String {
-        val aboveSource = checkNotNull(inversion.above.projected)
-        val belowSource = checkNotNull(inversion.below.projected)
-        return "inversion(#1578) group=${group.groupIdHex.take(8)} " +
-            "source=${inversion.sourceTimelineInverted} arrival=${inversion.arrivalInverted} " +
-            "above[${describeTimelineInversionRow(inversion.above, aboveSource)}] " +
-            "below[${describeTimelineInversionRow(inversion.below, belowSource)}]"
-    }
-
-    /** Formats the source and effective positions of one diagnostic row. */
-    private fun describeTimelineInversionRow(
-        row: TimelineMessage,
-        source: TimelineMessageRecordFfi,
-    ): String =
-        "id=${source.messageIdHex.take(8)} direction=${row.record.direction} " +
-            "displayAt=${row.record.recordedAt} sourceAt=${source.timelineAt} " +
-            "receivedAt=${source.receivedAt} order=${row.timelineOrder} authoritative=${row.authoritativeOrder} " +
-            "timestampOverride=${source.messageIdHex in localTimelineTimestampOverrides} " +
-            "orderOverride=${source.messageIdHex in localTimelineOrderOverrides} " +
-            "durable=${source.messageIdHex in durableStreamPositionOverrideIds} " +
-            "optimisticPreserve=${source.messageIdHex in optimisticSendPositionPreserves}"
-
-    /** Keeps a durable stream final at the position of the preview it replaces. */
-    private fun preserveStreamFinalDisplayPosition(
-        projectedId: String,
-        actionRecord: AppMessageRecordFfi,
-        displayedProjectedStreamItemIds: Set<String>,
-    ) {
-        val streamId = MessageProjector.streamId(actionRecord) ?: return
-        val itemId = "stream:$streamId"
-        val displayedStream =
-            optimisticMessages[itemId]
-                ?: timelineItemsById[itemId]?.takeIf { itemId in displayedProjectedStreamItemIds }
-        val position = streamFinalDisplayPosition(actionRecord, displayedStream) ?: return
-        durableStreamPositionOverrideIds.remove(projectedId)
-        preservedTimelinePositionOverrideIds.add(projectedId)
-        // A stream-final live preview holds its position for the whole session, so
-        // it is not an orphan-releasable optimistic-send preserve (#1578).
-        optimisticSendPositionPreserves.remove(projectedId)
-        localTimelineOrderOverrides[projectedId] = position.timelineOrder
-        localTimelineTimestampOverrides[projectedId] = position.recordedAt
     }
 
     /** Removes one projection and every controller-owned index keyed to it. */
@@ -8876,110 +4812,6 @@ class ConversationController(
         timelineOrder.remove(itemId)
     }
 
-    private fun suppressProjectedTimelineItems(messageIds: List<String>) {
-        messageIds.forEach { messageIdHex ->
-            val itemId = timelineRecords[messageIdHex]?.let(::projectedItemId) ?: "msg:$messageIdHex"
-            timelineItemsById.remove(itemId)
-            timelineOrder.remove(itemId)
-        }
-    }
-
-    // Drop the oldest live-projected records beyond [maxItems], using the same
-    // total order the publish sorts by. When older history was deliberately
-    // loaded, [protectedTimelineMessageIds] is excluded from the trim.
-    private fun trimLiveTimelineWindow(maxItems: Int) {
-        val protectedIds = if (hasLoadedOlderPages) protectedTimelineMessageIds else emptySet()
-        val evictedIds =
-            timelineMessageIdsExceedingLiveCap(
-                items = timelineItemsById.values,
-                protectedIds = protectedIds,
-                maxLiveItems = maxItems,
-            )
-        if (evictedIds.isNotEmpty()) {
-            evictedIds.forEach(::removeProjectedRecord)
-        }
-        readAnchoredAtSeconds.retainTimelineWindow()
-    }
-
-    /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */
-    private fun MutableMap<String, *>.retainTimelineWindow() = retainWindowMessageKeys(this, timelineRecords.keys, optimisticMessages.values)
-
-    private fun pruneMessageOverlaysToWindow() {
-        if (deletedMessageIds.isEmpty() && optimisticReactionChanges.isEmpty()) return
-        val optimisticIds = optimisticMessages.values.map { it.record.messageIdHex }
-        val overlayTargets =
-            buildList {
-                addAll(deletedMessageIds)
-                optimisticReactionChanges.values.forEach { add(it.targetMessageId) }
-            }
-        val retained =
-            retainedMessageOverlayTargets(
-                timelineMessageIds = timelineRecords.keys,
-                optimisticMessageIds = optimisticIds,
-                overlayTargetIds = overlayTargets,
-            )
-        if (deletedMessageIds.any { it !in retained }) {
-            deletedMessageIds = deletedMessageIds.filterTo(linkedSetOf()) { it in retained }
-        }
-        optimisticReactionChanges.entries.removeAll { (_, change) -> change.targetMessageId !in retained }
-    }
-
-    /** Projects one MDK row with its authoritative rank and any transient display bridge. */
-    private fun timelineMessageFromProjection(
-        record: TimelineMessageRecordFfi,
-        actionRecord: AppMessageRecordFfi = TimelineProjector.toAppMessageRecord(record),
-        retentionAtSendSeconds: ULong? = null,
-    ): TimelineMessage {
-        val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
-        val displayRecord =
-            if (streamId != null) {
-                actionRecord.copy(plaintext = actionRecord.plaintext.ifBlank { copy.waitingForStream })
-            } else {
-                actionRecord
-            }.withRecordedAtOverride(localTimelineTimestampOverrides[record.messageIdHex])
-        return TimelineMessage(
-            id = streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}",
-            record = displayRecord,
-            status =
-                when {
-                    streamId != null -> MessageStatus.Streaming
-                    MessageProjector.isMine(actionRecord, conversationAccountIdHex) ->
-                        if (record.sourceMessageIdHex == null && !record.recipientConfirmed) {
-                            MessageStatus.Pending
-                        } else {
-                            MessageStatus.Sent
-                        }
-                    else -> MessageStatus.Received
-                },
-            projected = record,
-            timelineOrder = localTimelineOrderOverrides[record.messageIdHex] ?: 0uL,
-            authoritativeOrder =
-                authoritativeTimelineOrderByMessageId[record.messageIdHex]
-                    ?.takeUnless {
-                        record.messageIdHex in localTimelineOrderOverrides ||
-                            record.messageIdHex in localTimelineTimestampOverrides
-                    },
-            displayAfterMessageIdHex = durableStreamDisplayParentByMessageId[record.messageIdHex],
-            retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
-            presentationId = timelinePresentationIds[record.messageIdHex] ?: projectedItemId(record),
-        )
-    }
-
-    private fun projectedItemId(record: TimelineMessageRecordFfi): String {
-        val actionRecord = TimelineProjector.toAppMessageRecord(record)
-        val streamId = MessageProjector.streamId(actionRecord).takeIf { MessageProjector.isStreamStart(actionRecord) }
-        return streamId?.let { "stream:$it" } ?: "msg:${record.messageIdHex}"
-    }
-
-    /** Adds an item to the membership index; publication performs display ordering. */
-    private fun insertTimelineItemId(itemId: String) {
-        // Append in O(1). Position is irrelevant: publishTimelineFromIndexes
-        // orders authoritative rows by MDK ordinal and merges local overlays,
-        // so timelineOrder is only a membership set. The previous sorted insert
-        // did an O(n) scan per item, making each page load O(n²). See #74.
-        timelineOrder.add(itemId)
-    }
-
     // Main-thread only, like the rest of ConversationController's Compose
     // state. Re-entrant counter — when non-zero,
     // `publishTimelineFromIndexes` defers its work and the outermost
@@ -8988,208 +4820,12 @@ class ConversationController(
     // 7.21ms-on-janky-frames "Input+Anim+Layout" cost in `dumpsys gfxinfo`:
     // each publish re-sorts + de-dupes the full timeline and re-aggregates the
     // edits index.
-    private var publishSuppressionDepth = 0
-    private var publishPending = false
-    private var timelinePositionSettlementJob: Job? = null
+    internal var publishSuppressionDepth = 0
+    internal var publishPending = false
+    internal var timelinePositionSettlementJob: Job? = null
 
     // #1578 detector de-dup: adjacent inversion pairs already logged this session.
-    private var loggedTimelineOrderingInversionPairs = emptySet<Pair<String, String>>()
-
-    private inline fun coalesceTimelinePublishes(block: () -> Unit) {
-        assertMainThread { "coalesceTimelinePublishes" }
-        publishSuppressionDepth += 1
-        try {
-            block()
-        } finally {
-            publishSuppressionDepth -= 1
-            if (publishSuppressionDepth == 0 && publishPending) {
-                publishPending = false
-                publishTimelineFromIndexesInternal()
-            }
-        }
-    }
-
-    private fun publishTimelineFromIndexes() {
-        assertMainThread { "publishTimelineFromIndexes" }
-        if (publishSuppressionDepth > 0) {
-            publishPending = true
-            return
-        }
-        publishTimelineFromIndexesInternal()
-    }
-
-    private fun scheduleTimelinePositionSettlement() {
-        timelinePositionSettlementJob =
-            deferTimelinePositionSettlement(
-                scope = inviteStreamScope,
-                currentJob = timelinePositionSettlementJob,
-                awaitBoundary = ::awaitRenderedTimelineFrame,
-            ) {
-                timelinePositionSettlementJob = null
-                publishPending = false
-                publishTimelineFromIndexes()
-            }
-    }
-
-    private suspend fun awaitRenderedTimelineFrame() {
-        // Choreographer callbacks run before traversal. Waiting for two callbacks
-        // guarantees the preserved state gets one complete draw before settlement
-        // updates the state for the following frame.
-        repeat(2) {
-            suspendCancellableCoroutine { continuation ->
-                val choreographer = Choreographer.getInstance()
-                val callback =
-                    Choreographer.FrameCallback {
-                        if (continuation.isActive) continuation.resume(Unit)
-                    }
-                continuation.invokeOnCancellation {
-                    choreographer.removeFrameCallback(callback)
-                }
-                choreographer.postFrameCallback(callback)
-            }
-        }
-    }
-
-    /** Publishes the indexed window after row-owned expiry and visibility filters. */
-    private fun publishTimelineFromIndexesInternal() {
-        // A first page held for its event cards is published whole by its release, with every change made meanwhile.
-        if (isHoldingInitialPageForEventCards) return
-        // Preserve the handoff snapshot for one complete frame. Any projection
-        // or optimistic mutation arriving during that frame is already reflected
-        // in the indexes and is folded into the scheduled settlement publish.
-        if (timelinePositionSettlementJob?.isActive == true) {
-            publishPending = true
-            return
-        }
-        val projected = timelineOrder.mapNotNull { timelineItemsById[it] }
-        // Read-anchored local expiry (#797) uses only the policy pinned to each
-        // row. The mutable group policy cannot reinterpret projected history.
-        // When no row owns a deadline, keep the no-filter-allocation fast path.
-        val candidates = optimisticMessages.values + projected
-        val hasExpiryCandidate =
-            candidates.any { message ->
-                message.record.retentionExpiresAt?.let { it > 0uL } == true ||
-                    message.retentionAtSendSeconds?.let { it > 0uL } == true
-            }
-        val live =
-            if (!hasExpiryCandidate) {
-                candidates
-            } else {
-                val nowMillis = clockMillis()
-                val nowSeconds = (nowMillis.coerceAtLeast(0L) / 1_000L).toULong()
-                val messageOrder =
-                    firstMessageOrder(
-                        buildList {
-                            optimisticMessages.values.forEach { add(it.record.messageIdHex) }
-                            projected.forEach { add(it.record.messageIdHex) }
-                        },
-                    )
-                candidates.filter { message ->
-                    val record = message.record
-                    if (record.direction == "sent" && message.projected == null) {
-                        readAnchoredAtSeconds.putIfAbsent(record.messageIdHex, nowSeconds)
-                    }
-                    !isTimelineRecordLocallyExpired(
-                        nowMillis = nowMillis,
-                        record = record,
-                        row = localExpiryRow(message, messageOrder),
-                    )
-                }
-            }
-        val hiddenIds = appState.hiddenMessageIdsInGroup(conversationAccountRef, group.groupIdHex)
-        val visible =
-            if (hiddenIds.isEmpty()) {
-                live
-            } else {
-                live.filter { message ->
-                    isTimelineMessageVisible(message.record.messageIdHex, hiddenIds)
-                }
-            }
-        val aggregated = withAuthoritativeEdits(emptyMap(), authoritativeEditsOf(timelineRecords.values))
-        // Admission projects the revised body before publication. The original row's
-        // delivery state cannot confirm its edit; retain the overlay until the edit's
-        // own native publication and exact revision agree.
-        optimisticEdits.entries
-            .filter { (target, edit) ->
-                isConfirmedOptimisticEdit(edit, aggregated[target], timelineRecords[target])
-            }.map { it.key }
-            .forEach(optimisticEdits::remove)
-        timeline =
-            orderTimelineMessagesForDisplay(
-                (visible + streamDebugTimelineItems.values).map { message ->
-                    message.withOptimisticEditStatus(optimisticEdits[message.record.messageIdHex])
-                },
-            )
-        timelinePresentationIds.keys.retainAll(timeline.mapTo(HashSet()) { it.record.messageIdHex })
-        // The optimistic→confirmed handoff snapshot is intentionally preserved;
-        // do not report it as the stale-override symptom this detector targets.
-        logTimelineInversionsForDebug(timeline, optimisticSendPositionPreserves.snapshot())
-        // Publish the confirmed row once at its optimistic position before
-        // cleaning the transient bridge. Cleanup rebuilds only the internal
-        // indexes; the immutable snapshot above remains stable for observers,
-        // and the next publish settles the row to its projected position.
-        if (releaseOrphanedOptimisticSendPreserves()) {
-            scheduleTimelinePositionSettlement()
-        }
-        editsByTarget = applyOptimisticEdits(aggregated, optimisticEdits)
-        signalForegroundSweepScheduleChanged()
-    }
-
-    private fun nextOptimisticTimelineOrder(): ULong =
-        nextTimelineOrder(
-            published = timeline.asSequence().map { it.timelineOrder },
-            pending = optimisticMessages.values.asSequence().map { it.timelineOrder },
-        )
-
-    private fun recomputeReactions() {
-        // Lowercased to match baseReactionSenders(): hex account-id casing can
-        // drift between the active account and reaction senders, and a mismatch
-        // would render your own reaction as not-mine. See #143.
-        val mine = conversationAccountIdHex?.lowercase()
-        val sendersByTarget = baseReactionSenders()
-        if (mine != null) {
-            optimisticReactionChanges.values.forEach { change ->
-                val sendersByEmoji = sendersByTarget.getOrPut(change.targetMessageId) { linkedMapOf() }
-                val senders = sendersByEmoji.getOrPut(change.emoji) { linkedSetOf() }
-                if (change.add) {
-                    senders.add(mine)
-                } else {
-                    senders.remove(mine)
-                }
-            }
-        }
-        val computed =
-            reactionTalliesForWindow(sendersByTarget, window.frame?.references, optimisticReactionChanges.values, mine)
-        reactionsState.keys.retainAll(computed.keys)
-        reactionsState.putAll(computed)
-    }
-
-    private fun recomputeReactions(targetMessageIds: Set<String>) {
-        if (targetMessageIds.isEmpty()) return
-        targetMessageIds.forEach { target ->
-            val tallies = reactionTalliesFor(target)
-            if (tallies.isEmpty()) {
-                reactionsState.remove(target)
-            } else {
-                reactionsState[target] = tallies
-            }
-        }
-    }
-
-    /** Chips for one message: window references when retained, otherwise confirmed senders plus optimistic changes. */
-    private fun reactionTalliesFor(targetMessageId: String): List<ReactionTally> {
-        val changes = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId }
-        window.references(targetMessageId)?.let { return windowReactionTallies(it.reactions, changes) }
-        val confirmed = linkedMapOf<String, MutableSet<String>>()
-        timelineRecords[targetMessageId]?.reactions?.byEmoji.orEmpty().forEach { summary ->
-            confirmed.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders)
-        }
-        return reactionTalliesForSenders(
-            activeAccountIdHex = conversationAccountIdHex,
-            confirmedSendersByEmoji = confirmed,
-            optimisticChanges = optimisticReactionChanges.values.filter { it.targetMessageId == targetMessageId },
-        )
-    }
+    internal var loggedTimelineOrderingInversionPairs = emptySet<Pair<String, String>>()
 
     /** Reads and maps a complete canonical reaction snapshot off the UI thread for this conversation. */
     internal suspend fun loadReactionParticipants(targetMessageId: String): List<ReactionParticipant> {
@@ -9216,19 +4852,6 @@ class ConversationController(
             now = nowSeconds(),
         )
 
-    private fun baseReactionSenders(): LinkedHashMap<String, LinkedHashMap<String, MutableSet<String>>> {
-        val result = linkedMapOf<String, LinkedHashMap<String, MutableSet<String>>>()
-        timelineRecords.values.forEach { record ->
-            val byEmoji = result.getOrPut(record.messageIdHex) { linkedMapOf() }
-            record.reactions.byEmoji.forEach { summary ->
-                // Lowercased so the optimistic add/remove and the `mine` check in
-                // recomputeReactions() match regardless of casing drift. See #143.
-                byEmoji.getOrPut(summary.emoji) { linkedSetOf() }.addAll(summary.senders.map { it.lowercase() })
-            }
-        }
-        return result
-    }
-
     /** Re-reads authoritative membership without replaying a pending group mutation. */
     suspend fun retryMembers() = refreshMembers()
 
@@ -9239,232 +4862,6 @@ class ConversationController(
         }
     }
 
-    /** Starts a roster read only while this controller still owns its account presentation. */
-    private fun beginMemberRosterRefresh(): Long? =
-        synchronized(liveSubscriptionLock) {
-            val resolvingElsewhere = inviteAcceptanceResolutionPending && inviteAuthorityReadInFlight
-            val cannotRefresh = accountTeardownRequested || controllerCleared || resolvingElsewhere
-            if (cannotRefresh) null else memberRosterRefreshGeneration.advance()
-        }
-
-    /** Resolves conflicting list snapshots only while the opening controller still owns the read. */
-    private suspend fun resolveInitialInviteConfirmation(
-        account: String,
-        refreshGeneration: Long,
-    ): Boolean {
-        if (!inviteConfirmationUnresolved) return true
-        val epoch = mutationPresentation.groupAuthorityEpoch
-        val runtimeGeneration = appState.runtimeGeneration
-        val canonical =
-            try {
-                inviteAuthorityReadInFlight = true
-                liveSubscriptions.readInviteConfirmation(account, group.groupIdHex)
-            } finally {
-                inviteAuthorityReadInFlight = false
-            }
-        val currentRead = memberRosterRefreshGeneration.isCurrent(refreshGeneration)
-        val ownsRead =
-            ownsInviteAcceptanceResult &&
-                epoch == mutationPresentation.groupAuthorityEpoch &&
-                currentRead &&
-                appState.runtimeGeneration == runtimeGeneration
-        if (ownsRead) applyGroupState(canonical)
-        // A newer canonical nonterminal update already resolved consent. Discard this
-        // older snapshot, but let the same owner load a fresh roster for that group.
-        val resolvedByUpdate = !inviteConfirmationUnresolved && group.acceptsInviteResults()
-        return ownsCurrentMemberRead(refreshGeneration, runtimeGeneration) && (ownsRead || resolvedByUpdate)
-    }
-
-    // Publication holds the generation lock; never acquire liveSubscriptionLock here.
-    private fun ownsCurrentMemberRead(
-        generation: Long,
-        runtimeGeneration: Int,
-    ): Boolean =
-        !controllerCleared &&
-            !accountTeardownRequested &&
-            memberRosterRefreshGeneration.isCurrent(generation) &&
-            appState.runtimeGeneration == runtimeGeneration
-
-    /**
-     * Publishes the latest authoritative roster while rejecting older refresh completions.
-     * [automaticRetryAttempt] counts the bounded re-reads already spent by this chain (#2861).
-     */
-    private suspend fun refreshMembers(
-        automaticRetryAttempt: Int = 0,
-        prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null,
-    ) {
-        val account = conversationAccountRef ?: return
-        val generation = beginMemberRosterRefresh() ?: return
-        val runtimeGeneration = appState.runtimeGeneration
-        val recoveringFromBlock = automaticRetryAttempt > 0 || rosterBlockReason != null
-        if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.LOADING
-        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
-        try {
-            runCatchingCancellable {
-                readAndApplyMembers(account, generation, runtimeGeneration, prefetchedRoster)
-            }.onSuccess {
-                if (recoveringFromBlock && memberRosterState == GroupRosterLoadState.READY) {
-                    logRosterRead("recovered", kind = null, attempt = automaticRetryAttempt)
-                }
-            }.onFailure { failure ->
-                if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                    handleMemberReadFailure(account, generation, runtimeGeneration, failure, automaticRetryAttempt)
-                }
-            }
-        } catch (cancel: CancellationException) {
-            memberRosterRefreshGeneration.runIfCurrent(generation) {
-                if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                    memberRosterLoadTracker.restoreAfterCancellation()
-                    if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
-                }
-            }
-            throw cancel
-        }
-    }
-
-    /** Reads consent before members and never publishes a roster across a canonical group edge. */
-    private suspend fun readAndApplyMembers(
-        account: String,
-        generation: Long,
-        runtimeGeneration: Int,
-        prefetchedRoster: Deferred<Result<GroupRosterFfi>>?,
-    ) {
-        val resolvingConflict = inviteConfirmationUnresolved
-        if (!resolveInitialInviteConfirmation(account, generation)) return
-        val authorityEpoch = mutationPresentation.groupAuthorityEpoch
-        // A prefetched roster can predate the consent check and must not settle that check.
-        val roster =
-            if (resolvingConflict) {
-                groupRosterReader(account, group.groupIdHex)
-            } else {
-                prefetchedRoster?.await()?.getOrThrow() ?: groupRosterReader(account, group.groupIdHex)
-            }
-        memberRosterRefreshGeneration.runIfCurrent(generation) {
-            if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                if (authorityEpoch != mutationPresentation.groupAuthorityEpoch) throw SupersededGroupRosterRead()
-                val applied = applyGroupRoster(account, roster)
-                if (applied != null) appState.applyLocalGroupDetails(account, applied.group, applied.members)
-            }
-        }
-    }
-
-    /**
-     * Re-reads a retryable failure with bounded backoff while the read is still owned, then
-     * exposes manual Retry. An account switch, newer read, disposal or runtime change wins.
-     * A blocked transcript's backoff runs on [controllerScope], so it never holds the caller's
-     * mutation lock or stalls the group-state stream; other retries keep the old inline re-read.
-     */
-    private suspend fun handleMemberReadFailure(
-        account: String,
-        generation: Long,
-        runtimeGeneration: Int,
-        failure: Throwable,
-        attempt: Int,
-    ) {
-        val kind = classifyGroupRosterReadFailure(failure)
-        if (kind == GroupRosterReadFailureKind.SUPERSEDED && !group.acceptsInviteResults()) return
-        val transcriptBlocked = !hasKnownTranscriptPresentation
-        val retryDelay =
-            groupRosterReadRetryDelayMs(kind, attempt, transcriptBlocked)
-                .takeUnless { failure.isUseAfterEviction() }
-        val backgroundBackoff = transcriptBlocked && kind != GroupRosterReadFailureKind.SUPERSEDED
-        if (retryDelay != null) {
-            logRosterRead("retry", kind, attempt)
-            if (backgroundBackoff) {
-                controllerScope.launch { retryMemberReadAfter(retryDelay, generation, runtimeGeneration, attempt) }
-            } else {
-                retryMemberReadAfter(retryDelay, generation, runtimeGeneration, attempt)
-            }
-        } else {
-            settleMemberReadFailure(account, generation, runtimeGeneration, failure, attempt)
-        }
-    }
-
-    /** Waits [delayMs], then re-reads only if the failed read is still the current owned read. */
-    private suspend fun retryMemberReadAfter(
-        delayMs: Long,
-        generation: Long,
-        runtimeGeneration: Int,
-        attempt: Int,
-    ) {
-        if (delayMs > 0L) delay(delayMs)
-        if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-            refreshMembers(automaticRetryAttempt = attempt + 1)
-        }
-    }
-
-    /** Settles a failure atomically with its roster generation, without holding a lock over IO. */
-    private fun settleMemberReadFailure(
-        account: String,
-        generation: Long,
-        runtimeGeneration: Int,
-        failure: Throwable,
-        attempt: Int,
-    ) {
-        memberRosterRefreshGeneration.runIfCurrent(generation) {
-            if (!ownsCurrentMemberRead(generation, runtimeGeneration)) return@runIfCurrent
-            if (failure.isUseAfterEviction()) {
-                markActiveAccountRemovedFromMembers(account)
-            } else {
-                val kind = classifyGroupRosterReadFailure(failure)
-                memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
-                if (memberRosterState == GroupRosterLoadState.FAILED) {
-                    rosterBlockReason = GroupRosterBlockReason.ReadFailed(kind, attempts = attempt + 1)
-                }
-                if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
-                logRosterRead("failed", kind, attempt)
-                if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", failure)
-            }
-        }
-    }
-
-    /** Logs a roster read branch with gate facts only, never account, group or member IDs. */
-    private fun logRosterRead(
-        event: String,
-        kind: GroupRosterReadFailureKind?,
-        attempt: Int,
-    ) {
-        Log.w(
-            "DMConversation",
-            groupRosterReadDiagnostic(
-                event = event,
-                kind = kind,
-                attempt = attempt,
-                transcriptBlocked = !hasKnownTranscriptPresentation,
-                initialSnapshot = initialMemberSnapshot != null,
-                targetAccountActive = conversationAccountRef == appState.activeAccountRef,
-            ),
-        )
-    }
-
-    /** Applies the engine's eviction proof and invalidates any in-flight group mutation result. */
-    private fun markActiveAccountRemovedFromMembers(account: String) {
-        val activeAccountIdHex = conversationAccountIdHex ?: return
-        mutationPresentation.authoritativeGroupApplied()
-        inviteConfirmationAuthority.invalidate()
-        observedBlockedLeave = false
-        cancelledLeaveAwaitingRoster = false
-        // Engine-confirmed removal (UseAfterEviction). Record the same
-        // authoritative local-left marker the leaveGroup() success path sets so
-        // a later authoritative roster result that races ahead of eviction can't re-add
-        // self (issue #787).
-        recordSelfLeft()
-        members = selfMembership.rosterHonoringSelfLeft(members, activeAccountIdHex)
-        acceptedInvitePeerAccount = null
-        membersLoaded = true
-        membersVerified = true
-        inviteAcceptanceAwaitingAuthority = null
-        inviteConfirmationUnresolved = false
-        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
-        rosterBlockReason = null
-        // UseAfterEviction is the engine's authoritative signal that this
-        // conversation can no longer accept composer writes. Invalidate an
-        // in-flight immutable dictation target before any late provider result
-        // can reach the draft persistence path.
-        appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
-        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
-    }
-
     /**
      * Latch the authoritative local self-leave marker (issue #787). Set on a
      * confirmed self-leave (leaveGroup success) or engine eviction
@@ -9473,11 +4870,14 @@ class ConversationController(
      * before the engine eviction is observed locally. A removed device
      * ([SelfMembershipFfi.DEVICE_REMOVED]) keeps its account on the roster.
      */
-    private fun recordSelfLeft() {
+    internal fun recordSelfLeft() {
         selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
     }
 
-    private fun Throwable.isUseAfterEviction(): Boolean {
+    /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */
+    internal fun MutableMap<String, *>.retainTimelineWindow() = retainWindowMessageKeys(this, timelineRecords.keys, optimisticMessages.values)
+
+    internal fun Throwable.isUseAfterEviction(): Boolean {
         // Stopgap until Marmot exposes a typed UniFFI error/code for
         // GroupStateError::UseAfterEviction. Keep this in sync with the Rust
         // OpenMLS group-state error variant name.
@@ -9487,319 +4887,6 @@ class ConversationController(
                     listOfNotNull(error.message, error.javaClass.simpleName).joinToString(" ")
                 }
         return "UseAfterEviction" in text || ("GroupStateError" in text && "eviction" in text.lowercase())
-    }
-
-    private fun applyGroupDetails(
-        account: String,
-        details: GroupDetailsFfi,
-        freshLeaveReadback: Boolean,
-    ): AppliedGroupDetails? {
-        val resolution = resolveAuthoritativeGroupRoster(details, conversationAccountIdHex)
-        return applyResolvedGroupRoster(
-            account = account,
-            resolution = resolution,
-            returnedRowCount = details.members.size,
-            returnedMembership = details.group.selfMembership,
-            freshLeaveReadback = freshLeaveReadback,
-        )
-    }
-
-    private fun applyGroupRoster(
-        account: String,
-        roster: GroupRosterFfi,
-    ): AppliedGroupDetails? {
-        val resolution = resolveAuthoritativeGroupRoster(group, roster, conversationAccountIdHex)
-        return applyResolvedGroupRoster(
-            account = account,
-            resolution = resolution,
-            returnedRowCount = roster.members.size,
-            returnedMembership = roster.selfMembership,
-        )
-    }
-
-    /** Applies a verified roster, or records the failed invariant that keeps the transcript gated. */
-    private fun applyResolvedGroupRoster(
-        account: String,
-        resolution: GroupRosterResolution,
-        returnedRowCount: Int,
-        returnedMembership: SelfMembershipFfi,
-        freshLeaveReadback: Boolean = false,
-    ): AppliedGroupDetails? {
-        val previousRetention = group.disappearingMessageSecs
-        val previousGroup = group
-        resolution.invariant?.let { invariant ->
-            memberRosterLoadTracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
-            rosterBlockReason = GroupRosterBlockReason.Inconsistent(invariant)
-            logGroupRosterInvariant(
-                resolution = resolution,
-                invariant = invariant,
-                returnedRowCount = returnedRowCount,
-                returnedMembership = returnedMembership,
-            )
-            return null
-        }
-        val applied = resolution.applied
-        val restoredAfterCancel = reconcileBlockedLeaveReadback(resolution, freshLeaveReadback)
-        mutationPresentation.authoritativeGroupApplied()
-        val reconciled =
-            if (restoredAfterCancel) applied.group else reconcileTerminalSelfMembership(applied.group, previousGroup)
-        group = inviteConfirmationAuthority.reconcile(reconciled, establishesAcceptance = false)
-        if (previousRetention != group.disappearingMessageSecs) {
-            publishTimelineFromIndexes()
-        }
-        // The reconciled group record carries the newest terminal self-membership
-        // observed by any snapshot. When it reports a non-member (evicted or
-        // voluntarily left), latch the self-left marker so the composer goes
-        // read-only and the roster line below drops self — no longer relying
-        // solely on the UseAfterEviction string-match round-trip.
-        if (group.selfMembership.isNonMember()) {
-            recordSelfLeft()
-        }
-        // Once a self-leave has been recorded locally, refuse to re-add self
-        // from a details round-trip that still predates the engine eviction —
-        // otherwise the full roster (self included) would restore the member
-        // count and re-enable the composer right after a leave (issue #787).
-        members = selfMembership.rosterHonoringSelfLeft(applied.members, conversationAccountIdHex)
-        if (
-            members.any { member ->
-                member.memberIdHex.isNotBlank() &&
-                    !GroupProjector.isActiveAccountMember(member, conversationAccountIdHex)
-            }
-        ) {
-            acceptedInvitePeerAccount = null
-        }
-        membersLoaded = true
-        membersVerified = true
-        inviteAcceptanceAwaitingAuthority = null
-        if (!inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.READY
-        memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
-        rosterBlockReason = null
-        cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
-        return AppliedGroupDetails(group = group, members = members)
-    }
-
-    /** Retires a provisional leave only after the current native roster proves the outcome. */
-    private fun reconcileBlockedLeaveReadback(
-        resolution: GroupRosterResolution,
-        freshLeaveReadback: Boolean,
-    ): Boolean {
-        val incoming = resolution.applied.group
-        if (incoming.leaveBlocked) observedBlockedLeave = true
-        val restored =
-            freshLeaveReadback &&
-                observedBlockedLeave &&
-                resolution.containsLocalMember &&
-                incoming.isJoinedAfterLeave() &&
-                !group.selfMembership.isGroupEviction()
-        val settled =
-            incoming.selfMembership.isGroupEviction() ||
-                incoming.disbanded ||
-                (freshLeaveReadback && incoming.hasSettledDeparture() && !resolution.containsLocalMember)
-        if (restored || settled) {
-            observedBlockedLeave = false
-            cancelledLeaveAwaitingRoster = false
-        }
-        if (restored) selfMembership.clearSelfLeft()
-        return restored
-    }
-
-    private fun logGroupRosterInvariant(
-        resolution: GroupRosterResolution,
-        invariant: GroupRosterInvariant,
-        returnedRowCount: Int,
-        returnedMembership: SelfMembershipFfi,
-    ) {
-        fun normalizedIds(rows: List<AppGroupMemberRecordFfi>): Set<String> =
-            rows
-                .mapNotNull { row ->
-                    row.memberIdHex
-                        .trim()
-                        .takeIf(String::isNotEmpty)
-                        ?.lowercase()
-                }.toSet()
-
-        val returnedIds = normalizedIds(resolution.applied.members)
-        // Before the first successful details read, `members` is the chat-list /
-        // shared snapshot seed. Compare sets here, but log counts only: member IDs
-        // and the group ID are intentionally excluded from this diagnostic.
-        val cachedIds = normalizedIds(members)
-        val cachedContainsLocal =
-            members.any { member ->
-                conversationAccountIdHex?.let { accountId ->
-                    member.memberIdHex.equals(accountId, ignoreCase = true)
-                } ?: member.local
-            }
-        Log.e(
-            "DMConversation",
-            "joined roster invariant" +
-                " reason=${invariant.name.lowercase()}" +
-                " rows=$returnedRowCount" +
-                " unique=${resolution.uniqueMemberCount}" +
-                " mls=${resolution.mlsMemberCount}" +
-                " cached_unique=${cachedIds.size}" +
-                " overlap=${returnedIds.intersect(cachedIds).size}" +
-                " cached_only=${cachedIds.subtract(returnedIds).size}" +
-                " returned_only=${returnedIds.subtract(cachedIds).size}" +
-                " returned_self=${resolution.containsLocalMember}" +
-                " cached_self=$cachedContainsLocal" +
-                " current_membership=${group.selfMembership.name.lowercase()}" +
-                " returned_membership=${returnedMembership.name.lowercase()}",
-        )
-    }
-
-    /** Returns whether committed details were applied, invalidating any roster refresh launched earlier. */
-    private fun applyMutationDetails(
-        account: String,
-        details: GroupDetailsFfi,
-        freshLeaveReadback: Boolean = false,
-    ): Boolean {
-        memberRosterRefreshGeneration.advance()
-        val applied = applyGroupDetails(account, details, freshLeaveReadback) ?: return false
-        appState.applyLocalGroupDetails(account, applied.group, applied.members)
-        return true
-    }
-
-    private suspend fun watchAgentTextStream(
-        account: String,
-        streamId: String,
-    ) {
-        val text = StringBuilder()
-        var subscription: AgentStreamSubscription? = null
-        try {
-            runCatchingCancellable {
-                val streamSubscription =
-                    appState.marmotIo {
-                        watchAgentTextStream(
-                            accountRef = account,
-                            groupIdHex = group.groupIdHex,
-                            streamIdHex = streamId,
-                            serverCertDer = null,
-                            insecureLocal = false,
-                        )
-                    }
-                subscription = streamSubscription
-                while (true) {
-                    val update =
-                        withContext(Dispatchers.IO) {
-                            streamSubscription.next()
-                        } ?: break
-                    if (streamId in removedStreamIds) {
-                        break
-                    }
-                    // When the developer toggle is on, surface every live
-                    // agent-stream update as a transient inline debug row. No-op
-                    // (and allocation-free past the boolean read) when off.
-                    appendStreamDebugEvent(streamId, update)
-                    when (update) {
-                        is AgentStreamUpdateFfi.Chunk -> {
-                            appendCappedAgentStreamPreview(text, update.text)
-                            updateStreamPreview(streamId, text.toString(), MessageStatus.Streaming)
-                        }
-                        is AgentStreamUpdateFfi.Finished -> {
-                            text.clear()
-                            text.append(update.text)
-                            // Parse once on completion only — per-chunk parsing
-                            // would be an FFI round-trip per token batch for a
-                            // document that's still mutating. Chunks render as
-                            // plain text; the finished message gets markdown.
-                            updateStreamPreview(
-                                streamId,
-                                text.toString(),
-                                MessageStatus.Sent,
-                                tokens = appState.parseMarkdownOrEmpty(update.text),
-                            )
-                        }
-                        is AgentStreamUpdateFfi.Failed -> {
-                            updateStreamPreview(streamId, copy.streamFailed(), MessageStatus.Failed)
-                        }
-                        // Typed Hermes-agent variants (Progress / Record / Status)
-                        // are surfaced only through the streaming-debug rows above;
-                        // they carry no user-visible preview text, so drop them here
-                        // and let the loop keep consuming the next chunk.
-                        is AgentStreamUpdateFfi.Progress,
-                        is AgentStreamUpdateFfi.Record,
-                        is AgentStreamUpdateFfi.Status,
-                        -> Unit
-                    }
-                }
-            }.onFailure { throwable ->
-                updateStreamPreview(
-                    streamId,
-                    agentStreamFailureText(throwable, copy),
-                    MessageStatus.Failed,
-                )
-            }
-        } finally {
-            withContext(NonCancellable + Dispatchers.IO) {
-                runCatching { subscription?.close() }
-            }
-            activeStreamIds.remove(streamId)
-        }
-    }
-
-    /**
-     * Surface one live agent-stream update as a transient inline streaming-debug
-     * row. Each row is a display-only synthetic [TimelineMessage] tagged
-     * [STREAM_DEBUG_DIRECTION] so it never inflates unread counts, marks-read, or
-     * reacts; the conversation renders it as a [StreamDebugEventRow] keyed off the
-     * [STREAM_DEBUG_ID_PREFIX] id. Gated entirely on
-     * [WhiteNoiseAppState.streamingDebugEnabled]: a no-op (past a single boolean
-     * read) when the toggle is off, so the timeline is byte-identical to today.
-     * Surfaces every live Chunk / Status / Progress / Record / Finished / Failed.
-     */
-    private fun appendStreamDebugEvent(
-        streamId: String,
-        update: AgentStreamUpdateFfi,
-    ) {
-        if (!appState.streamingDebugEnabled) return
-        val event = StreamDebugEventFormatter.of(update)
-        streamDebugEventSequence += 1uL
-        val now = nowSeconds()
-        // Zero-pad the sequence so same-second rows keep insertion order under
-        // the `id` tiebreak in `compareTimelineMessages`.
-        val id = "$STREAM_DEBUG_ID_PREFIX$streamId:$now:${streamDebugEventSequence.toString().padStart(20, '0')}"
-        val record =
-            AppMessageRecordFfi(
-                messageIdHex = id,
-                direction = STREAM_DEBUG_DIRECTION,
-                groupIdHex = group.groupIdHex,
-                sender = inferStreamSender(streamId),
-                plaintext = event.detail,
-                contentTokens = EMPTY_MARKDOWN_DOCUMENT,
-                kind = STREAM_DEBUG_KIND,
-                tags = listOf(MessageProjector.streamTag(streamId), MessageTagFfi(listOf("dbg", event.eventKind))),
-                sourceEpoch = null,
-                retentionSeconds = null,
-                retentionExpiresAt = null,
-                recordedAt = now,
-                receivedAt = now,
-                sticker = null,
-            )
-        val item =
-            TimelineMessage(
-                id = id,
-                record = record,
-                status = MessageStatus.Sent,
-                timelineOrder = nextOptimisticTimelineOrder(),
-            )
-        streamDebugTimelineItems[id] = item
-        // Bound the retained rows: a long-lived agent-heavy conversation could
-        // otherwise accrete debug rows without limit while the toggle stays on.
-        var evicted = false
-        while (streamDebugTimelineItems.size > MAX_STREAM_DEBUG_ROWS) {
-            streamDebugTimelineItems.remove(streamDebugTimelineItems.keys.first())
-            evicted = true
-        }
-        if (evicted) {
-            // A row dropped out of the middle of the published list — only a full
-            // rebuild can drop it from the timeline.
-            publishTimelineFromIndexes()
-        } else {
-            // The new row sorts to the tail (highest recordedAt + timelineOrder),
-            // so append it in place rather than re-sorting the whole timeline on
-            // every stream update — the slot trick updateStreamPreview uses.
-            timeline = timeline + item.withOptimisticEditStatus(optimisticEdits[item.record.messageIdHex])
-        }
     }
 
     /**
@@ -9818,85 +4905,6 @@ class ConversationController(
         publishTimelineFromIndexes()
     }
 
-    /** Creates or updates the timeline row that shows an agent stream's latest text and status. */
-    private fun updateStreamPreview(
-        streamId: String,
-        plaintext: String,
-        status: MessageStatus,
-        tokens: MarkdownDocumentFfi? = null,
-    ) {
-        if (streamId in removedStreamIds) return
-        val id = "stream:$streamId"
-        val existingItem = optimisticMessages[id] ?: timelineItemsById[id]
-        val existing = existingItem?.record
-        val record =
-            (
-                existing ?: AppMessageRecordFfi(
-                    messageIdHex = "stream-$streamId",
-                    direction = "received",
-                    groupIdHex = group.groupIdHex,
-                    sender = inferStreamSender(streamId),
-                    plaintext = "",
-                    contentTokens = EMPTY_MARKDOWN_DOCUMENT,
-                    kind = 1200uL,
-                    tags = listOf(MessageProjector.streamTag(streamId)),
-                    sourceEpoch = null,
-                    retentionSeconds = null,
-                    retentionExpiresAt = null,
-                    recordedAt = nowSeconds(),
-                    receivedAt = nowSeconds(),
-                    sticker = null,
-                )
-            ).copy(
-                plaintext = plaintext,
-                // Tokens must always describe the plaintext beside them.
-                // When the caller didn't parse this revision (streaming
-                // chunks, failure copy), reset to empty — carrying forward a
-                // previous revision's tokens would render stale markdown
-                // against the new text. Empty falls back to plain rendering.
-                contentTokens = tokens ?: EMPTY_MARKDOWN_DOCUMENT,
-            )
-        val updated =
-            TimelineMessage(
-                id,
-                record,
-                status,
-                timelineOrder = existingItem?.timelineOrder ?: nextOptimisticTimelineOrder(),
-            )
-        optimisticMessages[id] = updated
-        // A streaming chunk only mutates this one item's text, and none of its
-        // sort keys (recordedAt, timelineOrder, id) change across chunks — so
-        // its timeline slot is fixed. Replace the slot in place instead of
-        // rebuilding + re-sorting the whole timeline per chunk on the Main
-        // thread. Finished/Failed (and the first chunk, which has no slot yet)
-        // take the full publish so status-driven reconciliation stays on the
-        // canonical path. See #145.
-        val slot = if (status == MessageStatus.Streaming) timeline.indexOfFirst { it.id == id } else -1
-        if (slot >= 0) {
-            timeline = timeline.toMutableList().apply { set(slot, updated) }
-        } else {
-            publishTimelineFromIndexes()
-        }
-    }
-
-    // The authoritative sender for a stream comes from the projected timeline
-    // record (the kind:1200 event that introduced the streamId). If we're
-    // synthesizing a preview record because no projection has landed yet,
-    // walk timelineRecords for a record carrying the same stream tag — that
-    // covers the common case where the kind:1200 event arrived before the
-    // first chunk. Falls back to empty for the genuine cold-start window,
-    // which the projection will overwrite as soon as it lands.
-    private fun inferStreamSender(streamId: String): String {
-        val tagValues = MessageProjector.streamTag(streamId).values
-        return timelineRecords.values
-            .firstOrNull { record -> record.tags.any { it.values == tagValues } }
-            ?.sender
-            .orEmpty()
-    }
-
-    /** Current wall-clock seconds from the controller's lifecycle-stable clock. */
-    private fun nowSeconds(): ULong = (clockMillis() / 1000L).toULong()
-
     init {
         if (startOnConstruction) start()
     }
@@ -9910,15 +4918,15 @@ class ConversationController(
         // Synthetic `direction` for debug rows: anything other than "received"
         // keeps them out of unread counts (firstUnreadReceivedIndex /
         // countUnreadIncoming only tally "received" rows).
-        private const val STREAM_DEBUG_DIRECTION = "debug"
+        internal const val STREAM_DEBUG_DIRECTION = "debug"
 
         // Sentinel kind for debug-row synthetic records. ULong.MAX_VALUE is not a
         // real Nostr kind; these records are identified by their id prefix and
         // never round-trip to the engine, so the value is display-only.
-        private const val STREAM_DEBUG_KIND: ULong = ULong.MAX_VALUE
+        internal const val STREAM_DEBUG_KIND: ULong = ULong.MAX_VALUE
 
         // Cap retained transient debug rows while the toggle stays on, oldest-first.
-        private const val MAX_STREAM_DEBUG_ROWS = 200
+        internal const val MAX_STREAM_DEBUG_ROWS = 200
 
         /**
          * 32 MiB cap on retained compressed bytes for in-flight/failed

@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.setEnabled
 import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
 import kotlinx.coroutines.runBlocking

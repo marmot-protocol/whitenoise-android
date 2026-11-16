@@ -1,0 +1,58 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Over-limit dictation sent with no conversation open is refused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt",
+        "anchor": "R.string.toast_message_too_long",
+        "test_ids": [
+          "MSG-048"
+        ]
+      },
+      {
+        "surface": "string:toast_forward_batch_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt",
+        "anchor": "R.string.toast_forward_batch_failed",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "string:toast_forwarded_batch_partial",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt",
+        "anchor": "R.string.toast_forwarded_batch_partial",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "string:toast_forwarded_partial",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt",
+        "anchor": "R.string.toast_forwarded_partial",
+        "test_ids": [
+          "MSG-011"
+        ]
+      },
+      {
+        "surface": "string:toast_forwarded_to_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt",
+        "anchor": "R.string.toast_forwarded_to_chats",
+        "test_ids": [
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "string:toast_forward_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt",
+        "anchor": "R.string.toast_forward_failed",
+        "test_ids": [
+          "MSG-010",
+          "MSG-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
+import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
@@ -214,6 +215,19 @@ class MainActivity : AppCompatActivity() {
             }).also(AndroidFramePerformanceReporter::start)
     }
 
+    private fun syncSystemBarsAndHostReadiness(darkTheme: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !darkTheme
+        controller.isAppearanceLightNavigationBars = !darkTheme
+        if (!fontsHostReadyRecorded) {
+            fontsHostReadyRecorded = true
+            appState.recordHostPerformanceSince(HostPerformanceOperationFfi.FONTS_INIT, activityCreatedAtElapsedMs)
+        }
+        if (appState.phase == AppPhase.Ready) {
+            foregroundHostReady.success()
+        }
+    }
+
     private fun installComposeContent() {
         setContent {
             val state = remember { appState }
@@ -228,21 +242,7 @@ class MainActivity : AppCompatActivity() {
                 applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
-            SideEffect {
-                val controller = WindowCompat.getInsetsController(window, window.decorView)
-                controller.isAppearanceLightStatusBars = !darkTheme
-                controller.isAppearanceLightNavigationBars = !darkTheme
-                if (!fontsHostReadyRecorded) {
-                    fontsHostReadyRecorded = true
-                    state.recordHostPerformanceSince(
-                        HostPerformanceOperationFfi.FONTS_INIT,
-                        activityCreatedAtElapsedMs,
-                    )
-                }
-                if (state.phase == AppPhase.Ready) {
-                    foregroundHostReady.success()
-                }
-            }
+            SideEffect { syncSystemBarsAndHostReadiness(darkTheme) }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
@@ -250,30 +250,32 @@ class MainActivity : AppCompatActivity() {
                 fontScale = state.fontScale.factor,
                 appFont = state.appFont,
             ) {
-                WhiteNoiseApp(
-                    appState = state,
-                    mainShellStateHolder = mainShellStateHolder,
-                    warmResumeTraceToken = warmResumeTraceToken,
-                    warmResumeEpoch = warmResumeEpoch,
-                    inboundProfilePayload = inboundProfilePayload,
-                    onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
-                    inboundNotificationTarget = inboundNotificationTarget,
-                    inboundNotificationRequestId = inboundNotificationRequestId,
-                    onNotificationTargetHandled = ::handleNotificationTarget,
-                    inboundShareRequest = inboundShareRequest,
-                    onShareRequestHandled = ::handleShareRequest,
-                    onChatLinkResolved = { handled, target ->
-                        if (handled != null && intent?.dataString == handled) {
-                            setIntent(Intent(this@MainActivity, MainActivity::class.java))
-                        }
-                        if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
-                    },
-                    inboundAppUpdateTap = inboundAppUpdateTap,
-                    onAppUpdateTapHandled = { handled ->
-                        if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
-                    },
-                    onRequestAppUnlock = ::requestAppUnlock,
-                )
+                ProvideWindowLayout {
+                    WhiteNoiseApp(
+                        appState = state,
+                        mainShellStateHolder = mainShellStateHolder,
+                        warmResumeTraceToken = warmResumeTraceToken,
+                        warmResumeEpoch = warmResumeEpoch,
+                        inboundProfilePayload = inboundProfilePayload,
+                        onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
+                        inboundNotificationTarget = inboundNotificationTarget,
+                        inboundNotificationRequestId = inboundNotificationRequestId,
+                        onNotificationTargetHandled = ::handleNotificationTarget,
+                        inboundShareRequest = inboundShareRequest,
+                        onShareRequestHandled = ::handleShareRequest,
+                        onChatLinkResolved = { handled, target ->
+                            if (handled != null && intent?.dataString == handled) {
+                                setIntent(Intent(this@MainActivity, MainActivity::class.java))
+                            }
+                            if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
+                        },
+                        inboundAppUpdateTap = inboundAppUpdateTap,
+                        onAppUpdateTapHandled = { handled ->
+                            if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
+                        },
+                        onRequestAppUnlock = ::requestAppUnlock,
+                    )
+                }
             }
         }
     }
@@ -325,10 +327,10 @@ class MainActivity : AppCompatActivity() {
                     phase = appState.phase,
                     activeAccountRef = appState.activeAccountRef,
                     runtimeGeneration = appState.runtimeGeneration,
-                    appLockScreenVisible = appState.appLockScreenVisible,
+                    appLockScreenVisible = appState.appLock.screenVisible,
                 )
             val pendingShareFirstFrameReady =
-                if (mainShellStateHolder.hasPendingShareRoute && !appState.appLockScreenVisible) {
+                if (mainShellStateHolder.hasPendingShareRoute && !appState.appLock.screenVisible) {
                     val directGroupId =
                         if (appState.phase == AppPhase.Ready) {
                             mainShellStateHolder.visibleShareDirectGroupId(
@@ -488,7 +490,7 @@ class MainActivity : AppCompatActivity() {
             // the Activity restarted, so settle directly at the lifecycle boundary in that case.
             foregroundHostReady.successIf(appState.phase == AppPhase.Ready)
             applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
-            if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
+            if (!appState.appLock.screenVisible) releaseAppLockBackgroundSecureFlag()
         }
     }
 
@@ -503,12 +505,12 @@ class MainActivity : AppCompatActivity() {
         // The 12/24-hour switch and phone region can change while the app is in the background.
         DateTimeFormatState.refreshSystem(this)
         if (::appState.isInitialized) {
-            appState.appUnlockSessions.clearForegroundReturn()
+            appState.appLock.sessions.clearForegroundReturn()
             if (foregroundConversationDismissal.consumeShouldDismissOnResume()) {
                 appState.dismissRetainedVisibleConversationNotifications()
             }
             applyRecentsPreferenceSecureFlag(appState.allowChatScreenshotsInChats)
-            if (!appState.appLockScreenVisible) releaseAppLockBackgroundSecureFlag()
+            if (!appState.appLock.screenVisible) releaseAppLockBackgroundSecureFlag()
         }
     }
 
@@ -556,8 +558,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestAppUnlock() {
-        if (!::appState.isInitialized || !appState.appLockScreenVisible) return
-        val sessionId = appState.appUnlockSessions.activeSessionId
+        if (!::appState.isInitialized || !appState.appLock.screenVisible) return
+        val sessionId = appState.appLock.sessions.activeSessionId
         // A replacement Activity constructs BiometricPrompt early so AndroidX
         // reconnects this callback to its retained prompt. Never call
         // authenticate() a second time for that same logical session.
@@ -565,10 +567,10 @@ class MainActivity : AppCompatActivity() {
             sessionId != null &&
                 attachedAppUnlockSessionId == sessionId &&
                 attachedAppUnlockHostId == appUnlockHostId &&
-                appState.appUnlockSessions.owns(sessionId, appUnlockHostId)
+                appState.appLock.sessions.owns(sessionId, appUnlockHostId)
         if (sessionId == null || alreadyAttached) return
         if (
-            appState.appUnlockSessions.attachHost(
+            appState.appLock.sessions.attachHost(
                 sessionId = sessionId,
                 hostId = appUnlockHostId,
                 replaceExistingHost = false,
@@ -601,13 +603,13 @@ class MainActivity : AppCompatActivity() {
             appUnlockPrompt.authenticate(promptInfo, cryptoObject)
         }.onFailure {
             if (
-                appState.appUnlockSessions.terminate(
+                appState.appLock.sessions.terminate(
                     sessionId = sessionId,
                     hostId = appUnlockHostId,
                 )
             ) {
                 appUnlockPromptHostState.clear()
-                appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_unavailable))
+                appState.appLock.markUnlockFailed(AppText.Resource(R.string.app_lock_auth_unavailable))
                 attachedAppUnlockSessionId = null
                 attachedAppUnlockHostId = null
                 traceAppUnlock(sessionId, "prompt-launch-error")
@@ -622,14 +624,14 @@ class MainActivity : AppCompatActivity() {
         // logical session and launches one new prompt under the opaque cover.
         var abandonedSession = false
         val reattachedSessionId =
-            appState.appUnlockSessions.activeSessionId?.takeIf { sessionId ->
+            appState.appLock.sessions.activeSessionId?.takeIf { sessionId ->
                 if (
                     shouldReattachAppUnlockPrompt(
                         hasActiveSession = true,
-                        hasAttachedHost = appState.appUnlockSessions.hasAttachedHost,
+                        hasAttachedHost = appState.appLock.sessions.hasAttachedHost,
                         retainedHostSessionMatches = appUnlockPromptHostState.sessionId == sessionId,
                     ) &&
-                    appState.appUnlockSessions.attachHost(
+                    appState.appLock.sessions.attachHost(
                         sessionId = sessionId,
                         hostId = appUnlockHostId,
                         replaceExistingHost = true,
@@ -639,7 +641,7 @@ class MainActivity : AppCompatActivity() {
                     attachedAppUnlockHostId = appUnlockHostId
                     true
                 } else {
-                    appState.appUnlockSessions.clear()
+                    appState.appLock.sessions.clear()
                     appUnlockPromptHostState.clear()
                     abandonedSession = true
                     traceAppUnlock(sessionId, "prompt-not-retained")
@@ -653,7 +655,7 @@ class MainActivity : AppCompatActivity() {
             )
         reattachedSessionId?.let { sessionId -> traceAppUnlock(sessionId, "prompt-reattached") }
         if (abandonedSession) {
-            appState.requestAppUnlock()
+            appState.appLock.requestUnlock()
             requestAppUnlock()
         }
     }
@@ -668,27 +670,27 @@ class MainActivity : AppCompatActivity() {
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     if (sessionId == null || hostId == null) return
-                    if (!appState.appUnlockSessions.owns(sessionId, hostId)) {
+                    if (!appState.appLock.sessions.owns(sessionId, hostId)) {
                         traceAppUnlock(sessionId, "stale-success-ignored")
                     } else {
                         val expectedCipher = appUnlockPromptHostState.expectedCipher
                         appUnlockPromptHostState.expectedCipher = null
                         if (!appUnlockCryptoGate.verify(result, expectedCipher)) {
                             if (
-                                appState.appUnlockSessions.terminate(
+                                appState.appLock.sessions.terminate(
                                     sessionId = sessionId,
                                     hostId = hostId,
                                 )
                             ) {
                                 appUnlockPromptHostState.clear()
-                                appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
+                                appState.appLock.markUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
                                 attachedAppUnlockSessionId = null
                                 attachedAppUnlockHostId = null
                                 traceAppUnlock(sessionId, "prompt-crypto-failed")
                             }
                         } else {
                             val accepted =
-                                appState.appUnlockSessions.complete(
+                                appState.appLock.sessions.complete(
                                     sessionId = sessionId,
                                     hostId = hostId,
                                     foregroundReturnExpiresAtElapsedRealtime =
@@ -699,7 +701,7 @@ class MainActivity : AppCompatActivity() {
                                 )
                             if (accepted) {
                                 appUnlockPromptHostState.clear()
-                                appState.markAppUnlockSucceeded(
+                                appState.appLock.markUnlockSucceeded(
                                     dismissRetainedVisibleConversation =
                                         foregroundConversationDismissal.shouldDismissAfterUnlock(),
                                 )
@@ -718,9 +720,9 @@ class MainActivity : AppCompatActivity() {
                     sessionId ?: return
                     hostId ?: return
                     if (
-                        appState.appUnlockSessions.owns(sessionId, hostId)
+                        appState.appLock.sessions.owns(sessionId, hostId)
                     ) {
-                        appState.markAppUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
+                        appState.appLock.markUnlockFailed(AppText.Resource(R.string.app_lock_auth_failed))
                         traceAppUnlock(sessionId, "prompt-attempt-failed")
                     }
                 }
@@ -732,13 +734,13 @@ class MainActivity : AppCompatActivity() {
                     sessionId ?: return
                     hostId ?: return
                     if (
-                        appState.appUnlockSessions.terminate(
+                        appState.appLock.sessions.terminate(
                             sessionId = sessionId,
                             hostId = hostId,
                         )
                     ) {
                         appUnlockPromptHostState.clear()
-                        appState.markAppUnlockFailed(appLockAuthErrorMessage(errorCode, errString))
+                        appState.appLock.markUnlockFailed(appLockAuthErrorMessage(errorCode, errString))
                         attachedAppUnlockSessionId = null
                         attachedAppUnlockHostId = null
                         traceAppUnlock(sessionId, "prompt-terminated")
@@ -792,7 +794,7 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun retainAppLockBackgroundSecureFlagIfNeeded() {
-        if (!::appState.isInitialized || !appState.shouldSecureAppLockWindowWhileBackgrounded()) return
+        if (!::appState.isInitialized || !appState.appLock.shouldSecureWindowWhileBackgrounded()) return
         // Recents snapshots are captured while the activity is pausing/stopping,
         // before Compose can draw the app-lock surface on the next foreground.
         if (!appLockBackgroundSecureFlagRetained) {

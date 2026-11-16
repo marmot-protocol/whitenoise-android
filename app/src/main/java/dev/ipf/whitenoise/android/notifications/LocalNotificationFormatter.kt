@@ -205,13 +205,38 @@ object LocalNotificationFormatter {
     /**
      * The notification sub-text naming which signed-in identity received the
      * event, or null. Shown only when more than one signed-in identity is
-     * relevant to this conversation; unrelated local accounts do not make the
-     * event ambiguous. Blank labels are dropped.
+     * relevant, and blank labels are dropped. For a group invite every
+     * signed-in account counts, since the receiving account is usually the
+     * group's only local member. For other events unrelated local accounts do
+     * not make the event ambiguous.
      */
     fun recipientAccountSubtext(
         relevantSignedInAccountCount: Int,
         recipientLabel: String?,
     ): String? = recipientLabel?.takeIf { it.isNotBlank() && relevantSignedInAccountCount > 1 }
+
+    /**
+     * Name-only content (#3659): names, titles and pictures stay, while a message or reaction loses its text and
+     * emoji. Invites and role changes carry no message content and are unchanged.
+     */
+    fun nameOnlyContent(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        context: Context?,
+    ): LocalNotificationContent =
+        if (contentKind(update) != ContentKind.MESSAGE) {
+            content
+        } else {
+            content.copy(
+                body =
+                    if (isReaction(update)) {
+                        text(context, R.string.notification_reacted_hidden, "reacted to a message")
+                    } else {
+                        text(context, R.string.notification_new_message, "New message")
+                    },
+                reactionArtworkBody = null,
+            )
+        }
 
     /** Hidden-preview content: the app name replaces every sender and title, and no artwork body survives. */
     fun redactedContent(
