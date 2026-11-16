@@ -11,10 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -44,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.openMarkdownLink
 import kotlinx.coroutines.Dispatchers
@@ -204,32 +204,22 @@ internal fun DocumentViewerFrame(
                         )
                     }
 
-                    DropdownMenu(expanded = more, onDismissRequest = { more = false }, containerColor = Color.Black) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.save),
-                                    color = Color.White,
-                                )
-                            },
-                            onClick = {
-                                more = false
-                                onSave()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    stringResource(R.string.text_attachment_open_external),
-                                    color = Color.White,
-                                )
-                            },
-                            onClick = {
-                                more = false
-                                onOpenExternal()
-                            },
-                        )
-                    }
+                    WhiteNoiseDropdownMenu(
+                        expanded = more,
+                        onDismissRequest = { more = false },
+                        items =
+                            listOf(
+                                WhiteNoiseMenuItem(
+                                    label = stringResource(R.string.save),
+                                    icon = R.drawable.ic_download,
+                                    onClick = onSave,
+                                ),
+                                WhiteNoiseMenuItem(
+                                    label = stringResource(R.string.text_attachment_open_external),
+                                    onClick = onOpenExternal,
+                                ),
+                            ),
+                    )
                 }
             }
             if (kind == DocumentAttachmentKind.Html) {
@@ -275,7 +265,7 @@ internal fun DocumentSource(
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .fadingVerticalScroll(rememberScrollState())
             .padding(16.dp)
             .textAttachmentSelectionLongPress(preview, selection::requestSelection),
     ) {
