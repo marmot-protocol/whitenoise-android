@@ -34,12 +34,13 @@ data class RemoteGiphyMedia(
     )
 
     /** Encodes the same attributed message that the iOS composer sends. */
-    fun wireText(): String = buildString {
-        append(url)
-        append('\n')
-        append(ATTRIBUTION_PREFIX)
-        attribution?.let { append(CREATOR_SEPARATOR).append(it) }
-    }
+    fun wireText(): String =
+        buildString {
+            append(url)
+            append('\n')
+            append(ATTRIBUTION_PREFIX)
+            attribution?.let { append(CREATOR_SEPARATOR).append(it) }
+        }
 
     companion object {
         const val MAX_WIRE_TEXT_LENGTH = 2304

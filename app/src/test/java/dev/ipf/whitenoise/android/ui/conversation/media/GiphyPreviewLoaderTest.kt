@@ -71,6 +71,9 @@ class GiphyPreviewLoaderTest {
         return drawable
     }
 
-    private fun pixels(color: Int): Bitmap =
-        Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
+    private fun pixels(color: Int): Bitmap {
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(color)
+        return bitmap
+    }
 }

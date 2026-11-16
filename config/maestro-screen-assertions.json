@@ -1247,6 +1247,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
+      "symbol": "GiphySearchSheet",
+      "bindings": [],
+      "remaining": "Use an Android build with GIPHY configured to open Search GIFs from the composer. Verify the privacy disclosure, debounced search, playback before selection, retry, and dismissal during a request under MED-054."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
       "symbol": "PendingStatusOverlay",
       "bindings": [

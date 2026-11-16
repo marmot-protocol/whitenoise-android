@@ -127,7 +127,16 @@ private class GiphyPreviewFrameCallback(
         updates.trySend(Unit)
     }
 
-    override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) = Unit
+    /** The isolated animation session owns the frame clock. */
+    override fun scheduleDrawable(
+        who: Drawable,
+        what: Runnable,
+        `when`: Long,
+    ) = Unit
 
-    override fun unscheduleDrawable(who: Drawable, what: Runnable) = Unit
+    /** The sampler registers no callbacks with a host scheduler. */
+    override fun unscheduleDrawable(
+        who: Drawable,
+        what: Runnable,
+    ) = Unit
 }

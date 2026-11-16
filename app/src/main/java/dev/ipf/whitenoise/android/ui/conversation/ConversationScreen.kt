@@ -5478,7 +5478,8 @@ internal fun ConversationScreen(
                     if (giphySearchOpen) {
                         giphySearchOpen = false
                         appState.launchMutation {
-                            if (controller.ownsRetainedForegroundPresentation && controller.canSendMessages &&
+                            if (controller.ownsRetainedForegroundPresentation &&
+                                controller.canSendMessages &&
                                 controller.editingMessageId == null
                             ) {
                                 controller.send(wireText, onAccepted = { revealSentMessage() })

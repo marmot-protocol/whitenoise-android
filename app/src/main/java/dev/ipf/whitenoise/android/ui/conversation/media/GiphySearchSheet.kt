@@ -349,7 +349,8 @@ private fun rememberGiphySearchPreview(
     loader: GiphyPreviewLoader,
     visible: Boolean,
 ): GiphyPreviewState {
-    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow
+        .collectAsState()
     val foreground = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
     val active = visible && foreground && LocalWindowInfo.current.isWindowFocused
     val state = remember(result.media, active) { mutableStateOf<GiphyPreviewState>(GiphyPreviewState.Loading) }

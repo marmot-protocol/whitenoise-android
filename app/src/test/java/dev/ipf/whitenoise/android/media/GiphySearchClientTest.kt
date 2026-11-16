@@ -98,6 +98,8 @@ class GiphySearchClientTest {
             .put("height", "120")
             .put("size", size)
 
-    private fun response(vararg items: JSONObject): String =
-        JSONObject().put("data", JSONArray(items.toList())).toString()
+    private fun response(vararg items: JSONObject): String {
+        val data = JSONArray(items.toList())
+        return JSONObject().put("data", data).toString()
+    }
 }
