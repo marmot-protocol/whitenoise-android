@@ -3255,6 +3255,38 @@ class ConversationDictationControllerTest {
         }
     }
 
+    /** Elapsed authorization expires even while the Handler timeout cannot run during device sleep. */
+    @Test
+    fun settingsRecoveryChecksElapsedExpiryBeforeCaptureAndAfterUnlock() {
+        for (lockedReturn in listOf(false, true)) {
+            for (elapsed in listOf(29_999L, 30_000L, 30_001L)) {
+                var locked = false
+                val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
+                val draft = TextFieldValue("Keep", TextRange(2))
+                val f = fixture(draft = draft, platform = platform, appLocked = { locked })
+                f.controller.requestStart(ACCOUNT, GROUP, draft)
+                f.controller.resumeAfterMicrophoneSettings()
+                f.controller.onMicrophoneHostPaused()
+                f.controller.onAppBackgrounded()
+                platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+                if (lockedReturn) {
+                    locked = true
+                    f.controller.onAppForegrounded()
+                    f.controller.onMicrophoneHostResumed()
+                    assertFalse(platform.session.started)
+                    assertNotNull(f.controller.microphoneSettingsRecovery)
+                }
+                f.scheduler.sleepWithoutDispatch(elapsed)
+                locked = false
+                f.controller.onAppForegrounded()
+                f.controller.onMicrophoneHostResumed()
+                assertEquals(elapsed < 30_000L, platform.session.started)
+                assertNull(f.controller.microphoneSettingsRecovery)
+                assertEquals(draft, f.drafts.getValue(key()))
+            }
+        }
+    }
+
     @Test
     fun returningFromMicrophoneSettingsStartsOnceOnlyAfterAccessIsRestored() {
         val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)

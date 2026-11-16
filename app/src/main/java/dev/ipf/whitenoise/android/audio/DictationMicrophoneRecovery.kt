@@ -8,6 +8,7 @@ private const val MICROPHONE_UNBLOCK_TIMEOUT_MS = 30_000L
 internal class DictationMicrophoneRecovery(
     val failure: ConversationDictationState.Failed,
     val native: Boolean,
+    val expiresAtElapsedRealtime: Long,
     var resumed: Boolean = true,
 ) {
     var dispatched = false
@@ -40,7 +41,13 @@ internal fun ConversationDictationController.armMicrophoneSettingsRecovery(nativ
         return
     }
     clearMicrophoneRecovery()
-    val pending = DictationMicrophoneRecovery(failed, native = native, resumed = microphoneHostReady())
+    val pending =
+        DictationMicrophoneRecovery(
+            failed,
+            native = native,
+            expiresAtElapsedRealtime = elapsedRealtime() + MICROPHONE_UNBLOCK_TIMEOUT_MS,
+            resumed = microphoneHostReady(),
+        )
     microphoneSettingsRecovery = pending
     pending.timeout =
         scheduleTimeout(MICROPHONE_UNBLOCK_TIMEOUT_MS) {
@@ -50,6 +57,10 @@ internal fun ConversationDictationController.armMicrophoneSettingsRecovery(nativ
 
 internal fun ConversationDictationController.resumeMicrophoneSettingsRecovery(): Boolean {
     val pending = microphoneSettingsRecovery ?: return false
+    if (elapsedRealtime() >= pending.expiresAtElapsedRealtime) {
+        clearMicrophoneRecovery()
+        return false
+    }
     return when {
         !pending.resumed -> true
         else -> {
@@ -95,6 +106,10 @@ internal fun ConversationDictationController.requestNativeMicrophoneUnblock(
 }
 
 private fun ConversationDictationController.dispatchNativeMicrophoneUnblock(pending: DictationMicrophoneRecovery) {
+    if (elapsedRealtime() >= pending.expiresAtElapsedRealtime) {
+        clearMicrophoneRecovery()
+        return
+    }
     if (pending.dispatched || !pending.resumed) return
     if (!microphoneHostReady() || !microphoneRecoveryAllowed()) return
     if (platform.microphoneAccess() == ConversationDictationMicrophoneAccess.Granted) {
