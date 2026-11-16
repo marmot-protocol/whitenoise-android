@@ -107,12 +107,9 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
-import dev.ipf.whitenoise.android.media.AndroidKeystoreDiskByteCacheKeyProvider
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
-import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaThumbnail
-import dev.ipf.whitenoise.android.media.PersistentDisplayThumbnails
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
@@ -794,39 +791,9 @@ class WhiteNoiseAppState private constructor(
         return (mediaPlaintextCache.keysSnapshot() + mediaThumbnailCache.keysSnapshot()).toSet()
     }
 
-    /**
-     * Persistent (L2) cache of decrypted attachment bytes. Survives process
-     * restart so re-opening a chat after a kill doesn't re-download every
-     * visible image. Sits behind [mediaPlaintextCache] (L1):
-     *
-     *   L1 hit → return
-     *   L2 hit → hydrate L1, return
-     *   miss   → FFI download, store in both
-     *
-     * Lives in `cacheDir/decrypted-media/` — Android's not-backed-up cache
-     * surface, encrypted with a Keystore-backed AES-GCM key. Sign-out wipes it
-     * alongside L1 so account A's decrypted media doesn't linger after switch.
-     */
-    internal val diskMediaCache =
-        DiskByteCache(
-            cacheDir = java.io.File(appContext.cacheDir, "decrypted-media"),
-            maxBytes = DISK_MEDIA_CACHE_MAX_BYTES,
-            maxEntryBytes = DISK_MEDIA_CACHE_MAX_ENTRY_BYTES,
-            maxInMemoryEntryBytes = MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES,
-            keyProvider = AndroidKeystoreDiskByteCacheKeyProvider(),
-            onMutation = ::bumpMediaCacheRevision,
-        )
-
-    /** Derivatives have their own encrypted namespace and never satisfy original-availability probes. */
-    internal val displayThumbnails =
-        PersistentDisplayThumbnails(
-            DiskByteCache(
-                cacheDir = java.io.File(appContext.cacheDir, "display-thumbnails-v1"),
-                maxBytes = PersistentDisplayThumbnails.MAX_BYTES,
-                maxEntryBytes = PersistentDisplayThumbnails.MAX_ENTRY_BYTES.toLong(),
-                keyProvider = AndroidKeystoreDiskByteCacheKeyProvider("whitenoise.display_thumbnails.aes_gcm.v1"),
-            ),
-        )
+    /** Encrypted retained originals, separate from the bounded display derivatives. */
+    internal val diskMediaCache = createOriginalMediaCache(appContext, ::bumpMediaCacheRevision)
+    internal val displayThumbnails = createDisplayThumbnailCache(appContext)
 
     /** Serializes presentation-owned encoders whose queued bitmap references are weak and cancellable. */
     internal val displayThumbnailWritePermit = kotlinx.coroutines.sync.Semaphore(1)
