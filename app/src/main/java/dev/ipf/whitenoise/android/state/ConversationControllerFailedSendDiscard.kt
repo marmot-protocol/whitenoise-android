@@ -102,6 +102,6 @@ private suspend fun ConversationController.purgeDiscardedSendMedia(
     ciphertextSha256: List<String>,
 ) {
     removeMediaMemoryCacheKeys(cacheKeys, Dispatchers.Main.immediate, appState::removeMediaMemoryCacheEntry)
-    withContext(Dispatchers.IO) { cacheKeys.forEach { appState.diskMediaCache.remove(it) } }
+    withContext(Dispatchers.IO) { cacheKeys.forEach { appState.removeMediaDiskCacheEntry(it) } }
     evictExpiredMediaCaches(account, ciphertextSha256.mapTo(mutableSetOf()) { it.lowercase() })
 }
