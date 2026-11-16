@@ -361,7 +361,7 @@ class SettingsContourMorphTest {
         }
     }
 
-    @Test fun returningFrozenGroupsKeepTheirAvailableNativeKeysBeforeChoosingNearestSurplus() {
+    @Test fun returningFrozenGroupsKeepNativeKeysBeforeNearestSurplus() {
         val source = home()
         val frozen = sample(source, listOf(dividedGroup(90f, 2, 3)), 0.75f)
         val visible = frozen.filter { !it.bounds.intersect(viewport).isEmpty }

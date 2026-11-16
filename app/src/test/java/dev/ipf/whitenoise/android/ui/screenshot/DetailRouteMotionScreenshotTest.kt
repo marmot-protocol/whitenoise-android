@@ -806,25 +806,33 @@ class DetailRouteMotionScreenshotTest {
                 middle.sameAs(checkNotNull(settled)),
             )
             if (name.startsWith("composer_") && name.endsWith("_entry")) {
-                // The real route header must already occupy its final coordinates at native opacity.
-                // Compare raster ink, not only layout bounds, so an alpha/translation regression fails.
-                val title =
-                    rule
-                        .onNodeWithText(app.getString(R.string.composer_settings), useUnmergedTree = true)
-                        .fetchSemanticsNode()
-                        .boundsInRoot
-                val left = title.left.toInt().coerceAtLeast(0)
-                val top = title.top.toInt().coerceAtLeast(0)
-                val width = title.width.toInt().coerceAtMost(middle.width - left)
-                val height = title.height.toInt().coerceAtMost(middle.height - top)
-                org.junit.Assert.assertTrue(
-                    "$name must preserve opaque native header ink in place",
-                    Bitmap.createBitmap(middle, left, top, width, height).sameAs(
-                        Bitmap.createBitmap(checkNotNull(settled), left, top, width, height),
-                    ),
-                )
+                assertNativeComposerHeader(name, middle, checkNotNull(settled))
             }
         }
+    }
+
+    private fun assertNativeComposerHeader(
+        name: String,
+        middle: Bitmap,
+        settled: Bitmap,
+    ) {
+        // The real route header must already occupy its final coordinates at native opacity.
+        // Compare raster ink, not only layout bounds, so an alpha/translation regression fails.
+        val title =
+            rule
+                .onNodeWithText(app.getString(R.string.composer_settings), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val left = title.left.toInt().coerceAtLeast(0)
+        val top = title.top.toInt().coerceAtLeast(0)
+        val width = title.width.toInt().coerceAtMost(middle.width - left)
+        val height = title.height.toInt().coerceAtMost(middle.height - top)
+        org.junit.Assert.assertTrue(
+            "$name must preserve opaque native header ink in place",
+            Bitmap.createBitmap(middle, left, top, width, height).sameAs(
+                Bitmap.createBitmap(settled, left, top, width, height),
+            ),
+        )
     }
 
     /**
