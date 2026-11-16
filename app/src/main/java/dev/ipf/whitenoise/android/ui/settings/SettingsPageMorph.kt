@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
@@ -524,19 +523,13 @@ internal class SettingsPageMorph {
         contours.forEach { drawContourFill(it, host) }
         // One live display-list invocation: the fixed header and, after handoff, clipped body.
         val live =
-            Path().apply {
-                addRect(Rect(Offset.Zero, size))
-                op(this, bodyCoverage, PathOperation.Difference)
-                if (incomingPresence(time) > 0f) {
-                    val incoming =
-                        Path().apply {
-                            if (geometryFraction(time) >= CONTENT_HANDOFF_FRACTION) addPath(unoutlinedBodyMask)
-                            val outlined = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
-                            op(this, outlined, PathOperation.Union)
-                        }
-                    op(this, incoming, PathOperation.Union)
-                }
-            }
+            Rect(Offset.Zero, size).nativeLiveBodyMask(
+                bodyCoverage,
+                bodyMask,
+                interiors,
+                unoutlinedBodyMask.takeIf { entryStart > 0f || geometryFraction(time) >= CONTENT_HANDOFF_FRACTION },
+                incomingPresence(time) > 0f,
+            )
         clipPath(live) {
             clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
         }
@@ -567,47 +560,6 @@ internal class SettingsPageMorph {
         }
     }
 
-    private fun SettingsContour.drawnCorners(host: Rect): RoundRect {
-        val b = bounds.translate(-host.topLeft)
-        return RoundRect(
-            b.left,
-            b.top,
-            b.right,
-            b.bottom,
-            corners.topLeftCornerRadius,
-            corners.topRightCornerRadius,
-            corners.bottomRightCornerRadius,
-            corners.bottomLeftCornerRadius,
-        )
-    }
-
-    /** Current rounded interiors own body visibility; native viewport/header clipping stays stationary. */
-    private fun movingBodyMask(
-        contours: List<SettingsContour>,
-        host: Rect,
-    ): Path =
-        Path().apply {
-            contours.forEach { contour ->
-                if (!contour.bounds.isEmpty) {
-                    val rounded = Path().apply { addRoundRect(contour.drawnCorners(host)) }
-                    val viewport = Path().apply { addRect(contour.viewport.intersect(host).translate(-host.topLeft)) }
-                    rounded.op(rounded, viewport, PathOperation.Intersect)
-                    addPath(rounded)
-                }
-            }
-        }
-
-    private fun DrawScope.drawContourFill(
-        contour: SettingsContour,
-        host: Rect,
-    ) {
-        if (!contour.fill.isSpecified || contour.bounds.isEmpty) return
-        val viewport = contour.viewport.intersect(host).translate(-host.topLeft)
-        clipRect(viewport.left, viewport.top, viewport.right, viewport.bottom) {
-            drawPath(Path().apply { addRoundRect(contour.drawnCorners(host)) }, contour.fill)
-        }
-    }
-
     /** Cross-window presentation uses the same native contour batch and exclusive stroke mask. */
     fun ContentDrawScope.drawExternal(
         source: SettingsContour,
@@ -627,6 +579,7 @@ internal class SettingsPageMorph {
             mask = nativeChromeMask(native, host)
             bodyMask = nativeBodyMask(native, host)
             bodyCoverage = measuredBodyCoverage(native, host)
+            unoutlinedBodyMask = Path().apply { op(bodyCoverage, bodyMask, PathOperation.Difference) }
             externalSource = source
             externalPairs =
                 matchSettingsContours(
@@ -651,19 +604,13 @@ internal class SettingsPageMorph {
         contours.forEach { drawContourFill(it, host) }
         val interiors = movingBodyMask(contours, host)
         val live =
-            Path().apply {
-                addRect(Rect(Offset.Zero, size))
-                op(this, bodyCoverage, PathOperation.Difference)
-                if (presence >= CONTENT_HANDOFF_FRACTION) {
-                    val incoming =
-                        Path().apply {
-                            op(bodyCoverage, nativeBodyMask(native, host), PathOperation.Difference)
-                            val outlined = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
-                            op(this, outlined, PathOperation.Union)
-                        }
-                    op(this, incoming, PathOperation.Union)
-                }
-            }
+            Rect(Offset.Zero, size).nativeLiveBodyMask(
+                bodyCoverage,
+                bodyMask,
+                interiors,
+                unoutlinedBodyMask,
+                presence >= CONTENT_HANDOFF_FRACTION,
+            )
         clipPath(live) {
             clipPath(mask, ClipOp.Difference) { this@drawExternal.drawContent() }
         }

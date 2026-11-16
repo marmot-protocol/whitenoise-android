@@ -761,7 +761,7 @@ class DetailRouteMotionScreenshotTest {
         var settled: Bitmap? = null
         // Only AMOLED cards draw outlines, so only there do details cards visibly fold into the composer.
         val morphs =
-            profile ||
+            (profile && "_light" !in name && "_dark" !in name) ||
                 name.startsWith("composer_") ||
                 name.endsWith("_entry") ||
                 (name.endsWith("_entry_back") && "_light" !in name && "_dark" !in name)
@@ -773,7 +773,7 @@ class DetailRouteMotionScreenshotTest {
                 if (morphs && frame == 6) {
                     intermediate = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
-                if (morphs && frame == 20) {
+                if ((morphs || profile) && frame == 20) {
                     settled = bitmap.copy(Bitmap.Config.ARGB_8888, false)
                 }
                 exportTransitionFrame(frames, name, frame, bitmap)
@@ -787,6 +787,13 @@ class DetailRouteMotionScreenshotTest {
                 }
             }
             rule.mainClock.advanceTimeBy(16)
+        }
+        if (profile) {
+            // Borderless themes hand off their body once; no synthetic contour or dissolve is required.
+            org.junit.Assert.assertFalse(
+                "$name must replace its source body at the destination",
+                checkNotNull(settled).sameAs(transitionSources.getValue(name)),
+            )
         }
         if (morphs) {
             val middle = checkNotNull(intermediate)

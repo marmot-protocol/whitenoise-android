@@ -151,7 +151,7 @@ class LargeGroupInviteWarningUiTest {
                 ContactPickerScreen(
                     appState = reviewState,
                     title = "Add member",
-                    selected = mutableStateListOf(alice, bob),
+                    selected = androidx.compose.runtime.remember { mutableStateListOf(alice, bob) },
                     onBack = {},
                     onConfirm = { submits++ },
                     confirmLabel = "Add members",

@@ -797,7 +797,7 @@ class SettingsPageMorphHostTest {
                     .fillMaxSize()
                     .drawWithContent {
                         host = Rect(0f, 0f, size.width, size.height)
-                        page.reportViewport(viewport, host)
+                        page.reportViewport(viewport, Rect(0f, body.top, host.right, host.bottom))
                         reportUnoutlinedBody(page, viewport, group, body)
                         with(page) { draw(host, time.value, true, Color.Black) }
                     }.drawWithContent { drawRect(if (child.value) Color.Blue else Color.Red) },
@@ -853,7 +853,7 @@ class SettingsPageMorphHostTest {
                     .fillMaxSize()
                     .drawWithContent {
                         host = Rect(0f, 0f, size.width, size.height)
-                        page.reportViewport(viewport, host)
+                        page.reportViewport(viewport, Rect(0f, body.top, host.right, host.bottom))
                         reportUnoutlinedBody(page, viewport, group, body)
                         with(page) { draw(host, time.value, capture, Color.Black) }
                     }.drawWithContent { drawRect(color.value) },

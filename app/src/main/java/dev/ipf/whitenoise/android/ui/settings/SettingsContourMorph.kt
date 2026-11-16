@@ -275,7 +275,7 @@ internal data class SettingsContourPair(
     val key: Int,
 )
 
-/** Maximum-cardinality minimum-distance monotone assignment on either side of the semantic anchor. */
+/** Maximum-cardinality monotone assignment preserves shared keys before minimizing distance. */
 @Suppress("LongMethod", "CyclomaticComplexMethod", "LongParameterList", "NestedBlockDepth")
 internal fun matchSettingsContours(
     source: List<SettingsContour>,
@@ -340,6 +340,7 @@ internal fun matchSettingsContours(
         val small = if (swapped) ys else xs
         val large = if (swapped) xs else ys
         val scores = Array(small.size + 1) { FloatArray(large.size + 1) { Float.POSITIVE_INFINITY } }
+        val sharedKeys = Array(small.size + 1) { IntArray(large.size + 1) }
         val take = Array(small.size + 1) { BooleanArray(large.size + 1) }
         scores[0].fill(0f)
         for (i in 1..small.size) {
@@ -347,8 +348,12 @@ internal fun matchSettingsContours(
                 val x = if (swapped) large[j - 1] else small[i - 1]
                 val y = if (swapped) small[i - 1] else large[j - 1]
                 val paired = scores[i - 1][j - 1] + cost(a[x], b[y])
-                take[i][j] = paired <= scores[i][j - 1]
-                scores[i][j] = min(paired, scores[i][j - 1])
+                // Frozen contours retain their native correspondence even after moving nearer another group.
+                val shared = sharedKeys[i - 1][j - 1] + if (a[x].key == b[y].key) 1 else 0
+                take[i][j] = shared > sharedKeys[i][j - 1] ||
+                    (shared == sharedKeys[i][j - 1] && paired <= scores[i][j - 1])
+                scores[i][j] = if (take[i][j]) paired else scores[i][j - 1]
+                sharedKeys[i][j] = if (take[i][j]) shared else sharedKeys[i][j - 1]
             }
         }
         val result = mutableListOf<Pair<Int, Int>>()

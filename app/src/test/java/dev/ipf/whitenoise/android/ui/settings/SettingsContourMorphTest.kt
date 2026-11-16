@@ -361,6 +361,24 @@ class SettingsContourMorphTest {
         }
     }
 
+    @Test fun returningFrozenGroupsKeepTheirAvailableNativeKeysBeforeChoosingNearestSurplus() {
+        val source = home()
+        val frozen = sample(source, listOf(dividedGroup(90f, 2, 3)), 0.75f)
+        val visible = frozen.filter { !it.bounds.intersect(viewport).isEmpty }
+        val pairs = matchSettingsContours(frozen, source, 3, null, frozen.single { it.key == 3 }.bounds.center, viewport)
+        visible.forEach { contour ->
+            val pair = pairs.single { it.source == contour }
+            assertEquals(contour.key, pair.target.key)
+        }
+        val newlyArriving = pairs.filter { it.target.key == 1 }
+        assertEquals(1, newlyArriving.size)
+        assertTrue(
+            newlyArriving
+                .single()
+                .source.bounds.bottom <= viewport.top,
+        )
+    }
+
     @Test fun frozenFramesRemainOrderedOnReturnAndOnRetargetToAnotherGroup() {
         val source = home()
         val account = listOf(dividedGroup(90f, 2, 3))

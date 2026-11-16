@@ -243,8 +243,9 @@ class SettingsPageMorphTest {
         assertEquals(anchor, start.single().bounds)
         assertEquals(Color.Red, start.single().color)
         assertEquals(2f, start.single().width, 0f)
-        val selectedKey = page.renderedContours(1f).first { it.bounds == first }.key
-        assertTrue(start.single().key != selectedKey)
+        val selectedKey = start.single().key
+        val nativeKey = page.renderedContours(1f).first { it.bounds == first }.key
+        assertTrue(selectedKey != nativeKey)
         for (time in listOf(0.05f, 0.3f, 0.6f, 0.9f)) {
             val frame = page.renderedContours(time)
             val selected = frame.single { it.key == selectedKey }
