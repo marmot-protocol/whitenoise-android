@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.diagnostics
 
+import dev.ipf.whitenoise.android.chatsControllerSource
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,7 +26,7 @@ class PerformanceLogReleaseSafetyTest {
     fun coveredJourneyLogsDoNotExposeKnownDynamicPayloadShapesInRelease() {
         // This pins payload shapes removed by this migration. The exhaustive
         // WNPerf ownership boundary is enforced separately above.
-        val controllers = source("state/ChatsController.kt") + "\n" + source("state/ConversationController.kt")
+        val controllers = chatsControllerSource() + "\n" + conversationControllerSource()
         val appState = source("state/AppState.kt")
         val diskCache = source("media/DiskByteCache.kt")
         val updateWorker = source("updates/AppUpdateWorker.kt")

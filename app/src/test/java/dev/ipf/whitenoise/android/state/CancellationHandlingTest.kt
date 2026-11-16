@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
 import kotlinx.coroutines.runBlocking
@@ -88,7 +89,7 @@ class CancellationHandlingTest {
         assertNotificationIdentityReadPreservesCancellation(appState)
         assertLocalProfileReadUsesExtractedBoundary(appState)
 
-        val controllers = controllersSource().readText()
+        val controllers = conversationControllerSource()
         val unsafeRelayHealth = "runCatching { appState.marmotIo { relayHealth() } }.getOrNull()"
         val safeRelayHealth = "runCatchingCancellable { appState.marmotIo { relayHealth() } }.getOrNull()"
         assertFalse("relay-health fallback must stay migrated", unsafeRelayHealth in controllers)
@@ -150,7 +151,7 @@ class CancellationHandlingTest {
 
     @Test
     fun watchAgentTextStreamKeepsTheStreamLoopInsideCancellationSafeWrapper() {
-        val body = controllersSource().readText().functionBody("watchAgentTextStream")
+        val body = conversationControllerSource().functionBody("watchAgentTextStream")
         val wrapperStart = body.indexOf("runCatchingCancellable {")
         assertTrue("agent stream must use cancellation-safe result handling", wrapperStart >= 0)
 
@@ -182,8 +183,6 @@ class CancellationHandlingTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/$fileName"),
         ).firstOrNull(File::exists)
             ?: error("Missing $fileName source file")
-
-    private fun controllersSource(): File = sourceFile("ConversationController.kt")
 
     private fun appStateSource(): File = sourceFile("AppState.kt")
 

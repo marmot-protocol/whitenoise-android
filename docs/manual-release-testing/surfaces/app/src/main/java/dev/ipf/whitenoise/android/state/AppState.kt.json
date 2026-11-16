@@ -126,15 +126,6 @@
         ]
       },
       {
-        "surface": "incoming-attachment-receipt-scheduling",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "private suspend fun scheduleIncomingAttachmentDownloads(",
-        "test_ids": [
-          "MED-036",
-          "SET-011"
-        ]
-      },
-      {
         "surface": "durable-automatic-attachment-admission",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "private suspend fun awaitAutomaticAttachmentAdmission(",
@@ -252,26 +243,6 @@
         ]
       },
       {
-        "surface": "Notification permission feedback for delivery-mode activation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_notification_permission_needed",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-022"
-        ]
-      },
-      {
-        "surface": "Notification rendering repair failure feedback",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_enable_notifications",
-        "test_ids": [
-          "NTF-001",
-          "NTF-002",
-          "NTF-022"
-        ]
-      },
-      {
         "surface": "DM trace attribution and owner-approved diagnostic export",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "DmCreationDiagnostics.setEnabled(",
@@ -318,39 +289,6 @@
         "anchor": "R.string.toast_couldnt_add_member_duplicate_detail",
         "test_ids": [
           "PRO-005"
-        ]
-      },
-      {
-        "surface": "Deleted or hidden message notification retraction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "fun retractNotificationContent(",
-        "test_ids": [
-          "NTF-043"
-        ]
-      },
-      {
-        "surface": "Restart reconciliation of deleted or read message cards",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "fun requestActiveCardReconciliation(",
-        "test_ids": [
-          "NTF-043",
-          "NTF-044"
-        ]
-      },
-      {
-        "surface": "Read message delayed notification gate",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "fun notificationCandidateGate(",
-        "test_ids": [
-          "NTF-044"
-        ]
-      },
-      {
-        "surface": "Read-state change notification reconciliation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "fun reconcileConversationNotificationCards(",
-        "test_ids": [
-          "NTF-044"
         ]
       },
       {

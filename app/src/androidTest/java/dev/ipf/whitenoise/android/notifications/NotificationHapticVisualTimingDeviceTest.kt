@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.NotificationFirstPostTimingEvent
 import dev.ipf.whitenoise.android.state.NotificationFirstPostTimingStage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.processNotificationUpdateForTest
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals

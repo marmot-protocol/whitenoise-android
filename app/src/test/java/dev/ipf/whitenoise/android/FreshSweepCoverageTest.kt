@@ -165,9 +165,14 @@ class FreshSweepCoverageTest {
 
     @Test
     fun twoStepLeavesAndInviteFailuresStayInsideTheirSafetyBoundaries() {
-        val source = source("state/ChatsController.kt") + "\n" + source("state/ConversationController.kt")
+        val departure = source("state/ChatsControllerDeparture.kt")
+        val source = source("state/ChatsController.kt") + "\n" + conversationControllerSource()
         val chatListLeave =
-            source.section("suspend fun leaveGroup(\n        groupIdHex", "suspend fun deleteGroupLocal")
+            source.section("suspend fun leaveGroup(\n        groupIdHex", "suspend fun deleteGroupLocal") +
+                departure.section(
+                    "suspend fun ChatsController.demoteAndLeaveChat",
+                    "fun ChatsController.chatListDepartureAllowed",
+                )
         val conversationLeave = source.section("suspend fun leaveGroup(displayName", "fun dismissConversationNotifications")
         val accept = source.section("suspend fun acceptInvite", "suspend fun declineInvite")
         val invite = source.section("suspend fun inviteMembers", "suspend fun removeMember")
@@ -176,7 +181,10 @@ class FreshSweepCoverageTest {
         assertTrue(conversationLeave.contains("withContext(NonCancellable)"))
         assertTrue(accept.indexOf("acceptGroupInvite") < accept.indexOf("refreshMembers()"))
         val resolver =
-            source.section("private suspend fun resolveCanonicalInviteRefs", "private fun presentAdminCommitOutcome")
+            source.section(
+                "suspend fun ConversationController.resolveCanonicalInviteRefs",
+                "fun ConversationController.presentAdminCommitOutcome",
+            )
         val guardedResolution = resolver.indexOf("try {")
         assertTrue(guardedResolution >= 0)
         assertTrue(guardedResolution < resolver.indexOf("canonicalGroupInviteRefs("))
@@ -200,8 +208,8 @@ class FreshSweepCoverageTest {
     /** Successful acceptance still settles UI state before best-effort warmup, with account fencing. */
     @Test
     fun acceptInviteAcknowledgesSuccessBeforeLifecycleScopedWarmup() {
-        val body = source("state/ConversationController.kt").kotlinFunctionBody("acceptInvite")
-        val resolution = source("state/ConversationController.kt").kotlinFunctionBody("resolveInviteAcceptance")
+        val body = conversationControllerSource().kotlinFunctionBody("acceptInvite")
+        val resolution = conversationControllerSource().kotlinFunctionBody("resolveInviteAcceptance")
         val optimisticProjection = body.indexOf("group = optimisticGroup")
         val optimisticLocalUpdate = body.indexOf("applyLocalGroupUpdate(optimisticGroup")
         val accept = body.indexOf("resolveInviteAcceptance(attempt)")

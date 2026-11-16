@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
+import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
 import dev.ipf.whitenoise.android.ui.common.retainSecureFlag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
@@ -214,6 +215,19 @@ class MainActivity : AppCompatActivity() {
             }).also(AndroidFramePerformanceReporter::start)
     }
 
+    private fun syncSystemBarsAndHostReadiness(darkTheme: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.isAppearanceLightStatusBars = !darkTheme
+        controller.isAppearanceLightNavigationBars = !darkTheme
+        if (!fontsHostReadyRecorded) {
+            fontsHostReadyRecorded = true
+            appState.recordHostPerformanceSince(HostPerformanceOperationFfi.FONTS_INIT, activityCreatedAtElapsedMs)
+        }
+        if (appState.phase == AppPhase.Ready) {
+            foregroundHostReady.success()
+        }
+    }
+
     private fun installComposeContent() {
         setContent {
             val state = remember { appState }
@@ -228,21 +242,7 @@ class MainActivity : AppCompatActivity() {
                 applyPreComposeWindowBackground(state.themeMode, systemDarkTheme)
                 onDispose { }
             }
-            SideEffect {
-                val controller = WindowCompat.getInsetsController(window, window.decorView)
-                controller.isAppearanceLightStatusBars = !darkTheme
-                controller.isAppearanceLightNavigationBars = !darkTheme
-                if (!fontsHostReadyRecorded) {
-                    fontsHostReadyRecorded = true
-                    state.recordHostPerformanceSince(
-                        HostPerformanceOperationFfi.FONTS_INIT,
-                        activityCreatedAtElapsedMs,
-                    )
-                }
-                if (state.phase == AppPhase.Ready) {
-                    foregroundHostReady.success()
-                }
-            }
+            SideEffect { syncSystemBarsAndHostReadiness(darkTheme) }
             WhiteNoiseTheme(
                 darkTheme = darkTheme,
                 amoled = state.themeMode.isAmoled,
@@ -250,30 +250,32 @@ class MainActivity : AppCompatActivity() {
                 fontScale = state.fontScale.factor,
                 appFont = state.appFont,
             ) {
-                WhiteNoiseApp(
-                    appState = state,
-                    mainShellStateHolder = mainShellStateHolder,
-                    warmResumeTraceToken = warmResumeTraceToken,
-                    warmResumeEpoch = warmResumeEpoch,
-                    inboundProfilePayload = inboundProfilePayload,
-                    onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
-                    inboundNotificationTarget = inboundNotificationTarget,
-                    inboundNotificationRequestId = inboundNotificationRequestId,
-                    onNotificationTargetHandled = ::handleNotificationTarget,
-                    inboundShareRequest = inboundShareRequest,
-                    onShareRequestHandled = ::handleShareRequest,
-                    onChatLinkResolved = { handled, target ->
-                        if (handled != null && intent?.dataString == handled) {
-                            setIntent(Intent(this@MainActivity, MainActivity::class.java))
-                        }
-                        if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
-                    },
-                    inboundAppUpdateTap = inboundAppUpdateTap,
-                    onAppUpdateTapHandled = { handled ->
-                        if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
-                    },
-                    onRequestAppUnlock = ::requestAppUnlock,
-                )
+                ProvideWindowLayout {
+                    WhiteNoiseApp(
+                        appState = state,
+                        mainShellStateHolder = mainShellStateHolder,
+                        warmResumeTraceToken = warmResumeTraceToken,
+                        warmResumeEpoch = warmResumeEpoch,
+                        inboundProfilePayload = inboundProfilePayload,
+                        onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
+                        inboundNotificationTarget = inboundNotificationTarget,
+                        inboundNotificationRequestId = inboundNotificationRequestId,
+                        onNotificationTargetHandled = ::handleNotificationTarget,
+                        inboundShareRequest = inboundShareRequest,
+                        onShareRequestHandled = ::handleShareRequest,
+                        onChatLinkResolved = { handled, target ->
+                            if (handled != null && intent?.dataString == handled) {
+                                setIntent(Intent(this@MainActivity, MainActivity::class.java))
+                            }
+                            if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
+                        },
+                        inboundAppUpdateTap = inboundAppUpdateTap,
+                        onAppUpdateTapHandled = { handled ->
+                            if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
+                        },
+                        onRequestAppUnlock = ::requestAppUnlock,
+                    )
+                }
             }
         }
     }

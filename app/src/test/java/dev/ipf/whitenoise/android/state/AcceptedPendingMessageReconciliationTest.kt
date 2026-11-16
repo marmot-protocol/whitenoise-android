@@ -3,12 +3,12 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class AcceptedPendingMessageReconciliationTest {
     @Test
@@ -113,7 +113,7 @@ class AcceptedPendingMessageReconciliationTest {
 
     @Test
     fun acceptedPendingMediaChecksDiscardBeforeRestoringItsCanonicalBridge() {
-        val source = controllersSource().readText()
+        val source = conversationControllerSource()
         val acceptedPendingBranch =
             source.indexOf("if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING)")
         val discardCheck = source.indexOf("if (discardedDuringRetry.remove(key))", acceptedPendingBranch)
@@ -134,12 +134,6 @@ class AcceptedPendingMessageReconciliationTest {
             "discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)" in discardBlock,
         )
     }
-
-    private fun controllersSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/ConversationController.kt"),
-        ).firstOrNull(File::exists) ?: error("Missing ConversationController.kt source file")
 
     /** Builds a sent message record from alice with the given id. */
     private fun message(id: String): AppMessageRecordFfi =

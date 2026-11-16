@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import dev.ipf.whitenoise.android.chatsControllerSource
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -27,7 +29,7 @@ class MarkReadChatListProjectionTest {
      */
     @Test
     fun markReadUpTo_foldsReturnedChatListRowIntoChatsController() {
-        val source = controllersSource().readText()
+        val source = conversationControllerSource()
         val entry = source.kotlinFunctionBody("markReadUpTo")
         val body = source.kotlinFunctionBody("submitVisibleReadUpTo")
         val fold = source.kotlinFunctionBody("foldVisibleReadRow")
@@ -47,7 +49,7 @@ class MarkReadChatListProjectionTest {
     /** Checks an unchanged display watermark cannot suppress folding an authoritative native read result. */
     @Test
     fun markReadUpTo_successPathDoesNotGateRowFoldOnLastReadMessageId() {
-        val body = controllersSource().readText().kotlinFunctionBody("submitVisibleReadUpTo")
+        val body = conversationControllerSource().kotlinFunctionBody("submitVisibleReadUpTo")
 
         assertFalse(
             "success path must not gate row fold on trimmed != lastReadMessageId",
@@ -149,7 +151,7 @@ class MarkReadChatListProjectionTest {
 
     @Test
     fun markAllRead_foldsReturnedChatListRowIntoChatsController() {
-        val source = controllersSource().resolveSibling("ChatsController.kt").readText()
+        val source = chatsControllerSource()
         val body = source.kotlinFunctionBody("markAllRead")
         val fold = source.kotlinFunctionBody("applyChatListActionRow")
 

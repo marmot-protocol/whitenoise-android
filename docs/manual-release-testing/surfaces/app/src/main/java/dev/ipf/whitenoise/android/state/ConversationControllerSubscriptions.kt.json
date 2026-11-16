@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSubscriptions.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerSubscriptions.kt",
+        "surface": "Retained live timeline consumption during metadata refresh",
+        "anchor": "private suspend fun ConversationController.runConversationSubscriptionIteration(",
+        "test_ids": [
+          "CON-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

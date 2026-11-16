@@ -896,9 +896,11 @@ internal class NotificationBootstrapTestFixture(
 
     /** Replaces only durable push bookkeeping for storage-race tests. */
     fun replacePushTokenStore(store: PushTokenStore) {
-        val field = appState.javaClass.getDeclaredField("pushTokenStore")
-        field.isAccessible = true
-        field.set(appState, store)
+        listOf(appState, appState.notificationDelivery).forEach { owner ->
+            val field = owner.javaClass.getDeclaredField("pushTokenStore")
+            field.isAccessible = true
+            field.set(owner, store)
+        }
     }
 
     /** Reads the private startup milestone so settlement tests can reject premature readiness publication. */

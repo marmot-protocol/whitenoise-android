@@ -109,6 +109,7 @@ class NotificationNetworkReconnectCoverageTest {
     @Test
     fun offlineToOnlineTransitionReconnectsNotificationRuntimeWithoutPushWakeMarker() {
         val appState = appStateSource().readText()
+        val notificationContent = notificationContentSource().readText()
         val networkListener = appState.functionBody("registerActiveNetworkListener")
         val networkSnapshot = appState.functionBody("noteActiveNetworkSnapshot")
         val validatedListener = appState.functionBody("registerValidatedInternetListener")
@@ -121,7 +122,7 @@ class NotificationNetworkReconnectCoverageTest {
         val attempt = recovery.functionBody("runAttempt")
         val bridge = appState.propertyInitializerCall("notificationNetworkRecovery")
         val receiver = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
-        val listenerLoop = appState.functionBody("runNotificationListenerLoop")
+        val listenerLoop = notificationContent.functionBody("runNotificationListenerLoop")
 
         assertTrue(
             "connectivity callbacks must funnel through the shared snapshot helper",
@@ -235,6 +236,7 @@ class NotificationNetworkReconnectCoverageTest {
     @Test
     fun accountTeardownCancelsReconnectOwnersBeforeTheListener() {
         val appState = appStateSource().readText()
+        val notificationContent = notificationContentSource().readText()
         val prepare = appState.functionBody("prepareForDestructiveAccountWipe")
         val restore = appState.functionBody("restoreAfterFailedDestructiveAccountWipe")
         val teardown = appState.functionBody("stopNotificationListenerForAccountTeardown")
@@ -319,19 +321,20 @@ class NotificationNetworkReconnectCoverageTest {
                 wipe.lastIndexOf("networkNotificationRecoverySuppressed = false") > wipe.lastIndexOf("} finally {"),
         )
         val enrichment =
-            appState
-                .substringAfter("private suspend fun enrichPostedNotificationUpdate")
-                .substringBefore("private suspend fun postNotificationContentCorrection")
-        val latePost = appState.functionBody("postNotificationLateCorrection")
+            notificationContent
+                .substringAfter("private suspend fun WhiteNoiseAppState.enrichPostedNotificationUpdate")
+                .substringBefore("private suspend fun WhiteNoiseAppState.postNotificationContentCorrection")
+        val latePost = notificationContent.functionBody("postNotificationLateCorrection")
         val notificationGates =
-            appState
-                .substringAfter("private fun isNotificationGenerationPostAllowed")
+            notificationContent
+                .substringAfter("private fun WhiteNoiseAppState.isNotificationGenerationPostAllowed")
                 .substringBefore("/**")
         val capturedEnrichmentGate =
             Regex(
-                """private fun isNotificationEnrichmentAllowed\(\s*update: NotificationUpdateFfi,\s*""" +
+                """private fun WhiteNoiseAppState\.isNotificationEnrichmentAllowed\(""" +
+                    """\s*update: NotificationUpdateFfi,\s*""" +
                     """firstPost: NotificationFirstPost,\s*\): Boolean =([\s\S]*?)\n\s*/\*\*""",
-            ).find(appState)?.groupValues?.get(1).orEmpty()
+            ).find(notificationContent)?.groupValues?.get(1).orEmpty()
         assertTrue(
             "a wipe that starts during notification enrichment must block the final presenter write",
             "isNotificationEnrichmentAllowed(candidate, firstPost)" in enrichment &&
@@ -352,6 +355,13 @@ class NotificationNetworkReconnectCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    private fun notificationContentSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing AppStateNotificationContent.kt source file")
 
     /** Locates the isolated reconnect coordinator source for structural contracts. */
     private fun notificationNetworkRecoverySource(): File =

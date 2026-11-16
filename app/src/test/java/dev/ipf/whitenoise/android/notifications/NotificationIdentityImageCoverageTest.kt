@@ -8,6 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
+private const val CONTENT_SLICE = "AppStateNotificationContent.kt"
+
 /**
  * Invariant gate for #3311, #3505 and #3635: every rich message card uses the native conversation template and
  * carries one shared conversation identity snapshot through first post, enrichment, private contact pictures and
@@ -176,7 +178,7 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun lateGroupIdentityLoadsTheEncryptedGroupPicture() {
-        val appState = stateSource("AppState.kt")
+        val appState = appStateWithNotificationContent()
         val prepare = appState.functionBody("prepareLateNotificationIdentity")
         assertTrue(
             "the late sources carry it, from the encrypted-picture loader",
@@ -210,7 +212,7 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun conversationPictureComesFromTheChatListsStoredAvatarFirst() {
-        val appState = stateSource("AppState.kt")
+        val appState = appStateWithNotificationContent()
         val ready = appState.functionBody("readyNotificationAvatars")
         assertTrue("the first post reads the row", ".withChatRow(item, update.accountRef)" in ready)
         assertFalse("but never a private picture", "contactAvatarOverride" in ready)
@@ -277,7 +279,7 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun lateRefreshFetchesOnlyThroughLockCheckingLoaders() {
-        val appState = stateSource("AppState.kt")
+        val appState = appStateWithNotificationContent()
         val prepare = appState.functionBody("prepareLateNotificationIdentity")
         assertTrue("the late sources get their loaders", ".withLateLoaders(" in prepare)
         assertTrue("URL pictures through the lock-checked loader", "urlLoader = ::latePictureLoader" in prepare)
@@ -285,7 +287,7 @@ class NotificationIdentityImageCoverageTest {
         val late = lateLoaders()
         assertTrue("a conversation URL gets a loader", "url != null -> urlLoader(url, conversationDomain)" in late)
         assertTrue("as does a sender URL", "senderLoader = urlLoader(url, conversation.senderDomain)" in late)
-        val loader = appState.declaration("private fun latePictureLoader(")
+        val loader = appState.declaration("private fun WhiteNoiseAppState.latePictureLoader(")
         assertTrue(
             "nothing starts behind the lock",
             "lockCheckedPictureLoader(url, domain, { appLock.screenVisible })" in loader,
@@ -332,7 +334,7 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("the late refresh keeps the sender slot", "senderUrl = null" in late)
         val carried = source("NotificationCardContent.kt").functionBody("messagingStyle")
         assertTrue("carried blank rows get their monogram", "withoutBlankGroupSenderPicture(" in carried)
-        val ready = stateSource("AppState.kt").functionBody("readyNotificationAvatars")
+        val ready = stateSource("AppStateNotificationContent.kt").functionBody("readyNotificationAvatars")
         assertFalse("the first post resolves every sender", "NotificationTriggerFfi.NEW_MESSAGE" in ready)
         val target =
             stateSource("AppStatePresentation.kt").declaration("internal fun notificationAvatarPreWarmTarget(")
@@ -403,7 +405,7 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun directChatReportedAsAGroupFollowsItsPeerAtEachWrite() {
-        val appState = stateSource("AppState.kt")
+        val appState = appStateWithNotificationContent()
         assertEquals(
             "both message posts pass the peer",
             2,
@@ -495,6 +497,9 @@ class NotificationIdentityImageCoverageTest {
 
     /** The late refresh's loader wiring, which AppState hands its loaders to. */
     private fun lateLoaders(): String = stateSource("PreWarmedNotificationAvatars.kt").extensionBody("withLateLoaders")
+
+    /** AppState together with its notification content slice, where the notification identity paths live. */
+    private fun appStateWithNotificationContent(): String = stateSource("AppState.kt") + stateSource(CONTENT_SLICE)
 
     /** Reads one state source by file name. */
     private fun stateSource(name: String): String = File(notificationsRoot().parentFile, "state/$name").readText()

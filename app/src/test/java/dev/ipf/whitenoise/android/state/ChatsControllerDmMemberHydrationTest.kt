@@ -129,35 +129,19 @@ class ChatsControllerDmMemberHydrationTest {
         // An initial member-id page carrying an empty roster is a transient
         // catch-up result. Caching it would pin the Unknown fallback forever —
         // a cached key is never retried.
-        ChatsController::class.java
-            .getDeclaredMethod(
-                "applyInitialMemberIdProjections",
-                List::class.java,
-                String::class.java,
-                Boolean::class.javaPrimitiveType,
-            ).apply { isAccessible = true }
-            .invoke(
-                controller,
-                listOf(AppGroupMemberIdsFfi(DM_GROUP, emptyList(), emptyList())),
-                ME,
-                false,
-            )
+        controller.applyInitialMemberIdProjections(
+            listOf(AppGroupMemberIdsFfi(DM_GROUP, emptyList(), emptyList())),
+            ME,
+            false,
+        )
 
         // A self-only roster for a direct conversation is equally transient —
         // the streaming path grace-retries it, so the page path must too.
-        ChatsController::class.java
-            .getDeclaredMethod(
-                "applyInitialMemberIdProjections",
-                List::class.java,
-                String::class.java,
-                Boolean::class.javaPrimitiveType,
-            ).apply { isAccessible = true }
-            .invoke(
-                controller,
-                listOf(AppGroupMemberIdsFfi(DM_GROUP, listOf(ME), emptyList())),
-                ME,
-                false,
-            )
+        controller.applyInitialMemberIdProjections(
+            listOf(AppGroupMemberIdsFfi(DM_GROUP, listOf(ME), emptyList())),
+            ME,
+            false,
+        )
 
         @Suppress("UNCHECKED_CAST")
         val cache =

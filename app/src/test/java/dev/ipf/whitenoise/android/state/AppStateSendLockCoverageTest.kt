@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,7 +32,7 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "The ordinary text publisher must record its marmotIo timing section",
             "marmotIo(MarmotTraceSection.TEXT_SEND)" in controllerFunctionBody("send") ||
-                "marmotIo(MarmotTraceSection.TEXT_SEND)" in controllersSource().readText() ||
+                "marmotIo(MarmotTraceSection.TEXT_SEND)" in conversationControllerSource() ||
                 "marmotIo(MarmotTraceSection.TEXT_SEND)" in
                 controllersSource().resolveSibling("DurableLocalSends.kt").readText(),
         )
@@ -175,14 +176,14 @@ class AppStateSendLockCoverageTest {
     /** Keeps delivery cutover cleanup atomic with registration sync and suppresses competing token work. */
     @Test
     fun notificationDeliveryCleanupSerializesWithNativePushSync() {
-        val disableBody = appStateFunctionBody("disableNativePushForPersistentDelivery")
-        val rollbackBody = appStateFunctionBody("rollbackNativePushMode")
-        val rotationBody = appStateFunctionBody("onPushTokenRotated")
-        val finishBody = appStateFunctionBody("finishNotificationDeliveryModeTransaction")
+        val disableBody = notificationDeliveryFunctionBody("disableNativePushForPersistentDelivery")
+        val rollbackBody = notificationDeliveryFunctionBody("rollbackNativePushMode")
+        val rotationBody = notificationDeliveryFunctionBody("onPushTokenRotated")
+        val finishBody = notificationDeliveryFunctionBody("finishNotificationDeliveryModeTransaction")
         val modeEntryBodies =
             listOf(
-                appStateFunctionBody("setNotificationDeliveryMode"),
-                appStateFunctionBody("launchNotificationDeliveryModeReconciliation"),
+                notificationDeliveryFunctionBody("setNotificationDeliveryMode"),
+                notificationDeliveryFunctionBody("launchNotificationDeliveryModeReconciliation"),
             )
 
         listOf(disableBody, rollbackBody).forEach { body ->
@@ -287,8 +288,8 @@ class AppStateSendLockCoverageTest {
     fun localExpiryRowsFeedEngineAuthoritativeExpiry() {
         // localExpiryRow is an expression-body function, so window the source
         // instead of brace-matching a block body.
-        val source = controllersSource().readText()
-        val start = source.indexOf("fun localExpiryRow(")
+        val source = conversationControllerSource()
+        val start = source.indexOf("fun ConversationController.localExpiryRow(")
         require(start >= 0) { "Missing localExpiryRow" }
 
         assertTrue(
@@ -323,7 +324,7 @@ class AppStateSendLockCoverageTest {
      */
     @Test
     fun conversationClassificationPrefersProjectedKind() {
-        val source = controllersSource().readText()
+        val source = conversationControllerSource()
         val derivedKind =
             Regex(
                 """val\s+latestConversationKind:\s*ChatConversationKindFfi\?\s*by\s*derivedStateOf\s*\{\s*""" +
@@ -354,7 +355,7 @@ class AppStateSendLockCoverageTest {
 
         assertTrue(
             "discardFailedSend must arbitrate stale failure actions through the shared cancellation lock",
-            "suspend fun discardFailedSend" in controllersSource().readText() &&
+            "suspend fun discardFailedSend" in conversationControllerSource() &&
                 "cancelOptimisticSendResult(current.record" in body &&
                 "optimisticKeyOverride = key" in body,
         )
@@ -397,11 +398,13 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun markLatestVisibleReadDeadPathStaysDeleted() {
-        val source = controllersSource().readText()
+        val source = conversationControllerSource()
+        val declaration = Regex("""\bfun\s+(?:\w+\.)?markLatestVisibleRead\s*\(""")
 
+        assertTrue(declaration.containsMatchIn("internal fun ConversationController.markLatestVisibleRead()"))
         assertFalse(
             "markLatestVisibleRead zeroes unread state from a stale open-chat path and should stay deleted",
-            Regex("""\bfun\s+markLatestVisibleRead\s*\(""").containsMatchIn(source),
+            declaration.containsMatchIn(source),
         )
     }
 
@@ -516,7 +519,7 @@ class AppStateSendLockCoverageTest {
         val session = controllersSource().resolveSibling("ConversationTimelineSession.kt").readText()
         val close = functionBodyIn(session, "closeTimeline")
         val paging = pagingSource().readText()
-        val controllers = controllersSource().readText()
+        val controllers = conversationControllerSource()
         val olderPage = functionBodyIn(paging, "pageOlderIfActive", includeDeclaration = true)
         val newerPage = functionBodyIn(paging, "pageNewerIfActive", includeDeclaration = true)
         val mutexProxy =
@@ -545,7 +548,7 @@ class AppStateSendLockCoverageTest {
         val removeProjectedRecord = controllerFunctionBody("removeProjectedRecord")
         val retainTimelineWindow =
             Regex("""fun MutableMap<String, \*>\.retainTimelineWindow\(\)\s*=\s*([^\n]+)""")
-                .find(controllersSource().readText())
+                .find(conversationControllerSource())
                 ?.value
                 ?: error("Missing retainTimelineWindow")
 
@@ -596,7 +599,11 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun mediaKindResolveFanoutSwallowsUnexpectedProjectionFailures() {
-        val body = controllerFunctionBody("schedulePendingMediaKindResolves", "ChatsController.kt")
+        val body =
+            controllerFunctionBody(
+                "ChatsController.schedulePendingMediaKindResolves",
+                "ChatsControllerRowEnrichment.kt",
+            )
 
         assertTrue(
             "media-kind resolve fanout must rethrow cancellation but swallow unexpected projection failures",
@@ -632,6 +639,9 @@ class AppStateSendLockCoverageTest {
         require(braceStart >= 0) { "Missing body for $functionName" }
         return source.kotlinBlockFrom(braceStart, "function $functionName")
     }
+
+    private fun notificationDeliveryFunctionBody(functionName: String): String =
+        controllerFunctionBody(functionName, controllerFileName = "NotificationDeliveryController.kt")
 
     private fun appStateSource(): File =
         listOf(
@@ -679,9 +689,15 @@ class AppStateSendLockCoverageTest {
         functionName: String,
         controllerFileName: String = "ConversationController.kt",
     ): String {
-        val source = controllersSource().resolveSibling(controllerFileName).readText()
+        val source =
+            if (controllerFileName == "ConversationController.kt") {
+                conversationControllerSource()
+            } else {
+                controllersSource().resolveSibling(controllerFileName).readText()
+            }
         val start =
-            Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+            // Extensions declare a receiver between `fun` and the name.
+            Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(functionName)}\s*\(""")
                 .find(source)
                 ?.range
                 ?.first

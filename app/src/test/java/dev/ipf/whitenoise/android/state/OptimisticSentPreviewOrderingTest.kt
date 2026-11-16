@@ -17,7 +17,6 @@ import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
-import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -1374,10 +1373,7 @@ private fun replaceRows(
     controller: ChatsController,
     rows: List<ChatListRowFfi>,
 ) {
-    ChatsController::class.java
-        .getDeclaredMethod("replaceChatRows", List::class.java, ChatListWindowSnapshotFfi::class.java)
-        .apply { isAccessible = true }
-        .invoke(controller, rows, null)
+    controller.replaceChatRows(rows, null)
 }
 
 private fun applySubscriptionChatListRow(
@@ -1385,20 +1381,14 @@ private fun applySubscriptionChatListRow(
     row: ChatListRowFfi,
     trigger: ChatListUpdateTriggerFfi,
 ) {
-    ChatsController::class.java
-        .getDeclaredMethod("foldChatRow", ChatListRowFfi::class.java, ChatListUpdateTriggerFfi::class.java)
-        .apply { isAccessible = true }
-        .invoke(controller, row, trigger)
+    controller.foldChatRow(row, trigger)
 }
 
 private fun applyPinState(
     controller: ChatsController,
     orderedGroupIds: List<String>,
 ) {
-    ChatsController::class.java
-        .getDeclaredMethod("applyPinState", ChatPinStateFfi::class.java)
-        .apply { isAccessible = true }
-        .invoke(controller, ChatPinStateFfi(orderedGroupIds))
+    controller.applyPinState(ChatPinStateFfi(orderedGroupIds))
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -1414,19 +1404,8 @@ private fun removeAndRestoreChatRow(
     controller: ChatsController,
     groupIdHex: String,
 ) {
-    val snapshotMethod =
-        ChatsController::class.java
-            .getDeclaredMethod("snapshotChatRowForRemoval", String::class.java)
-            .apply { isAccessible = true }
-    val snapshot = requireNotNull(snapshotMethod.invoke(controller, groupIdHex))
-    ChatsController::class.java
-        .getDeclaredMethod(
-            "removeChatRow",
-            String::class.java,
-            java.lang.Boolean.TYPE,
-            MembershipRemoval::class.java,
-        ).apply { isAccessible = true }
-        .invoke(controller, groupIdHex, false, MembershipRemoval.Ambiguous)
+    val snapshot = requireNotNull(controller.snapshotChatRowForRemoval(groupIdHex))
+    controller.removeChatRow(groupIdHex, false, MembershipRemoval.Ambiguous)
     ChatsController::class.java
         .getDeclaredMethod("restoreRemovedChatRow", snapshot.javaClass)
         .apply { isAccessible = true }
