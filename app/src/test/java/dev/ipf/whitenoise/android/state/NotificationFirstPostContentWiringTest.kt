@@ -1,27 +1,29 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
+
+private const val STATE_DIR = "src/main/java/dev/ipf/whitenoise/android/state"
 
 /** Static ownership checks guarding the AppState integration boundaries for issue #2453. */
 class NotificationFirstPostContentWiringTest {
     /** Keeps title, sender, Markdown, system text, and media under one coordinator call. */
     @Test
     fun firstPostUsesOneCoordinatorForTheCompleteLocalContentValue() {
-        val source = appStateSource().readText()
+        val source = notificationContentSource()
         val process = source.functionBody("processNotificationUpdate")
         val resolve = source.functionBody("resolveNotificationFirstPost")
         val coordinator =
-            source
-                .substringAfter("private val notificationFirstPostContentCoordinator")
-                .substringBefore("private val notificationContentResolution")
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
+                .substringAfter("internal val notificationFirstPostContentCoordinator", missingDelimiterValue = "")
+                .substringBefore("internal val notificationContentResolution", missingDelimiterValue = "")
         val show =
             source
-                .substringAfter("private suspend fun showInitialNotificationUpdate")
-                .substringBefore("private suspend fun showRedactedNotificationUpdate")
+                .substringAfter("private suspend fun WhiteNoiseAppState.showInitialNotificationUpdate")
+                .substringBefore("private suspend fun WhiteNoiseAppState.showRedactedNotificationUpdate")
 
         assertTrue(
             "the first draw must put the complete local projection under one deadline",
@@ -53,18 +55,18 @@ class NotificationFirstPostContentWiringTest {
      */
     @Test
     fun lateContentCorrectionRunsBeforeAvatarWorkAndKeepsOneWrite() {
-        val source = appStateSource().readText()
+        val source = notificationContentSource()
         val enrichment =
             source
-                .substringAfter("private suspend fun enrichPostedNotificationUpdate")
-                .substringBefore("private suspend fun enrichResolvedNotificationUpdate")
+                .substringAfter("private suspend fun WhiteNoiseAppState.enrichPostedNotificationUpdate")
+                .substringBefore("private suspend fun WhiteNoiseAppState.enrichResolvedNotificationUpdate")
         val routing =
             source
-                .substringAfter("private suspend fun enrichResolvedNotificationUpdate")
-                .substringBefore("private suspend fun postNotificationContentCorrection")
+                .substringAfter("private suspend fun WhiteNoiseAppState.enrichResolvedNotificationUpdate")
+                .substringBefore("private suspend fun WhiteNoiseAppState.postNotificationContentCorrection")
         val contentCorrection =
             source
-                .substringAfter("private suspend fun postNotificationContentCorrection")
+                .substringAfter("private suspend fun WhiteNoiseAppState.postNotificationContentCorrection")
                 .substringBefore("/**")
         val firstResolve =
             enrichment.indexOf("notificationContentResolution.firstPost.resolve(candidate, localOnly = false)")
@@ -110,7 +112,7 @@ class NotificationFirstPostContentWiringTest {
     /** Ensures every late write carries lifecycle and account-cache generations. */
     @Test
     fun notificationWritesCarryBothLifecycleAndAccountCacheGenerations() {
-        val source = appStateSource().readText()
+        val source = notificationContentSource()
         val process = source.functionBody("processNotificationUpdate")
         val resolve = source.functionBody("resolveNotificationFirstPost")
         val eligibility = source.functionBody("isNotificationGenerationPostAllowed")
@@ -133,7 +135,7 @@ class NotificationFirstPostContentWiringTest {
     /** Keeps invite identity refresh inside the same correction and staleness fences. */
     @Test
     fun inviteProfileRefreshSharesThePostCorrectionPermitAndGenerationFences() {
-        val source = appStateSource().readText()
+        val source = notificationContentSource()
         val initialPost = source.functionBody("rememberPostedGroupInvite")
         val inviteRefresh = source.functionBody("refreshInviteNotificationIdentity")
         val invitePost = source.functionBody("postInviteNotificationIdentityCorrection")
@@ -156,24 +158,23 @@ class NotificationFirstPostContentWiringTest {
     /** Initial and corrected text share the exact first-card imagery without a cosmetic rewrite. */
     @Test
     fun readyAvatarSnapshotReachesBothWritesWithoutRemoteLoading() {
-        val source = appStateSource().readText()
+        val source = notificationContentSource()
         val firstPost =
             source
-                .substringAfter("private suspend fun showInitialNotificationUpdate")
-                .substringBefore("private suspend fun showRedactedNotificationUpdate")
+                .substringAfter("private suspend fun WhiteNoiseAppState.showInitialNotificationUpdate")
+                .substringBefore("private suspend fun WhiteNoiseAppState.showRedactedNotificationUpdate")
         val latePost = source.functionBody("postNotificationLateCorrection")
         for (post in listOf(firstPost, latePost)) {
             assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(useDirectLayout)" in post)
             assertTrue("senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap" in post)
         }
         assertTrue("postNotificationAvatarCorrection" !in source)
+        assertTrue(
+            "postNotificationAvatarCorrection" !in
+                appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
+        )
     }
 
-    /** Locates production AppState source from Gradle's module working directory. */
-    private fun appStateSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-        ).firstOrNull(File::exists)
-            ?: error("Missing AppState.kt source file")
+    /** Locates the AppState notification content source from Gradle's module working directory. */
+    private fun notificationContentSource(): String = appModuleSource("$STATE_DIR/AppStateNotificationContent.kt")
 }

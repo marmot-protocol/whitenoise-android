@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.state.NativeAttachmentPermissions
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentDownloadWorkName
 import dev.ipf.whitenoise.android.state.attachmentIntentStore
+import dev.ipf.whitenoise.android.state.automaticAttachmentPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext

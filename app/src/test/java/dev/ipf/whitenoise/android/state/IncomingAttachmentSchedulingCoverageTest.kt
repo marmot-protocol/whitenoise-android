@@ -18,8 +18,8 @@ class IncomingAttachmentSchedulingCoverageTest {
     @Test
     fun receiptSchedulingExcludesNoAttachmentType() {
         val body =
-            appState().functionBody("scheduleIncomingAttachmentDownloads") +
-                appState().functionBody("scheduleReceivedMessageAttachments")
+            notificationContent().functionBody("scheduleIncomingAttachmentDownloads") +
+                notificationContent().functionBody("scheduleReceivedMessageAttachments")
 
         listOf(
             "isImageMedia",
@@ -65,7 +65,7 @@ class IncomingAttachmentSchedulingCoverageTest {
     /** Scheduling starts beside the first post and before mute, so muted chats still follow media policy. */
     @Test
     fun receiptSchedulingRunsBeforeNotificationEligibility() {
-        val source = appState()
+        val source = notificationContent()
         val body = source.functionBody("processNotificationUpdate")
         val schedule = body.indexOf("scheduleIncomingAttachmentDownloadMaintenance(update)")
 
@@ -158,6 +158,9 @@ class IncomingAttachmentSchedulingCoverageTest {
     /** Reads AppState from either the module or the repository working directory. */
     private fun appState(): String = source("state/AppState.kt")
 
+    /** Reads AppState's notification content pipeline from either working directory. */
+    private fun notificationContent(): String = source("state/AppStateNotificationContent.kt")
+
     /** Reads the receipt planner from either the module or the repository working directory. */
     private fun scheduling(): String = source("state/IncomingAttachmentScheduling.kt")
 
@@ -196,15 +199,18 @@ class IncomingAttachmentSchedulingCoverageTest {
      */
     @Test
     fun theReceiptLoopRetriesAndContainsItsFailures() {
-        val loop = appState().functionBody("runMutedChatReceiptLoop")
-        val declaration = appState().substringAfter("fun runMutedChatReceiptLoop(").substringBefore("{\n")
+        val loop = notificationContent().functionBody("runMutedChatReceiptLoop")
+        val declaration =
+            notificationContent()
+                .substringAfter("fun WhiteNoiseAppState.runMutedChatReceiptLoop(")
+                .substringBefore("{\n")
         assertTrue("children are supervised", ") = supervisorScope" in declaration)
         assertFalse("a failing open never ends the loop", "return@" in loop)
         assertTrue(
             "one receipt's failure is contained",
             "runCatchingCancellable { scheduleRuntimeEventReceipt(received) }" in loop,
         )
-        val listener = appState().functionBody("runNotificationListenerLoop")
+        val listener = notificationContent().functionBody("runNotificationListenerLoop")
         assertTrue(
             "the loop itself is contained under the listener",
             "runCatchingCancellable { runMutedChatReceiptLoop(" in listener,
