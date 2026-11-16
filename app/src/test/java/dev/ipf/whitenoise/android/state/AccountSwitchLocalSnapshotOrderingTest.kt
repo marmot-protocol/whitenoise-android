@@ -139,7 +139,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
         val active = publish.indexOf("activeAccountRef = label")
         assertTrue("cache clearing precedes prepared projection staging", cacheClear >= 0 && stage > cacheClear)
         assertTrue("self metadata precedes active-label publication", profiles > stage && active > profiles)
-        val stageBody = source.kotlinFunctionBody("stageAccountSwitchLocalSnapshot")
+        val stageBody = accountSwitchPreloadSource().readText().kotlinFunctionBody("stageAccountSwitchLocalSnapshot")
         val unread = stageBody.indexOf("accountUnreadValueFromRows")
         val handoff = stageBody.indexOf("accountSwitchHandoff.publish(requestGeneration, localSnapshot)")
         assertTrue("target unread state precedes the one-shot handoff", unread >= 0 && handoff > unread)
@@ -151,7 +151,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
     @Test
     fun localPreloadFencesEverySuspendingStageAndDefersLiveSubscriptions() {
-        val source = appStateSource().readText()
+        val source = accountSwitchPreloadSource().readText()
         val body = source.kotlinFunctionBody("loadAccountSwitchLocalSnapshot")
         val presentation = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
         val rows = body.indexOf("presentedChatList(accountRef, includeArchived = true)")
@@ -193,8 +193,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
 
     @Test
     fun localProfileWarmUsesTheTargetAccountAndSharedTopBarLimit() {
-        val source = appStateSource().readText()
-        val snapshot = source.kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
+        val snapshot = accountSwitchPreloadSource().readText().kotlinFunctionBody("loadAccountSwitchPresentationSeeds")
         val directPeers =
             accountSwitchSnapshotSource()
                 .readText()
@@ -554,6 +553,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
     private fun controllersSource(): File = source("state/ChatsController.kt")
 
     private fun appStateSource(): File = source("state/AppState.kt")
+
+    private fun accountSwitchPreloadSource(): File = source("state/AppStateAccountSwitchPreload.kt")
 
     private fun accountSwitchSnapshotSource(): File = source("state/AccountSwitchLocalSnapshot.kt")
 

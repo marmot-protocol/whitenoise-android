@@ -246,6 +246,11 @@
     <string name="invite_message">Treten Sie mir bei White Noise bei. Keine Telefonnummer. Keine Überwachung. Nur echte Privatsphäre. Hier herunterladen: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Dieser Empfänger ist kein gültiger öffentlicher Nostr-Schlüssel. Verwenden Sie einen öffentlichen Schlüssel vom Typ npub, Profillink oder hex.</string>
     <string name="error_group_create_failed_retry">Beim Einrichten des verschlüsselten Chats ist etwas schiefgelaufen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
+    <string name="error_no_group_members_selected">Keine der ausgewählten Personen konnte hinzugefügt werden. Bitten Sie sie, ihre Chat-Einrichtung zu prüfen, oder ändern Sie Ihre Auswahl.</string>
+    <string name="error_no_group_members_selected_for">Für %1$s war das Hinzufügen nicht möglich. Bitten Sie die betroffenen Personen, ihre Chat-Einrichtung zu prüfen, oder ändern Sie Ihre Auswahl.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Wir konnten nicht vollständig prüfen, ob %1$s hinzugefügt werden können. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
+    <string name="error_no_group_members_selected_inbox_for">%1$s konnten nicht hinzugefügt werden. Diese Personen haben kein nutzbares Posteingangs-Relay. Bitten Sie sie, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
+    <string name="error_no_group_members_selected_update_for">%1$s konnten nicht hinzugefügt werden. Bitten Sie sie, White Noise zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
     <string name="error_chat_created_not_loaded">Der Chat wurde erstellt, ist aber noch nicht in Ihrer Chatliste erschienen. Versuchen Sie es gleich noch einmal.</string>
     <string name="remove">Entfernen</string>
     <string name="group_name">Gruppenname</string>
@@ -894,6 +899,8 @@
     <string name="toast_invite_sent">Einladung gesendet</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Einladung gesendet, aber Adminrechte konnten nicht hinzugefügt werden</string>
     <string name="toast_couldnt_add_members">Mitglieder konnten nicht hinzugefügt werden. Bitte erneut versuchen.</string>
+    <string name="toast_some_members_not_added">Einige Personen wurden nicht hinzugefügt</string>
+    <string name="group_members_not_added_count">Nicht hinzugefügte Personen (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">%1$s konnte nicht hinzugefügt werden. Die Person ist bereits Mitglied oder ihr Signaturschlüssel steht im Konflikt mit dem eines vorhandenen Mitglieds.</string>
     <string name="toast_invites_sent_to_groups">Einladungen an ausgewählte Gruppen gesendet</string>
     <string name="toast_invites_sent_to_groups_partial">Einladungen an einige Gruppen gesendet; einige sind fehlgeschlagen</string>
@@ -2425,6 +2432,8 @@
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
     <string name="error_invalid_key_package">Der veröffentlichte Chat-Schlüssel für diese Person konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
     <string name="error_invalid_key_package_for">Der veröffentlichte Chat-Schlüssel für %1$s konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
+    <string name="error_incompatible_key_package">Der Chat-Schlüssel dieser Person ist nicht kompatibel. Bitten Sie sie, White Noise zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
+    <string name="error_incompatible_key_package_for">Der Chat-Schlüssel von %1$s ist nicht kompatibel. Bitten Sie die Person, White Noise zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox">Für diese Person gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_missing_member_inbox_for">Für %1$s gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="error_invite_welcome_too_large">Diese Einladung ist zu groß für die Posteingangs-Relays einer eingeladenen Person. Bitten Sie die Person, ein Posteingangs-Relay hinzuzufügen, das größere Nachrichten annimmt.</string>

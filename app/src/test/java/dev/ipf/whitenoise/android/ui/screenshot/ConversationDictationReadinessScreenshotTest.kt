@@ -9,7 +9,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -297,6 +300,45 @@ class ConversationDictationReadinessScreenshotTest {
         )
     }
 
+    @Test
+    fun microphonePermissionDeniedKeepsInlineRetryLight() {
+        captureMicrophoneDenial("dictation_microphone_denied_inline_light.png")
+    }
+
+    @Test
+    fun microphonePermissionDeniedKeepsInlineRetryDark() {
+        captureMicrophoneDenial("dictation_microphone_denied_inline_dark.png", darkTheme = true)
+    }
+
+    @Test
+    fun microphonePermissionPermanentlyDeniedKeepsInlineSettingsLargeFontRtl() {
+        captureMicrophoneDenial(
+            "dictation_microphone_permanently_denied_inline_large_font_rtl_dark.png",
+            permanentlyDenied = true,
+            darkTheme = true,
+            fontScale = 2f,
+            rtl = true,
+        )
+    }
+
+    /** Renders the app's recovery after a native permission result, never a fabricated OS prompt. */
+    private fun captureMicrophoneDenial(
+        name: String,
+        permanentlyDenied: Boolean = false,
+        darkTheme: Boolean = false,
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
+    ) {
+        val fixture = fixture(appOwned = true, microphonePermission = false)
+        assertTrue(fixture.controller.state is ConversationDictationState.PermissionRequired)
+        fixture.controller.onPermissionResult(granted = false, permanentlyDenied = permanentlyDenied)
+        capture(fixture, name, fontScale = fontScale, rtl = rtl, darkTheme = darkTheme)
+        val action = if (permanentlyDenied) R.string.open_app_settings else R.string.retry
+        composeRule.onNodeWithContentDescription(context.getString(action)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.dismiss)).assertIsDisplayed()
+        composeRule.onAllNodes(isDialog()).assertCountEquals(0)
+    }
+
     /** Captures the bounded provider check before Android resolves an Activity. */
     @Test
     fun largeFontRtlCheckingServiceReadiness() {
@@ -331,9 +373,12 @@ class ConversationDictationReadinessScreenshotTest {
     }
 
     /** Builds a provider-Activity fixture whose readiness callback is controlled by the test. */
-    private fun fixture(appOwned: Boolean = false): Fixture {
+    private fun fixture(
+        appOwned: Boolean = false,
+        microphonePermission: Boolean = true,
+    ): Fixture {
         val draft = TextFieldValue("Keep")
-        val platform = DeferredActivityPlatform()
+        val platform = DeferredActivityPlatform(microphonePermission)
         val controller =
             ConversationDictationController(
                 platform = platform,
@@ -415,11 +460,13 @@ class ConversationDictationReadinessScreenshotTest {
         val platform: DeferredActivityPlatform,
     )
 
-    private class DeferredActivityPlatform : ConversationDictationPlatform {
+    private class DeferredActivityPlatform(
+        private val microphonePermission: Boolean,
+    ) : ConversationDictationPlatform {
         private lateinit var readinessCallback: (Boolean) -> Unit
         lateinit var listener: ConversationDictationRecognitionListener
 
-        override fun hasRecordAudioPermission() = true
+        override fun hasRecordAudioPermission() = microphonePermission
 
         override fun recognitionAvailable() = true
 

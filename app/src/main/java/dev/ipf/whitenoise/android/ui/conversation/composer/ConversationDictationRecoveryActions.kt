@@ -69,7 +69,7 @@ internal fun ConversationDictationFailureAction(
     }
 }
 
-private fun dictationFailureAction(
+internal fun dictationFailureAction(
     state: ConversationDictationState.Failed,
     controller: ConversationDictationController,
     recovery: ConversationDictationRecovery,
@@ -80,7 +80,11 @@ private fun dictationFailureAction(
             ({ if (controller.state === state) controller.finishFailedToDraft(state.sessionId) })
         state.reason == ConversationDictationFailure.SendBlocked -> controller::retry
         recovery == ConversationDictationRecovery.AppSettings ->
-            ({ if (openDictationAppSettings(context)) controller.resumeAfterMicrophoneSettings() })
+            ({
+                if (controller.state === state && openDictationAppSettings(context) && controller.state === state) {
+                    controller.resumeAfterMicrophoneSettings()
+                }
+            })
         recovery == ConversationDictationRecovery.SpeechProviderSetup ->
             ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
         else -> controller::retry

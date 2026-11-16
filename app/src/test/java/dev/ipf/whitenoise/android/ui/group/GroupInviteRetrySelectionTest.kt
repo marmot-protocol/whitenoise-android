@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.state.ConversationTimelineTestDraftPersistence
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.asTestInviteResult
 import dev.ipf.whitenoise.android.state.conversationTimelineMemberSnapshot
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.groupConversationSnapshotFixture
@@ -209,7 +210,7 @@ class GroupInviteRetrySelectionTest {
                         ),
                         snapshot.details,
                         snapshot.managementState.copy(isLastAdmin = admins.isEmpty()),
-                    )
+                    ).asTestInviteResult(members)
                 },
             )
 

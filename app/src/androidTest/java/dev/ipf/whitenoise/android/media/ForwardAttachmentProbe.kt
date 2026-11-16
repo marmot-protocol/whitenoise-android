@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
 import dev.ipf.whitenoise.android.state.hasNativeAttachment
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.page
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -205,9 +206,15 @@ internal object ForwardAttachmentProbe {
         val forwarder = base.receiver
         val author = base.sender
         val members = listOf(author.accountIdHex)
-        val ownSource = marmot.createGroup(forwarder.label, "Generated own source", members, null)
+        val ownSource =
+            marmot
+                .createGroup(forwarder.label, "Generated own source", members, null)
+                .requireCreatedGroupId()
         ControlledAttachmentProbe.awaitReceivedGroup(marmot, author.label, ownSource)
-        val destination = marmot.createGroup(forwarder.label, "Generated destination", members, null)
+        val destination =
+            marmot
+                .createGroup(forwarder.label, "Generated destination", members, null)
+                .requireCreatedGroupId()
         ControlledAttachmentProbe.awaitReceivedGroup(marmot, author.label, destination)
         marmot.catchUpAccounts()
         return ForwardPeers(author, forwarder, base.group, ownSource, destination)

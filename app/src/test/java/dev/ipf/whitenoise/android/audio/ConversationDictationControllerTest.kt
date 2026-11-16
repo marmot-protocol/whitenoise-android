@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.audio
 
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Looper
 import android.speech.SpeechRecognizer
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationRecovery
+import dev.ipf.whitenoise.android.ui.conversation.composer.dictationFailureAction
 import dev.ipf.whitenoise.android.ui.conversation.composer.dictationFailureRecovery
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -21,6 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
@@ -3044,6 +3048,67 @@ class ConversationDictationControllerTest {
                 f.controller.onMicrophoneHostResumed()
                 assertFalse(platform.session.started)
             }
+        }
+    }
+
+    @Test
+    fun staleSettingsActionCannotLaunchOrArmAReplacementFailure() {
+        for (replaceDuringLaunch in listOf(false, true)) {
+            val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied)
+            val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            val displayed = f.controller.state as ConversationDictationState.Failed
+            fun replaceFailure() {
+                f.controller.dismissFailure()
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            }
+            var launches = 0
+            val context =
+                object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                    override fun startActivity(intent: Intent) {
+                        launches += 1
+                        if (replaceDuringLaunch) replaceFailure()
+                    }
+                }
+            val action =
+                dictationFailureAction(displayed, f.controller, dictationFailureRecovery(displayed.reason), context)
+            if (!replaceDuringLaunch) replaceFailure()
+            action()
+            assertEquals(if (replaceDuringLaunch) 1 else 0, launches)
+            val replacement = f.controller.state
+            assertTrue(replacement !== displayed)
+            f.controller.onAppBackgrounded()
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+            f.controller.onAppForegrounded()
+            assertTrue(f.controller.state === replacement)
+            assertFalse(platform.session.started)
+            assertEquals("Keep ", f.drafts.getValue(key()).text)
+        }
+    }
+
+    @Test
+    fun currentSettingsActionArmsRecoveryOnlyAfterSuccessfulLaunch() {
+        for (launchSucceeds in listOf(false, true)) {
+            val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.AppOpDenied)
+            val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            val displayed = f.controller.state as ConversationDictationState.Failed
+            var launches = 0
+            val context =
+                object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                    override fun startActivity(intent: Intent) {
+                        launches += 1
+                        if (!launchSucceeds) error("Settings unavailable")
+                    }
+                }
+            dictationFailureAction(displayed, f.controller, dictationFailureRecovery(displayed.reason), context)()
+            assertEquals(1, launches)
+            f.controller.onAppBackgrounded()
+            platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
+            f.controller.onAppForegrounded()
+            assertEquals(launchSucceeds, platform.session.started)
+            if (!launchSucceeds) assertTrue(f.controller.state === displayed)
+            f.controller.cancel()
         }
     }
 

@@ -93,7 +93,7 @@ class StalenessGuardCoverageTest {
                     ),
                 "NotificationDeliveryController.kt:drainPendingPushDisables" to
                     listOf("runtime.marmot.setNativePushEnabled", "marmotRuntime !== runtime"),
-                "AppState.kt:refreshAccountUnreadCounts" to
+                "AppStateAccountUnread.kt:refreshAccountUnreadCounts" to
                     listOf("accountListLifetime.capture", "accountListLifetime.isCurrent"),
                 "AppState.kt:refreshAccountSnapshot" to
                     listOf("accountListLifetime.advance", "accountListLifetime.runIfCurrent"),

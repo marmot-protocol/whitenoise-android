@@ -248,6 +248,11 @@
     <string name="invite_message">Junte-se a mim no White Noise. Sem número de telefone. Sem vigilância. Apenas privacidade real. Baixe aqui: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Esse destinatário não é uma chave pública Nostr válida. Use um npub, link de perfil ou chave pública hex.</string>
     <string name="error_group_create_failed_retry">Algo deu errado ao configurar a conversa criptografada. Verifique sua conexão e tente novamente.</string>
+    <string name="error_no_group_members_selected">Não foi possível adicionar nenhuma das pessoas selecionadas. Peça que verifiquem a configuração da conversa ou altere sua seleção.</string>
+    <string name="error_no_group_members_selected_for">Não foi possível adicionar %1$s. Peça que verifiquem a configuração da conversa ou altere sua seleção.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Não conseguimos concluir a verificação de que %1$s podem ser adicionados. Verifique sua conexão e tente novamente.</string>
+    <string name="error_no_group_members_selected_inbox_for">Não foi possível adicionar %1$s. Essas pessoas não têm um relay de entrada utilizável. Peça para verificarem os relays de entrada nas configurações do White Noise e tente novamente.</string>
+    <string name="error_no_group_members_selected_update_for">Não foi possível adicionar %1$s. Peça que atualizem e abram o White Noise e tente novamente.</string>
     <string name="error_chat_created_not_loaded">A conversa foi criada, mas ainda não apareceu na sua lista. Tente novamente em instantes.</string>
     <string name="remove">Remover</string>
     <string name="group_name">Nome do Grupo</string>
@@ -896,6 +901,8 @@
     <string name="toast_invite_sent">Convite enviado</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Convite enviado, mas não foi possível adicionar o administrador</string>
     <string name="toast_couldnt_add_members">Não foi possível adicionar membros. Tente novamente.</string>
+    <string name="toast_some_members_not_added">Algumas pessoas não foram adicionadas</string>
+    <string name="group_members_not_added_count">Pessoas não adicionadas (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Não foi possível adicionar %1$s. Já é membro ou a chave de assinatura conflita com a de um membro existente.</string>
     <string name="toast_invites_sent_to_groups">Convites enviados aos grupos selecionados</string>
     <string name="toast_invites_sent_to_groups_partial">Convites enviados a alguns grupos; alguns falharam</string>
@@ -2413,6 +2420,8 @@
     <string name="group_svg_rejected_detail">Não foi possível preparar este SVG. Escolha um SVG simples, PNG ou JPEG.</string>
     <string name="error_invalid_key_package">Não foi possível validar a chave de conversa publicada desta pessoa. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
     <string name="error_invalid_key_package_for">Não foi possível validar a chave de conversa publicada de %1$s. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
+    <string name="error_incompatible_key_package">A chave de conversa desta pessoa não é compatível. Peça que ela atualize e abra o White Noise e tente novamente.</string>
+    <string name="error_incompatible_key_package_for">A chave de conversa de %1$s não é compatível. Peça que essa pessoa atualize e abra o White Noise e tente novamente.</string>
     <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_invite_welcome_too_large">Este convite é grande demais para os relays de entrada de um destinatário. Peça para ele adicionar um relay de entrada que aceite mensagens maiores.</string>

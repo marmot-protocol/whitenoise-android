@@ -248,6 +248,11 @@
     <string name="invite_message">Rejoignez-moi sur White Noise. Pas de numéro de téléphone. Pas de surveillance. Juste une vraie confidentialité. Téléchargez ici : https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Ce destinataire n’est pas une clé publique Nostr valide. Utilisez un npub, un lien de profil ou une clé publique hex.</string>
     <string name="error_group_create_failed_retry">Un problème est survenu lors de la configuration de la discussion chiffrée. Vérifiez votre connexion et réessayez.</string>
+    <string name="error_no_group_members_selected">Aucune des personnes sélectionnées n’a pu être ajoutée. Demandez-leur de vérifier la configuration de leur discussion ou modifiez votre sélection.</string>
+    <string name="error_no_group_members_selected_for">Impossible d’ajouter %1$s. Demandez aux personnes concernées de vérifier la configuration de leur discussion ou modifiez votre sélection.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Nous n’avons pas pu vérifier entièrement si %1$s peuvent être ajouté·es. Vérifiez votre connexion, puis réessayez.</string>
+    <string name="error_no_group_members_selected_inbox_for">Impossible d’ajouter %1$s. Ces personnes n’ont aucun relais de réception utilisable. Demandez-leur de vérifier leurs relais de réception dans les paramètres de White Noise, puis réessayez.</string>
+    <string name="error_no_group_members_selected_update_for">Impossible d’ajouter %1$s. Demandez-leur de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
     <string name="error_chat_created_not_loaded">La discussion a été créée, mais elle n’apparaît pas encore dans votre liste. Réessayez dans un instant.</string>
     <string name="remove">Supprimer</string>
     <string name="group_name">Nom du Groupe</string>
@@ -896,6 +901,8 @@
     <string name="toast_invite_sent">Invitation envoyée</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invitation envoyée, mais impossible d’ajouter l’administrateur</string>
     <string name="toast_couldnt_add_members">Impossible d’ajouter des membres. Veuillez réessayer.</string>
+    <string name="toast_some_members_not_added">Certaines personnes n’ont pas été ajoutées</string>
+    <string name="group_members_not_added_count">Personnes non ajoutées (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Impossible d’ajouter %1$s. Cette personne est déjà membre, ou sa clé de signature entre en conflit avec celle d’un membre existant.</string>
     <string name="toast_invites_sent_to_groups">Invitations envoyées aux groupes sélectionnés</string>
     <string name="toast_invites_sent_to_groups_partial">Invitations envoyées à certains groupes ; certaines ont échoué</string>
@@ -2413,6 +2420,8 @@
     <string name="group_svg_rejected_detail">Impossible de préparer ce SVG. Choisissez un SVG simple, un PNG ou un JPEG.</string>
     <string name="error_invalid_key_package">La clé de discussion publiée pour cette personne n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
     <string name="error_invalid_key_package_for">La clé de discussion publiée pour %1$s n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
+    <string name="error_incompatible_key_package">La clé de discussion de cette personne est incompatible. Demandez-lui de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
+    <string name="error_incompatible_key_package_for">La clé de discussion de %1$s est incompatible. Demandez à cette personne de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
     <string name="error_missing_member_inbox">Aucun relais de réception utilisable pour cette personne. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
     <string name="error_missing_member_inbox_for">Aucun relais de réception utilisable pour %1$s. Demandez-lui de vérifier ses relais de réception dans les paramètres de White Noise, puis réessayez.</string>
     <string name="error_invite_welcome_too_large">Cette invitation est trop volumineuse pour les relais de réception d’un destinataire. Demandez-lui d’ajouter un relais de réception qui accepte des messages plus volumineux.</string>

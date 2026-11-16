@@ -5,8 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
-import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
@@ -123,7 +123,7 @@ internal fun ConversationController.presentInviteFailure(
 /** A newer details read requires a fresh native snapshot after this commit, not its older result. */
 internal suspend fun ConversationController.publishInitialAdminInviteResult(
     account: String,
-    result: dev.ipf.marmotkit.GroupMutationResultFfi,
+    result: GroupInviteResultFfi,
     authorityEpoch: Long,
     runtimeGeneration: Int,
 ) {
@@ -133,6 +133,13 @@ internal suspend fun ConversationController.publishInitialAdminInviteResult(
     } else {
         refreshManagementState()
     }
+}
+
+/** A partial invite reports the skipped people after applying the committed roster. */
+internal fun ConversationController.presentInviteAccepted(skipped: AppText?) {
+    val account = conversationAccountRef ?: return
+    val title = if (skipped == null) R.string.toast_invite_sent else R.string.toast_some_members_not_added
+    appState.presentConversationTransient(account, group.groupIdHex, title, skipped)
 }
 
 /** These typed key, routing, lookup and admission rejections happen before the native membership commit. */
@@ -148,29 +155,30 @@ private fun ConversationController.inviteReplyNeedsReconciliation(throwable: Thr
         else -> true
     }
 
-/** Only an uncertain first invitation for absent recipients may reconcile by reading membership. */
+/** A definite all-skipped result cannot be reconciled against membership changed by another invitation. */
 internal fun ConversationController.canReconcileInviteReply(
     nativeInvoked: Boolean,
     absentBefore: Boolean,
     failure: Throwable,
-): Boolean = nativeInvoked && absentBefore && inviteReplyNeedsReconciliation(failure)
+): Boolean =
+    nativeInvoked &&
+        absentBefore &&
+        failure !is NoGroupMembersSelectedException &&
+        inviteReplyNeedsReconciliation(failure)
 
-/** Read actual membership after an uncertain reply, without issuing a second invitation. */
+/** Read actual membership after an uncertain reply and return the requested people still absent. */
 internal suspend fun ConversationController.reconcileInitialAdminInvite(
     refs: List<String>,
     admins: List<String>,
-    absentBefore: Boolean,
-    nativeInvoked: Boolean,
-    failure: Throwable,
-): Boolean {
-    val eligible = canReconcileInviteReply(nativeInvoked, absentBefore, failure)
-    if (!eligible) return false
+): List<String>? {
     val beforeRead = mutationPresentation.groupAuthorityEpoch
-    val applied = refreshManagementState()
-    val observedMembers =
-        membersVerified && refs.all { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
-    val observedAdmins = admins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
-    return applied && mutationPresentation.groupAuthorityEpoch != beforeRead && observedMembers && observedAdmins
+    if (!refreshManagementState() || mutationPresentation.groupAuthorityEpoch == beforeRead || !membersVerified) {
+        return null
+    }
+    val absent = refs.filterNot { ref -> members.any { it.memberIdHex.equals(ref, ignoreCase = true) } }
+    val presentAdmins = admins.filterNot { admin -> absent.any { it.equals(admin, ignoreCase = true) } }
+    val rolesMatch = presentAdmins.all { ref -> group.admins.any { it.equals(ref, ignoreCase = true) } }
+    return absent.takeIf { it.size < refs.size && rolesMatch }
 }
 
 /** Native capabilities stay unknown when local terminal reconciliation changes their returned group. */
