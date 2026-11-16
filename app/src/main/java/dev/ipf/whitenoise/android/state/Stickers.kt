@@ -50,7 +50,7 @@ data class LoadedSticker<I>(
  * of its conversations. Main-confined; MDK owns the packs, this only holds the last
  * installed list it returned.
  */
-class StickerLibrary(
+class StickerLibrary internal constructor(
     private val packs: suspend (installedOnly: Boolean, search: String?) -> List<StickerPackFfi>,
     private val syncPacks: suspend () -> Unit,
     private val fetchPack: suspend (input: String) -> StickerPackFfi,
@@ -60,6 +60,8 @@ class StickerLibrary(
     private val packShareLink: suspend (coordinate: String) -> String? = { null },
     /** Which White Noise default packs this account has had; null for a library that installs no defaults. */
     private val defaultPacks: StickerDefaultPackLedger? = null,
+    /** Reports a default pack that failed to install, which stays pending for the next open. */
+    private val onDefaultInstallFailed: (Throwable) -> Unit = {},
 ) {
     /** The link or address each pack was last opened from, so installing it asks the same relay hints. */
     private val openedFrom = HashMap<String, String>()
@@ -179,11 +181,24 @@ class StickerLibrary(
      */
     suspend fun installDefaultPacksIfNeeded() {
         val ledger = defaultPacks
-        if (ledger != null && synced && !isInstallingDefaults) {
+        if (ledger == null || !synced || isInstallingDefaults) return
+        // Claimed before the first suspension, so an overlapping open can't start a second run.
+        isInstallingDefaults = true
+        try {
             loadInstalledIfNeeded()
             if (hasLoadedInstalled) installDefaults(ledger)
+        } finally {
+            isInstallingDefaults = false
         }
     }
+
+    /** Whether a default pack may still install for this account, so a first open should wait for it. */
+    val mayInstallDefaults: Boolean
+        get() {
+            val ledger = defaultPacks ?: return false
+            val present = installed.mapTo(HashSet()) { it.coordinate }
+            return StickerDefaultPacks.toInstall(present, ledger.offered()).isNotEmpty()
+        }
 
     /** Installs each default the account still needs; one that fails stays pending for the next open. */
     private suspend fun installDefaults(ledger: StickerDefaultPackLedger) {
@@ -191,24 +206,21 @@ class StickerLibrary(
         ledger.record(StickerDefaultPacks.coordinates.filter { it in present })
         val pending = StickerDefaultPacks.toInstall(present, ledger.offered())
         if (pending.isEmpty()) return
-        isInstallingDefaults = true
-        try {
-            for (coordinate in pending) {
-                // A default the person removed while an earlier one installed stays removed.
-                val added =
-                    if (coordinate in ledger.offered()) {
-                        null
-                    } else {
-                        runCatchingCancellable { installPack(StickerDefaultPacks.installInput(coordinate)) }.getOrNull()
-                    }
-                if (added != null) {
-                    ledger.record(listOf(coordinate))
-                    membershipGeneration++
-                    installed = installed.filterNot { it.coordinate == added.coordinate } + added
+        for (coordinate in pending) {
+            // A default the person removed while an earlier one installed stays removed.
+            val added =
+                if (coordinate in ledger.offered()) {
+                    null
+                } else {
+                    runCatchingCancellable { installPack(StickerDefaultPacks.installInput(coordinate)) }
+                        .onFailure(onDefaultInstallFailed)
+                        .getOrNull()
                 }
+            if (added != null) {
+                ledger.record(listOf(coordinate))
+                membershipGeneration++
+                installed = installed.filterNot { it.coordinate == added.coordinate } + added
             }
-        } finally {
-            isInstallingDefaults = false
         }
         reloadInstalled()
     }

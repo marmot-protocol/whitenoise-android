@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StickerAssetCache
 import dev.ipf.whitenoise.android.state.StickerLibrary
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.sonarStickerLink
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -62,7 +63,6 @@ import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerPresentation.D
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
 
 private const val SEARCH_DEBOUNCE_MS = 250L
 
@@ -422,10 +422,5 @@ private fun stickerPackShareIntent(link: String): Intent =
         null,
     )
 
-private const val STICKER_SHARE_LINK_BASE = "https://sonarprivacy.xyz/stickers?a="
-
 /** A link to [pack] that opens on the web and that MDK reads back when pasted into "Add by link". */
-internal fun stickerPackShareLink(pack: StickerPackFfi): String {
-    val coordinate = URLEncoder.encode(pack.coordinate, "UTF-8")
-    return STICKER_SHARE_LINK_BASE + coordinate
-}
+internal fun stickerPackShareLink(pack: StickerPackFfi): String = sonarStickerLink(pack.coordinate)

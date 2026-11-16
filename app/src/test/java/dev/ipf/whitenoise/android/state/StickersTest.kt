@@ -383,6 +383,35 @@ class StickersTest {
 
             defaults.library.installDefaultPacksIfNeeded()
             assertEquals(2, defaults.inputs.size)
+            assertFalse(defaults.library.mayInstallDefaults)
+        }
+
+    /** An open that arrives while a run still reads the installed list, then installs, doesn't start a second run. */
+    @Test
+    fun overlappingOpensInstallEachDefaultOnce() =
+        runTest {
+            val defaults = DefaultsHarness()
+            // The sync's own reread fails, so the first run must read the installed list itself.
+            defaults.failReads = true
+            defaults.library.sync()
+            defaults.failReads = false
+            assertTrue(defaults.library.mayInstallDefaults)
+            val reads = CompletableDeferred<Unit>()
+            val installs = CompletableDeferred<Unit>()
+            defaults.readGate = reads
+            defaults.installGate = installs
+
+            val first = async { defaults.library.installDefaultPacksIfNeeded() }
+            runCurrent()
+            val second = async { defaults.library.installDefaultPacksIfNeeded() }
+            runCurrent()
+            reads.complete(Unit)
+            runCurrent()
+            installs.complete(Unit)
+            first.await()
+            second.await()
+
+            assertEquals(StickerDefaultPacks.coordinates.map(StickerDefaultPacks::installInput), defaults.inputs)
         }
 
     /** A removed default stays removed, and a default the account already has is recorded without reinstalling. */
@@ -438,16 +467,30 @@ class StickersTest {
         alreadyInstalled: List<String> = emptyList(),
         val failing: MutableSet<String> = mutableSetOf(),
     ) {
+        /** While set, installed-list reads fail, as an unreadable pack store does. */
+        var failReads = false
+
+        /** While set, each installed-list read waits for it. */
+        var readGate: CompletableDeferred<Unit>? = null
+
+        /** While set, each install waits for it after recording its input. */
+        var installGate: CompletableDeferred<Unit>? = null
+
         val inputs = mutableListOf<String>()
         var offered: Set<String> = emptySet()
         private val present = alreadyInstalled.toMutableSet()
         val library =
             StickerLibrary(
-                packs = { _, _ -> present.map { packAt(it, installed = true) } },
+                packs = { _, _ ->
+                    check(!failReads) { "pack storage busy" }
+                    readGate?.await()
+                    present.map { packAt(it, installed = true) }
+                },
                 syncPacks = {},
                 fetchPack = { error("unused") },
                 installPack = { input ->
                     inputs += input
+                    installGate?.await()
                     val coordinate = URLDecoder.decode(input.substringAfter("a=").substringBefore('&'), "UTF-8")
                     check(coordinate !in failing) { "relay unreachable" }
                     present += coordinate

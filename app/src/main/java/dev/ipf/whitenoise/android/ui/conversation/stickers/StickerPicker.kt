@@ -67,10 +67,16 @@ internal fun StickerPickerPage(
     onSend: (StickerFfi) -> Unit,
     onClose: () -> Unit,
 ) {
+    // A new account's White Noise packs land after its first sync, so wait through the sync and the installs
+    // instead of offering the browser.
+    var awaitingDefaults by remember(library) { mutableStateOf(library.mayInstallDefaults) }
     LaunchedEffect(library) {
-        library.loadInstalledIfNeeded()
-        // White Noise's own packs install once per account, after a sync shows what the account already has.
-        if (attemptSticker { library.sync() } == null) library.installDefaultPacksIfNeeded()
+        try {
+            library.loadInstalledIfNeeded()
+            if (attemptSticker { library.sync() } == null) library.installDefaultPacksIfNeeded()
+        } finally {
+            awaitingDefaults = false
+        }
     }
     val packs = library.installed.filter { it.stickers.isNotEmpty() }
     var selectedCoordinate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -91,7 +97,8 @@ internal fun StickerPickerPage(
                     retrying = false
                 }
             }
-        (!library.hasLoadedInstalled || library.isInstallingDefaults) && packs.isEmpty() -> StickerProgress()
+        (!library.hasLoadedInstalled || awaitingDefaults || library.isInstallingDefaults) && packs.isEmpty() ->
+            StickerProgress()
         selected == null -> EmptyStickerPicker(onBrowse)
         else -> {
             if (packs.size > 1) {

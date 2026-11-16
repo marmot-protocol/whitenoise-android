@@ -57,6 +57,9 @@ private fun stickerLibraryFor(
         uninstallPack = { input -> appState.marmotIo { uninstallStickerPack(account(), input) } },
         packShareLink = { coordinate -> appState.marmotIo { stickerPackShareLink(account(), coordinate) } },
         defaultPacks = accountRef?.let { StickerDefaultPackLedger.forAccount(appState.appContext, it) },
+        onDefaultInstallFailed = { failure ->
+            Log.w("StickerLibrary", "default_pack_install_failed type=${failure.javaClass.simpleName}")
+        },
     )
 }
 

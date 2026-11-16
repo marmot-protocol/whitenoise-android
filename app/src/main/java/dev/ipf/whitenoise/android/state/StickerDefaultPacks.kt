@@ -10,7 +10,6 @@ import java.net.URLEncoder
  */
 internal object StickerDefaultPacks {
     const val AUTHOR_PUBKEY_HEX = "75d737c3472471029c44876b330d2284288a42779b591a2ed4daa1c6c07efaf7"
-    private const val SONAR_LINK_BASE = "https://sonarprivacy.xyz/stickers"
 
     val coordinates: List<String> =
         listOf("30031:$AUTHOR_PUBKEY_HEX:white-noise-originals", "30031:$AUTHOR_PUBKEY_HEX:marmot")
@@ -19,12 +18,7 @@ internal object StickerDefaultPacks {
      * The packs live on White Noise's relays, which an imported account's own relay list may not include. MDK fetches
      * an install from the account's relays plus the input's hints, so each default install is a Sonar link naming them.
      */
-    fun installInput(coordinate: String): String {
-        val parameters = listOf("a" to coordinate) + MarmotClient.bootstrapRelays.map { "relay" to it }
-        return parameters.joinToString("&", prefix = "$SONAR_LINK_BASE?") { (name, value) ->
-            "$name=${URLEncoder.encode(value, "UTF-8")}"
-        }
-    }
+    fun installInput(coordinate: String): String = sonarStickerLink(coordinate, MarmotClient.bootstrapRelays)
 
     /** Default packs an account still needs, in order; one it has had installed is never offered again. */
     fun toInstall(
@@ -34,10 +28,27 @@ internal object StickerDefaultPacks {
 }
 
 /**
- * Which default packs one account has already had installed on this device. MDK's installed list can't tell "never
- * had it" from "removed it", so this is what keeps a removed default pack from coming back.
+ * A Sonar viewer link to the pack at [coordinate], naming [relays] as hints. It opens in a browser, and MDK reads it
+ * back, hints included, when it is pasted into "Add by link" or used as an install input.
  */
-class StickerDefaultPackLedger(
+internal fun sonarStickerLink(
+    coordinate: String,
+    relays: List<String> = emptyList(),
+): String {
+    val parameters = listOf("a" to coordinate) + relays.map { "relay" to it }
+    return parameters.joinToString("&", prefix = "$SONAR_STICKER_LINK_BASE?") { (name, value) ->
+        "$name=${URLEncoder.encode(value, "UTF-8")}"
+    }
+}
+
+private const val SONAR_STICKER_LINK_BASE = "https://sonarprivacy.xyz/stickers"
+
+/**
+ * Which default packs one account has already had installed on this device. MDK's installed list can't tell "never
+ * had it" from "removed it", so this is what keeps a removed default pack from coming back here. It is local: another
+ * device, or a reinstall, starts empty until MDK can keep this with the account.
+ */
+internal class StickerDefaultPackLedger(
     private val read: () -> Set<String>,
     private val write: (Set<String>) -> Unit,
 ) {
@@ -54,13 +65,27 @@ class StickerDefaultPackLedger(
     companion object {
         private const val PREFERENCES = "sticker_default_packs"
 
+        /** Drops what this device recorded for [accountRef], once its local data is wiped. */
+        fun forget(
+            context: Context,
+            accountRef: String,
+        ) {
+            context
+                .getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+                .edit()
+                .remove(key(accountRef))
+                .apply()
+        }
+
+        private fun key(accountRef: String) = "offered.$accountRef"
+
         /** The ledger for [accountRef], kept in app-private preferences. */
         fun forAccount(
             context: Context,
             accountRef: String,
         ): StickerDefaultPackLedger {
             val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-            val key = "offered.$accountRef"
+            val key = key(accountRef)
             return StickerDefaultPackLedger(
                 read = { preferences.getStringSet(key, null).orEmpty().toSet() },
                 write = { preferences.edit().putStringSet(key, it).apply() },
