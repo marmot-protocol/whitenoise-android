@@ -106,7 +106,7 @@ internal suspend fun NotificationDeliveryController.setNativePushEnabledLocked(
  * would stick indefinitely because `nativePushEnabled` is already
  * false locally and the sync loop would skip the account.
  */
-internal suspend fun NotificationDeliveryController.clearPushRegistrationForAccount(account: String) {
+private suspend fun NotificationDeliveryController.clearPushRegistrationForAccount(account: String) {
     nativePushSyncMutex.withLock {
         clearPushRegistrationForAccountLocked(account)
     }

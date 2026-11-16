@@ -47,6 +47,7 @@ class MarmotClient(
                         clientName = CLIENT_NAME,
                         cursorPersistence = CursorPersistenceFfi.ADVANCE,
                         attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
+                        moderationReportConfig = moderationReportConfig(),
                     ),
             )
         }

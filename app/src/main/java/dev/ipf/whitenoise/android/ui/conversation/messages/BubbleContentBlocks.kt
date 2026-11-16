@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.awaitingDelivery
+import dev.ipf.whitenoise.android.state.isDurableFailedSend
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
@@ -566,24 +567,29 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
 ) {
     val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
     val recoveryInFooter = showTimestamp && showOuterMetadata
+    val failedOwnSend = mine && item.status == MessageStatus.Failed
+    // A durable send whose publish failed offers Discard alone, retrying it is out of scope here.
+    val discardableSend = failedOwnSend || controller.isDurableFailedSend(item)
     val failedSendActions: @Composable () -> Unit = {
-        if (mine && item.status == MessageStatus.Failed) {
+        if (discardableSend) {
             Row(
                 modifier = Modifier.align(Alignment.End),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
-                    enabled = !textSelectionMode,
-                    onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
-                    modifier = Modifier.size(24.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = stringResource(R.string.retry),
-                        tint = timestampColor,
-                        modifier = Modifier.size(16.dp),
-                    )
+                if (failedOwnSend) {
+                    IconButton(
+                        enabled = !textSelectionMode,
+                        onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
+                        modifier = Modifier.size(24.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.retry),
+                            tint = timestampColor,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
                 IconButton(
                     enabled = !textSelectionMode,

@@ -278,6 +278,8 @@
     <string name="jump_to_newest">Zum Neuesten springen</string>
     <string name="scroll_to_top">Nach oben scrollen</string>
     <string name="discard_failed_message">Fehlgeschlagene Nachricht verwerfen</string>
+    <string name="message_discard_still_sending">Diese Nachricht wird noch gesendet. Versuche es gleich noch einmal.</string>
+    <string name="message_discard_not_failed">Diese Nachricht kann nicht mehr verworfen werden.</string>
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>
     <string name="invited_as_account">Eingeladenes Konto: %1$s</string>
@@ -808,8 +810,8 @@
     <string name="notification_sent_voice_message">hat eine Sprachnachricht gesendet</string>
     <string name="notification_sent_file">hat eine Datei gesendet</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
-    <string name="notification_invite_from_sender">Einladung von %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s hat dich zu %2$s eingeladen</string>
+    <string name="notification_invitation_to_group">Einladung zu %1$s</string>
+    <string name="notification_open_to_view_invite">Öffnen Sie White Noise, um die Einladung anzuzeigen</string>
     <string name="notification_removed_from_group">Du wurdest aus %1$s entfernt</string>
     <string name="notification_removed_from_unnamed_group">Du wurdest aus einer Gruppe entfernt</string>
     <string name="notification_made_admin_of_group">Du bist jetzt Admin von %1$s</string>
@@ -2040,10 +2042,14 @@
     <string name="setup_continue_without_profile">Ohne Profil fortfahren</string>
     <string name="setup_review_suggested_changes">Vorgeschlagene Änderungen prüfen</string>
     <string name="setup_chats_on_this_device">Chats auf diesem Gerät</string>
-    <string name="setup_chats_on_this_device_help">Die Anmeldung allein stellt deine bestehenden Chats und Nachrichten nicht wieder her. Wenn du ein anderes Gerät verwendest, behalte dort die App und ihre Daten, bis du deine Chats hier überprüft hast.</string>
+    <string name="setup_device_none_found">Wir haben keine Nachrichtenschlüssel von einer anderen App oder einem anderen Gerät gefunden.</string>
+    <string name="setup_device_unchecked">Wir konnten nicht prüfen, ob dieses Konto für Nachrichten eine andere App oder ein anderes Gerät verwendet.</string>
+    <string name="setup_device_found_on_date">Wir haben Nachrichtenschlüssel gefunden, die dieses Konto von einer anderen App oder einem anderen Gerät veröffentlicht hat, zuletzt am %1$s.</string>
+    <string name="setup_device_found">Wir haben Nachrichtenschlüssel gefunden, die dieses Konto von einer anderen App oder einem anderen Gerät veröffentlicht hat.</string>
+    <string name="setup_device_separate_chats">Dieses Gerät wird seine eigenen, getrennten Chats haben. Chats in der anderen App bleiben dort und werden hier nicht angezeigt.</string>
+    <string name="setup_device_new_chats_either_app">Wenn jemand einen neuen Chat mit dir beginnt, kann er in jeder der beiden Apps ankommen.</string>
+    <string name="setup_device_separate_chats_if_other_app">Wenn du eine andere App für Nachrichten verwendest, wird dieses Gerät seine eigenen, getrennten Chats haben, und Chats in der anderen App werden hier nicht angezeigt.</string>
     <string name="setup_device_stage">Gerätenutzung</string>
-    <string name="setup_other_sign_ins_found">Es wurden weitere Anmeldeeinträge gefunden. Sie können zu einer anderen oder einer früheren Installation gehören.</string>
-    <string name="setup_other_sign_ins_unchecked">Weitere Anmeldungen konnten nicht geprüft werden.</string>
     <string name="setup_approval_saved_pending">Deine Zustimmung ist gespeichert. Die Änderung steht noch aus.</string>
     <string name="setup_profile_scope_help">Dadurch wird dein Profil in anderen Nostr-Apps aktualisiert.</string>
     <string name="setup_optional_profile_help">Optional. Du kannst später ein Profil hinzufügen.</string>
@@ -2561,6 +2567,20 @@
     <string name="group_change_undelivered_message">Ihre letzte Änderung an dieser Gruppe hat noch nicht alle Relays der Gruppe erreicht. Mitglieder, die nur diese Relays nutzen, können der Gruppe womöglich nicht folgen, wenn Sie fortfahren. Warten oder trotzdem fortfahren?</string>
     <string name="group_change_wait">Warten</string>
     <string name="group_change_continue_anyway">Trotzdem fortfahren</string>
+    <string name="group_change_refused_title">Ein Relay hat Ihre letzte Änderung abgelehnt</string>
+    <string name="group_change_refused_message">Mindestens ein Relay dieser Gruppe hat Ihre letzte Änderung endgültig abgelehnt. Mitglieder, die nur dieses Relay nutzen, erhalten sie womöglich nicht und können der Gruppe nicht folgen, wenn Sie fortfahren. Warten hilft hier nicht. Fortfahren blendet auch die Warnung in diesem Chat aus.</string>
+    <string name="group_commit_refused_title">Gruppenänderung abgelehnt</string>
+    <string name="group_commit_refused_relay_too_large">%1$s hat eine Gruppenänderung von dir abgelehnt, weil sie zu groß war. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</string>
+    <string name="group_commit_refused_relay">%1$s hat eine Gruppenänderung von dir abgelehnt. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</string>
+    <string name="group_commit_refusal_dismiss_failed">Diese Warnung konnte nicht ausgeblendet werden. Versuche es noch einmal.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d Relay hat eine Gruppenänderung von dir abgelehnt, weil sie zu groß war. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</item>
+        <item quantity="other">%1$d Relays haben eine Gruppenänderung von dir abgelehnt, weil sie zu groß war. Mitglieder, die nur diese Relays nutzen, erhalten sie möglicherweise nicht.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d Relay hat eine Gruppenänderung von dir abgelehnt. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</item>
+        <item quantity="other">%1$d Relays haben eine Gruppenänderung von dir abgelehnt. Mitglieder, die nur diese Relays nutzen, erhalten sie möglicherweise nicht.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Trotzdem einladen</string>
     <string name="starting_as">Starten als</string>
     <string name="starting_as_account">Starten als %1$s</string>

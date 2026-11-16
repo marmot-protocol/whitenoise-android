@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-team-report-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "User Profile"
+- scrollUntilVisible:
+    element:
+      text: "Report to White Noise team"
+    direction: DOWN
+- tapOn: "Report to White Noise team"
+- assertVisible:
+    id: "message.report.body"
+- back
+- assertNotVisible:
+    id: "message.report.body"
+- assertVisible: "User Profile"

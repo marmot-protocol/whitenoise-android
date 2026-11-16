@@ -811,9 +811,7 @@ internal fun ChatListHeadReorderMotionHarness(
         }
         itemIds.forEachIndexed { targetIndex, id ->
             if (targetIndex == pinnedCount) {
-                item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {
-                    ChatListPinnedBoundary()
-                }
+                chatListPinnedBoundaryItem(rowPlacementDurationMillis)
             }
             item(key = id) {
                 Box(modifier = chatListRowMotion(targetIndex, rowPlacementDurationMillis)) {

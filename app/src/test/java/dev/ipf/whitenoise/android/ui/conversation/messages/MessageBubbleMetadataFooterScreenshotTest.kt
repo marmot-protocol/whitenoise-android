@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -274,11 +275,16 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
             1f,
         )
         val failedTime = composeRule.onNodeWithText("01:04", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        listOf("Retry", "Discard failed message").forEach {
-            val control =
-                composeRule.onNodeWithContentDescription(it, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val retry = composeRule.onNodeWithContentDescription("Retry", useUnmergedTree = true)
+        // The unconfirmed send MDK can discard offers Discard too, so the failed row's own control is the last one.
+        val discards = composeRule.onAllNodesWithContentDescription("Discard failed message", useUnmergedTree = true)
+        discards.assertCountEquals(2)
+        listOf(retry, discards[1]).forEach {
+            val control = it.getUnclippedBoundsInRoot()
             assertTrue("recovery controls must precede terminal metadata", control.bottom <= failedTime.top)
         }
+        val unconfirmedDiscard = discards[0].getUnclippedBoundsInRoot()
+        assertTrue("an unconfirmed send's Discard precedes its own time", unconfirmedDiscard.bottom <= time.top)
         capture(
             "message_metadata_footer_states_${if (amoled) {
                 "amoled"

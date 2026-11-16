@@ -57,6 +57,6 @@
     <string name="explanation_message_action_share">Öffnet das Android-Teilen-Menü mit dieser Nachricht. Die gewählte App erhält sie und liegt außerhalb von White Noise.</string>
     <string name="explanation_message_action_save">Speichert die Anhänge dieser Nachricht auf deinem Gerät.</string>
     <string name="explanation_message_action_info">Zeigt, wann diese Nachricht gesendet und empfangen wurde, wer sie gesendet hat, ihre ID und ihren Status.</string>
-    <string name="explanation_message_action_report">Öffnet ein Meldeformular für die Gruppenadmins. Nichts wird gesendet, bis du bestätigst, und Admins sehen, wer gemeldet hat.</string>
+    <string name="explanation_message_action_report">Öffnet ein Meldeformular für die Admins dieser Gruppe, das White-Noise-Team oder beide. Nichts wird gesendet, bevor du bestätigst.</string>
     <string name="explanation_message_action_delete">Lässt dich diese Nachricht nur auf diesem Gerät oder für alle löschen. Für alle löschen lässt sich nicht rückgängig machen. Nichts wird gelöscht, bis du wählst.</string>
 </resources>

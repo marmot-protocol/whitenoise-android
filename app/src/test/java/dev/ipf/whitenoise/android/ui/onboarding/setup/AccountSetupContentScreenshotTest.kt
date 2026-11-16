@@ -344,7 +344,7 @@ class AccountSetupContentScreenshotTest {
             theme = SetupScreenshotTheme.AMOLED,
         )
 
-    /** Expanded device diagnostics add no note when no other sign-ins were found, since finding none proves nothing. */
+    /** Expanded device diagnostics after a check that found no keys elsewhere state that once, with no explanation. */
     @Test fun deviceDiscoveryDetails() =
         capture(
             "device_discovery_details",
@@ -385,7 +385,7 @@ class AccountSetupContentScreenshotTest {
         capture("cancellation_retry", AccountSetupState(snapshot = snapshot))
     }
 
-    /** Records the acknowledgment text and evidence about another possible installation. */
+    /** Records the acknowledgment and the separate-chats explanation for another possible installation. */
     @Test fun singleDevice() =
         capture(
             "single_device",
@@ -403,6 +403,23 @@ class AccountSetupContentScreenshotTest {
                             setupDeviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE)
                         snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.findings =
                             listOf(setupFinding(OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE, null))
+                    },
+            ),
+        )
+
+    /** Names the day another installation last published messaging keys, then explains its separate chats. */
+    @Test fun singleDeviceFoundOnDate() =
+        capture(
+            "device_found_on_date",
+            AccountSetupState(
+                snapshot =
+                    setupSnapshot(OnboardingStepFfi.SINGLE_DEVICE, listOf(OnboardingActionFfi.CONTINUE_ANYWAY)).also {
+                        it.singleDeviceNotice =
+                            setupDeviceNotice(
+                                OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE,
+                                // Noon UTC, so the day reads 15 March 2026 anywhere from UTC−11 to UTC+11.
+                                publishedAt = listOf(1_773_576_000uL),
+                            )
                     },
             ),
         )

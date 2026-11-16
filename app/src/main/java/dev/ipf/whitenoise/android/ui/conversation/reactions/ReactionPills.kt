@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
@@ -50,12 +52,16 @@ import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 // Distinct emojis shown as pills; the "+N" pill carries every reaction beyond them.
 internal const val MAX_VISIBLE_REACTIONS = 4
 
-/** One rendered reaction pill: an emoji with its count, or the "+N" overflow of the omitted emoji types. */
+/**
+ * One rendered reaction pill: an emoji with its count, or the "+N" overflow of the omitted emoji types.
+ * [reactionMessageIdHex] names the reaction whose own artwork a `:shortcode:` pill draws.
+ */
 internal data class ReactionPill(
     val emoji: String?,
     val count: Int,
     val selected: Boolean,
     val omittedTypes: Int = 0,
+    val reactionMessageIdHex: String? = null,
 )
 
 /** The prototype's summary: up to [maximumPills] emoji pills, then one "+N" pill for the rest. */
@@ -63,8 +69,8 @@ internal fun reactionPills(
     tallies: List<ReactionTally>,
     maximumPills: Int = MAX_VISIBLE_REACTIONS,
 ): List<ReactionPill> {
-    if (tallies.size <= maximumPills) return tallies.map { ReactionPill(it.emoji, it.count, it.mine) }
-    val visible = tallies.take(maximumPills).map { ReactionPill(it.emoji, it.count, it.mine) }
+    if (tallies.size <= maximumPills) return tallies.map { it.toPill() }
+    val visible = tallies.take(maximumPills).map { it.toPill() }
     val omitted = tallies.drop(maximumPills)
     return visible +
         ReactionPill(
@@ -74,6 +80,9 @@ internal fun reactionPills(
             omittedTypes = omitted.size,
         )
 }
+
+/** The pill for one tally, carrying the reaction whose own artwork it may draw. */
+private fun ReactionTally.toPill() = ReactionPill(emoji, count, mine, reactionMessageIdHex = reactionMessageIdHex)
 
 /** The canonical overflow chip also represents an accepted local emoji beyond the visible four. */
 internal fun ReactionPill.motionEmoji(
@@ -243,7 +252,11 @@ private fun ReactionPillSurface(
     val emoji = pill.emoji
     // Keep the Text's own immutable layout for an already-present counted badge too.
     var emojiLayout by remember(emoji) { mutableStateOf<TextLayoutResult?>(null) }
-    val artwork = emoji?.let { EmojiShortcodes.art(it, LocalCustomEmoji.current, emptyMap()) }
+    val received = rememberReactionReceivedEmoji(emoji, pill.reactionMessageIdHex)
+    // As on iOS, a reaction's own artwork wins over the reader's emoji of the same name, which only fills in when the
+    // reaction carries none.
+    val library = if (received.art.isEmpty()) LocalCustomEmoji.current else CustomEmojiSet.Empty
+    val artwork = emoji?.let { EmojiShortcodes.art(it, library, received.art) }
     Row(
         modifier =
             Modifier
@@ -264,19 +277,21 @@ private fun ReactionPillSurface(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (emoji != null) {
-            Text(
-                text = EmojiShortcodes.annotate(AnnotatedString(emoji)),
-                modifier =
-                    Modifier.localReactionGlyphTarget(localMotion, emoji, pill.selected, allowHostClipping) {
-                        emojiLayout?.takeIf { artwork == null || it.placeholderRects.singleOrNull() != null }
-                    },
-                onTextLayout = { emojiLayout = it },
-                inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
-                fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
-                lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
-                maxLines = 1,
-                softWrap = false,
-            )
+            CompositionLocalProvider(LocalCustomEmoji provides library) {
+                Text(
+                    text = EmojiShortcodes.annotate(AnnotatedString(emoji)),
+                    modifier =
+                        Modifier.localReactionGlyphTarget(localMotion, emoji, pill.selected, allowHostClipping) {
+                            emojiLayout?.takeIf { artwork == null || it.placeholderRects.singleOrNull() != null }
+                        },
+                    onTextLayout = { emojiLayout = it },
+                    inlineContent = EmojiShortcodes.content(received),
+                    fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
+                    lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         } else {
             Text(
                 text = "+${pill.omittedTypes}",

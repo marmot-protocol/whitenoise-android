@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationReply.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Notification Mark as read marks the message read and updates the chat-list row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationReply.kt",
+        "anchor": "suspend fun WhiteNoiseAppState.markNotificationMessageRead(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

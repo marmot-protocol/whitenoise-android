@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRetentionSweep.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Hourly retention sweep prunes expired messages in closed chats across signed-in accounts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRetentionSweep.kt",
+        "anchor": "suspend fun WhiteNoiseAppState.sweepExpiredDisappearingMessages(",
+        "test_ids": [
+          "GRP-017"
+        ]
+      },
+      {
+        "surface": "Pruned groups dismiss their notification and evict expired decrypted media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRetentionSweep.kt",
+        "anchor": "private suspend fun WhiteNoiseAppState.processRetentionSweepOutcome(",
+        "test_ids": [
+          "GRP-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

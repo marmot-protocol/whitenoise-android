@@ -22,6 +22,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.isUsageDiagnosticsGranted
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

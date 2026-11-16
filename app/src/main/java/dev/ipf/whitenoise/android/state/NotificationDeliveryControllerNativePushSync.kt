@@ -40,7 +40,7 @@ internal suspend fun NotificationDeliveryController.hasConfirmedNativePushRegist
 
 /** Replays pending cleanup before registration and gates token acquisition on capability. */
 @Suppress("ReturnCount")
-internal suspend fun NotificationDeliveryController.syncNativePushRegistrationIfEnabledLocked(
+private suspend fun NotificationDeliveryController.syncNativePushRegistrationIfEnabledLocked(
     freshCallbackToken: String? = null,
     callbackOwnerIsCurrent: () -> Boolean = { true },
 ): Boolean {
@@ -84,7 +84,7 @@ internal suspend fun NotificationDeliveryController.syncNativePushRegistrationIf
 }
 
 /** The caller holds the sync mutex through every account and the atomic pending-marker acknowledgement. */
-internal suspend fun NotificationDeliveryController.syncNativePushRegistrationForAccountsLocked(
+private suspend fun NotificationDeliveryController.syncNativePushRegistrationForAccountsLocked(
     accountRefs: List<String>,
     config: PushServerConfig,
     freshCallbackToken: String?,
@@ -108,7 +108,7 @@ internal suspend fun NotificationDeliveryController.syncNativePushRegistrationFo
 }
 
 /** Only this invocation's fresh callback can replace a failed SDK acquisition. */
-internal suspend fun NotificationDeliveryController.tokenForNativePushSync(
+private suspend fun NotificationDeliveryController.tokenForNativePushSync(
     freshCallbackToken: String?,
     operationIsCurrent: () -> Boolean,
 ): String? =
@@ -118,7 +118,12 @@ internal suspend fun NotificationDeliveryController.tokenForNativePushSync(
                 withContext(pushWakeStorageDispatcher) { pushTokenStore.lastToken() == it }
         }
 
-internal suspend fun NotificationDeliveryController.syncPushForAccount(
+/**
+ * Registers [token] for [account] when its native push is enabled, caching the fingerprint only after a
+ * settings re-read confirms it, and rolling back when a concurrent disable won. Returns whether the
+ * account needs no retry.
+ */
+private suspend fun NotificationDeliveryController.syncPushForAccount(
     account: String,
     config: PushServerConfig,
     token: String,
@@ -222,7 +227,8 @@ internal suspend fun NotificationDeliveryController.fetchFcmTokenOrNull(
     }
 }
 
-internal suspend fun NotificationDeliveryController.readFcmTokenFromSdk(): String? =
+/** Reads the current FCM token from the Firebase SDK, or null when the task fails. */
+private suspend fun NotificationDeliveryController.readFcmTokenFromSdk(): String? =
     suspendCancellableCoroutine<String?> { continuation ->
         // The Firebase Task API has no cancel surface, so the
         // completion listener can fire after this coroutine is

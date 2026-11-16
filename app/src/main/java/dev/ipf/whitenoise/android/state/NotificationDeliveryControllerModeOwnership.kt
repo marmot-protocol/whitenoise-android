@@ -37,7 +37,7 @@ internal suspend fun NotificationDeliveryController.notificationDeliveryActivati
 
 /** Reads every captured account without treating an unavailable setting as disabled. */
 @Suppress("ReturnCount") // Missing settings, read failure, and owner invalidation abort the bounded scan.
-internal suspend fun NotificationDeliveryController.readNotificationDeliverySettings(
+private suspend fun NotificationDeliveryController.readNotificationDeliverySettings(
     owner: NotificationDeliveryModeOwner,
 ): Map<String, NotificationSettingsFfi>? {
     val settingsByAccount = linkedMapOf<String, NotificationSettingsFfi>()

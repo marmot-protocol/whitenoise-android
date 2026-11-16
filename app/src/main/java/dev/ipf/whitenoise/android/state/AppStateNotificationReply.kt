@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
+import android.util.Log
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
@@ -210,6 +212,27 @@ private suspend fun WhiteNoiseAppState.notificationReplyCommitState(
                 it.readableMessage()
         }
     }.getOrDefault(NotificationReplyCommitProbe.Indeterminate)
+}
+
+suspend fun WhiteNoiseAppState.markNotificationMessageRead(
+    accountRef: String,
+    groupIdHex: String,
+    messageIdHex: String,
+): Boolean {
+    val account = accountRef.takeIf { it.isNotBlank() } ?: return false
+    val group = groupIdHex.takeIf { it.isNotBlank() } ?: return false
+    val message = messageIdHex.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) } ?: return false
+    return runCatchingCancellable {
+        // markTimelineMessageRead advances the persisted cursor monotonically;
+        // an old notification tap must not move the read marker backwards.
+        val row = marmotIo { markTimelineMessageRead(account, group, message) }
+        if (!applyChatListRowFromMarkRead(account, row)) {
+            reconcileAccountUnreadAfterNotificationMarkRead(account, cursorAdvanced = row != null)
+        }
+        true
+    }.onFailure {
+        if (BuildConfig.DEBUG) Log.w("DMAppState", "notification mark read failed", it)
+    }.getOrDefault(false)
 }
 
 /**

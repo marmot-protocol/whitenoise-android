@@ -27,12 +27,14 @@ internal fun LocalNotificationPresenter.stampPresentationTime(
     builder.setPublicVersion(redactedPublicVersion(channelId, category, presentationTimestampMs))
 }
 
-// Shown in place of the real card whenever the lockscreen redacts private
-// notifications. The OS can auto-generate one, but that behaviour varies by
-// OEM; supplying our own guarantees no sender, body, or group name ever
-// reaches the lockscreen — it carries only the app name and the generic
-// hidden-content message.
-internal fun LocalNotificationPresenter.redactedPublicVersion(
+/**
+ * Shown in place of the real card whenever the lockscreen redacts private
+ * notifications. The OS can auto-generate one, but that behaviour varies by
+ * OEM; supplying our own guarantees no sender, body, or group name ever
+ * reaches the lockscreen — it carries only the app name and the generic
+ * hidden-content message.
+ */
+private fun LocalNotificationPresenter.redactedPublicVersion(
     channelId: String,
     category: String,
     presentationTimestampMs: Long,

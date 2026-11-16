@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.MAX_TOP_BAR_OTHER_ACCOUNTS
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
 import dev.ipf.whitenoise.android.state.otherAccountAvatars
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
