@@ -1981,7 +1981,19 @@ internal fun MainShell(
                 // disposal one committed frame before releasing the controller that
                 // the outgoing ConversationScreen may still reference.
                 withFrameNanos { }
-                if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
+                // A close or tap during that frame does not cancel this effect until the next
+                // recomposition, so recheck live state before releasing the slot.
+                val retainedForTap =
+                    currentTwoPane &&
+                        pendingConversationOpen?.let { request ->
+                            pendingConversationOpenBelongsToAccount(request.accountRef, appState.activeAccountRef)
+                        } == true
+                if (exitingConversationContent === exiting &&
+                    selectedChat?.id != exiting.chat.id &&
+                    !retainedForTap
+                ) {
+                    exitingConversationContent = null
+                }
             }
             // Keyed on the exact displaced set: a close that displaces another controller during the
             // wait restarts it, so only controllers whose exit already settled are released.
