@@ -280,6 +280,7 @@
     <string name="jump_to_newest">Vai al più recente</string>
     <string name="scroll_to_top">Scorri verso l\'alto</string>
     <string name="discard_failed_message">Elimina messaggio non riuscito</string>
+    <string name="message_discard_still_sending">Questo messaggio è ancora in fase di invio. Riprova tra poco.</string>
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>
     <string name="invited_as_account">Account invitato: %1$s</string>

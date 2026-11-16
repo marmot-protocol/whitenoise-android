@@ -352,6 +352,7 @@
     <string name="jump_to_newest">Jump to newest</string>
     <string name="scroll_to_top">Scroll to top</string>
     <string name="discard_failed_message">Discard failed message</string>
+    <string name="message_discard_still_sending">This message is still sending. Try again in a moment.</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
     <string name="invited_as_account">Invited as %1$s</string>

@@ -280,6 +280,7 @@
     <string name="jump_to_newest">Saltar al más reciente</string>
     <string name="scroll_to_top">Desplazar al inicio</string>
     <string name="discard_failed_message">Descartar mensaje fallido</string>
+    <string name="message_discard_still_sending">Este mensaje aún se está enviando. Inténtalo de nuevo en un momento.</string>
     <string name="decline">Rechazar</string>
     <string name="accept">Aceptar</string>
     <string name="invited_as_account">Cuenta invitada: %1$s</string>

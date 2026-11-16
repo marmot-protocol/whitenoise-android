@@ -109,7 +109,9 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.canReportMessage
+import dev.ipf.whitenoise.android.state.discardDurableFailedSend
 import dev.ipf.whitenoise.android.state.dismissReports
+import dev.ipf.whitenoise.android.state.isDurableFailedSend
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportMessage
 import dev.ipf.whitenoise.android.state.reportsFor
@@ -1029,13 +1031,21 @@ internal fun MessageBubble(
         surfaces.deleteDialogOpen = true
     }
 
-    /** Hides the message on this device only, closing the dialog once the controller confirms the removal. */
+    /**
+     * Removes the message from this device only, closing the dialog once the controller confirms it. A failed own
+     * send goes through MDK's discard, which publishes nothing; any other message is hidden locally.
+     */
     fun performDeleteForMe() {
         if (surfaces.deleteInFlight) return
         surfaces.deleteInFlight = true
         appState.launchMutation {
             try {
-                val removed = controller.hideMessageForMe(record.messageIdHex)
+                val removed =
+                    if (controller.isDurableFailedSend(item)) {
+                        controller.discardDurableFailedSend(record.messageIdHex)
+                    } else {
+                        controller.hideMessageForMe(record.messageIdHex)
+                    }
                 if (removed) surfaces.deleteDialogOpen = false
             } finally {
                 surfaces.deleteInFlight = false
@@ -1656,12 +1666,14 @@ internal fun MessageBubble(
         val readAloudLabels =
             setOf(stringResource(R.string.tts_choose_sentence), stringResource(R.string.tts_read_from_sentence))
         val failedOwnSend = mine && item.status == MessageStatus.Failed
+        // MDK can discard a durable failed send but has no host retry for it, so it offers Discard alone.
+        val discardableSend = failedOwnSend || controller.isDurableFailedSend(item)
         val rowActions =
             listOf(
                 MessageRowAction(stringResource(R.string.retry), failedOwnSend) {
                     appState.launchMutation { controller.retryFailedSend(item) }
                 },
-                MessageRowAction(stringResource(R.string.discard_failed_message), failedOwnSend) {
+                MessageRowAction(stringResource(R.string.discard_failed_message), discardableSend) {
                     appState.launchMutation { controller.discardFailedSend(item) }
                 },
                 MessageRowAction(stringResource(R.string.reply), !deleted && !actionsReadOnly, ::beginReply),
