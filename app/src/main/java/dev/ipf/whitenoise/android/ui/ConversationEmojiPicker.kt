@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.snapshotFlow
+import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationEmojiSource
 import dev.ipf.whitenoise.android.state.conversationEmojiSources
@@ -58,7 +59,13 @@ private fun conversationEmojiPicker(
     if (sources.isEmpty()) return null
     return ConversationEmojiPicker(sources) { code, source ->
         emojiArt(controller.mediaTrustDomain) {
-            controller.readConversationEmojiArtwork(code, source, CustomEmojiStore.MAX_BYTES.toLong()).bytes
+            controller
+                .readConversationEmojiArtwork(
+                    code,
+                    source,
+                    AttachmentDownloadPriority.Automatic,
+                    CustomEmojiStore.MAX_BYTES.toLong(),
+                ).bytes
         }
     }
 }

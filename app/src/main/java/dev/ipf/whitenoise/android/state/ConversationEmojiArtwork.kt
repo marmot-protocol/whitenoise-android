@@ -53,7 +53,7 @@ internal suspend fun ConversationController.emojiArtworkIncludingConversation(
     val codes = Nip30Emoji.shortcodesIn(text)
     val sources = if (codes.all(known::containsKey)) emptyMap() else conversationEmojiSources()
     return resolveConversationEmojiArtwork(codes, known, sources) { code, source, maxBytes ->
-        readConversationEmojiArtwork(code, source, maxBytes)
+        readConversationEmojiArtwork(code, source, AttachmentDownloadPriority.Interactive, maxBytes)
     }
 }
 
@@ -96,6 +96,7 @@ internal suspend fun ConversationController.conversationEmojiSources(): Map<Stri
 internal suspend fun ConversationController.readConversationEmojiArtwork(
     shortcode: String,
     source: ConversationEmojiSource,
+    priority: AttachmentDownloadPriority,
     maxBytes: Long = EMOJI_SEND_MAX_BYTES.toLong(),
 ): LocalEmojiArtwork {
     val reference = source.reference
@@ -104,7 +105,7 @@ internal suspend fun ConversationController.readConversationEmojiArtwork(
             source.messageIdHex,
             source.attachmentIndex,
             reference,
-            AttachmentDownloadPriority.Automatic,
+            priority,
             maxBytes = maxBytes,
         )
     val artwork =
