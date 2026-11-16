@@ -303,6 +303,24 @@ class PersistentDisplayThumbnailsTest {
         assertEquals(0, keyUses.get())
     }
 
+    /** Concurrent deletes never lose a queued message, although only one caller sweeps at a time. */
+    @Test
+    fun concurrentSweepsRemoveEveryQueuedMessage() {
+        val cache = cache()
+        val sources = (0 until 8).map { source.copy(attachmentKey = "account:chat:message-$it:0") }
+        sources.forEach { cache.write(it, MediaThumbnail(bitmap, 128), cache.captureGeneration(it)) }
+        assertEquals(sources.toSet(), cache.storedSources())
+        val deletes =
+            sources.map { deleted ->
+                Thread {
+                    cache.queueMessageRemoval(deleted.attachmentKey.dropLast(1))
+                    cache.removeQueuedMessages()
+                }.apply { start() }
+            }
+        deletes.forEach { it.join(5_000) }
+        assertEquals(emptySet<DisplayThumbnailSource>(), cache.storedSources())
+    }
+
     /** Independent instances share encrypted bytes and a test-only key, as across process restart. */
     private fun cache(
         budget: Long = PersistentDisplayThumbnails.MAX_BYTES,

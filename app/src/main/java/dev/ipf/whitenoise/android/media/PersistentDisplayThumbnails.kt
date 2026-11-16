@@ -62,7 +62,9 @@ internal class PersistentDisplayThumbnails(
     private val sourceIndex = mutableMapOf<String, DisplayThumbnailSource>()
     private val indexScanLock = Any()
     private var indexed = false
-    private val messageSweepLock = Any()
+    private val messageSweepRunning =
+        java.util.concurrent.atomic
+            .AtomicBoolean()
 
     /** Elapsed-realtime instant of the last complete native reconciliation in this process, if any. */
     @Volatile
@@ -154,21 +156,37 @@ internal class PersistentDisplayThumbnails(
     }
 
     /**
-     * Removes every size/index of each queued message in one authenticated scan, fencing writers that have yet to
-     * publish a slot. A caller that finds the queue taken waits for that sweep, so its own message is gone on return.
+     * Removes every size/index of each queued message, fencing writers that have yet to publish a slot. A caller that
+     * finds a sweep running returns at once: that sweep drains the queue, this caller's message included. Its pixels
+     * and pending producers were already fenced when the message was queued.
      */
-    fun removeQueuedMessages() =
-        synchronized(messageSweepLock) {
-            val prefixes =
-                synchronized(queuedMessagePrefixes) {
-                    queuedMessagePrefixes.toSet().also { queuedMessagePrefixes.clear() }
+    fun removeQueuedMessages() {
+        // One caller drains for everyone; the rest return at once instead of parking an IO thread on a lock while
+        // the cache's one-time startup scan runs. Rechecking after release catches a message queued in between.
+        while (messageSweepRunning.compareAndSet(false, true)) {
+            try {
+                while (true) {
+                    val prefixes = takeQueuedMessages()
+                    if (prefixes.isEmpty()) break
+                    invalidate(messagePrefixes = prefixes) { removeMessageSlots(prefixes) }
                 }
-            if (prefixes.isEmpty()) return@synchronized
-            invalidate(messagePrefixes = prefixes) {
-                storedSources()
-                    .filter { source -> prefixes.any { source.attachmentKey.startsWith(it, ignoreCase = true) } }
-                    .forEach { source -> thumbnailDecodeBuckets.forEach { disk.remove(slot(source, it)) } }
+            } finally {
+                messageSweepRunning.set(false)
             }
+            if (synchronized(queuedMessagePrefixes) { queuedMessagePrefixes.isEmpty() }) return
+        }
+    }
+
+    /** Removes every stored size of each source under [prefixes]; a lookup in the source index, not a scan. */
+    private fun removeMessageSlots(prefixes: Set<String>) =
+        storedSources()
+            .filter { source -> prefixes.any { source.attachmentKey.startsWith(it, ignoreCase = true) } }
+            .forEach { source -> thumbnailDecodeBuckets.forEach { disk.remove(slot(source, it)) } }
+
+    /** Takes every queued deleted-message prefix at once, so concurrent deletes share one sweep. */
+    private fun takeQueuedMessages(): Set<String> =
+        synchronized(queuedMessagePrefixes) {
+            queuedMessagePrefixes.toSet().also { queuedMessagePrefixes.clear() }
         }
 
     /** Authenticates source and bounds without allocating another decoded bitmap. */
