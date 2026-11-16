@@ -668,7 +668,7 @@ class AppStateSendLockCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing AppStateNotificationReply.kt source file")
 
-    /** The forwarding extensions, which fan one message out under each target's commit lock. */
+    /** The retention sweep extensions, which prune expired messages through the engine account worker. */
     private fun retentionSweepSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/AppStateRetentionSweep.kt"),
@@ -676,6 +676,7 @@ class AppStateSendLockCoverageTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing AppStateRetentionSweep.kt source file")
 
+    /** The forwarding extensions, which fan one message out under each target's commit lock. */
     private fun forwardingSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt"),
