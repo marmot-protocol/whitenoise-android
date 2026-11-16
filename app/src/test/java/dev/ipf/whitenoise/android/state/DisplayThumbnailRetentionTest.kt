@@ -127,9 +127,9 @@ class DisplayThumbnailRetentionTest {
             assertNotNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
         }
 
-    /** Every state in which MDK keeps no retained body rejects the derivative; transfers in progress keep it. */
+    /** Only MDK's removal states reject the derivative; transfers in progress and other bodiless states keep it. */
     @Test
-    fun onlyStatesWithoutARetainedBodyRemoveTheDerivative() {
+    fun onlyRemovalStatesRemoveTheDerivative() {
         val removed =
             setOf(
                 AttachmentTransferStateFfi.UNAVAILABLE,

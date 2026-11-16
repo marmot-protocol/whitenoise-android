@@ -13,8 +13,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * True when MDK holds no retained body for the source, so its derivative must not be read, written or kept.
- * Exhaustive on purpose: a state added by a future MarmotKit fails the build here instead of granting reads.
+ * True for MDK's removal states: the body was deleted, cleaned by a retention setting or is gone for good, so its
+ * derivative must not be read, written or kept. Other states without a body (for example CANCELLED after a cleaned
+ * file was requested again) keep the derivative, because Android's own cached original may still back it. Exhaustive
+ * on purpose: a state added by a future MarmotKit fails the build here instead of granting reads.
  */
 internal fun AttachmentTransferStateFfi.removesDisplayThumbnail(): Boolean =
     when (this) {
@@ -77,6 +79,8 @@ internal suspend fun WhiteNoiseAppState.reconcileDisplayThumbnails() {
         val stillOwned = {
             retentionSweepRuntimeOrNull() === engine && owner == (runtimeGeneration to mediaUploadSessionEpoch())
         }
+        // A deleted-message sweep that failed earlier left its batch queued; retry it before the scan.
+        sweepRemovedMessageDisplayThumbnails()
         val accounts = accounts.map { it.label }.toSet() + listOfNotNull(activeAccountRef)
         val sources = withContext(Dispatchers.IO) { displayThumbnails.storedSources() }
         val requests = sources.mapNotNull { source -> source.transferRequest()?.let { source to it } }
@@ -96,7 +100,10 @@ internal suspend fun WhiteNoiseAppState.reconcileDisplayThumbnails() {
     }
 }
 
-/** Reads one bounded group batch and applies only successful native removal answers; false when MDK was unreadable. */
+/**
+ * Reads one bounded group batch and applies only successful native removal answers. False when MDK was unreadable,
+ * including a source whose message lookup failed, so the pass does not count as complete.
+ */
 private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
     engine: MarmotInterface,
     account: String,
@@ -104,11 +111,15 @@ private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
     batch: List<Pair<DisplayThumbnailSource, AttachmentTransferRequest>>,
     stillOwned: () -> Boolean,
 ): Boolean {
+    var unreadable = false
     val resolved =
         batch.mapNotNull { (source, request) ->
-            runCatchingCancellable { resolveNativeAttachmentTarget(request) }.getOrNull()?.let { source to it }
+            runCatchingCancellable { resolveNativeAttachmentTarget(request) }
+                .onFailure { unreadable = true }
+                .getOrNull()
+                ?.let { source to it }
         }
-    if (resolved.isEmpty() || !stillOwned()) return true
+    if (resolved.isEmpty() || !stillOwned()) return !unreadable
     val tokens = resolved.map { displayThumbnails.captureGeneration(it.first) }
     val states =
         runCatchingCancellable {
@@ -121,7 +132,7 @@ private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
     states?.indices?.filter { states[it].state.removesDisplayThumbnail() }?.forEach { index ->
         evictRemovedDisplaySource(resolved[index].first, tokens[index], stillOwned)
     }
-    return states != null
+    return states != null && !unreadable
 }
 
 /** Checks the snapshot owner before destructive cache work and fences all pending producers of that source. */

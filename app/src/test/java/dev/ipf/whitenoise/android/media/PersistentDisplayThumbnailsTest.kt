@@ -303,7 +303,10 @@ class PersistentDisplayThumbnailsTest {
         assertEquals(0, keyUses.get())
     }
 
-    /** Concurrent deletes never lose a queued message, although only one caller sweeps at a time. */
+    /**
+     * Deletes from many threads all land, although only one caller sweeps at a time. The window in which a message is
+     * queued just as the runner finishes is hit only by chance here; the drain loop's recheck is what covers it.
+     */
     @Test
     fun concurrentSweepsRemoveEveryQueuedMessage() {
         val cache = cache()

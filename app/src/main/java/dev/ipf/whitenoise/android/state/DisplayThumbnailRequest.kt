@@ -102,6 +102,16 @@ internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
     maxEdgePx: Int,
 ) {
     val owner = currentCoroutineContext().job
+    // The native check runs before the one write permit, so no encode waits behind another source's MDK lookup.
+    val target =
+        withContext(Dispatchers.IO) {
+            runCatchingCancellable {
+                val transfer = request.source.transferRequest() ?: return@runCatchingCancellable null
+                val target = resolveNativeAttachmentTarget(transfer) ?: return@runCatchingCancellable null
+                val phase = nativeAttachmentState(transfer.copy(sourceMessageIdHex = target.sourceMessageIdHex))
+                target.takeUnless { phase == null || phase.removesDisplayThumbnail() }
+            }.getOrNull()
+        } ?: return
     displayThumbnailWritePermit.withPermit {
         if (!displayThumbnailRequestCurrent(request)) return@withPermit
         withContext(Dispatchers.IO) {
@@ -109,10 +119,6 @@ internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
                 if (displayThumbnails.hasMatching(request.source, maxEdgePx, request.generation)) {
                     return@runCatchingCancellable
                 }
-                val transfer = request.source.transferRequest() ?: return@runCatchingCancellable
-                val target = resolveNativeAttachmentTarget(transfer) ?: return@runCatchingCancellable
-                val phase = nativeAttachmentState(transfer.copy(sourceMessageIdHex = target.sourceMessageIdHex))
-                if (phase == null || phase.removesDisplayThumbnail()) return@runCatchingCancellable
                 val bitmap = pixels.get()?.takeUnless { it.isRecycled } ?: return@runCatchingCancellable
                 recordDisplayThumbnailEvent(DisplayThumbnailEvent.WRITE_ATTEMPT)
                 displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.write") {

@@ -158,7 +158,8 @@ internal class PersistentDisplayThumbnails(
     /**
      * Removes every size/index of each queued message, fencing writers that have yet to publish a slot. A caller that
      * finds a sweep running returns at once: that sweep drains the queue, this caller's message included. Its pixels
-     * and pending producers were already fenced when the message was queued.
+     * and pending producers were already fenced when the message was queued. A batch that fails stays queued for the
+     * next sweep, which the next delete or reconciliation pass starts.
      */
     fun removeQueuedMessages() {
         // One caller drains for everyone; the rest return at once instead of parking an IO thread on a lock while
@@ -168,12 +169,23 @@ internal class PersistentDisplayThumbnails(
                 while (true) {
                     val prefixes = takeQueuedMessages()
                     if (prefixes.isEmpty()) break
-                    invalidate(messagePrefixes = prefixes) { removeMessageSlots(prefixes) }
+                    removeMessageBatch(prefixes)
                 }
             } finally {
                 messageSweepRunning.set(false)
             }
             if (synchronized(queuedMessagePrefixes) { queuedMessagePrefixes.isEmpty() }) return
+        }
+    }
+
+    /** Removes one taken batch; a failed batch, other callers' messages included, is queued again for a later sweep. */
+    private fun removeMessageBatch(prefixes: Set<String>) {
+        var removed = false
+        try {
+            invalidate(messagePrefixes = prefixes) { removeMessageSlots(prefixes) }
+            removed = true
+        } finally {
+            if (!removed) synchronized(queuedMessagePrefixes) { queuedMessagePrefixes += prefixes }
         }
     }
 
@@ -264,7 +276,8 @@ internal class PersistentDisplayThumbnails(
             if (isCurrent(token) && canPublish()) {
                 val key = slot(source, entry.maxEdgePx)
                 disk.put(key, bytes, disk.capturePublicationToken(), source.ciphertextTag)
-                synchronized(sourceIndex) { sourceIndex[key] = source }
+                // Index the resolved source the header carries, so the slot maps to one id before and after restart.
+                synchronized(sourceIndex) { sourceIndex[key] = source.copy(sourceMessageIdHex = sourceMessageIdHex) }
                 if (!isCurrent(token) || !canPublish()) disk.remove(key)
             }
         }

@@ -105,7 +105,7 @@ class MediaImageBubbleLatencyTest {
         controller.cacheThumbnail(request(0).messageIdHex, 0, bitmap)
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
 
-        composeRule.onNodeWithContentDescription(reference(0).fileName).assertIsDisplayed()
+        assertLoaded()
         composeRule.mainClock.autoAdvance = true
         awaitLoaded()
         assertEquals(0, fixture.calls.size)
