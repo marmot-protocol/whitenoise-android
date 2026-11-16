@@ -1674,7 +1674,7 @@
         <item quantity="one">Instalado com %1$d item ignorado.</item>
         <item quantity="other">Instalado com %1$d itens ignorados.</item>
     </plurals>
-    <string name="custom_emoji_detail">As imagens aqui viram emojis :shortcode: guardados neste dispositivo. Uma nova mensagem (não resposta) que use um envia a imagem, criptografada, à conversa. Reações, respostas e edições enviam só o shortcode.</string>
+    <string name="custom_emoji_detail">As imagens aqui viram emojis :shortcode: guardados neste dispositivo. Mensagens, respostas e reações que usam um emoji enviam a imagem criptografada à conversa. Edições enviam só o shortcode. As imagens integradas têm prioridade para os seus códigos.</string>
     <string name="custom_emoji_empty">Nenhum emoji personalizado ainda.</string>
     <string name="custom_emoji_name_title">Dê um nome a este emoji</string>
     <string name="custom_emoji_name_label">Código</string>
@@ -2674,4 +2674,16 @@
     <string name="settings_voice_language">Voz e idioma</string>
     <string name="photo_editor_rotate">Girar</string>
     <string name="toast_wipe_outcome_unconfirmed">Não foi possível confirmar o resultado da limpeza. Verifique suas contas antes de continuar.</string>
+
+    <string name="emoji_name_marmot_classic">Marmota clássica</string>
+    <string name="emoji_name_marmot_wave">Marmota acenando</string>
+    <string name="emoji_name_marmot_yes">Marmota com joinha</string>
+    <string name="emoji_name_marmot_laugh">Marmota rindo</string>
+    <string name="emoji_name_marmot_love">Marmota com coração</string>
+    <string name="emoji_name_marmot_party">Marmota festeira</string>
+    <string name="emoji_name_marmot_fire">Marmota em chamas</string>
+    <string name="emoji_name_marmot_wow">Marmota surpresa</string>
+    <string name="emoji_name_marmot_smirk">Marmota com sorriso malicioso</string>
+    <string name="emoji_name_marmot_cry">Marmota chorando</string>
+    <string name="emoji_name_marmot_angry">Marmota brava</string>
 </resources>

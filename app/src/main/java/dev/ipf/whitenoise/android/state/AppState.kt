@@ -20,7 +20,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.work.NetworkType
 import androidx.work.WorkManager
 import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -43,8 +42,6 @@ import dev.ipf.marmotkit.RelayTelemetrySettingsFfi
 import dev.ipf.marmotkit.RetentionSweepGroupOutcomeFfi
 import dev.ipf.marmotkit.RetentionSweepStatusFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
-import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
@@ -98,12 +95,9 @@ import dev.ipf.whitenoise.android.core.exceedsOutgoingMessageLimit
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
-import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
-import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
-import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupPerformanceDiagnostics
@@ -126,17 +120,7 @@ import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
 import dev.ipf.whitenoise.android.notifications.NotificationChannels
-import dev.ipf.whitenoise.android.notifications.NotificationReactionSendOutcome
-import dev.ipf.whitenoise.android.notifications.NotificationReplyCommitProbe
-import dev.ipf.whitenoise.android.notifications.NotificationReplyCompletionStore
-import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryBoundary
-import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryLookup
-import dev.ipf.whitenoise.android.notifications.NotificationReplyRecoveryState
-import dev.ipf.whitenoise.android.notifications.NotificationReplySendOutcome
-import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelinePage
-import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
-import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPicture
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
@@ -145,18 +129,9 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
-import dev.ipf.whitenoise.android.notifications.PushWakeAdmission
-import dev.ipf.whitenoise.android.notifications.PushWakeAttemptBudget
-import dev.ipf.whitenoise.android.notifications.PushWakeAttemptClaim
-import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
-import dev.ipf.whitenoise.android.notifications.PushWakeEvent
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
-import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
-import dev.ipf.whitenoise.android.notifications.notificationReactionOutcome
-import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
-import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
 import dev.ipf.whitenoise.android.share.CappedShareStreamStaging
 import dev.ipf.whitenoise.android.share.SHARE_STREAM_MAX_ITEMS
@@ -225,7 +200,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import dev.ipf.whitenoise.android.audio.ConversationDictationTargetValidation as TargetValidation
-import dev.ipf.whitenoise.android.notifications.notificationReplyCommitProbe as probeNotificationReplyCommit
 
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_LIMIT = 3
 private const val NATIVE_ATTACHMENT_PERMISSION_RETRY_DELAY_MILLIS = 500L
@@ -291,8 +265,6 @@ internal fun appStateScopeExceptionHandler(
     },
 ): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
 
-private const val NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS = 25L
-
 private data class AccountBubbleColorSlot(
     val accountRef: String,
     val theme: BubbleTheme,
@@ -310,16 +282,9 @@ private data class PendingAccountSwitchTrace(
     val performance: PerformanceTrace? = null,
 )
 
-private class AccountSwitchSnapshotSuperseded : RuntimeException()
-
 private data class StartupUnreadRefresh(
     val accounts: List<AccountSummaryFfi>,
     val accountListRevision: Long,
-)
-
-private data class AccountUnreadFoldResult(
-    val accountRef: String,
-    val value: AccountUnreadValue,
 )
 
 class WhiteNoiseAppState private constructor(
@@ -327,8 +292,8 @@ class WhiteNoiseAppState private constructor(
     val draftStore: DraftStore,
     startPlatformServices: Boolean,
     private val accountIdHexResolver: (suspend (String) -> String?)?,
-    private val profileReader: (suspend (String) -> UserProfileMetadataFfi?)?,
-    private val profileDisplayNameReader: (suspend (String) -> String?)?,
+    internal val profileReader: (suspend (String) -> UserProfileMetadataFfi?)?,
+    internal val profileDisplayNameReader: (suspend (String) -> String?)?,
     private val npubPresentationReader: (suspend (String) -> String?)?,
     private val profileRefreshRequest: (suspend (String) -> Unit)?,
     private val identityLoginCalls: IdentityLoginCalls?,
@@ -1045,7 +1010,7 @@ class WhiteNoiseAppState private constructor(
     private var startupMemberDerivedLocalRecorded = false
     private var startupFirstLocalFrameRecorded = false
     private var startupRelayCatchUpRecorded = false
-    private val accountListLifetime = StalenessGuard()
+    internal val accountListLifetime = StalenessGuard()
     private var pendingStartupUnreadRefresh: StartupUnreadRefresh? = null
 
     @Volatile
@@ -1432,13 +1397,6 @@ class WhiteNoiseAppState private constructor(
 
     /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
     private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
-
-    private fun pushWakeAttemptBudget() =
-        PushWakeAttemptBudget(
-            store = pushTokenStore,
-            storageDispatcher = pushWakeStorageDispatcher,
-            nowMs = pushWakeNowMs,
-        )
 
     private val amberSigner = AmberSignerController(appContext)
 
@@ -1920,7 +1878,7 @@ class WhiteNoiseAppState private constructor(
             resumeForegroundWork = { if (appInForeground) initializedConversationDictation()?.onAppForegrounded() },
             resumeDeferredWork = ::resumePendingInviteNotificationIdentityRefreshes,
             onUnlockSucceeded = { dismissRetainedVisibleConversation ->
-                resumePushWakeEpisodeFromLifecycle()
+                pushWakeRecovery.resumePushWakeEpisodeFromLifecycle()
                 if (dismissRetainedVisibleConversation) dismissVisibleConversationNotifications()
             },
         )
@@ -2066,7 +2024,7 @@ class WhiteNoiseAppState private constructor(
                     override val accountSwitchHandoff get() = this@WhiteNoiseAppState.accountSwitchHandoff
                     override val signOutInProgress get() = this@WhiteNoiseAppState.signOutInProgress
                     override val wipeInProgress get() = this@WhiteNoiseAppState.wipeInProgress
-                    override val pushWakeServiceOwned get() = pushWakeServiceOwner != null
+                    override val pushWakeServiceOwned get() = pushWakeRecovery.pushWakeServiceOwned
 
                     override fun nativePushAccountRefs(): List<String> =
                         accounts
@@ -2206,8 +2164,57 @@ class WhiteNoiseAppState private constructor(
             activation = AccountSessionActivation(),
         )
     }
-    private val accountCatchUpCoordinator =
-        AccountCatchUpCoordinator(notificationScope, localNotificationPresenter.catchUpWindow)
+    internal val pushWakeRecovery: PushWakeRecoveryController =
+        PushWakeRecoveryController(
+            pushTokenStore = pushTokenStore,
+            pushWakeStorageDispatcher = pushWakeStorageDispatcher,
+            pushWakeNowMs = pushWakeNowMs,
+            schedulePushWakeRecovery = schedulePushWakeRecovery,
+            notificationScope = notificationScope,
+            catchUpWindow = localNotificationPresenter.catchUpWindow,
+            host =
+                object : PushWakeRecoveryHost {
+                    override val activeAccountRef get() = this@WhiteNoiseAppState.activeAccountRef
+                    override val runtimeGeneration get() = this@WhiteNoiseAppState.runtimeGeneration
+                    override val phase get() = this@WhiteNoiseAppState.phase
+                    override val appInForeground get() = this@WhiteNoiseAppState.appInForeground
+                    override val bootstrapCompleted get() = this@WhiteNoiseAppState.bootstrapCompleted
+                    override val networkNotificationRecoverySuppressed
+                        get() = this@WhiteNoiseAppState.networkNotificationRecoverySuppressed
+                    override val validatedConnectivityRecoveryGeneration
+                        get() = validatedConnectivityRecoveryGenerationMutable.value
+                    override val networkRecoveryActive get() = notificationNetworkRecovery.isActive()
+
+                    override fun captureNetworkGeneration(): Long = connectivitySignalOwner.captureNetworkGeneration()
+
+                    @Suppress("MaxLineLength")
+                    override fun isNetworkGenerationCurrent(generation: Long): Boolean = connectivitySignalOwner.isNetworkGenerationCurrent(generation)
+
+                    override fun recordStartupRelayCatchUpReady() {
+                        this@WhiteNoiseAppState.recordStartupRelayCatchUpReady()
+                    }
+
+                    override suspend fun <T> marmotIo(
+                        traceSection: String,
+                        block: suspend MarmotInterface.() -> T,
+                    ): T = this@WhiteNoiseAppState.marmotIo(traceSection, block)
+
+                    @Suppress("MaxLineLength")
+                    override fun notificationRuntimeRecoveryGeneration(): Long = this@WhiteNoiseAppState.notificationRuntimeRecoveryGeneration()
+
+                    override fun notificationRuntimeRecoveryAllowed(generation: Long): Boolean =
+                        this@WhiteNoiseAppState.notificationRuntimeRecoveryAllowed(generation)
+
+                    override suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(): Boolean =
+                        this@WhiteNoiseAppState.ensureNotificationRuntimeStartedAndAwaitPushDrain()
+
+                    @Suppress("MaxLineLength")
+                    override suspend fun ensureNotificationRuntimeStarted(): Boolean = this@WhiteNoiseAppState.ensureNotificationRuntimeStarted()
+
+                    @Suppress("MaxLineLength")
+                    override suspend fun syncNativePushRegistrationIfEnabled(): Boolean = this@WhiteNoiseAppState.syncNativePushRegistrationIfEnabled()
+                },
+        )
     private var pendingAccountSwitchTrace: PendingAccountSwitchTrace? = null
 
     /** Native identity commands and lifecycle transitions share the account-session owner. */
@@ -2226,7 +2233,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    private val accountSwitchHandoff get() = accountSession.handoff
+    internal val accountSwitchHandoff get() = accountSession.handoff
 
     // Bumped whenever cross-account caches are cleared (switch / sign-out). An
     // in-flight profile refresh captures it at start and discards its result if
@@ -2235,8 +2242,6 @@ class WhiteNoiseAppState private constructor(
     internal val profileCacheLifetime = StalenessGuard()
     private val mediaUploadSessionLifetime = StalenessGuard()
     internal val notificationJob = NotificationJobSlot()
-    private val pushWakeCatchUpDrainJob = NotificationJobSlot()
-    private val notificationPushWakeRecoveryCircuit = NotificationPushWakeRecoveryCircuit()
 
     @Volatile
     internal var networkNotificationRecoverySuppressed = false
@@ -2258,9 +2263,6 @@ class WhiteNoiseAppState private constructor(
         UnreadRefreshScheduler(scope = notificationScope) { accountRef ->
             refreshAccountUnreadCount(accountRef)
         }
-
-    @Volatile
-    private var isForegroundCatchUpRunning = false
 
     // Single source of truth for notification suppression: whether an Activity
     // is on screen, plus the conversation that will be suppressed only while it
@@ -3083,7 +3085,7 @@ class WhiteNoiseAppState private constructor(
                 backgroundConnectionEnabled ||
                     notificationJob.isActive() ||
                     notificationNetworkRecovery.isActive() ||
-                    pushWakeCatchUpDrainJob.isActive()
+                    pushWakeRecovery.isDrainActive()
             val oldChats = chatsController
             val oldConversations = conversationControllersForAccountTeardown()
             AccountSessionTeardown(
@@ -3963,224 +3965,17 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /**
-     * Drive Marmot's per-account catch-up so every signed-in account on this
-     * device processes the events its worker has pending — most importantly
-     * the MLS commits / kind-1210 group-system rows that peers (including the
-     * device's *other* local accounts) published while it was inactive.
-     *
-     * The engine owns one SQLite store per account-device identity, so an
-     * inactive account never sees a sibling account's group rename, avatar
-     * change, or membership commit until its own worker ingests that event.
-     * `catchUpAccounts` pumps all running workers, so calling it before we
-     * read an account's projection makes that account's source-of-truth store
-     * current first — rather than caching the change Android-side (which the
-     * repo's source-of-truth rule forbids). See issue #252 (group rename not
-     * propagating to a second same-device account) and the adjacent
-     * convergence cases #107 / #116 / #151.
-     *
-     * Best-effort: catch-up is a relay round-trip that can be slow or fail
-     * offline, and a read surface must still render its last-known projection
-     * in that case. Failures are swallowed (cancellation re-thrown) so a
-     * caller can always `await` this without it becoming a hard gate.
-     */
+    /** Runs one shared account catch-up; see [PushWakeRecoveryController.catchUpAccounts]. */
     suspend fun catchUpAccounts() {
-        launchAccountCatchUp(
-            mustStartAfter = null,
-            trigger = PerformanceTrigger.EXPLICIT,
-        ).await()
+        pushWakeRecovery.catchUpAccounts()
     }
 
-    /**
-     * Starts a process-owned catch-up after a chat list has rendered its local
-     * snapshot. A blocked relay call must not block that controller's live
-     * consumers. Callers for the same account, runtime, and network share one
-     * in-flight result; a newer identity waits instead of overlapping native work.
-     */
-    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> =
-        launchAccountCatchUp(
-            mustStartAfter = null,
-            trigger = PerformanceTrigger.CHAT_LIST_READINESS,
-        )
+    /** Starts the process-owned chat-list catch-up shared by callers for the same identity. */
+    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = pushWakeRecovery.launchCatchUpAccounts()
 
-    /** Builds the current catch-up identity and serializes its native work process-wide. */
-    private fun launchAccountCatchUp(
-        mustStartAfter: Long?,
-        trigger: PerformanceTrigger,
-        publishReadiness: Boolean = true,
-    ): Deferred<AccountCatchUpResult> =
-        AccountCatchUpKey(
-            accountRef = activeAccountRef,
-            runtimeGeneration = runtimeGeneration,
-            networkGeneration = connectivitySignalOwner.captureNetworkGeneration(),
-        ).let { key ->
-            val catchUp: suspend () -> Boolean = {
-                performAccountCatchUp(key, trigger).also { succeeded ->
-                    if (succeeded && publishReadiness) recordStartupRelayCatchUpReady()
-                }
-            }
-            if (mustStartAfter == null) {
-                accountCatchUpCoordinator.launch(key, catchUp)
-            } else {
-                accountCatchUpCoordinator.launchAfter(mustStartAfter, key, catchUp)
-            }
-        }
-
-    /** Checks queued work again at native admission and settlement, including destructive teardown. */
-    private fun isCatchUpKeyCurrent(key: AccountCatchUpKey): Boolean =
-        activeAccountRef == key.accountRef &&
-            runtimeGeneration == key.runtimeGeneration &&
-            connectivitySignalOwner.isNetworkGenerationCurrent(key.networkGeneration) &&
-            !networkNotificationRecoverySuppressed
-
-    /** Charges only executed native work; every owner shares this durable failure budget. */
-    private suspend fun performAccountCatchUp(
-        key: AccountCatchUpKey,
-        trigger: PerformanceTrigger,
-    ): Boolean =
-        if (!isCatchUpKeyCurrent(key)) {
-            false
-        } else {
-            val admission =
-                observePushState { pushWakeAttemptBudget().reserve() }
-                    ?: if (trigger == PerformanceTrigger.PUSH_WAKE) {
-                        PushWakeAdmission.Rejected
-                    } else {
-                        // Ordinary foreground/connectivity work is independently bounded
-                        // and cannot settle an unknown wake.
-                        PushWakeAdmission.Admitted(claim = null)
-                    }
-            when (admission) {
-                PushWakeAdmission.Rejected -> false
-                is PushWakeAdmission.Admitted -> {
-                    if (isCatchUpKeyCurrent(key)) {
-                        performAdmittedAccountCatchUp(key, trigger, admission.claim)
-                    } else {
-                        admission.claim?.let { reserved ->
-                            observePushState { pushWakeAttemptBudget().release(reserved) }
-                        }
-                        false
-                    }
-                }
-            }
-        }
-
-    /** Runs native catch-up only after admission and settles the same durable reservation. */
-    private suspend fun performAdmittedAccountCatchUp(
-        key: AccountCatchUpKey,
-        trigger: PerformanceTrigger,
-        claim: PushWakeAttemptClaim?,
-    ): Boolean {
-        val nativeSucceeded = instrumentedCatchUpAccounts(trigger)
-        var settlementSucceeded = nativeSucceeded && isCatchUpKeyCurrent(key)
-        if (claim != null) {
-            settlementSucceeded =
-                observePushState {
-                    pushWakeAttemptBudget().settle(nativeSucceeded) { isCatchUpKeyCurrent(key) }
-                } == true
-        }
-        val succeeded = settlementSucceeded && isCatchUpKeyCurrent(key)
-        if (claim != null) {
-            PushWakeDiagnostics.event(if (succeeded) PushWakeEvent.AttemptSucceeded else PushWakeEvent.AttemptFailed)
-        }
-        return succeeded
-    }
-
-    /** Runs catch-up work fresh enough to acknowledge the observed push-wake marker. */
-    private suspend fun catchUpAfterObservedPushWake(
-        pendingGeneration: Long,
-        trigger: PerformanceTrigger,
-    ): AccountCatchUpResult {
-        if (pendingGeneration == 0L) {
-            return launchAccountCatchUp(mustStartAfter = null, trigger = trigger).await()
-        }
-        val observedStartSequence = accountCatchUpCoordinator.captureStartSequence()
-        val result =
-            runCatchUpAfterTrigger(
-                observedStartSequence = observedStartSequence,
-                launchAfter = { sequence ->
-                    launchAccountCatchUp(
-                        mustStartAfter = sequence,
-                        trigger = trigger,
-                        publishReadiness = false,
-                    )
-                },
-                onSucceeded = { result ->
-                    observePushState {
-                        result.key?.let { key -> acknowledgePendingPushWakeCatchUp(pendingGeneration, key) } == true
-                    } == true
-                },
-            )
-        if (result.succeeded) recordStartupRelayCatchUpReady()
-        return result
-    }
-
-    /** Measures only native catch-up work admitted by the single-flight coordinator. */
-    private suspend fun instrumentedCatchUpAccounts(trigger: PerformanceTrigger): Boolean {
-        val startedAtMs = SystemClock.elapsedRealtime()
-        val trace = PerformanceDiagnostics.begin(PerformanceOperation.SYNC_CATCH_UP, trigger)
-        PerformanceDiagnostics.record(
-            trace = trace,
-            phase = PerformancePhase.ACCOUNT_CATCH_UP_START,
-            elapsedMs = 0L,
-            result = PerformanceResult.PENDING,
-            layer = PerformanceLayer.MDK,
-        )
-        val succeeded = RecoveryTrace.catchUp(trigger) { catchUpAccountsBestEffort() }
-        val elapsedMs = (SystemClock.elapsedRealtime() - startedAtMs).coerceAtLeast(0L)
-        PerformanceDiagnostics.record(
-            trace = trace,
-            phase =
-                if (succeeded) {
-                    PerformancePhase.ACCOUNT_CATCH_UP_READY
-                } else {
-                    PerformancePhase.ACCOUNT_CATCH_UP_RETRY
-                },
-            elapsedMs = elapsedMs,
-            durationMs = elapsedMs,
-            result = if (succeeded) PerformanceResult.SUCCESS else PerformanceResult.FAILURE,
-            layer = PerformanceLayer.MDK,
-        )
-        return succeeded
-    }
-
-    private suspend fun catchUpAccountsBestEffort(): Boolean =
-        runCatchingCancellable { marmotIo(MarmotTraceSection.CATCH_UP) { catchUpAccounts() } }
-            .onFailure {
-                appStateDebug(it) { "catchUpAccounts failed: ${it.readableMessage()}" }
-            }.isSuccess
-
-    /**
-     * Best-effort account catch-up when the app returns to the foreground.
-     * Mirrors iOS `catchUpAfterForegroundActivation`: pumps every running worker
-     * so relay-ingested commits and projections converge without requiring an
-     * account switch or process restart. Failures are swallowed; cancellation
-     * propagates.
-     */
+    /** Best-effort catch-up when the app returns to the foreground. */
     suspend fun catchUpAfterForegroundActivation() {
-        if (
-            !ForegroundCatchUpPolicy.shouldCatchUp(
-                appPhase = phase,
-                isCatchUpRunning = isForegroundCatchUpRunning,
-                appInForeground = appInForeground,
-            )
-        ) {
-            return
-        }
-        admitPushWakeEpisodeFromLifecycle()
-        val pendingGeneration =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-            } ?: 0L // Unknown storage must not acknowledge a saved generation.
-        isForegroundCatchUpRunning = true
-        try {
-            catchUpAfterObservedPushWake(
-                pendingGeneration = pendingGeneration,
-                trigger = PerformanceTrigger.FOREGROUND,
-            )
-        } finally {
-            isForegroundCatchUpRunning = false
-        }
+        pushWakeRecovery.catchUpAfterForegroundActivation()
     }
 
     /**
@@ -4850,136 +4645,32 @@ class WhiteNoiseAppState private constructor(
             bootstrap()
             val receiverReady = bootstrapCompleted && notificationReceiverActive.value
             if (!receiverReady) throw receiverUnavailable()
-            drainPendingNativePushRegistrationSyncIfNeeded()
-            return drainPendingPushWakeCatchUpIfNeeded()
+            pushWakeRecovery.drainPendingNativePushRegistrationSyncIfNeeded()
+            return pushWakeRecovery.drainPendingPushWakeCatchUpIfNeeded()
         }
         localNotificationPresenter.ensureChannels()
         refreshLocalNotificationPermission()
         if (!awaitNotificationReceiverForStartupWithin(notificationReceiverTimeoutMillis())) throw receiverUnavailable()
         if (accounts.isEmpty()) refreshAccounts()
         refreshLocalNotificationSettings()
-        drainPendingNativePushRegistrationSyncIfNeeded()
-        return drainPendingPushWakeCatchUpIfNeeded()
+        pushWakeRecovery.drainPendingNativePushRegistrationSyncIfNeeded()
+        return pushWakeRecovery.drainPendingPushWakeCatchUpIfNeeded()
     }
-
-    private val pushWakeAttemptMutex = kotlinx.coroutines.sync.Mutex()
-    private var acceptedPushWakeJob: Job? = null
-    private var acceptedPushWakeOwner: Any? = null
-    private var pushWakeServiceOwner: Any? = null
 
     /** Fences teardown while preserving existing screen-lock notification redaction. */
-    internal fun pushWakeRecoveryAllowed(): Boolean = !networkNotificationRecoverySuppressed
+    internal fun pushWakeRecoveryAllowed(): Boolean = pushWakeRecovery.pushWakeRecoveryAllowed()
 
-    /** Keeps storage failure in recovery bookkeeping from interrupting unlock or connectivity handling. */
-    private suspend fun admitPushWakeEpisodeFromLifecycle() {
-        val admitted =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState { pushTokenStore.admitPushWakeEpisode(pushWakeNowMs()) }
-            }
-        if (admitted != true) {
-            PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-        }
-    }
+    /** Acknowledges the foreground-service instance that currently owns background runtime. */
+    internal fun acknowledgePushWakeServiceOwner(owner: Any) = pushWakeRecovery.acknowledgePushWakeServiceOwner(owner)
 
-    /** Acknowledges the concrete foreground-service instance that currently owns background runtime. */
-    internal fun acknowledgePushWakeServiceOwner(owner: Any) {
-        assertMainThread { "acknowledgePushWakeServiceOwner" }
-        pushWakeServiceOwner = owner
-    }
-
-    /** Releases only the matching service lease and hands unresolved foreground work to durable scheduling. */
-    internal fun releasePushWakeServiceOwner(owner: Any) {
-        assertMainThread { "releasePushWakeServiceOwner" }
-        if (pushWakeServiceOwner !== owner) return
-        pushWakeServiceOwner = null
-        transferUnownedPushWakeRecovery()
-    }
+    /** Releases only the matching service lease. */
+    internal fun releasePushWakeServiceOwner(owner: Any) = pushWakeRecovery.releasePushWakeServiceOwner(owner)
 
     /** Accepts a process-owned drain only while an Activity or acknowledged service owns its lifetime. */
-    internal fun acceptPushWakeRecovery(): Boolean {
-        assertMainThread { "acceptPushWakeRecovery" }
-        val ownsRuntime = bootstrapCompleted && (appInForeground || pushWakeServiceOwner != null)
-        return when {
-            !pushWakeRecoveryAllowed() || !ownsRuntime -> false
-            acceptedPushWakeJob?.isActive == true -> acceptedPushWakeOwner != null
-            else -> {
-                val owner = Any()
-                acceptedPushWakeOwner = owner
-                acceptedPushWakeJob =
-                    notificationScope.launch {
-                        try {
-                            runPushWakeRecoveryAttempt()
-                        } finally {
-                            if (acceptedPushWakeOwner === owner) {
-                                acceptedPushWakeOwner = null
-                                withContext(kotlinx.coroutines.NonCancellable + pushWakeStorageDispatcher) {
-                                    schedulePushWakeRecovery()
-                                }
-                            }
-                        }
-                    }
-                true
-            }
-        }
-    }
+    internal fun acceptPushWakeRecovery(): Boolean = pushWakeRecovery.acceptPushWakeRecovery()
 
-    /** Revokes process ownership at its lifecycle boundary and immediately confirms a durable successor. */
-    private fun transferUnownedPushWakeRecovery() {
-        if (appInForeground || pushWakeServiceOwner != null) return
-        acceptedPushWakeOwner = null
-        acceptedPushWakeJob?.cancel()
-        acceptedPushWakeJob = null
-        notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
-    }
-
-    /**
-     * Shares service/worker ownership; cancellation leaves native settlement with AccountCatchUpCoordinator.
-     * Native/platform bootstrap failures preserve the shared retry obligation.
-     */
-    @Suppress("TooGenericExceptionCaught")
-    internal suspend fun runPushWakeRecoveryAttempt() {
-        pushWakeAttemptMutex.lock()
-        try {
-            val recoveryState =
-                withContext(pushWakeStorageDispatcher) {
-                    Triple(
-                        pushTokenStore.pushWakeCatchUpPending(),
-                        pushTokenStore.pushWakeAttempts(),
-                        pushTokenStore.pushWakeRetryDelay(pushWakeNowMs()),
-                    )
-                }
-            if (!pushWakeRecoveryAllowed() || !recoveryState.first) return
-            val generation = notificationRuntimeRecoveryGeneration()
-            val attempts = recoveryState.second
-            if (attempts >= PUSH_WAKE_MAX_ATTEMPTS || recoveryState.third > 0L) return
-            PushWakeDiagnostics.event(PushWakeEvent.AttemptStarted)
-            try {
-                ensureNotificationRuntimeStartedAndAwaitPushDrain()
-                val pending = withContext(pushWakeStorageDispatcher) { pushTokenStore.pushWakeCatchUpPending() }
-                if (notificationRuntimeRecoveryAllowed(generation) && !pending) {
-                    PushWakeDiagnostics.complete()
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                // Receiver/bootstrap failure must also consume this same finite episode.
-                if (notificationRuntimeRecoveryAllowed(generation)) {
-                    withContext(pushWakeStorageDispatcher) {
-                        if (pushTokenStore.pushWakeAttempts() == attempts) {
-                            val reclaimed = pushTokenStore.claimPushWakeAttempt(pushWakeNowMs())
-                            if (reclaimed == null || !pushTokenStore.deferPushWakeRetry(pushWakeNowMs())) {
-                                PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-                            }
-                        }
-                    }
-                }
-                PushWakeDiagnostics.event(PushWakeEvent.AttemptFailed)
-                throw error
-            }
-        } finally {
-            pushWakeAttemptMutex.unlock()
-        }
-    }
+    /** Runs one bounded push-wake recovery attempt shared by the service and worker owners. */
+    internal suspend fun runPushWakeRecoveryAttempt() = pushWakeRecovery.runPushWakeRecoveryAttempt()
 
     /** Captures the active notification-runtime recovery lifetime. */
     internal fun notificationRuntimeRecoveryGeneration(): Long = notificationRuntimeRecovery.capture()
@@ -5006,7 +4697,7 @@ class WhiteNoiseAppState private constructor(
             if (accounts.isEmpty()) refreshAccounts()
             if (!networkNotificationRecoverySuppressed && notificationReceiverActive.value) {
                 refreshLocalNotificationSettings()
-                drainPendingNativePushRegistrationSyncIfNeeded()
+                pushWakeRecovery.drainPendingNativePushRegistrationSyncIfNeeded()
             }
         }
         return receiverReady &&
@@ -5024,69 +4715,6 @@ class WhiteNoiseAppState private constructor(
             startRuntime = ::ensureNotificationRuntimeStarted,
             keepConnected = { backgroundConnectionEnabled },
         )
-
-    /** Retries a persisted token-registration obligation when notification startup reaches a usable runtime. */
-    private suspend fun drainPendingNativePushRegistrationSyncIfNeeded() {
-        val pending =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState {
-                    pushTokenStore.nativePushRegistrationSyncPending() || pushTokenStore.lastToken() != null
-                }
-            } ?: return
-        if (pending) {
-            syncNativePushRegistrationIfEnabled()
-        }
-    }
-
-    /** Returns fetch success, acknowledging only the matching durable wake after fresh work. */
-    private suspend fun drainPendingPushWakeCatchUpIfNeeded(): Boolean {
-        val pendingGeneration =
-            withContext(pushWakeStorageDispatcher) {
-                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-            } ?: return false
-        return pendingGeneration == 0L ||
-            catchUpAfterObservedPushWake(
-                pendingGeneration = pendingGeneration,
-                trigger = PerformanceTrigger.PUSH_WAKE,
-            ).succeeded
-    }
-
-    /**
-     * Clears only work whose recovery identity stays current across the durable acknowledgement commit.
-     * Cancellation is deferred across this bounded transaction so a committed clear cannot skip marker restoration.
-     */
-    private suspend fun acknowledgePendingPushWakeCatchUp(
-        pendingGeneration: Long,
-        key: AccountCatchUpKey,
-    ): Boolean {
-        if (pendingGeneration == 0L || !isCatchUpKeyCurrent(key)) return false
-        val acknowledged =
-            withContext(NonCancellable) {
-                val cleared =
-                    withContext(pushWakeStorageDispatcher) {
-                        pushTokenStore.clearPendingPushWakeCatchUp(pendingGeneration)
-                    }
-                if (!isCatchUpKeyCurrent(key)) {
-                    if (cleared) {
-                        val restored =
-                            withContext(pushWakeStorageDispatcher) {
-                                pushTokenStore.recordPendingPushWakeCatchUp()
-                            }
-                        if (!restored) PushWakeDiagnostics.event(PushWakeEvent.PersistenceFailed)
-                    }
-                    false
-                } else {
-                    if (cleared) {
-                        appStateDebug { "pending push wake catch-up drained" }
-                    } else {
-                        appStateDebug { "newer pending push wake catch-up remains queued" }
-                    }
-                    true
-                }
-            }
-        currentCoroutineContext().ensureActive()
-        return acknowledged
-    }
 
     private val profileSignUp =
         AppProfileSignUp(
@@ -5589,186 +5217,7 @@ class WhiteNoiseAppState private constructor(
         hasManualUnread: Boolean,
     ) = accountUnreadStore.updateManualUnread(accountRef, hasManualUnread)
 
-    @Suppress(
-        "ReturnCount", // Empty, stale-empty, and stale-in-flight snapshots each stop before publishing.
-        "CyclomaticComplexMethod", // Raw and roster-aware paths deliberately share one guarded publication point.
-    )
-    /** Refreshes unread projections only while the captured account list remains current. */
-    private suspend fun refreshAccountUnreadCounts(
-        accountSummaries: List<AccountSummaryFfi> = accounts,
-        loadMemberRosters: Boolean = true,
-        stillCurrent: () -> Boolean = { true },
-    ) {
-        if (!stillCurrent()) return
-        val accountListTokenAtStart = accountListLifetime.capture()
-        val refreshGeneration = accountUnreadStore.beginRefresh()
-
-        fun refreshIsCurrent(): Boolean =
-            stillCurrent() &&
-                accountListLifetime.isCurrent(accountListTokenAtStart) &&
-                accountUnreadStore.isRefreshCurrent(refreshGeneration)
-
-        val signingAccounts = accountSummaries.filter { it.isSignedInSigningAccount() && accountSetup.eligible(it) }
-        if (signingAccounts.isEmpty()) {
-            if (!refreshIsCurrent()) return
-            accountUnreadStore.publishRefresh(
-                previous = accountUnreadStore.snapshot(),
-                refreshed = emptyMap(),
-                generation = refreshGeneration,
-            )
-            return
-        }
-
-        val previous = accountUnreadStore.snapshot()
-        val previousValues = previous.mapValues { (_, versioned) -> versioned.value }
-        val rawCountsByHex =
-            runCatchingCancellable {
-                accountAttentionCounts()
-            }.onFailure { appStateDebug { "account unread summary refresh failed" } }
-                .getOrNull()
-        if (!refreshIsCurrent()) return
-        val rawValues = rawAccountUnreadValues(signingAccounts, rawCountsByHex, previousValues)
-        // Publish best-effort freshness before slower exact row folds: present
-        // summary rows are current, while omitted/failed rows immediately stop
-        // presenting their retained count as confirmed.
-        val interimPublication =
-            accountUnreadStore.publishRefresh(
-                previous = previous,
-                refreshed = rawValues,
-                generation = refreshGeneration,
-            )
-        if (!loadMemberRosters) return
-        if (!refreshIsCurrent()) return
-        val foldBaselineValues = interimPublication.values.mapValues { (_, versioned) -> versioned.value }
-        val accountGate = Semaphore(ACCOUNT_UNREAD_ACCOUNT_FANOUT)
-        // Share one roster gate across the whole bulk refresh so member FFI
-        // fan-out stays bounded across all signed-in accounts, not per account.
-        val memberGate = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT)
-        val refreshedPairs =
-            coroutineScope {
-                signingAccounts
-                    .map { summary ->
-                        async {
-                            accountGate.withPermit {
-                                refreshAccountUnreadFold(
-                                    summary = summary,
-                                    rawCount = rawCountsByHex?.get(summary.accountIdHex),
-                                    previous = foldBaselineValues[summary.label],
-                                    memberGate = memberGate,
-                                )
-                            }
-                        }
-                    }.awaitAll()
-            }
-        // A sign-out/account refresh may have completed while the cold-start
-        // fold was suspended. Discard that obsolete result rather than
-        // resurrecting counts for an account no longer in the authoritative
-        // list; the newer lifecycle operation owns convergence.
-        if (!refreshIsCurrent()) return
-        // Our own interim freshness writes are valid baselines for the exact
-        // fold. Values preserved because a controller/notification writer won
-        // the race keep their original baseline, so this bulk pass cannot
-        // overwrite newer authoritative evidence.
-        accountUnreadStore.publishRefresh(
-            previous = accountUnreadExactBaseline(previous, interimPublication),
-            refreshed = refreshedPairs.associate { it.accountRef to it.value },
-            generation = refreshGeneration,
-        )
-    }
-
-    private suspend fun refreshAccountUnreadFold(
-        summary: AccountSummaryFfi,
-        rawCount: ULong?,
-        previous: AccountUnreadValue?,
-        memberGate: Semaphore,
-    ): AccountUnreadFoldResult {
-        val cheapZero =
-            rawCount == 0uL &&
-                previous?.hasManualUnread == false
-        // The cheap engine total can't see the client's manual-unread flag, so
-        // an account believed to be manually flagged still takes the row fold.
-        if (!cheapZero) {
-            refreshEffectiveAccountUnreadCount(summary, memberGate)?.let { return it }
-        }
-        return AccountUnreadFoldResult(
-            accountRef = summary.label,
-            value =
-                accountUnreadValueAfterRefresh(
-                    rawCount = rawCount,
-                    previous = previous,
-                    exactUnreadCount = if (cheapZero) 0uL else null,
-                    exactHasManualUnread = if (cheapZero) false else null,
-                ),
-        )
-    }
-
-    /**
-     * Reads one account's durable chat-list rows and folds them with loaded
-     * member rosters so removed/left groups no longer contribute frozen unread
-     * totals to [accountUnreadCounts]. This intentionally uses the same
-     * removed-group semantics as the active chat-list projection (#625), but is
-     * scoped to [summary.accountIdHex] instead of the currently-active account so
-     * cross-account indicators stay honest for background accounts too (#662).
-     */
-    private suspend fun refreshEffectiveAccountUnreadCount(
-        summary: AccountSummaryFfi,
-        memberGate: Semaphore = Semaphore(ACCOUNT_UNREAD_MEMBER_FANOUT),
-    ): AccountUnreadFoldResult? {
-        val ref = summary.label.takeIf { it.isNotBlank() } ?: return null
-        return runCatchingCancellable {
-            marmotIo {
-                val rows = chatList(ref, includeArchived = true)
-                val membersByGroupId =
-                    loadUnreadMemberRosters(
-                        rows = rows,
-                        gate = memberGate,
-                        onFailure = { _, _ -> appStateDebug { "account unread member refresh failed" } },
-                    ) { groupIdHex ->
-                        groupMembers(ref, groupIdHex)
-                    }
-                AccountUnreadFoldResult(
-                    accountRef = ref,
-                    value =
-                        AccountUnreadValue(
-                            unreadCount = accountUnreadCount(rows, summary.accountIdHex, membersByGroupId),
-                            freshness = AccountUnreadFreshness.CONFIRMED,
-                            hasManualUnread = accountHasManualUnread(rows, summary.accountIdHex, membersByGroupId),
-                        ),
-                )
-            }
-        }.onFailure { appStateDebug { "account unread refresh failed" } }
-            .getOrNull()
-    }
-
-    /**
-     * Refresh the unread count for a single account, merging the result into
-     * [accountUnreadCounts] without disturbing the other accounts' counts.
-     *
-     * On a per-notification hot path we only ever need the one account that
-     * changed, so we avoid fanning out an all-account scan (#473) while still
-     * applying removed-group suppression for that account (#662). This remains
-     * intentionally more expensive than the old raw-row fold: it loads the
-     * account's chat list plus member rosters for unread rows, so keep callers
-     * scoped to the changed account until Marmot exposes a suppressed summary.
-     */
-    private suspend fun refreshAccountUnreadCount(accountRef: String) {
-        val ref = accountRef.takeIf { it.isNotBlank() } ?: return
-        // Only signed-in signing accounts are tracked in accountUnreadCounts;
-        // skip refs we don't know about (matches refreshAccountUnreadCounts'
-        // filter).
-        val summary = accounts.firstOrNull { it.isSignedInSigningAccount() && it.label == ref } ?: return
-        val previous = accountUnreadStore.snapshot()[ref]
-        val result = refreshEffectiveAccountUnreadCount(summary) ?: return
-        accountUnreadStore.publishExactIfUnchanged(ref, previous, result.value)
-    }
-
-    private fun isAccountSwitchCurrent(generation: Long) = accountSwitchHandoff.isCurrent(generation)
-
-    private fun ensureAccountSwitchRequestIsCurrent(generation: Long) {
-        if (!isAccountSwitchCurrent(generation)) throw AccountSwitchSnapshotSuperseded()
-    }
-
-    private fun recordAccountSwitchPreloadStage(
+    internal fun recordAccountSwitchPreloadStage(
         accountRef: String,
         stage: String,
         rowCount: Int,
@@ -5780,7 +5229,7 @@ class WhiteNoiseAppState private constructor(
         appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
     }
 
-    private fun recordAccountSwitchIdentityState(
+    internal fun recordAccountSwitchIdentityState(
         accountRef: String,
         snapshot: AccountSwitchLocalSnapshot,
     ) {
@@ -5795,173 +5244,7 @@ class WhiteNoiseAppState private constructor(
         appStateDebug { "account-switch identity-state +${elapsedMs}ms ${counts.privacySafeTrace()}" }
     }
 
-    /**
-     * Reads the target account's local chat rows, and decodes their stored first-frame
-     * avatars, before publishing the new active account. The first target composition gets
-     * these rows instead of a loading placeholder; its controller owns full group and live
-     * subscription admission after that seeded frame is visible.
-     */
-    private suspend fun loadAccountSwitchLocalSnapshot(
-        accountRef: String,
-        generation: Long,
-        plan: AccountSwitchPreloadPlan,
-    ): AccountSwitchLocalSnapshot? =
-        try {
-            val presentedRows =
-                marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
-                    presentedChatList(accountRef, includeArchived = true)
-                }.rows
-            val rows = presentedRows.map { it.row }
-            val firstFrameAvatars =
-                prewarmFirstFrameDurableAvatars(
-                    accountRef,
-                    presentedRows,
-                    awaitColdWorkers = plan.awaitColdAvatarWorkers,
-                )
-            ensureAccountSwitchRequestIsCurrent(generation)
-            recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
-            val presentation =
-                loadAccountSwitchPresentationSeeds(
-                    accountRef = accountRef,
-                    generation = generation,
-                    rows = rows,
-                    plan = plan,
-                )
-            ensureAccountSwitchRequestIsCurrent(generation)
-
-            AccountSwitchLocalSnapshot(
-                accountRef = accountRef,
-                activeAccountIdHex = presentation.activeAccountIdHex,
-                rows = rows,
-                groups = emptyList(),
-                memberIds = presentation.memberIds,
-                profiles = presentation.profiles,
-                presentedRows = presentedRows,
-                firstFrameAvatars = firstFrameAvatars,
-            ).also { snapshot ->
-                if (plan.includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
-            }
-        } catch (_: AccountSwitchSnapshotSuperseded) {
-            null
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (throwable: Throwable) {
-            appStateDebug(throwable) {
-                "account-switch local snapshot failed: ${throwable.readableMessage()}"
-            }
-            null
-        }
-
-    private suspend fun loadAccountSwitchPresentationSeeds(
-        accountRef: String,
-        generation: Long,
-        rows: List<ChatListRowFfi>,
-        plan: AccountSwitchPreloadPlan,
-    ): AccountSwitchPresentationSeeds =
-        coroutineScope {
-            val activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-            // The bounded set the selector/overflow policy will actually render. Both
-            // switch paths read it here, so an interactive switch owes its first frame
-            // exactly the seeds the full-snapshot path already loads (#2155).
-            val topBarProfileIds =
-                if (plan.includeTopBarProfileSeeds) {
-                    accountSwitchProfileSeedIds(emptyList(), accounts, accountRef)
-                } else {
-                    emptyList()
-                }
-            if (!plan.includePresentationSeeds) {
-                recordAccountSwitchPreloadStage(accountRef, "member-derived-local-deferred", rows.size)
-                // Off the main thread, and dropped wholesale if a later switch wins.
-                val topBarProfiles = loadAccountSwitchProfileSeeds(topBarProfileIds)
-                ensureAccountSwitchRequestIsCurrent(generation)
-                recordAccountSwitchPreloadStage(accountRef, "top-bar-profiles-ready", rows.size)
-                return@coroutineScope AccountSwitchPresentationSeeds(activeAccountIdHex, emptyList(), topBarProfiles)
-            }
-            // Overlap bounded top-bar reads with the identity-critical member page.
-            val topBarProfilesDeferred = async { loadAccountSwitchProfileSeeds(topBarProfileIds) }
-            val memberIds = loadAccountSwitchMemberIds(accountRef, rows)
-            ensureAccountSwitchRequestIsCurrent(generation)
-            recordAccountSwitchPreloadStage(
-                accountRef,
-                accountSwitchMemberStage(rows, memberIds),
-                rows.size,
-            )
-            val directPeerProfileIds = accountSwitchDirectPeerProfileIds(rows, memberIds, activeAccountIdHex)
-            val topBarKeys = topBarProfileIds.mapTo(mutableSetOf()) { it.lowercase(Locale.ROOT) }
-            val directProfiles =
-                loadAccountSwitchProfileSeeds(
-                    directPeerProfileIds.filterNot { it.lowercase(Locale.ROOT) in topBarKeys },
-                )
-            ensureAccountSwitchRequestIsCurrent(generation)
-            val topBarProfiles = topBarProfilesDeferred.await()
-            ensureAccountSwitchRequestIsCurrent(generation)
-            recordAccountSwitchPreloadStage(accountRef, "persisted-profiles-ready", rows.size)
-            AccountSwitchPresentationSeeds(
-                activeAccountIdHex = activeAccountIdHex,
-                memberIds = memberIds,
-                profiles = (directProfiles + topBarProfiles).distinctBy { it.accountIdHex.lowercase(Locale.ROOT) },
-            )
-        }
-
-    private suspend fun loadAccountSwitchMemberIds(
-        accountRef: String,
-        rows: List<ChatListRowFfi>,
-    ): List<AppGroupMemberIdsFfi> {
-        val identityGroupIds = accountSwitchFirstFrameMemberGroupIds(rows)
-        if (identityGroupIds.isEmpty()) return emptyList()
-        return runCatchingCancellable {
-            loadGroupMemberIdsPages(identityGroupIds) { page ->
-                marmotIo(MarmotTraceSection.MEMBER_IDS_READ) { groupMemberIdsPage(accountRef, page) }
-            }
-        }.onFailure { error ->
-            appStateDebug(error) {
-                "account-switch local member projection failed: ${error.readableMessage()}"
-            }
-        }.getOrDefault(emptyList())
-    }
-
-    private suspend fun loadAccountSwitchProfileSeeds(profileIds: List<String>): List<AccountSwitchProfileSeed> =
-        if (profileReader != null || profileDisplayNameReader != null) {
-            // Existing injected single-identity readers retain their fixture contract.
-            coroutineScope {
-                val gate = Semaphore(PROFILE_PRESENTATION_WARM_FANOUT)
-                profileIds
-                    .map { id -> async { gate.withPermit { loadAccountSwitchProfileSeed(id) } } }
-                    .awaitAll()
-            }
-        } else {
-            loadAccountSwitchIdentityPages(profileIds) { page ->
-                marmotIo(MarmotTraceSection.PROFILE_READ) { cachedIdentityProjections(page) }
-            }
-        }
-
     internal fun consumeAccountSwitchLocalSnapshot(accountRef: String?) = accountSwitchHandoff.consume(accountRef)
-
-    private fun stageAccountSwitchLocalSnapshot(
-        label: String,
-        switchingAccounts: Boolean,
-        requestGeneration: Long,
-        localSnapshot: AccountSwitchLocalSnapshot?,
-    ) {
-        if (localSnapshot != null) {
-            // The target account's local SQLite rows are authoritative at the
-            // same generation boundary as the first target composition. Replace
-            // a stale/unknown picker value before activeAccountRef changes.
-            accountUnreadStore.updateValue(label) {
-                accountUnreadValueFromRows(
-                    rows = localSnapshot.rows,
-                    activeAccountIdHex = localSnapshot.activeAccountIdHex,
-                )
-            }
-            localSnapshot.profiles.forEach(::applyAccountSwitchProfileSeed)
-            accountSwitchHandoff.publish(requestGeneration, localSnapshot)
-        } else if (switchingAccounts) {
-            // A failed or intentionally deferred local snapshot cannot certify
-            // the previous aggregate. Retain it for reconciliation, but stop
-            // presenting it as current on the target account's first frame.
-            accountUnreadStore.markUnknown(label)
-        }
-    }
 
     private suspend fun restoreSignedOutAccountForActivation(
         target: AccountSummaryFfi?,
@@ -7921,17 +7204,7 @@ class WhiteNoiseAppState private constructor(
                 wake.isSuccess
             },
             ensureNotificationReceiverActive = ::ensureNotificationReceiverForNetworkReconnect,
-            catchUpAccounts = {
-                val pendingGeneration =
-                    withContext(pushWakeStorageDispatcher) {
-                        observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-                    } ?: 0L
-                // Unknown push storage cannot prevent ordinary relay catch-up or authorize marker acknowledgement.
-                catchUpAfterObservedPushWake(
-                    pendingGeneration = pendingGeneration,
-                    trigger = PerformanceTrigger.NETWORK_RECONNECT,
-                )
-            },
+            catchUpAccounts = { pushWakeRecovery.catchUpAfterNetworkReconnect() },
             awaitRetry = { generation, attempt ->
                 appStateDebug { "notification network recovery pending attempt=$attempt" }
                 awaitNotificationRetryWindow(
@@ -7941,24 +7214,19 @@ class WhiteNoiseAppState private constructor(
                 )
             },
             onRecoveryAttemptStarted = { networkGeneration ->
-                observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }?.let { generation ->
-                    notificationPushWakeRecoveryCircuit.noteRecoveryAttempt(
-                        networkGeneration = networkGeneration,
-                        pushWakeGeneration = generation,
-                    )
-                }
+                pushWakeRecovery.noteNetworkRecoveryAttempt(networkGeneration)
             },
             onRecoveryExhausted = { networkGeneration, _ ->
-                notificationPushWakeRecoveryCircuit.noteRecoveryExhausted(networkGeneration)
+                pushWakeRecovery.noteNetworkRecoveryExhausted(networkGeneration)
             },
-            onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain,
+            onDrainCompleted = { pushWakeRecovery.schedulePendingPushWakeCatchUpDrain() },
             diagnostics = notificationNetworkRecoveryDiagnostics,
         )
 
     internal val runtimeListenerTeardownOwner =
         AppRuntimeListenerTeardownOwner(
             cancelNetworkRecovery = { notificationNetworkRecovery.cancelAndJoin() },
-            cancelPushWakeDrain = { pushWakeCatchUpDrainJob.cancelAndJoin() },
+            cancelPushWakeDrain = { pushWakeRecovery.cancelDrainAndJoin() },
             cancelListener = { notificationJob.cancelAndJoin() },
             clearUnreadRefresh = { unreadRefreshScheduler.cancelAndClear() },
             receiverActive = notificationReceiverActive,
@@ -8040,7 +7308,7 @@ class WhiteNoiseAppState private constructor(
             )
             activeNetworkTypesSnapshot =
                 network?.let { cm.getNetworkCapabilities(it) }?.let(::networkTypesFor) ?: emptySet()
-            if (network != null) schedulePendingPushWakeCatchUpDrain()
+            if (network != null) pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
         }.onFailure {
             // Restricted profiles can throw from the connectivity queries; the
             // empty snapshots are the same conservative offline default the
@@ -8165,7 +7433,7 @@ class WhiteNoiseAppState private constructor(
         hasActiveNetworkSnapshot = true
         activeNetworkTypesSnapshot = networkTypes ?: emptySet()
         noteUsableValidatedInternetSnapshot()
-        schedulePendingPushWakeCatchUpDrain()
+        pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
     }
 
     /** Publish aggregate connectivity and wake retry owners on a genuine recovery edge. */
@@ -8181,73 +7449,10 @@ class WhiteNoiseAppState private constructor(
         )
         requestNetworkPermissionRefresh()
         if (!recovery.restored) return
-        resumePushWakeEpisodeFromLifecycle()
+        pushWakeRecovery.resumePushWakeEpisodeFromLifecycle()
         AvatarLoadRecovery.onNetworkRestored()
         validatedConnectivityRecoveryGenerationMutable.update { generation -> generation + 1 }
         notificationNetworkRecovery.noteNetworkRestored(validatedConnectivityRecoveryGenerationMutable.value)
-    }
-
-    /** Starts push-wake catch-up only when network recovery does not own the receiver. */
-    private fun schedulePendingPushWakeCatchUpDrain() {
-        val pendingPushWakeGeneration =
-            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() } ?: return
-        if (pendingPushWakeGeneration != 0L && !networkNotificationRecoverySuppressed) {
-            notificationScope.launch(pushWakeStorageDispatcher) { schedulePushWakeRecovery() }
-        }
-        val networkGeneration = validatedConnectivityRecoveryGenerationMutable.value
-        val runtimeUnavailable =
-            networkNotificationRecoverySuppressed ||
-                pendingPushWakeGeneration == 0L ||
-                notificationNetworkRecovery.isActive()
-        val triggerAlreadyConsumed =
-            !notificationPushWakeRecoveryCircuit.allowsIndependentDrain(
-                networkGeneration = networkGeneration,
-                pushWakeGeneration = pendingPushWakeGeneration,
-            )
-        if (runtimeUnavailable || triggerAlreadyConsumed) {
-            return
-        }
-        pushWakeCatchUpDrainJob.startIfInactive {
-            notificationScope
-                .launch {
-                    if (
-                        notificationPushWakeRecoveryCircuit.claimIndependentDrain(
-                            networkGeneration = networkGeneration,
-                            pushWakeGeneration = pendingPushWakeGeneration,
-                        )
-                    ) {
-                        ensureNotificationRuntimeStarted()
-                    }
-                }.also { drainJob ->
-                    drainJob.invokeOnCompletion {
-                        val currentPushWakeGeneration =
-                            observePushState { pushTokenStore.pendingPushWakeCatchUpGeneration() }
-                                ?: return@invokeOnCompletion
-                        val currentNetworkGeneration = validatedConnectivityRecoveryGenerationMutable.value
-                        if (
-                            currentPushWakeGeneration != 0L &&
-                            (
-                                currentPushWakeGeneration != pendingPushWakeGeneration ||
-                                    currentNetworkGeneration != networkGeneration
-                            )
-                        ) {
-                            notificationScope.launch {
-                                // Completion can run inline while the job slot lock is held.
-                                yield()
-                                schedulePendingPushWakeCatchUpDrain()
-                            }
-                        }
-                    }
-                }
-        }
-    }
-
-    /** Reopens an exhausted episode off-main before evaluating process and durable owners. */
-    private fun resumePushWakeEpisodeFromLifecycle() {
-        notificationScope.launch {
-            admitPushWakeEpisodeFromLifecycle()
-            schedulePendingPushWakeCatchUpDrain()
-        }
     }
 
     private fun networkTypesFor(caps: android.net.NetworkCapabilities): Set<MediaAutoDownloadNetwork> =
@@ -8343,7 +7548,7 @@ class WhiteNoiseAppState private constructor(
         // process cannot keep silencing that chat after the UI is gone (#821).
         updateNotificationSuppression(if (foreground) suppression.onForeground() else suppression.onBackground())
         AppUpdateForegroundState.isForeground = foreground
-        if (!foreground) transferUnownedPushWakeRecovery()
+        if (!foreground) pushWakeRecovery.transferUnownedPushWakeRecovery()
         diagnostics.setForeground(foreground)
         marmotRuntime?.marmot?.let { engine ->
             notificationScope.launch {
@@ -8759,187 +7964,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /**
-     * Sends one notification reply exactly once, reporting an earlier attempt that already committed instead of
-     * resending it, and refusing a reply over the outgoing limit before anything is sent.
-     */
-    internal suspend fun sendNotificationReply(
-        accountRef: String,
-        groupIdHex: String,
-        afterMessageIdHex: String,
-        text: String,
-        completionStore: NotificationReplyCompletionStore,
-        completionKey: String,
-        recoveryScope: String,
-    ): NotificationReplySendOutcome {
-        val account = accountRef.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
-        val group = groupIdHex.takeIf { it.isNotBlank() } ?: return NotificationReplySendOutcome.NonRetryableFailure
-        if (!ConversationController.HEX_MESSAGE_ID.matches(afterMessageIdHex)) {
-            return NotificationReplySendOutcome.NonRetryableFailure
-        }
-        val body = text.trim().takeIf { it.isNotEmpty() } ?: return NotificationReplySendOutcome.NonRetryableFailure
-        return runCatchingCancellable {
-            withGroupCommitLock(account, group) {
-                val recoveryLookup =
-                    withContext(Dispatchers.IO) {
-                        completionStore.recoveryLookup(completionKey)
-                    }
-                val recoverySnapshot =
-                    when (recoveryLookup) {
-                        NotificationReplyRecoveryLookup.NotStarted -> null
-                        NotificationReplyRecoveryLookup.Indeterminate ->
-                            return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-                        is NotificationReplyRecoveryLookup.Ready -> recoveryLookup.snapshot
-                    }
-                if (recoverySnapshot != null) {
-                    when (
-                        notificationReplyCommitState(
-                            account = account,
-                            group = group,
-                            recoveryState = recoverySnapshot.recoveryState,
-                            nextAttemptBoundary = recoverySnapshot.nextAttemptBoundary,
-                            text = body,
-                        )
-                    ) {
-                        NotificationReplyCommitProbe.Committed ->
-                            return@withGroupCommitLock NotificationReplySendOutcome.AlreadyCommitted
-                        NotificationReplyCommitProbe.Indeterminate ->
-                            return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-                        NotificationReplyCommitProbe.NotCommitted -> Unit
-                    }
-                }
-                // A reply queued before the limit existed may be over it. Refuse it only now, once the
-                // probe above has ruled out an earlier attempt that already committed it.
-                if (exceedsOutgoingMessageLimit(body)) return@withGroupCommitLock NotificationReplySendOutcome.TooLong
-
-                // A synthetic max-id cursor excludes every row in this wall-clock
-                // second. Wait for the next second before asking MDK to build the
-                // event so its random event id cannot sort below the lower bound.
-                val recoveryBoundary = notificationReplyRecoveryBoundary(System.currentTimeMillis())
-                val persistedBoundary =
-                    withContext(Dispatchers.IO) {
-                        completionStore.markStarted(completionKey, recoveryScope, recoveryBoundary)
-                    }
-                if (persistedBoundary == null) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-                while (!notificationReplySendWindowReady(persistedBoundary, System.currentTimeMillis())) {
-                    currentCoroutineContext().ensureActive()
-                    delay(NOTIFICATION_REPLY_SEND_WINDOW_POLL_MILLIS)
-                }
-
-                val summary = marmotIo(MarmotTraceSection.TEXT_SEND) { sendText(account, group, body) }
-                // MDK assigns the app-event id before deciding whether this call
-                // can publish it immediately. Persist it before returning either
-                // outcome: after a process death, it is our durable proof that an
-                // accepted-pending quick reply must never be sent a second time.
-                val committedMessageId =
-                    summary.messageIds
-                        .firstOrNull()
-                        ?.takeIf { ConversationController.HEX_MESSAGE_ID.matches(it) }
-                        ?: return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-                val committed =
-                    withContext(Dispatchers.IO) {
-                        completionStore.markCommittedMessage(completionKey, committedMessageId)
-                    }
-                if (!committed) return@withGroupCommitLock NotificationReplySendOutcome.RetryableFailure
-                if (summary.acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING) {
-                    NotificationReplySendOutcome.AcceptedPending
-                } else {
-                    NotificationReplySendOutcome.Sent
-                }
-            }
-        }.onFailure {
-            appStateDebug(it) { "notification reply failed for group=${group.take(8)}: ${it.readableMessage()}" }
-        }.getOrElse(::notificationReplySendFailureOutcome)
-    }
-
-    /** Sends a notification quick reaction and reports MDK's accept disposition, not an assumed publication. */
-    internal suspend fun sendNotificationReaction(
-        accountRef: String,
-        groupIdHex: String,
-        messageIdHex: String,
-        reaction: String,
-    ): NotificationReactionSendOutcome {
-        val emoji = normalizeNotificationReaction(reaction)
-        val validTarget =
-            accountRef.isNotBlank() &&
-                groupIdHex.isNotBlank() &&
-                ConversationController.HEX_MESSAGE_ID.matches(messageIdHex)
-        if (!validTarget || emoji == null) {
-            return NotificationReactionSendOutcome.NonRetryableFailure
-        }
-        return runCatchingCancellable {
-            withGroupCommitLock(accountRef, groupIdHex) {
-                val summary =
-                    marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                        reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)
-                    }
-                notificationReactionOutcome(summary.acceptDisposition)
-            }
-        }.onFailure {
-            appStateDebug(it) {
-                "notification reaction failed for group=${groupIdHex.take(8)}: ${it.readableMessage()}"
-            }
-        }.getOrElse(::notificationReactionSendFailureOutcome)
-    }
-
-    /** Checks whether a notification reply already landed after the recovery boundary, so a retry never sends twice. */
-    private suspend fun notificationReplyCommitState(
-        account: String,
-        group: String,
-        recoveryState: NotificationReplyRecoveryState,
-        nextAttemptBoundary: NotificationReplyRecoveryBoundary?,
-        text: String,
-    ): NotificationReplyCommitProbe {
-        if (!ConversationController.HEX_MESSAGE_ID.matches(recoveryState.boundary.messageIdHex)) {
-            return NotificationReplyCommitProbe.Indeterminate
-        }
-        if (
-            nextAttemptBoundary != null &&
-            !ConversationController.HEX_MESSAGE_ID.matches(nextAttemptBoundary.messageIdHex)
-        ) {
-            return NotificationReplyCommitProbe.Indeterminate
-        }
-        return runCatchingCancellable {
-            probeNotificationReplyCommit(
-                recoveryState = recoveryState,
-                nextAttemptBoundary = nextAttemptBoundary,
-                text = text,
-            ) { after, limit ->
-                val page =
-                    marmotIo {
-                        timelineMessages(
-                            account,
-                            TimelineMessageQueryFfi.page(
-                                groupIdHex = group,
-                                search = null,
-                                before = null,
-                                beforeMessageId = null,
-                                after = after.timelineAt,
-                                afterMessageId = after.messageIdHex,
-                                limit = limit,
-                            ),
-                        )
-                    }
-                NotificationReplyTimelinePage(
-                    records =
-                        page.messages.map { record ->
-                            NotificationReplyTimelineRecord(
-                                timelineAt = record.timelineAt,
-                                messageIdHex = record.messageIdHex,
-                                sourceMessageIdHex = record.sourceMessageIdHex,
-                                direction = record.direction,
-                                plaintext = record.plaintext,
-                                recipientConfirmed = record.recipientConfirmed,
-                            )
-                        },
-                    hasMoreAfter = page.hasMoreAfter,
-                )
-            }
-        }.onFailure {
-            appStateDebug(it) { "notification reply dedupe probe failed for group=${group.take(8)}: ${it.readableMessage()}" }
-        }.getOrDefault(NotificationReplyCommitProbe.Indeterminate)
-    }
-
     suspend fun markNotificationMessageRead(
         accountRef: String,
         groupIdHex: String,
@@ -8959,39 +7983,6 @@ class WhiteNoiseAppState private constructor(
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMAppState", "notification mark read failed", it)
         }.getOrDefault(false)
-    }
-
-    /**
-     * Reconcile a background [accountRef]'s per-account unread aggregate after
-     * a successful notification-action mark-read whose authoritative row could
-     * not fold into a bound [ChatsController]. Without this, the acting
-     * account's avatar dot keeps presenting the stale pre-action count until an
-     * unrelated refresh happens to land.
-     *
-     * When the read cursor provably advanced, the stored CONFIRMED value is
-     * known-stale: retain the count but stop presenting it, so a failed refresh
-     * degrades honestly instead of keeping a stale dot lit. Reconciliation then
-     * reuses the same coalesced refresh path inbound notification updates use,
-     * which publishes the authoritative post-action projection for exactly this
-     * account and never touches other accounts' values.
-     */
-    private fun reconcileAccountUnreadAfterNotificationMarkRead(
-        accountRef: String,
-        cursorAdvanced: Boolean,
-    ) {
-        // The active account's projection is owned by its bound (or rebinding)
-        // ChatsController and, on the notification-tap open path, by the
-        // account-switch snapshot staging — both publish the authoritative
-        // value themselves. Reconciling here would only add redundant refresh
-        // traffic to the open path; the gap this closes is the account that has
-        // no such owner: a background account acted on from the shade.
-        if (accountRef == activeAccountRef) return
-        if (cursorAdvanced) accountUnreadStore.markUnknown(accountRef)
-        // Honor the same destructive-teardown suppression as inbound-update
-        // maintenance: a wipe owns listener and scheduler restarts, and the
-        // post-restore lifecycle refresh reconciles the retained value.
-        if (networkNotificationRecoverySuppressed) return
-        unreadRefreshScheduler.schedule(accountRef)
     }
 
     @Suppress("MaxLineLength")
@@ -10311,7 +9302,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Read one persisted profile without mutating the active account caches. */
-    private suspend fun loadAccountSwitchProfileSeed(id: String): AccountSwitchProfileSeed =
+    internal suspend fun loadAccountSwitchProfileSeed(id: String): AccountSwitchProfileSeed =
         readLocalAccountProfileSeed(
             id = id,
             readProfile = profileReader ?: { marmotIo(MarmotTraceSection.PROFILE_READ) { userProfile(it) } },
@@ -10442,14 +9433,10 @@ class WhiteNoiseAppState private constructor(
         private const val DISAPPEARING_TOOLTIP_SHOWN_KEY = "disappearing_tooltip_shown"
 
         private const val PROFILE_REFRESH_RETRY_COOLDOWN_MILLIS = 60_000L
-        private const val PROFILE_PRESENTATION_WARM_FANOUT = 6
+        internal const val PROFILE_PRESENTATION_WARM_FANOUT = 6
         private const val PROFILE_REFRESH_FANOUT = 6
         private const val NOTIFICATION_ENRICHMENT_FANOUT = 4
 
-        // Bulk account-unread refresh runs on cold start/account switch. Bound
-        // both dimensions of the FFI fan-out: accounts and per-account rosters.
-        private const val ACCOUNT_UNREAD_ACCOUNT_FANOUT = 4
-        private const val ACCOUNT_UNREAD_MEMBER_FANOUT = 4
         private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
         private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
         private const val MAX_PENDING_AVATAR_PREWARMS = 64

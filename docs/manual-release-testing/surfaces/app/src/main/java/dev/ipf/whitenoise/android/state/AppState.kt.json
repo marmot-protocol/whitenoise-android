@@ -224,15 +224,6 @@
         ]
       },
       {
-        "surface": "Startup and account-switch snapshots carry MDK's stored per-row presentation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "awaitColdWorkers = plan.awaitColdAvatarWorkers",
-        "test_ids": [
-          "CHL-023",
-          "NAV-006"
-        ]
-      },
-      {
         "surface": "Single notification delivery mode and safe cutover",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "internal suspend fun setNotificationDeliveryMode(",

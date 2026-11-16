@@ -3241,40 +3241,47 @@ internal fun MessageBubble(
                 )
                 if (surfaces.emojiPickerOpen && !deleted && !actionsReadOnly) {
                     val pickingSlot = surfaces.configureReactionSlot
-                    EmojiPickerSheet(
-                        purpose =
-                            if (pickingSlot == null) {
-                                EmojiPickerPurpose.USE
-                            } else {
-                                EmojiPickerPurpose.CONFIGURE_QUICK_REACTION
-                            },
-                        recentEmojis = recentEmojis,
-                        onEmojiUsed = onEmojiUsed,
-                        onDismissRequest = {
-                            surfaces.emojiPickerOpen = false
-                            surfaces.configureReactionSlot = null
-                        },
-                        onEmojiPicked = { emoji ->
-                            surfaces.emojiPickerOpen = false
-                            if (pickingSlot == null) {
-                                reactWithEmoji(emoji)
-                            } else {
-                                surfaces.pickConfigureReaction(pickingSlot, emoji)
+                    dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary(
+                        dev.ipf.whitenoise.android.ui
+                            .rememberInstalledEmojiPicker(appState),
+                        dev.ipf.whitenoise.android.ui
+                            .rememberConversationEmojiPicker(controller),
+                    ) {
+                        EmojiPickerSheet(
+                            purpose =
+                                if (pickingSlot == null) {
+                                    EmojiPickerPurpose.USE
+                                } else {
+                                    EmojiPickerPurpose.CONFIGURE_QUICK_REACTION
+                                },
+                            recentEmojis = recentEmojis,
+                            onEmojiUsed = onEmojiUsed,
+                            onDismissRequest = {
+                                surfaces.emojiPickerOpen = false
                                 surfaces.configureReactionSlot = null
-                                surfaces.customizeReactionsOpen = true
-                            }
-                        },
-                        onConfigure =
-                            if (pickingSlot != null) {
-                                null
-                            } else {
-                                {
-                                    surfaces.configureReactionsDraft = quickReactionEmojis
-                                    surfaces.emojiPickerOpen = false
+                            },
+                            onEmojiPicked = { emoji ->
+                                surfaces.emojiPickerOpen = false
+                                if (pickingSlot == null) {
+                                    reactWithEmoji(emoji)
+                                } else {
+                                    surfaces.pickConfigureReaction(pickingSlot, emoji)
+                                    surfaces.configureReactionSlot = null
                                     surfaces.customizeReactionsOpen = true
                                 }
                             },
-                    )
+                            onConfigure =
+                                if (pickingSlot != null) {
+                                    null
+                                } else {
+                                    {
+                                        surfaces.configureReactionsDraft = quickReactionEmojis
+                                        surfaces.emojiPickerOpen = false
+                                        surfaces.customizeReactionsOpen = true
+                                    }
+                                },
+                        )
+                    }
                 }
                 if (surfaces.customizeReactionsOpen && !deleted) {
                     ConfigureReactionsSheet(

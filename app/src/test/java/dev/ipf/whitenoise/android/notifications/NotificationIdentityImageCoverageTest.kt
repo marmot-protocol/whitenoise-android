@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import dev.ipf.whitenoise.android.localNotificationPresenterSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -22,7 +23,7 @@ class NotificationIdentityImageCoverageTest {
     /** The presenter sets the picture only through the shared snapshot, and never on a redacted card. */
     @Test
     fun richCardsShareOneIdentitySnapshotAndRedactedCardsGetNone() {
-        val presenter = source("LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         assertFalse("identity pictures go through setConversationIdentityImage", ".setLargeIcon(" in presenter)
         assertFalse(
             "content rewrites use the same identity snapshot",
@@ -42,7 +43,7 @@ class NotificationIdentityImageCoverageTest {
     /** Long first messages never switch the image into BigTextStyle's trailing picture slot. */
     @Test
     fun everyNewMessageUsesTheSameNativeConversationTemplate() {
-        val show = source("LocalNotificationPresenter.kt").functionBody("show")
+        val show = localNotificationPresenterSource().functionBody("show")
         val richWrite =
             show
                 .substringAfter("val presentationTimestampMs = nowMillis()")
@@ -59,7 +60,7 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun identityShortcutIsPublishedBeforeTheFirstPost() {
-        val presenter = source("LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         val show = presenter.functionBody("show")
         val publish = show.indexOf("publishShortcutBeforePost(")
         assertTrue("the first post publishes its identity shortcut", publish >= 0)
@@ -117,7 +118,7 @@ class NotificationIdentityImageCoverageTest {
     /** A late picture or contact refresh rewrites the live card, so no rewrite may drop or replace the identity. */
     @Test
     fun liveCardRewritesNeverDropTheIdentityPicture() {
-        val presenter = source("LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         assertFalse("no path clears the picture", "setLargeIcon(null" in presenter)
         assertFalse(
             "no content rewrite clears the picture",
@@ -137,7 +138,7 @@ class NotificationIdentityImageCoverageTest {
             assertFalse("$name must not set a picture", "LargeIcon" in body || "IdentityImage" in body)
             assertFalse("$name must not copy the identity extras", "EXTRA_IDENTITY_IMAGE" in body)
         }
-        val redacted = source("LocalNotificationPresenter.kt").functionBody("redactedPublicVersion")
+        val redacted = localNotificationPresenterSource().functionBody("redactedPublicVersion")
         assertFalse("the lock-screen version stays generic", "LargeIcon" in redacted || "IdentityImage" in redacted)
     }
 
@@ -161,7 +162,7 @@ class NotificationIdentityImageCoverageTest {
             val forget = section.indexOf("forgetNotificationConversationShortcut(")
             assertTrue("$name forgets inside the removal's lock", section.indexOf(removal) in 0 until forget)
         }
-        val presenter = source("LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         assertTrue(
             "local removal reaches the shortcut owner",
             "conversationShortcuts.forgetConversationShortcut(" in presenter,
@@ -192,13 +193,13 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("through the group avatar cache", "GroupAvatarImageLoader" in loader)
         assertTrue("and MDK's encrypted download", "downloadGroupBlossomImage(" in loader)
         assertTrue("nothing decrypts behind the lock", loader.split("appLock.screenVisible").size - 1 >= 2)
-        val presenter = source("LocalNotificationPresenter.kt")
-        val resolve = presenter.declaration("private suspend fun resolveAvatars(")
+        val presenter = localNotificationPresenterSource()
+        val resolve = presenter.declaration("internal suspend fun LocalNotificationPresenter.resolveAvatars(")
         assertTrue(
             "the presenter falls back to the loader",
             "sources.conversationLoader?.let { boundedIdentityLoad(it) }" in resolve,
         )
-        val bounded = presenter.declaration("private suspend fun boundedIdentityLoad(")
+        val bounded = presenter.declaration("internal suspend fun LocalNotificationPresenter.boundedIdentityLoad(")
         assertTrue("within its own late-refresh bound", "GROUP_IDENTITY_LOAD_TIMEOUT_MS" in bounded)
     }
 
@@ -259,8 +260,8 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("whose private picture is never read here", "contactAvatarOverride(" in stored)
         assertTrue("never acquiring a missing copy", "acquireMissing = false" in stored)
         assertTrue("nothing starts behind the lock", stored.split("appLock.screenVisible").size - 1 >= 3)
-        val presenter = source("LocalNotificationPresenter.kt")
-        val resolve = presenter.declaration("private suspend fun resolveAvatars(")
+        val presenter = localNotificationPresenterSource()
+        val resolve = presenter.declaration("internal suspend fun LocalNotificationPresenter.resolveAvatars(")
         val storedAt = resolve.indexOf("sources.storedConversationLoader")
         val urlAt = resolve.indexOf("sources.conversationUrl")
         assertTrue("the stored copy comes before the URL", storedAt in 0 until urlAt)
@@ -268,7 +269,7 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("and replaces the picture the card shows", storedAt < resolve.indexOf("sources.conversationBitmap"))
         assertTrue(
             "a stored copy with the shown pixels changes nothing",
-            "sameAs(" in presenter.declaration("private suspend fun arrivedPictures("),
+            "sameAs(" in presenter.declaration("internal suspend fun LocalNotificationPresenter.arrivedPictures("),
         )
     }
 
@@ -292,7 +293,9 @@ class NotificationIdentityImageCoverageTest {
             "nothing starts behind the lock",
             "lockCheckedPictureLoader(url, domain, { appLock.screenVisible })" in loader,
         )
-        val resolve = source("LocalNotificationPresenter.kt").declaration("private suspend fun resolveAvatars(")
+        val resolve =
+            localNotificationPresenterSource()
+                .declaration("internal suspend fun LocalNotificationPresenter.resolveAvatars(")
         assertTrue(
             "a conversation slot with a loader skips its URL",
             "takeUnless { sources.hasConversationLoader }" in resolve,
@@ -327,7 +330,7 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("no blank picture for a group row", "groupSenderIcon" in rendering)
         val write = source("NotificationCardPublisher.kt").functionBody("postNotificationSafely")
         assertFalse("the final write keeps member pictures", "GroupSenderPictures(" in write)
-        val presenter = source("LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         val firstPost = presenter.branch("NotificationStyleChoice.Messaging -> {").before("messagingPost =")
         assertFalse("a group keeps its sender's picture", "isGroupConversation" in firstPost)
         val late = presenter.functionBody("refreshLateIdentityImage")
@@ -346,7 +349,7 @@ class NotificationIdentityImageCoverageTest {
             )
         assertTrue("every sender has a late source", "senderUrl = warmed.senderAvatarUrl," in sources)
         assertTrue("a cold sender picture gets a loader", "senderLoader = urlLoader(" in lateLoaders())
-        val resolve = presenter.declaration("private suspend fun resolveAvatars(")
+        val resolve = presenter.declaration("internal suspend fun LocalNotificationPresenter.resolveAvatars(")
         val loaderAt = resolve.indexOf("sources.senderLoader?.let { boundedIdentityLoad(it) }")
         assertTrue("with the late bound, before the short URL fetch", loaderAt in 0 until resolve.indexOf("senderUrl"))
         val enriched = source("NotificationCardContent.kt").functionBody("enrichedMessagingStyle")
@@ -363,7 +366,7 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun reactionCardsShowWhoReacted() {
-        val presenter = source("LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         val plain = presenter.branch("NotificationStyleChoice.Plain -> {")
         val reactor = plain.indexOf("reactorImage(")
         assertTrue("the reaction card draws who reacted", reactor >= 0)
@@ -411,7 +414,7 @@ class NotificationIdentityImageCoverageTest {
             2,
             appState.split("identityContact = firstPost.avatars.identityContact").size - 1,
         )
-        val presenter = source("LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         val firstPost = presenter.branch("NotificationStyleChoice.Messaging -> {")
         assertTrue("the first post records the peer", "contact = identityContact," in firstPost)
         assertTrue("and hands them to the shortcut", "identityContact = identityContact," in firstPost)

@@ -185,7 +185,7 @@ class LocalReactionMotionScreenshotTest {
     @Test fun largeFontRtlTargetsItsGlyph() = record("large_rtl", true, true)
 
     /** Bundled artwork uses the same decoded crop at both ends of the flight. */
-    @Test fun bundledArtworkLandsInBadge() = record("bundled", false, true, ":marmot:")
+    @Test fun bundledArtworkLandsInBadge() = record("bundled", false, true, ":marmot_classic:")
 
     /** Rectangular custom artwork retains its aspect ratio while traveling to the badge. */
     @Test fun rectangularArtworkLandsInBadge() = record("rectangular", false, true, ":flag:")

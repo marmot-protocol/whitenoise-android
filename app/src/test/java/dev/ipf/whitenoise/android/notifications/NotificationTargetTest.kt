@@ -746,8 +746,8 @@ class NotificationTargetTest {
             )
         assertEquals(ListenableWorker.Result.failure(), result)
         val send =
-            appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
-                .substringAfter("internal suspend fun sendNotificationReply(")
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationReply.kt")
+                .substringAfter("internal suspend fun WhiteNoiseAppState.sendNotificationReply(")
                 .substringBefore("sendText(account, group, body)")
         val probe = send.indexOf("NotificationReplyCommitProbe.Committed")
         val limit = send.indexOf("exceedsOutgoingMessageLimit(body)")
