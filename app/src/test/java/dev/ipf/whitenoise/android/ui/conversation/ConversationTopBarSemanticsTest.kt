@@ -1,12 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -16,7 +20,9 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
+import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -33,20 +39,27 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MarmotWindowTestFakes
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.group.ConversationMuteControl
+import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
+import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -196,6 +209,113 @@ class ConversationTopBarSemanticsTest {
             .captureRoboImage("src/test/snapshots/conversation_header_prepared_title_light.png")
     }
 
+    /** The default header has no shortcut buttons. */
+    @Test fun headerWithoutShortcutsLight() = shortcutHeader("none_light", emptyList())
+
+    @Test fun headerWithoutShortcutsDark() = shortcutHeader("none_dark", emptyList(), dark = true)
+
+    /** One chosen shortcut sits at the end of the header. */
+    @Test fun headerWithOneShortcutLight() = shortcutHeader("one_light", listOf(HeaderShortcut.Search))
+
+    @Test fun headerWithOneShortcutDark() = shortcutHeader("one_dark", listOf(HeaderShortcut.Search), dark = true)
+
+    /** Two shortcuts keep the person's order and leave the title its width. */
+    @Test fun headerWithTwoShortcutsLight() =
+        shortcutHeader("two_light", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search))
+
+    @Test fun headerWithTwoShortcutsDark() =
+        shortcutHeader("two_dark", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search), dark = true)
+
+    /** Search runs the supplied handler; Mute asks for a duration through the shared control, never directly. */
+    @Test
+    fun shortcutsRunTheirSharedHandlers() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val dialogOpen = mutableStateOf(false)
+        var searches = 0
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                shortcuts = listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute),
+                muteControl = muteControl(appState, dialogOpen = dialogOpen),
+                onSearch = { searches += 1 },
+            )
+        })
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_SEARCH_TAG).assertTouchHeightIsEqualTo(48.dp).performClick()
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertTouchHeightIsEqualTo(48.dp).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, searches)
+            assertTrue(dialogOpen.value)
+        }
+    }
+
+    /** A mute command in flight disables the header button so a second tap cannot race it. */
+    @Test
+    fun pendingMuteDisablesTheHeaderShortcut() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val dialogOpen = mutableStateOf(false)
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                shortcuts = listOf(HeaderShortcut.MuteUnmute),
+                muteControl = muteControl(appState, pending = true, dialogOpen = dialogOpen),
+                onSearch = {},
+            )
+        })
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_MUTE_TAG).assertIsNotEnabled().performClick()
+        composeRule.runOnIdle { assertFalse(dialogOpen.value) }
+    }
+
+    /** With a change handler the timer badge opens the picker instead of details; without one it stays inert. */
+    @Test
+    fun timerBadgeOpensPickerOnlyWhenEditable() {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 60uL))
+        val editable = mutableStateOf(true)
+        var timerClicks = 0
+        var detailsClicks = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    TopBar(
+                        appState,
+                        controller,
+                        onOpenDetails = { detailsClicks += 1 },
+                        onTimerClick = if (editable.value) ({ timerClicks += 1 }) else null,
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG)
+            .assertHasClickAction()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, timerClicks)
+            assertEquals(0, detailsClicks)
+            editable.value = false
+        }
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag("conversation.header.timer", useUnmergedTree = true).assertExists()
+    }
+
+    /** Only an admin member whose group mutations are not blocked may open the timer picker from the header. */
+    @Test
+    fun timerEditabilityCoversEditorBlockedEditorAndNonEditor() {
+        val appState = appState()
+        val editor = ConversationController(appState, group())
+        val nonEditor = ConversationController(appState, group().copy(admins = emptyList()))
+        for (controller in listOf(editor, nonEditor)) {
+            controller.members = listOf(AppGroupMemberRecordFfi(ACCOUNT_ID, ACCOUNT_REF, true))
+        }
+        assertTrue(editor.canEditGroupSettings)
+        assertFalse(nonEditor.canEditGroupSettings)
+        assertTrue(disappearingTimerEditable(canEdit = editor.canEditGroupSettings, mutationsBlocked = false))
+        assertFalse(disappearingTimerEditable(canEdit = editor.canEditGroupSettings, mutationsBlocked = true))
+        assertFalse(disappearingTimerEditable(canEdit = nonEditor.canEditGroupSettings, mutationsBlocked = false))
+    }
+
     /** Hydration cannot replace the opening route title until the existing route owner releases its freeze. */
     @Test
     fun frozenRouteRetainsTitleUntilTransitionCompletes() {
@@ -212,6 +332,7 @@ class ConversationTopBarSemanticsTest {
     }
 
     /** Real controller presentation with inert navigation; no native reads or mutations are supplied. */
+    @Suppress("LongParameterList")
     private fun render(
         appState: WhiteNoiseAppState,
         controller: ConversationController,
@@ -219,37 +340,84 @@ class ConversationTopBarSemanticsTest {
         frozen: State<Boolean> = mutableStateOf(false),
         onOpenDetails: () -> Unit = {},
         fontScale: Float = 1f,
+        dark: Boolean = false,
+        actions: @Composable RowScope.() -> Unit = {},
     ) {
-        val searchFocusRequester = FocusRequester()
         composeRule.setContent {
-            WhiteNoiseTheme(fontScale = fontScale) {
+            WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                 Surface {
-                    ConversationTopBar(
-                        selectionMode = false,
-                        selectedCount = 0,
-                        onCloseSelection = {},
-                        searchOpen = false,
-                        searchQuery = "",
-                        onSearchQueryChange = {},
-                        onClearSearch = {},
-                        onCloseSearch = {},
-                        onSearchAction = {},
-                        searchFocusRequester = searchFocusRequester,
-                        appState = appState,
-                        controller = controller,
-                        groupTitleCopy = GroupTitleCopy.Default,
-                        openedAsDmHint = false,
-                        freezeRoutePresentation = frozen.value,
-                        openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
-                        onOpenDetails = onOpenDetails,
-                        onBack = {},
-                        compactHeight = compactHeight,
-                        performanceSelectorsEnabled = true,
-                    )
+                    TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions)
                 }
             }
         }
     }
+
+    @Composable
+    @Suppress("LongParameterList")
+    private fun TopBar(
+        appState: WhiteNoiseAppState,
+        controller: ConversationController,
+        compactHeight: Boolean = false,
+        frozen: Boolean = false,
+        onOpenDetails: () -> Unit = {},
+        actions: @Composable RowScope.() -> Unit = {},
+        onTimerClick: (() -> Unit)? = null,
+    ) {
+        ConversationTopBar(
+            selectionMode = false,
+            selectedCount = 0,
+            onCloseSelection = {},
+            searchOpen = false,
+            searchQuery = "",
+            onSearchQueryChange = {},
+            onClearSearch = {},
+            onCloseSearch = {},
+            onSearchAction = {},
+            searchFocusRequester = remember { FocusRequester() },
+            appState = appState,
+            controller = controller,
+            groupTitleCopy = GroupTitleCopy.Default,
+            openedAsDmHint = false,
+            freezeRoutePresentation = frozen,
+            openDetailsDescription = OPEN_DETAILS_DESCRIPTION,
+            onOpenDetails = onOpenDetails,
+            onBack = {},
+            compactHeight = compactHeight,
+            performanceSelectorsEnabled = true,
+            actions = actions,
+            onTimerClick = onTimerClick,
+        )
+    }
+
+    /** Records the header with [shortcuts] chosen, using an unmuted conversation's mute control. */
+    private fun shortcutHeader(
+        name: String,
+        shortcuts: List<HeaderShortcut>,
+        dark: Boolean = false,
+    ) {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        render(appState, controller, dark = dark, actions = {
+            ConversationHeaderShortcuts(shortcuts, muteControl(appState), onSearch = {})
+        })
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")
+    }
+
+    private fun muteControl(
+        appState: WhiteNoiseAppState,
+        pending: Boolean = false,
+        dialogOpen: MutableState<Boolean> = mutableStateOf(false),
+    ) = ConversationMuteControl(
+        appState,
+        GROUP_ID,
+        muted = false,
+        mutedUntilMs = null,
+        pending = pending,
+        restoreMode = ChatNotifyMode.ALL,
+        dialogOpen = dialogOpen,
+    )
 
     /** Builds an app state with the test account active. */
     private fun appState() =

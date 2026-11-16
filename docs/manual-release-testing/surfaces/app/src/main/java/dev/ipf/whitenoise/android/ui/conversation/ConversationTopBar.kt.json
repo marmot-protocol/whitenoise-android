@@ -4,6 +4,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "HeaderTimerBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "fun HeaderTimerBadge(",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
         "surface": "Custom emoji authored labels: ConversationTopBar",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
         "anchor": "EmojiLabel(",
@@ -17,7 +25,8 @@
         "anchor": "fun ConversationTopBar(",
         "test_ids": [
           "CON-001",
-          "PRO-006"
+          "PRO-006",
+          "SET-058"
         ]
       },
       {
@@ -42,6 +51,14 @@
         "anchor": "R.string.explanation_conversation_header_details",
         "test_ids": [
           "CON-049"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_header_timer_change",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.conversation_header_timer_change",
+        "test_ids": [
+          "SET-058"
         ]
       }
     ],

@@ -126,6 +126,7 @@ import dev.ipf.whitenoise.android.state.ConversationPagingOrigin
 import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
+import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
@@ -178,6 +179,7 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchTransitions
 import dev.ipf.whitenoise.android.ui.chats.isBrowsingAttachments
 import dev.ipf.whitenoise.android.ui.chats.messageSearchConstraintsFor
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
+import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.canInviteFromEmptyGroup
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchByMe
 import dev.ipf.whitenoise.android.ui.chats.rememberGlobalSearchLookup
@@ -260,8 +262,14 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerSheet
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.group.DisappearingTimerEditor
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
+import dev.ipf.whitenoise.android.ui.group.MuteDurationHost
+import dev.ipf.whitenoise.android.ui.group.applyDisappearingTimer
+import dev.ipf.whitenoise.android.ui.group.canEditGroupSettings
+import dev.ipf.whitenoise.android.ui.group.disappearingTimerEditable
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
+import dev.ipf.whitenoise.android.ui.group.rememberConversationMuteControl
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
@@ -3870,6 +3878,44 @@ internal fun ConversationScreen(
         ).second
     // Both full-screen routes replace the focused composer, so they lay out for the closed keyboard.
     val routedAwayIme = rememberLeavingImeModifier(routeKey = showDetails to showComposerSettings)
+    // Chat details and the optional header shortcut open the same in-chat search.
+    val openConversationSearch: () -> Unit = {
+        showDetails = false
+        presentationState.searchState.value =
+            conversationSearchPreset(
+                conversationAccountRef,
+                appState.runtimeGeneration,
+                chat.id,
+                controller.title(groupTitleCopy),
+            )
+        navigationState.searchOpen = true
+    }
+    val headerShortcuts = appState.swipePreferences.headerShortcuts.shortcuts
+    // The mute state read runs only when the person put Mute/unmute in the header.
+    val headerMuteControl =
+        if (HeaderShortcut.MuteUnmute in headerShortcuts) {
+            rememberConversationMuteControl(appState, controller)
+        } else {
+            null
+        }
+    headerMuteControl?.let { MuteDurationHost(it) }
+    var showHeaderTimerPicker by remember(controller) { mutableStateOf(false) }
+    val headerTimerRuntime = remember(controller) { appState.runtimeGeneration }
+    val headerTimerEditable =
+        disappearingTimerEditable(
+            canEdit = controller.canEditGroupSettings,
+            mutationsBlocked =
+                controller.mutationInFlight || !controller.isCurrentGroupMutationOwner(appState, headerTimerRuntime),
+        )
+    DisappearingTimerEditor(
+        open = showHeaderTimerPicker && headerTimerEditable,
+        currentSecs = controller.group.disappearingMessageSecs.toLong(),
+        editable = headerTimerEditable,
+        identity = { GroupActingAccountIdentity(appState, controller.boundAccountRef) },
+        resetKeys = arrayOf(controller, appState.activeAccountRef, appState.runtimeGeneration),
+        onDismiss = { showHeaderTimerPicker = false },
+        onApply = { secs -> controller.applyDisappearingTimer(appState, headerTimerRuntime, secs) },
+    )
     if (transcriptRoutedAway) {
         if (showDetails) {
             /** Shows group details in place of the transcript while they are open. */
@@ -3889,17 +3935,7 @@ internal fun ConversationScreen(
                     },
                     autoOpenAddMember = openAddMemberOnDetails,
                     onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
-                    onOpenSearch = {
-                        showDetails = false
-                        presentationState.searchState.value =
-                            conversationSearchPreset(
-                                conversationAccountRef,
-                                appState.runtimeGeneration,
-                                chat.id,
-                                controller.title(groupTitleCopy),
-                            )
-                        navigationState.searchOpen = true
-                    },
+                    onOpenSearch = openConversationSearch,
                     onStartGroupWithPeer = onStartGroupWithPeer,
                 )
             }
@@ -4263,6 +4299,14 @@ internal fun ConversationScreen(
                                 },
                                 onBack = exitConversation,
                                 compactHeight = compactHeightConversation,
+                                actions = {
+                                    ConversationHeaderShortcuts(
+                                        shortcuts = headerShortcuts,
+                                        muteControl = headerMuteControl,
+                                        onSearch = openConversationSearch,
+                                    )
+                                },
+                                onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
                             )
                         }
                     },

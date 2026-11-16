@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">聊天標題列快捷按鈕</string>
+    <string name="header_shortcut_search">在聊天中搜尋</string>
+    <string name="header_shortcuts_limit">最多兩個。請先關閉一個。</string>
+    <string name="explanation_header_shortcut_search">在每個聊天的標題列顯示搜尋按鈕。它開啟的搜尋與聊天詳細資料中的相同。僅適用於這部裝置。</string>
+    <string name="explanation_header_shortcut_mute">在每個聊天的標題列顯示靜音按鈕。靜音時會詢問時長；取消靜音會立即生效。僅適用於這部裝置。</string>
+    <string name="conversation_header_timer_change">變更閱後即焚訊息計時器</string>
+</resources>

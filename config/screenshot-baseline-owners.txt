@@ -88,6 +88,12 @@
 *.ConversationTopBarSemanticsTest.compactHeaderKeepsAccessibleDetailsAndNativeTimer
 *.ConversationTopBarSemanticsTest.performanceSelectorIsClickableWithoutReplacingAccessibilityDescription
 *.ConversationTopBarSemanticsTest.preparedWindowTitleReplacesFallback
+*.ConversationTopBarSemanticsTest.headerWithoutShortcutsLight
+*.ConversationTopBarSemanticsTest.headerWithoutShortcutsDark
+*.ConversationTopBarSemanticsTest.headerWithOneShortcutLight
+*.ConversationTopBarSemanticsTest.headerWithOneShortcutDark
+*.ConversationTopBarSemanticsTest.headerWithTwoShortcutsLight
+*.ConversationTopBarSemanticsTest.headerWithTwoShortcutsDark
 *.ConversationTtsFollowComposeTest.tallMediaBeforeSentenceUsesMeasuredSentenceGeometry
 *.ConversationTtsFollowComposeTest.resumeTargetControlLight
 *.ConversationTtsFollowComposeTest.resumeTargetControlDark
@@ -165,6 +171,7 @@
 *.GestureSettingsScreenTest.amoled
 *.GestureSettingsScreenTest.largeRtl
 *.GestureSettingsScreenTest.configured
+*.GestureSettingsScreenTest.headerShortcutsChosen
 
 # Current chat swipe cues.
 *.ChatRowPortGestureTest.readCueDark

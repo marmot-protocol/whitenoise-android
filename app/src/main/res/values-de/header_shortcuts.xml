@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">Schnellzugriffe in der Chat-Kopfzeile</string>
+    <string name="header_shortcut_search">Im Chat suchen</string>
+    <string name="header_shortcuts_limit">Höchstens zwei. Schalte zuerst einen aus.</string>
+    <string name="explanation_header_shortcut_search">Zeigt in jeder Chat-Kopfzeile eine Suchschaltfläche. Sie öffnet dieselbe Suche wie die Chat-Details. Gilt nur auf diesem Gerät.</string>
+    <string name="explanation_header_shortcut_mute">Zeigt in jeder Chat-Kopfzeile eine Stummschalten-Schaltfläche. Beim Stummschalten wird nach der Dauer gefragt; das Aufheben gilt sofort. Gilt nur auf diesem Gerät.</string>
+    <string name="conversation_header_timer_change">Timer für verschwindende Nachrichten ändern</string>
+</resources>

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -187,6 +188,16 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             "search.GestureSettings.5",
             "pull_unread",
         )
+        HeaderShortcut.entries.forEach { shortcut ->
+            control(
+                "Gestures.${headerShortcutRowKey(shortcut)}",
+                headerShortcutTitleRes(shortcut),
+                R.string.header_shortcuts_title,
+                SettingsDetail.Gestures,
+                "search.GestureSettings.9",
+                headerShortcutRowKey(shortcut),
+            )
+        }
         control(
             "Gestures.reset",
             R.string.reset_to_default,

@@ -344,11 +344,13 @@ class ChatsScreenSelectionActionsCoverageTest {
     @Test
     fun groupDetailsGatesProtocolMutationsForTerminalGroups() {
         val source = groupDetailsSource().readText()
+        val editor = sourceFile("ui/group/DisappearingTimerEditor.kt").readText()
 
         assertTrue(
             "disbanding/disbanded groups must not advertise protocol mutations; leave is engine-refused too",
             "val groupTerminal = controller.group.disbanding || controller.group.disbanded" in source &&
-                "controller.isSelfAdmin && !groupTerminal" in source &&
+                "val canEdit = controller.canEditGroupSettings" in source &&
+                Regex("""isSelfAdmin &&\s*!group\.disbanding &&\s*!group\.disbanded""").containsMatchIn(editor) &&
                 "!mutationsBlocked && controller.membersLoaded && !groupTerminal" in source,
         )
     }
@@ -373,6 +375,13 @@ class ChatsScreenSelectionActionsCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing GroupDetailsScreen.kt source file")
+
+    private fun sourceFile(path: String): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/$path"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/$path"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing $path source file")
 
     private fun String.requiredSection(
         start: String,

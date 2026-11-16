@@ -30,7 +30,7 @@
     <string name="explanation_appearance_gesture_message_right">設定向右滑動一則訊息時會發生什麼。此設定適用於這部裝置上的所有聊天。你可以將它關閉或選擇其他操作。</string>
     <string name="explanation_appearance_gesture_chat_left">設定在聊天清單中向左滑動一個聊天時會發生什麼。預設為關閉。此設定僅適用於這部裝置。</string>
     <string name="explanation_appearance_gesture_chat_right">設定在聊天清單中向右滑動一個聊天時會發生什麼。預設為關閉。此設定僅適用於這部裝置。</string>
-    <string name="explanation_appearance_gesture_reset">將所有滑動操作以及未讀聊天的下拉手勢還原為初始設定。你的聊天不會改變，重設僅適用於這部裝置。</string>
+    <string name="explanation_appearance_gesture_reset">將所有滑動操作、未讀聊天的下拉手勢以及聊天標題列快捷按鈕還原為初始設定。你的聊天不會改變，重設僅適用於這部裝置。</string>
     <string name="explanation_appearance_tts_engine">選擇裝置上由哪個語音引擎朗讀訊息。標示為裝置端的引擎會讓語音留在你的手機上，其他引擎可能會使用網路。此選擇僅適用於這部裝置。</string>
     <string name="explanation_appearance_tts_voice">選擇朗讀訊息所用的聲音。「自動」由語音引擎決定聲音。無法使用的聲音會連同原因一起顯示。此選擇僅適用於這部裝置。</string>
     <string name="explanation_appearance_tts_rate">設定朗讀訊息的速度。「跟隨系統」使用 Android 設定中的語速，你也可以選擇預設值或輸入自己的值。此選擇僅適用於這部裝置。</string>

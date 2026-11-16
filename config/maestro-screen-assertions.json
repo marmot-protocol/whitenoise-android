@@ -2182,6 +2182,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingTimerEditor.kt",
+      "symbol": "DisappearingTimerEditor",
+      "bindings": [
+        {
+          "case": "groups-retention-cancel",
+          "selector": {
+            "text": "Disappearing messages"
+          },
+          "scope": "chat details opens the shared timer editor's picker; Cancel keeps the original timer.",
+          "entry_assertion": {
+            "text": "Disappearing messages"
+          },
+          "opened_by": {
+            "text": "Disappearing"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
       "symbol": "GroupChangeConfirmationDialog",
       "bindings": [

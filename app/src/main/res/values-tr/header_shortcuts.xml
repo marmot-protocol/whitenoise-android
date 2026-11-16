@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">Sohbet başlığı kısayolları</string>
+    <string name="header_shortcut_search">Sohbette ara</string>
+    <string name="header_shortcuts_limit">En fazla iki. Önce birini kapatın.</string>
+    <string name="explanation_header_shortcut_search">Her sohbet başlığında bir arama düğmesi gösterir. Sohbet ayrıntılarındaki aramanın aynısını açar. Yalnızca bu cihazda geçerlidir.</string>
+    <string name="explanation_header_shortcut_mute">Her sohbet başlığında bir sessize alma düğmesi gösterir. Sessize alırken süre sorulur; sesi açmak hemen uygulanır. Yalnızca bu cihazda geçerlidir.</string>
+    <string name="conversation_header_timer_change">Kaybolan mesaj zamanlayıcısını değiştir</string>
+</resources>

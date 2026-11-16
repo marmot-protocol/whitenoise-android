@@ -787,6 +787,16 @@
           "SET-046"
         ]
       }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "R.string.header_shortcuts_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.header_shortcuts_title",
+        "test_ids": [
+          "SET-058"
+        ]
+      }
     ]
   }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
@@ -30,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -39,6 +41,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
@@ -116,6 +119,10 @@ internal fun ConversationTopBar(
     // conversation identity and the details action reachable.
     compactHeight: Boolean = false,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
+    // Optional header shortcuts chosen in Gestures settings; empty keeps the plain header.
+    actions: @Composable RowScope.() -> Unit = {},
+    // Set only when this person may change the timer now; otherwise a tap on it opens details.
+    onTimerClick: (() -> Unit)? = null,
 ) {
     // MDK 0.10.0 prepares the conversation title inside the live window; fall back to the app's own
     // projection until the first replacement arrives or when the seam has no window. A DM peer's
@@ -325,17 +332,11 @@ internal fun ConversationTopBar(
                                                 if (membersSubtitle != null) {
                                                     Text("·", style = labelStyle, color = labelColor)
                                                 }
-                                                Icon(
-                                                    painterResource(R.drawable.ic_timer),
-                                                    contentDescription = null,
-                                                    modifier =
-                                                        Modifier.size(12.dp).testTag("conversation.header.timer"),
-                                                    tint = labelColor,
-                                                )
-                                                Text(
-                                                    disappearingMessagesLabel(disappearingSecs),
-                                                    style = labelStyle,
-                                                    color = labelColor,
+                                                HeaderTimerBadge(
+                                                    label = disappearingMessagesLabel(disappearingSecs),
+                                                    labelStyle = labelStyle,
+                                                    labelColor = labelColor,
+                                                    onClick = onTimerClick,
                                                 )
                                             }
                                         }
@@ -398,6 +399,7 @@ internal fun ConversationTopBar(
                             )
                         }
                     },
+                    actions = actions,
                     scrollBehavior = LocalWhiteNoiseHeaderScroll.current,
                     colors =
                         TopAppBarDefaults.topAppBarColors(
@@ -411,3 +413,41 @@ internal fun ConversationTopBar(
 }
 
 private const val CONVERSATION_TITLE_LINE_SPACING_DP = -2
+
+/** The timer badge; with [onClick] it opens the disappearing-messages picker instead of chat details. */
+@Composable
+@Suppress("FunctionNaming")
+private fun HeaderTimerBadge(
+    label: String,
+    labelStyle: TextStyle,
+    labelColor: Color,
+    onClick: (() -> Unit)?,
+) {
+    val clickModifier =
+        if (onClick == null) {
+            Modifier
+        } else {
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(
+                    onClickLabel = stringResource(R.string.conversation_header_timer_change),
+                    role = Role.Button,
+                    onClick = onClick,
+                ).testTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG)
+        }
+    Row(
+        modifier = clickModifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            painterResource(R.drawable.ic_timer),
+            contentDescription = null,
+            modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
+            tint = labelColor,
+        )
+        Text(label, style = labelStyle, color = labelColor)
+    }
+}
+
+internal const val CONVERSATION_HEADER_TIMER_BUTTON_TAG = "conversation.header.timer.button"

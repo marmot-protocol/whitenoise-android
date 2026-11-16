@@ -467,6 +467,10 @@
         {
           "declaration": "binding.name",
           "represented_by": "Gestures.MessageLeft"
+        },
+        {
+          "declaration": "rowKey",
+          "represented_by": "Gestures.header.search"
         }
       ]
     },

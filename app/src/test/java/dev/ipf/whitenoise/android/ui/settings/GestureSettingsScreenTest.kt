@@ -13,9 +13,11 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.SwipePreferenceState
+import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -71,7 +73,8 @@ class GestureSettingsScreenTest {
             rule.onNodeWithTag("gestures." + binding.name).performScrollTo().performClick()
             rule.onNodeWithText(picks[index], useUnmergedTree = true).performClick()
         }
-        rule.onNodeWithTag("gestures.reset").performScrollTo().performClick()
+        rule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("gestures.reset"))
+        rule.onNodeWithTag("gestures.reset").performClick()
         assertEquals(SwipeBinding.entries, changes.map { it.first })
         assertEquals(1, resets)
     }
@@ -85,6 +88,54 @@ class GestureSettingsScreenTest {
         }
         rule.onNodeWithTag("gestures.pull_unread").performScrollTo().performClick()
         assertEquals(false, enabled)
+    }
+
+    /** Chosen shortcuts show as on; with the header full, the remaining choice waits instead of replacing one. */
+    @Test fun headerShortcutsChosen() {
+        rule.setContent {
+            WhiteNoiseTheme {
+                GestureSettingsContent(
+                    SwipePreferenceState(),
+                    { _, _ -> },
+                    {},
+                    {},
+                    headerShortcuts = listOf(HeaderShortcut.Search),
+                )
+            }
+        }
+        rule.onNodeWithTag("gestures.header.mute").performScrollTo()
+        rule.onRoot().captureRoboImage("src/test/snapshots/gesture_settings_header_shortcuts.png")
+    }
+
+    /** Each shortcut switch toggles only its own choice. */
+    @Test fun headerShortcutSwitchesToggleTheirShortcut() {
+        val toggled = mutableListOf<HeaderShortcut>()
+        rule.setContent {
+            WhiteNoiseTheme {
+                GestureSettingsContent(
+                    SwipePreferenceState(),
+                    { _, _ -> },
+                    {},
+                    {},
+                    onToggleHeaderShortcut = { toggled += it },
+                )
+            }
+        }
+        rule.onNodeWithTag("gestures.header.search").performScrollTo().performClick()
+        rule.onNodeWithTag("gestures.header.mute").performScrollTo().performClick()
+        assertEquals(listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute), toggled)
+    }
+
+    /** Settings search reaches every shortcut switch through its Gestures row. */
+    @Test fun everyHeaderShortcutIsSearchable() {
+        val entries = settingsSearchAdditionalControls().associateBy { it.id }
+        HeaderShortcut.entries.forEach { shortcut ->
+            val entry = entries.getValue("Gestures.${headerShortcutRowKey(shortcut)}")
+            assertEquals(SettingsDetail.Gestures, entry.destination)
+            assertEquals("search.GestureSettings.9", entry.itemKey)
+            assertEquals(headerShortcutRowKey(shortcut), entry.rowKey)
+            assertEquals(headerShortcutTitleRes(shortcut), entry.titleRes)
+        }
     }
 
     /** Mounts the stateless settings screen under controlled theme, direction, text scale and binding state. */

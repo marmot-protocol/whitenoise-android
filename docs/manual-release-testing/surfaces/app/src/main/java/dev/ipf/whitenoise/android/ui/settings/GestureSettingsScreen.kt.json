@@ -16,7 +16,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
         "anchor": "fun GestureSettingsContent(",
         "test_ids": [
-          "SET-032"
+          "SET-032",
+          "SET-058"
         ]
       },
       {
@@ -24,7 +25,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
         "anchor": "fun GestureSettingsScreen(",
         "test_ids": [
-          "SET-032"
+          "SET-032",
+          "SET-058"
         ]
       },
       {
@@ -161,6 +163,46 @@
         "anchor": "R.string.explanation_gestures_pull_unread",
         "test_ids": [
           "SET-053"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_header_shortcut_mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_header_shortcut_mute",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.explanation_header_shortcut_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.explanation_header_shortcut_search",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.header_shortcut_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.header_shortcut_search",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.header_shortcuts_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.header_shortcuts_limit",
+        "test_ids": [
+          "SET-058"
+        ]
+      },
+      {
+        "surface": "R.string.header_shortcuts_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.header_shortcuts_title",
+        "test_ids": [
+          "SET-058"
         ]
       }
     ],

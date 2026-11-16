@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_shortcuts_title">Atalhos no cabeçalho da conversa</string>
+    <string name="header_shortcut_search">Pesquisar na conversa</string>
+    <string name="header_shortcuts_limit">No máximo dois. Desative um primeiro.</string>
+    <string name="explanation_header_shortcut_search">Mostra um botão de pesquisa no cabeçalho de cada conversa. Ele abre a mesma pesquisa dos detalhes da conversa. Vale somente neste dispositivo.</string>
+    <string name="explanation_header_shortcut_mute">Mostra um botão de silenciar no cabeçalho de cada conversa. Ao silenciar, é perguntado por quanto tempo; ativar o som vale na hora. Vale somente neste dispositivo.</string>
+    <string name="conversation_header_timer_change">Alterar o temporizador de mensagens temporárias</string>
+</resources>
