@@ -72,12 +72,19 @@ class ReactionArtworkScreenshotTest {
     ) {
         val largeRtl = theme == Theme.LARGE_RTL
         val source =
-            ReactionArtworkSource { reactionId ->
-                onLoad(reactionId)
-                when (reactionId) {
-                    RED_REACTION -> square(android.graphics.Color.RED)
-                    BLUE_REACTION -> square(android.graphics.Color.BLUE)
-                    else -> null
+            object : ReactionArtworkSource {
+                override fun allowNetwork() = true
+
+                override suspend fun load(
+                    reactionMessageIdHex: String,
+                    allowNetwork: Boolean,
+                ): EmojiArt? {
+                    onLoad(reactionMessageIdHex)
+                    return when (reactionMessageIdHex) {
+                        RED_REACTION -> square(android.graphics.Color.RED)
+                        BLUE_REACTION -> square(android.graphics.Color.BLUE)
+                        else -> null
+                    }
                 }
             }
         composeRule.setContent {

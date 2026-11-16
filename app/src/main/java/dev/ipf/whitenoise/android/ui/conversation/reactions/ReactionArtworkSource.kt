@@ -1,8 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
@@ -22,9 +22,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Loads the artwork one custom-emoji reaction carries, or null when it has none that can be shown. */
-internal fun interface ReactionArtworkSource {
-    /** The decoded artwork of the reaction [reactionMessageIdHex], or null. */
-    suspend fun load(reactionMessageIdHex: String): EmojiArt?
+internal interface ReactionArtworkSource {
+    /** Whether artwork may be fetched now. Read during composition, so turning downloads on retries missing art. */
+    fun allowNetwork(): Boolean
+
+    /** The decoded artwork of the reaction [reactionMessageIdHex], fetched only when [allowNetwork], or null. */
+    suspend fun load(
+        reactionMessageIdHex: String,
+        allowNetwork: Boolean,
+    ): EmojiArt?
 }
 
 /** The open conversation's reaction artwork, null outside a conversation, where pills stay literal text. */
@@ -40,18 +46,16 @@ internal fun rememberReactionArtwork(
     reactionMessageIdHex: String?,
 ): EmojiArt? {
     val source = LocalReactionArtworkSource.current
-    val art by produceState<EmojiArt?>(null, source, emoji, reactionMessageIdHex) {
-        // A new reaction in the same pill must not show the previous reaction's artwork while its own loads.
-        value = null
-        val shortcode = emoji?.takeIf { it.length > 2 && it.startsWith(':') && it.endsWith(':') }
-        value =
-            if (source != null && shortcode != null && reactionMessageIdHex != null) {
-                source.load(reactionMessageIdHex)
-            } else {
-                null
-            }
+    val allowNetwork = source?.allowNetwork() == true
+    val shortcode = emoji?.takeIf { it.length > 2 && it.startsWith(':') && it.endsWith(':') }
+    // Keyed by the reaction's identity, so a new reaction in the same pill starts empty in the same frame.
+    val art = remember(source, shortcode, reactionMessageIdHex) { mutableStateOf<EmojiArt?>(null) }
+    LaunchedEffect(art, allowNetwork) {
+        if (source != null && shortcode != null && reactionMessageIdHex != null) {
+            source.load(reactionMessageIdHex, allowNetwork)?.let { art.value = it }
+        }
     }
-    return art
+    return art.value
 }
 
 /** The pill's received emoji: its own reaction's artwork under [emoji], or none. */
@@ -73,24 +77,34 @@ internal fun rememberReactionReceivedEmoji(
 internal fun conversationReactionArtwork(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
-): ReactionArtworkSource = ReactionArtworkSource { reactionId -> loadReactionArtwork(appState, controller, reactionId) }
+): ReactionArtworkSource =
+    object : ReactionArtworkSource {
+        override fun allowNetwork(): Boolean =
+            reactionArtworkAutoDownloadAllowed(
+                mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+                automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused(),
+            )
 
-/** Reads and decodes the image reaction [reactionId] carries, or null when it has none or it cannot be read. */
+        override suspend fun load(
+            reactionMessageIdHex: String,
+            allowNetwork: Boolean,
+        ): EmojiArt? = loadReactionArtwork(controller, reactionMessageIdHex, allowNetwork)
+    }
+
+/**
+ * Reads and decodes the image reaction [reactionId] carries, fetching it only when [allowNetwork], or null when it
+ * has none or it cannot be read.
+ */
 private suspend fun loadReactionArtwork(
-    appState: WhiteNoiseAppState,
     controller: ConversationController,
     reactionId: String,
+    allowNetwork: Boolean,
 ): EmojiArt? {
     val entry = controller.reactionAttachment(reactionId)
     val accepted =
         (entry?.attachment as? MediaAttachmentOutcomeFfi.Accepted)
             ?.takeIf { MediaReferenceSupport.isImageMedia(it.reference) }
     if (entry == null || accepted == null) return null
-    val allowNetwork =
-        reactionArtworkAutoDownloadAllowed(
-            mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
-            automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused(),
-        )
     // As for any reaction on iOS, the earliest reaction's artwork is read the same way whoever sent it.
     val bytes =
         runCatchingCancellable {
