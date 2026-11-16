@@ -300,7 +300,9 @@ Admission:
 - The conversation on screen is a foreground domain (#3819). While one of its
   requests waits for a worker, other domains take no spare, start none and
   evict none, so it gets the next one; its idle worker is evicted only when no
-  other idle one remains. Without this, an opened chat waited behind every
+  other idle one remains, or for another foreground domain. A request stops
+  holding others back once it waits on its own domain's worker or its screen
+  closes. Without this, an opened chat waited behind every
   chat-list group picture queued before it: one exec-spawned start each, about
   0.5 s on a GrapheneOS Pixel 9a.
 - A refused bind fails that input. A binding Android reports dead or null before

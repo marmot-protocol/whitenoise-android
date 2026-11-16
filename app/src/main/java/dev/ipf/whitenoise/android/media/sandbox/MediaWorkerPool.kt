@@ -151,21 +151,15 @@ internal class MediaWorkerPool(
         }
         // The domain fence: one live generation per domain, and a retiring one dies before the domain is served.
         generations.firstOrNull { it.domain == domain && it.dead.count != 0L }?.let { owner ->
+            // Waiting on its own domain's worker, it needs no new generation, so it holds no other domain back.
+            settlePriority(demand)
             return when {
                 owner.retiring -> ClaimStep.AwaitDeath(owner)
                 owner.busy -> ClaimStep.Await(signal)
                 else -> ClaimStep.Claimed(owner.also { it.busy = true })
             }
         }
-        // A foreground domain without a generation is served first: others wait rather than take what it needs.
-        if (domain in priority) {
-            if (!demand.prioritized) {
-                demand.prioritized = true
-                priorityDemand++
-            }
-        } else if (priorityDemand > 0) {
-            return ClaimStep.Await(signal)
-        }
+        if (heldBackForForeground(domain, demand)) return ClaimStep.Await(signal)
         generations.firstOrNull(MediaWorker::clean)?.let { ready ->
             ready.domain = domain
             ready.reusable = reusable
@@ -194,21 +188,51 @@ internal class MediaWorkerPool(
         }
         val freeing = generations.filter { it.retiring && it.dead.count != 0L }
         if (freeing.size >= slotDemand) return ClaimStep.AwaitDeath(freeing.first())
-        // The least recently used idle domain leaves through the death fence. A foreground domain's generation goes
-        // last, and only while none of its claims waits, so a lane full of foreground workers cannot starve others.
-        val idle = generations.filter { it.reusable && !it.busy && !it.retiring && it.dead.count != 0L }
-        (idle.filter { it.domain !in priority }.takeIf { it.isNotEmpty() } ?: idle.takeIf { priorityDemand == 0 })
-            ?.minByOrNull { it.lastUsedNanos }
-            ?.let { victim ->
-                // Marked here, under the lock, so no claim for the victim's domain takes it before RETIRE.
-                victim.retiring = true
-                return ClaimStep.Evict(victim)
-            }
+        evictionVictim(domain)?.let { victim ->
+            // Marked here, under the lock, so no claim for the victim's domain takes it before RETIRE.
+            victim.retiring = true
+            return ClaimStep.Evict(victim)
+        }
         if (generations.any { it.busy }) return ClaimStep.Await(signal)
         // Every slot is held by a generation whose lifetime is unresolved, never exceed the bound.
         generations.firstOrNull { it.dead.count != 0L }?.let { return ClaimStep.AwaitDeath(it) }
         // Only generations already dead and not yet released hold the slots: their release signals.
         return if (generations.isEmpty()) ClaimStep.Refused else ClaimStep.Await(signal)
+    }
+
+    /**
+     * Counts a foreground claim that needs a generation, and says whether any other claim must wait for those. A
+     * claim whose screen closed while it waited stops counting, so it holds back neither itself nor the lane.
+     * Called under the lock.
+     */
+    private fun heldBackForForeground(
+        domain: Any,
+        demand: SlotDemand,
+    ): Boolean {
+        if (domain in priority) {
+            if (!demand.prioritized) {
+                demand.prioritized = true
+                priorityDemand++
+            }
+            return false
+        }
+        settlePriority(demand)
+        return priorityDemand > 0
+    }
+
+    /**
+     * The least recently used idle generation that may leave for [domain]'s claim. A foreground domain's generation
+     * goes last: to another foreground claim, or once none waits, so a lane of foreground workers starves no one.
+     * Called under the lock.
+     */
+    private fun evictionVictim(domain: Any): MediaWorker? {
+        val idle = generations.filter { it.reusable && !it.busy && !it.retiring && it.dead.count != 0L }
+        val background = idle.filter { it.domain !in priority }
+        return when {
+            background.isNotEmpty() -> background
+            domain in priority || priorityDemand == 0 -> idle
+            else -> emptyList()
+        }.minByOrNull { it.lastUsedNanos }
     }
 
     /**
