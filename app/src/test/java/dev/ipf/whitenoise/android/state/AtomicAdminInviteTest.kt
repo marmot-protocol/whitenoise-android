@@ -158,6 +158,7 @@ class AtomicAdminInviteTest {
             }
         }
 
+    /** A roster published while the invite reply is in flight wins over that reply's membership and admin view. */
     @Test
     fun newerAuthoritativeRosterWinsOverTheInvitationReply() =
         runTest {

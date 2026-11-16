@@ -135,6 +135,10 @@ class NativeStartupDiagnosticDeviceTest {
             }
         }
 
+    /**
+     * The published runtime records startup diagnostics that share as stable reports, and the audit archive carries
+     * a native performance snapshot only while performance diagnostics are active.
+     */
     @Test
     @Suppress("LongMethod") // Actual native work, immutable share files and active/inactive archives form one flow.
     fun publishedNativeRuntimeFeedsSharesAndOnlyActivePerformanceArchives() =

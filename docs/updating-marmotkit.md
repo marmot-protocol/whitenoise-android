@@ -9,14 +9,13 @@ The [official 0.17.0 adoption](marmotkit-0.17.0.md) records Android's pin and
 consumer changes. The [official 0.16.0 adoption](marmotkit-0.16.0.md) records the
 populated upgrade baseline.
 
-The [official 0.15.0 release](marmotkit-0.15.0.md) is the populated campaign's
-upgrade baseline. The
+The [official 0.15.0 release](marmotkit-0.15.0.md), the
 [November 9 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261109),
 [8 November nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108),
 [6 November nightly](marmotkit-nightly-20261106.md),
 [5 November nightly](marmotkit-nightly-20261105.md),
 [4 November nightly](marmotkit-nightly-20261104.md),
-[2 November nightly](marmotkit-nightly-20261102.md) and
+[2 November nightly](marmotkit-nightly-20261102.md),
 [30 October nightly](marmotkit-nightly-20261030.md) and the
 [official 0.14.0 adoption](marmotkit-0.14.0.md) are historical.
 

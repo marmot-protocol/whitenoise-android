@@ -82,6 +82,7 @@ internal class AppReviewDemoNative(
         return existing.groupIdHex
     }
 
+    /** Creates the demo DM, reopening a committed group whose chat projection or member report is unavailable. */
     override suspend fun createDirectConversation(
         ref: String,
         peerId: String,

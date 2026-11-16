@@ -187,6 +187,7 @@ internal data class DiagnosticLogEntry(
 internal const val DIAGNOSTICS_CONTENT_TAG = "diagnostics-content"
 private const val PERFORMANCE_STATUS_REFRESH_MILLIS = 1_000L
 
+/** Settings page showing relay health and the live diagnostic event log, with a test ping and a log copy action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DiagnosticsScreen(
