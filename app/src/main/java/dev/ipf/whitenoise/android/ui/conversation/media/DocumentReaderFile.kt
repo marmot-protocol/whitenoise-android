@@ -48,13 +48,14 @@ internal suspend fun withPrivatePdfFile(
             val directory = documentReaderDirectory(cacheDir)
             check(directory.isDirectory || directory.mkdirs())
             val copy = File.createTempFile("reader-", ".pdf", directory)
+            var written = false
             try {
                 ensureActive()
                 BoundedPdfOutput(copy.outputStream(), this).use { source.copyTo(it) }
+                written = true
                 copy
-            } catch (failure: Throwable) {
-                copy.delete()
-                throw failure
+            } finally {
+                if (!written) copy.delete()
             }
         }
     try {

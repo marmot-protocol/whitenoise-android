@@ -182,7 +182,8 @@ class ComposerDocumentReaderTest {
 
                     override fun close() = Unit
                 }
-            val result = runCatching { withPrivatePdfFile(temporary.root, { misreported }) { error("must not render") } }
+            val result =
+                runCatching { withPrivatePdfFile(temporary.root, { misreported }) { error("must not render") } }
             assertTrue(result.exceptionOrNull() is IOException)
             assertTrue(
                 documentReaderDirectory(temporary.root)
