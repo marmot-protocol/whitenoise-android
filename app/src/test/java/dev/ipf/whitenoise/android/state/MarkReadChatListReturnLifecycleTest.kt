@@ -76,10 +76,7 @@ class MarkReadChatListReturnLifecycleTest {
         row: ChatListRowFfi,
         trigger: ChatListUpdateTriggerFfi,
     ) {
-        ChatsController::class.java
-            .getDeclaredMethod("foldChatRow", ChatListRowFfi::class.java, ChatListUpdateTriggerFfi::class.java)
-            .apply { isAccessible = true }
-            .invoke(controller, row, trigger)
+        controller.foldChatRow(row, trigger)
     }
 
     /** Builds an app state with a single running, locally signing active account. */

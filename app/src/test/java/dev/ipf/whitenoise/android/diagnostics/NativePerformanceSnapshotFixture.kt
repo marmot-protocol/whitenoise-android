@@ -16,7 +16,6 @@ internal fun nativePerformanceFixture(operation: AppPerformanceOperationSnapshot
         accountSessionOpen = operation,
         accountGroupHydration = operation,
         accountProfileLoad = operation,
-        accountGroupReadSnapshot = operation,
         accountTransportActivation = operation,
         accountSubscriptionRegistration = operation,
         accountCatchUp = operation,

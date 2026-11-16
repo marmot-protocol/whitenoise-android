@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.audio.kotlinFunctionBody
+import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -150,7 +151,7 @@ class MarkReadChatListProjectionTest {
 
     @Test
     fun markAllRead_foldsReturnedChatListRowIntoChatsController() {
-        val source = controllersSource().resolveSibling("ChatsController.kt").readText()
+        val source = chatsControllerSource()
         val body = source.kotlinFunctionBody("markAllRead")
         val fold = source.kotlinFunctionBody("applyChatListActionRow")
 

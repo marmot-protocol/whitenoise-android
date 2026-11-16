@@ -3,19 +3,19 @@ package dev.ipf.whitenoise.android.state
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
-import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotOptions
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.marmotDeploymentWhiteNoise
 import dev.ipf.marmotkit.verifyPublicNostrEventJson
 import dev.ipf.whitenoise.android.ManualDeviceFixture
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -79,7 +79,7 @@ class SignedInvitationVectorDeviceTest {
         try {
             native.start()
             val account = native.createIdentity(relays, relays).accountIdHex
-            val group = native.createGroup(account, "Signed vector fixture", emptyList(), null)
+            val group = native.createGroup(account, "Signed vector fixture", emptyList(), null).requireCreatedGroupId()
             for (index in 0 until cases.length()) verifyRejected(native, account, group, cases.getJSONObject(index))
             assertTrue(discovery.publicationAttempts(GIFT_WRAP).isEmpty())
             assertTrue(outbox.publicationAttempts(GIFT_WRAP).isEmpty())
@@ -98,35 +98,22 @@ class SignedInvitationVectorDeviceTest {
         val peer = case.getString("account")
         val epoch = native.groupMlsState(account, group).epoch
         val chats = native.chatList(account, true).map { it.groupIdHex }.toSet()
-        rejected(case.getString("name")) { native.inviteMembersDetailed(account, group, listOf(peer)) }
-        rejected(case.getString("name")) { native.createGroup(account, "Unsafe package", listOf(peer), null) }
+        val invite = native.inviteMembersDetailed(account, group, listOf(peer)).invite
+        val create = native.createGroup(account, "Unsafe package", listOf(peer), null)
+        assertNull(invite.summary)
+        assertNull(create.groupIdHex)
+        val status = invite.memberOutcomes.single().status
+        assertEquals(status, create.memberOutcomes.single().status)
+        val expected =
+            if (case.getString("name") == "incompatible") {
+                MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE
+            } else {
+                MemberResolutionStatusFfi.INVALID_KEY_PACKAGE
+            }
+        assertEquals(expected, status)
         assertEquals(1, native.groupMembers(account, group).size)
         assertEquals(epoch, native.groupMlsState(account, group).epoch)
         assertEquals(chats, native.chatList(account, true).map { it.groupIdHex }.toSet())
-    }
-
-    /** A package rejection is distinct from an unrelated missing-inbox or transport failure. */
-    private suspend fun rejected(
-        name: String,
-        block: suspend () -> Unit,
-    ) {
-        val error =
-            try {
-                block()
-                null
-            } catch (cancel: CancellationException) {
-                throw cancel
-            } catch (failure: Exception) {
-                failure
-            }
-        val packageFailure =
-            error is MarmotKitException.InvalidKeyPackageEvent ||
-                (
-                    name == "incompatible" &&
-                        error is MarmotKitException.Runtime &&
-                        error.message.orEmpty().contains("missing required capabilities")
-                )
-        assertTrue("$name must fail package preflight: $error", packageFailure)
     }
 
     /** Copies the JSON fixture's record list without changing signed fields. */

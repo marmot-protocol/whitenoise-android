@@ -128,6 +128,35 @@
           "NCH-002",
           "GRP-005"
         ]
+      },
+      {
+        "surface": "setting:error_no_group_members_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_no_group_members_selected",
+        "test_ids": [
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_incompatible_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_incompatible_key_package",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_incompatible_key_package_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_incompatible_key_package_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
       }
     ],
     "source_coverage": [

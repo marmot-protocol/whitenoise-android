@@ -248,6 +248,11 @@
     <string name="invite_message">Unisciti a me su White Noise. Nessun numero di telefono. Nessuna sorveglianza. Solo vera privacy. Scarica qui: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">Quel destinatario non è una chiave pubblica Nostr valida. Utilizza un npub, un collegamento al profilo o una chiave pubblica hex.</string>
     <string name="error_group_create_failed_retry">Si è verificato un problema durante la configurazione della chat crittografata. Controlla la connessione e riprova.</string>
+    <string name="error_no_group_members_selected">Non è stato possibile aggiungere nessuna delle persone selezionate. Chiedi loro di controllare la configurazione della chat oppure modifica la selezione.</string>
+    <string name="error_no_group_members_selected_for">Non è stato possibile aggiungere %1$s. Chiedi di controllare la configurazione della chat oppure modifica la selezione.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Non siamo riusciti a completare il controllo per capire se %1$s possono essere aggiunti. Controlla la connessione, poi riprova.</string>
+    <string name="error_no_group_members_selected_inbox_for">Non è stato possibile aggiungere %1$s. Non hanno un relay di ricezione utilizzabile. Chiedi loro di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
+    <string name="error_no_group_members_selected_update_for">Non è stato possibile aggiungere %1$s. Chiedi loro di aggiornare e aprire White Noise, poi riprova.</string>
     <string name="error_chat_created_not_loaded">La chat è stata creata, ma non è ancora comparsa nell’elenco delle chat. Riprova tra poco.</string>
     <string name="remove">Rimuovi</string>
     <string name="group_name">Nome del Gruppo</string>
@@ -896,6 +901,8 @@
     <string name="toast_invite_sent">Invito inviato</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invito inviato, ma impossibile aggiungere l’amministratore</string>
     <string name="toast_couldnt_add_members">Impossibile aggiungere membri. Riprova.</string>
+    <string name="toast_some_members_not_added">Alcune persone non sono state aggiunte</string>
+    <string name="group_members_not_added_count">Persone non aggiunte (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Impossibile aggiungere %1$s. È già un membro oppure la sua chiave di firma è in conflitto con quella di un membro esistente.</string>
     <string name="toast_invites_sent_to_groups">Inviti inviati ai gruppi selezionati</string>
     <string name="toast_invites_sent_to_groups_partial">Inviti inviati ad alcuni gruppi; alcuni non sono riusciti</string>
@@ -2245,6 +2252,7 @@
     <string name="startup_loading_message">Avvio di White Noise…</string>
     <string name="chat_rows_no_chats_title">Nessuna chat</string>
     <string name="chat_rows_no_chats_detail">Avvia una nuova chat per inviare un messaggio.</string>
+    <string name="conversation_pane_placeholder">Seleziona una chat</string>
     <string name="chat_rows_no_unread_title">Nessuna chat non letta</string>
     <string name="chat_rows_no_unread_detail">Hai letto tutto.</string>
     <string name="chat_rows_no_results_detail">Controlla l’ortografia o prova un’altra ricerca.</string>
@@ -2413,6 +2421,8 @@
     <string name="group_svg_rejected_detail">Impossibile preparare questo SVG. Scegli un SVG semplice, PNG o JPEG.</string>
     <string name="error_invalid_key_package">Non è stato possibile convalidare la chiave di chat pubblicata per questa persona. Chiedi di aggiornare White Noise e pubblicare una nuova chiave di chat, poi riprova.</string>
     <string name="error_invalid_key_package_for">Non è stato possibile convalidare la chiave di chat pubblicata per %1$s. Chiedi di aggiornare White Noise e pubblicare una nuova chiave di chat, poi riprova.</string>
+    <string name="error_incompatible_key_package">La chiave di chat di questa persona non è compatibile. Chiedile di aggiornare e aprire White Noise, poi riprova.</string>
+    <string name="error_incompatible_key_package_for">La chiave di chat di %1$s non è compatibile. Chiedi a questa persona di aggiornare e aprire White Noise, poi riprova.</string>
     <string name="error_missing_member_inbox">Non c’è un relay di ricezione utilizzabile per questa persona. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
     <string name="error_missing_member_inbox_for">Non c’è un relay di ricezione utilizzabile per %1$s. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
     <string name="error_invite_welcome_too_large">Questo invito è troppo grande per i relay di ricezione di un destinatario. Chiedi di aggiungere un relay di ricezione che accetti messaggi più grandi.</string>

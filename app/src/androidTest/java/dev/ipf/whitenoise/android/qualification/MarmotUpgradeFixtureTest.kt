@@ -160,7 +160,7 @@ class MarmotUpgradeFixtureTest {
     ) {
         val sender = runtime.createIdentity(listOf(relay), listOf(relay))
         val receiver = runtime.createIdentity(listOf(relay), listOf(relay))
-        val group = runtime.createGroup(sender.label, GROUP, listOf(receiver.accountIdHex), null)
+        val group = runtime.createQualificationGroup(sender.label, GROUP, listOf(receiver.accountIdHex), null)
         while (runCatching { runtime.acceptGroupInvite(receiver.label, group) }.isFailure) delay(100L)
         repeat(3) { runtime.sendText(sender.label, group, "$TEXT $it") }
         val upload =
@@ -386,7 +386,8 @@ class MarmotUpgradeFixtureTest {
     ) {
         val sender = runtime.createIdentity(listOf(relay), listOf(relay))
         val peer = runtime.createIdentity(listOf(relay), listOf(relay))
-        val group = runtime.createGroup(sender.label, "Stale upload retry", listOf(peer.accountIdHex), null)
+        val group =
+            runtime.createQualificationGroup(sender.label, "Stale upload retry", listOf(peer.accountIdHex), null)
         while (runCatching { runtime.acceptGroupInvite(peer.label, group) }.isFailure) delay(100L)
 
         val plaintext = payload(1)

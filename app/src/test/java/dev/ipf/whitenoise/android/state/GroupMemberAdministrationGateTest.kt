@@ -696,7 +696,7 @@ private fun invitationFailureRuntime(
                 accountRef: String,
                 groupIdHex: String,
                 memberRefs: List<String>,
-            ): dev.ipf.marmotkit.GroupMutationResultFfi {
+            ): dev.ipf.marmotkit.GroupInviteResultFfi {
                 calls += "inviteMembersDetailed"
                 throw failure
             }
@@ -706,7 +706,7 @@ private fun invitationFailureRuntime(
                 groupIdHex: String,
                 memberRefs: List<String>,
                 initialAdminRefs: List<String>,
-            ): dev.ipf.marmotkit.GroupMutationResultFfi {
+            ): dev.ipf.marmotkit.GroupInviteResultFfi {
                 calls += "inviteMembersDetailedWithInitialAdmins"
                 throw failure
             }

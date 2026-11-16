@@ -98,9 +98,7 @@ class ConversationDictationCompatibilityContractTest {
     @Test
     fun productionAndPreviewHaveNoTemporaryStartOrderingSelector() {
         val activity = projectFile("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
-        val controller =
-            projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt")
-                .readText()
+        val controller = conversationDictationControllerSource()
         val platform =
             projectFile("app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt")
                 .readText()

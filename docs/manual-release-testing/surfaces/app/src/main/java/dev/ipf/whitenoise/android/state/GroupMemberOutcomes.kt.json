@@ -1,0 +1,54 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupMemberOutcomes.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "setting:group_members_not_added_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupMemberOutcomes.kt",
+        "anchor": "R.string.group_members_not_added_count",
+        "test_ids": [
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_no_group_members_selected_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupMemberOutcomes.kt",
+        "anchor": "R.string.error_no_group_members_selected_for",
+        "test_ids": [
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_no_group_members_selected_lookup_incomplete_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupMemberOutcomes.kt",
+        "anchor": "R.string.error_no_group_members_selected_lookup_incomplete_for",
+        "test_ids": [
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_no_group_members_selected_inbox_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupMemberOutcomes.kt",
+        "anchor": "R.string.error_no_group_members_selected_inbox_for",
+        "test_ids": [
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_no_group_members_selected_update_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupMemberOutcomes.kt",
+        "anchor": "R.string.error_no_group_members_selected_update_for",
+        "test_ids": [
+          "NCH-002",
+          "GRP-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -431,10 +431,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
         controller: ChatsController,
         items: List<ChatListItem>,
     ) {
-        ChatsController::class.java
-            .getDeclaredMethod("setItems", List::class.java)
-            .apply { isAccessible = true }
-            .invoke(controller, items)
+        controller.items = items
     }
 
     /** Returns the running active account summary for the chats screen. */
