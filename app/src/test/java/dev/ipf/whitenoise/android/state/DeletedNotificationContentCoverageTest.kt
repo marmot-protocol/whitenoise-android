@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.localNotificationPresenterSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -59,7 +60,7 @@ class DeletedNotificationContentCoverageTest {
     /** Every new history entry is stamped with its message id, and carried entries keep theirs. */
     @Test
     fun everyHistoryEntryCarriesItsIdentity() {
-        val presenter = source("notifications/LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         val styles =
             callArguments(presenter, "messagingStyle(").filterNot { it.contains("content: LocalNotificationContent") }
         assertTrue("expected the first-write and fallback styles", styles.size >= 2)

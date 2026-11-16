@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -48,8 +49,7 @@ class ConversationShortcutLifecycleCoverageTest {
     /** Causal facade/coordinator tests execute these entrypoints; the registered gate prevents bypassing them. */
     @Test
     fun lifetimeAndNativeFalseRemainAtTheActualOwnershipMutationBoundaries() {
-        val notificationDeliverySource =
-            appStateSource().resolveSibling("NotificationDeliveryController.kt").readText()
+        val notificationDeliverySource = notificationDeliveryControllerSource()
         val bootstrap =
             appStateSection(
                 "private suspend fun startBootstrapRuntime()",
