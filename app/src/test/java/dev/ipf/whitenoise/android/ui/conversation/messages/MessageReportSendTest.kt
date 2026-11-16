@@ -24,7 +24,7 @@ class MessageReportSendTest {
         MessageReportSends(
             group = {
                 groupSends++
-                R.string.report_message_sent
+                GroupAnswer(R.string.report_message_sent, took = true)
             },
             team = { teamAnswers.removeFirst() },
             present = { group, team -> presented += group to team },
@@ -69,20 +69,39 @@ class MessageReportSendTest {
             assertEquals(null to R.string.report_team_sent, presented.last())
         }
 
-    /** A report the group refused finishes without a team copy, and the next report starts fresh. */
+    /** When the group refuses the report, the team copy still goes, and one notice says what each audience got. */
     @Test
-    fun aGroupRefusalSendsNoTeamCopy() =
+    fun aGroupRefusalStillSendsTheTeamCopy() =
         runBlocking {
+            teamAnswers += ACCEPTED
             val refused =
-                MessageReportSends(group = { null }, team = { error("no team copy") }, present = sends.present)
+                MessageReportSends(
+                    group = { GroupAnswer(R.string.report_message_not_allowed, took = false) },
+                    team = sends.team,
+                    present = sends.present,
+                )
 
             surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), refused)
 
+            assertEquals(listOf(R.string.report_message_not_allowed to R.string.report_team_sent), presented)
+            assertTrue(teamAnswers.isEmpty())
+            assertNull(surfaces.reportGroupResult)
+        }
+
+    /** A group-only report the controller already reported as failed adds no second notice. */
+    @Test
+    fun aGroupOnlyFailureIsNotShownTwice() =
+        runBlocking {
+            val failed =
+                MessageReportSends(
+                    group = { GroupAnswer(R.string.report_message_failed, took = false, alreadyShown = true) },
+                    team = { error("no team copy") },
+                    present = sends.present,
+                )
+
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.Group), failed)
+
             assertTrue(presented.isEmpty())
-            assertEquals(
-                ReportAudience.GroupAndTeam,
-                surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam),
-            )
         }
 
     /** A remembered group report outlives this bubble's state, so a new bubble for the message sends only the copy. */

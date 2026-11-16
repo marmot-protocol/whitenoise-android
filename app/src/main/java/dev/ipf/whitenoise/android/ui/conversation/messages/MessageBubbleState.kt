@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,12 +36,29 @@ internal fun rememberMessageBubbleSurfaces(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
     item: TimelineMessage,
-): MessageBubbleSurfaceState =
-    remember(controller, item.presentationId) {
-        val chat = "${controller.conversationAccountRef}|${controller.group.groupIdHex}"
-        val reportKey = "$chat|${item.record.messageIdHex}"
-        MessageBubbleSurfaceState(appState.runtimeMirrors.messageReports, reportKey)
+): MessageBubbleSurfaceState {
+    val surfaces =
+        remember(controller, item.presentationId) {
+            val chat = "${controller.conversationAccountRef}|${controller.group.groupIdHex}"
+            val reportKey = "$chat|${item.record.messageIdHex}"
+            MessageBubbleSurfaceState(appState.runtimeMirrors.messageReports, reportKey)
+        }
+    CloseReportOnDispose(surfaces)
+    return surfaces
+}
+
+/**
+ * Closes [surfaces]' report sheet when the bubble leaves composition, as on rotation or scrolling away. A report
+ * still sending then treats its own sheet as gone and shows a late failure as a notice, instead of writing it into a
+ * sheet nobody can see.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun CloseReportOnDispose(surfaces: MessageBubbleSurfaceState) {
+    DisposableEffect(surfaces) {
+        onDispose { if (surfaces.reportSheetOpen) surfaces.closeReport() }
     }
+}
 
 /**
  * Sheet, dialog and in-flight flags for one message, reset together when the message id changes. A report still

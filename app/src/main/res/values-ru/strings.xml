@@ -305,6 +305,7 @@
     <string name="scroll_to_top">Прокрутить вверх</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
     <string name="message_discard_still_sending">Это сообщение ещё отправляется. Повторите попытку чуть позже.</string>
+    <string name="message_discard_already_delivered">Это сообщение уже доставлено, поэтому оно не удалено.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
     <string name="invited_as_account">Приглашённый аккаунт: %1$s</string>

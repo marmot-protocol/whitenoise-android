@@ -20,6 +20,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -104,6 +105,40 @@ class TeamReportSheetScreenshotTest {
         assertEquals(ReportReasonFfi.SPAM to "", submitted)
         assertEquals(false, choice?.reachesTeam)
         assertEquals(true, choice?.reachesGroup)
+    }
+
+    /** A bubble leaving composition closes its report sheet, so a late team-copy failure becomes a notice. */
+    @Test
+    fun aDisposedBubbleClosesItsReportSheet() {
+        val surfaces =
+            MessageBubbleSurfaceState(
+                dev.ipf.whitenoise.android.state
+                    .MessageReportRegistry(),
+                "key",
+            )
+        val shown = mutableStateOf(true)
+        surfaces.reportSheetOpen = true
+        val generation = surfaces.reportSheetGeneration
+        composeRule.setContent { if (shown.value) CloseReportOnDispose(surfaces) }
+
+        composeRule.runOnIdle { shown.value = false }
+        composeRule.waitForIdle()
+
+        assertEquals(false, surfaces.reportSheetOpen)
+        assertEquals(generation + 1, surfaces.reportSheetGeneration)
+    }
+
+    /** In a short sheet at large text, a failure leaves Send fully on screen and is reachable in the body. */
+    @Test
+    @Config(qualifiers = "en-w360dp-h320dp-mdpi")
+    fun aFailureInAShortSheetKeepsSendVisible() {
+        render(
+            ReportAudience.GroupAndTeam,
+            Theme.LARGE_RTL,
+            ReportFormState(locked = true, error = R.string.report_team_copy_failed),
+        )
+        composeRule.onNodeWithTag("message.report.send").assertIsDisplayed().assertIsEnabled()
+        composeRule.onNodeWithTag(REPORT_ERROR_TEST_TAG).performScrollTo().assertIsDisplayed()
     }
 
     /** Only someone else's live message can be reported, and the team is offered only when this build reaches it. */

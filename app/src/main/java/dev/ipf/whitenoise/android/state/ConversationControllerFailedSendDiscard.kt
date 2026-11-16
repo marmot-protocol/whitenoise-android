@@ -35,9 +35,9 @@ DiscardFailedSendResultFfi
  * Removes a failed own send from this device through MDK, which publishes nothing, so the group never hears about a
  * message nobody received. The timeline then drops the row through its own removal. Returns true once the row is
  * gone. A send MDK may still publish is left alone with a notice. A row MDK no longer counts as a failed send, because
- * it was delivered or resent meanwhile, is hidden on this device instead, as the user asked to remove it, which
- * matches White Noise on iOS. No group commit lock is taken: nothing is committed, MDK arbitrates the sends it still
- * owns, and the lock is held for whole uploads.
+ * it was delivered or resent meanwhile, stays visible with a notice that it was already delivered, so the sender can
+ * still delete it for everyone. No group commit lock is taken: nothing is committed, MDK arbitrates the sends it
+ * still owns, and the lock is held for whole uploads.
  */
 internal suspend fun ConversationController.discardDurableFailedSend(
     messageIdHex: String,
@@ -87,7 +87,11 @@ private suspend fun ConversationController.applyDiscardOutcome(
             if (owns()) presentConversationTransient(R.string.message_discard_still_sending)
             false
         }
-        DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND -> owns() && hideMessageForMe(messageIdHex)
+        DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND -> {
+            // The group has it, so hiding it would only stop the sender from deleting it for everyone.
+            if (owns()) presentConversationTransient(R.string.message_discard_already_delivered)
+            false
+        }
     }
 
 /** Drops a discarded send's decrypted media by cache key and by MDK's ciphertext hashes. */

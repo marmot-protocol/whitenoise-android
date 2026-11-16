@@ -281,6 +281,7 @@
     <string name="scroll_to_top">Desplazar al inicio</string>
     <string name="discard_failed_message">Descartar mensaje fallido</string>
     <string name="message_discard_still_sending">Este mensaje aún se está enviando. Inténtalo de nuevo en un momento.</string>
+    <string name="message_discard_already_delivered">Este mensaje ya se entregó, así que no se descartó.</string>
     <string name="decline">Rechazar</string>
     <string name="accept">Aceptar</string>
     <string name="invited_as_account">Cuenta invitada: %1$s</string>

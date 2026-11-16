@@ -26,6 +26,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -162,7 +163,7 @@ private fun ReportMessageDragHandle() {
 
 /**
  * Measures the action first, then lets only the form body scroll within the sheet's inset-aware viewport. A failure
- * in [form] stays above Send, so the retry it asks for is one tap away.
+ * in [form] ends the scrolling body and is scrolled into view, so even a short sheet keeps Send's full height.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -194,15 +195,8 @@ internal fun ReportMessageForm(
                 Modifier.weight(1f, fill = false),
                 enabled = !sending && !form.locked,
                 team = team,
+                error = form.error,
             )
-            form.error?.let {
-                Text(
-                    stringResource(it),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag(REPORT_ERROR_TEST_TAG),
-                )
-            }
             Button(
                 onClick = { onSubmit(reason, boundedExplanation(explanation)) },
                 enabled = !sending && (team.reachesGroup || team.reachesTeam),
@@ -214,7 +208,10 @@ internal fun ReportMessageForm(
     }
 }
 
-/** Scroll ownership stays in the body while the outer form measures its Send action independently. */
+/**
+ * Scroll ownership stays in the body while the outer form measures its Send action independently. A report failure
+ * ends the body and is scrolled into view when it appears.
+ */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
 private fun ReportMessageBody(
@@ -225,10 +222,14 @@ private fun ReportMessageBody(
     modifier: Modifier,
     enabled: Boolean,
     team: ReportTeamChoice,
+    @StringRes error: Int?,
 ) {
     val teamOnly = !team.reachesGroup
+    val scroll = rememberScrollState()
+    // The failure sits at the end of the scrolling body, so it never squeezes Send, and is scrolled into view.
+    LaunchedEffect(error) { if (error != null) scroll.animateScrollTo(scroll.maxValue) }
     Column(
-        modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()).testTag(REPORT_BODY_TEST_TAG),
+        modifier = modifier.fillMaxWidth().verticalScroll(scroll).testTag(REPORT_BODY_TEST_TAG),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val profile = team.audience == ReportAudience.TeamProfile
@@ -260,6 +261,14 @@ private fun ReportMessageBody(
             minLines = 2,
         )
         ReportTeamSection(team, enabled)
+        error?.let {
+            Text(
+                stringResource(it),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.testTag(REPORT_ERROR_TEST_TAG),
+            )
+        }
     }
 }
 

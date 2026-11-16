@@ -52,6 +52,14 @@
         "test_ids": [
           "MSG-016"
         ]
+      },
+      {
+        "surface": "string:report_message_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "R.string.report_message_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
       }
     ],
     "source_coverage": [

@@ -109,17 +109,17 @@ class ConversationDiscardFailedSendTest {
             assertEquals(1, calls)
         }
 
-    /** A row MDK no longer counts as a failed send is hidden on this device, as the user asked to remove it. */
+    /** A row MDK no longer counts as a failed send was delivered, so Discard leaves it visible and says so. */
     @Test
-    fun aSendNoLongerFailedIsHiddenLocally() =
+    fun aSendAlreadyDeliveredStaysVisible() =
         withController(listOf(failedSend())) { controller ->
             val removed =
                 controller.discardDurableFailedSend(FAILED) { _, _, _ ->
                     result(DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND)
                 }
 
-            assertTrue(removed)
-            assertTrue(controller.timeline.none { it.record.messageIdHex == FAILED })
+            assertFalse(removed)
+            assertTrue(controller.timeline.any { it.record.messageIdHex == FAILED })
         }
 
     /** Opens a controller on [records] and runs [block] once the initial timeline page has loaded. */

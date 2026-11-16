@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
+import android.util.LruCache
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -72,13 +73,17 @@ internal fun rememberReactionReceivedEmoji(
 
 /**
  * Reaction artwork for [controller]'s chat. MDK resolves the reaction's own encrypted image without starting a
- * download, and the bytes are fetched only under the automatic-download policy for someone else's media.
+ * download, the bytes are fetched only under the automatic-download policy for someone else's media, and decoded
+ * images are reused while the conversation stays open.
  */
 internal fun conversationReactionArtwork(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
 ): ReactionArtworkSource =
     object : ReactionArtworkSource {
+        // A reaction's attachment never changes, so its decoded art is reused while the conversation stays open.
+        private val decoded = LruCache<String, EmojiArt>(REACTION_ARTWORK_CACHE_ENTRIES)
+
         override fun allowNetwork(): Boolean =
             reactionArtworkAutoDownloadAllowed(
                 mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
@@ -88,8 +93,15 @@ internal fun conversationReactionArtwork(
         override suspend fun load(
             reactionMessageIdHex: String,
             allowNetwork: Boolean,
-        ): EmojiArt? = loadReactionArtwork(controller, reactionMessageIdHex, allowNetwork)
+        ): EmojiArt? =
+            decoded.get(reactionMessageIdHex)
+                ?: loadReactionArtwork(controller, reactionMessageIdHex, allowNetwork)?.also {
+                    decoded.put(reactionMessageIdHex, it)
+                }
     }
+
+/** Decoded reaction images kept per open conversation, enough for a screenful of busy reaction rows. */
+private const val REACTION_ARTWORK_CACHE_ENTRIES = 64
 
 /**
  * Reads and decodes the image reaction [reactionId] carries, fetching it only when [allowNetwork], or null when it
