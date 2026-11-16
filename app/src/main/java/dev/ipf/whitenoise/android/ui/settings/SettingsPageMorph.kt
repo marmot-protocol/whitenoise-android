@@ -93,6 +93,7 @@ internal class SettingsPageMorph {
     private var externalSource: SettingsContour? = null
     private var externalPairs: List<SettingsContourPair>? = null
     private var bodyMask = Path()
+    private var bodyCoverage = Path()
     private var unoutlinedBodyMask = Path()
     private var bodyReports: NativeFrame? = null
     private var rebaseTime = 0f
@@ -317,7 +318,9 @@ internal class SettingsPageMorph {
             }
         correspondenceKey =
             if (forward) {
-                activatedGroup ?: correspondenceKey
+                activatedGroup?.let { key ->
+                    if (interrupted) correspondence?.firstOrNull { it.target.key == key }?.key ?: key else key
+                } ?: correspondenceKey
             } else {
                 returnTarget?.childGroupKey?.takeIf { key -> current.orEmpty().any { it.key == key } }
                     ?: returnTarget?.groupKey ?: correspondenceKey
@@ -447,11 +450,12 @@ internal class SettingsPageMorph {
         if (contours.isEmpty()) return contours
         val saved = routeGroupKeys.getOrPut(target) { mutableMapOf() }
         nextGroupKey = maxOf(nextGroupKey, (sourceContours.maxOfOrNull { it.key } ?: 0) + 1)
-        val keys = contours.indices.map { index ->
-            val identity = groups[index].value.key
-            val occurrence = groups.take(index).count { it.value.key == identity }
-            saved.getOrPut(identity to occurrence) { nextGroupKey++ }
-        }
+        val keys =
+            contours.indices.map { index ->
+                val identity = groups[index].value.key
+                val occurrence = groups.take(index).count { it.value.key == identity }
+                saved.getOrPut(identity to occurrence) { nextGroupKey++ }
+            }
         return contours.mapIndexed { index, contour -> contour.copy(key = keys[index]) }
     }
 
@@ -519,18 +523,20 @@ internal class SettingsPageMorph {
         val interiors = if (contours.isEmpty()) leaving?.body ?: bodyMask else movingBodyMask(contours, host)
         contours.forEach { drawContourFill(it, host) }
         // One live display-list invocation: the fixed header and, after handoff, clipped body.
-        val live = Path().apply {
-            addRect(Rect(Offset.Zero, size))
-            op(this, bodyMask, PathOperation.Difference)
-            if (incomingPresence(time) > 0f) {
-                val incoming = Path().apply {
-                    addPath(unoutlinedBodyMask)
-                    val outlined = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
-                    op(this, outlined, PathOperation.Union)
+        val live =
+            Path().apply {
+                addRect(Rect(Offset.Zero, size))
+                op(this, bodyCoverage, PathOperation.Difference)
+                if (incomingPresence(time) > 0f) {
+                    val incoming =
+                        Path().apply {
+                            if (geometryFraction(time) >= CONTENT_HANDOFF_FRACTION) addPath(unoutlinedBodyMask)
+                            val outlined = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
+                            op(this, outlined, PathOperation.Union)
+                        }
+                    op(this, incoming, PathOperation.Union)
                 }
-                op(this, incoming, PathOperation.Union)
             }
-        }
         clipPath(live) {
             clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
         }
@@ -610,7 +616,7 @@ internal class SettingsPageMorph {
         backplate: Color,
     ) {
         val native = nativeContours(host)
-        if (native == null || native.isEmpty() || presence >= 1f) {
+        if (native == null || presence >= 1f) {
             drawContent()
             return
         }
@@ -620,6 +626,7 @@ internal class SettingsPageMorph {
             maskHost = host
             mask = nativeChromeMask(native, host)
             bodyMask = activeNativeBody(native, host)
+            bodyCoverage = measuredBodyCoverage(native, host)
             externalSource = source
             externalPairs =
                 matchSettingsContours(
@@ -643,14 +650,20 @@ internal class SettingsPageMorph {
             )
         contours.forEach { drawContourFill(it, host) }
         val interiors = movingBodyMask(contours, host)
-        val live = Path().apply {
-            addRect(Rect(Offset.Zero, size))
-            op(this, bodyMask, PathOperation.Difference)
-            if (presence >= CONTENT_HANDOFF_FRACTION) {
-                val incoming = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
-                op(this, incoming, PathOperation.Union)
+        val live =
+            Path().apply {
+                addRect(Rect(Offset.Zero, size))
+                op(this, bodyCoverage, PathOperation.Difference)
+                if (presence >= CONTENT_HANDOFF_FRACTION) {
+                    val incoming =
+                        Path().apply {
+                            op(bodyCoverage, nativeBodyMask(native, host), PathOperation.Difference)
+                            val outlined = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
+                            op(this, outlined, PathOperation.Union)
+                        }
+                    op(this, incoming, PathOperation.Union)
+                }
             }
-        }
         clipPath(live) {
             clipPath(mask, ClipOp.Difference) { this@drawExternal.drawContent() }
         }
@@ -695,7 +708,7 @@ internal class SettingsPageMorph {
             updateCorrespondence()
         }
         // Native masks change only with measured batches; body ink stays at native coordinates.
-        // Headers and other ink outside the measured groups remain live throughout.
+        // Headers and ink outside measured body viewports remain live throughout.
         val chrome = if (!opening && native?.isEmpty() == true) end else native
         if (maskFrame != chrome || maskHost != host || bodyReports !== nativeFrame) {
             bodyReports = nativeFrame
@@ -703,12 +716,26 @@ internal class SettingsPageMorph {
             maskFrame = chrome
             mask = nativeChromeMask(chrome.orEmpty(), host)
             bodyMask = activeNativeBody(native.orEmpty(), host)
-            unoutlinedBodyMask = Path().apply {
-                op(bodyMask, nativeBodyMask(native.orEmpty(), host), PathOperation.Difference)
-            }
+            bodyCoverage = measuredBodyCoverage(native.orEmpty(), host)
+            unoutlinedBodyMask =
+                Path().apply {
+                    op(bodyCoverage, nativeBodyMask(native.orEmpty(), host), PathOperation.Difference)
+                }
             externalSource = null
         }
     }
+
+    /** Include free-form controls and margins inside the actual measured scroll body, never headers. */
+    private fun measuredBodyCoverage(
+        native: List<SettingsContour>,
+        host: Rect,
+    ): Path =
+        activeNativeBody(native, host).apply {
+            viewports.values.forEach { viewport ->
+                val visible = viewport.intersect(host)
+                if (!visible.isEmpty) addRect(visible.translate(-host.topLeft))
+            }
+        }
 
     private fun activeNativeBody(
         native: List<SettingsContour>,

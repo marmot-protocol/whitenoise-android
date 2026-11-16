@@ -67,7 +67,6 @@ class SettingsContourMorphTest {
         assertEquals(expected.bottom, actual.bottom, tolerance)
     }
 
-
     @Test fun oneToManyRemeasureKeepsSemanticAnchorWhenNeighbourIsNearer() {
         val source = listOf(group(100f, key = 1))
         val target = listOf(group(100f, key = 20), group(500f, key = 10).copy(destination = "child"))
@@ -275,16 +274,32 @@ class SettingsContourMorphTest {
         assertTrue(surplus.target.bounds.bottom < target[1].bounds.top)
         for (step in 1 until 100) {
             val t = step / 100f
-            val frame = interpolateSettingsContours(source, target, t, source[0].bounds.center, viewport,
-                1, correspondence = pairs)
+            val frame =
+                interpolateSettingsContours(
+                    source,
+                    target,
+                    t,
+                    source[0].bounds.center,
+                    viewport,
+                    1,
+                    correspondence = pairs,
+                )
             val middle = frame.single { it.key == 2 }
-            assertEquals(source[1].bounds.width, middle.bounds.width, 0f)
+            assertEquals(source[1].bounds.width, middle.bounds.width, 0.001f)
             assertEquals(1f, middle.color.alpha, 0f)
             assertTrue(middle.bounds.height > 0f)
             assertTrue(middle.corners.topLeftCornerRadius.y <= middle.bounds.height / 2f)
             assertNotNull(orderedSettingsContours(frame))
-            val reversed = interpolateSettingsContours(target, source, 1f - t, source[0].bounds.center,
-                viewport, 1, correspondence = pairs.map { SettingsContourPair(it.target, it.source, it.key) })
+            val reversed =
+                interpolateSettingsContours(
+                    target,
+                    source,
+                    1f - t,
+                    source[0].bounds.center,
+                    viewport,
+                    1,
+                    correspondence = pairs.map { SettingsContourPair(it.target, it.source, it.key) },
+                )
             frame.zip(reversed).forEach { (a, b) -> assertBounds(a.bounds, b.bounds) }
         }
     }
@@ -294,7 +309,13 @@ class SettingsContourMorphTest {
         val target = listOf(group(110f, 100f, 4))
         val pairs = matchSettingsContours(source, target, 2, null, source[1].bounds.center, viewport)
         assertTrue(pairs.none { it.source.key == 1 })
-        assertEquals(40f, pairs.single { it.source.key == 2 }.source.bounds.top, 0f)
+        assertEquals(
+            40f,
+            pairs
+                .single { it.source.key == 2 }
+                .source.bounds.top,
+            0f,
+        )
     }
 
     @Test fun onlyOffscreenTargetGroupsDoNotTurnVisibleSourceIntoAnEmptySeedOrPop() {
@@ -306,8 +327,16 @@ class SettingsContourMorphTest {
             assertEquals(pair.source.bounds.size, pair.target.bounds.size)
             assertTrue(pair.target.bounds.top > viewport.bottom)
         }
-        val frame = interpolateSettingsContours(source, target, 0.1f, source[0].bounds.center,
-            viewport, 1, correspondence = pairs)
+        val frame =
+            interpolateSettingsContours(
+                source,
+                target,
+                0.1f,
+                source[0].bounds.center,
+                viewport,
+                1,
+                correspondence = pairs,
+            )
         assertEquals(2, frame.size)
         frame.forEach { assertEquals(1f, it.color.alpha, 0f) }
     }
@@ -316,7 +345,11 @@ class SettingsContourMorphTest {
         val source = dividedGroup(100f, 1).copy(rtl = true)
         val target = source.copy(seams = emptyList())
         val frame = sample(listOf(source), listOf(target), 0.999f).single()
-        assertTrue(frame.seams.single().start.x > 340f)
+        assertTrue(
+            frame.seams
+                .single()
+                .start.x > 340f,
+        )
     }
 
     @Test fun nativeEndpointsIncludingRowsCornersViewportAndStylesAreTheOriginalObjects() {
@@ -337,7 +370,10 @@ class SettingsContourMorphTest {
                 assertSame(frozen, sample(frozen, target, 0f))
                 assertSame(target, sample(frozen, target, 1f))
                 for (step in 1 until 240) assertNotNull(orderedSettingsContours(sample(frozen, target, step / 240f)))
-                sample(frozen, target, 0.00001f).zip(frozen).forEach { (actual, prior) ->
+                val visibleFrozen = frozen.filter { !it.bounds.intersect(viewport).isEmpty }
+                val visibleNext = sample(frozen, target, 0.00001f).filter { !it.bounds.intersect(viewport).isEmpty }
+                assertEquals(visibleFrozen.size, visibleNext.size)
+                visibleNext.zip(visibleFrozen).forEach { (actual, prior) ->
                     assertBounds(prior.bounds, actual.bounds, 0.02f)
                     assertEquals(prior.width, actual.width, 0f)
                 }

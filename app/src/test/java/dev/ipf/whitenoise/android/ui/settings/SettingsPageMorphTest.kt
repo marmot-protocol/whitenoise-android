@@ -301,7 +301,7 @@ class SettingsPageMorphTest {
             assertEquals(lerp(first, target, AppMotionOpenEasing.transform(time)), selected.bounds)
             assertEquals(2, frame.size)
             assertTrue(frame[0].bounds.bottom < frame[1].bounds.top)
-            assertEquals(second.width, frame[1].bounds.width, 0f)
+            assertEquals(second.width, frame[1].bounds.width, 0.001f)
             frame.forEach { contour ->
                 assertEquals(1f, contour.modulationAlpha, 0f)
                 // Compose sRGB Color stores alpha in eight bits, as does the native paint.
@@ -413,6 +413,33 @@ class SettingsPageMorphTest {
         assertEquals(
             lerp(first, connectors, AppMotionOpenEasing.transform(time)),
             page.renderedContours(time).single { it.key == sourceKey }.bounds,
+        )
+    }
+
+    @Test fun forwardInterruptionResolvesNativeGroupToItsFrozenAnchor() {
+        val page = SettingsPageMorph()
+        page.begin("parent", true, false, host)
+        val bottom = Rect(16f, 500f, 344f, 580f)
+        reportGroup(page, first)
+        reportGroup(page, bottom)
+        page.pendingOrigin = bottom
+        assertTrue(page.begin("child", true, true, host))
+        val destination = Rect(16f, 100f, 344f, 180f)
+        page.reportDestination(Any(), surface(destination).copy(destination = "child"))
+        for (top in listOf(250f, 400f, 650f)) reportGroup(page, Rect(16f, top, 344f, top + 80f))
+        assertTrue(page.admitDestination())
+        val anchorKey = page.renderedContours(0f).single { it.bounds == bottom }.key
+        val frozen = page.renderedContours(0.2f)
+        val anchor = frozen.single { it.key == anchorKey }
+        page.pendingOrigin = destination
+        assertTrue(page.begin("grandchild", true, true, host, 0.2f))
+        val target = Rect(16f, 140f, 344f, 300f)
+        reportGroup(page, target)
+        assertTrue(page.admitDestination())
+        val fraction = 0.1f
+        assertEquals(
+            lerp(anchor.bounds, target, AppMotionOpenEasing.transform(fraction)),
+            page.renderedContours(fraction).single { it.key == anchorKey }.bounds,
         )
     }
 

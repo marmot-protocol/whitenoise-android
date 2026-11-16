@@ -984,7 +984,7 @@ class SettingsPageMorphHostTest {
         val pixels = rule.onRoot().captureToImage().toPixelMap()
         assertEquals("measured unoutlined ink stays opaque before handoff", 1f, pixels[100, 150].red, 0.02f)
         assertEquals("header stays live", 1f, pixels[100, 50].blue, 0.01f)
-        assertEquals("outside group stays live", 1f, pixels[8, 150].blue, 0.01f)
+        assertEquals("destination body margin waits for handoff", 0f, pixels[8, 150].blue, 0.01f)
         assertEquals("source viewport stays frozen", 1f, pixels[100, 240].blue, 0.01f)
         rule.runOnIdle { time.value = 0.9f }
         assertEquals(
@@ -997,6 +997,44 @@ class SettingsPageMorphHostTest {
                 .red,
             0.01f,
         )
+    }
+
+    @Test fun unoutlinedEntryWithholdsBodyAndMarginsUntilHandoffWithoutMovingHeader() {
+        val page = SettingsPageMorph()
+        val time = mutableStateOf(1f)
+        val child = mutableStateOf(false)
+        val viewport = Any()
+        val group = Any()
+        lateinit var host: Rect
+        rule.setContent {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        host = Rect(0f, 0f, size.width, size.height)
+                        if (child.value) {
+                            page.reportViewport(viewport, Rect(0f, 100f, size.width, size.height))
+                            reportUnoutlinedBody(page, viewport, group, Rect(16f, 100f, 344f, 300f))
+                        }
+                        with(page) { draw(host, time.value, false, Color.Black) }
+                    }.drawWithContent { drawRect(Color.Blue) },
+            )
+        }
+        rule.onRoot().captureToImage()
+        rule.runOnIdle {
+            page.pendingOrigin = Rect(16f, 500f, 344f, 550f)
+            assertTrue(page.begin("editor", true, true, host))
+            child.value = true
+            time.value = 0f
+        }
+        val first = rule.onRoot().captureToImage().toPixelMap()
+        assertEquals("header stays native", 1f, first[100, 50].blue, 0.01f)
+        assertEquals("unoutlined body waits", 0f, first[100, 150].blue, 0.01f)
+        assertEquals("body margins also wait", 0f, first[8, 150].blue, 0.01f)
+        rule.runOnIdle { time.value = 0.9f }
+        val arrived = rule.onRoot().captureToImage().toPixelMap()
+        assertEquals("body arrives without a synthetic border", 1f, arrived[100, 150].blue, 0.01f)
+        assertEquals("margins arrive with body", 1f, arrived[8, 150].blue, 0.01f)
     }
 
     private fun reportUnoutlinedBody(

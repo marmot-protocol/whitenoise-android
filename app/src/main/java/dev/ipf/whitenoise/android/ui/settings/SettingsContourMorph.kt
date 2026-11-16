@@ -136,7 +136,11 @@ private fun interpolateSettingsContour(
     key: Int,
 ): SettingsContour {
     val bounds = lerp(a.bounds, b.bounds, t)
-    fun radius(a: CornerRadius, b: CornerRadius): CornerRadius {
+
+    fun radius(
+        a: CornerRadius,
+        b: CornerRadius,
+    ): CornerRadius {
         val value = contourRadius(a, b, t)
         val limit = min(bounds.width, bounds.height) / 2f
         return CornerRadius(min(value.x, limit), min(value.y, limit))
@@ -283,7 +287,12 @@ internal fun matchSettingsContours(
     targetAnchorKey: Int? = anchorKey,
 ): List<SettingsContourPair> {
     fun visible(contours: List<SettingsContour>) =
-        contours.filter { !it.bounds.intersect(it.viewport).intersect(viewport).isEmpty }
+        contours.filter {
+            !it.bounds
+                .intersect(it.viewport)
+                .intersect(viewport)
+                .isEmpty
+        }
     val a = visible(source)
     val b = visible(target)
     if (a.isEmpty() || b.isEmpty()) {
@@ -293,12 +302,13 @@ internal fun matchSettingsContours(
         return visible.map { slot ->
             val offset = Offset(0f, dy)
             val bounds = slot.bounds.translate(offset)
-            val peer = slot.copy(
-                bounds = bounds,
-                corners = RoundRect(bounds, slot.corners.topLeftCornerRadius.x, slot.corners.topLeftCornerRadius.y),
-                seams = slot.seams.map { it.copy(start = it.start + offset, end = it.end + offset) },
-                rows = emptyList(),
-            )
+            val peer =
+                slot.copy(
+                    bounds = bounds,
+                    corners = RoundRect(bounds, slot.corners.topLeftCornerRadius.x, slot.corners.topLeftCornerRadius.y),
+                    seams = slot.seams.map { it.copy(start = it.start + offset, end = it.end + offset) },
+                    rows = emptyList(),
+                )
             if (a.isEmpty()) SettingsContourPair(peer, slot, slot.key) else SettingsContourPair(slot, peer, slot.key)
         }
     }
@@ -310,12 +320,20 @@ internal fun matchSettingsContours(
         b.indexOfFirst { routeKey != null && it.destination == routeKey }.takeIf { it >= 0 }
             ?: b.indexOfFirst { it.key == (targetAnchorKey ?: selectedKey) }.takeIf { it >= 0 }
             ?: nearestSettingsContour(b, point)
-    fun cost(x: SettingsContour, y: SettingsContour): Float {
+
+    fun cost(
+        x: SettingsContour,
+        y: SettingsContour,
+    ): Float {
         val xc = x.bounds.intersect(x.viewport).intersect(viewport)
         val yc = y.bounds.intersect(y.viewport).intersect(viewport)
         return kotlin.math.abs(xc.center.y - yc.center.y) + kotlin.math.abs(xc.height - yc.height) * MATCH_HEIGHT_WEIGHT
     }
-    fun assign(xs: List<Int>, ys: List<Int>): List<Pair<Int, Int>> {
+
+    fun assign(
+        xs: List<Int>,
+        ys: List<Int>,
+    ): List<Pair<Int, Int>> {
         if (xs.isEmpty() || ys.isEmpty()) return emptyList()
         // The smaller side is fully matched; skip only on the larger side.
         val swapped = xs.size > ys.size
@@ -349,17 +367,23 @@ internal fun matchSettingsContours(
         assign((0 until ai).toList(), (0 until bi).toList()) +
             listOf(ai to bi) + assign((ai + 1..a.lastIndex).toList(), (bi + 1..b.lastIndex).toList())
     val result =
-        indices.map { (x, y) ->
-            val key =
-                when {
-                    x == ai -> a[x].key // The frozen anchor keeps its identity through a measured rebase.
-                    a.size > b.size -> a[x].key
-                    b.size > a.size -> b[y].key
-                    else -> min(a[x].key, b[y].key)
-                }
-            SettingsContourPair(a[x], b[y], key)
-        }.toMutableList()
-    fun addSurplus(own: List<SettingsContour>, other: List<SettingsContour>, reverse: Boolean) {
+        indices
+            .map { (x, y) ->
+                val key =
+                    when {
+                        x == ai -> a[x].key // The frozen anchor keeps its identity through a measured rebase.
+                        a.size > b.size -> a[x].key
+                        b.size > a.size -> b[y].key
+                        else -> min(a[x].key, b[y].key)
+                    }
+                SettingsContourPair(a[x], b[y], key)
+            }.toMutableList()
+
+    fun addSurplus(
+        own: List<SettingsContour>,
+        other: List<SettingsContour>,
+        reverse: Boolean,
+    ) {
         val pairs = if (reverse) indices.map { it.second to it.first } else indices
         own.indices.filter { index -> pairs.none { it.first == index } }.forEach { index ->
             val slot = own[index]
@@ -385,14 +409,15 @@ internal fun matchSettingsContours(
                         Rect(slot.bounds.left, y, slot.bounds.right, y)
                     }
                 }
-            val seams = slot.seams.map { seam ->
-                fun move(point: Offset): Offset {
-                    val relative =
-                        if (slot.bounds.height == 0f) 0.5f else (point.y - slot.bounds.top) / slot.bounds.height
-                    return Offset(point.x, bounds.top + relative * bounds.height)
+            val seams =
+                slot.seams.map { seam ->
+                    fun move(point: Offset): Offset {
+                        val relative =
+                            if (slot.bounds.height == 0f) 0.5f else (point.y - slot.bounds.top) / slot.bounds.height
+                        return Offset(point.x, bounds.top + relative * bounds.height)
+                    }
+                    seam.copy(start = move(seam.start), end = move(seam.end))
                 }
-                seam.copy(start = move(seam.start), end = move(seam.end))
-            }
             val peer =
                 slot.copy(
                     bounds = bounds,
