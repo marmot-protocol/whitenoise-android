@@ -365,7 +365,8 @@ class SettingsContourMorphTest {
         val source = home()
         val frozen = sample(source, listOf(dividedGroup(90f, 2, 3)), 0.75f)
         val visible = frozen.filter { !it.bounds.intersect(viewport).isEmpty }
-        val pairs = matchSettingsContours(frozen, source, 3, null, frozen.single { it.key == 3 }.bounds.center, viewport)
+        val anchor = frozen.single { it.key == 3 }.bounds.center
+        val pairs = matchSettingsContours(frozen, source, 3, null, anchor, viewport)
         visible.forEach { contour ->
             val pair = pairs.single { it.source == contour }
             assertEquals(contour.key, pair.target.key)
