@@ -445,7 +445,7 @@ internal fun MediaFileBubble(
             status = status,
             footerWarningText = footerWarningText,
             openPending = opening,
-            nativeProgress = presentationProgress,
+            nativeProgress = presentationProgress.takeUnless { heldUntilDelivered },
             cancellationState = cancellationState,
             // A held own card has no native transfer to cancel.
             onCancelTransfer =
