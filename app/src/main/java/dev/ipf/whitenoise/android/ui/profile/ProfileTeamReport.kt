@@ -12,13 +12,15 @@ import dev.ipf.whitenoise.android.state.reportToTeam
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReportAudience
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReportFormState
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReportMessageSheet
+import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val PROFILE_TEAM_REPORT_ACTION_TAG = "person_profile.team_report"
 
 /**
  * Privately reports the person at [targetHex] to the White Noise team from [accountRef]. A failure keeps the sheet
- * open with its reason so the reader can retry, nothing is posted in any chat, and a late answer after [canAct] turns
- * false is dropped.
+ * open with its reason so the reader can retry, or is shown as feedback when the reader already dismissed it. Nothing
+ * is posted in any chat, a second tap while sending does nothing, and a late answer after [canAct] turns false is
+ * dropped.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -32,9 +34,15 @@ internal fun ProfileTeamReportSheet(
 ) {
     var sending by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<Int?>(null) }
+    // Outlives the sheet, so an answer that lands after the reader dismissed it is still shown.
+    val dismissed = remember { AtomicBoolean(false) }
     ReportMessageSheet(
-        onDismissRequest = onClose,
-        onSubmit = { reason, explanation ->
+        onDismissRequest = {
+            dismissed.set(true)
+            onClose()
+        },
+        onSubmit = submit@{ reason, explanation ->
+            if (sending) return@submit
             sending = true
             error = null
             appState.launchMutation {
@@ -47,7 +55,13 @@ internal fun ProfileTeamReportSheet(
                                 appState.present(outcome.message)
                                 onFeedback(appState.toast)
                             }
-                            is TeamReportOutcome.Failed -> error = outcome.message
+                            is TeamReportOutcome.Failed ->
+                                if (dismissed.get()) {
+                                    appState.present(outcome.message)
+                                    onFeedback(appState.toast)
+                                } else {
+                                    error = outcome.message
+                                }
                         }
                     }
                 } finally {

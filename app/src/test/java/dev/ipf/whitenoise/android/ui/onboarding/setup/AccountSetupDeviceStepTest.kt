@@ -11,17 +11,33 @@ import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.TimeZone
 
 /** The "Chats on this device" step states what MDK's device check found once, then what it means for chats. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class AccountSetupDeviceStepTest {
     @get:Rule val composeRule = createComposeRule()
+    private val originalTimeZone: TimeZone = TimeZone.getDefault()
+
+    /** Pins UTC, so a noon-UTC publication reads as the same calendar day on every host. */
+    @Before
+    fun pinUtc() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Restores the host's zone for the next suite. */
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     /** A check that could not run says so, then explains that another app's chats would stay there. */
     @Test fun uncheckedDeviceCheckSaysSoAndExplainsSeparateChats() {
@@ -85,6 +101,17 @@ class AccountSetupDeviceStepTest {
                 publishedAt = listOf(NOON_UTC_2025_11_02, NOON_UTC_2026_03_15),
             )
         show(AccountSetupState(snapshot = snapshot))
+        composeRule.onNodeWithText("$FOUND_ON_DATE_PREFIX March 15, 2026.").performScrollTo().assertIsDisplayed()
+        composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
+    }
+
+    /** Beside MDK's own finding in an error state, a dated notice still names the day, and says it only once. */
+    @Test
+    fun aDatedNoticeKeepsItsDateBesideTheFinding() {
+        val snapshot = foundSignInsSnapshot()
+        snapshot.singleDeviceNotice =
+            setupDeviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE, listOf(NOON_UTC_2026_03_15))
+        show(AccountSetupState(snapshot = snapshot, error = true))
         composeRule.onNodeWithText("$FOUND_ON_DATE_PREFIX March 15, 2026.").performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
     }

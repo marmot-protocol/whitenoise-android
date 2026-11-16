@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -14,6 +16,9 @@ import androidx.compose.ui.unit.IntSize
 import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.RecentEmojiList
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.MarkdownLinkLayoutRegistry
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayoutReporter
 import dev.ipf.whitenoise.android.ui.SelectableTextLayoutReporter
@@ -23,9 +28,29 @@ import kotlinx.coroutines.Job
 // Every separately remembered value added about 100 bytecode units to the bubble, and at 16,383 units
 // (UINT16_MAX / 4) or more ART refuses to compile a method at all, so each row composed in the interpreter.
 
-/** Sheet, dialog and in-flight flags for one message, reset together when the message id changes. */
+/** One message's surface state, with its owed group report kept app-wide under the account, group and message. */
+@Composable
+internal fun rememberMessageBubbleSurfaces(
+    appState: WhiteNoiseAppState,
+    controller: ConversationController,
+    item: TimelineMessage,
+): MessageBubbleSurfaceState =
+    remember(controller, item.presentationId) {
+        val chat = "${controller.conversationAccountRef}|${controller.group.groupIdHex}"
+        val reportKey = "$chat|${item.record.messageIdHex}"
+        MessageBubbleSurfaceState(appState.runtimeMirrors.groupReports, reportKey)
+    }
+
+/**
+ * Sheet, dialog and in-flight flags for one message, reset together when the message id changes. A group report the
+ * group already took lives in [groupReports] under [reportKey], which outlives this bubble, so scrolling away or
+ * recreating the screen cannot make the group receive the same report twice.
+ */
 @Stable
-internal class MessageBubbleSurfaceState {
+internal class MessageBubbleSurfaceState(
+    private val groupReports: MutableMap<String, Int> = mutableStateMapOf(),
+    private val reportKey: String = "",
+) {
     var emojiPickerOpen by mutableStateOf(false)
     var bodyExceedsCollapseLimit by mutableStateOf(false)
 
@@ -51,7 +76,11 @@ internal class MessageBubbleSurfaceState {
     var reportToTeam by mutableStateOf(true)
 
     /** The group's answer once it has the report, kept until the report finishes so the group never gets it twice. */
-    var reportGroupResult by mutableStateOf<Int?>(null)
+    var reportGroupResult: Int?
+        get() = groupReports[reportKey]
+        set(value) {
+            if (value == null) groupReports.remove(reportKey) else groupReports[reportKey] = value
+        }
 
     /** Whether the open sheet is retrying only a failed team copy, with the group's report already sent. */
     var reportCopyPending by mutableStateOf(false)

@@ -49,7 +49,8 @@ internal fun MessageReportSheetHost(
     val effectiveAudience = surfaces.effectiveReportAudience(audience)
     ReportMessageSheet(
         onDismissRequest = surfaces::closeReport,
-        onSubmit = { reason, explanation ->
+        onSubmit = submit@{ reason, explanation ->
+            if (surfaces.reportInFlight) return@submit
             val team = ReportTeamChoice(effectiveAudience, surfaces.reportToTeam)
             val generation = appState.runtimeGeneration
             val account = appState.activeAccountRef
@@ -130,7 +131,8 @@ internal suspend fun MessageBubbleSurfaceState.sendReport(
 /**
  * Keeps the sheet open after the team copy failed. A group answer that arrived with this send locks the sheet to
  * that report, and one recorded by an earlier send is never forgotten, so the group never gets the report twice. The
- * group's answer is shown once, when it first arrives.
+ * group's answer is shown once, when it first arrives, and a failure after the reader dismissed the sheet is shown
+ * instead of being kept for a sheet nobody sees.
  */
 private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
     @StringRes groupResult: Int?,
@@ -139,13 +141,19 @@ private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
 ) {
     if (reportGroupResult == null && groupResult != null) present(groupResult, null)
     reportGroupResult = groupResult ?: reportGroupResult
-    reportCopyPending = groupResult != null
-    reportError =
+    val error =
         if (reportGroupResult != null && failure == R.string.report_team_failed) {
             R.string.report_team_copy_failed
         } else {
             failure
         }
+    if (reportSheetOpen) {
+        reportCopyPending = groupResult != null
+        reportError = error
+    } else {
+        // The reader dismissed the sheet while it was sending, so the failure is shown instead.
+        present(null, error)
+    }
 }
 
 /** Says what each audience took: the group's answer when it got the report, then the team's. */

@@ -40,6 +40,12 @@ internal fun setupDeviceEvidence(
         }
     }
 
+/** Whether the evidence names the day another installation last published, which MDK's own finding never does. */
+internal fun SetupDeviceEvidence?.namesPublicationDate(): Boolean {
+    val otherApps = this as? SetupDeviceEvidence.OtherApps
+    return otherApps?.latestPublishedAtSeconds != null
+}
+
 /**
  * What this sign-in means for the user's chats. Each sign-in is a separate installation with its own chats, so the
  * copy never says this device is added, linked or synced. A check that found nothing needs no explanation, and one

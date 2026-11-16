@@ -310,15 +310,24 @@ private fun SetupStepFindings(
 ) {
     if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
     val directRemovalEndpoint = state.directRemovalEndpoint()
+    val deviceStep = step.step == OnboardingStepFfi.SINGLE_DEVICE
+    // A dated device notice states the finding with its date, so MDK's undated restatement is left out.
+    val datedDeviceNotice =
+        deviceStep &&
+            remember(snapshot.singleDeviceNotice) {
+                setupDeviceEvidence(snapshot.singleDeviceNotice, System.currentTimeMillis() / 1_000L)
+                    .namesPublicationDate()
+            }
     step.findings
         .distinct()
         .filterNot { finding ->
-            val routineDeviceNotice = step.step == OnboardingStepFfi.SINGLE_DEVICE && state.routineDeviceNotice
+            val routineDeviceNotice = deviceStep && state.routineDeviceNotice
+            val restatedByNotice = datedDeviceNotice && finding.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE
             val directRemovalFinding =
                 directRemovalEndpoint != null &&
                     finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
                     finding.endpoint == directRemovalEndpoint
-            routineDeviceNotice || directRemovalFinding
+            routineDeviceNotice || restatedByNotice || directRemovalFinding
         }.forEach { SetupFindingContent(it) }
 }
 
@@ -340,8 +349,8 @@ private fun SetupOperationNotice(
 }
 
 /**
- * States what MDK's device check found, unless one of the [shownFindings] already says it, then explains that this
- * sign-in keeps its own chats apart from any other app.
+ * States what MDK's device check found, unless one of the [shownFindings] already says it without a date the notice
+ * could add, then explains that this sign-in keeps its own chats apart from any other app.
  */
 @Composable
 private fun SetupSingleDeviceNotice(
@@ -351,6 +360,7 @@ private fun SetupSingleDeviceNotice(
     val evidence = remember(notice) { setupDeviceEvidence(notice, System.currentTimeMillis() / 1_000L) }
     val restated =
         evidence is SetupDeviceEvidence.OtherApps &&
+            !evidence.namesPublicationDate() &&
             shownFindings.any { it.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE }
     evidence?.takeUnless { restated }?.let { SetupNotice(setupDeviceFinding(it)) }
     setupDeviceExplanation(evidence).forEach { Text(stringResource(it)) }

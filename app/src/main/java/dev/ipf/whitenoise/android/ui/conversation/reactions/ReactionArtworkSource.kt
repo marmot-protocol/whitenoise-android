@@ -41,6 +41,8 @@ internal fun rememberReactionArtwork(
 ): EmojiArt? {
     val source = LocalReactionArtworkSource.current
     val art by produceState<EmojiArt?>(null, source, emoji, reactionMessageIdHex) {
+        // A new reaction in the same pill must not show the previous reaction's artwork while its own loads.
+        value = null
         val shortcode = emoji?.takeIf { it.length > 2 && it.startsWith(':') && it.endsWith(':') }
         value =
             if (source != null && shortcode != null && reactionMessageIdHex != null) {

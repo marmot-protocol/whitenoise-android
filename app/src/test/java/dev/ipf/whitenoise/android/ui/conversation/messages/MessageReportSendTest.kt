@@ -11,7 +11,7 @@ import org.junit.Test
 
 /** A message report reaches the group at most once, however its White Noise copy fails, retries or is reopened. */
 class MessageReportSendTest {
-    private val surfaces = MessageBubbleSurfaceState()
+    private val surfaces = MessageBubbleSurfaceState().apply { reportSheetOpen = true }
     private var groupSends = 0
     private val teamAnswers = ArrayDeque<TeamReportOutcome>()
     private val presented = mutableListOf<Pair<Int?, Int?>>()
@@ -52,6 +52,7 @@ class MessageReportSendTest {
 
             send(ReportAudience.GroupAndTeam)
             surfaces.closeReport()
+            surfaces.reportSheetOpen = true
             assertEquals(ReportAudience.TeamMessage, surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam))
             send(ReportAudience.GroupAndTeam)
             assertEquals(ReportAudience.TeamMessage, surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam))
@@ -77,6 +78,40 @@ class MessageReportSendTest {
                 ReportAudience.GroupAndTeam,
                 surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam),
             )
+        }
+
+    /** A remembered group report outlives this bubble's state, so a new bubble for the message sends only the copy. */
+    @Test
+    fun aGroupReportOutlivesTheBubbleThatSentIt() =
+        runBlocking {
+            val shared = mutableMapOf<String, Int>()
+            val first = MessageBubbleSurfaceState(shared, "account|group|message")
+            teamAnswers += listOf(FAILED, ACCEPTED)
+            first.reportSheetOpen = true
+            first.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), sends)
+            first.closeReport()
+
+            val recreated = MessageBubbleSurfaceState(shared, "account|group|message")
+            val audience = recreated.effectiveReportAudience(ReportAudience.GroupAndTeam)
+            recreated.sendReport(ReportTeamChoice(audience), sends)
+
+            assertEquals(ReportAudience.TeamMessage, audience)
+            assertEquals(1, groupSends)
+            assertTrue(shared.isEmpty())
+        }
+
+    /** A team copy that fails after the reader dismissed the sheet is shown, not kept for a sheet nobody sees. */
+    @Test
+    fun aFailureAfterDismissalIsShown() =
+        runBlocking {
+            teamAnswers += FAILED
+            surfaces.reportSheetOpen = false
+
+            send(ReportAudience.GroupAndTeam)
+
+            assertEquals(null to R.string.report_team_copy_failed, presented.last())
+            assertFalse(surfaces.reportCopyPending)
+            assertEquals(ReportAudience.TeamMessage, surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam))
         }
 
     /** Sends one report from the sheet as it stands for [audience], with the team switch on. */

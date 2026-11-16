@@ -495,7 +495,7 @@ internal fun MessageBubble(
     val context = LocalContext.current
     // Per-key state lives in three holders so the bubble stays within ART's compile limit (MessageBubbleState.kt).
     val pressState = remember(item.presentationId) { MessageBubblePressState() }
-    val surfaces = remember(controller, item.presentationId) { MessageBubbleSurfaceState() }
+    val surfaces = rememberMessageBubbleSurfaces(appState, controller, item)
     // The chat setting supplies the default until Read More or Show less changes this message.
     var collapseOverride by androidx.compose.runtime.saveable.rememberSaveable(
         controller.boundAccountRef,
