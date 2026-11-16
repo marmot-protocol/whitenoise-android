@@ -23,6 +23,7 @@ import java.util.Locale
 internal class RuntimeMirrors(
     val attention: AccountAttentionMirror = AccountAttentionMirror(),
     val blocks: BlockListMirror = BlockListMirror(),
+    val teamReporting: TeamReportingMirror = TeamReportingMirror(),
 )
 
 /** Outcome of a block or unblock request, as the UI must present it. */

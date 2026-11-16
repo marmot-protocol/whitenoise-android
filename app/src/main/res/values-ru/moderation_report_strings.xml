@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">Пожаловаться команде White Noise</string>
+    <string name="report_team_send_toggle">Отправить в White Noise</string>
+    <string name="report_team_message_detail">Ваша жалоба и открытый ключ отправителя конфиденциально передаются команде White Noise. Само сообщение не передаётся, а отправитель не получает уведомления.</string>
+    <string name="report_team_profile_detail">Ваша жалоба и открытый ключ этого человека конфиденциально передаются команде White Noise. Сообщения не передаются, а этот человек не получает уведомления.</string>
+    <string name="report_team_explanation_hint">Что стоит знать команде White Noise (необязательно)</string>
+    <string name="report_team_sent">Отправлено команде White Noise.</string>
+    <string name="report_team_queued">Сохранено и ожидает отправки команде White Noise.</string>
+    <string name="report_team_pending">Сохранено; доставка команде White Noise ожидает подтверждения.</string>
+    <string name="report_team_copy_failed">Не удалось отправить копию в White Noise. Повторите попытку.</string>
+    <string name="report_team_failed">Не удалось отправить жалобу команде White Noise. Повторите попытку.</string>
+    <string name="report_team_rate_limited">Слишком много жалоб с этого аккаунта. Повторите попытку позже.</string>
+</resources>

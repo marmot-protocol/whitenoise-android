@@ -143,6 +143,7 @@ import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
+import dev.ipf.whitenoise.android.state.loadTeamReporting
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
@@ -935,6 +936,8 @@ internal fun ConversationScreen(
         LaunchedEffect(controller, notificationOpenRequestId, transcriptRoutedAway, transcriptReadyToReveal) {
             onNotificationTimelineVisibilityChanged(!transcriptRoutedAway && transcriptReadyToReveal)
         }
+        // A message's Report action can offer the White Noise team only once MDK has confirmed this build reaches it.
+        LaunchedEffect(appState.runtimeGeneration) { appState.loadTeamReporting() }
 
         // Timeline publication can precede route settlement and the first visible
         // Compose frame. Record visibility only after the transcript can be shown.

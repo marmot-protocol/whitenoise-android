@@ -46,8 +46,23 @@ internal class MessageBubbleSurfaceState {
     var messageShareJob by mutableStateOf<Job?>(null)
     var reportSheetOpen by mutableStateOf(false)
     var reportInFlight by mutableStateOf(false)
+
+    /** Whether a group report also sends the White Noise team a copy; on unless the reader turns it off. */
+    var reportToTeam by mutableStateOf(true)
+
+    /** The group's answer once it has the report, so a retried team copy never reports to the group twice. */
+    var reportGroupResult by mutableStateOf<Int?>(null)
+    var reportError by mutableStateOf<Int?>(null)
     var messageReports by mutableStateOf<List<ContentReportFfi>?>(null)
     var reportsRevision by mutableIntStateOf(0)
+
+    /** Closes the report sheet and forgets its choices, so the next report starts fresh. */
+    fun closeReport() {
+        reportSheetOpen = false
+        reportToTeam = true
+        reportGroupResult = null
+        reportError = null
+    }
 
     /** Puts an emoji picked for configure [slot] in the draft, replacing that slot or appending the next (#3279). */
     fun pickConfigureReaction(
