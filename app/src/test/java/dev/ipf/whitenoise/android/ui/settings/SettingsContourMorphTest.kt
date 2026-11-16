@@ -67,6 +67,21 @@ class SettingsContourMorphTest {
         assertEquals(expected.bottom, actual.bottom, tolerance)
     }
 
+
+    @Test fun oneToManyRemeasureKeepsSemanticAnchorWhenNeighbourIsNearer() {
+        val source = listOf(group(100f, key = 1))
+        val target = listOf(group(100f, key = 20), group(500f, key = 10).copy(destination = "child"))
+        val point = source.single().bounds.center
+        val pairs = matchSettingsContours(source, target, 1, "child", point, viewport)
+        val anchor = pairs.single { it.target.key == 10 }
+        val frozen = interpolateSettingsContours(source, target, 0.7f, point, viewport, 1, correspondence = pairs)
+        val frozenAnchor = frozen.single { it.key == anchor.key }
+        val remeasured = target.map { it.copy(bounds = it.bounds.translate(Offset(0f, 30f))) }
+        val rebased = matchSettingsContours(frozen, remeasured, 1, "child", point, viewport)
+        assertEquals(frozenAnchor.bounds, rebased.single { it.target.key == 10 }.source.bounds)
+        assertEquals(1, rebased.single { it.target.key == 10 }.key)
+    }
+
     @Test fun firstAndThirdGroupsEachMoveDirectlyToTheirKeyedDestinationThroughoutTheClock() {
         val source = home()
         for (selected in listOf(0, 2)) {

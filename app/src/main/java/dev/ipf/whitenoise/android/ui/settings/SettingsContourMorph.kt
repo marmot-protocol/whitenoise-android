@@ -352,6 +352,7 @@ internal fun matchSettingsContours(
         indices.map { (x, y) ->
             val key =
                 when {
+                    x == ai -> a[x].key // The frozen anchor keeps its identity through a measured rebase.
                     a.size > b.size -> a[x].key
                     b.size > a.size -> b[y].key
                     else -> min(a[x].key, b[y].key)
