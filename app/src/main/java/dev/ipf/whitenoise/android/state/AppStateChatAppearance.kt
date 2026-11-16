@@ -103,9 +103,8 @@ internal fun WhiteNoiseAppState.updateChatBubbleColor(
  * gate (#1180). Default ON preserves the existing Read More behavior for every
  * account/group until the user disables it from that group's details screen.
  */
-fun WhiteNoiseAppState.collapseLongMessagesInGroup(groupIdHex: String): Boolean {
-    return longMessageCollapseState.collapseLongMessages(activeAccountRef, groupIdHex)
-}
+fun WhiteNoiseAppState.collapseLongMessagesInGroup(groupIdHex: String): Boolean =
+    longMessageCollapseState.collapseLongMessages(activeAccountRef, groupIdHex)
 
 fun WhiteNoiseAppState.updateCollapseLongMessagesInGroup(
     groupIdHex: String,
