@@ -159,20 +159,8 @@ class DownloadNeverOpensTest {
      */
     @Test
     fun aFileCardTapDownloadsTheFileWithoutRequestingAnOpen() {
-        composeRule.setContent { WhiteNoiseTheme { FileCard() } }
-        awaitDescribed(text(R.string.media_tap_to_download))
-        val revision = composeRule.runOnIdle { fixture.state.attachmentOpens.revision }
-
-        val cardTag = fileAttachmentCardTestTag(request(0).messageIdHex, 0)
-        // Download semantics can exist while the first local-cache probe still keeps this card disabled.
-        composeRule.waitUntil(WAIT_MILLIS) {
-            composeRule.onAllNodes(hasTestTag(cardTag) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
-        }
-        composeRule.onNodeWithTag(cardTag).performClick()
-        awaitSingleTransfer()
-        composeRule.runOnIdle { fixture.calls.single().succeed(byteArrayOf(5, 6, 7, 8)) }
-        // The card's type glyph replaces its Download action once the file is on the device.
-        awaitDescribed(text(R.string.attachment_type_pdf_description))
+        composeRule.setContent { WhiteNoiseTheme { FileCard("application/zip", "bundle.zip") } }
+        val revision = downloadThroughFileCard(text(R.string.attachment_type_archive))
 
         composeRule.runOnIdle {
             assertEquals("a download tap requested an open", revision, fixture.state.attachmentOpens.revision)
@@ -186,6 +174,40 @@ class DownloadNeverOpensTest {
                 fixture.state.attachmentOpens.revision,
             )
         }
+    }
+
+    /**
+     * A downloaded PDF routes to the in-app reader, so the tap that opens a downloaded archive requests no external
+     * open here. The reader needs a timeline source to stay current; device and Maestro proof cover its UI.
+     */
+    @Test
+    fun aDownloadedPdfCardTapRequestsNoExternalOpen() {
+        composeRule.setContent { WhiteNoiseTheme { FileCard("application/pdf", "report.pdf") } }
+        val revision = downloadThroughFileCard(text(R.string.attachment_type_pdf_description))
+
+        composeRule.onNodeWithTag(fileAttachmentCardTestTag(request(0).messageIdHex, 0)).performClick()
+        composeRule.runOnIdle {
+            assertEquals("a PDF tap requested an external open", revision, fixture.state.attachmentOpens.revision)
+            assertFalse(hasOpenIntent())
+        }
+    }
+
+    /** Downloads the file card's attachment with one tap, asserting that the tap requested no open. */
+    private fun downloadThroughFileCard(downloadedTypeDescription: String): Int {
+        awaitDescribed(text(R.string.media_tap_to_download))
+        val revision = composeRule.runOnIdle { fixture.state.attachmentOpens.revision }
+
+        val cardTag = fileAttachmentCardTestTag(request(0).messageIdHex, 0)
+        // Download semantics can exist while the first local-cache probe still keeps this card disabled.
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.onAllNodes(hasTestTag(cardTag) and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(cardTag).performClick()
+        awaitSingleTransfer()
+        composeRule.runOnIdle { fixture.calls.single().succeed(byteArrayOf(5, 6, 7, 8)) }
+        // The card's type glyph replaces its Download action once the file is on the device.
+        awaitDescribed(downloadedTypeDescription)
+        return revision
     }
 
     /**
@@ -580,13 +602,16 @@ class DownloadNeverOpensTest {
             shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>()).peekNextStartedActivity() !=
             null
 
-    /** The production file card for the fixture's first attachment, as a document. */
+    /** The production file card for the fixture's first attachment, with the given type and name. */
     @Composable
-    private fun FileCard() {
+    private fun FileCard(
+        mediaType: String,
+        fileName: String,
+    ) {
         MediaFileBubble(
             messageIdHex = request(0).messageIdHex,
             attachmentIndex = 0,
-            reference = reference(0).copy(mediaType = "application/pdf", fileName = "report.pdf"),
+            reference = reference(0).copy(mediaType = mediaType, fileName = fileName),
             controller = controller,
             appState = fixture.state,
             senderKey = "sender",

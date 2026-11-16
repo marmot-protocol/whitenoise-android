@@ -111,4 +111,19 @@ class LocalHtmlPolicyTest {
             assertEquals("999", body.selectFirst("td")!!.attr("colspan"))
             assertFalse(body.selectFirst("td")!!.hasAttr("rowspan"))
         }
+
+    @Test fun discardedRootAndBodyAttributesReportOmittedContent() =
+        runBlocking {
+            assertFalse(LocalHtmlPolicy.sanitize("<p>Notes</p>").omitted)
+            for (source in listOf(
+                "<body style='color:red'><p>Notes</p></body>",
+                "<html style='background:black'><body><p>Notes</p></body></html>",
+            )) {
+                val doc = LocalHtmlPolicy.sanitize(source)
+                assertTrue(source, doc.omitted)
+                val output = Jsoup.parse(doc.html)
+                assertEquals(source, 0, output.body().attributesSize())
+                assertFalse(source, output.selectFirst("html")!!.hasAttr("style"))
+            }
+        }
 }

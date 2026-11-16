@@ -54,7 +54,11 @@ internal object LocalHtmlPolicy {
         val output = Document.createShell("")
         val links = mutableListOf<String>()
         var visited = 0
-        var omitted = parsed.head().children().isNotEmpty()
+        // The output shell keeps no root or body attributes, so a styled <body> also counts as omitted content.
+        var omitted =
+            parsed.head().children().isNotEmpty() ||
+                parsed.body().attributesSize() > 0 ||
+                (parsed.body().parent()?.attributesSize() ?: 0) > 0
 
         fun copy(
             node: Node,
