@@ -23,7 +23,9 @@ internal suspend fun WhiteNoiseAppState.migrateLegacyMutePreferences() {
                     .setMuted(
                         legacy.accountRef,
                         legacy.groupIdHex,
-                        legacy.expiryMillis?.takeIf { it > System.currentTimeMillis() },
+                        // Expired entries returned above. Re-reading the clock here could turn a dated mute
+                        // that just lapsed into an indefinite one, so pass the expiry through unchanged.
+                        legacy.expiryMillis,
                     ).getOrNull()
             }
         if (confirmed?.muted == true) {
