@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -145,18 +146,19 @@ internal fun GestureSettingsContent(
                         val checked = shortcut in headerShortcuts
                         // A full header keeps its choices; another one waits until the person turns one off.
                         val full = !checked && headerShortcuts.size >= HeaderShortcutPreferences.MAX
-                        val rowKey = headerShortcutRowKey(shortcut)
+                        val shortcutRow = headerShortcutRow(shortcut)
+                        val rowKey = shortcutRow.key
                         row(rowKey) { context ->
                             SettingsSwitch(
                                 context,
-                                stringResource(headerShortcutTitleRes(shortcut)),
+                                stringResource(shortcutRow.titleRes),
                                 checked,
                                 { onToggleHeaderShortcut(shortcut) },
                                 modifier = Modifier.testTag("gestures.$rowKey"),
-                                explanation = stringResource(headerShortcutExplanationRes(shortcut)),
+                                explanation = stringResource(shortcutRow.explanationRes),
                                 subtitle = if (full) stringResource(R.string.header_shortcuts_limit) else null,
                                 enabled = !full,
-                                leading = { SettingsLeadingIcon(headerShortcutIconRes(shortcut)) },
+                                leading = { SettingsLeadingIcon(shortcutRow.iconRes) },
                             )
                         }
                     }
@@ -197,31 +199,31 @@ internal fun GestureSettingsContent(
     }
 }
 
-/** Settings search addresses each shortcut switch by this stable row key. */
-internal fun headerShortcutRowKey(shortcut: HeaderShortcut): String =
-    when (shortcut) {
-        HeaderShortcut.Search -> "header.search"
-        HeaderShortcut.MuteUnmute -> "header.mute"
-    }
+/** Settings presentation of one header shortcut; [key] is the stable row key settings search addresses. */
+internal class HeaderShortcutRow(
+    val key: String,
+    @StringRes val titleRes: Int,
+    @StringRes val explanationRes: Int,
+    @DrawableRes val iconRes: Int,
+)
 
-@StringRes
-internal fun headerShortcutTitleRes(shortcut: HeaderShortcut): Int =
+/** Maps each shortcut to its settings row. */
+internal fun headerShortcutRow(shortcut: HeaderShortcut): HeaderShortcutRow =
     when (shortcut) {
-        HeaderShortcut.Search -> R.string.header_shortcut_search
-        HeaderShortcut.MuteUnmute -> R.string.gestures_mute_unmute
-    }
-
-@StringRes
-private fun headerShortcutExplanationRes(shortcut: HeaderShortcut): Int =
-    when (shortcut) {
-        HeaderShortcut.Search -> R.string.explanation_header_shortcut_search
-        HeaderShortcut.MuteUnmute -> R.string.explanation_header_shortcut_mute
-    }
-
-private fun headerShortcutIconRes(shortcut: HeaderShortcut): Int =
-    when (shortcut) {
-        HeaderShortcut.Search -> R.drawable.ic_search
-        HeaderShortcut.MuteUnmute -> R.drawable.ic_notifications_off
+        HeaderShortcut.Search ->
+            HeaderShortcutRow(
+                "header.search",
+                R.string.header_shortcut_search,
+                R.string.explanation_header_shortcut_search,
+                R.drawable.ic_search,
+            )
+        HeaderShortcut.MuteUnmute ->
+            HeaderShortcutRow(
+                "header.mute",
+                R.string.gestures_mute_unmute,
+                R.string.explanation_header_shortcut_mute,
+                R.drawable.ic_notifications_off,
+            )
     }
 
 /** Explains the effective mirrored default while explicit bindings retain their physical direction. */

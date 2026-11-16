@@ -62,10 +62,12 @@ internal class ConversationMuteControl(
         dialogOpen.value = true
     }
 
+    /** Restores the notify mode saved before the mute; no confirmation. */
     fun unmute() {
         appState.setConversationNotifyMode(groupIdHex, restoreMode)
     }
 
+    /** Closes the duration choice and mutes until [target]. */
     fun mute(target: MuteTarget) {
         dialogOpen.value = false
         when (target) {
@@ -75,6 +77,7 @@ internal class ConversationMuteControl(
         }
     }
 
+    /** Closes the duration choice without muting. */
     fun dismissDurationDialog() {
         dialogOpen.value = false
     }

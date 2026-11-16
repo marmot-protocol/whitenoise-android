@@ -7,11 +7,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -220,11 +222,18 @@ class ConversationTopBarSemanticsTest {
     @Test fun headerWithOneShortcutDark() = shortcutHeader("one_dark", listOf(HeaderShortcut.Search), dark = true)
 
     /** Two shortcuts keep the person's order and leave the title its width. */
-    @Test fun headerWithTwoShortcutsLight() =
-        shortcutHeader("two_light", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search))
+    @Test fun headerWithTwoShortcutsLight() = shortcutHeader("two_light", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search))
 
-    @Test fun headerWithTwoShortcutsDark() =
-        shortcutHeader("two_dark", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search), dark = true)
+    @Test fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search), dark = true)
+
+    /** A narrow window at double font keeps two shortcuts, the members line and the tappable timer badge on screen. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
+    fun crowdedHeaderLargeFont() = crowdedHeader("crowded_large_font", rtl = false)
+
+    @Test
+    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
+    fun crowdedHeaderLargeFontRtl() = crowdedHeader("crowded_large_font_rtl", rtl = true)
 
     /** Search runs the supplied handler; Mute asks for a duration through the shared control, never directly. */
     @Test
@@ -342,11 +351,16 @@ class ConversationTopBarSemanticsTest {
         fontScale: Float = 1f,
         dark: Boolean = false,
         actions: @Composable RowScope.() -> Unit = {},
+        rtl: Boolean = false,
+        onTimerClick: (() -> Unit)? = null,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
-                Surface {
-                    TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions)
+            val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
+                    Surface {
+                        TopBar(appState, controller, compactHeight, frozen.value, onOpenDetails, actions, onTimerClick)
+                    }
                 }
             }
         }
@@ -400,6 +414,26 @@ class ConversationTopBarSemanticsTest {
         render(appState, controller, dark = dark, actions = {
             ConversationHeaderShortcuts(shortcuts, muteControl(appState), onSearch = {})
         })
+        composeRule
+            .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
+            .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")
+    }
+
+    /** Records a three-member group with a one-day timer and both shortcuts at double font scale. */
+    private fun crowdedHeader(
+        name: String,
+        rtl: Boolean,
+    ) {
+        val appState = appState()
+        appState.markDisappearingTooltipShown()
+        val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
+        controller.members = (1..3).map { AppGroupMemberRecordFfi("0$it" + "00".repeat(31), ACCOUNT_REF, it == 1) }
+        controller.membersLoaded = true
+        val shortcuts = listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search)
+        render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
+            ConversationHeaderShortcuts(shortcuts, muteControl(appState), onSearch = {})
+        })
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertHasClickAction()
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
             .captureRoboImage("src/test/snapshots/conversation_header_shortcuts_$name.png")

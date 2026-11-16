@@ -188,14 +188,14 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             "search.GestureSettings.5",
             "pull_unread",
         )
-        HeaderShortcut.entries.forEach { shortcut ->
+        HeaderShortcut.entries.map(::headerShortcutRow).forEach { row ->
             control(
-                "Gestures.${headerShortcutRowKey(shortcut)}",
-                headerShortcutTitleRes(shortcut),
+                "Gestures.${row.key}",
+                row.titleRes,
                 R.string.header_shortcuts_title,
                 SettingsDetail.Gestures,
                 "search.GestureSettings.9",
-                headerShortcutRowKey(shortcut),
+                row.key,
             )
         }
         control(

@@ -93,16 +93,15 @@ internal fun DisappearingTimerEditor(
 
 /**
  * Header timer apply path: the same retention command details runs, behind the same lock and owner fences.
- * Returns false when another mutation or an account/runtime change makes the pick stale.
+ * Does nothing when another mutation or an account/runtime change makes the pick stale.
  */
 internal fun ConversationController.applyDisappearingTimer(
     appState: WhiteNoiseAppState,
     reviewedRuntime: Int,
     secs: Long,
-): Boolean {
-    if (mutationInFlight || !isCurrentGroupMutationOwner(appState, reviewedRuntime)) return false
+) {
+    if (mutationInFlight || !isCurrentGroupMutationOwner(appState, reviewedRuntime)) return
     clearLastMutationError()
     val controller = this
     appState.launchMutation { controller.updateMessageRetention(secs.toULong()) }
-    return true
 }

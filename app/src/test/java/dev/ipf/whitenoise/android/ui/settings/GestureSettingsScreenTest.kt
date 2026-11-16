@@ -129,12 +129,12 @@ class GestureSettingsScreenTest {
     /** Settings search reaches every shortcut switch through its Gestures row. */
     @Test fun everyHeaderShortcutIsSearchable() {
         val entries = settingsSearchAdditionalControls().associateBy { it.id }
-        HeaderShortcut.entries.forEach { shortcut ->
-            val entry = entries.getValue("Gestures.${headerShortcutRowKey(shortcut)}")
+        HeaderShortcut.entries.map(::headerShortcutRow).forEach { row ->
+            val entry = entries.getValue("Gestures.${row.key}")
             assertEquals(SettingsDetail.Gestures, entry.destination)
             assertEquals("search.GestureSettings.9", entry.itemKey)
-            assertEquals(headerShortcutRowKey(shortcut), entry.rowKey)
-            assertEquals(headerShortcutTitleRes(shortcut), entry.titleRes)
+            assertEquals(row.key, entry.rowKey)
+            assertEquals(row.titleRes, entry.titleRes)
         }
     }
 

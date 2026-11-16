@@ -15,10 +15,10 @@ internal class HeaderShortcutPreferences(
     var shortcuts by mutableStateOf(read())
         private set
 
-    /** Adds or removes one shortcut; a third shortcut is rejected rather than replacing an existing one. */
+    /** Adds or removes one shortcut; adding past [MAX] is ignored rather than replacing an existing one. */
     fun toggle(shortcut: HeaderShortcut) {
         val next = if (shortcut in shortcuts) shortcuts - shortcut else shortcuts + shortcut
-        require(next.size <= MAX) { "At most $MAX header shortcuts" }
+        if (next.size > MAX) return
         write(next)
     }
 
@@ -28,6 +28,7 @@ internal class HeaderShortcutPreferences(
         shortcuts = emptyList()
     }
 
+    /** Saves [next] in order and republishes it through the same filter as a cold read. */
     private fun write(next: List<HeaderShortcut>) {
         preferences.edit().putString(KEY, next.joinToString(",") { it.name }).apply()
         shortcuts = read()

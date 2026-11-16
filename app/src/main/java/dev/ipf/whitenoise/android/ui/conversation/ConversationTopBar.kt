@@ -325,8 +325,16 @@ internal fun ConversationTopBar(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         ) {
+                                            // The timer keeps its width; a long member line yields first.
                                             if (membersSubtitle != null) {
-                                                Text(membersSubtitle, style = labelStyle, color = labelColor)
+                                                Text(
+                                                    membersSubtitle,
+                                                    style = labelStyle,
+                                                    color = labelColor,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false),
+                                                )
                                             }
                                             if (showTimer) {
                                                 if (membersSubtitle != null) {
@@ -446,7 +454,7 @@ private fun HeaderTimerBadge(
             modifier = Modifier.size(12.dp).testTag("conversation.header.timer"),
             tint = labelColor,
         )
-        Text(label, style = labelStyle, color = labelColor)
+        Text(label, style = labelStyle, color = labelColor, maxLines = 1, softWrap = false)
     }
 }
 
