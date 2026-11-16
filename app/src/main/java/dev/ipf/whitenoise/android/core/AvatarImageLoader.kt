@@ -1206,6 +1206,10 @@ private class CompletedAvatarRequest(
     override suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap? = image
 }
 
+/**
+ * One shared fetch or decode for [key]. It stays [abandonable] only while every caller that joined it allowed a skip,
+ * and [waiters] counts the callers still waiting for its result.
+ */
 private class AvatarInFlightRequest(
     /** The [AvatarImageLoader] cache key this request is registered under while in flight. */
     val key: String,
@@ -1232,6 +1236,7 @@ private class PendingAvatarRequest(
         if (!abandonable) request.abandonable = false
     }
 
+    /** Waits for the shared result, counting this caller as waiting until it returns or is cancelled. */
     override suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap? {
         try {
             val image = request.result.await()

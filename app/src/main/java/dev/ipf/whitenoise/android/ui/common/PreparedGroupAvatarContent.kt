@@ -144,7 +144,7 @@ private fun PrepareRetainedAvatarWindow(
         withTimeoutOrNull(LOCAL_GROUP_AVATAR_PREPARATION_BUDGET_MILLIS) {
             for (asset in selected) {
                 if (!window.hasExactRevision(asset)) {
-                    appState.durableAvatar(asset, accountRef, acquireMissing = false)?.let {
+                    appState.durableAvatar(asset, accountRef, acquireMissing = false, abandonable = true)?.let {
                         window.recordLoaded(asset, it)
                     }
                 }
@@ -284,7 +284,7 @@ private fun rememberAvatarPixelPreparation(
                 for (asset in selected) {
                     val imageKey = checkNotNull(asset.cacheKey(checkNotNull(accountRef)))
                     if (imageKey !in images) {
-                        appState.durableAvatar(asset, accountRef, acquireMissing = false)?.let {
+                        appState.durableAvatar(asset, accountRef, acquireMissing = false, abandonable = true)?.let {
                             images[imageKey] =
                                 PreparedAvatarImage(
                                     asset.copy(),
