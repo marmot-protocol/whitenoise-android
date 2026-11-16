@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-giphy-disclosure-dismiss
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Search GIFs
+- assertVisible:
+    text: Your search and IP address are sent to GIPHY. Opening a received GIF also contacts GIPHY.
+- back
+- assertVisible:
+    id: presentation.complete

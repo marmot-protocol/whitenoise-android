@@ -1249,8 +1249,20 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
       "symbol": "GiphySearchSheet",
-      "bindings": [],
-      "remaining": "Use an Android build with GIPHY configured to open Search GIFs from the composer. Verify the privacy disclosure, debounced search, playback before selection, retry, and dismissal during a request under MED-054."
+      "bindings": [
+        {
+          "case": "presentation-giphy-disclosure-dismiss",
+          "selector": {
+            "text": "Your search and IP address are sent to GIPHY. Opening a received GIF also contacts GIPHY."
+          },
+          "scope": "The unkeyed production sheet shows the disclosure and dispatches dismissal on Back in an isolated presentation fixture.",
+          "entry_assertion": {
+            "text": "Search GIFs"
+          },
+          "visible_on_entry": true
+        }
+      ],
+      "remaining": "MED-054 still requires the keyed composer entry, debounced provider search, playback before selection, retry, cancellation during a request, and cross-platform delivery."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPending.kt",
