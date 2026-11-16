@@ -189,3 +189,56 @@ internal suspend fun WhiteNoiseAppState.refreshAccountUnreadCount(accountRef: St
     val result = refreshEffectiveAccountUnreadCount(summary) ?: return
     accountUnreadStore.publishExactIfUnchanged(ref, previous, result.value)
 }
+
+val WhiteNoiseAppState.accountUnreadCounts: Map<String, ULong>
+    get() = accountUnreadStore.retainedCounts
+
+/** Retained count for reconciliation and diagnostics, even while freshness is unknown. */
+fun WhiteNoiseAppState.unreadCountForAccount(accountRef: String): ULong = accountUnreadStore.values[accountRef]?.unreadCount ?: 0uL
+
+/** Count safe to render as current. Unknown retained values intentionally present as no badge. */
+fun WhiteNoiseAppState.confirmedUnreadCountForAccount(accountRef: String): ULong = accountUnreadStore.values[accountRef].confirmedUnreadCount()
+
+/**
+ * Whether [accountRef]'s avatar should light the unread dot, from that
+ * account's own per-account aggregate (#805). Shared by the active avatar,
+ * the secondary top-bar avatars, and the account switcher so no avatar can
+ * light for another account's unread.
+ */
+fun WhiteNoiseAppState.accountShowsUnreadDot(accountRef: String?): Boolean {
+    val ref = accountRef?.takeIf { it.isNotBlank() } ?: return false
+    return accountUnreadStore.values[ref].showsUnreadDot()
+}
+
+internal fun WhiteNoiseAppState.updateAccountUnreadCount(
+    accountRef: String?,
+    unreadCount: ULong,
+) = accountUnreadStore.updateCount(accountRef, unreadCount)
+
+/**
+ * Publishes a chat-list row fold only while no complete native total exists for [accountRef]. The fold sees
+ * just the bounded loaded rows, so it must not replace a Ready total that also counts chats outside the
+ * window, such as an older unread chat or a manual reminder (#3729).
+ */
+internal fun WhiteNoiseAppState.updateAccountUnreadProjection(
+    accountRef: String?,
+    unreadCount: ULong,
+    hasManualUnread: Boolean,
+) {
+    val accountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
+    if (accountIdHex != null && runtimeMirrors.attention.latest?.hasReadyTotal(accountIdHex) == true) return
+    accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
+}
+
+/**
+ * Accounts with at least one manually-marked-unread chat. A boolean
+ * sidecar to [accountUnreadCounts]: the numeric map stays a real message
+ * count (it feeds literal count badges), while this set only lights dots.
+ */
+internal val WhiteNoiseAppState.accountManualUnreadRefs: Set<String>
+    get() = accountUnreadStore.manualUnreadRefs
+
+internal fun WhiteNoiseAppState.updateAccountManualUnread(
+    accountRef: String?,
+    hasManualUnread: Boolean,
+) = accountUnreadStore.updateManualUnread(accountRef, hasManualUnread)

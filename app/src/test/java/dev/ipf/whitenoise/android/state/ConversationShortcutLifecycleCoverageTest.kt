@@ -21,7 +21,7 @@ class ConversationShortcutLifecycleCoverageTest {
 
     @Test
     fun nonDestructiveSignOutClearsOnlyTheSignedOutAccountsShortcutSurfaces() {
-        val body = appStateSection("suspend fun signOutActiveAccount", "suspend fun exportActiveAccountNsec")
+        val body = appStateSection("suspend fun signOutActiveAccount", "suspend fun signOutAndWipeActiveAccount")
 
         assertTrue(
             "sign-out must clear dynamic and long-lived shortcuts for the signed-out account",
@@ -34,7 +34,7 @@ class ConversationShortcutLifecycleCoverageTest {
         val body =
             appStateSection(
                 "suspend fun signOutAndWipeActiveAccount",
-                "suspend fun exportEncryptedSecretKeyBackup",
+                "private fun persistHostSetting(",
             )
         val wipeIndex = body.indexOf("signOutAndWipe(wipedRef)")
         val completedCleanupIndex = body.indexOf("if (!outcome.localCleanup.completed)")
