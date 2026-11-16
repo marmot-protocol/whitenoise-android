@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -127,4 +128,18 @@ internal class NotificationCandidateReadCoordinator(
     private companion object {
         const val MAX_PENDING_READS = 4
     }
+}
+
+/**
+ * The pending-invite checks' own read coordinator, created once per app state. An invite check that times out is
+ * then abandoned in its own slot, so it can never make a message's read-state check in that conversation fail fast,
+ * while its native work stays bounded the same way.
+ */
+internal class PendingInviteReads {
+    private var coordinator: NotificationCandidateReadCoordinator? = null
+
+    /** The coordinator, created on first use with [scope]. */
+    @Synchronized
+    fun coordinator(scope: CoroutineScope): NotificationCandidateReadCoordinator =
+        coordinator ?: NotificationCandidateReadCoordinator(scope, Dispatchers.IO).also { coordinator = it }
 }

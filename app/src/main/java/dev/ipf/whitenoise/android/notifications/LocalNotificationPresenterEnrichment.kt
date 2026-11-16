@@ -44,7 +44,7 @@ internal suspend fun LocalNotificationPresenter.dispatchMessagingEnrichment(
  * picture leaves both alone, because the pre-post publish already published this shortcut and reported its use,
  * so a message reports the shortcut used once. A changed picture republishes it and reports its use once more.
  */
-internal suspend fun LocalNotificationPresenter.enrichMessagingNotification(
+private suspend fun LocalNotificationPresenter.enrichMessagingNotification(
     update: NotificationUpdateFfi,
     content: LocalNotificationContent,
     messaging: MessagingPostContext,
@@ -82,7 +82,7 @@ internal suspend fun LocalNotificationPresenter.enrichMessagingNotification(
  * Resolves the post's picture inputs, fetching only a slot that has a URL and no bitmap. The conversation slot
  * decodes in [conversationDomain], the sender slot in [senderDomain].
  */
-internal suspend fun LocalNotificationPresenter.resolveMessagingAvatars(
+private suspend fun LocalNotificationPresenter.resolveMessagingAvatars(
     messaging: MessagingPostContext,
     conversationDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     senderDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
@@ -138,13 +138,13 @@ internal suspend fun LocalNotificationPresenter.resolveAvatars(sources: Notifica
     }
 
 /** Runs one late picture loader within its bound; a failure yields no picture, never a crash. */
-internal suspend fun LocalNotificationPresenter.boundedIdentityLoad(load: suspend () -> Bitmap?): Bitmap? =
+private suspend fun LocalNotificationPresenter.boundedIdentityLoad(load: suspend () -> Bitmap?): Bitmap? =
     withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) {
         runCatchingCancellable { load() }.getOrNull()
     }
 
 /** Rewrites one live card with avatars that changed after its post, preserving dismissal ownership. */
-internal suspend fun LocalNotificationPresenter.postEnrichedMessagingNotification(
+private suspend fun LocalNotificationPresenter.postEnrichedMessagingNotification(
     update: NotificationUpdateFfi,
     content: LocalNotificationContent,
     messaging: MessagingPostContext,
@@ -218,7 +218,7 @@ internal suspend fun LocalNotificationPresenter.postEnrichedMessagingNotificatio
 }
 
 /** Whether this message's card is still on the platform, the cheap check before spending a pacer slot. */
-internal fun LocalNotificationPresenter.isLiveCardForMessage(
+private fun LocalNotificationPresenter.isLiveCardForMessage(
     content: LocalNotificationContent,
     update: NotificationUpdateFfi,
 ): Boolean {
@@ -229,7 +229,7 @@ internal fun LocalNotificationPresenter.isLiveCardForMessage(
 }
 
 /** Writes the late sender and identity picture to the still-live card, keeping its dismissal ownership. */
-internal fun LocalNotificationPresenter.postEnrichedAvatarCard(
+private fun LocalNotificationPresenter.postEnrichedAvatarCard(
     content: LocalNotificationContent,
     active: Notification,
     sender: Person,

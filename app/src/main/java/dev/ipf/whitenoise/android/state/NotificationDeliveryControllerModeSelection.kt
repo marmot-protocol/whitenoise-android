@@ -44,7 +44,7 @@ internal suspend fun NotificationDeliveryController.applyMode(
 
 /** Enables the shared rendering prerequisite while the delivery intent and account stay current. */
 @Suppress("MaxLineLength")
-internal suspend fun NotificationDeliveryController.ensureNotificationRenderingEnabled(owner: NotificationDeliveryModeOwner): Boolean {
+private suspend fun NotificationDeliveryController.ensureNotificationRenderingEnabled(owner: NotificationDeliveryModeOwner): Boolean {
     val alreadyEnabled = localNotificationSettings?.localNotificationsEnabled == true
     return when {
         alreadyEnabled -> ownsNotificationDeliveryMode(owner)
@@ -121,8 +121,9 @@ internal suspend fun NotificationDeliveryController.selectFcmDelivery(
     }
 }
 
+/** Drops [owner]'s queued native-push disable, reporting whether it was cleared while the owner stays current. */
 @Suppress("MaxLineLength")
-internal suspend fun NotificationDeliveryController.clearExplicitPendingDisable(owner: NotificationDeliveryModeOwner): Boolean {
+private suspend fun NotificationDeliveryController.clearExplicitPendingDisable(owner: NotificationDeliveryModeOwner): Boolean {
     val cleared =
         nativePushSyncMutex.withLock {
             withContext(pushWakeStorageDispatcher) { pushTokenStore.clearPendingDisable(owner.activeAccountRef) }
@@ -131,7 +132,7 @@ internal suspend fun NotificationDeliveryController.clearExplicitPendingDisable(
 }
 
 /** Registers at most three accounts together while the native sync lock fences other mutations. */
-internal suspend fun NotificationDeliveryController.enableNativeDeliveryForAccounts(
+private suspend fun NotificationDeliveryController.enableNativeDeliveryForAccounts(
     owner: NotificationDeliveryModeOwner,
     config: PushServerConfig,
     token: String,
@@ -154,7 +155,7 @@ internal suspend fun NotificationDeliveryController.enableNativeDeliveryForAccou
 
 /** Applies one account's authoritative notification preference and confirms its registration. */
 @Suppress("ReturnCount")
-internal suspend fun NotificationDeliveryController.configureNativeDeliveryForAccount(
+private suspend fun NotificationDeliveryController.configureNativeDeliveryForAccount(
     owner: NotificationDeliveryModeOwner,
     account: String,
     config: PushServerConfig,
@@ -238,7 +239,7 @@ internal suspend fun NotificationDeliveryController.establishPersistentMode(mode
 
 /** Disables native delivery for every captured signed-in account behind the acknowledged service. */
 @Suppress("ReturnCount")
-internal suspend fun NotificationDeliveryController.disableNativePushForPersistentDelivery(
+private suspend fun NotificationDeliveryController.disableNativePushForPersistentDelivery(
     modeOwner: NotificationDeliveryModeOwner,
     fallbackOwner: NativePushFallbackOwner,
     nativeDisableCommitted: AtomicBoolean,

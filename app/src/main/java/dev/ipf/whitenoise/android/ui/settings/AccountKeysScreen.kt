@@ -96,6 +96,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.WipeReport
 import dev.ipf.whitenoise.android.state.WipeStage
 import dev.ipf.whitenoise.android.state.WipeStageReport
+import dev.ipf.whitenoise.android.state.exportActiveAccountNsec
+import dev.ipf.whitenoise.android.state.exportEncryptedSecretKeyBackup
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.Explanation

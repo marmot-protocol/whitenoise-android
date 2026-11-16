@@ -46,11 +46,12 @@
         ]
       },
       {
-        "surface": "R.string.setup_other_sign_ins_found",
+        "surface": "Device-step finding",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "setupDeviceDiscoveryNote(discovered)",
+        "anchor": "SetupNotice(setupDeviceFinding(it))",
         "test_ids": [
-          "ONB-017"
+          "ONB-017",
+          "ONB-018"
         ]
       },
       {
@@ -143,11 +144,12 @@
         ]
       },
       {
-        "surface": "R.string.setup_chats_on_this_device_help",
+        "surface": "Device-step separate-chats explanation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_chats_on_this_device_help",
+        "anchor": "setupDeviceExplanation(evidence).forEach",
         "test_ids": [
-          "ONB-017"
+          "ONB-017",
+          "ONB-018"
         ]
       },
       {
@@ -194,14 +196,6 @@
         "surface": "R.string.setup_add_relay_before_saving",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_add_relay_before_saving",
-        "test_ids": [
-          "ONB-017"
-        ]
-      },
-      {
-        "surface": "R.string.setup_chats_on_this_device",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_chats_on_this_device",
         "test_ids": [
           "ONB-017"
         ]
@@ -443,9 +437,9 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.setup_device_possible",
+        "surface": "Imported-account setup: device-step finding",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "setupDeviceDiscoveryNote(discovered)",
+        "anchor": "SetupNotice(setupDeviceFinding(it))",
         "test_ids": [
           "ONB-018"
         ]
@@ -540,9 +534,9 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.setup_single_device_help",
+        "surface": "Imported-account setup: device-step separate-chats explanation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
-        "anchor": "R.string.setup_chats_on_this_device_help",
+        "anchor": "setupDeviceExplanation(evidence).forEach",
         "test_ids": [
           "ONB-018"
         ]

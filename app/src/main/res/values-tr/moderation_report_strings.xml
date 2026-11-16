@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">White Noise ekibine bildir</string>
+    <string name="report_team_send_toggle">White Noise’a gönder</string>
+    <string name="report_team_message_detail">Bildiriminiz ve gönderenin açık anahtarı White Noise ekibine gizli olarak gönderilir. İletinin kendisi paylaşılmaz ve gönderene bildirim yapılmaz.</string>
+    <string name="report_team_profile_detail">Bildiriminiz ve bu kişinin açık anahtarı White Noise ekibine gizli olarak gönderilir. Hiçbir ileti paylaşılmaz ve bu kişiye bildirim yapılmaz.</string>
+    <string name="report_team_explanation_hint">White Noise ekibinin bilmesi gerekenler (isteğe bağlı)</string>
+    <string name="report_team_sent">White Noise ekibine gönderildi.</string>
+    <string name="report_team_queued">Kaydedildi, White Noise ekibine gönderilmeyi bekliyor.</string>
+    <string name="report_team_pending">Kaydedildi; White Noise ekibine teslimat onay bekliyor.</string>
+    <string name="report_team_copy_failed">White Noise’a gönderilecek kopya gönderilemedi. Yeniden deneyin.</string>
+    <string name="report_team_failed">Bildirim White Noise ekibine gönderilemedi. Yeniden deneyin.</string>
+    <string name="report_team_rate_limited">Bu hesaptan çok fazla bildirim gönderildi. Daha sonra yeniden deneyin.</string>
+</resources>

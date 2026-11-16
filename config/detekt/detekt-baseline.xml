@@ -221,7 +221,6 @@
     <ID>LargeClass:LocalNotificationPresenter.kt:LocalNotificationPresenter</ID>
     <ID>LargeClass:MarkdownInlineTextTest.kt:MarkdownInlineTextTest</ID>
     <ID>LargeClass:MediaPipeline.kt:MediaPipeline</ID>
-    <ID>LargeClass:NotificationDeliveryController.kt:NotificationDeliveryController</ID>
     <ID>LargeClass:NotificationTargetTest.kt:NotificationTargetTest</ID>
     <ID>LongMethod:AccountKeysScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable internal fun AccountKeysScreen</ID>
     <ID>LongMethod:AgentStreamPreviewTest.kt:AgentStreamPreviewTest$@Test fun durableStreamDisplayPositions_reanchorsAfterOptimisticPromptOverride</ID>
@@ -746,7 +745,6 @@
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$fun</ID>
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$group != null &amp;&amp; !update.isDm -&gt; text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)</ID>
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$private fun inviteTitle: String</ID>
-    <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$text(context, R.string.notification_sender_invited_you_to_group, "%1\$s invited you to %2\$s", sender, group)</ID>
     <ID>MaxLineLength:LocalNotificationFormatterTest.kt:LocalNotificationFormatterTest$val redacted = LocalNotificationFormatter.redactedContent(content, appName = "White Noise", body = "New notification")</ID>
     <ID>MaxLineLength:LocalNotificationPolicy.kt:LocalNotificationPolicy$conversationNotifyMode: (accountRef: String, groupIdHex: String) -&gt; ChatNotifyMode = { _, _ -&gt; ChatNotifyMode.ALL }</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$.</ID>
@@ -1056,7 +1054,7 @@
     <ID>ReturnCount:NotificationConversationShortcuts.kt:NotificationConversationShortcuts$private fun pruneConversationShortcutsBeforePublish</ID>
     <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$suspend fun setBackgroundConnectionEnabled: Boolean</ID>
     <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$suspend fun setLocalNotificationsEnabled: Boolean</ID>
-    <ID>ReturnCount:NotificationDeliveryControllerNativePushSync.kt:internal suspend fun NotificationDeliveryController.syncPushForAccount: Boolean</ID>
+    <ID>ReturnCount:NotificationDeliveryControllerNativePushSync.kt:private suspend fun NotificationDeliveryController.syncPushForAccount: Boolean</ID>
     <ID>ReturnCount:NotificationMarkReadWorker.kt:NotificationMarkReadWorker$override suspend fun doWork: Result</ID>
     <ID>ReturnCount:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore$private fun recoveryState: NotificationReplyRecoveryState?</ID>
     <ID>ReturnCount:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore$private fun strictlyLaterBoundary: NotificationReplyRecoveryBoundary?</ID>

@@ -329,13 +329,23 @@ internal fun StickerPackDetailPage(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // A tap waits for MDK's link, so further taps meanwhile must not open a second share sheet.
+    var sharing by remember(pack.coordinate) { mutableStateOf(false) }
     StickerSheetTopBar(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
         IconButton(
+            enabled = !sharing,
             onClick = {
-                scope.launch {
-                    // MDK's link names the relays the pack was found on; the local link is the offline fallback.
-                    val shared = runCatchingCancellable { library.shareLink(pack) }.getOrNull()
-                    context.startActivity(stickerPackShareIntent(shared ?: stickerPackShareLink(pack)))
+                if (!sharing) {
+                    sharing = true
+                    scope.launch {
+                        try {
+                            // MDK's link names the relays the pack was found on; the local link is the fallback.
+                            val shared = runCatchingCancellable { library.shareLink(pack) }.getOrNull()
+                            context.startActivity(stickerPackShareIntent(shared ?: stickerPackShareLink(pack)))
+                        } finally {
+                            sharing = false
+                        }
+                    }
                 }
             },
             modifier = Modifier.testTag("sticker.pack.share"),

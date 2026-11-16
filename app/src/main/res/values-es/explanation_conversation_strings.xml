@@ -57,6 +57,6 @@
     <string name="explanation_message_action_share">Abre Compartir de Android con este mensaje. La app que elijas lo recibe y queda fuera de White Noise.</string>
     <string name="explanation_message_action_save">Guarda los adjuntos de este mensaje en tu dispositivo.</string>
     <string name="explanation_message_action_info">Muestra cuándo se envió y recibió este mensaje, quién lo envió, su ID y su estado.</string>
-    <string name="explanation_message_action_report">Abre un formulario de denuncia para los administradores del grupo. No se envía nada hasta que confirmes, y los administradores ven quién denunció.</string>
+    <string name="explanation_message_action_report">Abre un formulario de denuncia para los administradores de este grupo, el equipo de White Noise o ambos. No se envía nada hasta que confirmes.</string>
     <string name="explanation_message_action_delete">Te permite eliminar este mensaje solo en este dispositivo o para todos. Eliminar para todos no se puede deshacer. No se elimina nada hasta que elijas.</string>
 </resources>

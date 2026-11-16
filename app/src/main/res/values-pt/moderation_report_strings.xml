@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">Denunciar à equipe do White Noise</string>
+    <string name="report_team_send_toggle">Enviar ao White Noise</string>
+    <string name="report_team_message_detail">Sua denúncia e a chave pública do remetente são enviadas de forma privada à equipe do White Noise. A mensagem em si não é compartilhada, e o remetente não é notificado.</string>
+    <string name="report_team_profile_detail">Sua denúncia e a chave pública desta pessoa são enviadas de forma privada à equipe do White Noise. Nenhuma mensagem é compartilhada, e esta pessoa não é notificada.</string>
+    <string name="report_team_explanation_hint">O que a equipe do White Noise deve saber (opcional)</string>
+    <string name="report_team_sent">Enviado à equipe do White Noise.</string>
+    <string name="report_team_queued">Salvo e aguardando envio à equipe do White Noise.</string>
+    <string name="report_team_pending">Salvo; a entrega à equipe do White Noise aguarda confirmação.</string>
+    <string name="report_team_copy_failed">Não foi possível enviar a cópia ao White Noise. Tente novamente.</string>
+    <string name="report_team_failed">Não foi possível enviar a denúncia à equipe do White Noise. Tente novamente.</string>
+    <string name="report_team_rate_limited">Muitas denúncias desta conta. Tente novamente mais tarde.</string>
+</resources>

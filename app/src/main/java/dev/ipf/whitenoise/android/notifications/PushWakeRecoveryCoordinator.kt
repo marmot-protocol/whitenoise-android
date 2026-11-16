@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.os.Build
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.state.acceptPushWakeRecovery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

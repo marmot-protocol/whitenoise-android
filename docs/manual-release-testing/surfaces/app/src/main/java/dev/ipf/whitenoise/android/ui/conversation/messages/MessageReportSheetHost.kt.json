@@ -1,0 +1,77 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MessageReportSheetHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "fun MessageReportSheetHost(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:report_message_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "R.string.report_message_sent",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_queued",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "R.string.report_message_queued",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_not_allowed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "R.string.report_message_not_allowed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_team_copy_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "R.string.report_team_copy_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_team_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "R.string.report_team_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "R.string.report_message_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Who a message report reaches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageReportSheetHost.kt",
+        "anchor": "internal fun messageReportAudience(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

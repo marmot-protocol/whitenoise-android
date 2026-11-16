@@ -9,6 +9,8 @@ import dev.ipf.whitenoise.android.state.AccountCatchUpResult
 import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import dev.ipf.whitenoise.android.state.NotificationBootstrapTestFixture
 import dev.ipf.whitenoise.android.state.SecureStoreKeyProvider
+import dev.ipf.whitenoise.android.state.launchCatchUpAccounts
+import dev.ipf.whitenoise.android.state.runPushWakeRecoveryAttempt
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
