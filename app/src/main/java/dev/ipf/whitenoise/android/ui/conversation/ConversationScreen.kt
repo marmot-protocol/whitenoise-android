@@ -134,6 +134,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
+import dev.ipf.whitenoise.android.state.consumeInboundShareStreamsCapped
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
