@@ -185,13 +185,17 @@ internal suspend fun WhiteNoiseAppState.sweepRemovedMessageDisplayThumbnails() {
     }
 }
 
-/** Deletes for everyone under the commit lock, then sweeps the message's disk derivatives without holding it. */
+/**
+ * Runs [deleteNative] and fences [target]'s derivatives under the commit lock, then sweeps them from disk without
+ * holding it. The caller keeps the native call in view of its authorization guard.
+ */
 internal suspend fun ConversationController.deleteMessageForEveryone(
     account: String,
     target: String,
+    deleteNative: suspend () -> Unit,
 ) {
     appState.withGroupCommitLock(account, group.groupIdHex) {
-        appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+        deleteNative()
         appState.fenceMessageDisplayThumbnails(account, group.groupIdHex, target)
     }
     appState.mutationsScope.launch { appState.sweepRemovedMessageDisplayThumbnails() }

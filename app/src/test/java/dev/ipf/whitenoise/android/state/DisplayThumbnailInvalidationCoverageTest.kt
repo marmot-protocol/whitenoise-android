@@ -43,8 +43,8 @@ class DisplayThumbnailInvalidationCoverageTest {
         val localDelete = retention.substringAfter("fun ConversationController.deleteMessageForEveryone(")
         val commitLocked = localDelete.substringAfter("withGroupCommitLock(").substringBefore("\n    }\n")
         assertTrue(
-            "Local delete must fence derivatives inside the commit lock",
-            "fenceMessageDisplayThumbnails(" in commitLocked,
+            "Local delete must run the native delete and fence derivatives inside the commit lock",
+            "deleteNative()" in commitLocked && "fenceMessageDisplayThumbnails(" in commitLocked,
         )
         assertTrue(
             "Local delete must sweep derivatives after releasing the commit lock",
