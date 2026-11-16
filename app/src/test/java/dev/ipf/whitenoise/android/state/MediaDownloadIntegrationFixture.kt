@@ -32,9 +32,13 @@ import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.withContext
@@ -56,6 +60,9 @@ internal class MediaDownloadIntegrationFixture(
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
     private val diskRoot = java.io.File(root, "encrypted")
     val disk = DiskByteCache(diskRoot, maxBytes = 4L * 1024 * 1024, keyProvider = keyProvider)
+
+    /** Bumped whenever a native job is admitted, so a fixture feed opened before admission can wait for it. */
+    private val jobAdmissions = MutableStateFlow(0L)
     private val jobs = ConcurrentHashMap<String, Call>()
     val calls = CopyOnWriteArrayList<Call>()
     val entered = Channel<Call>(Channel.UNLIMITED)
@@ -307,6 +314,7 @@ internal class MediaDownloadIntegrationFixture(
                 .toInt() - 17
         val call = Call(args[0] as String, args[1] as String, reference(index))
         jobs[key] = call
+        jobAdmissions.update { it + 1L }
         calls += call
         val activeNow = active.incrementAndGet()
         peak.updateAndGet { maxOf(it, activeNow) }
@@ -332,6 +340,7 @@ internal class MediaDownloadIntegrationFixture(
             )
         jobs[key(request.accountRef, request.groupIdHex, target)] =
             Call(request.accountRef, request.groupIdHex, reference(index)).also { it.succeed(bytes) }
+        jobAdmissions.update { it + 1L }
     }
 
     /** Returns local-only transfer metadata, never creating a job from a read. */
@@ -358,11 +367,15 @@ internal class MediaDownloadIntegrationFixture(
         return nativeStub(FixtureTransferFeed::class.java).also {
             var initial = true
             var pauseDelivered = false
+            var readyDelivered = initialSnapshot.items.single().state == AttachmentTransferStateFfi.READY
             it.nextSnapshot = {
                 if (initial) {
                     initial = false
                     initialSnapshot
                 } else {
+                    if (readyDelivered) awaitCancellation()
+                    // Real native observers remain open when subscribed before acquisition is admitted.
+                    jobAdmissions.first { jobs[key] != null }
                     val call = checkNotNull(jobs[key])
                     call.observed.complete(Unit)
                     val deliverPause =
@@ -372,7 +385,9 @@ internal class MediaDownloadIntegrationFixture(
                                 call.pausedSignal.onJoin { true }
                             }
                     if (deliverPause) pauseDelivered = true else call.result.await()
-                    AttachmentTransferSnapshotFfi(listOf(status(key)))
+                    AttachmentTransferSnapshotFfi(listOf(status(key))).also { snapshot ->
+                        readyDelivered = snapshot.items.single().state == AttachmentTransferStateFfi.READY
+                    }
                 }
             }
         }
