@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.HeaderShortcut
 import dev.ipf.whitenoise.android.state.HeaderShortcutPreferences
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.headerShortcutPreferences
 
 /** Settings → Chats → Chat header: which optional buttons sit in every chat header on this device. */
 @Composable

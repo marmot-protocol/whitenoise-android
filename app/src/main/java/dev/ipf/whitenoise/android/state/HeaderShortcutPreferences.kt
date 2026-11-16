@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.util.WeakHashMap
 
 /** Optional conversation header shortcuts; each one reuses the chat details action of the same name. */
 internal enum class HeaderShortcut { Search, MuteUnmute, ReadAloud }
@@ -43,3 +44,12 @@ internal class HeaderShortcutPreferences(
         private const val KEY = "conversation_header_shortcuts"
     }
 }
+
+private val headerShortcutHolders = WeakHashMap<WhiteNoiseAppState, HeaderShortcutPreferences>()
+
+/** One shared header shortcut choice per app state, so the chat header and its settings list stay in step. */
+internal val WhiteNoiseAppState.headerShortcutPreferences: HeaderShortcutPreferences
+    get() =
+        synchronized(headerShortcutHolders) {
+            headerShortcutHolders.getOrPut(this) { HeaderShortcutPreferences(preferences) }
+        }

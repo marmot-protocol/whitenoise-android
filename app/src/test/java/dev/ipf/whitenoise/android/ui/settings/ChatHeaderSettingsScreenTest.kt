@@ -71,7 +71,11 @@ class ChatHeaderSettingsScreenTest {
     @Test fun fullHeaderDisablesOnlyTheUncheckedRow() {
         val toggled = mutableListOf<HeaderShortcut>()
         rule.setContent { WhiteNoiseTheme { ChatHeaderSettingsContent(FULL, { toggled += it }, {}) } }
-        rule.onNodeWithTag("chatHeader.read_aloud").performScrollTo().assertIsNotEnabled().performClick()
+        rule
+            .onNodeWithTag("chatHeader.read_aloud")
+            .performScrollTo()
+            .assertIsNotEnabled()
+            .performClick()
         rule.onNodeWithTag("chatHeader.mute").assertIsEnabled().performClick()
         assertEquals(listOf(HeaderShortcut.MuteUnmute), toggled)
     }
