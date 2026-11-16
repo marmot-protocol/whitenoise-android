@@ -25,6 +25,8 @@ import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import kotlinx.coroutines.CompletableDeferred
@@ -84,6 +86,11 @@ internal class MediaDownloadIntegrationFixture(
     val active = AtomicInteger()
     val peak = AtomicInteger()
     var onDownload: (Call) -> Unit = {}
+
+    /** Answers native timeline page reads, which row tag lookups step through; unexpected unless a test sets it. */
+    @Volatile var onTimelineMessages: (TimelineMessageQueryFfi) -> TimelinePageFfi = {
+        error("Unexpected native method: timelineMessages")
+    }
     var explicitDemandFailure: Throwable? = null
     val state =
         WhiteNoiseAppState(
@@ -248,6 +255,7 @@ internal class MediaDownloadIntegrationFixture(
                     onPermissionApplied()
                     true
                 }
+                "timelineMessages" -> onTimelineMessages(args!![1] as TimelineMessageQueryFfi)
                 "downloadMedia" -> error("Legacy network fallback is forbidden")
                 "toString" -> "SyntheticMediaBoundary"
                 "hashCode" -> System.identityHashCode(proxy)
