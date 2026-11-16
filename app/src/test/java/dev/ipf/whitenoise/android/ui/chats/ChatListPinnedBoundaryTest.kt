@@ -302,7 +302,10 @@ class ChatListPinnedBoundaryTest {
         val y = line.top.toInt()
         val xs = (line.left.toInt() + 1 until line.right.toInt() - 1)
         val drawn = xs.count { bitmap.getPixel(it, y) == lineColor }
-        assertTrue("boundary painted through the crossing row on $drawn of ${xs.count()} pixels", drawn < xs.count() / 2)
+        assertTrue(
+            "boundary painted through the crossing row on $drawn of ${xs.count()} pixels",
+            drawn < xs.count() / 2,
+        )
     }
 
     private fun assertBoundaryBetween(

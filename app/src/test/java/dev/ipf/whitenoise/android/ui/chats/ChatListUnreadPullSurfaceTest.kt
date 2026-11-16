@@ -75,52 +75,53 @@ class ChatListUnreadPullSurfaceTest {
         }
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         repeat(2) { direction ->
-            val before =
-                rule
-                    .onNodeWithTag("row.0")
-                    .fetchSemanticsNode()
-                    .boundsInRoot.top
+            val before = top("row.0")
             val boundaryAtRest = boundaryBelowFirstRow()
             rule.onNodeWithTag("chats.unread_surface").performTouchInput {
                 down(Offset(width / 2f, height * 0.3f))
                 moveBy(Offset(0f, 40f))
             }
-            val moved =
-                rule
-                    .onNodeWithTag("row.0")
-                    .fetchSemanticsNode()
-                    .boundsInRoot.top
+            val moved = top("row.0")
             assertTrue(moved > before)
             assertTrue(moved - before < 40f)
             assertEquals(direction, toggles)
             val boundaryFrom = boundaryBelowFirstRow()
             assertEquals("the pull must not double-translate the boundary", boundaryAtRest, boundaryFrom, 0.5f)
-            rule.mainClock.autoAdvance = false
-            rule.onNodeWithTag("chats.unread_surface").performTouchInput {
-                moveBy(Offset(0f, height * 0.4f))
-                up()
-            }
-            val samples = mutableListOf(boundaryFrom)
-            repeat(BOUNDARY_FRAMES) {
-                rule.mainClock.advanceTimeByFrame()
-                rule.runOnIdle { }
-                samples += boundaryBelowFirstRow()
-            }
-            rule.mainClock.autoAdvance = true
-            rule.waitForIdle()
+            val samples = releasePullAndSampleBoundary(boundaryFrom)
             assertEquals(direction + 1, toggles)
             assertEquals(direction + 1, haptics)
             assertEquals(direction == 0, unread.value)
-            val boundaryTo = boundaryBelowFirstRow()
-            assertBoundaryTravelled(samples + boundaryTo)
-            if (unread.value) {
-                assertBoundaryBetween("row.2", "row.4")
-                assertTrue(top("row.0") >= rule.onNodeWithTag("chats.unread_filter").fetchSemanticsNode().boundsInRoot.bottom)
-            } else {
-                assertBoundaryBetween("row.3", "row.4")
-                rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
-                assertEquals(top("chats.unread_surface"), top("row.0"), 0.5f)
-            }
+            assertBoundaryTravelled(samples)
+            assertSettledPinnedSlot(unread.value)
+        }
+    }
+
+    /** Completes the pull past the threshold and samples the boundary every frame until the rows settle. */
+    private fun releasePullAndSampleBoundary(boundaryFrom: Float): List<Float> {
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("chats.unread_surface").performTouchInput {
+            moveBy(Offset(0f, height * 0.4f))
+            up()
+        }
+        val samples = mutableListOf(boundaryFrom)
+        repeat(BOUNDARY_FRAMES) {
+            rule.mainClock.advanceTimeByFrame()
+            rule.runOnIdle { }
+            samples += boundaryBelowFirstRow()
+        }
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        return samples + boundaryBelowFirstRow()
+    }
+
+    private fun assertSettledPinnedSlot(unreadOnly: Boolean) {
+        if (unreadOnly) {
+            assertBoundaryBetween("row.2", "row.4")
+            assertTrue(top("row.0") >= bounds("chats.unread_filter").bottom)
+        } else {
+            assertBoundaryBetween("row.3", "row.4")
+            rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+            assertEquals(top("chats.unread_surface"), top("row.0"), 0.5f)
         }
     }
 
@@ -170,11 +171,13 @@ class ChatListUnreadPullSurfaceTest {
         }
     }
 
-    private fun top(tag: String): Float =
+    private fun bounds(tag: String) =
         rule
             .onNodeWithTag(tag, useUnmergedTree = true)
             .fetchSemanticsNode()
-            .boundsInRoot.top
+            .boundsInRoot
+
+    private fun top(tag: String): Float = bounds(tag).top
 
     private fun boundaryBelowFirstRow(): Float = top(CHAT_LIST_PINNED_BOUNDARY_TAG) - top("row.0")
 
@@ -182,8 +185,8 @@ class ChatListUnreadPullSurfaceTest {
         above: String,
         below: String,
     ) {
-        val line = rule.onNodeWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue(line.top >= rule.onNodeWithTag(above).fetchSemanticsNode().boundsInRoot.bottom - 0.5f)
+        val line = bounds(CHAT_LIST_PINNED_BOUNDARY_TAG)
+        assertTrue(line.top >= bounds(above).bottom - 0.5f)
         assertTrue(line.bottom <= top(below) + 0.5f)
     }
 
@@ -196,7 +199,10 @@ class ChatListUnreadPullSurfaceTest {
         samples.zipWithNext().forEachIndexed { frame, (previous, next) ->
             assertTrue("boundary reversed at frame $frame", (next - previous) * direction >= -0.5f)
             assertTrue("boundary overshot at frame $frame", (to - next) * direction >= -0.5f)
-            assertTrue("boundary jumped at frame $frame: $previous -> $next", Math.abs(next - previous) < Math.abs(to - from) / 2f)
+            assertTrue(
+                "boundary jumped at frame $frame: $previous -> $next",
+                Math.abs(next - previous) < Math.abs(to - from) / 2f,
+            )
         }
     }
 
