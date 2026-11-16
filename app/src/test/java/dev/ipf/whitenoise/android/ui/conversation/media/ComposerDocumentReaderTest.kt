@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.net.Uri
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.sandbox.PdfPagePolicy
 import kotlinx.coroutines.CompletableDeferred
@@ -93,6 +95,24 @@ class ComposerDocumentReaderTest {
             withComposerPdfFile(temporary.root, byteArrayOf(2)) { owned = it }
             assertFalse(checkNotNull(owned).exists())
         }
+
+    /** A kill skips the reader's cleanup; the next process removes that copy, and sign-out removes this one's. */
+    @Test fun previewCopiesFromEarlierProcessesAreSweptAndSignOutWipesTheRest() {
+        val cache = temporary.newFolder("cache")
+        val earlier = File(File(cache, MediaCacheDirs.COMPOSER_DOCUMENT_READER), "process-earlier").apply { mkdirs() }
+        val orphan = File(earlier, "preview-orphan.pdf").apply { writeText("orphan") }
+        val own = File(composerPreviewDirectory(cache).apply { mkdirs() }, "preview-open.pdf").apply { writeText("open") }
+
+        sweepOrphanedComposerPreviews(cache)
+
+        assertFalse(orphan.exists())
+        assertFalse(earlier.exists())
+        assertTrue("an open reader keeps its copy", own.exists())
+
+        wipeSessionAttachmentPlaintext(cache) { name, failure -> throw AssertionError(name, failure) }
+
+        assertFalse(File(cache, MediaCacheDirs.COMPOSER_DOCUMENT_READER).exists())
+    }
 
     @Test fun oversizedPdfIsRejectedBeforeCreatingAFile() =
         runBlocking {

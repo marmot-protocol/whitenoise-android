@@ -15,6 +15,9 @@ object MediaCacheDirs {
     const val NATIVE_ATTACHMENT_LEASES = "native_attachment_leases"
     const val COMPOSER_PASTE = "composer_paste"
 
+    /** Temporary copies of staged PDFs open in the composer preview reader. */
+    const val COMPOSER_DOCUMENT_READER = "composer_document_reader"
+
     /** Private snapshots of large picks that the native runtime uploads from a path. */
     const val UPLOAD_SOURCES = "upload_sources"
 }
@@ -30,6 +33,7 @@ internal fun wipeSessionAttachmentPlaintext(
         MediaCacheDirs.COMPOSER_PASTE,
         MediaCacheDirs.NATIVE_ATTACHMENT_LEASES,
         MediaCacheDirs.UPLOAD_SOURCES,
+        MediaCacheDirs.COMPOSER_DOCUMENT_READER,
     ).forEach { name ->
         runCatching {
             check(java.io.File(cacheRoot, name).deleteRecursively()) {
