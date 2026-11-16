@@ -8,7 +8,7 @@ import kotlinx.coroutines.async
 /** Owns one shared native-or-legacy acquisition decision per attachment cache key. */
 internal class InFlightAttachmentAcquisitions(
     private val scope: CoroutineScope,
-    private val promote: (String) -> Unit,
+    private val promote: (String, Boolean) -> Unit,
 ) {
     private val lock = Any()
     private val entries = mutableMapOf<String, Deferred<AttachmentAcquisitionOutcome>>()
@@ -16,15 +16,22 @@ internal class InFlightAttachmentAcquisitions(
     /** Identifies a joined automatic owner so a deliberate tap can upgrade its native demand. */
     fun isActive(cacheKey: String): Boolean = synchronized(lock) { entries[cacheKey]?.isActive == true }
 
-    /** Joins active work, promoting interactive demand without choosing a second network path. */
+    /**
+     * Joins active work without choosing a second network path. Interactive demand promotes the queued owner, and a
+     * [foreground] bubble's automatic demand only brings it to the front of the automatic queue.
+     */
     fun acquire(
         cacheKey: String,
         priority: AttachmentDownloadPriority,
+        foreground: Boolean = false,
         block: suspend CoroutineScope.() -> AttachmentAcquisitionOutcome,
     ): Deferred<AttachmentAcquisitionOutcome> =
         synchronized(lock) {
             entries[cacheKey]?.takeIf { it.isActive }?.let { active ->
-                if (priority == AttachmentDownloadPriority.Interactive) promote(cacheKey)
+                when {
+                    priority == AttachmentDownloadPriority.Interactive -> promote(cacheKey, true)
+                    foreground -> promote(cacheKey, false)
+                }
                 return@synchronized active
             }
             scope.async(block = block).also { deferred ->

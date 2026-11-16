@@ -50,19 +50,19 @@ class MediaDownloadHostRegressionTest {
             completed.succeed(expected)
             assertArrayEquals(expected, first.await())
 
-            val backlog = (1..3).map { index -> async { download(index) } }
-            val held = List(3) { fixture.entered.receive() }
-            assertEquals(3, fixture.active.get())
+            val backlog = (1..4).map { index -> async { download(index) } }
+            val held = List(4) { fixture.entered.receive() }
+            assertEquals(4, fixture.active.get())
             try {
                 val retained = async { download(0, AttachmentDownloadPriority.Interactive) }
-                // Timeout is only a deadlock guard. All three permits remain held until after this read.
+                // Timeout is only a deadlock guard. All four permits remain held until after this read.
                 assertArrayEquals(
                     expected,
                     withContext(Dispatchers.Default) { withTimeout(5_000L) { retained.await() } },
                 )
-                assertEquals(3, fixture.active.get())
+                assertEquals(4, fixture.active.get())
                 assertEquals(0, fixture.explicitDemands.get())
-                assertEquals(4, fixture.calls.size)
+                assertEquals(5, fixture.calls.size)
             } finally {
                 held.forEach { it.succeed(bytes(it.reference.fileName)) }
                 backlog.awaitAll()
@@ -89,14 +89,14 @@ class MediaDownloadHostRegressionTest {
         }
     }
 
-    /** Sixteen distinct cold references share three slots; a late explicit request gets the next slot. */
+    /** Sixteen distinct cold references share four slots; a late explicit request gets the next slot. */
     @Test
     fun distinctImageBacklogIsBoundedAndAnExplicitTapJoinsAndPromotesItsOwner() =
         runTest(dispatcher) {
             val owners = List(16) { index -> async { download(index) } }
-            val first = List(3) { fixture.entered.receive() }
+            val first = List(4) { fixture.entered.receive() }
             fixture.awaitOwners(16)
-            assertEquals(3, fixture.active.get())
+            assertEquals(4, fixture.active.get())
             assertTrue(fixture.entered.tryReceive().isFailure)
             val tappedIndex = (0 until 16).last { index -> first.none { it.reference == reference(index) } }
             val tapped =
@@ -105,9 +105,9 @@ class MediaDownloadHostRegressionTest {
             first.first().succeed(bytes(first.first().reference.fileName))
             val next = fixture.entered.receive()
             assertEquals(reference(tappedIndex), next.reference)
-            assertEquals(3, fixture.active.get())
+            assertEquals(4, fixture.active.get())
             (first.drop(1) + next).forEach { it.succeed(bytes(it.reference.fileName)) }
-            repeat(12) {
+            repeat(11) {
                 val call = fixture.entered.receive()
                 call.succeed(bytes(call.reference.fileName))
             }
@@ -115,7 +115,7 @@ class MediaDownloadHostRegressionTest {
                 assertArrayEquals(bytes(reference(index).fileName), result)
             }
             assertArrayEquals(bytes(reference(tappedIndex).fileName), tapped.await())
-            assertEquals(3, fixture.peak.get())
+            assertEquals(4, fixture.peak.get())
             assertEquals(0, fixture.active.get())
             assertEquals(16, fixture.calls.size)
             assertEquals(
@@ -143,7 +143,7 @@ class MediaDownloadHostRegressionTest {
             assertEquals(1, fixture.calls.count { it.reference == reference(0) })
             stalled.succeed(bytes(reference(0).fileName))
             assertArrayEquals(bytes(reference(0).fileName), delayed.await())
-            assertTrue(fixture.peak.get() <= 3)
+            assertTrue(fixture.peak.get() <= 4)
         }
 
     /** Composition disappearance cancels a waiter, not the shared producer used by a returning consumer. */

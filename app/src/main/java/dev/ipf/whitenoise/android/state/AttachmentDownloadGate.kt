@@ -91,13 +91,19 @@ internal class AttachmentDownloadGate(
             block = block,
         )
 
+    /**
+     * Runs [block] while holding one permit for [key]. A [foreground] automatic request, one a visible bubble made,
+     * queues ahead of every other automatic request, the newest first, as MDK orders its own automatic queue.
+     * Background work queues behind them in arrival order.
+     */
     suspend fun <T> withPermit(
         key: String,
         accountRef: String?,
         priority: AttachmentDownloadPriority,
+        foreground: Boolean = false,
         block: suspend () -> T,
     ): T {
-        val waiter = acquire(key, accountRef, priority)
+        val waiter = acquire(key, accountRef, priority, foreground)
         try {
             return block()
         } finally {
@@ -106,25 +112,34 @@ internal class AttachmentDownloadGate(
     }
 
     /**
-     * Moves a queued automatic identity to the interactive lane without creating another waiter.
-     * A promotion that wins the race with gate registration is retained until that key registers.
+     * Moves a queued automatic identity to the interactive lane without creating another waiter. An [explicit]
+     * promotion that wins the race with gate registration is retained until that key registers.
+     *
+     * A non-[explicit] call, for a visible bubble that asks again for work it joined, only moves the queued request to
+     * the front of the automatic queue, never ahead of explicit requests, and reports whether anything was queued.
      */
-    fun promote(key: String): Boolean =
+    fun promote(
+        key: String,
+        explicit: Boolean = true,
+    ): Boolean =
         synchronized(lock) {
             val waiters =
                 keyedWaiters.forKey(key)
                     ?: run {
-                        pendingPromotions.add(key)
-                        return@synchronized true
+                        if (explicit) pendingPromotions.add(key)
+                        return@synchronized explicit
                     }
-            waiters
-                .filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
-                .forEach { waiter ->
-                    automatic.remove(waiter)
+            val queued = waiters.filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
+            queued.forEach { waiter ->
+                automatic.remove(waiter)
+                if (explicit) {
                     waiter.priority = AttachmentDownloadPriority.Interactive
                     interactive.addLast(waiter)
+                } else {
+                    automatic.addFirst(waiter)
                 }
-            true
+            }
+            explicit || queued.isNotEmpty()
         }
 
     /** True only while this attachment currently owns one of the bounded native-work permits. */
@@ -184,6 +199,7 @@ internal class AttachmentDownloadGate(
         key: String,
         accountRef: String?,
         priority: AttachmentDownloadPriority,
+        foreground: Boolean,
     ): Waiter {
         val waiter =
             synchronized(lock) {
@@ -199,7 +215,11 @@ internal class AttachmentDownloadGate(
                     }
                 val registered = Waiter(key, accountRef, effectivePriority)
                 keyedWaiters.register(registered)
-                lane(effectivePriority).addLast(registered)
+                if (foreground && effectivePriority == AttachmentDownloadPriority.Automatic) {
+                    automatic.addFirst(registered)
+                } else {
+                    lane(effectivePriority).addLast(registered)
+                }
                 admitAvailableLocked()
                 registered
             }
@@ -277,7 +297,8 @@ internal class AttachmentDownloadGate(
         }
 
     internal companion object {
-        const val DEFAULT_PARALLELISM = 3
+        /** MarmotKit's own attachment transfer limit; under host-managed mode this gate decides what reaches it. */
+        const val DEFAULT_PARALLELISM = 4
         const val MAX_INTERACTIVE_BURST = 3
         const val DEFAULT_MAX_ATTEMPTS = 3
         const val DEFAULT_INITIAL_RETRY_BACKOFF_MILLIS = 150L
