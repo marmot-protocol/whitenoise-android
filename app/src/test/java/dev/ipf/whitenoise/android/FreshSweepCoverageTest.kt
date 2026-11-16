@@ -165,9 +165,14 @@ class FreshSweepCoverageTest {
 
     @Test
     fun twoStepLeavesAndInviteFailuresStayInsideTheirSafetyBoundaries() {
+        val departure = source("state/ChatsControllerDeparture.kt")
         val source = source("state/ChatsController.kt") + "\n" + conversationControllerSource()
         val chatListLeave =
-            source.section("suspend fun leaveGroup(\n        groupIdHex", "suspend fun deleteGroupLocal")
+            source.section("suspend fun leaveGroup(\n        groupIdHex", "suspend fun deleteGroupLocal") +
+                departure.section(
+                    "suspend fun ChatsController.demoteAndLeaveChat",
+                    "fun ChatsController.chatListDepartureAllowed",
+                )
         val conversationLeave = source.section("suspend fun leaveGroup(displayName", "fun dismissConversationNotifications")
         val accept = source.section("suspend fun acceptInvite", "suspend fun declineInvite")
         val invite = source.section("suspend fun inviteMembers", "suspend fun removeMember")

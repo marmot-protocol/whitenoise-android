@@ -599,7 +599,11 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun mediaKindResolveFanoutSwallowsUnexpectedProjectionFailures() {
-        val body = controllerFunctionBody("schedulePendingMediaKindResolves", "ChatsController.kt")
+        val body =
+            controllerFunctionBody(
+                "ChatsController.schedulePendingMediaKindResolves",
+                "ChatsControllerRowEnrichment.kt",
+            )
 
         assertTrue(
             "media-kind resolve fanout must rethrow cancellation but swallow unexpected projection failures",
