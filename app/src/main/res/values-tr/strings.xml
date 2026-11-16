@@ -1670,7 +1670,7 @@
         <item quantity="one">Yüklendi, %1$d giriş atlandı.</item>
         <item quantity="other">Yüklendi, %1$d giriş atlandı.</item>
     </plurals>
-    <string name="custom_emoji_detail">Buradaki görseller bu cihazda saklanan :shortcode: emojilerine dönüşür. Birini kullanan yeni bir mesaj (yanıt değil) görselini şifreli olarak o sohbete yükler. Tepkiler, yanıtlar ve düzenlemeler yalnızca kısa kodu gönderir.</string>
+    <string name="custom_emoji_detail">Buradaki görseller bu cihazda saklanan :shortcode: emojilerine dönüşür. Birini kullanan mesajlar, yanıtlar ve tepkiler görselini şifreli olarak o sohbete yükler. Düzenlemeler yalnızca kısa kodu gönderir. Yerleşik görseller kendi kısa kodlarında önceliklidir.</string>
     <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
     <string name="custom_emoji_name_title">Bu emojiye ad ver</string>
     <string name="custom_emoji_name_label">Kısa kod</string>
@@ -2666,4 +2666,16 @@
     <string name="settings_voice_language">Ses ve dil</string>
     <string name="photo_editor_rotate">Döndür</string>
     <string name="toast_wipe_outcome_unconfirmed">Silme işleminin sonucu doğrulanamadı. Devam etmeden önce hesaplarınızı kontrol edin.</string>
+
+    <string name="emoji_name_marmot_classic">Klasik dağ sıçanı</string>
+    <string name="emoji_name_marmot_wave">El sallayan dağ sıçanı</string>
+    <string name="emoji_name_marmot_yes">Başparmağını kaldıran dağ sıçanı</string>
+    <string name="emoji_name_marmot_laugh">Gülen dağ sıçanı</string>
+    <string name="emoji_name_marmot_love">Kalp tutan dağ sıçanı</string>
+    <string name="emoji_name_marmot_party">Parti yapan dağ sıçanı</string>
+    <string name="emoji_name_marmot_fire">Alevler içinde dağ sıçanı</string>
+    <string name="emoji_name_marmot_wow">Şaşırmış dağ sıçanı</string>
+    <string name="emoji_name_marmot_smirk">Sırıtan dağ sıçanı</string>
+    <string name="emoji_name_marmot_cry">Ağlayan dağ sıçanı</string>
+    <string name="emoji_name_marmot_angry">Kızgın dağ sıçanı</string>
 </resources>

@@ -1973,7 +1973,7 @@
         <item quantity="one">Installed with %1$d entry skipped.</item>
         <item quantity="other">Installed with %1$d entries skipped.</item>
     </plurals>
-    <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. A new message (not a reply) using one uploads its image, encrypted, to that chat. Reactions, replies and edits send only the shortcode.</string>
+    <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. Messages, replies and reactions using one upload its image, encrypted, to that chat. Edits send only the shortcode. Built-in images take precedence for their shortcodes.</string>
     <string name="custom_emoji_empty">No custom emoji yet.</string>
     <string name="custom_emoji_name_title">Name this emoji</string>
     <string name="custom_emoji_name_label">Shortcode</string>
@@ -2851,4 +2851,16 @@
     <string name="settings_search_alias_date_time_format">time format|date format|clock|12-hour|24-hour|AM/PM</string>
     <string name="photo_editor_rotate">Rotate</string>
     <string name="toast_wipe_outcome_unconfirmed">The wipe result could not be confirmed. Check your accounts before continuing.</string>
+
+    <string name="emoji_name_marmot_classic">Classic marmot</string>
+    <string name="emoji_name_marmot_wave">Waving marmot</string>
+    <string name="emoji_name_marmot_yes">Marmot thumbs up</string>
+    <string name="emoji_name_marmot_laugh">Laughing marmot</string>
+    <string name="emoji_name_marmot_love">Marmot with heart</string>
+    <string name="emoji_name_marmot_party">Party marmot</string>
+    <string name="emoji_name_marmot_fire">Marmot on fire</string>
+    <string name="emoji_name_marmot_wow">Surprised marmot</string>
+    <string name="emoji_name_marmot_smirk">Smirking marmot</string>
+    <string name="emoji_name_marmot_cry">Crying marmot</string>
+    <string name="emoji_name_marmot_angry">Angry marmot</string>
 </resources>

@@ -90,10 +90,7 @@ class PushWakeBookkeepingFailureTest {
                     }
 
                 assertFalse(drained)
-                fixture.appState.javaClass
-                    .getDeclaredMethod("schedulePendingPushWakeCatchUpDrain")
-                    .apply { isAccessible = true }
-                    .invoke(fixture.appState)
+                fixture.appState.pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()
                 assertEquals(phase, fixture.appState.phase)
                 val callsBeforeRejectedWake = nativeCatchUps.get()
                 val rejectedWake =
@@ -146,8 +143,9 @@ class PushWakeBookkeepingFailureTest {
 
     /** Invokes the production push-wake admission path without another lifecycle trigger. */
     private suspend fun launchRejectedPushWake(fixture: NotificationBootstrapTestFixture): AccountCatchUpResult {
+        val recovery = fixture.appState.pushWakeRecovery
         val launch =
-            fixture.appState.javaClass
+            recovery.javaClass
                 .getDeclaredMethod(
                     "launchAccountCatchUp",
                     java.lang.Long::class.java,
@@ -157,7 +155,7 @@ class PushWakeBookkeepingFailureTest {
 
         @Suppress("UNCHECKED_CAST")
         val work =
-            launch.invoke(fixture.appState, null, PerformanceTrigger.PUSH_WAKE, true) as
+            launch.invoke(recovery, null, PerformanceTrigger.PUSH_WAKE, true) as
                 kotlinx.coroutines.Deferred<dev.ipf.whitenoise.android.state.AccountCatchUpResult>
         return work.await()
     }

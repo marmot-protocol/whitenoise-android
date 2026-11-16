@@ -169,15 +169,15 @@ internal fun renderNotificationEmojiArtwork(images: List<Bitmap>): Bitmap {
     return output
 }
 
-/** Ordinary message previews retain their existing device-local then bundled artwork precedence. */
+/** Message previews use the same canonical built-in precedence as conversation rendering. */
 private suspend fun notificationEmojiBitmap(
     context: Context,
     code: String,
     readBudget: EmojiReadBudget,
 ): Bitmap? {
-    val local = localNotificationEmojiBitmap(context, code, readBudget)
-    if (local != null) return local
-    return notificationBuiltinEmojiBitmap(context, code)
+    val builtin = notificationBuiltinEmojiBitmap(context, code)
+    if (builtin != null) return builtin
+    return localNotificationEmojiBitmap(context, code, readBudget)
 }
 
 private suspend fun localNotificationEmojiBitmap(

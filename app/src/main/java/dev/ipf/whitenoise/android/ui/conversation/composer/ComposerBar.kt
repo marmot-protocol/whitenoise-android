@@ -456,6 +456,7 @@ internal fun ComposerBar(
     replyingToMedia: List<MediaAttachmentReferenceFfi> = emptyList(),
     replyingToDisplay: TimelineReplyDisplay? = null,
     replyingToEmoji: dev.ipf.whitenoise.android.ui.ReceivedEmoji = dev.ipf.whitenoise.android.ui.ReceivedEmoji.None,
+    conversationEmoji: dev.ipf.whitenoise.android.ui.ConversationEmojiPicker? = null,
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
@@ -556,11 +557,14 @@ internal fun ComposerBar(
         Box(modifier.fillMaxWidth().height(with(routeDensity) { lastMeasuredHeight.toDp() }))
         return
     }
+    val conversationEmojiForSend =
+        conversationEmoji.takeIf {
+            draftAccountRef == appState?.activeAccountRef && editingMessageId == null && !hasPendingAttachments
+        }
     val installedEmoji =
         rememberInstalledEmojiPicker(
             appState?.takeIf {
                 draftAccountRef == it.activeAccountRef &&
-                    replyingTo == null &&
                     editingMessageId == null &&
                     !hasPendingAttachments
             },
@@ -1525,7 +1529,7 @@ internal fun ComposerBar(
                     composerTextMatchesEditSession &&
                     composerExpansion.mode == ComposerExpansionMode.Automatic
                 ) {
-                    ComposerEmojiLibrary(installedEmoji) {
+                    ComposerEmojiLibrary(installedEmoji, conversationEmojiForSend) {
                         EmojiShortcodeSuggestions(
                             modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
                             field = textFieldValue,
@@ -2225,7 +2229,7 @@ internal fun ComposerBar(
                         .fillMaxWidth()
                         .onSizeChanged { customInputPaneHeightPx = it.height.toFloat() },
                 ) {
-                    ComposerEmojiLibrary(installedEmoji) {
+                    ComposerEmojiLibrary(installedEmoji, conversationEmojiForSend) {
                         ComposerEmojiPickerPane(
                             height = renderedEmojiPaneHeight,
                             alpha = 1f,

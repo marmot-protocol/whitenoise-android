@@ -130,7 +130,7 @@ class StalenessGuardCoverageTest {
                     ),
                 "NotificationDeliveryController.kt:clearPushRegistrationForOwnerLocked" to
                     listOf("ownsNativePushFallback(owner)", "clearPending(owner.accountRef)"),
-                "AppState.kt:acknowledgePendingPushWakeCatchUp" to
+                "PushWakeRecoveryController.kt:acknowledgePendingPushWakeCatchUp" to
                     listOf("isCatchUpKeyCurrent(key)", "recordPendingPushWakeCatchUp"),
                 "NotificationDeliveryController.kt:ensureNotificationRenderingEnabled" to
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = it"),

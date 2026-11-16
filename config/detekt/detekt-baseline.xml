@@ -1215,6 +1215,7 @@
     <ID>TooManyFunctions:MessageProjector.kt:MessageProjector</ID>
     <ID>TooManyFunctions:Nip55SignerProtocol.kt:Nip55</ID>
     <ID>TooManyFunctions:NotificationDeliveryController.kt:NotificationDeliveryController</ID>
+    <ID>TooManyFunctions:PushWakeRecoveryController.kt:PushWakeRecoveryController</ID>
     <ID>TooManyFunctions:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore</ID>
     <ID>TooManyFunctions:NotificationReplyWorker.kt:NotificationReplyWorker$Companion</ID>
     <ID>TooManyFunctions:NotificationStreamForegroundService.kt:dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService.kt</ID>

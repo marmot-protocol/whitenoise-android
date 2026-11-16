@@ -6,6 +6,9 @@ import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
 
 /** Reactions must wait for a blocked leave to be resolved, even with seeded membership. */
 internal fun ConversationController.reactionAccountIfAccepted(): String? {
@@ -30,6 +33,7 @@ internal fun ConversationController.reactionAccountIfAccepted(): String? {
 }
 
 /** Commits an add and retains its exact event id for an immediate queued removal. */
+@Suppress("LongMethod") // Resolution, upload and publication share one owner.
 private suspend fun ConversationController.commitReactionAdd(
     owner: ReactionMutationTarget,
     emoji: String,
@@ -37,18 +41,63 @@ private suspend fun ConversationController.commitReactionAdd(
     val account = owner.account
     val target = owner.messageId
     val key = target.lowercase() to emoji
-    val messageIdHex =
-        appState.withGroupCommitLock(account, group.groupIdHex) {
-            owner.requireAvailable()
-            val summary =
-                appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                    reactToMessage(account, group.groupIdHex, target, emoji)
-                }
-            summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
+    val ensureCurrent = {
+        owner.requireAvailable()
+        if (appState.activeAccountRef != account ||
+            appState.runtimeGeneration != conversationRuntimeGeneration ||
+            appState.mediaUploadSessionEpoch() != mediaUploadSessionEpoch
+        ) {
+            throw CancellationException("reaction artwork owner changed")
         }
-    // Presence records that the add committed even when older bindings return no event id.
-    // A rapid later removal can then wait for local history instead of mistaking it for a no-op.
-    unprojectedOwnReactionEventIds[key] = messageIdHex.orEmpty()
+    }
+    ensureCurrent()
+    val artwork =
+        if (dev.ipf.whitenoise.android.core.Nip30Emoji
+                .shortcodesIn(emoji)
+                .singleOrNull() == emoji
+        ) {
+            emojiArtworkForSend(account, emoji)
+        } else {
+            emptyList()
+        }
+    ensureCurrent()
+    val uploadKey = "reaction:$target:$emoji"
+    val uploadJob =
+        if (artwork.isEmpty()) null else appState.trackInFlightMediaUpload(account, group.groupIdHex, uploadKey)
+    try {
+        val controllerContext = currentCoroutineContext()
+        val publishLock: EmojiPublishLock = { publish ->
+            withContext(controllerContext) {
+                appState.withGroupCommitLock(account, group.groupIdHex) {
+                    ensureCurrent()
+                    appState.untrackInFlightMediaUpload(account, group.groupIdHex, uploadKey, uploadJob)
+                    appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) { publish() }
+                }
+            }
+        }
+        val summary =
+            if (artwork.isEmpty()) {
+                publishLock { appState.marmot().reactToMessage(account, group.groupIdHex, target, emoji) }
+            } else {
+                appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                    sendReactionWithCustomEmoji(
+                        account,
+                        group.groupIdHex,
+                        target,
+                        emoji,
+                        artwork,
+                        appState.emojiUploads,
+                        ensureCurrent = { withContext(controllerContext) { ensureCurrent() } },
+                        publishLock = publishLock,
+                    )
+                }
+            }
+        val messageIdHex = summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
+        // A committed add remains present while older bindings/projections have no exact event id yet.
+        unprojectedOwnReactionEventIds[key] = messageIdHex.orEmpty()
+    } finally {
+        appState.untrackInFlightMediaUpload(account, group.groupIdHex, uploadKey, uploadJob)
+    }
 }
 
 /** Commits a removal, using history when a just-added reaction did not return an event id. */
