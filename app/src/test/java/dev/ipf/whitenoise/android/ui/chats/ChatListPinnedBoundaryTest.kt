@@ -162,28 +162,35 @@ class ChatListPinnedBoundaryTest {
         assertEquals(1, boundaryCount())
         assertBoundaryBetween("A", "B")
 
-        composeRule.runOnUiThread { pinned = ids.size }
-        composeRule.waitForIdle()
-        assertEquals("an all-pinned list has no boundary", 0, boundaryCount())
+        assertBoundaryGoneOnEveryFrame(movingRow = "B") { pinned = ids.size }
 
         composeRule.runOnUiThread { pinned = 2 }
         composeRule.waitForIdle()
         assertEquals(1, boundaryCount())
         assertBoundaryBetween("B", "C")
 
-        val restingTop = rowBounds("C").top
+        assertBoundaryGoneOnEveryFrame(movingRow = "C") { pinned = 0 }
+    }
+
+    /** Removing the boundary must take it out on the first frame, so no exit fade can strand a line. */
+    private fun assertBoundaryGoneOnEveryFrame(
+        movingRow: String,
+        change: () -> Unit,
+    ) {
+        val restingTop = rowBounds(movingRow).top
         composeRule.mainClock.autoAdvance = false
-        composeRule.runOnUiThread { pinned = 0 }
+        composeRule.runOnUiThread(change)
+        composeRule.runOnIdle { }
         var rowsMoved = false
         repeat(FRAMES) { frame ->
             composeRule.mainClock.advanceTimeByFrame()
             composeRule.runOnIdle { }
-            rowsMoved = rowsMoved || rowBounds("C").top != restingTop
-            if (rowsMoved) {
-                assertEquals("boundary still drawn at frame $frame after the rows moved", 0, boundaryCount())
-            }
+            assertEquals("boundary still drawn at frame $frame", 0, boundaryCount())
+            rowsMoved = rowsMoved || rowBounds(movingRow).top != restingTop
         }
-        assertTrue("rows never moved after unpinning everything", rowsMoved)
+        assertTrue("$movingRow never moved into the removed boundary's space", rowsMoved)
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
         assertEquals(0, boundaryCount())
     }
 
@@ -205,6 +212,11 @@ class ChatListPinnedBoundaryTest {
         composeRule.waitForIdle()
         assertBoundaryBetween(start[startPinned - 1], start[startPinned])
         val from = boundary().top
+        val (settledLine, settledWidth) = linePixels(boundary(), lineColor())
+        assertTrue(
+            "settled boundary drew its line on only $settledLine of $settledWidth pixels",
+            settledLine > settledWidth / 2,
+        )
 
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnUiThread {
@@ -298,14 +310,22 @@ class ChatListPinnedBoundaryTest {
         line: Rect,
         lineColor: Int,
     ) {
+        val (drawn, width) = linePixels(line, lineColor)
+        assertTrue(
+            "boundary painted through the crossing row on $drawn of $width pixels",
+            drawn < width / 2,
+        )
+    }
+
+    /** Pixels on the line's top row that exactly match [lineColor], and the row's inset width. */
+    private fun linePixels(
+        line: Rect,
+        lineColor: Int,
+    ): Pair<Int, Int> {
         val bitmap = composeRule.onRoot().captureToImage().asAndroidBitmap()
         val y = line.top.toInt()
         val xs = (line.left.toInt() + 1 until line.right.toInt() - 1)
-        val drawn = xs.count { bitmap.getPixel(it, y) == lineColor }
-        assertTrue(
-            "boundary painted through the crossing row on $drawn of ${xs.count()} pixels",
-            drawn < xs.count() / 2,
-        )
+        return xs.count { bitmap.getPixel(it, y) == lineColor } to xs.count()
     }
 
     private fun assertBoundaryBetween(
