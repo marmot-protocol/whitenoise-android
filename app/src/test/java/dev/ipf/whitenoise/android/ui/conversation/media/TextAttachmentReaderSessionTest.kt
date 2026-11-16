@@ -6,6 +6,7 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -120,7 +121,12 @@ class TextAttachmentReaderSessionTest {
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.read_aloud)).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(context.getString(R.string.share)).assertDoesNotExist()
-        composeRule.runOnIdle { uris = emptyList() }
+        // The rule does not apply global writes made while the dialog window is open; production's
+        // GlobalSnapshotManager does, so the tests publish them explicitly.
+        composeRule.runOnIdle {
+            uris = emptyList()
+            Snapshot.sendApplyNotifications()
+        }
         composeRule.waitUntil(5_000) { selectedSession == null }
         composeRule.runOnIdle { uris = listOf(uri) }
         composeRule.onNodeWithText("prepared bytes").assertDoesNotExist()
@@ -153,7 +159,10 @@ class TextAttachmentReaderSessionTest {
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("prepared bytes", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.runOnIdle { sendClaim.tryClaim() }
+        composeRule.runOnIdle {
+            checkNotNull(sendClaim.tryClaim())
+            Snapshot.sendApplyNotifications()
+        }
         composeRule.waitUntil(5_000) { !attached }
         composeRule.onNodeWithText("prepared bytes").assertDoesNotExist()
     }
