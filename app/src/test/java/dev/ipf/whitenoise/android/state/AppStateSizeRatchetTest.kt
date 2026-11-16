@@ -52,7 +52,7 @@ class AppStateSizeRatchetTest {
 
     private companion object {
         // Microphone recovery keeps host-policy wiring at the lifecycle owner.
-        const val MAX_LINES = 9_464
+        const val MAX_LINES = 9_329
         const val CHATS_CONTROLLER_MAX_LINES = 2_152
 
         // Recovery adds host readiness, origin validity and lifecycle cleanup wiring at this owner.
