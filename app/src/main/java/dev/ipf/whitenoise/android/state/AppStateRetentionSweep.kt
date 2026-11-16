@@ -7,6 +7,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
+private const val RETENTION_LOG_GROUP_LENGTH = 8
+
 /**
  * Sweeps closed conversations across signed-in accounts (#745) on the coarse worker cadence.
  * Expired messages, decrypted L2 media, and stale tray cards are removed without reopening a
@@ -60,7 +62,7 @@ internal suspend fun WhiteNoiseAppState.runRetentionSweep(
         ) {
             appStateDebug {
                 val kind = outcome.failureKind?.let { " kind=$it" }.orEmpty()
-                "retention sweep ${outcome.status} group=${outcome.groupIdHex.take(8)}$kind"
+                "retention sweep ${outcome.status} group=${outcome.groupIdHex.take(RETENTION_LOG_GROUP_LENGTH)}$kind"
             }
         }
         // Case-insensitive like every other hex-id comparison here: a
