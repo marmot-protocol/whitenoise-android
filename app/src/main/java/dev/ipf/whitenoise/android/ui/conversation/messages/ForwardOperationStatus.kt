@@ -45,6 +45,9 @@ import dev.ipf.whitenoise.android.state.ForwardOperationPhase
 import dev.ipf.whitenoise.android.state.ForwardOperationSnapshot
 import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.forwardTargetMembersRevision
+import dev.ipf.whitenoise.android.state.forwardTargets
+import dev.ipf.whitenoise.android.state.forwardTargetsRevision
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.icons.Icons

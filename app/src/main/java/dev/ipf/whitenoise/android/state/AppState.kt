@@ -133,10 +133,7 @@ import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
-import dev.ipf.whitenoise.android.share.CappedShareStreamStaging
-import dev.ipf.whitenoise.android.share.SHARE_STREAM_MAX_ITEMS
 import dev.ipf.whitenoise.android.share.ShareInboundStager
-import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
@@ -144,7 +141,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolutio
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
-import dev.ipf.whitenoise.android.ui.conversation.presentAttachmentAdmission
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
@@ -1840,7 +1836,7 @@ class WhiteNoiseAppState private constructor(
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
         get() = shareStaging.revision + draftHydrationRevision
-    private val shareInboundStager =
+    internal val shareInboundStager =
         ShareInboundStager(
             stageText =
                 inboundShareTextStager ?: { accountRef, groupIdHex, text ->
@@ -3301,39 +3297,6 @@ class WhiteNoiseAppState private constructor(
             ?.markGroupLeft(groupIdHex)
     }
 
-    /**
-     * Confirmed chats the active account can forward a message into, recent
-     * first. Empty when no chats controller is attached yet (the chat-list
-     * stream hasn't bound) — the forward picker then shows its empty state.
-     */
-    fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
-
-    /** Account-wide forward targets beyond the active controller's window (#2618); null when none is attached. */
-    internal suspend fun loadAccountWideForwardTargets(): AccountWideForwardTargets? {
-        val controller = chatsController ?: return null
-        return controller.loadAccountWideForwardTargets()
-    }
-
-    internal val forwardTargetsLoading: Boolean
-        get() = chatsController?.isLoading == true
-
-    internal val forwardTargetsError: ErrorPresentation?
-        get() = chatsController?.error
-
-    internal val forwardTargetMembersRevision: Long
-        get() = chatsController?.memberSnapshotsRevision ?: 0L
-
-    internal val forwardTargetsRevision: Long
-        get() = chatsController?.forwardTargetsRevision ?: 0L
-
-    internal fun requestForwardTargetMembers(groupIds: Iterable<String>) {
-        chatsController?.requestMemberSnapshots(groupIds)
-    }
-
-    internal fun retryForwardTargets() {
-        chatsController?.retryLoad()
-    }
-
     /** Encrypted no-backup persistence for the single unresolved forward request. */
     internal val forwardRequestPersistence =
         ForwardRequestPersistence(mutationsScope) {
@@ -3354,104 +3317,6 @@ class WhiteNoiseAppState private constructor(
                 activeForwardTargetTitles = emptyMap()
             }
         }
-
-    /**
-     * Stage an inbound Android share for the explicitly chosen local account.
-     *
-     * The system-share picker can enumerate a non-active account, so resolving
-     * through [activeAccountRef] here would silently move the draft and stream
-     * ownership to whichever account happened to be active at commit time.
-     * Return false when the chosen account is no longer a signed-in signing
-     * account; callers keep the picker/recovery path visible in that case.
-     */
-    fun stageInboundShare(
-        accountRef: String,
-        targetGroupIds: List<String>,
-        payload: SharePayload,
-    ): Boolean {
-        val target = validatedInboundShareTarget(accountRef, targetGroupIds) ?: return false
-        shareInboundStager.stageToChats(
-            context = appContext,
-            accountIdHex = target.accountIdHex,
-            groupIds = target.groupIds,
-            payload = payload,
-            draftAccountRef = accountRef,
-        )
-        return true
-    }
-
-    /**
-     * Prepares provider MIME metadata on I/O for the automatic Direct Share
-     * route, then applies draft/staging state on the calling Main coroutine.
-     */
-    suspend fun stageInboundShareForFirstFrame(
-        accountRef: String,
-        targetGroupIds: List<String>,
-        payload: SharePayload,
-        shouldCommit: () -> Boolean = { true },
-    ): Boolean {
-        val initialTarget = validatedInboundShareTarget(accountRef, targetGroupIds)
-        if (initialTarget == null || !shouldCommit()) return false
-        val prepared = withContext(Dispatchers.IO) { shareInboundStager.prepare(appContext, payload) }
-        return dev.ipf.whitenoise.android.share.retainShareAtDestination(
-            appContext,
-            initialTarget.accountIdHex,
-            initialTarget.groupIds,
-            payload,
-        ) { droppedCount ->
-            if (!shouldCommit() || validatedInboundShareTarget(accountRef, targetGroupIds) != initialTarget) {
-                false
-            } else {
-                shareInboundStager.stagePreparedToChats(
-                    initialTarget.accountIdHex,
-                    initialTarget.groupIds,
-                    if (payload.importReady) prepared.copy(streamStaging = null) else prepared,
-                    accountRef,
-                )
-                if (payload.importReady && payload.streamUris.isNotEmpty()) shareStaging.notifyTextStaged()
-                val offered = payload.streamUris.size
-                presentAttachmentAdmission(appContext, (offered - droppedCount).coerceAtLeast(0), offered)
-                true
-            }
-        }
-    }
-
-    /** Revalidates account ownership and de-duplicates recipient ids at the commit boundary. */
-    private fun validatedInboundShareTarget(
-        accountRef: String,
-        targetGroupIds: List<String>,
-    ): ValidatedInboundShareTarget? {
-        val account =
-            accounts.firstOrNull { summary ->
-                summary.label == accountRef && summary.isSignedInSigningAccount()
-            } ?: return null
-        val validGroupIds = targetGroupIds.filter(String::isNotBlank).distinct()
-        return validGroupIds
-            .takeIf { it.isNotEmpty() }
-            ?.let { ValidatedInboundShareTarget(account.accountIdHex, it) }
-    }
-
-    /** Account-bound destination resolved immediately before local staging. */
-    private data class ValidatedInboundShareTarget(
-        val accountIdHex: String,
-        val groupIds: List<String>,
-    )
-
-    fun consumeInboundShareStreamsCapped(
-        groupIdHex: String,
-        existingMediaCount: Int,
-        existingDocumentCount: Int,
-        maxItems: Int = SHARE_STREAM_MAX_ITEMS,
-    ): CappedShareStreamStaging? {
-        val accountIdHex = activeAccount?.accountIdHex ?: return null
-        return shareStaging.consumeCapped(
-            accountIdHex = accountIdHex,
-            groupIdHex = groupIdHex,
-            existingMediaCount = existingMediaCount,
-            existingDocumentCount = existingDocumentCount,
-            maxItems = maxItems,
-        )
-    }
 
     /** Publishes Direct Share, then refreshes pinned labels, replacing any earlier publication still in flight. */
     fun publishShareShortcuts(chats: List<ChatListItem>) {
