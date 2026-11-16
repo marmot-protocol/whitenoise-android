@@ -23,7 +23,14 @@ class SettingsContourMorphTest {
         key: Int = 1,
     ): SettingsContour {
         val bounds = Rect(16f, top, 344f, top + height)
-        return SettingsContour(bounds, RoundRect(bounds, minOf(20f, height / 2f), minOf(20f, height / 2f)), viewport, Color.White, 1f, key = key)
+        return SettingsContour(
+            bounds,
+            RoundRect(bounds, minOf(20f, height / 2f), minOf(20f, height / 2f)),
+            viewport,
+            Color.White,
+            1f,
+            key = key,
+        )
     }
 
     private fun home(): List<SettingsContour> = List(4) { group(100f + it * 110f, key = it + 1) }
@@ -183,7 +190,8 @@ class SettingsContourMorphTest {
                     contour
                 }
             val selected = random.nextInt(source.size)
-            val target = listOf(group(100f + random.nextFloat() * 250f, 40f + random.nextFloat() * 250f, source[selected].key))
+            val target =
+                listOf(group(100f + random.nextFloat() * 250f, 40f + random.nextFloat() * 250f, source[selected].key))
             for (step in 1 until 240) {
                 val t = step / 240f
                 val frame = sample(source, target, t)

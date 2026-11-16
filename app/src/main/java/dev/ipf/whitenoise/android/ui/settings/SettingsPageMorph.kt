@@ -45,6 +45,8 @@ import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import kotlin.math.ceil
 import kotlin.math.min
 
+private const val CONTENT_HANDOFF_FRACTION = 0.5f
+
 /** Frozen activation metadata; this is presentation data, never a navigation owner. */
 internal data class SettingsRouteEndpoint(
     val key: Any,
@@ -213,11 +215,15 @@ internal class SettingsPageMorph {
                 ?: native
         }
 
-    internal fun outgoingPresence(time: Float): Float =
-        if (active && !entryOnly && exitStart > 0f && geometryFraction(time) < 0.5f) 1f else 0f
+    internal fun outgoingPresence(time: Float): Float {
+        val hasOutgoingFrame = active && !entryOnly && exitStart > 0f
+        return if (hasOutgoingFrame && geometryFraction(time) < CONTENT_HANDOFF_FRACTION) 1f else 0f
+    }
 
-    internal fun incomingPresence(time: Float): Float =
-        if (!active || entryOnly || entryStart > 0f || geometryFraction(time) >= 0.5f) 1f else 0f
+    internal fun incomingPresence(time: Float): Float {
+        if (!active || entryOnly || entryStart > 0f) return 1f
+        return if (geometryFraction(time) >= CONTENT_HANDOFF_FRACTION) 1f else 0f
+    }
 
     private fun geometryFraction(time: Float): Float {
         val easing = if (opening) AppMotionOpenEasing else AppMotionCloseEasing
@@ -504,21 +510,7 @@ internal class SettingsPageMorph {
         }
         if (bounds(host, time) == null || time >= 1f) {
             leaving = null
-            if (recording && captureContent) {
-                val picture = settled?.picture ?: Picture()
-                drawAndRecord(picture)
-                settled =
-                    PresentedFrame(
-                        picture,
-                        native.orEmpty(),
-                        activeNativeBody(native.orEmpty(), host),
-                        bodyTop,
-                        host,
-                        inputs,
-                    )
-            } else {
-                drawContent()
-            }
+            drawSettledFrame(native, host, recording && captureContent, inputs)
             return
         }
         updateNativeFrame(native, host, time)
@@ -546,6 +538,70 @@ internal class SettingsPageMorph {
         contours.forEach { drawContinuousContour(it, host) }
     }
 
+    private fun ContentDrawScope.drawSettledFrame(
+        native: List<SettingsContour>?,
+        host: Rect,
+        capture: Boolean,
+        inputs: Any?,
+    ) {
+        if (capture) {
+            val picture = settled?.picture ?: Picture()
+            drawAndRecord(picture)
+            settled =
+                PresentedFrame(
+                    picture,
+                    native.orEmpty(),
+                    activeNativeBody(native.orEmpty(), host),
+                    bodyTop,
+                    host,
+                    inputs,
+                )
+        } else {
+            drawContent()
+        }
+    }
+
+    private fun SettingsContour.drawnCorners(host: Rect): RoundRect {
+        val b = bounds.translate(-host.topLeft)
+        return RoundRect(
+            b.left,
+            b.top,
+            b.right,
+            b.bottom,
+            corners.topLeftCornerRadius,
+            corners.topRightCornerRadius,
+            corners.bottomRightCornerRadius,
+            corners.bottomLeftCornerRadius,
+        )
+    }
+
+    /** Current rounded interiors own body visibility; native viewport/header clipping stays stationary. */
+    private fun movingBodyMask(
+        contours: List<SettingsContour>,
+        host: Rect,
+    ): Path =
+        Path().apply {
+            contours.forEach { contour ->
+                if (!contour.bounds.isEmpty) {
+                    val rounded = Path().apply { addRoundRect(contour.drawnCorners(host)) }
+                    val viewport = Path().apply { addRect(contour.viewport.intersect(host).translate(-host.topLeft)) }
+                    rounded.op(rounded, viewport, PathOperation.Intersect)
+                    addPath(rounded)
+                }
+            }
+        }
+
+    private fun DrawScope.drawContourFill(
+        contour: SettingsContour,
+        host: Rect,
+    ) {
+        if (!contour.fill.isSpecified || contour.bounds.isEmpty) return
+        val viewport = contour.viewport.intersect(host).translate(-host.topLeft)
+        clipRect(viewport.left, viewport.top, viewport.right, viewport.bottom) {
+            drawPath(Path().apply { addRoundRect(contour.drawnCorners(host)) }, contour.fill)
+        }
+    }
+
     /** Cross-window presentation uses the same native contour batch and exclusive stroke mask. */
     fun ContentDrawScope.drawExternal(
         source: SettingsContour,
@@ -566,11 +622,23 @@ internal class SettingsPageMorph {
             bodyMask = activeNativeBody(native, host)
             externalSource = source
             externalPairs =
-                matchSettingsContours(listOf(source), native, source.key, source.destination, source.bounds.center, host)
+                matchSettingsContours(
+                    listOf(source),
+                    native,
+                    source.key,
+                    source.destination,
+                    source.bounds.center,
+                    host,
+                )
         }
         val contours =
             interpolateSettingsContours(
-                listOf(source), native, presence, source.bounds.center, host, source.key,
+                listOf(source),
+                native,
+                presence,
+                source.bounds.center,
+                host,
+                source.key,
                 correspondence = externalPairs,
             )
         contours.forEach { drawContourFill(it, host) }
@@ -578,7 +646,7 @@ internal class SettingsPageMorph {
         val live = Path().apply {
             addRect(Rect(Offset.Zero, size))
             op(this, bodyMask, PathOperation.Difference)
-            if (presence >= 0.5f) {
+            if (presence >= CONTENT_HANDOFF_FRACTION) {
                 val incoming = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
                 op(this, incoming, PathOperation.Union)
             }
@@ -732,41 +800,6 @@ private fun nativeChromeMask(
         result.op(chrome, android.graphics.Path.Op.UNION)
     }
     return result.asComposePath()
-}
-
-private fun SettingsContour.drawnCorners(host: Rect): RoundRect {
-    val b = bounds.translate(-host.topLeft)
-    return RoundRect(
-        b.left, b.top, b.right, b.bottom,
-        corners.topLeftCornerRadius, corners.topRightCornerRadius,
-        corners.bottomRightCornerRadius, corners.bottomLeftCornerRadius,
-    )
-}
-
-/** Current rounded interiors own body visibility; native viewport/header clipping stays stationary. */
-private fun movingBodyMask(
-    contours: List<SettingsContour>,
-    host: Rect,
-): Path = Path().apply {
-    contours.forEach { contour ->
-        if (!contour.bounds.isEmpty) {
-            val rounded = Path().apply { addRoundRect(contour.drawnCorners(host)) }
-            val viewport = Path().apply { addRect(contour.viewport.intersect(host).translate(-host.topLeft)) }
-            rounded.op(rounded, viewport, PathOperation.Intersect)
-            addPath(rounded)
-        }
-    }
-}
-
-private fun DrawScope.drawContourFill(
-    contour: SettingsContour,
-    host: Rect,
-) {
-    if (!contour.fill.isSpecified || contour.bounds.isEmpty) return
-    val viewport = contour.viewport.intersect(host).translate(-host.topLeft)
-    clipRect(viewport.left, viewport.top, viewport.right, viewport.bottom) {
-        drawPath(Path().apply { addRoundRect(contour.drawnCorners(host)) }, contour.fill)
-    }
 }
 
 private fun DrawScope.drawContinuousContour(

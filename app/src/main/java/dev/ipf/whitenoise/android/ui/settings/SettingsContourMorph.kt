@@ -13,6 +13,7 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 internal const val SETTINGS_OUTGOING_PHASE_END = 0.4f
+private const val MATCH_HEIGHT_WEIGHT = 0.25f
 
 /** Geometry only: no pictures, navigation, clock or application state. All coordinates are screen pixels. */
 internal data class SettingsContourSeam(
@@ -312,7 +313,7 @@ internal fun matchSettingsContours(
     fun cost(x: SettingsContour, y: SettingsContour): Float {
         val xc = x.bounds.intersect(x.viewport).intersect(viewport)
         val yc = y.bounds.intersect(y.viewport).intersect(viewport)
-        return kotlin.math.abs(xc.center.y - yc.center.y) + kotlin.math.abs(xc.height - yc.height) * 0.25f
+        return kotlin.math.abs(xc.center.y - yc.center.y) + kotlin.math.abs(xc.height - yc.height) * MATCH_HEIGHT_WEIGHT
     }
     fun assign(xs: List<Int>, ys: List<Int>): List<Pair<Int, Int>> {
         if (xs.isEmpty() || ys.isEmpty()) return emptyList()
@@ -385,7 +386,8 @@ internal fun matchSettingsContours(
                 }
             val seams = slot.seams.map { seam ->
                 fun move(point: Offset): Offset {
-                    val relative = if (slot.bounds.height == 0f) 0.5f else (point.y - slot.bounds.top) / slot.bounds.height
+                    val relative =
+                        if (slot.bounds.height == 0f) 0.5f else (point.y - slot.bounds.top) / slot.bounds.height
                     return Offset(point.x, bounds.top + relative * bounds.height)
                 }
                 seam.copy(start = move(seam.start), end = move(seam.end))
@@ -397,7 +399,8 @@ internal fun matchSettingsContours(
                     seams = seams,
                     rows = emptyList(),
                 )
-            result += if (reverse) SettingsContourPair(peer, slot, slot.key) else SettingsContourPair(slot, peer, slot.key)
+            result +=
+                if (reverse) SettingsContourPair(peer, slot, slot.key) else SettingsContourPair(slot, peer, slot.key)
         }
     }
     addSurplus(a, b, false)
