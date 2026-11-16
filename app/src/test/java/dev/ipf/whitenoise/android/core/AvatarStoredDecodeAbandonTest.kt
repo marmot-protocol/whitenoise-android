@@ -4,6 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -56,7 +57,8 @@ class AvatarStoredDecodeAbandonTest {
                             Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
                         }
                     }
-                abandoned.cancel()
+                // Joined, so the caller has left and its waiter count is released before the slots free.
+                abandoned.cancelAndJoin()
                 release.complete(Unit)
                 blockers.awaitAll()
                 kotlinx.coroutines.delay(SETTLE_MS)
@@ -106,7 +108,7 @@ class AvatarStoredDecodeAbandonTest {
                     List(2) {
                         async(start = CoroutineStart.UNDISPATCHED) { AvatarImageLoader.loadStored(key, lifetime, read) }
                     }
-                leaving.cancel()
+                leaving.cancelAndJoin()
                 release.complete(Unit)
                 assertNotNull(withTimeout(5_000) { staying.await() })
                 assertEquals(1, reads.get())
