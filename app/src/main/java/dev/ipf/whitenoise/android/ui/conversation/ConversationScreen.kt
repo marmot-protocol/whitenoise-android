@@ -146,6 +146,7 @@ import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
+import dev.ipf.whitenoise.android.state.loadTeamReporting
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
@@ -246,6 +247,8 @@ import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.nostr.readCachedPublicEventCards
 import dev.ipf.whitenoise.android.ui.conversation.nostr.refreshPublicEventCard
 import dev.ipf.whitenoise.android.ui.conversation.nostr.refreshPublicEventCardAuthor
+import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionArtworkSource
+import dev.ipf.whitenoise.android.ui.conversation.reactions.conversationReactionArtwork
 import dev.ipf.whitenoise.android.ui.conversation.share.ContactPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.LocationPickerScreen
 import dev.ipf.whitenoise.android.ui.conversation.share.PickContactPhoneRow
@@ -940,6 +943,8 @@ internal fun ConversationScreen(
         LaunchedEffect(controller, notificationOpenRequestId, transcriptRoutedAway, transcriptReadyToReveal) {
             onNotificationTimelineVisibilityChanged(!transcriptRoutedAway && transcriptReadyToReveal)
         }
+        // A message's Report action can offer the White Noise team only once MDK has confirmed this build reaches it.
+        LaunchedEffect(appState.runtimeGeneration) { appState.loadTeamReporting() }
 
         // Timeline publication can precede route settlement and the first visible
         // Compose frame. Record visibility only after the transcript can be shown.
@@ -4581,11 +4586,13 @@ internal fun ConversationScreen(
                 }
             },
         ) { padding ->
+            val reactionArtwork = remember(appState, controller) { conversationReactionArtwork(appState, controller) }
             CompositionLocalProvider(
                 dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
                 dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
                 LocalPollVotesHost provides pollVotesHost,
                 LocalKeptMessages provides keptMessagesController,
+                LocalReactionArtworkSource provides reactionArtwork,
                 // Bubbles mark their own matches while search is open, so a hit is obvious on any
                 // bubble colour rather than only on the one the jump happened to land on.
                 LocalConversationSearchMarking provides

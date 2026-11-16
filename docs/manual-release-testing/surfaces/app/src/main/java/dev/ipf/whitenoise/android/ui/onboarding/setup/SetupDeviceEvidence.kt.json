@@ -1,0 +1,88 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Device-step evidence from MDK's discovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "internal fun setupDeviceEvidence(",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step separate-chats explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "internal fun setupDeviceExplanation(",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step finding sentence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "internal fun setupDeviceFinding(",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step finding: none found",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_none_found",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step finding: unchecked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_unchecked",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step finding: found on a date",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_found_on_date",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step finding: found",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_found",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step explanation: separate chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_separate_chats",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step explanation: new chats in either app",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_new_chats_either_app",
+        "test_ids": [
+          "ONB-018"
+        ]
+      },
+      {
+        "surface": "Device-step explanation: separate chats if another app is used",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/SetupDeviceEvidence.kt",
+        "anchor": "R.string.setup_device_separate_chats_if_other_app",
+        "test_ids": [
+          "ONB-018"
+        ]
+      }
+    ]
+  }
+}

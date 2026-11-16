@@ -1,0 +1,66 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupCommitRefusalNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "fun GroupCommitRefusalNotice(",
+        "test_ids": [
+          "GRP-039"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Refusal banner: R.string.group_commit_refused_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "R.string.group_commit_refused_title",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "Refusal banner: R.string.group_commit_refused_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "R.string.group_commit_refused_relay",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "Refusal banner: R.string.group_commit_refused_relay_too_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "R.string.group_commit_refused_relay_too_large",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "Refusal banner: R.plurals.group_commit_refused_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "R.plurals.group_commit_refused_relays",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "Refusal banner: R.plurals.group_commit_refused_relays_too_large",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "R.plurals.group_commit_refused_relays_too_large",
+        "test_ids": [
+          "GRP-039"
+        ]
+      },
+      {
+        "surface": "Refusal banner: R.string.dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupCommitRefusalNotice.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "GRP-039"
+        ]
+      }
+    ]
+  }
+}

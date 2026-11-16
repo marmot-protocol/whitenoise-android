@@ -280,6 +280,8 @@
     <string name="jump_to_newest">Vai al più recente</string>
     <string name="scroll_to_top">Scorri verso l\'alto</string>
     <string name="discard_failed_message">Elimina messaggio non riuscito</string>
+    <string name="message_discard_still_sending">Questo messaggio è ancora in fase di invio. Riprova tra poco.</string>
+    <string name="message_discard_not_failed">Questo messaggio non può più essere eliminato.</string>
     <string name="decline">Rifiuta</string>
     <string name="accept">Accetta</string>
     <string name="invited_as_account">Account invitato: %1$s</string>
@@ -810,8 +812,8 @@
     <string name="notification_sent_voice_message">ha inviato un messaggio vocale</string>
     <string name="notification_sent_file">ha inviato un file</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
-    <string name="notification_invite_from_sender">Invito da %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s ti ha invitato a %2$s</string>
+    <string name="notification_invitation_to_group">Invito a %1$s</string>
+    <string name="notification_open_to_view_invite">Apri White Noise per visualizzare l’invito</string>
     <string name="notification_removed_from_group">Ti hanno rimosso da %1$s</string>
     <string name="notification_removed_from_unnamed_group">Ti hanno rimosso da un gruppo</string>
     <string name="notification_made_admin_of_group">Ora sei amministratore di %1$s</string>
@@ -2028,10 +2030,14 @@
     <string name="setup_continue_without_profile">Continua senza un profilo</string>
     <string name="setup_review_suggested_changes">Esamina le modifiche suggerite</string>
     <string name="setup_chats_on_this_device">Chat su questo dispositivo</string>
-    <string name="setup_chats_on_this_device_help">Il solo accesso non ripristina le chat né i messaggi esistenti. Se usi un altro dispositivo, conserva la sua app e i suoi dati finché non hai controllato le chat qui.</string>
+    <string name="setup_device_none_found">Non abbiamo trovato chiavi di messaggistica di un’altra app o di un altro dispositivo.</string>
+    <string name="setup_device_unchecked">Non è stato possibile verificare se questo account usa un’altra app o un altro dispositivo per i messaggi.</string>
+    <string name="setup_device_found_on_date">Abbiamo trovato chiavi di messaggistica pubblicate da questo account da un’altra app o da un altro dispositivo, le più recenti il %1$s.</string>
+    <string name="setup_device_found">Abbiamo trovato chiavi di messaggistica pubblicate da questo account da un’altra app o da un altro dispositivo.</string>
+    <string name="setup_device_separate_chats">Questo dispositivo avrà chat proprie e separate. Le chat nell’altra app restano lì e non appariranno qui.</string>
+    <string name="setup_device_new_chats_either_app">Quando qualcuno inizia una nuova chat con te, può arrivare in una delle due app.</string>
+    <string name="setup_device_separate_chats_if_other_app">Se usi un’altra app per i messaggi, questo dispositivo avrà chat proprie e separate, e le chat di quell’app non appariranno qui.</string>
     <string name="setup_device_stage">Utilizzo del dispositivo</string>
-    <string name="setup_other_sign_ins_found">Sono stati trovati altri record di accesso. Potrebbero appartenere a un’altra installazione o a una precedente.</string>
-    <string name="setup_other_sign_ins_unchecked">Non è stato possibile controllare altri accessi.</string>
     <string name="setup_approval_saved_pending">La tua approvazione è salvata. La modifica è ancora in sospeso.</string>
     <string name="setup_profile_scope_help">Questo aggiorna il tuo profilo in altre app Nostr.</string>
     <string name="setup_optional_profile_help">Opzionale. Puoi aggiungere un profilo in un secondo momento.</string>
@@ -2549,6 +2555,20 @@
     <string name="group_change_undelivered_message">La tua ultima modifica a questo gruppo non ha ancora raggiunto tutti i suoi relay. Se continui, i membri che usano solo quei relay potrebbero non riuscire a seguire il gruppo. Aspettare o continuare comunque?</string>
     <string name="group_change_wait">Aspetta</string>
     <string name="group_change_continue_anyway">Continua comunque</string>
+    <string name="group_change_refused_title">Un relay ha rifiutato la tua ultima modifica</string>
+    <string name="group_change_refused_message">Almeno un relay di questo gruppo ha rifiutato definitivamente la tua ultima modifica. Se continui, i membri che usano solo quel relay potrebbero non riceverla né riuscire a seguire il gruppo. Aspettare non risolverà il problema. Continuare chiude anche l’avviso in questa chat.</string>
+    <string name="group_commit_refused_title">Modifica del gruppo rifiutata</string>
+    <string name="group_commit_refused_relay_too_large">%1$s ha rifiutato una modifica del gruppo che hai fatto perché era troppo grande. I membri che usano solo quel relay potrebbero non riceverla.</string>
+    <string name="group_commit_refused_relay">%1$s ha rifiutato una modifica del gruppo che hai fatto. I membri che usano solo quel relay potrebbero non riceverla.</string>
+    <string name="group_commit_refusal_dismiss_failed">Impossibile ignorare questo avviso. Riprova.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d relay ha rifiutato una modifica del gruppo che hai fatto perché era troppo grande. I membri che usano solo quel relay potrebbero non riceverla.</item>
+        <item quantity="other">%1$d relay hanno rifiutato una modifica del gruppo che hai fatto perché era troppo grande. I membri che usano solo quei relay potrebbero non riceverla.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d relay ha rifiutato una modifica del gruppo che hai fatto. I membri che usano solo quel relay potrebbero non riceverla.</item>
+        <item quantity="other">%1$d relay hanno rifiutato una modifica del gruppo che hai fatto. I membri che usano solo quei relay potrebbero non riceverla.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Invita comunque</string>
     <string name="starting_as">Avvio come</string>
     <string name="starting_as_account">Avvio come %1$s</string>

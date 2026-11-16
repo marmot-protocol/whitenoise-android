@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">Signaler à l’équipe White Noise</string>
+    <string name="report_team_send_toggle">Envoyer à White Noise</string>
+    <string name="report_team_message_detail">Votre signalement et la clé publique de l’expéditeur sont envoyés en privé à l’équipe White Noise. Le message lui-même n’est pas partagé et l’expéditeur n’est pas averti.</string>
+    <string name="report_team_profile_detail">Votre signalement et la clé publique de cette personne sont envoyés en privé à l’équipe White Noise. Aucun message n’est partagé et cette personne n’est pas avertie.</string>
+    <string name="report_team_explanation_hint">Ce que l’équipe White Noise devrait savoir (facultatif)</string>
+    <string name="report_team_sent">Envoyé à l’équipe White Noise.</string>
+    <string name="report_team_queued">Enregistré, en attente d’envoi à l’équipe White Noise.</string>
+    <string name="report_team_pending">Enregistré ; la remise à l’équipe White Noise est en attente de confirmation.</string>
+    <string name="report_team_copy_failed">La copie destinée à White Noise n’a pas pu être envoyée. Réessayez.</string>
+    <string name="report_team_failed">Impossible d’envoyer le signalement à l’équipe White Noise. Réessayez.</string>
+    <string name="report_team_rate_limited">Trop de signalements depuis ce compte. Réessayez plus tard.</string>
+</resources>

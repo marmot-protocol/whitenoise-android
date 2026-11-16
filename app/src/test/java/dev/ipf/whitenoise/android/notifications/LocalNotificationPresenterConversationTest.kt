@@ -721,6 +721,7 @@ class LocalNotificationPresenterConversationTest {
         assertTrue(manager.activeNotifications.isEmpty())
     }
 
+    /** A resolved inviter refreshes the live invite in place without alerting again, and the card never names them. */
     @Test
     fun activeInviteIdentityRefreshUpdatesInPlaceWithoutAlertingAgain() {
         presenter.ensureChannels()
@@ -754,7 +755,7 @@ class LocalNotificationPresenterConversationTest {
         assertEquals("Work", active.notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
         assertNull(active.notification.getLargeIcon())
         assertTrue(active.notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
-        assertTrue(
+        assertFalse(
             active.notification.extras
                 .getCharSequence(Notification.EXTRA_TEXT)
                 .toString()

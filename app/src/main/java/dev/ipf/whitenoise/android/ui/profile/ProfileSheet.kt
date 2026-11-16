@@ -88,12 +88,14 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
 import dev.ipf.whitenoise.android.state.isUserBlocked
+import dev.ipf.whitenoise.android.state.loadTeamReporting
 import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
 import dev.ipf.whitenoise.android.state.profileNotificationOverrides
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
+import dev.ipf.whitenoise.android.state.teamReportingAvailable
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -510,6 +512,7 @@ internal fun ProfileSheet(
     var blocked by remember(npub) { mutableStateOf<Boolean?>(null) }
     var blockBusy by remember(npub) { mutableStateOf(false) }
     var feedback by remember(npub) { mutableStateOf<ToastMessage?>(null) }
+    val teamReport = remember(npub) { ProfileTeamReportState() }
     LaunchedEffect(copied) {
         if (copied) {
             delay(PROFILE_COPY_FEEDBACK_MILLIS)
@@ -517,6 +520,7 @@ internal fun ProfileSheet(
         }
     }
 
+    LaunchedEffect(appState.runtimeGeneration) { appState.loadTeamReporting() }
     LaunchedEffect(hex, appState.runtimeMirrors.blocks.revision) {
         val target = hex
         val account = appState.activeAccountRef
@@ -891,6 +895,12 @@ internal fun ProfileSheet(
                     }
                 }
             },
+            onTeamReport =
+                if (hex != null && !targetIsSelf && appState.teamReportingAvailable) {
+                    { if (owner.canAct()) teamReport.open = true }
+                } else {
+                    null
+                },
             memberMute =
                 memberMuteKey?.let {
                     ProfileMemberMuteRowState(muted = it in mutedMemberKeys, enabled = owner.canAct())
@@ -1156,6 +1166,17 @@ internal fun ProfileSheet(
         }
     }
 
+    val reportTarget = hex
+    if (teamReport.open && reportTarget != null && accountAtOpen != null) {
+        ProfileTeamReportSheet(
+            appState = appState,
+            accountRef = accountAtOpen,
+            targetHex = reportTarget,
+            canAct = owner::canAct,
+            state = teamReport,
+            onFeedback = { feedback = it },
+        )
+    }
     feedback?.let { result ->
         PersonProfileFeedbackDialog(result, onDismiss = { feedback = null }, securePolicy = securePolicy)
     }

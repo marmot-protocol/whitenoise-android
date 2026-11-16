@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">向 White Noise 團隊檢舉</string>
+    <string name="report_team_send_toggle">傳送給 White Noise</string>
+    <string name="report_team_message_detail">你的檢舉和傳送者的公鑰會私密地傳送給 White Noise 團隊。訊息本身不會被分享，傳送者也不會收到通知。</string>
+    <string name="report_team_profile_detail">你的檢舉和此人的公鑰會私密地傳送給 White Noise 團隊。不會分享任何訊息，此人也不會收到通知。</string>
+    <string name="report_team_explanation_hint">White Noise 團隊需要知道的資訊（選填）</string>
+    <string name="report_team_sent">已傳送給 White Noise 團隊。</string>
+    <string name="report_team_queued">已儲存，等待傳送給 White Noise 團隊。</string>
+    <string name="report_team_pending">已儲存；傳送給 White Noise 團隊的投遞正在等待確認。</string>
+    <string name="report_team_copy_failed">未能將副本傳送給 White Noise。請再試一次。</string>
+    <string name="report_team_failed">未能將檢舉傳送給 White Noise 團隊。請再試一次。</string>
+    <string name="report_team_rate_limited">此帳號的檢舉過多。請稍後再試。</string>
+</resources>
