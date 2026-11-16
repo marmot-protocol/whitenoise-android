@@ -106,7 +106,15 @@ internal fun MediaFileBubble(
     val lifecycleOwner = LocalLifecycleOwner.current
     val pillKey = "$messageIdHex#$attachmentIndex"
     var openRequested by remember(pillKey) { mutableStateOf(false) }
-    var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
+    var readerOpen by rememberSaveable(
+        controller,
+        pillKey,
+        reference,
+        appState.runtimeGeneration,
+    ) {
+        mutableStateOf(false)
+    }
+
     val initiallyAvailable =
         remember(controller, pillKey, mine) {
             controller.hasCachedAttachmentInMemory(messageIdHex, attachmentIndex)
@@ -138,6 +146,7 @@ internal fun MediaFileBubble(
         remember(reference.mediaType, reference.fileName) {
             resolveAttachmentPresentation(reference.mediaType, reference.fileName)
         }
+    val documentKind = documentAttachmentKind(reference.mediaType, reference.fileName)
     val textCandidate =
         remember(reference.mediaType, reference.fileName) {
             textAttachmentCandidate(reference.mediaType, reference.fileName)
@@ -416,7 +425,7 @@ internal fun MediaFileBubble(
                                         reference,
                                         priority = AttachmentDownloadPriority.Interactive,
                                     )
-                                } else if (textCandidate != null) {
+                                } else if (documentKind != null || textCandidate != null) {
                                     readerOpen = true
                                 } else if (usesDurableInstallerHandoff) {
                                     controller.requestAttachmentInstallerHandoff(
@@ -454,7 +463,45 @@ internal fun MediaFileBubble(
                 }.takeUnless { heldUntilDelivered },
         )
     }
-    if (readerOpen && textCandidate != null) {
+    if (readerOpen && documentKind != null) {
+        val actions =
+            rememberTextAttachmentNativeActions(
+                controller,
+                appState,
+                messageIdHex,
+                attachmentIndex,
+                reference,
+                mine,
+            )
+        androidx.compose.runtime.key(actions) {
+            DocumentAttachmentViewer(
+                kind = documentKind,
+                name = reference.fileName,
+                account = controller.boundAccountRef.toString(),
+                source = "$pillKey:${reference.sourceEpoch}:${reference.ciphertextSha256}",
+                actions = actions,
+                loadBytes = { loadTextReaderBytes(controller, messageIdHex, attachmentIndex, reference, mine) },
+                loadFile = {
+                    materializeMediaFile(
+                        context,
+                        controller,
+                        messageIdHex,
+                        attachmentIndex,
+                        reference,
+                        mine,
+                    )
+                },
+                onOpenExternal = {
+                    if (actions.isCurrent()) {
+                        readerOpen = false
+                        openRequested =
+                            controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                    }
+                },
+                onDismiss = { readerOpen = false },
+            )
+        }
+    } else if (readerOpen && textCandidate != null) {
         val readerActions =
             rememberTextAttachmentNativeActions(
                 controller,

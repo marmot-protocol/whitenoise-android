@@ -509,6 +509,12 @@ internal fun classifyAttachmentOpen(
             } else {
                 AttachmentOpenClassification.InvalidAndroidPackage
             }
+        fileName
+            .substringAfterLast(
+                '.',
+                "",
+            ).lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ->
+            AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         isActiveContentMime(openMime) -> AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         else -> AttachmentOpenClassification.Ready(openMime)
     }

@@ -2718,4 +2718,11 @@
     <string name="emoji_name_marmot_smirk">Verschmitztes Murmeltier</string>
     <string name="emoji_name_marmot_cry">Weinendes Murmeltier</string>
     <string name="emoji_name_marmot_angry">Wütendes Murmeltier</string>
+    <string name="document_rendered">Ansicht</string>
+    <string name="document_source">Quelltext</string>
+    <string name="document_html_omitted">Bilder, Stile und eingebettete Inhalte werden ausgelassen.</string>
+    <string name="document_html_unavailable">Diese HTML-Datei kann nicht angezeigt werden. Sie ist möglicherweise zu groß, zu komplex oder verwendet eine nicht unterstützte Kodierung.</string>
+    <string name="document_pdf_unavailable">Diese PDF-Datei kann nicht angezeigt werden. Sie ist möglicherweise beschädigt, geschützt oder zu groß.</string>
+    <string name="document_pdf_page">Seite %1$d von %2$d</string>
+    <string name="document_zoom_reset">Vergrößern / zurücksetzen</string>
 </resources>

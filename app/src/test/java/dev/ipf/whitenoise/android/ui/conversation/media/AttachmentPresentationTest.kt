@@ -18,6 +18,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.file.Files
 
+@Suppress("LargeClass")
 class AttachmentPresentationTest {
     /** Remote reply filenames cannot expose paths, controls, or bidi spoofing. */
     @Test
@@ -187,13 +188,28 @@ class AttachmentPresentationTest {
             )
         }
         assertEquals(
-            AttachmentOpenClassification.Ready("application/pdf"),
+            AttachmentOpenClassification.Ready("text/plain"),
             classifyAttachmentOpen("application/pdf", "page.html") { false },
         )
         assertEquals(
             AttachmentOpenClassification.Ready("application/json"),
             classifyAttachmentOpen("application/json", "data.json") { false },
         )
+    }
+
+    @Test
+    fun htmlExtensionsOpenAsInertTextEvenWithGenericMetadata() {
+        for (extension in listOf("htm", "HTML", "xhtml")) {
+            assertEquals(
+                AttachmentOpenClassification.Ready("text/plain"),
+                classifyAttachmentOpen(
+                    "application/octet-stream",
+                    "page.$extension",
+                ) {
+                    false
+                },
+            )
+        }
     }
 
     /** FileProvider types the cached copy by extension, so active extensions are cached as text. */

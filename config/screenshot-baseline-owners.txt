@@ -245,3 +245,6 @@
 # Final typed wipe gate, using the real dialog window with deterministic frames.
 *.ProfileKeyWipeConfirmationTest.wipeConfirmationLight
 *.ProfileKeyWipeConfirmationTest.wipeConfirmationLargeRtl
+
+# In-app document viewers: deterministic PDF fixtures and native HTML chrome.
+*.DocumentAttachmentViewerScreenshotTest
