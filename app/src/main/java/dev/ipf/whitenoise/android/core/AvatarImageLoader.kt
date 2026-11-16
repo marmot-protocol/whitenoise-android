@@ -294,7 +294,7 @@ object AvatarImageLoader {
                         PendingAvatarRequest(it)
                     }
                 }
-                val inFlightRequest = AvatarInFlightRequest()
+                val inFlightRequest = AvatarInFlightRequest(url)
                 val deferred = inFlightRequest.result
                 inFlight[url] = inFlightRequest
                 val launchedGeneration = cacheLifetime.capture()
@@ -308,7 +308,7 @@ object AvatarImageLoader {
                         val fetchResult =
                             runCatching {
                                 fetchGate.withPermit(fetchLane) {
-                                    if (!isCurrentRequest(launchedGeneration, launchedRequest)) {
+                                    if (skipsFetch(launchedGeneration, launchedRequest, fetchLane, inFlightRequest)) {
                                         AvatarImageFetchResult.Unavailable
                                     } else {
                                         fetchImage(request)
@@ -358,6 +358,30 @@ object AvatarImageLoader {
                 PendingAvatarRequest(inFlightRequest)
             }
         return pending.await(waitForDetachedFetch)
+    }
+
+    /**
+     * Whether the detached fetch should not run: its lifetime was retired, or it is a stored avatar decode that
+     * reached its slot with no caller still waiting for it, such as a chat list
+     * row the user scrolled or navigated away from. Each stored decode can start an isolated worker for its
+     * conversation, about half a second where workers are exec-spawned, so a queue of abandoned rows would hold
+     * up the screen the user moved to. The entry leaves [inFlight] under the same lock its joiners take, so a
+     * later caller starts a fresh decode rather than joining the skipped one. A skip records no failure, so the
+     * avatar loads normally when its row is shown again.
+     */
+    private fun skipsFetch(
+        launchedGeneration: Long,
+        launchedRequest: Long,
+        lane: AvatarFetchLane,
+        request: AvatarInFlightRequest,
+    ): Boolean {
+        if (!isCurrentRequest(launchedGeneration, launchedRequest)) return true
+        return lane == AvatarFetchLane.STORED &&
+            synchronized(lock) {
+                val abandoned = request.waiters.get() == 0
+                if (abandoned) inFlight.remove(request.key, request)
+                abandoned
+            }
     }
 
     /**
@@ -1171,17 +1195,34 @@ private class CompletedAvatarRequest(
     override suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap? = image
 }
 
-private class AvatarInFlightRequest {
+private class AvatarInFlightRequest(
+    /** The [AvatarImageLoader] cache key this request is registered under while in flight. */
+    val key: String,
+) {
     val result = CompletableDeferred<ImageBitmap?>()
     val fetchCompleted = CompletableDeferred<Unit>()
+
+    /** Callers still awaiting [result]; counted under the loader lock, released when each one returns or leaves. */
+    val waiters =
+        java.util.concurrent.atomic
+            .AtomicInteger()
 }
 
+/** Created under the loader lock, so a stored decode's skip check always sees this caller counted. */
 private class PendingAvatarRequest(
     private val request: AvatarInFlightRequest,
 ) : AvatarRequest {
+    init {
+        request.waiters.incrementAndGet()
+    }
+
     override suspend fun await(waitForDetachedFetch: Boolean): ImageBitmap? {
-        val image = request.result.await()
-        if (waitForDetachedFetch) request.fetchCompleted.await()
-        return image
+        try {
+            val image = request.result.await()
+            if (waitForDetachedFetch) request.fetchCompleted.await()
+            return image
+        } finally {
+            request.waiters.decrementAndGet()
+        }
     }
 }
