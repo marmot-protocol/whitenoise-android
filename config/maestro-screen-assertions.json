@@ -3573,6 +3573,26 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatHeaderSettingsScreen.kt",
+      "symbol": "ChatHeaderSettingsScreen",
+      "bindings": [
+        {
+          "case": "settings-chats",
+          "selector": {
+            "id": "chatHeader.search"
+          },
+          "scope": "Chats opens the chat header shortcut check list; Back restores Chats. Assertions authored only, no toggle persistence, limit state, header rendering or device execution proof.",
+          "entry_assertion": {
+            "id": "chatHeader.search"
+          },
+          "opened_by": {
+            "text": "Chat header shortcuts"
+          }
+        }
+      ],
+      "remaining": "Toggle persistence, the two-shortcut limit, header button rendering and actions, read-aloud engine availability and visual qualification remain separate; this navigation case is unexecuted."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ComposerSettingsScreen.kt",
       "symbol": "ComposerSettingsScreen",
       "bindings": [

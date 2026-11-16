@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,36 +28,28 @@ class HeaderShortcutPreferencesTest {
         assertEquals(listOf(HeaderShortcut.Search), HeaderShortcutPreferences(prefs).shortcuts)
     }
 
-    /** Reset restores the plain header for this and later readers. */
-    @Test
-    fun resetRemovesEveryShortcut() {
-        val prefs = preferences("reset")
-        val owner = HeaderShortcutPreferences(prefs)
-        owner.toggle(HeaderShortcut.Search)
-        owner.reset()
-        assertEquals(emptyList<HeaderShortcut>(), owner.shortcuts)
-        assertFalse(prefs.contains(KEY))
-        assertEquals(emptyList<HeaderShortcut>(), HeaderShortcutPreferences(prefs).shortcuts)
-    }
-
     /** A stored value can never put more than two shortcuts, duplicates or unknown names in the header. */
     @Test
     fun storedValueIsBoundedToTwoKnownDistinctShortcuts() {
         val prefs = preferences("bounded")
-        prefs.edit().putString(KEY, "ReadAloud,Search,Search,MuteUnmute,Pin").commit()
+        prefs.edit().putString(KEY, "Pin,Search,Search,MuteUnmute,ReadAloud").commit()
         val owner = HeaderShortcutPreferences(prefs)
         assertEquals(listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute), owner.shortcuts)
         assertTrue(owner.shortcuts.size <= HeaderShortcutPreferences.MAX)
     }
 
-    /** The limit is two and every current choice fits, so the settings switches never need to refuse one. */
+    /** A full header refuses another shortcut instead of replacing one; freeing a slot lets it in. */
     @Test
-    fun limitIsTwoAndEveryChoiceFits() {
+    fun fullHeaderRefusesAThirdShortcutUntilOneIsTurnedOff() {
         assertEquals(2, HeaderShortcutPreferences.MAX)
-        val owner = HeaderShortcutPreferences(preferences("limit"))
+        val prefs = preferences("limit")
+        val owner = HeaderShortcutPreferences(prefs)
         HeaderShortcut.entries.forEach(owner::toggle)
-        assertEquals(HeaderShortcut.entries, owner.shortcuts)
-        assertTrue(owner.shortcuts.size <= HeaderShortcutPreferences.MAX)
+        assertEquals(listOf(HeaderShortcut.Search, HeaderShortcut.MuteUnmute), owner.shortcuts)
+        assertEquals(owner.shortcuts, HeaderShortcutPreferences(prefs).shortcuts)
+        owner.toggle(HeaderShortcut.Search)
+        owner.toggle(HeaderShortcut.ReadAloud)
+        assertEquals(listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.ReadAloud), owner.shortcuts)
     }
 
     private fun preferences(name: String): SharedPreferences =

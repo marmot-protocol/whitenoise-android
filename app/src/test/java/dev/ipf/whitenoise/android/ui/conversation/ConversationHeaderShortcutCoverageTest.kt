@@ -26,6 +26,15 @@ class ConversationHeaderShortcutCoverageTest {
         assertContains(conversation, "onSearch = openConversationSearch")
     }
 
+    @Test
+    fun headerAndDetailsShareTheReadAloudOverride() {
+        for (source in listOf(conversation, details)) {
+            assertContains(source, "appState.ttsHasUsableEngine")
+            assertContains(source, "appState.setConversationAutoReadOverride(")
+        }
+        assertContains(conversation, "resolveConversationAutoRead(")
+    }
+
     private fun assertContains(
         source: String,
         expected: String,

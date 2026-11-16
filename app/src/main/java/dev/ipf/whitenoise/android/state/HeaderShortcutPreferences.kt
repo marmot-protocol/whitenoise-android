@@ -6,7 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /** Optional conversation header shortcuts; each one reuses the chat details action of the same name. */
-internal enum class HeaderShortcut { Search, MuteUnmute }
+internal enum class HeaderShortcut { Search, MuteUnmute, ReadAloud }
 
 /** Device-wide header shortcut choice: ordered, at most [MAX] entries, empty by default. */
 internal class HeaderShortcutPreferences(
@@ -20,12 +20,6 @@ internal class HeaderShortcutPreferences(
         val next = if (shortcut in shortcuts) shortcuts - shortcut else shortcuts + shortcut
         if (next.size > MAX) return
         write(next)
-    }
-
-    /** Restores the plain header. */
-    fun reset() {
-        preferences.edit().remove(KEY).apply()
-        shortcuts = emptyList()
     }
 
     /** Saves [next] in order and republishes it through the same filter as a cold read. */

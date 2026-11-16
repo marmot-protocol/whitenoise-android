@@ -36,6 +36,7 @@ class SettingsDetailNavigationTest {
     fun chatsAndVoiceLanguageSubscreensReturnToTheirHubs() {
         assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.CustomEmoji))
         assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.Composer))
+        assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.ChatHeader))
         assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.Gestures))
         assertEquals(SettingsDetail.VoiceLanguage, settingsDetailParent(SettingsDetail.Language))
         assertEquals(SettingsDetail.Account, settingsDetailParent(SettingsDetail.Relays))

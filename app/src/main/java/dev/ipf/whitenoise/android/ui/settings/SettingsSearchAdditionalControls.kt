@@ -190,11 +190,11 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
         )
         HeaderShortcut.entries.map(::headerShortcutRow).forEach { row ->
             control(
-                "Gestures.${row.key}",
+                "ChatHeader.${row.key}",
                 row.titleRes,
                 R.string.header_shortcuts_title,
-                SettingsDetail.Gestures,
-                "search.GestureSettings.9",
+                SettingsDetail.ChatHeader,
+                "search.ChatHeaderSettings.1",
                 row.key,
             )
         }

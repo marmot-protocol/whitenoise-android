@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasClickAction
@@ -226,6 +227,11 @@ class ConversationTopBarSemanticsTest {
 
     @Test fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", BOTH_SHORTCUTS, dark = true)
 
+    /** Search and an active Read aloud button share the header. */
+    @Test fun headerWithReadAloudLight() = shortcutHeader("read_aloud_light", READ_ALOUD_SHORTCUTS)
+
+    @Test fun headerWithReadAloudDark() = shortcutHeader("read_aloud_dark", READ_ALOUD_SHORTCUTS, dark = true)
+
     /** A narrow window at double font keeps two shortcuts, the members line and the tappable timer badge on screen. */
     @Test
     @Config(qualifiers = "en-w320dp-h780dp-mdpi")
@@ -255,6 +261,33 @@ class ConversationTopBarSemanticsTest {
             assertEquals(1, searches)
             assertTrue(dialogOpen.value)
         }
+    }
+
+    /** Read aloud is a checkable button that flips this chat's override; without a speech engine it is absent. */
+    @Test
+    fun readAloudShortcutTogglesAndHidesWithoutEngine() {
+        val appState = appState()
+        val controller = ConversationController(appState, group())
+        val readAloudOn = mutableStateOf<Boolean?>(false)
+        render(appState, controller, actions = {
+            ConversationHeaderShortcuts(
+                shortcuts = listOf(HeaderShortcut.ReadAloud),
+                muteControl = null,
+                onSearch = {},
+                readAloudOn = readAloudOn.value,
+                onToggleReadAloud = { readAloudOn.value = !(readAloudOn.value ?: false) },
+            )
+        })
+        composeRule
+            .onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG)
+            .assertTouchHeightIsEqualTo(48.dp)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off))
+            .performClick()
+        composeRule
+            .onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.On))
+        composeRule.runOnIdle { readAloudOn.value = null }
+        composeRule.onNodeWithTag(CONVERSATION_HEADER_READ_ALOUD_TAG).assertDoesNotExist()
     }
 
     /** A mute command in flight disables the header button so a second tap cannot race it. */
@@ -412,7 +445,7 @@ class ConversationTopBarSemanticsTest {
         val appState = appState()
         val controller = ConversationController(appState, group())
         render(appState, controller, dark = dark, actions = {
-            ConversationHeaderShortcuts(shortcuts, muteControl(appState), onSearch = {})
+            ConversationHeaderShortcuts(shortcuts, muteControl(appState), onSearch = {}, readAloudOn = true)
         })
         composeRule
             .onNodeWithTag(CONVERSATION_TOP_BAR_TAG)
@@ -534,5 +567,6 @@ class ConversationTopBarSemanticsTest {
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
         val BOTH_SHORTCUTS = listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search)
+        val READ_ALOUD_SHORTCUTS = listOf(HeaderShortcut.Search, HeaderShortcut.ReadAloud)
     }
 }

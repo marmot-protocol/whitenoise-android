@@ -2,8 +2,10 @@
 <resources>
     <string name="header_shortcuts_title">Raccourcis dans l\'en-tête de discussion</string>
     <string name="header_shortcut_search">Rechercher dans la discussion</string>
-    <string name="header_shortcuts_limit">Deux au maximum. Désactivez-en un d\'abord.</string>
+    <string name="header_shortcuts_limit">Deux au maximum. Décochez-en un d\'abord.</string>
     <string name="explanation_header_shortcut_search">Affiche un bouton de recherche dans l\'en-tête de chaque discussion. Il ouvre la même recherche que les détails de la discussion. S\'applique uniquement sur cet appareil.</string>
     <string name="explanation_header_shortcut_mute">Affiche un bouton pour couper le son dans l\'en-tête de chaque discussion. Couper le son demande une durée ; le réactiver s\'applique immédiatement. S\'applique uniquement sur cet appareil.</string>
+    <string name="explanation_header_shortcut_read_aloud">Affiche un bouton de lecture à voix haute dans l\'en-tête de chaque discussion. Il active ou désactive la lecture à voix haute des nouveaux messages de cette discussion, comme dans les détails de la discussion. S\'applique uniquement sur cet appareil.</string>
+    <string name="header_shortcuts_hint">L\'en-tête en affiche deux au maximum, dans l\'ordre où vous les cochez.</string>
     <string name="conversation_header_timer_change">Modifier le minuteur des messages éphémères</string>
 </resources>

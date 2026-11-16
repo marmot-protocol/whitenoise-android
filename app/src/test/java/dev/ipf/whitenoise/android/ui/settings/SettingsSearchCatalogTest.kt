@@ -91,6 +91,7 @@ class SettingsSearchCatalogTest {
                 val generated =
                     entry.id.startsWith("Data.download.") ||
                         entry.id.startsWith("Gestures.") ||
+                        entry.id.startsWith("ChatHeader.") ||
                         SettingsHomeRow.entries.any { it.name == row }
                 assertTrue("${entry.id}: invalid row $row", literal || generated)
             }

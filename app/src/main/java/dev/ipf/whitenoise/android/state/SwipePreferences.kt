@@ -47,9 +47,6 @@ internal class SwipePreferences(
     var state by mutableStateOf(read())
         private set
 
-    /** Chat header shortcuts share the Gestures settings screen and its reset. */
-    val headerShortcuts = HeaderShortcutPreferences(preferences)
-
     /** Applies one binding without freezing the other side's locale-sensitive default. */
     fun set(
         binding: SwipeBinding,

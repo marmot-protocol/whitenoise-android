@@ -13,6 +13,7 @@ internal enum class SettingsDetail {
     ShareConnect,
     Appearance,
     Composer,
+    ChatHeader,
     ActionColor,
     ChatBubbleColors,
     Language,

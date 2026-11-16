@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,8 +15,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.state.HeaderShortcut
-import dev.ipf.whitenoise.android.state.HeaderShortcutPreferences
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.SwipePreferenceState
@@ -36,28 +33,21 @@ internal fun GestureSettingsScreen(
     GestureSettingsContent(
         appState.swipePreferences.state,
         appState.swipePreferences::set,
-        {
-            appState.swipePreferences.reset()
-            appState.swipePreferences.headerShortcuts.reset()
-        },
+        appState.swipePreferences::reset,
         onBack,
         appState.swipePreferences::setPullUnread,
-        appState.swipePreferences.headerShortcuts.shortcuts,
-        appState.swipePreferences.headerShortcuts::toggle,
     )
 }
 
 /** The stateless settings body exposes the currently effective default and physical-direction choices. */
 @Composable
-@Suppress("LongMethod", "LongParameterList") // Bounded settings groups and their choice dialog.
+@Suppress("LongMethod") // Two bounded settings groups and their choice dialog.
 internal fun GestureSettingsContent(
     state: SwipePreferenceState,
     onChange: (SwipeBinding, SwipeAction) -> Unit,
     onReset: () -> Unit,
     onBack: () -> Unit,
     onPullUnreadChange: (Boolean) -> Unit = {},
-    headerShortcuts: List<HeaderShortcut> = emptyList(),
-    onToggleHeaderShortcut: (HeaderShortcut) -> Unit = {},
 ) {
     var picker by rememberSaveable { mutableStateOf<SwipeBinding?>(null) }
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -137,33 +127,6 @@ internal fun GestureSettingsContent(
             item(key = "search.GestureSettings.6") {
                 SettingsCallout(text = stringResource(R.string.gestures_physical_hint))
             }
-            item(key = "search.GestureSettings.8") {
-                SettingsSection(stringResource(R.string.header_shortcuts_title))
-            }
-            item(key = "search.GestureSettings.9") {
-                SettingsGroup {
-                    for (shortcut in HeaderShortcut.entries) {
-                        val checked = shortcut in headerShortcuts
-                        // A full header keeps its choices; another one waits until the person turns one off.
-                        val full = !checked && headerShortcuts.size >= HeaderShortcutPreferences.MAX
-                        val shortcutRow = headerShortcutRow(shortcut)
-                        val rowKey = shortcutRow.key
-                        row(rowKey) { context ->
-                            SettingsSwitch(
-                                context,
-                                stringResource(shortcutRow.titleRes),
-                                checked,
-                                { onToggleHeaderShortcut(shortcut) },
-                                modifier = Modifier.testTag("gestures.$rowKey"),
-                                explanation = stringResource(shortcutRow.explanationRes),
-                                subtitle = if (full) stringResource(R.string.header_shortcuts_limit) else null,
-                                enabled = !full,
-                                leading = { SettingsLeadingIcon(shortcutRow.iconRes) },
-                            )
-                        }
-                    }
-                }
-            }
             item(key = "search.GestureSettings.7") {
                 SettingsGroup {
                     row("reset") { rowContext ->
@@ -198,33 +161,6 @@ internal fun GestureSettingsContent(
         )
     }
 }
-
-/** Settings presentation of one header shortcut; [key] is the stable row key settings search addresses. */
-internal class HeaderShortcutRow(
-    val key: String,
-    @StringRes val titleRes: Int,
-    @StringRes val explanationRes: Int,
-    @DrawableRes val iconRes: Int,
-)
-
-/** Maps each shortcut to its settings row. */
-internal fun headerShortcutRow(shortcut: HeaderShortcut): HeaderShortcutRow =
-    when (shortcut) {
-        HeaderShortcut.Search ->
-            HeaderShortcutRow(
-                "header.search",
-                R.string.header_shortcut_search,
-                R.string.explanation_header_shortcut_search,
-                R.drawable.ic_search,
-            )
-        HeaderShortcut.MuteUnmute ->
-            HeaderShortcutRow(
-                "header.mute",
-                R.string.gestures_mute_unmute,
-                R.string.explanation_header_shortcut_mute,
-                R.drawable.ic_notifications_off,
-            )
-    }
 
 /** Explains the effective mirrored default while explicit bindings retain their physical direction. */
 @Composable

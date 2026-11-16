@@ -474,6 +474,7 @@ class WhiteNoiseAppState private constructor(
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
     internal val swipePreferences = SwipePreferences(preferences)
+    internal val headerShortcutPreferences = HeaderShortcutPreferences(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()

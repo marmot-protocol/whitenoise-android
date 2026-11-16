@@ -454,6 +454,14 @@
         }
       ]
     },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatHeaderSettingsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "shortcutRow.key",
+          "represented_by": "ChatHeader.search"
+        }
+      ]
+    },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt": {
       "controls": [
         {
@@ -467,10 +475,6 @@
         {
           "declaration": "binding.name",
           "represented_by": "Gestures.MessageLeft"
-        },
-        {
-          "declaration": "rowKey",
-          "represented_by": "Gestures.header.search"
         }
       ]
     },
@@ -784,6 +788,10 @@
           "represented_by": "Chats.composer"
         },
         {
+          "declaration": "\"chat_header\"",
+          "represented_by": "home.ChatHeader"
+        },
+        {
           "declaration": "\"enter_behavior\"",
           "represented_by": "Chats.enter_behavior"
         },
@@ -927,6 +935,9 @@
     },
     "Composer": {
       "catalog_id": "Chats.composer"
+    },
+    "ChatHeader": {
+      "catalog_id": "home.ChatHeader"
     },
     "Account": {
       "catalog_id": "home.Account"

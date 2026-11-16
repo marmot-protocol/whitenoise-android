@@ -119,7 +119,7 @@ internal fun ConversationTopBar(
     // conversation identity and the details action reachable.
     compactHeight: Boolean = false,
     performanceSelectorsEnabled: Boolean = BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS,
-    // Optional header shortcuts chosen in Gestures settings; empty keeps the plain header.
+    // Optional header shortcuts chosen in Chat header settings; empty keeps the plain header.
     actions: @Composable RowScope.() -> Unit = {},
     // Set only when this person may change the timer now; otherwise a tap on it opens details.
     onTimerClick: (() -> Unit)? = null,

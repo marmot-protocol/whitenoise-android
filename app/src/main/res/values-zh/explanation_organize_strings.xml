@@ -70,6 +70,7 @@
     <string name="explanation_organize_hub_chat_folders">打开你的聊天文件夹。文件夹会把你的聊天整理到各个标签页中，可以自己选择聊天，也可以按未读或提及等规则。你可以在这里添加、编辑、重新排序和删除文件夹。</string>
     <string name="explanation_organize_hub_gestures">打开滑动操作设置。你可以选择在聊天列表中滑动某个聊天时会发生什么。这些选择适用于此设备。</string>
     <string name="explanation_organize_hub_composer">打开消息输入框设置。你可以更改快捷方式、它们的顺序，以及你撰写消息的输入框周围控件的布局。</string>
+    <string name="explanation_organize_hub_chat_header">打开聊天标题栏快捷按钮设置。你可以选择最多两个按钮，例如搜索或静音，显示在每个聊天的顶部。这些选择适用于此设备。</string>
     <string name="explanation_organize_hub_enter_behavior">让你选择撰写消息时回车键的作用：发送消息或换行。在外接键盘上，Shift+Enter 始终会换行。当前的选择显示在右侧。</string>
     <string name="explanation_organize_hub_custom_emoji">打开你的自定义表情。这些是你可以添加并在消息中使用的额外表情图片，与标准表情集并存。</string>
     <string name="explanation_organize_hub_quick_switching">在你的头像旁显示你的其他账号，让你一键切换。关闭后会隐藏它们。这只会改变切换的外观，不会移除任何账号。</string>

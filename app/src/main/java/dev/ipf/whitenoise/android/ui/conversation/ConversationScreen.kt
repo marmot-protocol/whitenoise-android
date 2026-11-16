@@ -132,6 +132,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
 import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.TtsAutoReadOverride
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
@@ -159,6 +160,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.resolveConversationAutoRead
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendSticker
@@ -3890,7 +3892,21 @@ internal fun ConversationScreen(
             )
         navigationState.searchOpen = true
     }
-    val headerShortcuts = appState.swipePreferences.headerShortcuts.shortcuts
+    val headerShortcuts = appState.headerShortcutPreferences.shortcuts
+    // Read aloud mirrors the chat details auto-read choice and stays hidden without a usable speech engine.
+    val headerReadAloudOn =
+        if (HeaderShortcut.ReadAloud in headerShortcuts && appState.ttsHasUsableEngine) {
+            val autoRead by appState.ttsAutoReadPreferences.state.collectAsState()
+            val accountRef = appState.activeAccountRef
+            accountRef?.let {
+                resolveConversationAutoRead(
+                    autoRead.globalDefaultEnabled,
+                    appState.ttsAutoReadPreferences.overrideFor(it, controller.group.groupIdHex),
+                )
+            }
+        } else {
+            null
+        }
     // The mute state read runs only when the person put Mute/unmute in the header.
     val headerMuteControl =
         if (HeaderShortcut.MuteUnmute in headerShortcuts) {
@@ -4304,6 +4320,17 @@ internal fun ConversationScreen(
                                         shortcuts = headerShortcuts,
                                         muteControl = headerMuteControl,
                                         onSearch = openConversationSearch,
+                                        readAloudOn = headerReadAloudOn,
+                                        onToggleReadAloud = {
+                                            appState.setConversationAutoReadOverride(
+                                                controller.group.groupIdHex,
+                                                if (headerReadAloudOn == true) {
+                                                    TtsAutoReadOverride.OFF
+                                                } else {
+                                                    TtsAutoReadOverride.ON
+                                                },
+                                            )
+                                        },
                                     )
                                 },
                                 onTimerClick = if (headerTimerEditable) ({ showHeaderTimerPicker = true }) else null,
