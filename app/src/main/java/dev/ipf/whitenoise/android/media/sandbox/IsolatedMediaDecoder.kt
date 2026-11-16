@@ -154,6 +154,14 @@ internal object IsolatedMediaDecoder {
         transport?.retireDomain(domain)
     }
 
+    /** Serves [domain]'s still images first while [prioritized]; it never blocks, so main may call it. */
+    fun prioritizeDomain(
+        domain: MediaTrustDomain,
+        prioritized: Boolean,
+    ) {
+        transport?.prioritizeDomain(domain, prioritized)
+    }
+
     /**
      * The [domains] whose next still-image decode needs no worker to start first. A lane that does not start
      * workers on demand, or no lane at all, has nothing to wait for, so every domain is reported.

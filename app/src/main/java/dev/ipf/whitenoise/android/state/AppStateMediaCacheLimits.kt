@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import android.app.ActivityManager
+import android.content.Context
+
 // 24 MiB cap on decrypted attachment bytes resident in memory — roughly ten
 // 1920px JPEGs. Persists across conversation re-entry.
 internal const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
@@ -7,9 +10,47 @@ internal const val MEDIA_PLAINTEXT_CACHE_MAX_BYTES: Long = 24L * 1024L * 1024L
 // Admit ordinary photos while keeping large documents on the file-lease path.
 internal const val MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES: Long = 8L * 1024L * 1024L
 
-// ~48 MiB of decoded thumbnails (sampled to <=1280px). Enough to keep visible
-// bubbles spinner-free; bounded so it cannot grow unbounded.
-internal const val MEDIA_THUMBNAIL_CACHE_MAX_BYTES: Long = 48L * 1024L * 1024L
+// Decoded thumbnails (sampled to <=1280px): the floor keeps visible bubbles spinner-free on a low-memory device, the
+// ceiling bounds what a long photo chat keeps decoded while it is scrolled back through.
+internal const val MEDIA_THUMBNAIL_CACHE_MIN_BYTES: Long = 48L * 1024L * 1024L
+internal const val MEDIA_THUMBNAIL_CACHE_MAX_BYTES: Long = 256L * 1024L * 1024L
+private const val MEDIA_THUMBNAIL_CACHE_MEMORY_SHARE = 16L
+
+@Volatile private var mediaThumbnailCacheBytes = 0L
+
+/**
+ * The decoded-thumbnail budget for this device, read once: a sixteenth of its RAM within the floor and ceiling, and the
+ * floor on a low-RAM device. [mediaThumbnailTrimTargetBytes] limits what survives once the UI is hidden.
+ */
+internal fun mediaThumbnailCacheMaxBytes(context: Context): Long =
+    mediaThumbnailCacheBytes.takeIf { it > 0L } ?: run {
+        val manager = context.getSystemService(ActivityManager::class.java)
+        val memory = ActivityManager.MemoryInfo().also { manager?.getMemoryInfo(it) }
+        mediaThumbnailCacheBudget(memory.totalMem, manager?.isLowRamDevice != false).also {
+            mediaThumbnailCacheBytes = it
+        }
+    }
+
+/**
+ * The thumbnail bytes a memory trim keeps. Hiding the UI keeps half the floor, the warm share of the former fixed
+ * budget, and a background trim keeps none. The RAM-scaled share is therefore held only while the app is visible: a
+ * process kept alive by its connection service may get only the UI-hidden trim, so halving the larger budget would
+ * keep up to 128 MiB of thumbnails in the background.
+ */
+internal fun mediaThumbnailTrimTargetBytes(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim): Long =
+    trim.targetBytes(MEDIA_THUMBNAIL_CACHE_MIN_BYTES)
+
+/** A sixteenth of [totalMemoryBytes] within the thumbnail floor and ceiling; a low-RAM device keeps the floor. */
+internal fun mediaThumbnailCacheBudget(
+    totalMemoryBytes: Long,
+    lowRam: Boolean,
+): Long =
+    if (lowRam) {
+        MEDIA_THUMBNAIL_CACHE_MIN_BYTES
+    } else {
+        (totalMemoryBytes / MEDIA_THUMBNAIL_CACHE_MEMORY_SHARE)
+            .coerceIn(MEDIA_THUMBNAIL_CACHE_MIN_BYTES, MEDIA_THUMBNAIL_CACHE_MAX_BYTES)
+    }
 
 // ~256 MiB of persistent decrypted media on disk. OS may trim it earlier under
 // device-wide cache pressure.
