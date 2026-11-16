@@ -19,6 +19,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -179,5 +180,6 @@ internal fun LocalHtmlView(
             }
         }
     }
-    if (view != null) AndroidView(factory = { view }, modifier = modifier)
+    // A replacement WebView needs a new host: AndroidView never reruns its factory.
+    if (view != null) key(view) { AndroidView(factory = { view }, modifier = modifier) }
 }
