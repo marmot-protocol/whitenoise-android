@@ -10,6 +10,13 @@ import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.actionColorArgb
+import dev.ipf.whitenoise.android.state.chatBubbleColorArgb
+import dev.ipf.whitenoise.android.state.effectiveBubbleColorArgb
+import dev.ipf.whitenoise.android.state.globalBubbleColorArgb
+import dev.ipf.whitenoise.android.state.updateActionColor
+import dev.ipf.whitenoise.android.state.updateChatBubbleColor
+import dev.ipf.whitenoise.android.state.updateGlobalBubbleColor
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
