@@ -568,7 +568,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
     val recoveryInFooter = showTimestamp && showOuterMetadata
     val failedOwnSend = mine && item.status == MessageStatus.Failed
-    // A durable send whose publish failed offers Discard alone, and resending it stays with MDK convergence.
+    // A durable send whose publish failed offers Discard alone, retrying it is out of scope here.
     val discardableSend = failedOwnSend || controller.isDurableFailedSend(item)
     val failedSendActions: @Composable () -> Unit = {
         if (discardableSend) {

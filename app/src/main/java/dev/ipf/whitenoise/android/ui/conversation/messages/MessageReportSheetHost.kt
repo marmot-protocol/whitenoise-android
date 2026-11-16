@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.ReportReasonFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ReportOutcome
@@ -47,9 +46,7 @@ internal fun MessageReportSheetHost(
     audience: ReportAudience,
     surfaces: MessageBubbleSurfaceState,
 ) {
-    val groupHasReport = surfaces.reportGroupResult != null
-    val effectiveAudience =
-        if (groupHasReport && !surfaces.reportCopyPending) ReportAudience.TeamMessage else audience
+    val effectiveAudience = surfaces.effectiveReportAudience(audience)
     ReportMessageSheet(
         onDismissRequest = surfaces::closeReport,
         onSubmit = { reason, explanation ->
@@ -57,12 +54,28 @@ internal fun MessageReportSheetHost(
             val generation = appState.runtimeGeneration
             val account = appState.activeAccountRef
             val owns = { appState.runtimeGeneration == generation && appState.activeAccountRef == account }
+            val sends =
+                MessageReportSends(
+                    group = {
+                        val outcome = controller.reportMessage(record.messageIdHex, reason, explanation)
+                        // The controller already presented a failure with its report.
+                        if (outcome == ReportOutcome.NotAllowed && owns()) {
+                            appState.present(R.string.report_message_not_allowed)
+                        }
+                        groupReportResult(outcome)
+                    },
+                    team = {
+                        val reporter = controller.boundAccountRef
+                        reporter?.let { appState.reportToTeam(it, record.sender, reason, explanation) }
+                            ?: TeamReportOutcome.Failed(R.string.report_team_failed)
+                    },
+                    present = { group, team -> if (owns()) presentReportOutcome(appState, group, team) },
+                )
             surfaces.reportInFlight = true
             surfaces.reportError = null
             appState.launchMutation {
                 try {
-                    val report = MessageReport(record, team, reason, explanation)
-                    sendMessageReport(appState, controller, report, surfaces, owns)
+                    surfaces.sendReport(team, sends)
                 } finally {
                     surfaces.reportInFlight = false
                 }
@@ -75,93 +88,77 @@ internal fun MessageReportSheetHost(
     )
 }
 
-/** One submitted report: the message, who receives it, and what the reader chose. */
-private data class MessageReport(
-    val record: AppMessageRecordFfi,
-    val team: ReportTeamChoice,
-    val reason: ReportReasonFfi,
-    val explanation: String,
+/** What a reopened sheet offers: only the team copy once the group already has this report. */
+internal fun MessageBubbleSurfaceState.effectiveReportAudience(audience: ReportAudience): ReportAudience =
+    if (reportGroupResult != null && !reportCopyPending) ReportAudience.TeamMessage else audience
+
+/**
+ * The two sends one report makes and how their answers reach the reader. [group] returns what the group's answer
+ * tells the reader, or null when the group did not take the report. [present] takes the group's and the team's
+ * messages, either of which may be absent.
+ */
+internal class MessageReportSends(
+    val group: suspend () -> Int?,
+    val team: suspend () -> TeamReportOutcome,
+    val present: (group: Int?, team: Int?) -> Unit,
 )
 
 /**
- * Sends the group report unless the group already has it, then the team copy, and says what each achieved while
- * [owns] still holds, so an answer that lands after an account or runtime change is not presented.
+ * Sends the group report unless the group already has it, then the team copy, and says what each achieved. Once the
+ * group has the report it stays recorded until the report finishes, so neither a locked retry nor a reopened,
+ * team-only sheet sends it to the group again.
  */
-private suspend fun sendMessageReport(
-    appState: WhiteNoiseAppState,
-    controller: ConversationController,
-    report: MessageReport,
-    surfaces: MessageBubbleSurfaceState,
-    owns: () -> Boolean,
+internal suspend fun MessageBubbleSurfaceState.sendReport(
+    team: ReportTeamChoice,
+    sends: MessageReportSends,
 ) {
-    val team = report.team
-    val groupResult =
-        if (team.reachesGroup) {
-            surfaces.reportGroupResult
-                ?: sendGroupReport(appState, controller, report, owns)
-        } else {
-            null
-        }
+    val groupResult = if (team.reachesGroup) reportGroupResult ?: sends.group() else null
     if (team.reachesGroup && groupResult == null || !team.reachesTeam) {
-        surfaces.finishReport()
-        if (owns()) groupResult?.let { appState.present(it) }
+        finishReport()
+        groupResult?.let { sends.present(it, null) }
         return
     }
-    val outcome =
-        controller.boundAccountRef?.let {
-            appState.reportToTeam(it, report.record.sender, report.reason, report.explanation)
-        } ?: TeamReportOutcome.Failed(R.string.report_team_failed)
-    when (outcome) {
+    when (val outcome = sends.team()) {
         is TeamReportOutcome.Accepted -> {
-            surfaces.finishReport()
-            if (owns()) presentReportOutcome(appState, groupResult, outcome.message)
+            finishReport()
+            sends.present(groupResult, outcome.message)
         }
-        is TeamReportOutcome.Failed -> keepTeamCopyForRetry(appState, surfaces, groupResult, outcome.message, owns)
+        is TeamReportOutcome.Failed -> keepTeamCopyForRetry(groupResult, outcome.message, sends.present)
     }
+}
+
+/**
+ * Keeps the sheet open after the team copy failed. A group answer that arrived with this send locks the sheet to
+ * that report, and one recorded by an earlier send is never forgotten, so the group never gets the report twice. The
+ * group's answer is shown once, when it first arrives.
+ */
+private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
+    @StringRes groupResult: Int?,
+    @StringRes failure: Int,
+    present: (Int?, Int?) -> Unit,
+) {
+    if (reportGroupResult == null && groupResult != null) present(groupResult, null)
+    reportGroupResult = groupResult ?: reportGroupResult
+    reportCopyPending = groupResult != null
+    reportError =
+        if (reportGroupResult != null && failure == R.string.report_team_failed) {
+            R.string.report_team_copy_failed
+        } else {
+            failure
+        }
 }
 
 /** Says what each audience took: the group's answer when it got the report, then the team's. */
 private fun presentReportOutcome(
     appState: WhiteNoiseAppState,
-    @StringRes groupResult: Int?,
-    @StringRes teamResult: Int,
+    @StringRes group: Int?,
+    @StringRes team: Int?,
 ) {
-    if (groupResult == null) appState.present(teamResult) else appState.present(groupResult, teamResult)
-}
-
-/** Sends the group's report, presenting a refusal itself, and returns what the group's answer tells the reader. */
-private suspend fun sendGroupReport(
-    appState: WhiteNoiseAppState,
-    controller: ConversationController,
-    report: MessageReport,
-    owns: () -> Boolean,
-): Int? {
-    val outcome = controller.reportMessage(report.record.messageIdHex, report.reason, report.explanation)
-    // The controller already presented a failure with its report.
-    if (outcome == ReportOutcome.NotAllowed && owns()) appState.present(R.string.report_message_not_allowed)
-    return groupReportResult(outcome)
-}
-
-/**
- * Keeps the sheet open after the team copy failed. With the group's answer recorded, it is locked to that report so
- * a retry, or a reopened sheet, never reports to the group twice. The group's answer is shown once, when it arrives.
- */
-private fun keepTeamCopyForRetry(
-    appState: WhiteNoiseAppState,
-    surfaces: MessageBubbleSurfaceState,
-    @StringRes groupResult: Int?,
-    @StringRes failure: Int,
-    owns: () -> Boolean,
-) {
-    if (surfaces.reportGroupResult == null && owns()) groupResult?.let { appState.present(it) }
-    surfaces.reportGroupResult = groupResult
-    surfaces.reportCopyPending = groupResult != null
-    surfaces.reportError =
-        if (groupResult != null && failure == R.string.report_team_failed) {
-            R.string.report_team_copy_failed
-        } else {
-            failure
-        }
+    when {
+        group != null && team != null -> appState.present(group, team)
+        group != null -> appState.present(group)
+        team != null -> appState.present(team)
+    }
 }
 
 /** What the group's answer tells the reader, or null when the report did not reach the group. */

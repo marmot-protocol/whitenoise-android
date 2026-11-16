@@ -104,7 +104,7 @@ class ConversationGroupConvergenceParkedTest {
             assertFalse(controller.conversationGroupRecoveryRowVisible())
         }
 
-    /** Dismissing acknowledges the refusal once for this chat and clears the banner even before the reread. */
+    /** Dismissing acknowledges the refusal once for this chat, and the reread that follows clears the banner. */
     @Test
     fun dismissingARefusalAcknowledgesItOnceAndClearsTheBanner() =
         runBlocking {

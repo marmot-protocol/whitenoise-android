@@ -108,7 +108,6 @@ import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
-import dev.ipf.whitenoise.android.state.discardDurableFailedSend
 import dev.ipf.whitenoise.android.state.dismissReports
 import dev.ipf.whitenoise.android.state.isDurableFailedSend
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
@@ -1030,23 +1029,13 @@ internal fun MessageBubble(
         surfaces.deleteDialogOpen = true
     }
 
-    /**
-     * Removes the message from this device only, closing the dialog once the controller confirms it. A failed own
-     * send goes through MDK's discard, which publishes nothing; any other message is hidden locally.
-     */
+    /** Hides the message on this device only, closing the dialog once the controller confirms the removal. */
     fun performDeleteForMe() {
         if (surfaces.deleteInFlight) return
         surfaces.deleteInFlight = true
         appState.launchMutation {
             try {
-                val removed =
-                    if (controller.isDurableFailedSend(item)) {
-                        controller.discardDurableFailedSend(record.messageIdHex, {
-                            controller.hideMessageForMe(record.messageIdHex)
-                        })
-                    } else {
-                        controller.hideMessageForMe(record.messageIdHex)
-                    }
+                val removed = controller.hideMessageForMe(record.messageIdHex)
                 if (removed) surfaces.deleteDialogOpen = false
             } finally {
                 surfaces.deleteInFlight = false
@@ -1667,7 +1656,7 @@ internal fun MessageBubble(
         val readAloudLabels =
             setOf(stringResource(R.string.tts_choose_sentence), stringResource(R.string.tts_read_from_sentence))
         val failedOwnSend = mine && item.status == MessageStatus.Failed
-        // A durable failed send offers Discard alone, and resending it stays with MDK convergence.
+        // A durable failed send offers Discard alone, retrying it is out of scope here.
         val discardableSend = failedOwnSend || controller.isDurableFailedSend(item)
         val rowActions =
             listOf(

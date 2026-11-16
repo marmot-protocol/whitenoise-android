@@ -31,7 +31,7 @@
         ]
       },
       {
-        "surface": "Reaction artwork download policy and size cap",
+        "surface": "Reaction artwork download policy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionArtworkSource.kt",
         "anchor": "private suspend fun loadReactionArtwork(",
         "test_ids": [

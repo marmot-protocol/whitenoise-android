@@ -1548,7 +1548,7 @@ class ConversationController(
             mine = isMessageMine(message),
             selfIsAdmin = isSelfAdmin,
             localDeleteSupported = message.messageIdHex.isNotBlank(),
-            remoteDeleteSupported = remoteDeleteAllowed(message),
+            remoteDeleteSupported = canSendMessages && message.messageIdHex.isNotBlank(),
             alreadyDeleted = alreadyDeleted,
         )
     }

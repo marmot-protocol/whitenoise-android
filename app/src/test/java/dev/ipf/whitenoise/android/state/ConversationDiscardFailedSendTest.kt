@@ -22,9 +22,9 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationDiscardFailedSendTest {
-    /** A failed own send offers only the local scope, so the delete dialog can never publish it to the group. */
+    /** A failed own send is discardable and keeps both delete scopes, since its publish may have reached a relay. */
     @Test
-    fun failedOwnSendOffersOnlyTheLocalDeleteScope() =
+    fun failedOwnSendIsDiscardableAndKeepsBothDeleteScopes() =
         withController(listOf(failedSend(), deliveredSend())) { controller ->
             val failed = controller.timeline.single { it.record.messageIdHex == FAILED }
             val delivered = controller.timeline.single { it.record.messageIdHex == DELIVERED }
@@ -33,7 +33,7 @@ class ConversationDiscardFailedSendTest {
             assertFalse(controller.isDurableFailedSend(delivered))
             val failedScope = controller.deleteCapabilityFor(failed.record)
             assertTrue(failedScope.canDeleteForMe)
-            assertFalse(failedScope.canDeleteForEveryone)
+            assertTrue(failedScope.canDeleteForEveryone)
             assertTrue(controller.deleteCapabilityFor(delivered.record).canDeleteForEveryone)
         }
 
@@ -109,32 +109,17 @@ class ConversationDiscardFailedSendTest {
             assertEquals(1, calls)
         }
 
-    /** Discard leaves a row MDK no longer counts as a failed send, and only Delete for me hides it then. */
+    /** A row MDK no longer counts as a failed send is hidden on this device, as the user asked to remove it. */
     @Test
-    fun aSendNoLongerFailedIsHiddenOnlyByDeleteForMe() =
+    fun aSendNoLongerFailedIsHiddenLocally() =
         withController(listOf(failedSend())) { controller ->
-            val notFailed: suspend (String, String, String) -> DiscardFailedSendResultFfi = { _, _, _ ->
-                result(DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND)
-            }
-            var hides = 0
+            val removed =
+                controller.discardDurableFailedSend(FAILED) { _, _, _ ->
+                    result(DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND)
+                }
 
-            assertFalse(controller.discardDurableFailedSend(FAILED, discard = notFailed))
-            assertEquals(0, hides)
-            assertTrue(controller.discardDurableFailedSend(FAILED, { ++hides > 0 }, discard = notFailed))
-            assertEquals(1, hides)
-        }
-
-    /** Batch Delete for me hides a delivered row locally but never hides a failed send MDK did not discard. */
-    @Test
-    fun batchDeleteForMeSendsAFailedSendToMdkInsteadOfHidingIt() =
-        withController(listOf(failedSend(), deliveredSend())) { controller ->
-            val delivered = controller.removeForMeResult(DELIVERED)
-            val failed = controller.removeForMeResult(FAILED)
-
-            assertTrue(delivered.isSuccess)
-            assertTrue(controller.timeline.none { it.record.messageIdHex == DELIVERED })
-            assertTrue(failed.isFailure)
-            assertTrue(controller.timeline.any { it.record.messageIdHex == FAILED })
+            assertTrue(removed)
+            assertTrue(controller.timeline.none { it.record.messageIdHex == FAILED })
         }
 
     /** Opens a controller on [records] and runs [block] once the initial timeline page has loaded. */

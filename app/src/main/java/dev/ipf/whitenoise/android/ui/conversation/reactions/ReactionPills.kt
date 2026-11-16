@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
@@ -251,7 +253,10 @@ private fun ReactionPillSurface(
     // Keep the Text's own immutable layout for an already-present counted badge too.
     var emojiLayout by remember(emoji) { mutableStateOf<TextLayoutResult?>(null) }
     val received = rememberReactionReceivedEmoji(emoji, pill.reactionMessageIdHex)
-    val artwork = emoji?.let { EmojiShortcodes.art(it, LocalCustomEmoji.current, received.art) }
+    // As on iOS, a reaction's own artwork wins over the reader's emoji of the same name, which only fills in when the
+    // reaction carries none.
+    val library = if (received.art.isEmpty()) LocalCustomEmoji.current else CustomEmojiSet.Empty
+    val artwork = emoji?.let { EmojiShortcodes.art(it, library, received.art) }
     Row(
         modifier =
             Modifier
@@ -272,19 +277,21 @@ private fun ReactionPillSurface(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (emoji != null) {
-            Text(
-                text = EmojiShortcodes.annotate(AnnotatedString(emoji)),
-                modifier =
-                    Modifier.localReactionGlyphTarget(localMotion, emoji, pill.selected, allowHostClipping) {
-                        emojiLayout?.takeIf { artwork == null || it.placeholderRects.singleOrNull() != null }
-                    },
-                onTextLayout = { emojiLayout = it },
-                inlineContent = EmojiShortcodes.content(received),
-                fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
-                lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
-                maxLines = 1,
-                softWrap = false,
-            )
+            CompositionLocalProvider(LocalCustomEmoji provides library) {
+                Text(
+                    text = EmojiShortcodes.annotate(AnnotatedString(emoji)),
+                    modifier =
+                        Modifier.localReactionGlyphTarget(localMotion, emoji, pill.selected, allowHostClipping) {
+                            emojiLayout?.takeIf { artwork == null || it.placeholderRects.singleOrNull() != null }
+                        },
+                    onTextLayout = { emojiLayout = it },
+                    inlineContent = EmojiShortcodes.content(received),
+                    fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
+                    lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         } else {
             Text(
                 text = "+${pill.omittedTypes}",

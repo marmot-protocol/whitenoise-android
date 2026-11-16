@@ -33,8 +33,7 @@ internal fun ConversationController.publishGroupCommitRefusal(refused: List<Grou
 
 /**
  * Dismisses this chat's relay refusals for good through MDK, which then allows group changes again, and rereads the
- * chat's state. The banner clears as soon as MDK accepts, and reads already in flight are made stale first, so neither
- * one of them nor a failed reread can bring back a dismissed refusal. A
+ * chat's state. As on iOS, the banner clears through that reread, so a reread that fails keeps it on screen. A
  * failure shows a localized reason only. No group commit lock is taken: nothing is committed, and the lock is held for
  * whole uploads. Acknowledging also admits one change attempt that relays still owe, which MDK keeps in memory.
  */
@@ -56,9 +55,6 @@ internal suspend fun ConversationController.dismissGroupCommitRefusal() {
                 appState.marmotIo { acknowledgeGroupCommitUndelivered(account, groupIdHex) }
             }
         }.onSuccess {
-            // A read that started before the acknowledgement may still answer with the refusal it saw.
-            groupConvergenceReads.advance()
-            if (owns()) state.refusedRelays = emptyList()
             readGroupConvergenceParkedAfterRetry()
         }.onFailure {
             if (owns()) state.dismissFailure = R.string.group_commit_refusal_dismiss_failed

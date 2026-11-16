@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.DiscardFailedSendOutcomeFfi
 import dev.ipf.marmotkit.DiscardFailedSendResultFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
@@ -25,33 +24,24 @@ internal fun ConversationController.isDurableFailedRecord(record: TimelineMessag
         record.invalidationStatus == LOCAL_PUBLISH_FAILED &&
         isMessageMine(TimelineProjector.toAppMessageRecord(record))
 
-/** The delete-capability form of [isDurableFailedRecord], looked up from the loaded timeline. */
-internal fun ConversationController.isDurableFailedRecord(message: AppMessageRecordFfi): Boolean {
-    val record = timelineRecords[message.messageIdHex] ?: return false
-    return isDurableFailedRecord(record)
-}
-
-/** A delete for everyone needs a live send path, a message id, and a message the group actually received. */
-internal fun ConversationController.remoteDeleteAllowed(message: AppMessageRecordFfi): Boolean =
-    canSendMessages && message.messageIdHex.isNotBlank() && !isDurableFailedRecord(message)
-
 /** The row form of [isDurableFailedRecord], used by the bubble's Discard actions. */
 internal fun ConversationController.isDurableFailedSend(item: TimelineMessage) = isDurableFailedRecord(item.projected)
 
+/** MDK's discard call for one failed send, made off the main thread. */
+private typealias FailedSendDiscard = suspend (account: String, groupIdHex: String, messageIdHex: String) ->
+DiscardFailedSendResultFfi
+
 /**
  * Removes a failed own send from this device through MDK, which publishes nothing, so the group never hears about a
- * message nobody received. The timeline then drops the row through its own removal. Returns true once MDK discarded
- * it. A send MDK may still publish is left alone with a notice. A row MDK no longer counts as a failed send, because
- * it was delivered or resent meanwhile, changes only through [onNotFailedSend]: Discard leaves it alone, and Delete
- * for me passes its local hide. With [presentFailure] off, as in a batch, nothing is presented per row. No group
- * commit lock is taken: nothing is committed, MDK arbitrates the sends it still owns, and the lock is held for whole
- * uploads.
+ * message nobody received. The timeline then drops the row through its own removal. Returns true once the row is
+ * gone. A send MDK may still publish is left alone with a notice. A row MDK no longer counts as a failed send, because
+ * it was delivered or resent meanwhile, is hidden on this device instead, as the user asked to remove it, which
+ * matches White Noise on iOS. No group commit lock is taken: nothing is committed, MDK arbitrates the sends it still
+ * owns, and the lock is held for whole uploads.
  */
 internal suspend fun ConversationController.discardDurableFailedSend(
     messageIdHex: String,
-    onNotFailedSend: suspend () -> Boolean = { false },
-    presentFailure: Boolean = true,
-    discard: suspend (String, String, String) -> DiscardFailedSendResultFfi = { account, groupIdHex, messageId ->
+    discard: FailedSendDiscard = { account, groupIdHex, messageId ->
         appState.marmotIo { discardFailedSend(account, groupIdHex, messageId) }
     },
 ): Boolean {
@@ -60,7 +50,6 @@ internal suspend fun ConversationController.discardDurableFailedSend(
     if (account == null || !durableDiscardsInFlight.add(flightKey)) return false
     val generation = appState.runtimeGeneration
     val owns = { appState.runtimeGeneration == generation }
-    val presents = { presentFailure && owns() }
     // The removal can land before MDK replies, so capture the row's cache keys first.
     val cacheKeys =
         timelineRecords[messageIdHex]
@@ -69,17 +58,9 @@ internal suspend fun ConversationController.discardDurableFailedSend(
             .map { index -> mediaCacheKey(account, messageIdHex, index) }
     try {
         return runCatchingCancellable { discard(account, group.groupIdHex, messageIdHex) }.fold(
-            onSuccess = { result ->
-                if (result.outcome == DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND) {
-                    owns() && onNotFailedSend()
-                } else {
-                    applyDiscardOutcome(account, messageIdHex, cacheKeys, result, presents)
-                }
-            },
+            onSuccess = { result -> applyDiscardOutcome(account, messageIdHex, cacheKeys, result, owns) },
             onFailure = { failure ->
-                if (presents()) {
-                    appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_DISCARD", failure)
-                }
+                if (owns()) appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_DISCARD", failure)
                 false
             },
         )
@@ -88,13 +69,13 @@ internal suspend fun ConversationController.discardDurableFailedSend(
     }
 }
 
-/** Applies MDK's discard answer for [messageIdHex], returning true once the send is gone from this device. */
+/** Applies MDK's discard answer for [messageIdHex], returning true once the row is gone from this device. */
 private suspend fun ConversationController.applyDiscardOutcome(
     account: String,
     messageIdHex: String,
     cacheKeys: List<String>,
     result: DiscardFailedSendResultFfi,
-    presents: () -> Boolean,
+    owns: () -> Boolean,
 ): Boolean =
     when (result.outcome) {
         DiscardFailedSendOutcomeFfi.DISCARDED -> {
@@ -103,11 +84,10 @@ private suspend fun ConversationController.applyDiscardOutcome(
             true
         }
         DiscardFailedSendOutcomeFfi.STILL_SENDING -> {
-            if (presents()) presentConversationTransient(R.string.message_discard_still_sending)
+            if (owns()) presentConversationTransient(R.string.message_discard_still_sending)
             false
         }
-        // The caller decides what a row that is no longer a failed send means; nothing changed in MDK.
-        DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND -> false
+        DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND -> owns() && hideMessageForMe(messageIdHex)
     }
 
 /** Drops a discarded send's decrypted media by cache key and by MDK's ciphertext hashes. */
@@ -119,16 +99,4 @@ private suspend fun ConversationController.purgeDiscardedSendMedia(
     removeMediaMemoryCacheKeys(cacheKeys, Dispatchers.Main.immediate, appState::removeMediaMemoryCacheEntry)
     withContext(Dispatchers.IO) { cacheKeys.forEach { appState.diskMediaCache.remove(it) } }
     evictExpiredMediaCaches(account, ciphertextSha256.mapTo(mutableSetOf()) { it.lowercase() })
-}
-
-/**
- * Batch Delete for me of one selected row. A durable failed send goes through MDK's discard, so its media is purged
- * and nothing is published. Any other row, including one MDK no longer counts as a failed send, is hidden on this
- * device as before.
- */
-internal suspend fun ConversationController.removeForMeResult(messageIdHex: String): Result<Unit> {
-    if (!isDurableFailedRecord(timelineRecords[messageIdHex])) return hideMessageForMeResult(messageIdHex)
-    val hide = suspend { hideMessageForMeResult(messageIdHex).isSuccess }
-    val removed = discardDurableFailedSend(messageIdHex, onNotFailedSend = hide, presentFailure = false)
-    return if (removed) Result.success(Unit) else Result.failure(java.io.IOException("Failed send was not discarded"))
 }
