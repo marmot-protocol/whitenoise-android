@@ -2844,20 +2844,24 @@ class ConversationDictationControllerTest {
     @Test
     fun returningFromMicrophoneSettingsStartsOnceOnlyAfterAccessIsRestored() {
         val platform = FakePlatform(microphoneAccessOverride = ConversationDictationMicrophoneAccess.MicrophoneMuted)
-        val f = fixture(draft = TextFieldValue("Keep "), platform = platform)
+        val f = fixture(draft = TextFieldValue("Keep ", TextRange(5)), platform = platform)
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.controller.resumeAfterMicrophoneSettings()
         f.controller.onAppBackgrounded()
         assertFalse(platform.session.started)
+        val currentDraft = TextFieldValue("Keep updated ", TextRange(13))
+        f.edit(key(), currentDraft)
         platform.microphoneAccessOverride = ConversationDictationMicrophoneAccess.Granted
         f.controller.onAppForegrounded()
         assertTrue(platform.session.started)
+        assertEquals(currentDraft, f.drafts.getValue(key()))
         val startedSession = f.controller.state.sessionId
         f.controller.onAppForegrounded()
         assertEquals(startedSession, f.controller.state.sessionId)
         f.controller.stop()
         platform.listener.onResult("recovered words")
-        assertEquals("Keep recovered words", f.drafts.getValue(key()).text)
+        assertEquals("Keep updated recovered words", f.drafts.getValue(key()).text)
+        assertEquals(TextRange("Keep updated recovered words".length), f.drafts.getValue(key()).selection)
         assertEquals(1, f.writes)
     }
 

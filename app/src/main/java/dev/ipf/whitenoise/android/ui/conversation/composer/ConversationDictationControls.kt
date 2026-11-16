@@ -214,11 +214,12 @@ internal fun ConversationDictationCompactActions(
         ConversationDictationMicrophoneDialog(
             onDismiss = controller::dismissFailure,
             onOpenSettings = {
-                val opened = runCatching {
-                    context.startActivity(
-                        Intent(Settings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }.isSuccess
+                val opened =
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_PRIVACY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }.isSuccess
                 if (opened) controller.resumeAfterMicrophoneSettings()
             },
         )

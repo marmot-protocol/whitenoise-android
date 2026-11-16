@@ -51,8 +51,9 @@ class AppStateSizeRatchetTest {
     }
 
     private companion object {
-        const val MAX_LINES = 10_475
+        // Microphone recovery adds host-policy wiring and documents app-lock ordering at the lifecycle owner.
+        const val MAX_LINES = 10_477
         const val CHATS_CONTROLLER_MAX_LINES = 2_152
-        const val DICTATION_CONTROLLER_MAX_LINES = 1_453
+        const val DICTATION_CONTROLLER_MAX_LINES = 1_452
     }
 }

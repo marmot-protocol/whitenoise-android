@@ -62,7 +62,7 @@ internal data class ConversationDictationKey(
 @Suppress("LargeClass", "ReturnCount", "TooManyFunctions")
 internal class ConversationDictationController internal constructor(
     internal val platform: ConversationDictationPlatform,
-    private val microphoneRecoveryAllowed: () -> Boolean = { true },
+    internal val microphoneRecoveryAllowed: () -> Boolean = { true },
     internal val readDraft: (accountRef: String, groupIdHex: String) -> ConversationDictationDraftSnapshot,
     internal val writeDraft: (
         accountRef: String,
@@ -720,16 +720,7 @@ internal class ConversationDictationController internal constructor(
                 )
             return
         }
-        when (platform.microphoneAccess()) {
-            ConversationDictationMicrophoneAccess.Granted ->
-                startWhenProviderAvailable(pending.sessionId, pending.target)
-            ConversationDictationMicrophoneAccess.RuntimePermissionRequired ->
-                fail(pending.sessionId, pending.target, ConversationDictationFailure.PermissionDenied)
-            ConversationDictationMicrophoneAccess.AppOpDenied ->
-                fail(pending.sessionId, pending.target, ConversationDictationFailure.PermissionPermanentlyDenied)
-            ConversationDictationMicrophoneAccess.MicrophoneMuted ->
-                fail(pending.sessionId, pending.target, ConversationDictationFailure.MicrophoneMuted)
-        }
+        resumeAfterMicrophonePermission(pending)
     }
 
     /** Claims one permission request so recomposition or Activity recreation cannot launch it twice. */
@@ -891,17 +882,7 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** Arms one return from settings only for the failure whose recovery the user chose. */
-    fun resumeAfterMicrophoneSettings() {
-        val failed = state as? ConversationDictationState.Failed ?: return
-        if (failed.reason !in setOf(
-                ConversationDictationFailure.MicrophoneMuted,
-                ConversationDictationFailure.PermissionDenied,
-                ConversationDictationFailure.PermissionPermanentlyDenied,
-            ) || !failed.retainedTranscript.isNullOrBlank() ||
-            runCatching(platform::callerAudioHasPending).getOrDefault(true)
-        ) return
-        microphoneSettingsRecovery = failed
-    }
+    fun resumeAfterMicrophoneSettings() = armMicrophoneSettingsRecovery()
 
     /** Recreates a failed session against the origin's current authoritative draft. */
     fun retry() {
@@ -1017,19 +998,6 @@ internal class ConversationDictationController internal constructor(
                 "phase=${state.diagnosticPhase()} outcome=${if (abort) "aborted" else "continued"}",
         )
         if (abort) abortSessionPreservingTranscript("app_background")
-    }
-
-    /** Keeps a settings return bound to its original failure and the host's unlocked state. */
-    private fun resumeMicrophoneSettingsRecovery(): Boolean {
-        val microphoneRecovery = microphoneSettingsRecovery
-        // A foreground callback can precede app-lock evaluation; wait for the host's unlocked return.
-        if (microphoneRecovery != null && state === microphoneRecovery && !microphoneRecoveryAllowed()) return true
-        microphoneSettingsRecovery = null
-        val restored =
-            microphoneRecovery != null && state === microphoneRecovery &&
-                runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
-        if (restored) retry()
-        return restored
     }
 
     /** Retries any deferred narrowing only after a real foreground return. */
