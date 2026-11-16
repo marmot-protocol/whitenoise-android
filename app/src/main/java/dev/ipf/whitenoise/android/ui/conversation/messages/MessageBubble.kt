@@ -930,6 +930,17 @@ internal fun MessageBubble(
             )
         }
     val forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload
+    // Text is self-contained; a media snapshot still needs its live source.
+    val openForwardPayload =
+        surfaces.forwardSnapshot?.takeIf { it is ForwardMessagePayload.Text || forwardPayload != null }
+    val forwardPickerVisible = surfaces.forwardSheetOpen && !deleted && openForwardPayload != null
+    LaunchedEffect(surfaces.forwardSheetOpen, openForwardPayload) {
+        if (surfaces.forwardSheetOpen && openForwardPayload == null) {
+            surfaces.forwardSheetOpen = false
+            surfaces.forwardSnapshot = null
+            onActionMenuOpenChange(false)
+        }
+    }
     val reserveSenderAvatarSlot =
         GroupProjector.shouldShowTranscriptSenderAvatar(
             isDm = controller.usesDirectTranscriptChrome,
@@ -3044,7 +3055,7 @@ internal fun MessageBubble(
                     canInfo = !deleted,
                     canReport = reportAudience != null,
                     quickReactionEmojis = quickReactionEmojis,
-                    onDismissRequest = { if (!surfaces.forwardSheetOpen) onActionMenuOpenChange(false) },
+                    onDismissRequest = { if (!forwardPickerVisible) onActionMenuOpenChange(false) },
                     onReactionOrigin = localReactionMotion::choose,
                     onReact = { emoji ->
                         if (!deleted && !actionsReadOnly) {
@@ -3396,11 +3407,7 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                // A text snapshot is complete on its own, so a pending source that confirms, fails or reconciles
-                // while the sheet is open cannot rewrite or close it. Media still needs its live source.
-                val openForwardPayload =
-                    surfaces.forwardSnapshot?.takeIf { it is ForwardMessagePayload.Text || forwardPayload != null }
-                if (surfaces.forwardSheetOpen && !deleted && openForwardPayload != null) {
+                if (forwardPickerVisible && openForwardPayload != null) {
                     ForwardMessageSheet(
                         appState = appState,
                         payloads = listOf(openForwardPayload),

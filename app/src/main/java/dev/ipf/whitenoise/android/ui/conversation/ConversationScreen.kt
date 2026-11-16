@@ -1756,7 +1756,8 @@ internal fun ConversationScreen(
             menuBackdropImeReturning = false
         }
     }
-    LaunchedEffect(openActionMenuId, routeTransitionInProgress, transcriptRoutedAway, selectionMode) {
+    val suppressMenuImeRestore = selectionMode || dragAnchorTimelineId != null
+    LaunchedEffect(openActionMenuId, routeTransitionInProgress, transcriptRoutedAway, suppressMenuImeRestore) {
         if (routeTransitionInProgress || transcriptRoutedAway) {
             menuIme.cancel()
             menuBackdropImeBottom = null
@@ -1766,9 +1767,9 @@ internal fun ConversationScreen(
                 menuIme.close(
                     replyTarget = controller.replyingTo?.messageIdHex,
                     editTarget = controller.editingMessageId,
-                    selectionMode = selectionMode,
+                    selectionMode = suppressMenuImeRestore,
                 )
-            if (selectionMode) {
+            if (suppressMenuImeRestore) {
                 keyboardController?.hide()
                 menuBackdropImeBottom = null
                 menuBackdropImeReturning = false

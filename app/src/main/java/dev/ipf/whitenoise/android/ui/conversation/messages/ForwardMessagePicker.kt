@@ -66,11 +66,11 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
+import dev.ipf.whitenoise.android.state.requestForwardTargetMembers
 import dev.ipf.whitenoise.android.ui.chats.ChatListPinnedBoundary
 import dev.ipf.whitenoise.android.ui.chats.pinnedBoundaryIndex
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
-import dev.ipf.whitenoise.android.state.requestForwardTargetMembers
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen

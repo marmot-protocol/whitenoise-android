@@ -98,6 +98,7 @@ class ForwardAttentionFolderReactivityTest {
         val otherAccountHex = "d0".repeat(32)
         val appState =
             emptyAppState(
+                profiles = mutableMapOf(PEER_A to profile("Person A"), PEER_B to profile("Person B")),
                 accounts = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX), testAccount(otherAccountRef, otherAccountHex)),
             )
         val activeController = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
@@ -134,13 +135,19 @@ class ForwardAttentionFolderReactivityTest {
             activeChip.assertDoesNotExist()
             scrollToFolder(folders.getValue(otherAccountRef).id)
             destinationChip.assertExists()
-            destinationChip.performClick()
+            destinationChip.performClick().assertIsSelected()
+            composeRule.onNodeWithText("Person A").assertDoesNotExist()
+            composeRule.onNodeWithText("Person B").assertDoesNotExist()
 
             val destination = requireNotNull(destinationController)
             publishAndAwaitRevision(destination, attentionRow(GROUP_A), otherAccountRef)
-            destinationChip.assertExists()
+            destinationChip.assertIsSelected()
+            composeRule.onNodeWithText("Person A").assertExists()
+            composeRule.onNodeWithText("Person B").assertDoesNotExist()
             publishAndAwaitRevision(destination, attentionRow(GROUP_B), otherAccountRef)
-            destinationChip.assertExists()
+            destinationChip.assertIsSelected()
+            composeRule.onNodeWithText("Person A").assertExists()
+            composeRule.onNodeWithText("Person B").assertExists()
             activeChip.assertDoesNotExist()
 
             composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG).performClick()

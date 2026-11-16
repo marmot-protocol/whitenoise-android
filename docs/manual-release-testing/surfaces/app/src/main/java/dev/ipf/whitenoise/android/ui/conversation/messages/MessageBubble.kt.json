@@ -282,6 +282,14 @@
         "test_ids": [
           "AXY-002"
         ]
+      },
+      {
+        "surface": "Media eligibility loss closes the forward picker and message menu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "val forwardPickerVisible",
+        "test_ids": [
+          "MSG-010"
+        ]
       }
     ],
     "message_rendering_contracts": [
