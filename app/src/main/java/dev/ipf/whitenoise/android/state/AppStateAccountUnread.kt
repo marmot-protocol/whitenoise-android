@@ -190,6 +190,7 @@ internal suspend fun WhiteNoiseAppState.refreshAccountUnreadCount(accountRef: St
     accountUnreadStore.publishExactIfUnchanged(ref, previous, result.value)
 }
 
+/** Last retained unread total per account label, including totals whose freshness is unknown. */
 val WhiteNoiseAppState.accountUnreadCounts: Map<String, ULong>
     get() = accountUnreadStore.retainedCounts
 
@@ -212,6 +213,7 @@ fun WhiteNoiseAppState.accountShowsUnreadDot(accountRef: String?): Boolean {
     return accountUnreadStore.values[ref].showsUnreadDot()
 }
 
+/** Stores a confirmed unread total for [accountRef], keeping its manual-unread flag. Blank refs are ignored. */
 internal fun WhiteNoiseAppState.updateAccountUnreadCount(
     accountRef: String?,
     unreadCount: ULong,
@@ -240,6 +242,7 @@ internal fun WhiteNoiseAppState.updateAccountUnreadProjection(
 internal val WhiteNoiseAppState.accountManualUnreadRefs: Set<String>
     get() = accountUnreadStore.manualUnreadRefs
 
+/** Adds or removes [accountRef] from [accountManualUnreadRefs]. */
 internal fun WhiteNoiseAppState.updateAccountManualUnread(
     accountRef: String?,
     hasManualUnread: Boolean,

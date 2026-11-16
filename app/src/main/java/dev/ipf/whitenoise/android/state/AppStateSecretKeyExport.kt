@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.R
 
+/** Reveals the active account's nsec for export, or returns null after a scrubbed failure toast. */
 suspend fun WhiteNoiseAppState.exportActiveAccountNsec(): String? {
     val accountRef = activeAccountRef ?: return null
     return runCatchingCancellable {
@@ -13,6 +14,7 @@ suspend fun WhiteNoiseAppState.exportActiveAccountNsec(): String? {
     }.getOrNull()
 }
 
+/** Encrypts the active account's secret key with [passphrase]; returns null after a failure toast. */
 suspend fun WhiteNoiseAppState.exportEncryptedSecretKeyBackup(passphrase: String): String? {
     val account = activeAccountRef ?: return null
     return runCatchingCancellable {
