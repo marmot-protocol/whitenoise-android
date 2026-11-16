@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
@@ -208,6 +209,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ComposerSendMotionMediaG
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
+import dev.ipf.whitenoise.android.ui.conversation.media.GiphySearchSheet
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalPickMediaDomains
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
@@ -1913,6 +1915,12 @@ internal fun ConversationScreen(
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
     var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
     var stickerSheetOpen by remember(chat.id) { mutableStateOf(false) }
+    var giphySearchOpen by remember(attachmentOrigin) { mutableStateOf(false) }
+    val canSendGiphy = controller.canSendMessages && controller.editingMessageId == null
+    val giphyPickerAvailable = canSendGiphy && !transcriptRoutedAway && !freezeRoutePresentation
+    LaunchedEffect(giphyPickerAvailable) {
+        if (!giphyPickerAvailable) giphySearchOpen = false
+    }
     var emojiLibraryPages by remember(chat.id) { mutableStateOf(emptyList<ConversationEmojiLibraryPage>()) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
@@ -4500,6 +4508,12 @@ internal fun ConversationScreen(
                             } else {
                                 null
                             },
+                        onSearchGifs =
+                            if (BuildConfig.WHITENOISE_GIPHY_API_KEY.isNotBlank() && giphyPickerAvailable) {
+                                { giphySearchOpen = true }
+                            } else {
+                                null
+                            },
                         onOpenEmojiSettings =
                             if (draftAccountRef != null && draftAccountRef == appState.activeAccountRef) {
                                 { emojiLibraryPages = listOf(ConversationEmojiLibraryPage.Settings) }
@@ -5450,6 +5464,25 @@ internal fun ConversationScreen(
                             created = controller.createPoll(question, options, type, deadlineDurationSeconds, reply)
                         } finally {
                             onResult(created)
+                        }
+                    }
+                },
+            )
+        }
+
+        if (giphySearchOpen && giphyPickerAvailable) {
+            GiphySearchSheet(
+                apiKey = BuildConfig.WHITENOISE_GIPHY_API_KEY,
+                onDismiss = { giphySearchOpen = false },
+                onSend = { wireText ->
+                    if (giphySearchOpen) {
+                        giphySearchOpen = false
+                        appState.launchMutation {
+                            if (controller.ownsRetainedForegroundPresentation && controller.canSendMessages &&
+                                controller.editingMessageId == null
+                            ) {
+                                controller.send(wireText, onAccepted = { revealSentMessage() })
+                            }
                         }
                     }
                 },

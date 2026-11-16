@@ -2543,6 +2543,14 @@
     <string name="collapse_message">Collapse Message</string>
     <string name="go_to_message">Go to Message</string>
     <string name="gif" translatable="false">GIF</string>
+    <string name="giphy_search_title">Search GIFs</string>
+    <string name="giphy_search_hint">Search GIPHY</string>
+    <string name="giphy_search_privacy">Your search and IP address are sent to GIPHY. Opening a received GIF also contacts GIPHY.</string>
+    <string name="giphy_search_powered_by_prefix">Powered by</string>
+    <string name="giphy_search_powered_by">Powered by GIPHY</string>
+    <string name="giphy_search_empty">No GIFs found</string>
+    <string name="giphy_search_failed">Couldn’t search GIPHY</string>
+    <string name="giphy_send_result">Send GIF: %1$s</string>
     <string name="preview_media">Preview</string>
     <string name="cancel_media_changes">Cancel Media Changes</string>
     <string name="media_included">Included</string>

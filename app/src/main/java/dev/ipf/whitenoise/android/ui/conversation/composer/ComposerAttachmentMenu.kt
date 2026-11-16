@@ -140,6 +140,7 @@ internal fun ComposerAttachmentMenu(
     onContact: (() -> Unit)?,
     onPoll: (() -> Unit)? = null,
     onSticker: (() -> Unit)? = null,
+    onSearchGifs: (() -> Unit)? = null,
     textShortcuts: ComposerMenuTextShortcuts = ComposerMenuTextShortcuts(),
     onCustomize: (() -> Unit)? = null,
     onRouteOrigin: (ComposerShortcut, Rect?) -> Unit = { _, _ -> },
@@ -153,6 +154,18 @@ internal fun ComposerAttachmentMenu(
             onCamera?.let { composerAttachmentItem(ComposerShortcut.Camera, R.drawable.ic_camera, it, explain) },
             onGallery?.let { composerAttachmentItem(ComposerShortcut.Gallery, R.drawable.ic_image, it, explain) },
             onFiles?.let { composerAttachmentItem(ComposerShortcut.Files, R.drawable.ic_description, it, explain) },
+            onSearchGifs?.let {
+                WhiteNoiseMenuItem(
+                    stringResource(R.string.giphy_search_title),
+                    it,
+                    R.drawable.ic_gif,
+                    modifier =
+                        Modifier.explainOnLongPress(
+                            composerExplanation(R.string.giphy_search_title, R.string.giphy_search_privacy),
+                            beforeShow = onDismiss,
+                        ),
+                )
+            },
             onLocation?.let {
                 composerAttachmentItem(ComposerShortcut.Location, R.drawable.ic_location_on, it, explain) { origin ->
                     onRouteOrigin(ComposerShortcut.Location, origin)

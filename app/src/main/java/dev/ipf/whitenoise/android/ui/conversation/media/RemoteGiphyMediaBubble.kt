@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.SafeHttpsGet
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
+import dev.ipf.whitenoise.android.media.GIPHY_MAX_MEDIA_BYTES
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
@@ -71,7 +72,7 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.coroutines.resume
 
-internal const val GIPHY_MAX_BODY_BYTES = 5 * 1024 * 1024
+internal const val GIPHY_MAX_BODY_BYTES = GIPHY_MAX_MEDIA_BYTES
 private const val GIPHY_MEMORY_CACHE_MAX_BYTES = 20L * 1024 * 1024
 private const val GIPHY_CONNECT_TIMEOUT_MILLIS = 10_000
 private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
@@ -433,7 +434,7 @@ private suspend fun decodeOwnedGiphyPresentation(
 }
 
 /** Fetches bounded encoded bytes through the existing HTTPS, host, redirect and MIME validation. */
-private suspend fun fetchRemoteGiphyBytes(request: RemoteGiphyMedia.ImageRequest): ByteArray? =
+internal suspend fun fetchRemoteGiphyBytes(request: RemoteGiphyMedia.ImageRequest): ByteArray? =
     withContext(Dispatchers.IO) {
         suspendCancellableCoroutine { continuation ->
             val result =

@@ -339,6 +339,7 @@ internal fun ComposerBar(
     onShareContact: (() -> Unit)? = null,
     onCreatePoll: (() -> Unit)? = null,
     onOpenStickers: (() -> Unit)? = null,
+    onSearchGifs: (() -> Unit)? = null,
     // Rail actions of the inline emoji keyboard; each button is hidden while its callback is null.
     onBrowseEmojiSets: (() -> Unit)? = null,
     onOpenEmojiSettings: (() -> Unit)? = null,
@@ -1775,6 +1776,7 @@ internal fun ComposerBar(
                                     onPickFromGallery
                                         ?.takeIf { ComposerShortcut.Gallery in hiddenAttachments }
                                         ?.let(::guardedAttachmentAction),
+                                onSearchGifs = onSearchGifs?.let(::guardedAttachmentAction),
                                 onFiles =
                                     onPickDocument
                                         ?.takeIf { ComposerShortcut.Files in hiddenAttachments }
