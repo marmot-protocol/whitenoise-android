@@ -918,10 +918,10 @@
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$fun chatMemberTitle: String</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$fun mentionDisplayName: String?</ID>
     <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun enableDefaultNotificationsIfReady: Boolean</ID>
-    <ID>ReturnCount:AppState.kt:WhiteNoiseAppState$suspend fun markNotificationMessageRead: Boolean</ID>
     <ID>ReturnCount:AppStateAccountUnread.kt:internal suspend fun WhiteNoiseAppState.refreshAccountUnreadCount</ID>
     <ID>ReturnCount:AppStateNotificationReply.kt:internal suspend fun WhiteNoiseAppState.sendNotificationReply: NotificationReplySendOutcome</ID>
     <ID>ReturnCount:AppStateNotificationReply.kt:private suspend fun WhiteNoiseAppState.notificationReplyCommitState: NotificationReplyCommitProbe</ID>
+    <ID>ReturnCount:AppStateNotificationReply.kt:suspend fun WhiteNoiseAppState.markNotificationMessageRead: Boolean</ID>
     <ID>ReturnCount:AppUpdateNotifier.kt:AppUpdateNavigation$fun isUpdateTap: Boolean</ID>
     <ID>ReturnCount:AppUpdateNotifier.kt:AppUpdateNotifier$@SuppressLint("MissingPermission") fun show: Boolean</ID>
     <ID>ReturnCount:AttachmentCachePublication.kt:AttachmentCachePublication$fun capturePermit: Permit?</ID>
