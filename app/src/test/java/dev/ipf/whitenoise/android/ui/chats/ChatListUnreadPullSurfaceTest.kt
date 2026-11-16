@@ -124,9 +124,15 @@ class ChatListUnreadPullSurfaceTest {
                 }
             }
         }
-        fun top(tag: String) = rule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.top
+
+        fun top(tag: String) =
+            rule
+                .onNodeWithTag(tag, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.top
         val above = top(CHAT_LIST_PINNED_BOUNDARY_TAG) - top("row.1")
         val below = top("row.2") - top(CHAT_LIST_PINNED_BOUNDARY_TAG)
+
         fun assertTogether(phase: String) {
             assertEquals(phase, above, top(CHAT_LIST_PINNED_BOUNDARY_TAG) - top("row.1"), 0.5f)
             assertEquals(phase, below, top("row.2") - top(CHAT_LIST_PINNED_BOUNDARY_TAG), 0.5f)

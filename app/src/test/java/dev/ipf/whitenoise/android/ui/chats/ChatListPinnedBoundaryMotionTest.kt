@@ -223,7 +223,10 @@ class ChatListPinnedBoundaryMotionTest {
     }
 
     private fun dividerCount(): Int =
-        composeRule.onAllNodesWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG, useUnmergedTree = true).fetchSemanticsNodes().size
+        composeRule
+            .onAllNodesWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .size
 
     private fun dividerBounds(): Rect = boundsOf(CHAT_LIST_PINNED_BOUNDARY_TAG)
 
@@ -239,5 +242,7 @@ class ChatListPinnedBoundaryMotionTest {
             .boundsInRoot()
 
     private fun Color.closeTo(other: Color): Boolean =
-        abs(red - other.red) < 0.02f && abs(green - other.green) < 0.02f && abs(blue - other.blue) < 0.02f
+        abs(red - other.red) < 0.02f &&
+            abs(green - other.green) < 0.02f &&
+            abs(blue - other.blue) < 0.02f
 }
