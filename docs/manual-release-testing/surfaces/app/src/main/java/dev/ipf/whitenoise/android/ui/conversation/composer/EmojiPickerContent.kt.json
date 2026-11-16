@@ -103,7 +103,7 @@
       {
         "surface": "Installed set artwork in the composer picker",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "installedEmojiArtwork(emoji)",
+        "anchor": "libraryEmojiArtwork(emoji)",
         "test_ids": [
           "SET-051"
         ]

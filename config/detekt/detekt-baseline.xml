@@ -468,6 +468,8 @@
     <ID>MagicNumber:NotificationActionReceiver.kt:NotificationActionReceiver$8</ID>
     <ID>MagicNumber:NotificationChannels.kt:NotificationChannels$150L</ID>
     <ID>MagicNumber:NotificationDeliveryController.kt:NotificationDeliveryController$8</ID>
+    <ID>MagicNumber:NotificationDeliveryControllerNativePushSync.kt:8</ID>
+    <ID>MagicNumber:NotificationDeliveryControllerPushClears.kt:8</ID>
     <ID>MagicNumber:NotificationIdentityRendering.kt:0.45f</ID>
     <ID>MagicNumber:NotificationIdentityRendering.kt:0.58f</ID>
     <ID>MagicNumber:NotificationMarkReadWorker.kt:NotificationMarkReadWorker$8</ID>
@@ -1051,9 +1053,9 @@
     <ID>ReturnCount:NotificationAction.kt:NotificationActions$private fun parseFields: NotificationAction?</ID>
     <ID>ReturnCount:NotificationActionReceiver.kt:NotificationActionReceiver$private suspend fun enqueueReplyAction</ID>
     <ID>ReturnCount:NotificationConversationShortcuts.kt:NotificationConversationShortcuts$private fun pruneConversationShortcutsBeforePublish</ID>
-    <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$private suspend fun syncPushForAccount: Boolean</ID>
     <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$suspend fun setBackgroundConnectionEnabled: Boolean</ID>
     <ID>ReturnCount:NotificationDeliveryController.kt:NotificationDeliveryController$suspend fun setLocalNotificationsEnabled: Boolean</ID>
+    <ID>ReturnCount:NotificationDeliveryControllerNativePushSync.kt:internal suspend fun NotificationDeliveryController.syncPushForAccount: Boolean</ID>
     <ID>ReturnCount:NotificationMarkReadWorker.kt:NotificationMarkReadWorker$override suspend fun doWork: Result</ID>
     <ID>ReturnCount:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore$private fun recoveryState: NotificationReplyRecoveryState?</ID>
     <ID>ReturnCount:NotificationReplyCompletionStore.kt:NotificationReplyCompletionStore$private fun strictlyLaterBoundary: NotificationReplyRecoveryBoundary?</ID>

@@ -1751,7 +1751,7 @@
         <item quantity="many">Установлено, пропущено %1$d записей.</item>
         <item quantity="other">Установлено, пропущено %1$d записи.</item>
     </plurals>
-    <string name="custom_emoji_detail">Изображения здесь становятся эмодзи :shortcode:, хранящимися на устройстве. Новое сообщение (не ответ) с таким эмодзи загружает его изображение в зашифрованном виде в этот чат. Реакции, ответы и правки отправляют только shortcode.</string>
+    <string name="custom_emoji_detail">Изображения здесь становятся эмодзи :shortcode:, хранящимися на устройстве. Сообщения, ответы и реакции с таким эмодзи загружают его изображение в зашифрованном виде в этот чат. Правки отправляют только shortcode. Встроенные изображения имеют приоритет для своих кодов.</string>
     <string name="custom_emoji_empty">Своих эмодзи пока нет.</string>
     <string name="custom_emoji_name_title">Название эмодзи</string>
     <string name="custom_emoji_name_label">Код</string>
@@ -2779,4 +2779,16 @@
     <string name="settings_voice_language">Голос и язык</string>
     <string name="photo_editor_rotate">Поворот</string>
     <string name="toast_wipe_outcome_unconfirmed">Не удалось подтвердить результат удаления. Проверьте свои аккаунты, прежде чем продолжить.</string>
+
+    <string name="emoji_name_marmot_classic">Классический сурок</string>
+    <string name="emoji_name_marmot_wave">Сурок машет лапой</string>
+    <string name="emoji_name_marmot_yes">Сурок с поднятым большим пальцем</string>
+    <string name="emoji_name_marmot_laugh">Смеющийся сурок</string>
+    <string name="emoji_name_marmot_love">Сурок с сердечком</string>
+    <string name="emoji_name_marmot_party">Сурок на вечеринке</string>
+    <string name="emoji_name_marmot_fire">Сурок в огне</string>
+    <string name="emoji_name_marmot_wow">Удивлённый сурок</string>
+    <string name="emoji_name_marmot_smirk">Ухмыляющийся сурок</string>
+    <string name="emoji_name_marmot_cry">Плачущий сурок</string>
+    <string name="emoji_name_marmot_angry">Сердитый сурок</string>
 </resources>

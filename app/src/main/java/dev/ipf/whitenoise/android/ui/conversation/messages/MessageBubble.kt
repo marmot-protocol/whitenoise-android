@@ -109,6 +109,8 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.dismissReports
+import dev.ipf.whitenoise.android.state.effectiveBubbleColorArgb
+import dev.ipf.whitenoise.android.state.hideMessageForMe
 import dev.ipf.whitenoise.android.state.isDurableFailedSend
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportsFor
@@ -3230,40 +3232,47 @@ internal fun MessageBubble(
                 )
                 if (surfaces.emojiPickerOpen && !deleted && !actionsReadOnly) {
                     val pickingSlot = surfaces.configureReactionSlot
-                    EmojiPickerSheet(
-                        purpose =
-                            if (pickingSlot == null) {
-                                EmojiPickerPurpose.USE
-                            } else {
-                                EmojiPickerPurpose.CONFIGURE_QUICK_REACTION
-                            },
-                        recentEmojis = recentEmojis,
-                        onEmojiUsed = onEmojiUsed,
-                        onDismissRequest = {
-                            surfaces.emojiPickerOpen = false
-                            surfaces.configureReactionSlot = null
-                        },
-                        onEmojiPicked = { emoji ->
-                            surfaces.emojiPickerOpen = false
-                            if (pickingSlot == null) {
-                                reactWithEmoji(emoji)
-                            } else {
-                                surfaces.pickConfigureReaction(pickingSlot, emoji)
+                    dev.ipf.whitenoise.android.ui.ComposerEmojiLibrary(
+                        dev.ipf.whitenoise.android.ui
+                            .rememberInstalledEmojiPicker(appState),
+                        dev.ipf.whitenoise.android.ui
+                            .rememberConversationEmojiPicker(controller),
+                    ) {
+                        EmojiPickerSheet(
+                            purpose =
+                                if (pickingSlot == null) {
+                                    EmojiPickerPurpose.USE
+                                } else {
+                                    EmojiPickerPurpose.CONFIGURE_QUICK_REACTION
+                                },
+                            recentEmojis = recentEmojis,
+                            onEmojiUsed = onEmojiUsed,
+                            onDismissRequest = {
+                                surfaces.emojiPickerOpen = false
                                 surfaces.configureReactionSlot = null
-                                surfaces.customizeReactionsOpen = true
-                            }
-                        },
-                        onConfigure =
-                            if (pickingSlot != null) {
-                                null
-                            } else {
-                                {
-                                    surfaces.configureReactionsDraft = quickReactionEmojis
-                                    surfaces.emojiPickerOpen = false
+                            },
+                            onEmojiPicked = { emoji ->
+                                surfaces.emojiPickerOpen = false
+                                if (pickingSlot == null) {
+                                    reactWithEmoji(emoji)
+                                } else {
+                                    surfaces.pickConfigureReaction(pickingSlot, emoji)
+                                    surfaces.configureReactionSlot = null
                                     surfaces.customizeReactionsOpen = true
                                 }
                             },
-                    )
+                            onConfigure =
+                                if (pickingSlot != null) {
+                                    null
+                                } else {
+                                    {
+                                        surfaces.configureReactionsDraft = quickReactionEmojis
+                                        surfaces.emojiPickerOpen = false
+                                        surfaces.customizeReactionsOpen = true
+                                    }
+                                },
+                        )
+                    }
                 }
                 if (surfaces.customizeReactionsOpen && !deleted) {
                     ConfigureReactionsSheet(

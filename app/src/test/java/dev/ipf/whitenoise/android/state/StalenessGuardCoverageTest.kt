@@ -4,6 +4,8 @@ import dev.ipf.whitenoise.android.chatsControllerFiles
 import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerFiles
 import dev.ipf.whitenoise.android.conversationControllerSource
+import dev.ipf.whitenoise.android.notificationDeliveryControllerFiles
+import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -376,7 +378,11 @@ class StalenessGuardCoverageTest {
                     appState,
                     notificationContent.functionSections(indentation = ""),
                 ) +
-                asyncPublicationCandidates("NotificationDeliveryController.kt", notificationDelivery) +
+                asyncPublicationCandidates(
+                    "NotificationDeliveryController.kt",
+                    notificationDelivery,
+                    controllerFunctionSections(notificationDeliveryControllerFiles()),
+                ) +
                 asyncPublicationCandidates(
                     "ChatsController.kt",
                     chats,
@@ -603,6 +609,7 @@ class StalenessGuardCoverageTest {
         when (fileName) {
             "ChatsController.kt" -> chatsControllerSource()
             "ConversationController.kt" -> conversationControllerSource()
+            "NotificationDeliveryController.kt" -> notificationDeliveryControllerSource()
             else -> packageSource(fileName)
         }
 

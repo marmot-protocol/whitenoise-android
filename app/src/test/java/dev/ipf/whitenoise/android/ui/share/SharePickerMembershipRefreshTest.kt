@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
+import dev.ipf.whitenoise.android.state.forwardTargets
 import dev.ipf.whitenoise.android.state.presentedRow
 import dev.ipf.whitenoise.android.state.replaceActiveAccountForTest
 import kotlinx.coroutines.CompletableDeferred

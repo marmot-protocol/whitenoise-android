@@ -22,6 +22,7 @@ import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.core.SnippetHighlight
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.chats.ChatRowPortFixtures
 import dev.ipf.whitenoise.android.ui.chats.ChatRowPreviewLine
@@ -133,6 +134,7 @@ class BuiltinEmojiScreenshotTest {
                 WhiteNoiseTheme(darkTheme = dark) {
                     Surface(Modifier.width(360.dp).testTag("builtin-emoji")) {
                         Column(Modifier.padding(16.dp)) {
+                            ReaderSelectablePlainText(EmojiShortcodes.builtins.joinToString(" "), { _, _, _ -> })
                             MarkdownMessageBody(document)
                             Text("Plain fallback")
                             ReaderSelectablePlainText(":marmot: :wn: `:wn:`", { _, _, _ -> })

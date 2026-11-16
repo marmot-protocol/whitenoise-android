@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateInboundShare.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Direct Share stages into the chosen account's chats only after revalidating the account at commit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateInboundShare.kt",
+        "anchor": "suspend fun WhiteNoiseAppState.stageInboundShareForFirstFrame(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Shared files staged for the open chat are consumed within the per-message attachment cap",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateInboundShare.kt",
+        "anchor": "fun WhiteNoiseAppState.consumeInboundShareStreamsCapped(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

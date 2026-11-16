@@ -1676,7 +1676,7 @@
         <item quantity="one">Instalado con %1$d entrada omitida.</item>
         <item quantity="other">Instalado con %1$d entradas omitidas.</item>
     </plurals>
-    <string name="custom_emoji_detail">Las imágenes añadidas aquí se convierten en emojis :shortcode: y se guardan en este dispositivo. Un mensaje nuevo (no una respuesta) con un emoji sube su imagen cifrada a este chat. Reacciones, respuestas y ediciones solo envían el shortcode.</string>
+    <string name="custom_emoji_detail">Las imágenes añadidas aquí se convierten en emojis :shortcode: y se guardan en este dispositivo. Los mensajes, las respuestas y las reacciones con un emoji suben su imagen cifrada a este chat. Las ediciones solo envían el shortcode. Las imágenes integradas tienen prioridad para sus códigos.</string>
     <string name="custom_emoji_empty">Aún no hay emoji personalizados.</string>
     <string name="custom_emoji_name_title">Nombra este emoji</string>
     <string name="custom_emoji_name_label">Código</string>
@@ -2694,4 +2694,16 @@
     <string name="settings_voice_language">Voz e idioma</string>
     <string name="photo_editor_rotate">Girar</string>
     <string name="toast_wipe_outcome_unconfirmed">No se pudo confirmar el resultado del borrado. Revisa tus cuentas antes de continuar.</string>
+
+    <string name="emoji_name_marmot_classic">Marmota clásica</string>
+    <string name="emoji_name_marmot_wave">Marmota saludando</string>
+    <string name="emoji_name_marmot_yes">Marmota con el pulgar arriba</string>
+    <string name="emoji_name_marmot_laugh">Marmota riendo</string>
+    <string name="emoji_name_marmot_love">Marmota con corazón</string>
+    <string name="emoji_name_marmot_party">Marmota de fiesta</string>
+    <string name="emoji_name_marmot_fire">Marmota en llamas</string>
+    <string name="emoji_name_marmot_wow">Marmota sorprendida</string>
+    <string name="emoji_name_marmot_smirk">Marmota con sonrisa pícara</string>
+    <string name="emoji_name_marmot_cry">Marmota llorando</string>
+    <string name="emoji_name_marmot_angry">Marmota enfadada</string>
 </resources>

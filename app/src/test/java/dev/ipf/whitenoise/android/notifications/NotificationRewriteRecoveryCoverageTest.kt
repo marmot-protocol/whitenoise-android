@@ -1,6 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
-import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.localNotificationPresenterSource
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -9,8 +9,7 @@ class NotificationRewriteRecoveryCoverageTest {
     /** Both recovery retries that follow an owned cancellation post without requiring a live card. */
     @Test
     fun ownedRecoveryRetriesDoNotRequireALiveCard() {
-        val presenter =
-            appModuleSource("src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         val historyRetry =
             presenter
                 .substringAfter("val cleanNotification = buildSettled(true)")

@@ -52,6 +52,7 @@ internal class MainShellProcessState(
     private var chatsEntry by mutableStateOf<RetainedChatsController?>(null)
     private var initialConnectionPresentationAvailable = true
     private val conversationControllers = linkedMapOf<ConversationControllerKey, ConversationController>()
+    private var conversationMediaUploadEpoch = appState.mediaUploadSessionEpoch()
 
     /**
      * Returns the retained controller for [accountRef] and [runtimeGeneration], or replaces it
@@ -123,6 +124,7 @@ internal class MainShellProcessState(
         return true
     }
 
+    /** Reuses a conversation only within its captured media session, retaining its route and scroll hints. */
     fun conversationController(
         chatId: String,
         accountRef: String,
@@ -130,6 +132,11 @@ internal class MainShellProcessState(
         presentationKey: Int,
         create: () -> ConversationController,
     ): ConversationController {
+        val mediaUploadEpoch = appState.mediaUploadSessionEpoch()
+        if (conversationMediaUploadEpoch != mediaUploadEpoch) {
+            clearConversationControllers()
+            conversationMediaUploadEpoch = mediaUploadEpoch
+        }
         val key = ConversationControllerKey(chatId, accountRef, runtimeGeneration, presentationKey)
         return conversationControllers.getOrPut(key, create)
     }

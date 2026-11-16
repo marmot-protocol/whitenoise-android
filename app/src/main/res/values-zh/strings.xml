@@ -1654,7 +1654,7 @@
     <plurals name="emoji_sets_skipped">
         <item quantity="other">已安装，跳过了 %1$d 项。</item>
     </plurals>
-    <string name="custom_emoji_detail">此处的图片会变成存储在此设备上的 :shortcode: 表情。使用其中之一的新消息（非回复）会把图片加密上传到该聊天。回应、回复和编辑只发送短代码。</string>
+    <string name="custom_emoji_detail">此处的图片会变成存储在此设备上的 :shortcode: 表情。使用这些表情的消息、回复和回应会把图片加密上传到该聊天。编辑只发送短代码。内置图片在其短代码上优先显示。</string>
     <string name="custom_emoji_empty">还没有自定义表情。</string>
     <string name="custom_emoji_name_title">为此表情命名</string>
     <string name="custom_emoji_name_label">短代码</string>
@@ -2648,4 +2648,16 @@
     <string name="settings_voice_language">语音和语言</string>
     <string name="photo_editor_rotate">旋转</string>
     <string name="toast_wipe_outcome_unconfirmed">无法确认清除结果。请先检查你的账户，然后再继续。</string>
+
+    <string name="emoji_name_marmot_classic">经典土拨鼠</string>
+    <string name="emoji_name_marmot_wave">挥手的土拨鼠</string>
+    <string name="emoji_name_marmot_yes">竖起大拇指的土拨鼠</string>
+    <string name="emoji_name_marmot_laugh">大笑的土拨鼠</string>
+    <string name="emoji_name_marmot_love">抱着爱心的土拨鼠</string>
+    <string name="emoji_name_marmot_party">开派对的土拨鼠</string>
+    <string name="emoji_name_marmot_fire">着火的土拨鼠</string>
+    <string name="emoji_name_marmot_wow">惊讶的土拨鼠</string>
+    <string name="emoji_name_marmot_smirk">坏笑的土拨鼠</string>
+    <string name="emoji_name_marmot_cry">哭泣的土拨鼠</string>
+    <string name="emoji_name_marmot_angry">生气的土拨鼠</string>
 </resources>

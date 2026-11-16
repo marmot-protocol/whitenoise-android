@@ -112,14 +112,11 @@ import dev.ipf.whitenoise.android.media.editor.EditorSourceStore
 import dev.ipf.whitenoise.android.media.editor.MarmotMessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
-import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
-import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationBatteryPolicy
-import dev.ipf.whitenoise.android.notifications.NotificationChannels
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPicture
@@ -130,13 +127,9 @@ import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushStorageRecovery
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
-import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
-import dev.ipf.whitenoise.android.share.CappedShareStreamStaging
-import dev.ipf.whitenoise.android.share.SHARE_STREAM_MAX_ITEMS
 import dev.ipf.whitenoise.android.share.ShareInboundStager
-import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareShortcutPublisher
 import dev.ipf.whitenoise.android.share.ShareStagingStore
 import dev.ipf.whitenoise.android.share.shareResolveMime
@@ -144,7 +137,6 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolutio
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
-import dev.ipf.whitenoise.android.ui.conversation.presentAttachmentAdmission
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
@@ -264,17 +256,6 @@ internal fun appStateScopeExceptionHandler(
         }
     },
 ): CoroutineExceptionHandler = CoroutineExceptionHandler { _, throwable -> report(throwable) }
-
-private data class AccountBubbleColorSlot(
-    val accountRef: String,
-    val theme: BubbleTheme,
-    val side: BubbleSide,
-)
-
-private data class AccountActionColorSlot(
-    val accountRef: String,
-    val theme: BubbleTheme,
-)
 
 private data class PendingAccountSwitchTrace(
     val accountRef: String,
@@ -478,7 +459,8 @@ class WhiteNoiseAppState private constructor(
     /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
     internal val emojiUploads = EmojiUploadCache()
     internal val emojiSetLibrary = EmojiSetLibrary()
-    private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val preferences =
+        preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
     internal val contactPictureStore =
         ContactPictureStore(preferences, appContext.noBackupFilesDir.resolve("contact-pictures"))
             .also {
@@ -560,7 +542,7 @@ class WhiteNoiseAppState private constructor(
     internal suspend fun discoverDictationProviders(): List<ConversationDictationProvider> =
         discoverDictationProvidersForSettings(appContext, conversationDictationPreferences)
 
-    private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
+    internal val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
 
     /** Which draft each picked file belongs to, per account and conversation, so its outgoing worker never changes. */
@@ -1019,11 +1001,11 @@ class WhiteNoiseAppState private constructor(
     private val auditLogSettingsMutex = Mutex()
     private val auditUploadConsent = AuditUploadConsent(preferences)
     val auditUploadConsentRequired: Boolean get() = auditUploadConsent.requiresChoice
-    private val conversationVibrationChannelMutex = Mutex()
+    internal val conversationVibrationChannelMutex = Mutex()
 
     // Treat preference I/O plus observable-state publication as one transaction;
     // otherwise an older successful hide can publish after a newer hide or wipe.
-    private val hiddenMessageMutationMutex = Mutex()
+    internal val hiddenMessageMutationMutex = Mutex()
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     internal val conversationNotificationRouting by lazy { ConversationNotificationRouting(appContext) }
     internal val notificationPreviewSettings by lazy { NotificationPreviewSettings.forContext(appContext) }
@@ -1513,21 +1495,21 @@ class WhiteNoiseAppState private constructor(
     internal val profilePresentationLock = Any()
     private val groupMemberSnapshotLock = Any()
 
-    private val globalBubbleColors =
+    internal val globalBubbleColors =
         ScopedCache<AccountBubbleColorSlot, MutableState<Long?>>(
             registry = accountScopedCaches,
             name = "global-bubble-colors",
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
             observable = true,
         )
-    private val actionColors =
+    internal val actionColors =
         ScopedCache<AccountActionColorSlot, MutableState<Long?>>(
             registry = accountScopedCaches,
             name = "action-colors",
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
             observable = true,
         )
-    private val chatBubbleColors =
+    internal val chatBubbleColors =
         ScopedCache<String, MutableState<Long?>>(
             registry = accountScopedCaches,
             name = "chat-bubble-colors",
@@ -1745,13 +1727,13 @@ class WhiteNoiseAppState private constructor(
             lock = groupMemberSnapshotLock,
         )
     private val conversationStateLock = Any()
-    private val longMessageCollapseState =
+    internal val longMessageCollapseState =
         LongMessageCollapseState(
             registry = accountScopedCaches,
             preferences = preferences,
             maxEntries = MAX_ACCOUNT_SCOPED_UI_CACHE_ENTRIES,
         )
-    private val hiddenMessageIdsByAccountGroup =
+    internal val hiddenMessageIdsByAccountGroup =
         ScopedCache<String, MutableState<Set<String>>>(
             registry = accountScopedCaches,
             name = "hidden-message-ids",
@@ -1840,7 +1822,7 @@ class WhiteNoiseAppState private constructor(
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
         get() = shareStaging.revision + draftHydrationRevision
-    private val shareInboundStager =
+    internal val shareInboundStager =
         ShareInboundStager(
             stageText =
                 inboundShareTextStager ?: { accountRef, groupIdHex, text ->
@@ -3301,39 +3283,6 @@ class WhiteNoiseAppState private constructor(
             ?.markGroupLeft(groupIdHex)
     }
 
-    /**
-     * Confirmed chats the active account can forward a message into, recent
-     * first. Empty when no chats controller is attached yet (the chat-list
-     * stream hasn't bound) — the forward picker then shows its empty state.
-     */
-    fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
-
-    /** Account-wide forward targets beyond the active controller's window (#2618); null when none is attached. */
-    internal suspend fun loadAccountWideForwardTargets(): AccountWideForwardTargets? {
-        val controller = chatsController ?: return null
-        return controller.loadAccountWideForwardTargets()
-    }
-
-    internal val forwardTargetsLoading: Boolean
-        get() = chatsController?.isLoading == true
-
-    internal val forwardTargetsError: ErrorPresentation?
-        get() = chatsController?.error
-
-    internal val forwardTargetMembersRevision: Long
-        get() = chatsController?.memberSnapshotsRevision ?: 0L
-
-    internal val forwardTargetsRevision: Long
-        get() = chatsController?.forwardTargetsRevision ?: 0L
-
-    internal fun requestForwardTargetMembers(groupIds: Iterable<String>) {
-        chatsController?.requestMemberSnapshots(groupIds)
-    }
-
-    internal fun retryForwardTargets() {
-        chatsController?.retryLoad()
-    }
-
     /** Encrypted no-backup persistence for the single unresolved forward request. */
     internal val forwardRequestPersistence =
         ForwardRequestPersistence(mutationsScope) {
@@ -3354,104 +3303,6 @@ class WhiteNoiseAppState private constructor(
                 activeForwardTargetTitles = emptyMap()
             }
         }
-
-    /**
-     * Stage an inbound Android share for the explicitly chosen local account.
-     *
-     * The system-share picker can enumerate a non-active account, so resolving
-     * through [activeAccountRef] here would silently move the draft and stream
-     * ownership to whichever account happened to be active at commit time.
-     * Return false when the chosen account is no longer a signed-in signing
-     * account; callers keep the picker/recovery path visible in that case.
-     */
-    fun stageInboundShare(
-        accountRef: String,
-        targetGroupIds: List<String>,
-        payload: SharePayload,
-    ): Boolean {
-        val target = validatedInboundShareTarget(accountRef, targetGroupIds) ?: return false
-        shareInboundStager.stageToChats(
-            context = appContext,
-            accountIdHex = target.accountIdHex,
-            groupIds = target.groupIds,
-            payload = payload,
-            draftAccountRef = accountRef,
-        )
-        return true
-    }
-
-    /**
-     * Prepares provider MIME metadata on I/O for the automatic Direct Share
-     * route, then applies draft/staging state on the calling Main coroutine.
-     */
-    suspend fun stageInboundShareForFirstFrame(
-        accountRef: String,
-        targetGroupIds: List<String>,
-        payload: SharePayload,
-        shouldCommit: () -> Boolean = { true },
-    ): Boolean {
-        val initialTarget = validatedInboundShareTarget(accountRef, targetGroupIds)
-        if (initialTarget == null || !shouldCommit()) return false
-        val prepared = withContext(Dispatchers.IO) { shareInboundStager.prepare(appContext, payload) }
-        return dev.ipf.whitenoise.android.share.retainShareAtDestination(
-            appContext,
-            initialTarget.accountIdHex,
-            initialTarget.groupIds,
-            payload,
-        ) { droppedCount ->
-            if (!shouldCommit() || validatedInboundShareTarget(accountRef, targetGroupIds) != initialTarget) {
-                false
-            } else {
-                shareInboundStager.stagePreparedToChats(
-                    initialTarget.accountIdHex,
-                    initialTarget.groupIds,
-                    if (payload.importReady) prepared.copy(streamStaging = null) else prepared,
-                    accountRef,
-                )
-                if (payload.importReady && payload.streamUris.isNotEmpty()) shareStaging.notifyTextStaged()
-                val offered = payload.streamUris.size
-                presentAttachmentAdmission(appContext, (offered - droppedCount).coerceAtLeast(0), offered)
-                true
-            }
-        }
-    }
-
-    /** Revalidates account ownership and de-duplicates recipient ids at the commit boundary. */
-    private fun validatedInboundShareTarget(
-        accountRef: String,
-        targetGroupIds: List<String>,
-    ): ValidatedInboundShareTarget? {
-        val account =
-            accounts.firstOrNull { summary ->
-                summary.label == accountRef && summary.isSignedInSigningAccount()
-            } ?: return null
-        val validGroupIds = targetGroupIds.filter(String::isNotBlank).distinct()
-        return validGroupIds
-            .takeIf { it.isNotEmpty() }
-            ?.let { ValidatedInboundShareTarget(account.accountIdHex, it) }
-    }
-
-    /** Account-bound destination resolved immediately before local staging. */
-    private data class ValidatedInboundShareTarget(
-        val accountIdHex: String,
-        val groupIds: List<String>,
-    )
-
-    fun consumeInboundShareStreamsCapped(
-        groupIdHex: String,
-        existingMediaCount: Int,
-        existingDocumentCount: Int,
-        maxItems: Int = SHARE_STREAM_MAX_ITEMS,
-    ): CappedShareStreamStaging? {
-        val accountIdHex = activeAccount?.accountIdHex ?: return null
-        return shareStaging.consumeCapped(
-            accountIdHex = accountIdHex,
-            groupIdHex = groupIdHex,
-            existingMediaCount = existingMediaCount,
-            existingDocumentCount = existingDocumentCount,
-            maxItems = maxItems,
-        )
-    }
 
     /** Publishes Direct Share, then refreshes pinned labels, replacing any earlier publication still in flight. */
     fun publishShareShortcuts(chats: List<ChatListItem>) {
@@ -6594,348 +6445,6 @@ class WhiteNoiseAppState private constructor(
         persistHostSetting { putString(APP_FONT_KEY, font.preferenceValue) }
     }
 
-    internal fun globalBubbleColorArgb(
-        theme: BubbleTheme,
-        side: BubbleSide,
-    ): Long? {
-        val account = activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        val slot = AccountBubbleColorSlot(account, theme, side)
-        return globalBubbleColors
-            .getOrPut(slot) {
-                mutableStateOf(BubbleColorPreferences.readGlobalColor(preferences, account, theme, side))
-            }.value
-    }
-
-    internal fun chatBubbleColorArgb(
-        groupIdHex: String,
-        side: BubbleSide,
-    ): Long? {
-        val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return null
-        return chatBubbleColors
-            .getOrPut(key) {
-                mutableStateOf(BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side))
-            }.value
-    }
-
-    internal fun effectiveBubbleColorArgb(
-        theme: BubbleTheme,
-        side: BubbleSide,
-        groupIdHex: String,
-    ): Long? = chatBubbleColorArgb(groupIdHex, side) ?: globalBubbleColorArgb(theme, side)
-
-    internal fun updateGlobalBubbleColor(
-        theme: BubbleTheme,
-        side: BubbleSide,
-        argb: Long?,
-    ) {
-        val account = activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: return
-        BubbleColorPreferences.writeGlobalColor(preferences, account, theme, side, argb)
-        val color = BubbleColorPreferences.readGlobalColor(preferences, account, theme, side)
-        globalBubbleColors
-            .getOrPut(AccountBubbleColorSlot(account, theme, side)) { mutableStateOf(color) }
-            .value = color
-    }
-
-    internal fun actionColorArgb(
-        theme: BubbleTheme,
-        accountRef: String? = activeAccountRef,
-    ): Long? {
-        val account = accountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        val slot = AccountActionColorSlot(account, theme)
-        return actionColors
-            .getOrPut(slot) {
-                mutableStateOf(ActionColorPreferences.readColor(preferences, account, theme))
-            }.value
-    }
-
-    internal fun updateActionColor(
-        theme: BubbleTheme,
-        argb: Long?,
-    ) {
-        val account = activeAccountRef?.trim()?.takeIf(String::isNotEmpty) ?: return
-        ActionColorPreferences.writeColor(preferences, account, theme, argb)
-        val color = ActionColorPreferences.readColor(preferences, account, theme)
-        actionColors
-            .getOrPut(AccountActionColorSlot(account, theme)) { mutableStateOf(color) }
-            .value = color
-    }
-
-    internal fun updateChatBubbleColor(
-        groupIdHex: String,
-        side: BubbleSide,
-        argb: Long?,
-    ) {
-        val key = BubbleColorPreferences.chatKey(activeAccountRef, groupIdHex, side) ?: return
-        BubbleColorPreferences.writeChatColor(preferences, activeAccountRef, groupIdHex, side, argb)
-        val color = BubbleColorPreferences.readChatColor(preferences, activeAccountRef, groupIdHex, side)
-        chatBubbleColors.getOrPut(key) { mutableStateOf(color) }.value = color
-    }
-
-    /**
-     * Local UI preference for the active account's per-group long-message collapse
-     * gate (#1180). Default ON preserves the existing Read More behavior for every
-     * account/group until the user disables it from that group's details screen.
-     */
-    fun collapseLongMessagesInGroup(groupIdHex: String): Boolean = longMessageCollapseState.collapseLongMessages(activeAccountRef, groupIdHex)
-
-    fun updateCollapseLongMessagesInGroup(
-        groupIdHex: String,
-        enabled: Boolean,
-    ) {
-        longMessageCollapseState.updateCollapseLongMessages(activeAccountRef, groupIdHex, enabled)
-    }
-
-    /** Creates the immutable target channel before making it the persisted active choice. */
-    fun setConversationVibrationPattern(
-        groupIdHex: String,
-        isDm: Boolean,
-        conversationTitle: String,
-        pattern: ConversationVibrationPattern,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
-        mutationsScope.launch {
-            // Channel creation performs NotificationManager Binder calls. Keep
-            // them off the UI dispatcher and serialize rapid choices so an
-            // older operation cannot overwrite the newest persisted choice.
-            conversationVibrationChannelMutex.withLock {
-                val previous = conversationVibrationPreferences.pattern(accountRef, groupIdHex)
-                if (previous == pattern) return@withLock
-                val activeChannelId =
-                    withContext(Dispatchers.Default) {
-                        runCatchingCancellable {
-                            NotificationChannels.ensureChannels(appContext)
-                            ConversationNotificationChannels.ensureConversationChannel(
-                                context = appContext,
-                                parentChannelId = ConversationNotificationChannels.primaryMessageParent(isDm).id,
-                                conversationShortcutId = shortcutId,
-                                conversationTitle = conversationTitle,
-                                vibrationPattern = pattern,
-                                sourceVibrationPattern = previous,
-                            )
-                        }.onFailure { error ->
-                            appStateDebug(error) {
-                                "conversation vibration channel failed group=${groupIdHex.take(8)}"
-                            }
-                        }.getOrNull()
-                    }
-                // Never persist an app-only value when Android could not create
-                // the channel that future posts and settings links need.
-                if (activeChannelId != null) {
-                    conversationVibrationPreferences.setPattern(accountRef, groupIdHex, pattern)
-                }
-            }
-        }
-    }
-
-    /** The engine's durable mute projection for the chat, from the live list. */
-    fun engineConversationMuted(groupIdHex: String): Boolean =
-        (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
-            .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-            ?.engineMuted() == true
-
-    /** Awaitable batch boundary, serialized by the same repository as single-chat mute commands. */
-    @Suppress("ReturnCount") // Owner fences bracket the awaited native command and its committed result.
-    internal suspend fun setConversationMutedAwaited(
-        account: String,
-        groupId: String,
-        muted: Boolean,
-        isCurrent: () -> Boolean,
-    ): Boolean {
-        if (!isCurrent()) return false
-        return chatMuteOwner.admit(ChatMutePreferences.compositeKey(account, groupId)).execute {
-            val result = muteRepositoryCommand(account, groupId, muted, null, isCurrent)
-            if (!isCurrent()) return@execute false
-            result.fold(
-                onSuccess = {
-                    commit(it)
-                    true
-                },
-                onFailure = { false },
-            )
-        }
-    }
-
-    fun setConversationMuted(
-        groupIdHex: String,
-        muted: Boolean,
-        onCommitted: () -> Unit = {},
-        isCurrent: () -> Boolean = { true },
-        completionIsCurrent: () -> Boolean = isCurrent,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        submitMuteCommand(accountRef, groupIdHex, muted, null, onCommitted, isCurrent, completionIsCurrent)
-    }
-
-    /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
-    fun muteConversationFor(
-        groupIdHex: String,
-        durationMillis: Long,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        val expiry = if (durationMillis <= 0) null else System.currentTimeMillis() + durationMillis
-        submitMuteCommand(accountRef, groupIdHex, true, expiry)
-    }
-
-    /** Mute the chat until the exact future Unix epoch-millisecond [expiryMillis]. */
-    fun muteConversationUntil(
-        groupIdHex: String,
-        expiryMillis: Long,
-    ) {
-        val accountRef = activeAccountRef ?: return
-        if (expiryMillis > System.currentTimeMillis()) submitMuteCommand(accountRef, groupIdHex, true, expiryMillis)
-    }
-
-    /** Sends the command to MDK; UI changes only after MDK returns its authoritative settings. */
-    @Suppress("LongParameterList") // Admission and committed-result ownership differ after presentation retires.
-    private fun submitMuteCommand(
-        accountRef: String,
-        groupIdHex: String,
-        muted: Boolean,
-        mutedUntilMs: Long?,
-        onCommitted: () -> Unit = {},
-        isCurrent: () -> Boolean = { true },
-        completionIsCurrent: () -> Boolean = isCurrent,
-    ) {
-        val runtime = runtimeGeneration
-        val ownsSession = { activeAccountRef == accountRef && runtimeGeneration == runtime }
-        val command = chatMuteOwner.admit(ChatMutePreferences.compositeKey(accountRef, groupIdHex))
-        mutationsScope.launch {
-            command.execute<Unit> {
-                if (!ownsSession() || !isCurrent()) return@execute
-                muteRepositoryCommand(accountRef, groupIdHex, muted, mutedUntilMs) { ownsSession() && isCurrent() }
-                    .onSuccess {
-                        if (ownsSession() && completionIsCurrent()) {
-                            commit(it)
-                            onCommitted()
-                        }
-                    }.onFailure {
-                        if (ownsSession() && isCurrent()) {
-                            presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it)
-                        }
-                    }
-            }
-        }
-    }
-
-    private suspend fun muteRepositoryCommand(
-        accountRef: String,
-        groupIdHex: String,
-        muted: Boolean,
-        mutedUntilMs: Long?,
-        isCurrent: () -> Boolean,
-    ): Result<dev.ipf.marmotkit.ChatNotificationSettingsFfi> =
-        if (muted) {
-            chatMuteRepository.setMuted(accountRef, groupIdHex, mutedUntilMs, isCurrent)
-        } else {
-            chatMuteRepository.clearMuted(accountRef, groupIdHex, isCurrent)
-        }
-
-    private suspend fun migrateLegacyMutePreferences() {
-        chatMutePreferences.legacyMuteEntries().forEach { legacy ->
-            val authoritative =
-                chatMuteRepository.settings(legacy.accountRef, legacy.groupIdHex).getOrNull()
-                    ?: return@forEach
-            if (legacy.expiryMillis?.let { it <= System.currentTimeMillis() } == true) {
-                chatMutePreferences.setNotifyForMode(legacy.accountRef, legacy.groupIdHex, legacy.restoreMode)
-                chatMutePreferences.confirmLegacyMuteMigrated(legacy.key)
-                return@forEach
-            }
-            // Existing MDK state always wins. A local-only legacy mute is copied once.
-            val confirmed =
-                if (authoritative.muted || authoritative.updatedAtMs > 0L) {
-                    authoritative
-                } else {
-                    chatMuteRepository
-                        .setMuted(
-                            legacy.accountRef,
-                            legacy.groupIdHex,
-                            legacy.expiryMillis?.takeIf { it > System.currentTimeMillis() },
-                        ).getOrNull()
-                }
-            if (confirmed?.muted == true) {
-                chatMutePreferences.setNotifyForMode(
-                    legacy.accountRef,
-                    legacy.groupIdHex,
-                    legacy.restoreMode,
-                )
-                chatMutePreferences.confirmLegacyMuteMigrated(legacy.key)
-            }
-        }
-    }
-
-    private suspend fun migrateLegacyDrafts() {
-        val accountRefsById = accounts.associate { it.accountIdHex to it.label }
-        val legacyDrafts = withContext(Dispatchers.IO) { legacyDraftMigrationSource.read() }
-        legacyDrafts.forEach { (legacyKey, encoded) ->
-            migrateLegacyDraft(accountRefsById, legacyKey, encoded)
-        }
-    }
-
-    private suspend fun migrateLegacyDraft(
-        accountRefsById: Map<String, String>,
-        legacyKey: String,
-        encoded: String,
-    ) {
-        val separator = legacyKey.indexOf(' ')
-        separator.takeIf { it > 0 && it < legacyKey.lastIndex }?.let { validSeparator ->
-            accountRefsById[legacyKey.substring(0, validSeparator)]?.let { accountRef ->
-                val groupIdHex = legacyKey.substring(validSeparator + 1)
-                val legacyContent = decodeLegacyDraftForMigration(encoded)
-                if (legacyContent == null) {
-                    confirmLegacyDraftMigrated(legacyKey)
-                } else {
-                    migrateDecodedLegacyDraft(legacyKey, accountRef, groupIdHex, legacyContent)
-                }
-            }
-        }
-    }
-
-    private suspend fun migrateDecodedLegacyDraft(
-        legacyKey: String,
-        accountRef: String,
-        groupIdHex: String,
-        legacyContent: String,
-    ) {
-        val currentResult = messageDraftRepository.draft(accountRef, groupIdHex)
-        val current = currentResult.getOrNull()
-        if (currentResult.isSuccess) {
-            val result =
-                if (current == null || (current.content.isBlank() && legacyContent.isNotBlank())) {
-                    messageDraftRepository.saveText(accountRef, groupIdHex, legacyContent)
-                } else {
-                    MessageDraftMutationResult.Success(current)
-                }
-            (result as? MessageDraftMutationResult.Success)?.let { confirmed ->
-                val matchesLegacy = confirmed.draft?.content == legacyContent
-                val confirmedBlankDeletion = legacyContent.isBlank() && confirmed.draft == null
-                val authoritativeContentWins = current?.content?.isNotBlank() == true
-                if (matchesLegacy || confirmedBlankDeletion || authoritativeContentWins) {
-                    confirmLegacyDraftMigrated(legacyKey)
-                }
-            }
-        }
-    }
-
-    private suspend fun confirmLegacyDraftMigrated(legacyKey: String) {
-        withContext(Dispatchers.IO) { legacyDraftMigrationSource.confirmMigrated(legacyKey) }
-    }
-
-    suspend fun authoritativeConversationMuteSettings(groupIdHex: String) =
-        activeAccountRef?.let { accountRef -> chatMuteRepository.settings(accountRef, groupIdHex).getOrNull() }
-
-    /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
-    fun conversationMuteExpiryMillis(groupIdHex: String): Long? {
-        val accountRef = activeAccountRef ?: return null
-        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
-        return chatMuteOwner.mutedUntilMs(key, System.currentTimeMillis()) {
-            (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
-                .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
-                ?.projection
-                ?.mutedUntilMs
-        }
-    }
-
     fun acknowledgeTtsTrustWarning(enginePackage: String) {
         ttsWarningPreferences.acknowledge(enginePackage)
     }
@@ -7029,60 +6538,6 @@ class WhiteNoiseAppState private constructor(
                 if (replacementPublished && previousHandle !== adoptedHandle) {
                     runCatching { previousHandle?.release() }
                 }
-            }
-        }
-
-    fun hiddenMessageIdsInGroup(
-        accountRef: String?,
-        groupIdHex: String,
-    ): Set<String> {
-        val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return emptySet()
-        return hiddenMessageIdsByAccountGroup[key]?.value
-            ?: MessageHidePreferences.readHiddenMessageIdsByKey(preferences, key)
-    }
-
-    /**
-     * Hides one message on this device only, persisting it for its account and conversation, and retracts any
-     * notification content that carried it (#3323). Returns whether the hide was stored.
-     */
-    suspend fun hideMessageForMe(
-        accountRef: String?,
-        groupIdHex: String,
-        messageIdHex: String,
-    ): Boolean {
-        val hidden =
-            hiddenMessageMutationMutex.withLock {
-                val key = MessageHidePreferences.preferenceKey(accountRef, groupIdHex) ?: return@withLock false
-                val updated =
-                    withContext(Dispatchers.IO) {
-                        MessageHidePreferences.hideMessage(preferences, accountRef, groupIdHex, messageIdHex)
-                    }
-                        ?: return@withLock false
-                val state = hiddenMessageIdsByAccountGroup.getOrPut(key) { mutableStateOf(updated) }
-                state.value = updated
-                true
-            }
-        // A successful local hide retracts the message's notification content too (#3323).
-        if (hidden && accountRef != null) {
-            // The hide is already persisted, so its retraction completes even if the caller is cancelled.
-            withContext(NonCancellable) {
-                retractNotificationContent(RemovedNotificationMessage(accountRef, groupIdHex, messageIdHex))
-            }
-        }
-        return hidden
-    }
-
-    suspend fun clearHiddenMessagesForAccount(accountRef: String): Boolean =
-        withContext(NonCancellable) {
-            hiddenMessageMutationMutex.withLock {
-                val prefix = MessageHidePreferences.accountKeyPrefix(accountRef) ?: return@withLock false
-                val cleared =
-                    withContext(Dispatchers.IO) {
-                        MessageHidePreferences.clearAccount(preferences, accountRef)
-                    }
-                if (!cleared) return@withLock false
-                hiddenMessageIdsByAccountGroup.removeAll { it.startsWith(prefix) }
-                true
             }
         }
 
