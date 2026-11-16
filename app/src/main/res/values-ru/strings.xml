@@ -2321,6 +2321,7 @@
     <string name="startup_loading_message">Запуск White Noise…</string>
     <string name="chat_rows_no_chats_title">Нет чатов</string>
     <string name="chat_rows_no_chats_detail">Начните новый чат, чтобы отправить сообщение.</string>
+    <string name="conversation_pane_placeholder">Выберите чат</string>
     <string name="chat_rows_no_unread_title">Нет непрочитанных чатов</string>
     <string name="chat_rows_no_unread_detail">Вы всё прочитали.</string>
     <string name="chat_rows_no_results_detail">Проверьте написание или попробуйте другой запрос.</string>

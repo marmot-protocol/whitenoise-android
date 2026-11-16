@@ -2252,6 +2252,7 @@
     <string name="startup_loading_message">Iniciando o White Noise…</string>
     <string name="chat_rows_no_chats_title">Nenhuma conversa</string>
     <string name="chat_rows_no_chats_detail">Inicie uma nova conversa para enviar uma mensagem.</string>
+    <string name="conversation_pane_placeholder">Selecione uma conversa</string>
     <string name="chat_rows_no_unread_title">Nenhuma conversa não lida</string>
     <string name="chat_rows_no_unread_detail">Você está em dia.</string>
     <string name="chat_rows_no_results_detail">Confira a grafia ou tente outra busca.</string>

@@ -2430,6 +2430,7 @@
     <string name="startup_loading_message">Starting White Noise…</string>
     <string name="chat_rows_no_chats_title">No Chats</string>
     <string name="chat_rows_no_chats_detail">Start a new chat to send a message.</string>
+    <string name="conversation_pane_placeholder">Select a chat</string>
     <string name="chat_rows_no_unread_title">No Unread Chats</string>
     <string name="chat_rows_no_unread_detail">You’re all caught up.</string>
     <string name="chat_rows_no_results_detail">Check the spelling or try a different search.</string>
