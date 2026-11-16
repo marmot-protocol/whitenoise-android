@@ -36,7 +36,6 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
-import dev.ipf.whitenoise.android.state.createdGroupSkippedMembers
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
@@ -104,7 +103,6 @@ private suspend fun createOrRecoverNewGroup(
             }
     }.getOrElse { failure ->
         createdGroupIdAfterProjectionUnavailable(failure)?.also {
-            owner.forgetMemberReport()
             diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
             diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
             diagnostic.failed(DmCreationPhase.PROJECTION, failure)
@@ -231,19 +229,11 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
             }
         diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
         onRetryGroupIdCleared()
-        val skipped =
-            createdGroupSkippedMembers(
-                owner.skippedMembers,
-                owner.memberReportCaptured,
-                submittedMembers,
-                memberIds,
-                appState::displayName,
-            )
+        val skipped = owner.takeSkippedMembers(submittedMembers, memberIds, appState::displayName)
         val title = createdGroupNoticeTitle(showCreatedToast, skipped)
         if (title != null) {
             appState.presentConversationTransient(accountRef, groupIdHex, title, skipped)
         }
-        owner.forgetMemberReport()
         onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
         diagnostic.failed(DmCreationPhase.PROJECTION, it)

@@ -5,7 +5,6 @@ import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
-import dev.ipf.whitenoise.android.state.createdGroupSkippedMembers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -173,14 +172,8 @@ class GroupCreationStagesTest {
                                 opens++
                                 if (attempt == 0) error("Projection temporarily unavailable")
                                 assertEquals("accepted", it)
-                                assertTrue(owner.memberReportCaptured)
-                                val skipped =
-                                    createdGroupSkippedMembers(
-                                        owner.skippedMembers,
-                                        owner.memberReportCaptured,
-                                        submitted = listOf("alice", "bob"),
-                                        memberIds = listOf("self", "alice", "bob"),
-                                    ) { it }
+                                // MDK's report wins over a roster that happens to list everyone.
+                                val skipped = owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it }
                                 assertEquals(AppText.Plain("bob"), skipped)
                                 assertEquals(
                                     R.string.toast_some_members_not_added,
@@ -198,28 +191,24 @@ class GroupCreationStagesTest {
     /** Without MDK's member report, the people missing from the created roster are the ones shown as not added. */
     @Test fun unavailableMemberReportFallsBackToTheCreatedRoster() {
         val owner = GroupCreationSession { true }
-        owner.acceptCreatedGroup(GroupCreationResultFfi("earlier", emptyList())) { it }
-        owner.forgetMemberReport()
 
-        assertEquals(AppText.Plain("bob"), owner.rosterFallback(listOf("self", "ALICE")) { it })
+        assertEquals(AppText.Plain("bob"), owner.takeSkippedMembers(SUBMITTED, listOf("self", "ALICE")) { it })
         assertEquals(
             AppText.Resource(R.string.group_members_not_added_count, listOf(2)),
-            owner.rosterFallback(listOf("self")) { "" },
+            owner.takeSkippedMembers(SUBMITTED, listOf("self")) { "" },
         )
-        assertNull(owner.rosterFallback(listOf("self", "alice", "bob")) { it })
+        assertNull(owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })
     }
 
-    /** Resolves the notice for a two-person submission against [memberIds] as the setup screen does after opening. */
-    private fun GroupCreationSession.rosterFallback(
-        memberIds: List<String>,
-        displayName: (String) -> String,
-    ) = createdGroupSkippedMembers(
-        skippedMembers,
-        memberReportCaptured,
-        submitted = listOf("alice", "bob"),
-        memberIds = memberIds,
-        displayName = displayName,
-    )
+    /** An opened group consumes MDK's report, so a later open reads only its own roster. */
+    @Test fun openingConsumesTheCapturedReport() {
+        val owner = GroupCreationSession { true }
+        val outcomes = listOf(MemberResolutionOutcomeFfi("bob", MemberResolutionStatusFfi.MISSING_KEY_PACKAGE, 0u))
+        owner.acceptCreatedGroup(GroupCreationResultFfi("accepted", outcomes)) { it }
+
+        assertEquals(AppText.Plain("bob"), owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })
+        assertNull(owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })
+    }
 
     /** Handled native failure has no canonical ID, so projection may not run. */
     @Test fun unacceptedFailureCannotEnterOpenStage() =
@@ -235,4 +224,8 @@ class GroupCreationStagesTest {
             )
             assertEquals(listOf("create"), stages)
         }
+
+    private companion object {
+        val SUBMITTED = listOf("alice", "bob")
+    }
 }

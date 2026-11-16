@@ -84,7 +84,8 @@ internal fun inviteFailureDetail(
 
 /**
  * Resolves all-skipped reports and uses the caller's fallback for errors without typed recovery. Several recipients
- * are named only when every one of them has a name, with the remedy their shared skip reason calls for.
+ * are named only when every one of them has a name, with the remedy their shared skip reason calls for. Display names
+ * fall back to a short npub, so the unnamed general message is a defensive fallback rather than an expected state.
  */
 private fun skippedInviteFailureDetail(
     failure: Throwable,

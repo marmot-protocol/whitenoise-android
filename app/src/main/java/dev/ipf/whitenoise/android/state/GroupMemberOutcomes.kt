@@ -81,25 +81,6 @@ internal fun List<String>.missingGroupMembersDetail(displayName: (String) -> Str
     }
 }
 
-/**
- * Uses MDK's member report when this screen received one. An unavailable projection or member report discards it,
- * so the submitted people missing from the created roster are then the only evidence of who was not added.
- */
-internal fun createdGroupSkippedMembers(
-    reported: AppText?,
-    reportCaptured: Boolean,
-    submitted: List<String>,
-    memberIds: List<String>,
-    displayName: (String) -> String,
-): AppText? =
-    if (reportCaptured) {
-        reported
-    } else {
-        submitted
-            .filterNot { ref -> memberIds.any { it.equals(ref, ignoreCase = true) } }
-            .missingGroupMembersDetail(displayName)
-    }
-
 /** Reads the shared runtime's eligibility result independently of its display names. */
 private fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberRefs(): List<String> =
     filter { it.status != MemberResolutionStatusFfi.SELECTED }.map(MemberResolutionOutcomeFfi::accountIdHex)
