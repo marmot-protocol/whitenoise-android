@@ -1685,7 +1685,7 @@
         <item quantity="one">Installato con %1$d voce saltata.</item>
         <item quantity="other">Installato con %1$d voci saltate.</item>
     </plurals>
-    <string name="custom_emoji_detail">Le immagini qui diventano emoji :shortcode: salvate su questo dispositivo. Un nuovo messaggio (non una risposta) che ne usa una carica la sua immagine, cifrata, in quella chat. Reazioni, risposte e modifiche inviano solo lo shortcode.</string>
+    <string name="custom_emoji_detail">Le immagini qui diventano emoji :shortcode: salvate su questo dispositivo. Messaggi, risposte e reazioni che usano una emoji caricano la sua immagine cifrata in quella chat. Le modifiche inviano solo lo shortcode. Le immagini integrate hanno la precedenza per i loro codici.</string>
     <string name="custom_emoji_empty">Ancora nessuna emoji personalizzata.</string>
     <string name="custom_emoji_name_title">Dai un nome a questa emoji</string>
     <string name="custom_emoji_name_label">Codice breve</string>
@@ -2674,4 +2674,16 @@
     <string name="settings_voice_language">Voce e lingua</string>
     <string name="photo_editor_rotate">Ruota</string>
     <string name="toast_wipe_outcome_unconfirmed">Non è stato possibile confermare il risultato della cancellazione. Controlla i tuoi account prima di continuare.</string>
+
+    <string name="emoji_name_marmot_classic">Marmotta classica</string>
+    <string name="emoji_name_marmot_wave">Marmotta che saluta</string>
+    <string name="emoji_name_marmot_yes">Marmotta con il pollice in su</string>
+    <string name="emoji_name_marmot_laugh">Marmotta che ride</string>
+    <string name="emoji_name_marmot_love">Marmotta con cuore</string>
+    <string name="emoji_name_marmot_party">Marmotta in festa</string>
+    <string name="emoji_name_marmot_fire">Marmotta in fiamme</string>
+    <string name="emoji_name_marmot_wow">Marmotta sorpresa</string>
+    <string name="emoji_name_marmot_smirk">Marmotta con un sorrisetto</string>
+    <string name="emoji_name_marmot_cry">Marmotta che piange</string>
+    <string name="emoji_name_marmot_angry">Marmotta arrabbiata</string>
 </resources>

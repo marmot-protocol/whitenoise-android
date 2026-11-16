@@ -80,16 +80,28 @@ internal fun rememberInstalledEmojiPicker(appState: WhiteNoiseAppState?): Instal
 @Composable
 internal fun ComposerEmojiLibrary(
     installed: InstalledEmojiPicker?,
+    conversation: ConversationEmojiPicker? = null,
     content: @Composable () -> Unit,
 ) {
     val local = LocalCustomEmoji.current
-    val library = remember(local, installed) { installed?.let { CustomEmojiSet(local.entries, it) } ?: local }
+    val library =
+        remember(local, installed, conversation) {
+            CustomEmojiSet(local.entries, installed ?: local.installed, conversation ?: local.conversation)
+        }
     CompositionLocalProvider(LocalCustomEmoji provides library, content = content)
 }
 
 /** Resolves one visible shortcode without retaining stale pixels when its set or account changes. */
 @Composable
-internal fun installedEmojiArtwork(shortcode: String): EmojiArt? {
+internal fun libraryEmojiArtwork(shortcode: String): EmojiArt? {
+    val library = LocalCustomEmoji.current
+    val conversation = library.conversation
+    if (library.usesConversationArtwork(shortcode) && conversation != null) {
+        return key(conversation, shortcode) {
+            val art by produceState<EmojiArt?>(null) { value = conversation.artwork(shortcode) }
+            art
+        }
+    }
     val picker = LocalCustomEmoji.current.installed
     val entry = picker?.entries?.get(shortcode)
     return if (picker == null || entry == null) {

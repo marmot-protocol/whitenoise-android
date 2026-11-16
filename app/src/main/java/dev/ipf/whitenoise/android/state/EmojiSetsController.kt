@@ -173,11 +173,28 @@ internal class EmojiSetsController(
         operate(set) { state = state.copy(artwork = backend.preview(set)) }
     }
 
-    /** Installs exactly the displayed version and updates the composer projection on completion. */
+    /** Refreshes the native projection, installs a new version and updates the composer on completion. */
     suspend fun install() {
         val set = state.preview ?: return
         operate(set) {
-            val result = installWithProgress(set)
+            val current = backend.current(set.coordinate)
+            if (closed) return@operate
+            if (current == null) {
+                state = state.copy(preview = null, artwork = null, notice = EmojiSetNotice.NotFound)
+                return@operate
+            }
+            if (current.eventIdHex != set.eventIdHex) {
+                state = state.copy(preview = current, artwork = null, notice = EmojiSetNotice.Changed)
+                return@operate
+            }
+            state = state.copy(preview = current)
+            val installed = current.installed
+            if (installed != null &&
+                (installed.eventIdHex == current.eventIdHex || !installed.updateAvailable)
+            ) {
+                return@operate
+            }
+            val result = installWithProgress(current)
             libraryChanged()
             show(result.set)
             state = state.copy(installedWithSkips = result.skipped.size.takeIf { it > 0 })
@@ -220,6 +237,11 @@ internal class EmojiSetsController(
         backend.newInstall().use { install ->
             activeInstall = install
             try {
+                // Main owns disposal and this handoff, before the first native suspension.
+                if (closed) {
+                    install.cancel()
+                    throw MarmotKitException.EmojiSetInstallCancelled()
+                }
                 state = state.copy(progress = install.progress())
                 coroutineScope {
                     val poll =

@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalEmojiArtwork.kt",
+  "legacy_sha256": "3396af217ec8a2e6922d0271410449a8dcb3ab1afb2d043d8ffcf9d87b5454a1",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Custom emoji image read for sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalEmojiArtwork.kt",
+        "anchor": "internal fun readLocalEmojiArtwork(",
+        "test_ids": [
+          "MSG-034",
+          "MSG-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

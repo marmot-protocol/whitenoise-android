@@ -176,10 +176,10 @@ class NotificationReactionArtworkTest {
         assertNull(LocalNotificationFormatter.redactedContent(content, "White Noise", "hidden").reactionArtworkBody)
     }
 
-    /** Built-in tiles crop canvas padding as the in-app reaction chip does, so the Marmot is not drawn small. */
+    /** The classic tile keeps the original padding crop used by the in-app reaction chip. */
     @Test
     fun builtinArtworkFillsItsTileLikeTheInAppGlyph() {
-        for (code in listOf(":marmot:", ":wn:")) {
+        for (code in listOf(":marmot_classic:", ":wn:")) {
             val tile = requireNotNull(notificationBuiltinEmojiBitmap(context, code))
             try {
                 val opaque =

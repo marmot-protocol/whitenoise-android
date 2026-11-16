@@ -1885,6 +1885,55 @@ class ConversationSendRetryIntegrationTest {
         customEmojiSender = { _, _, _, _, _ -> send() },
     )
 
+    /** A queued artwork send cannot adopt a later session after switching away and back. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun queuedEmojiSendStaysBoundToItsOriginalAccountSession() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state =
+                appState(
+                    additionalAccounts =
+                        listOf(AccountSummaryFfi("bob", "b".repeat(64), true, false, false, true, false)),
+                )
+            var published = 0
+            val controller =
+                emojiController(state) {
+                    published += 1
+                    successfulSendSummary()
+                }
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val holder =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    state.withConversationTextSendOrder(ACCOUNT_REF, GROUP_ID) {
+                        entered.complete(Unit)
+                        release.await()
+                    }
+                }
+            try {
+                entered.await()
+                val send =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        state.sendConversationText(controller, "hi :party:")
+                    }
+                runCurrent()
+                val preload = AccountSwitchPreloadPolicy.STARTUP_RESTORATION
+                assertTrue(state.setActiveAccount("bob", preloadPolicy = preload))
+                assertTrue(state.setActiveAccount(ACCOUNT_REF, preloadPolicy = preload))
+                release.complete(Unit)
+                holder.await()
+                val failure = runCatching { send.await() }.exceptionOrNull()
+                assertTrue(failure is java.util.concurrent.CancellationException)
+                assertEquals(0, published)
+            } finally {
+                release.complete(Unit)
+                holder.await()
+                clearAndAwaitConversationTestFixture(controller)
+                Dispatchers.resetMain()
+            }
+        }
+
     /**
      * Cancelling while the emoji images upload must not wait for the upload, must publish nothing, and
      * must not hold the group commit lock, so reactions and edits stay usable meanwhile.

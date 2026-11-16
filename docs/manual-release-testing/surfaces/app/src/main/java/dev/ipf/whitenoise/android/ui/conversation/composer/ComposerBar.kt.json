@@ -192,9 +192,10 @@
       {
         "surface": "Account-scoped composer emoji library",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "ComposerEmojiLibrary(installedEmoji)",
+        "anchor": "ComposerEmojiLibrary(installedEmoji, conversationEmojiForSend)",
         "test_ids": [
-          "SET-051"
+          "SET-051",
+          "MSG-023"
         ]
       },
       {
