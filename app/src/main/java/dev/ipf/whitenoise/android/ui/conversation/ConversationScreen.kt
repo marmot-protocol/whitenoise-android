@@ -282,7 +282,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 
 private data class ConversationSearchScrollAnchor(
@@ -534,8 +533,6 @@ private fun rememberConversationBatchSelectionUiState(
         )
     }
 }
-
-private const val MENU_KEYBOARD_SETTLE_TIMEOUT_MILLIS = 1_500L
 
 /** Renders one account-owned conversation and coordinates its route-stable presentation. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -1723,21 +1720,34 @@ internal fun ConversationScreen(
     // Scoped to the actual controller: neither account/runtime replacement nor route exit
     // can reuse a menu's pending keyboard restoration.
     val menuIme = remember(controller) { MessageMenuKeyboardPolicy() }
-    var menuBackdropImeBottom by remember(controller) { mutableIntStateOf(0) }
+    var menuBackdropImeBottom by remember(controller) { mutableStateOf<Int?>(null) }
+    var menuBackdropImeReturning by remember(controller) { mutableStateOf(false) }
+    val displayedMenuImeBottom =
+        animatedMenuImeBackdrop(
+            frozenBottom = menuBackdropImeBottom,
+            returning = menuBackdropImeReturning,
+            liveBottom = imeInsets.getBottom(density),
+            onReleased = {
+                menuBackdropImeBottom = null
+                menuBackdropImeReturning = false
+            },
+        )
     var menuComposerWasEditing by remember(controller) { mutableStateOf(false) }
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
-        if (openActionMenuId != null || menuIme.pendingRestore) {
+        if (openActionMenuId != null || menuIme.pendingRestore || menuBackdropImeBottom != null) {
             menuIme.pause()
             openActionMenuId = null
             focusManager.clearFocus(force = true)
             keyboardController?.hide()
-            menuBackdropImeBottom = 0
+            menuBackdropImeBottom = null
+            menuBackdropImeReturning = false
         }
     }
     LaunchedEffect(openActionMenuId, routeTransitionInProgress, transcriptRoutedAway, selectionMode) {
         if (routeTransitionInProgress || transcriptRoutedAway) {
             menuIme.cancel()
-            menuBackdropImeBottom = 0
+            menuBackdropImeBottom = null
+            menuBackdropImeReturning = false
         } else if (openActionMenuId == null) {
             val restoreOwner =
                 menuIme.close(
@@ -1747,7 +1757,8 @@ internal fun ConversationScreen(
                 )
             if (selectionMode) {
                 keyboardController?.hide()
-                menuBackdropImeBottom = 0
+                menuBackdropImeBottom = null
+                menuBackdropImeReturning = false
             } else if (restoreOwner != null) {
                 val focusTarget =
                     when (restoreOwner) {
@@ -1761,27 +1772,25 @@ internal fun ConversationScreen(
                 ) {
                     keyboardController?.show()
                 } else {
-                    menuBackdropImeBottom = 0
+                    menuBackdropImeReturning = true
                 }
+                // Failed focus starts the continuous return immediately.
             }
         }
     }
     val menuImeTargetInsets = WindowInsets.imeAnimationTarget
-    LaunchedEffect(openActionMenuId, menuBackdropImeBottom) {
-        if (openActionMenuId == null && menuBackdropImeBottom > 0) {
+    LaunchedEffect(openActionMenuId, menuBackdropImeBottom != null) {
+        if (openActionMenuId == null && menuBackdropImeBottom != null && !menuBackdropImeReturning) {
             // The return may use a shorter keyboard. Hand geometry back at its actual
             // settled target, rather than waiting for the previous keyboard height.
-            withTimeoutOrNull(MENU_KEYBOARD_SETTLE_TIMEOUT_MILLIS) {
-                snapshotFlow {
-                    imeInsets.getBottom(density) > 0 || menuImeTargetInsets.getBottom(density) > 0
-                }.first { it }
-                awaitImeInsetAtTarget(
-                    readInset = { imeInsets.getBottom(density) },
-                    readTargetInset = { menuImeTargetInsets.getBottom(density) },
-                    awaitFrame = { withFrameNanos { } },
-                )
-            }
-            menuBackdropImeBottom = 0
+            awaitMenuImeRestore(
+                readInset = { imeInsets.getBottom(density) },
+                readTargetInset = { menuImeTargetInsets.getBottom(density) },
+                awaitFrame = { withFrameNanos { } },
+            )
+            // Settlement and timeout both enter a continuous handoff. Neither may
+            // swap a partial snapshot straight to a different live keyboard height.
+            menuBackdropImeReturning = true
         }
     }
     val scope = rememberCoroutineScope()
@@ -4223,9 +4232,9 @@ internal fun ConversationScreen(
                     .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                     .then(
-                        if (menuBackdropImeBottom > 0) {
+                        if (displayedMenuImeBottom != null) {
                             Modifier
-                                .padding(bottom = with(density) { menuBackdropImeBottom.toDp() })
+                                .padding(bottom = with(density) { displayedMenuImeBottom.toDp() })
                                 .consumeWindowInsets(WindowInsets.ime)
                         } else {
                             Modifier
@@ -4620,7 +4629,7 @@ internal fun ConversationScreen(
                             ) &&
                                 !freezeRoutePresentation,
                         autoFocusConsumedState = composerAutoFocusConsumed,
-                        preserveComposerEditingLayout = menuBackdropImeBottom > 0 && menuComposerWasEditing,
+                        preserveComposerEditingLayout = menuBackdropImeBottom != null && menuComposerWasEditing,
                         composerFocus = composerFocus,
                         onComposerFocusChanged = { focused ->
                             if (focused) composerDismissInProgress = false
@@ -5042,7 +5051,13 @@ internal fun ConversationScreen(
                                                             menuComposerWasEditing =
                                                                 composerFocused &&
                                                                 !composerDismissInProgress
-                                                            menuBackdropImeBottom = imeInsets.getBottom(density)
+                                                            // Freeze the visible handoff geometry.
+                                                            menuBackdropImeBottom =
+                                                                captureMenuImeBackdrop(
+                                                                    displayedMenuImeBottom,
+                                                                    imeInsets.getBottom(density),
+                                                                )
+                                                            menuBackdropImeReturning = false
                                                             focusManager.clearFocus(force = true)
                                                             keyboardController?.hide()
                                                         }
@@ -5053,7 +5068,8 @@ internal fun ConversationScreen(
                                                 },
                                                 onForwardMenuHandoff = {
                                                     menuIme.cancel()
-                                                    menuBackdropImeBottom = 0
+                                                    menuBackdropImeBottom = null
+                                                    menuBackdropImeReturning = false
                                                     menuComposerWasEditing = false
                                                     focusManager.clearFocus(force = true)
                                                     keyboardController?.hide()
