@@ -1499,8 +1499,9 @@ internal fun ComposerBar(
                 // Unpinned text actions stay reachable from the Plus menu.
                 val hiddenMenuShortcuts =
                     hiddenAttachments + (composerMenuTextShortcuts intersect available) - selectedShortcuts.toSet()
+                val hasMoreActions = hiddenMenuShortcuts.isNotEmpty() || onSearchGifs != null
                 val liveShortcuts =
-                    selectedShortcuts.filter { it != ComposerShortcut.More || hiddenMenuShortcuts.isNotEmpty() }
+                    selectedShortcuts.filter { it != ComposerShortcut.More || hasMoreActions }
                 var idleToolbar by remember(draftKey, draftAccountRef, draftGroupIdHex) {
                     mutableStateOf(settings to liveShortcuts)
                 }

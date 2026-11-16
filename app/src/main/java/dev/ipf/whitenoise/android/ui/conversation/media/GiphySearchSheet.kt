@@ -15,39 +15,38 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.maxLength
+import androidx.compose.foundation.text.input.maxLengthReject
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onVisibilityChanged
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -58,28 +57,30 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.os.ConfigurationCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.GIPHY_QUERY_MAX_LENGTH
 import dev.ipf.whitenoise.android.media.GiphySearchClient
 import dev.ipf.whitenoise.android.media.GiphySearchResult
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 
-private const val PREVIEW_EDGE_PX = 240
-private const val CONCURRENT_PREVIEWS = 2
+internal const val GIPHY_SEARCH_DEBOUNCE_MS = 300L
+private const val PREVIEW_VISIBLE_FRACTION = 0.05f
 private const val SHEET_HEIGHT_SHARE = 0.82f
 private const val RESULT_TILE_ASPECT_RATIO = 1.25f
 private val ResultTileMinWidth = 132.dp
-
-/** A distinct submission also permits retrying the same query. Its lifetime is the open sheet. */
-private class GiphySearchRequest(
-    val query: String,
-)
+private val PreviewIndicatorSize = 24.dp
 
 internal sealed interface GiphySearchState {
     data object Idle : GiphySearchState
@@ -93,7 +94,7 @@ internal sealed interface GiphySearchState {
     ) : GiphySearchState
 }
 
-/** Opens an on-demand search and sends the selected GIF through the caller's conversation owner. */
+/** Presents debounced GIPHY search and sends only the rendition validated by the picker. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun GiphySearchSheet(
@@ -102,44 +103,61 @@ internal fun GiphySearchSheet(
     onSend: (String) -> Unit,
 ) {
     val client = remember(apiKey) { GiphySearchClient(apiKey) }
+    val loader = remember { GiphyPreviewLoader() }
     val configuration = LocalConfiguration.current
     val language = ConfigurationCompat.getLocales(configuration)[0]?.language.orEmpty()
-    val focusManager = LocalFocusManager.current
     val searchField = remember { TextFieldState() }
     val query = searchField.text.toString().trim()
-    var submitted by remember { mutableStateOf<GiphySearchRequest?>(null) }
-    val activeRequest = submitted?.takeIf { it.query == query }
-    var state by remember(activeRequest) { mutableStateOf<GiphySearchState>(GiphySearchState.Idle) }
-    val previewGate = remember { Semaphore(CONCURRENT_PREVIEWS) }
-    val submit = {
-        if (query.isNotEmpty()) {
-            focusManager.clearFocus()
-            submitted = GiphySearchRequest(query)
-        }
-    }
-
-    LaunchedEffect(query) {
-        if (submitted?.query != query) submitted = null
-    }
-    LaunchedEffect(activeRequest, client, language) {
-        if (activeRequest != null) {
-            state = GiphySearchState.Loading
-            val results = client.search(activeRequest.query, language)
-            state = results?.let { GiphySearchState.Results(it) } ?: GiphySearchState.Failed
-        }
-    }
+    var retryAttempt by remember(query) { mutableIntStateOf(0) }
+    val search: suspend (String) -> List<GiphySearchResult>? =
+        remember(client, language) { { text -> client.search(text, language) } }
+    val state = rememberGiphySearchState(query, retryAttempt, search)
 
     WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss, containerColor = amoledSheetContainerColor()) {
         WhiteNoiseSheetHeader(stringResource(R.string.giphy_search_title), onClose = onDismiss)
         GiphySearchContent(
             searchField = searchField,
             state = state,
-            onSearch = submit,
-            onSend = { onSend(it.media.wireText()) },
-            preview = { result -> rememberGiphySearchPreview(result, previewGate) },
+            onRetry = { retryAttempt++ },
+            onSend = { result ->
+                if (searchField.text.toString().trim() == query) onSend(result.media.wireText())
+            },
+            preview = { result, visible -> rememberGiphySearchPreview(result, loader, visible) },
             modifier = Modifier.heightIn(max = configuration.screenHeightDp.dp * SHEET_HEIGHT_SHARE),
         )
     }
+}
+
+/** Cancels requests and removes stale results as soon as the search text changes. */
+@Composable
+internal fun rememberGiphySearchState(
+    query: String,
+    retryAttempt: Int,
+    search: suspend (String) -> List<GiphySearchResult>?,
+): GiphySearchState {
+    val state =
+        remember(query, retryAttempt, search) {
+            mutableStateOf<GiphySearchState>(if (query.isEmpty()) GiphySearchState.Idle else GiphySearchState.Loading)
+        }
+    LaunchedEffect(query, retryAttempt, search) {
+        if (query.isNotEmpty()) {
+            delay(GIPHY_SEARCH_DEBOUNCE_MS)
+            val results = search(query)
+            currentCoroutineContext().ensureActive()
+            state.value = results?.let { GiphySearchState.Results(it) } ?: GiphySearchState.Failed
+        }
+    }
+    return state.value
+}
+
+internal sealed interface GiphyPreviewState {
+    data object Loading : GiphyPreviewState
+
+    data object Unavailable : GiphyPreviewState
+
+    data class Playable(
+        val preview: GiphyPreview,
+    ) : GiphyPreviewState
 }
 
 /** Renders the disclosure, search field and results in one scrollable area for compact and large-text windows. */
@@ -148,39 +166,48 @@ internal fun GiphySearchSheet(
 internal fun GiphySearchContent(
     searchField: TextFieldState,
     state: GiphySearchState,
-    onSearch: () -> Unit,
+    onRetry: () -> Unit,
     onSend: (GiphySearchResult) -> Unit,
-    preview: @Composable (GiphySearchResult) -> ImageBitmap?,
+    preview: @Composable (GiphySearchResult, Boolean) -> GiphyPreviewState,
     modifier: Modifier = Modifier,
 ) {
-    LazyVerticalGrid(
+    val motionEnabled = rememberSystemAnimationsEnabled()
+    WhiteNoiseLazyVerticalGrid(
         columns = GridCells.Adaptive(ResultTileMinWidth),
         modifier = modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related),
+        contentPadding =
+            PaddingValues(
+                horizontal = WhiteNoiseSpacing.CompactScreenMargin,
+                vertical = WhiteNoiseSpacing.Related,
+            ),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            GiphySearchControls(searchField, onSearch)
+            GiphySearchControls(searchField)
         }
         val results = (state as? GiphySearchState.Results)?.items.orEmpty()
         if (results.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                GiphySearchStatus(state, onSearch)
+                GiphySearchStatus(state, onRetry)
             }
         }
         items(results, key = { it.media.url }) { result ->
-            GiphySearchTile(result, preview(result)) { onSend(result) }
+            var visible by remember { mutableStateOf(false) }
+            GiphySearchTile(
+                result = result,
+                preview = preview(result, visible),
+                motionEnabled = motionEnabled,
+                modifier = Modifier.onVisibilityChanged(minFractionVisible = PREVIEW_VISIBLE_FRACTION) { visible = it },
+                onSend = { onSend(result) },
+            )
         }
     }
 }
 
-/** Gives the provider disclosure before any search and keeps the action available without an IME. */
+/** Places the provider disclosure above the field before typing can trigger a request. */
 @Composable
-private fun GiphySearchControls(
-    searchField: TextFieldState,
-    onSearch: () -> Unit,
-) {
+private fun GiphySearchControls(searchField: TextFieldState) {
     Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
         Text(
             stringResource(R.string.giphy_search_privacy),
@@ -214,14 +241,9 @@ private fun GiphySearchControls(
             state = searchField,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(label) },
-            trailingIcon = {
-                IconButton(onClick = onSearch, enabled = searchField.text.isNotBlank()) {
-                    Icon(painterResource(R.drawable.ic_search), label)
-                }
-            },
-            inputTransformation = InputTransformation.maxLength(GIPHY_QUERY_MAX_LENGTH),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            onKeyboardAction = { onSearch() },
+            leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
+            inputTransformation = InputTransformation.maxLengthReject(GIPHY_QUERY_MAX_LENGTH),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             lineLimits = TextFieldLineLimits.SingleLine,
         )
     }
@@ -250,51 +272,98 @@ private fun GiphySearchStatus(
     }
 }
 
-/** A labeled send action remains available while the preview loads. */
+/** A result becomes actionable only after a playable loop is available for the exact sent GIF. */
 @Composable
 private fun GiphySearchTile(
     result: GiphySearchResult,
-    image: ImageBitmap?,
+    preview: GiphyPreviewState,
+    motionEnabled: Boolean,
+    modifier: Modifier,
     onSend: () -> Unit,
 ) {
     val title = result.title ?: stringResource(R.string.gif)
+    val selectionEnabled = preview is GiphyPreviewState.Playable
     Box(
-        Modifier
+        modifier
             .aspectRatio(RESULT_TILE_ASPECT_RATIO)
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .clickable(onClickLabel = stringResource(R.string.giphy_send_result, title), role = Role.Button, onClick = onSend),
+            .clickable(
+                enabled = selectionEnabled,
+                onClickLabel = stringResource(R.string.giphy_send_result, title),
+                role = Role.Button,
+                onClick = { if (selectionEnabled) onSend() },
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        if (image == null) {
-            Text(
-                title,
-                modifier = Modifier.padding(WhiteNoiseSpacing.Related),
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-        } else {
-            Image(image, title, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+        when (preview) {
+            is GiphyPreviewState.Playable -> GiphyPreviewImage(preview.preview, title, motionEnabled)
+            else -> GiphyPreviewPlaceholder(title, loading = preview == GiphyPreviewState.Loading)
         }
     }
 }
 
-/** Fetches and decodes a first frame only while a result is composed, using the isolated media decoder. */
+/** Keeps loading and unavailable previews readable while their send action is disabled. */
+@Composable
+private fun GiphyPreviewPlaceholder(
+    title: String,
+    loading: Boolean,
+) {
+    Column(
+        modifier = Modifier.padding(WhiteNoiseSpacing.Related),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    ) {
+        if (loading) {
+            CircularProgressIndicator(Modifier.size(PreviewIndicatorSize))
+        }
+        Text(title, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        val status = if (loading) R.string.giphy_preview_loading else R.string.giphy_preview_unavailable
+        Text(stringResource(status), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+    }
+}
+
+/** Loops already-decoded pixels and honors the system's motion preference. */
+@Composable
+private fun GiphyPreviewImage(
+    preview: GiphyPreview,
+    title: String,
+    motionEnabled: Boolean,
+) {
+    var index by remember(preview, motionEnabled) { mutableIntStateOf(0) }
+    LaunchedEffect(preview, motionEnabled) {
+        if (motionEnabled) {
+            while (true) {
+                delay(preview.frames[index].durationMs)
+                index = (index + 1) % preview.frames.size
+            }
+        }
+    }
+    Image(preview.frames[index].image, title, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+}
+
+/** Retires the capture and its pixels as soon as the tile loses visibility, focus, or its result identity. */
 @Composable
 private fun rememberGiphySearchPreview(
     result: GiphySearchResult,
-    gate: Semaphore,
-): ImageBitmap? {
-    val presentation =
-        produceState<DecodedAttachmentPresentation?>(null, result.preview) {
-            value =
-                gate.withPermit {
-                    val request = result.preview.imageRequest() ?: return@withPermit null
-                    val bytes = fetchRemoteGiphyBytes(request) ?: return@withPermit null
-                    decodeMessageAttachmentImage(bytes, request.mediaType, PREVIEW_EDGE_PX)
-                }
+    loader: GiphyPreviewLoader,
+    visible: Boolean,
+): GiphyPreviewState {
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val foreground = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    val active = visible && foreground && LocalWindowInfo.current.isWindowFocused
+    val state = remember(result.media, active) { mutableStateOf<GiphyPreviewState>(GiphyPreviewState.Loading) }
+    LaunchedEffect(state) {
+        if (active) {
+            val preview = loader.load(result.media)
+            try {
+                currentCoroutineContext().ensureActive()
+                state.value = preview?.let { GiphyPreviewState.Playable(it) } ?: GiphyPreviewState.Unavailable
+                if (preview != null) awaitCancellation()
+            } finally {
+                preview?.release()
+            }
         }
-    OwnLatestAttachmentPresentation(result.preview, presentation)
-    return (presentation.value as? DecodedAttachmentPresentation.Static)?.bitmap?.asImageBitmap()
+    }
+    return state.value
 }

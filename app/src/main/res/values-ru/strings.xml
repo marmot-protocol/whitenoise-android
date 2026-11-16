@@ -467,6 +467,16 @@
     <string name="media_attachment">Медиавложение</string>
     <string name="generic_message">Сообщение</string>
     <string name="giphy_media_preview">GIF через GIPHY</string>
+    <string name="giphy_search_title">Поиск GIF</string>
+    <string name="giphy_search_hint">Поиск в GIPHY</string>
+    <string name="giphy_search_privacy">Ваш запрос и IP-адрес отправляются в GIPHY. При открытии полученного GIF также выполняется запрос к GIPHY.</string>
+    <string name="giphy_search_powered_by_prefix">Предоставлено</string>
+    <string name="giphy_search_powered_by">Предоставлено GIPHY</string>
+    <string name="giphy_search_empty">GIF не найдены</string>
+    <string name="giphy_search_failed">Не удалось выполнить поиск в GIPHY</string>
+    <string name="giphy_preview_loading">Загрузка предпросмотра</string>
+    <string name="giphy_preview_unavailable">Предпросмотр недоступен</string>
+    <string name="giphy_send_result">Отправить GIF: %1$s</string>
     <string name="waiting_for_stream">Ожидание потока...</string>
     <string name="stream_failed_format">Ошибка потока: %1$s</string>
     <string name="copy_text">Копировать текст</string>

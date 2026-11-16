@@ -441,6 +441,16 @@
     <string name="media_attachment">Medya eki</string>
     <string name="generic_message">Mesaj</string>
     <string name="giphy_media_preview">GIPHY üzerinden GIF</string>
+    <string name="giphy_search_title">GIF ara</string>
+    <string name="giphy_search_hint">GIPHY’de ara</string>
+    <string name="giphy_search_privacy">Aramanız ve IP adresiniz GIPHY’ye gönderilir. Alınan bir GIF’i açtığınızda da GIPHY ile bağlantı kurulur.</string>
+    <string name="giphy_search_powered_by_prefix">Sağlayan</string>
+    <string name="giphy_search_powered_by">GIPHY tarafından sağlanır</string>
+    <string name="giphy_search_empty">GIF bulunamadı</string>
+    <string name="giphy_search_failed">GIPHY’de arama yapılamadı</string>
+    <string name="giphy_preview_loading">Önizleme yükleniyor</string>
+    <string name="giphy_preview_unavailable">Önizleme kullanılamıyor</string>
+    <string name="giphy_send_result">GIF gönder: %1$s</string>
     <string name="waiting_for_stream">Akış bekleniyor...</string>
     <string name="stream_failed_format">Akış başarısız: %1$s</string>
     <string name="copy_text">Metni kopyala</string>

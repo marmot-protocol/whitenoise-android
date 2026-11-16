@@ -48,7 +48,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
         "surface": "Search GIFs composer action",
-        "anchor": "onSearchGifs?.let {",
+        "anchor": "fun composerGiphyItem(",
         "test_ids": [
           "MED-054"
         ]

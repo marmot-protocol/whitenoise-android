@@ -2550,6 +2550,8 @@
     <string name="giphy_search_powered_by">Powered by GIPHY</string>
     <string name="giphy_search_empty">No GIFs found</string>
     <string name="giphy_search_failed">Couldn’t search GIPHY</string>
+    <string name="giphy_preview_loading">Loading preview</string>
+    <string name="giphy_preview_unavailable">Preview unavailable</string>
     <string name="giphy_send_result">Send GIF: %1$s</string>
     <string name="preview_media">Preview</string>
     <string name="cancel_media_changes">Cancel Media Changes</string>

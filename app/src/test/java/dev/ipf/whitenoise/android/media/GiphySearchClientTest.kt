@@ -20,7 +20,10 @@ class GiphySearchClientTest {
             url.rawQuery.split('&').associate {
                 it.substringBefore('=') to URLDecoder.decode(it.substringAfter('='), "UTF-8")
             }
-        assertEquals(mapOf("api_key" to "test+key", "q" to "cat & 🐾", "limit" to "24", "rating" to "pg-13", "lang" to "en"), query)
+        assertEquals(
+            mapOf("api_key" to "test+key", "q" to "cat & 🐾", "limit" to "24", "rating" to "pg-13", "lang" to "en"),
+            query,
+        )
         assertNull(giphySearchUrl("   ", "test", "en"))
         assertNull(giphySearchUrl("x".repeat(51), "test", "en"))
         assertNull(giphySearchUrl("cats", "", "en"))
@@ -34,16 +37,29 @@ class GiphySearchClientTest {
                 .put("original", rendition("https://media.giphy.com/media/paws/giphy.gif", size = "6000000"))
                 .put("downsized_medium", rendition("https://media.giphy.com.evil.test/media/paws/200.gif"))
                 .put("downsized", rendition("https://media.giphy.com/media/paws/200.gif"))
-                .put("fixed_width_small", rendition("https://media.giphy.com/media/paws/100.gif"))
 
         val item = JSONObject().put("title", "  Happy paws ").put("username", " Test\nCreator ").put("images", images)
         val results = requireNotNull(decodeGiphySearchResults(response(item, item)))
         val result = results.single()
 
         assertEquals("Happy paws", result.title)
-        assertEquals("https://media.giphy.com/media/paws/100.gif", result.preview.url)
         assertEquals("https://media.giphy.com/media/paws/200.gif\nvia GIPHY · Test Creator", result.media.wireText())
         assertEquals(result.media, RemoteGiphyMedia.parse(result.media.wireText()))
+    }
+
+    /** A smaller GIF is both previewed and sent when the original exceeds the preferred download budget. */
+    @Test
+    fun prefersTheLargestRenditionUnderTwoMebibytes() {
+        val bestUrl = "https://media.giphy.com/media/paws/200.gif"
+        val smaller = rendition("https://media.giphy.com/media/paws/100.gif", size = "200000").put("width", "100")
+        val original = rendition("https://media.giphy.com/media/paws/giphy.gif", size = "3000000").put("width", "480")
+        val images =
+            JSONObject()
+                .put("original", original)
+                .put("downsized", rendition(bestUrl, size = "1000000"))
+                .put("fixed_width_small", smaller)
+        val body = response(JSONObject().put("images", images))
+        assertEquals(bestUrl, requireNotNull(decodeGiphySearchResults(body)).single().media.url)
     }
 
     /** Distinguishes a failed response from a valid response with no admissible GIF. */
@@ -82,5 +98,6 @@ class GiphySearchClientTest {
             .put("height", "120")
             .put("size", size)
 
-    private fun response(vararg items: JSONObject): String = JSONObject().put("data", JSONArray(items.toList())).toString()
+    private fun response(vararg items: JSONObject): String =
+        JSONObject().put("data", JSONArray(items.toList())).toString()
 }

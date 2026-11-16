@@ -42,6 +42,22 @@
         "test_ids": [
           "MED-054"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
+        "surface": "GiphyPreviewPlaceholder",
+        "anchor": "fun GiphyPreviewPlaceholder(",
+        "test_ids": [
+          "MED-054"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
+        "surface": "GiphyPreviewImage",
+        "anchor": "fun GiphyPreviewImage(",
+        "test_ids": [
+          "MED-054"
+        ]
       }
     ],
     "settings_controls": [
@@ -121,6 +137,22 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
         "surface": "string:retry",
         "anchor": "R.string.retry",
+        "test_ids": [
+          "MED-054"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
+        "surface": "string:giphy_preview_loading",
+        "anchor": "R.string.giphy_preview_loading",
+        "test_ids": [
+          "MED-054"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/GiphySearchSheet.kt",
+        "surface": "string:giphy_preview_unavailable",
+        "anchor": "R.string.giphy_preview_unavailable",
         "test_ids": [
           "MED-054"
         ]

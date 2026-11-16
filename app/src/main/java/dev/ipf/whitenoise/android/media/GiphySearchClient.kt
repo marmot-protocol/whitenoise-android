@@ -16,13 +16,13 @@ import kotlin.coroutines.resume
 private const val GIPHY_API_HOST = "api.giphy.com"
 private const val MAX_RESULTS = 24
 private const val MAX_RESPONSE_BYTES = 1024 * 1024
+private const val GIPHY_PREFERRED_MEDIA_BYTES = 2 * 1024 * 1024
 internal const val GIPHY_MAX_MEDIA_BYTES = 5 * 1024 * 1024
 internal const val GIPHY_QUERY_MAX_LENGTH = 50
 
-/** The compact picker preview and separately selected message rendition of one result. */
+/** The title and bounded GIF rendition used for both playback and sending. */
 internal data class GiphySearchResult(
     val title: String?,
-    val preview: RemoteGiphyMedia,
     val media: RemoteGiphyMedia,
 )
 
@@ -95,17 +95,7 @@ internal fun decodeGiphySearchResults(body: String): List<GiphySearchResult>? {
 
 /** Rejects a result when no rendition fits the existing GIPHY bubble's media limits. */
 private fun giphyResult(item: JSONObject): GiphySearchResult? {
-    val images = item.optJSONObject("images") ?: return null
-    val original = images.optJSONObject("original")
-    val originalFrames = original?.optString("frames")?.toIntOrNull()
-    val url =
-        sequenceOf("original", "downsized_medium", "downsized", "fixed_height", "fixed_width", "fixed_width_small")
-            .mapNotNull { images.optJSONObject(it)?.let { rendition -> boundedGiphyRendition(rendition, originalFrames) } }
-            .firstOrNull() ?: return null
-    val preview =
-        sequenceOf("fixed_width_small", "fixed_width")
-            .mapNotNull { images.optJSONObject(it)?.let { rendition -> boundedGiphyRendition(rendition, originalFrames) } }
-            .firstOrNull() ?: url
+    val url = item.optJSONObject("images")?.let(::selectGiphyRendition) ?: return null
     val user = item.optJSONObject("user")
     val attribution =
         sequenceOf(
@@ -115,16 +105,32 @@ private fun giphyResult(item: JSONObject): GiphySearchResult? {
         ).mapNotNull { ProfileSanitizer.displayName(it)?.trimEnd() }.firstOrNull()
     return GiphySearchResult(
         title = ProfileSanitizer.displayName(item.opt("title") as? String),
-        preview = RemoteGiphyMedia(preview, null),
         media = RemoteGiphyMedia(url, attribution),
     )
+}
+
+private data class GiphyRendition(
+    val url: String,
+    val pixels: Long,
+    val bytes: Int,
+)
+
+/** Prefers the largest GIF within the iOS picker's 2 MiB budget and otherwise uses the smallest valid GIF. */
+private fun selectGiphyRendition(images: JSONObject): String? {
+    val originalFrames = images.optJSONObject("original")?.optString("frames")?.toIntOrNull()
+    val candidates =
+        listOf("original", "downsized_medium", "downsized", "fixed_height", "fixed_width", "fixed_width_small")
+            .mapNotNull { images.optJSONObject(it) }
+            .mapNotNull { boundedGiphyRendition(it, originalFrames) }
+    val preferred = candidates.filter { it.bytes <= GIPHY_PREFERRED_MEDIA_BYTES }
+    return (preferred.maxByOrNull { it.pixels } ?: candidates.minByOrNull { it.bytes })?.url
 }
 
 /** Checks provider metadata against the same size and animation budgets as the local decoder. */
 private fun boundedGiphyRendition(
     rendition: JSONObject,
     originalFrames: Int?,
-): String? {
+): GiphyRendition? {
     val url = rendition.optString("url", "")
     if (!RemoteGiphyMedia.isAllowedMediaUrl(url)) return null
     val path = URI(url).path.orEmpty().lowercase(Locale.ROOT)
@@ -137,8 +143,7 @@ private fun boundedGiphyRendition(
             height in 1..MAX_ANIMATION_SOURCE_EDGE_PX &&
             pixels <= MAX_ANIMATION_SOURCE_CANVAS_PIXELS
     val fitsWork = frames in 1..MAX_ANIMATION_SOURCE_FRAMES && pixels * frames <= MAX_ANIMATION_SOURCE_WORK_PIXELS
-    return url.takeIf {
-        val fitsMedia = path.endsWith(".gif") && rendition.optInt("size") in 1..GIPHY_MAX_MEDIA_BYTES
-        fitsMedia && fitsCanvas && fitsWork
-    }
+    val size = rendition.optInt("size")
+    val fitsMedia = path.endsWith(".gif") && size in 1..GIPHY_MAX_MEDIA_BYTES
+    return if (fitsMedia && fitsCanvas && fitsWork) GiphyRendition(url, pixels, size) else null
 }

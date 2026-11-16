@@ -441,6 +441,16 @@
     <string name="media_attachment">Medienanhang</string>
     <string name="generic_message">Nachricht</string>
     <string name="giphy_media_preview">GIF über GIPHY</string>
+    <string name="giphy_search_title">GIFs suchen</string>
+    <string name="giphy_search_hint">GIPHY durchsuchen</string>
+    <string name="giphy_search_privacy">Deine Suchanfrage und deine IP-Adresse werden an GIPHY gesendet. Beim Öffnen eines empfangenen GIFs wird ebenfalls eine Verbindung zu GIPHY hergestellt.</string>
+    <string name="giphy_search_powered_by_prefix">Bereitgestellt von</string>
+    <string name="giphy_search_powered_by">Bereitgestellt von GIPHY</string>
+    <string name="giphy_search_empty">Keine GIFs gefunden</string>
+    <string name="giphy_search_failed">GIPHY konnte nicht durchsucht werden</string>
+    <string name="giphy_preview_loading">Vorschau wird geladen</string>
+    <string name="giphy_preview_unavailable">Vorschau nicht verfügbar</string>
+    <string name="giphy_send_result">GIF senden: %1$s</string>
     <string name="waiting_for_stream">Warte auf Stream...</string>
     <string name="stream_failed_format">Stream fehlgeschlagen: %1$s</string>
     <string name="copy_text">Text kopieren</string>
