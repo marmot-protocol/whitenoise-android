@@ -60,10 +60,9 @@ internal fun DocumentAttachmentViewer(
     source: String,
     actions: TextAttachmentNativeActions,
     loadBytes: suspend () -> ByteArray,
-    loadFile: suspend () -> File?,
+    withPdfFile: suspend (suspend (File) -> Unit) -> Unit,
     onOpenExternal: (() -> Unit)?,
     onDismiss: () -> Unit,
-    withFile: (suspend (suspend (File) -> Unit) -> Unit)? = null,
 ) {
     LaunchedEffect(actions) {
         snapshotFlow { actions.isCurrent() }.collect { if (!it) onDismiss() }
@@ -116,7 +115,7 @@ internal fun DocumentAttachmentViewer(
             onSourceTab = { sourceTab = it },
         ) {
             if (kind == DocumentAttachmentKind.Pdf) {
-                PdfDocumentPages(account, source, actions, loadFile, onOpenExternal, withFile)
+                PdfDocumentPages(account, source, actions, withPdfFile, onOpenExternal)
             } else if (sourceTab && original != null) {
                 DocumentSource(original!!, name)
             } else if (error) {

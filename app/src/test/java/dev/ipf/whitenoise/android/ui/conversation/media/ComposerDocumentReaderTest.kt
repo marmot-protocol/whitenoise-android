@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.sandbox.PdfPagePolicy
@@ -24,6 +25,8 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
+import java.io.IOException
+import java.io.OutputStream
 
 @RunWith(RobolectricTestRunner::class)
 class ComposerDocumentReaderTest {
@@ -70,7 +73,7 @@ class ComposerDocumentReaderTest {
             val bytes = "%PDF prepared draft".toByteArray()
             val reader =
                 launch {
-                    withComposerPdfFile(temporary.root, bytes) {
+                    withPrivatePdfFile(temporary.root, AttachmentPlaintext.Bytes(bytes)) {
                         assertTrue(it.readBytes().contentEquals(bytes))
                         ready.complete(it)
                         awaitCancellation()
@@ -87,14 +90,14 @@ class ComposerDocumentReaderTest {
             var owned: File? = null
             val result =
                 runCatching {
-                    withComposerPdfFile(temporary.root, byteArrayOf(1)) {
+                    withPrivatePdfFile(temporary.root, AttachmentPlaintext.Bytes(byteArrayOf(1))) {
                         owned = it
                         error("renderer failed")
                     }
                 }
             assertTrue(result.isFailure)
             assertFalse(checkNotNull(owned).exists())
-            withComposerPdfFile(temporary.root, byteArrayOf(2)) { owned = it }
+            withPrivatePdfFile(temporary.root, AttachmentPlaintext.Bytes(byteArrayOf(2))) { owned = it }
             assertFalse(checkNotNull(owned).exists())
         }
 
@@ -103,11 +106,11 @@ class ComposerDocumentReaderTest {
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()
             val cache = context.cacheDir
-            val root = File(cache, MediaCacheDirs.COMPOSER_DOCUMENT_READER)
+            val root = File(cache, MediaCacheDirs.DOCUMENT_READER)
             val earlier = File(root, "process-earlier").apply { mkdirs() }
             val orphan = File(earlier, "preview-orphan.pdf").apply { writeText("orphan") }
 
-            withComposerPdfFile(cache, byteArrayOf(1)) { open ->
+            withPrivatePdfFile(cache, AttachmentPlaintext.Bytes(byteArrayOf(1))) { open ->
                 sweepStaleSharedMedia(context, maxAgeMillis = Long.MAX_VALUE)
 
                 assertFalse(orphan.exists())
@@ -124,13 +127,43 @@ class ComposerDocumentReaderTest {
         runBlocking {
             val result =
                 runCatching {
-                    withComposerPdfFile(temporary.root, ByteArray(PdfPagePolicy.MAX_INPUT.toInt() + 1)) {
+                    val oversized = AttachmentPlaintext.Bytes(ByteArray(PdfPagePolicy.MAX_INPUT.toInt() + 1))
+                    withPrivatePdfFile(temporary.root, oversized) {
                         error("must not render")
                     }
                 }
             assertTrue(result.exceptionOrNull() is IllegalArgumentException)
             assertTrue(
                 temporary.root
+                    .listFiles()
+                    .orEmpty()
+                    .isEmpty(),
+            )
+        }
+
+    /** A source that streams past its declared size is cut off at the renderer limit and leaves no file behind. */
+    @Test fun pdfStreamingPastTheLimitIsRejectedAndDeleted() =
+        runBlocking {
+            val misreported =
+                object : AttachmentPlaintext {
+                    override val size = 1L
+
+                    override fun copyTo(output: OutputStream) {
+                        val chunk = ByteArray(1024 * 1024)
+                        var remaining = PdfPagePolicy.MAX_INPUT + 1
+                        while (remaining > 0) {
+                            val count = minOf(remaining, chunk.size.toLong()).toInt()
+                            output.write(chunk, 0, count)
+                            remaining -= count
+                        }
+                    }
+
+                    override fun close() = Unit
+                }
+            val result = runCatching { withPrivatePdfFile(temporary.root, misreported) { error("must not render") } }
+            assertTrue(result.exceptionOrNull() is IOException)
+            assertTrue(
+                documentReaderDirectory(temporary.root)
                     .listFiles()
                     .orEmpty()
                     .isEmpty(),

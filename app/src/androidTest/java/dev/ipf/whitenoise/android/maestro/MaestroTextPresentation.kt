@@ -113,7 +113,7 @@ private fun LocalHtmlDocumentPresentation(fixture: MaestroPresentationFixture) {
             fixture.record("load-bytes")
             "<h1>Fixture heading</h1><p>Fixture source paragraph</p>".toByteArray(Charsets.UTF_8)
         },
-        loadFile = { null },
+        withPdfFile = { error("Not a PDF") },
         onOpenExternal = { fixture.finish("external-handoff") },
         onDismiss = { fixture.finish("dismiss") },
     )

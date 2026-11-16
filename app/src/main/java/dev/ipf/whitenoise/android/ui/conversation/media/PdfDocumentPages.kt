@@ -65,9 +65,8 @@ internal fun PdfDocumentPages(
     account: String,
     source: String,
     actions: TextAttachmentNativeActions,
-    loadFile: suspend () -> File?,
+    withPdfFile: suspend (suspend (File) -> Unit) -> Unit,
     onOpenExternal: (() -> Unit)?,
-    withFile: (suspend (suspend (File) -> Unit) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var retry by remember { mutableIntStateOf(0) }
@@ -118,13 +117,9 @@ internal fun PdfDocumentPages(
             }
             val result =
                 runCatchingCancellable {
-                    if (withFile == null) {
-                        inspect(loadFile() ?: error("Missing document"))
-                    } else {
-                        withFile { selected ->
-                            inspect(selected)
-                            snapshotFlow { failed }.collect { if (it) error("PDF page unavailable") }
-                        }
+                    withPdfFile { selected ->
+                        inspect(selected)
+                        snapshotFlow { failed }.collect { if (it) error("PDF page unavailable") }
                     }
                 }
             if (active && actions.isCurrent()) result.onFailure { failed = true }

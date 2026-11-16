@@ -482,15 +482,15 @@ internal fun MediaFileBubble(
                 source = "$pillKey:${reference.sourceEpoch}:${reference.ciphertextSha256}",
                 actions = actions,
                 loadBytes = { loadTextReaderBytes(controller, messageIdHex, attachmentIndex, reference, mine) },
-                loadFile = {
-                    materializeMediaFile(
-                        context,
-                        controller,
-                        messageIdHex,
-                        attachmentIndex,
-                        reference,
-                        mine,
-                    )
+                // The renderer reads a private copy that no FileProvider path exposes and is deleted on close.
+                withPdfFile = { use ->
+                    check(actions.isCurrent())
+                    attachmentSource(controller, messageIdHex, attachmentIndex, reference, mine).use { plaintext ->
+                        withPrivatePdfFile(context.cacheDir, plaintext) { file ->
+                            check(actions.isCurrent())
+                            use(file)
+                        }
+                    }
                 },
                 onOpenExternal = {
                     if (actions.isCurrent()) {

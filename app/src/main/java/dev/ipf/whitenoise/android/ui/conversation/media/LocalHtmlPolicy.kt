@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.ui.isOpenableMarkdownLink
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.jsoup.Jsoup
@@ -88,7 +89,8 @@ internal object LocalHtmlPolicy {
                             val href = child.attr("href").trim()
                             if ((href.startsWith("http://", true) || href.startsWith("https://", true)) &&
                                 href.length <= MAX_LINK_LENGTH &&
-                                href.none { it.code <= MAX_LINK_CONTROL_CODE }
+                                href.none { it.code <= MAX_LINK_CONTROL_CODE } &&
+                                isOpenableMarkdownLink(href)
                             ) {
                                 element.attr("href", "wn-document-link:${links.size}")
                                 links.add(href)

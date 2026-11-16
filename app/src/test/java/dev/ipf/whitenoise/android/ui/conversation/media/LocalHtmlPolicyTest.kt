@@ -84,6 +84,16 @@ class LocalHtmlPolicyTest {
             }
         }
 
+    /** Links the chat link confirmation would refuse, such as hidden userinfo or bidi overrides, stay inert text. */
+    @Test fun deceptiveHttpLinksGetNoDestination() =
+        runBlocking {
+            for (href in listOf("https://bank.example@evil.example/", "https://bank.example\u202Eelpmaxe.live")) {
+                val doc = LocalHtmlPolicy.sanitize("<a href=\"$href\">bank</a>")
+                assertTrue(doc.links.isEmpty())
+                assertFalse("wn-document-link" in doc.html)
+            }
+        }
+
     @Test fun extremeDepthAndStructureAreBounded() =
         runBlocking {
             val deep = "<div>".repeat(1000) + "text" + "</div>".repeat(1000)
