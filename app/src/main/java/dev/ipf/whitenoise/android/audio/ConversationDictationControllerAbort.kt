@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 internal fun ConversationDictationController.cancelSession() {
-    microphoneSettingsRecovery = null
+    clearMicrophoneRecovery()
     recoveryHandedToComposer = false
     retainedAudioFailure = null
     completion.draftRecovery.reset()

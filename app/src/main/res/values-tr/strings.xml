@@ -2002,7 +2002,6 @@
     <string name="dictation_disclosure_message">Bu cihazda yüklü konuşma hizmeti söylediklerinizi işler ve sesi sağlayıcısına gönderebilir. Bir hatadan sonra tanınan metin özgün taslağa otomatik olarak kaydedilebilir. Dikte ayarlarından açmadığınız sürece otomatik gönderme kapalıdır.</string>
     <string name="dictation_continue">Devam</string>
     <string name="dictation_microphone_muted">Mikrofon erişimi kapalı</string>
-    <string name="dictation_microphone_muted_help">Android gizlilik ayarlarından veya Hızlı Ayarlar’dan mikrofon erişimini açın, ardından dikteyi tekrar deneyin.</string>
     <!-- Imported-account preflight (#2519). -->
     <string name="setup_title">Hesap kurulumu</string>
     <string name="setup_working">Hesabınız kontrol ediliyor…</string>

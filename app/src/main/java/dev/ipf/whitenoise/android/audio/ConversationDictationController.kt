@@ -249,7 +249,8 @@ internal class ConversationDictationController internal constructor(
     internal var recoveryDeadlineElapsedMillis: Long? = null
     internal var recoveryProtectionExpired = false
     internal var pendingForegroundRecoverySessionId: Long? = null
-    internal var microphoneSettingsRecovery: ConversationDictationState.Failed? = null
+    internal var microphoneSettingsRecovery: DictationMicrophoneRecovery? = null
+    internal var microphoneHostReady: () -> Boolean = { true }
     var foregroundMicrophoneRequired by mutableStateOf(true)
         internal set
     var notificationActionGeneration by mutableLongStateOf(0L)
@@ -623,6 +624,7 @@ internal class ConversationDictationController internal constructor(
         // Tear down the previous generation before publishing the new target;
         // all callbacks from the previous generation then fail the session-id
         // ownership check and become no-ops.
+        clearMicrophoneRecovery()
         retainedAudioFailure = null
         recoveryHandedToComposer = false
         clearRecognitionSession(cancel = true)
@@ -979,6 +981,7 @@ internal class ConversationDictationController internal constructor(
     /** Releases any provider/microphone resource without discarding retained transcript text. */
     fun onAppBackgrounded() {
         pendingForegroundRecoverySessionId = null
+        if (microphoneSettingsRecovery?.native == true) clearMicrophoneRecovery()
         val abort =
             when (state) {
                 is ConversationDictationState.ProviderSelectionRequired,

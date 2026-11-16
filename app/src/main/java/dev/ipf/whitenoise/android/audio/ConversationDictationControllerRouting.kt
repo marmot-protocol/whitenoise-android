@@ -203,10 +203,9 @@ internal fun ConversationDictationController.startOrRequestPermission(
             state = ConversationDictationState.PermissionRequired(sessionId, target)
             permissionRequestIdState.longValue += 1L
         }
-        ConversationDictationMicrophoneAccess.AppOpDenied ->
-            fail(sessionId, target, ConversationDictationFailure.PermissionPermanentlyDenied)
-        ConversationDictationMicrophoneAccess.MicrophoneMuted ->
-            fail(sessionId, target, ConversationDictationFailure.MicrophoneMuted)
+        ConversationDictationMicrophoneAccess.AppOpDenied,
+        ConversationDictationMicrophoneAccess.MicrophoneMuted,
+        -> requestNativeMicrophoneUnblock(sessionId, target)
     }
 }
 

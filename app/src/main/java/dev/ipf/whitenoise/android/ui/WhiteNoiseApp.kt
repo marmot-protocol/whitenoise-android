@@ -47,9 +47,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.clearMicrophoneRecovery
+import dev.ipf.whitenoise.android.audio.onMicrophoneHostPaused
+import dev.ipf.whitenoise.android.audio.onMicrophoneHostResumed
+import dev.ipf.whitenoise.android.audio.onMicrophoneOriginChanged
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.core.ChatLink
 import dev.ipf.whitenoise.android.core.ChatLinkParse
@@ -549,6 +554,37 @@ internal fun WhiteNoiseApp(
         // While the unlock-timestamp evaluation is pending, the scrim secures
         // the UI but the biometric sheet waits for the real decision.
         if (appState.appLock.screenVisible && !appState.appLock.evaluationPending) onRequestAppUnlock()
+    }
+    LaunchedEffect(dictationState, appState.activeAccountRef, appState.activeConversationGroupIdHex) {
+        dictation.onMicrophoneOriginChanged(appState.activeAccountRef, appState.activeConversationGroupIdHex)
+    }
+    val microphoneLifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(dictation, microphoneLifecycle) {
+        dictation.microphoneHostReady = {
+            val target = dictation.state.target
+            microphoneLifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                target != null &&
+                target.matchesConversation(
+                    appState.activeAccountRef.orEmpty(),
+                    appState.activeConversationGroupIdHex.orEmpty(),
+                )
+        }
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> dictation.onMicrophoneHostPaused()
+                Lifecycle.Event.ON_RESUME -> dictation.onMicrophoneHostResumed()
+                Lifecycle.Event.ON_STOP -> {
+                    if (dictation.microphoneSettingsRecovery?.native == true) dictation.clearMicrophoneRecovery()
+                }
+                else -> Unit
+            }
+        }
+        microphoneLifecycle.addObserver(observer)
+        onDispose {
+            microphoneLifecycle.removeObserver(observer)
+            dictation.microphoneHostReady = { false }
+            dictation.clearMicrophoneRecovery()
+        }
     }
     LaunchedEffect(dictationPermissionRequestId) {
         if (dictationPermissionRequestId > 0L && dictation.state is ConversationDictationState.PermissionRequired) {

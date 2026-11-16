@@ -6,7 +6,6 @@ import androidx.compose.ui.Alignment
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerAccess
 import dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
-import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationMicrophoneDialog
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationRecoveryStatus
 
 /** Exercises presentation decisions without microphone capture, recognition or message submission. */
@@ -14,11 +13,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictation
 @Suppress("FunctionNaming")
 internal fun MaestroDictationPresentation(fixture: MaestroPresentationFixture) {
     when {
-        fixture.scenario.startsWith("dictation-microphone") ->
-            ConversationDictationMicrophoneDialog(
-                onDismiss = { fixture.finish("dismiss") },
-                onOpenSettings = { fixture.finish("settings-handoff") },
-            )
         fixture.scenario.startsWith("dictation-draft-") -> MaestroDictationDraftPresentation(fixture)
         else -> {
             val phase =

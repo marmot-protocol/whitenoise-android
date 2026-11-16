@@ -42,6 +42,14 @@
         "test_ids": [
           "DIC-014"
         ]
+      },
+      {
+        "surface": "Dictation native microphone unblock attempt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/AndroidConversationDictationPlatform.kt",
+        "anchor": "override fun requestMicrophoneUnblock(onChanged: () -> Unit)",
+        "test_ids": [
+          "DIC-015"
+        ]
       }
     ]
   },

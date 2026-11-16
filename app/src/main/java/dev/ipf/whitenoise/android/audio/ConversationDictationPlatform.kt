@@ -131,6 +131,9 @@ internal interface ConversationDictationPlatform {
             ConversationDictationMicrophoneAccess.RuntimePermissionRequired
         }
 
+    /** Registers before noting this explicit capture attempt; null means native recovery is unavailable. */
+    fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? = null
+
     /** Whether Android has an explicit selected recognition service to validate after permission. */
     fun recognitionConfigured(): Boolean = recognitionAvailable()
 

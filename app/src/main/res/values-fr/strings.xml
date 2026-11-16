@@ -2009,7 +2009,6 @@
     <string name="dictation_disclosure_message">Le service vocal installé sur cet appareil traite ce que vous dites et peut envoyer l’audio à son fournisseur. Après un échec, le texte reconnu peut être enregistré automatiquement dans le brouillon d’origine. L’envoi automatique est désactivé tant que vous ne l’activez pas dans les paramètres de Dictée.</string>
     <string name="dictation_continue">Continuer</string>
     <string name="dictation_microphone_muted">L’accès au microphone est désactivé</string>
-    <string name="dictation_microphone_muted_help">Activez l’accès au microphone dans les paramètres de confidentialité Android ou les paramètres rapides, puis réessayez la dictée.</string>
     <!-- Imported-account preflight (#2519). -->
     <string name="setup_title">Configurer le compte</string>
     <string name="setup_working">Vérification de votre compte…</string>

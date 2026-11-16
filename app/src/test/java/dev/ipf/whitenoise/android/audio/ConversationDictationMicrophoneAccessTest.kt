@@ -7,6 +7,7 @@ import android.media.AudioManager
 import android.os.Process
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -79,6 +80,31 @@ class ConversationDictationMicrophoneAccessTest {
                 platform.microphoneAccess(),
             )
         }
+    }
+
+    @Test
+    fun privacyOnlyIgnoredAccessCanRequestNativeReminderWhenAudioManagerReportsUnmuted() {
+        // AOSP hides privacy-only mute from AudioManager but restricts the effective app-op.
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
+        setMode(AppOpsManager.MODE_IGNORED)
+
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+        val unregister = platform.requestMicrophoneUnblock {}
+        assertNotNull(unregister)
+        // Enqueueing the OS reminder is not a grant and must never admit capture.
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+        unregister?.invoke()
+    }
+
+    @Test
+    fun policyDeniedNativeAttemptNeverGrantsMicrophoneAccess() {
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
+        setMode(AppOpsManager.MODE_ERRORED)
+
+        val unregister = platform.requestMicrophoneUnblock {}
+        assertNotNull(unregister)
+        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+        unregister?.invoke()
     }
 
     @Test

@@ -4,12 +4,15 @@ package dev.ipf.whitenoise.android.audio
 
 import android.Manifest
 import android.app.AppOpsManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -105,6 +108,47 @@ internal class AndroidConversationDictationPlatform(
         } else {
             microphoneAppOpAccess()
         }
+    }
+
+    override fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? {
+        if (
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            microphoneAccess() !in
+                setOf(
+                    ConversationDictationMicrophoneAccess.MicrophoneMuted,
+                    ConversationDictationMicrophoneAccess.AppOpDenied,
+                )
+        ) {
+            return null
+        }
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    if (intent.action == AudioManager.ACTION_MICROPHONE_MUTE_CHANGED) onChanged()
+                }
+            }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(AudioManager.ACTION_MICROPHONE_MUTE_CHANGED),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
+        try {
+            // Privacy-only mute is hidden by AudioManager and can look like app policy denial.
+            // Note this explicit user-owned attempt without opening capture. AOSP shows its
+            // reminder only when sensor privacy is enabled; policy denial grants nothing.
+            context.getSystemService(AppOpsManager::class.java).noteOpNoThrow(
+                AppOpsManager.OPSTR_RECORD_AUDIO,
+                Process.myUid(),
+                context.packageName,
+                context.attributionTag,
+                null,
+            )
+        } catch (failure: RuntimeException) {
+            context.unregisterReceiver(receiver)
+            throw failure
+        }
+        return { context.unregisterReceiver(receiver) }
     }
 
     @Suppress("DEPRECATION")

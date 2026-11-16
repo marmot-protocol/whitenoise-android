@@ -2009,7 +2009,6 @@
     <string name="dictation_disclosure_message">El servicio de voz instalado en este dispositivo procesa lo que dices y puede enviar el audio a su proveedor. Tras un fallo, el texto reconocido puede guardarse automáticamente en el borrador original. El envío automático está desactivado a menos que lo actives en los ajustes de Dictado.</string>
     <string name="dictation_continue">Continuar</string>
     <string name="dictation_microphone_muted">El acceso al micrófono está desactivado</string>
-    <string name="dictation_microphone_muted_help">Activa el acceso al micrófono en los ajustes de privacidad de Android o en los ajustes rápidos y vuelve a intentar el dictado.</string>
     <!-- Imported-account preflight (#2519). -->
     <string name="setup_title">Configurar cuenta</string>
     <string name="setup_working">Comprobando tu cuenta…</string>

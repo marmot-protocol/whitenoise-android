@@ -54,6 +54,7 @@ class AppStateSizeRatchetTest {
         // Microphone recovery adds host-policy wiring and documents app-lock ordering at the lifecycle owner.
         const val MAX_LINES = 10_477
         const val CHATS_CONTROLLER_MAX_LINES = 2_152
-        const val DICTATION_CONTROLLER_MAX_LINES = 1_452
+        // Native recovery adds host readiness plus background and explicit replacement cleanup at this owner.
+        const val DICTATION_CONTROLLER_MAX_LINES = 1_455
     }
 }
