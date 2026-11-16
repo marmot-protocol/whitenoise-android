@@ -278,7 +278,8 @@ class PersistentDisplayThumbnailsTest {
         cache.retireMessagePending("account:chat:message:")
         cache.write(source, MediaThumbnail(bitmap, 128), pending)
         assertEquals(0L, cache.residentBytes())
-        cache.removeMessage("account:chat:message:")
+        cache.queueMessageRemoval("account:chat:message:")
+        cache.removeQueuedMessages()
         cache.write(source, MediaThumbnail(bitmap, 128), pending)
         assertEquals(0L, cache.residentBytes())
     }

@@ -102,6 +102,29 @@ class DisplayThumbnailRetentionTest {
             assertNotNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
         }
 
+    /** Deletes fenced together are swept by one pass, after the caller has released its commit lock. */
+    @Test
+    fun queuedDeletesShareOneSweep() =
+        runTest(dispatcher) {
+            listOf(source(0), source(1), source(2)).forEach(::seed)
+            listOf(qualifiedRequest(0), qualifiedRequest(1)).forEach {
+                fixture.state.fenceMessageDisplayThumbnails(it.accountRef, it.groupIdHex, it.messageIdHex)
+            }
+            assertEquals(setOf(source(0), source(1), source(2)), fixture.thumbnails.storedSources())
+            fixture.state.sweepRemovedMessageDisplayThumbnails()
+            assertEquals(setOf(source(2)), fixture.thumbnails.storedSources())
+        }
+
+    /** A pass whose native read failed does not let the next foreground return skip reconciliation. */
+    @Test
+    fun failedNativeReadDoesNotCountAsAFreshPass() =
+        runTest(dispatcher) {
+            seed(source(0))
+            fixture.onNativeSnapshot = { throw IOException("synthetic unavailable read") }
+            fixture.state.reconcileDisplayThumbnails()
+            assertNotNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
+        }
+
     /** Native read failure leaves cache data for a later authoritative answer. */
     @Test
     fun failedNativeReadPreservesTheDerivative() =

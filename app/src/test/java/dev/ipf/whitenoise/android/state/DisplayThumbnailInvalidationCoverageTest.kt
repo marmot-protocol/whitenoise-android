@@ -33,11 +33,23 @@ class DisplayThumbnailInvalidationCoverageTest {
         val controller = appModuleSource(root + "ConversationController.kt")
         val appState = appModuleSource(root + "AppState.kt")
         val notificationContent = appModuleSource(root + "AppStateNotificationContent.kt")
+        val retention = appModuleSource(root + "DisplayThumbnailRetention.kt")
         assertTrue(
             controller
                 .substringAfter("internal suspend fun deleteMessageResult(")
                 .substringBefore("internal fun")
-                .contains("removeMessageDisplayThumbnails("),
+                .contains("deleteMessageForEveryone("),
+        )
+        val localDelete = retention.substringAfter("fun ConversationController.deleteMessageForEveryone(")
+        val commitLocked = localDelete.substringAfter("withGroupCommitLock(").substringBefore("\n    }\n")
+        assertTrue(
+            "Local delete must fence derivatives inside the commit lock",
+            "fenceMessageDisplayThumbnails(" in commitLocked,
+        )
+        assertTrue(
+            "Local delete must sweep derivatives after releasing the commit lock",
+            "sweepRemovedMessageDisplayThumbnails(" !in commitLocked &&
+                "sweepRemovedMessageDisplayThumbnails(" in localDelete.substringBefore("\n}\n"),
         )
         assertTrue(
             notificationContent

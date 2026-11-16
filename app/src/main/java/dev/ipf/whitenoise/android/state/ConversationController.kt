@@ -2752,10 +2752,7 @@ class ConversationController(
                 val target = message.messageIdHex
                 deletedMessageIds = deletedMessageIds + target
                 try {
-                    appState.withGroupCommitLock(account, group.groupIdHex) {
-                        appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
-                        appState.removeMessageDisplayThumbnails(account, group.groupIdHex, target)
-                    }
+                    deleteMessageForEveryone(account, target)
                     Result.success(Unit)
                 } catch (throwable: Throwable) {
                     deletedMessageIds = deletedMessageIds - target

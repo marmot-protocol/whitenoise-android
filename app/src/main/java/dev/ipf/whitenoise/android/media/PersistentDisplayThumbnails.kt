@@ -55,6 +55,8 @@ internal class PersistentDisplayThumbnails(
     private val removingKeys = mutableMapOf<String, Int>()
     private val removingTags = mutableMapOf<String, Int>()
     private val removingMessages = mutableMapOf<String, Int>()
+    private val queuedMessagePrefixes = mutableSetOf<String>()
+    private val messageSweepLock = Any()
 
     /** Elapsed-realtime instant of the last complete native reconciliation in this process, if any. */
     @Volatile
@@ -123,12 +125,27 @@ internal class PersistentDisplayThumbnails(
         return sources
     }
 
-    /** Removes every size/index of a deleted message while fencing writers that have yet to publish a slot. */
-    fun removeMessage(attachmentKeyPrefix: String) =
-        invalidate(messagePrefix = attachmentKeyPrefix) {
-            storedSources()
-                .filter { it.attachmentKey.startsWith(attachmentKeyPrefix, ignoreCase = true) }
-                .forEach { source -> thumbnailDecodeBuckets.forEach { disk.remove(slot(source, it)) } }
+    /** Records a deleted message for the next sweep; it costs no disk read, so it is safe under a commit lock. */
+    fun queueMessageRemoval(attachmentKeyPrefix: String) {
+        synchronized(queuedMessagePrefixes) { queuedMessagePrefixes += attachmentKeyPrefix }
+    }
+
+    /**
+     * Removes every size/index of each queued message in one authenticated scan, fencing writers that have yet to
+     * publish a slot. A caller that finds the queue taken waits for that sweep, so its own message is gone on return.
+     */
+    fun removeQueuedMessages() =
+        synchronized(messageSweepLock) {
+            val prefixes =
+                synchronized(queuedMessagePrefixes) {
+                    queuedMessagePrefixes.toSet().also { queuedMessagePrefixes.clear() }
+                }
+            if (prefixes.isEmpty()) return@synchronized
+            invalidate(messagePrefixes = prefixes) {
+                storedSources()
+                    .filter { source -> prefixes.any { source.attachmentKey.startsWith(it, ignoreCase = true) } }
+                    .forEach { source -> thumbnailDecodeBuckets.forEach { disk.remove(slot(source, it)) } }
+            }
         }
 
     /** Authenticates source and bounds without allocating another decoded bitmap. */
@@ -229,14 +246,14 @@ internal class PersistentDisplayThumbnails(
     private fun invalidate(
         attachmentKey: String? = null,
         tags: Set<String> = emptySet(),
-        messagePrefix: String? = null,
+        messagePrefixes: Set<String> = emptySet(),
         block: () -> Unit,
     ) {
-        val global = attachmentKey == null && tags.isEmpty() && messagePrefix == null
+        val global = attachmentKey == null && tags.isEmpty() && messagePrefixes.isEmpty()
         val matches: (DisplayThumbnailSource) -> Boolean = {
             it.attachmentKey == attachmentKey ||
                 it.ciphertextTag in tags ||
-                (messagePrefix != null && it.attachmentKey.startsWith(messagePrefix, ignoreCase = true))
+                messagePrefixes.any { prefix -> it.attachmentKey.startsWith(prefix, ignoreCase = true) }
         }
         synchronized(requestLock) {
             if (global) {
@@ -244,7 +261,7 @@ internal class PersistentDisplayThumbnails(
                 generation.incrementAndGet()
             } else {
                 attachmentKey?.let { removingKeys[it] = removingKeys.getOrDefault(it, 0) + 1 }
-                messagePrefix?.let { removingMessages[it] = removingMessages.getOrDefault(it, 0) + 1 }
+                messagePrefixes.forEach { removingMessages[it] = removingMessages.getOrDefault(it, 0) + 1 }
                 tags.forEach { removingTags[it] = removingTags.getOrDefault(it, 0) + 1 }
                 retireSources(matches)
             }
@@ -259,7 +276,7 @@ internal class PersistentDisplayThumbnails(
                 } else {
                     retireSources(matches)
                     attachmentKey?.let { endRemoval(removingKeys, it) }
-                    messagePrefix?.let { endRemoval(removingMessages, it) }
+                    messagePrefixes.forEach { endRemoval(removingMessages, it) }
                     tags.forEach { endRemoval(removingTags, it) }
                 }
                 removalsCompleted.value += 1L

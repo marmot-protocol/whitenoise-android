@@ -57,45 +57,48 @@ internal suspend fun WhiteNoiseAppState.reconcileDisplayThumbnails() {
         val accounts = accounts.map { it.label }.toSet() + listOfNotNull(activeAccountRef)
         val sources = withContext(Dispatchers.IO) { displayThumbnails.storedSources() }
         val requests = sources.mapNotNull { source -> source.transferRequest()?.let { source to it } }
+        var complete = true
         for ((identity, group) in requests.groupBy { it.second.accountRef to it.second.groupIdHex }) {
             if (identity.first !in accounts) continue
             for (batch in group.chunked(THUMBNAIL_RECONCILIATION_BATCH)) {
                 currentCoroutineContext().ensureActive()
                 if (!stillOwned()) return
-                reconcileDisplayThumbnailBatch(engine, identity.first, identity.second, batch, stillOwned)
+                complete = reconcileDisplayThumbnailBatch(engine, identity.first, identity.second, batch, stillOwned) &&
+                    complete
             }
         }
-        displayThumbnails.reconciledAtElapsedMillis = SystemClock.elapsedRealtime()
+        if (complete) displayThumbnails.reconciledAtElapsedMillis = SystemClock.elapsedRealtime()
     } finally {
         displayThumbnailReconciliationMutex.unlock()
     }
 }
 
-/** Reads one bounded group batch and applies only successful native removal answers. */
+/** Reads one bounded group batch and applies only successful native removal answers; false when MDK was unreadable. */
 private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
     engine: MarmotInterface,
     account: String,
     groupIdHex: String,
     batch: List<Pair<DisplayThumbnailSource, AttachmentTransferRequest>>,
     stillOwned: () -> Boolean,
-) {
+): Boolean {
     val resolved =
         batch.mapNotNull { (source, request) ->
             runCatchingCancellable { resolveNativeAttachmentTarget(request) }.getOrNull()?.let { source to it }
         }
-    if (resolved.isEmpty() || !stillOwned()) return
+    if (resolved.isEmpty() || !stillOwned()) return true
     val tokens = resolved.map { displayThumbnails.captureGeneration(it.first) }
     val states =
         runCatchingCancellable {
             withContext(Dispatchers.IO) {
                 engine.attachmentTransferSnapshot(account, groupIdHex, resolved.map { it.second.toFfi() })
             }
-        }.getOrNull()?.items ?: return
-    if (states.size == resolved.size) {
-        resolved.indices.filter { states[it].state in REMOVED_DISPLAY_THUMBNAIL_SOURCES }.forEach { index ->
-            evictRemovedDisplaySource(resolved[index].first, tokens[index], stillOwned)
-        }
+        }.getOrNull()
+            ?.items
+            ?.takeIf { it.size == resolved.size }
+    states?.indices?.filter { states[it].state in REMOVED_DISPLAY_THUMBNAIL_SOURCES }?.forEach { index ->
+        evictRemovedDisplaySource(resolved[index].first, tokens[index], stillOwned)
     }
+    return states != null
 }
 
 /** Checks the snapshot owner before destructive cache work and fences all pending producers of that source. */
@@ -128,18 +131,47 @@ internal suspend fun WhiteNoiseAppState.removeMessageDisplayThumbnails(
     groupIdHex: String,
     messageIdHex: String,
 ) {
+    fenceMessageDisplayThumbnails(account, groupIdHex, messageIdHex)
+    sweepRemovedMessageDisplayThumbnails()
+}
+
+/**
+ * Retires pending producers and memory pixels and queues the disk sweep. It reads no disk, so it belongs inside the
+ * group commit lock, while [sweepRemovedMessageDisplayThumbnails] runs after the lock is released.
+ */
+internal suspend fun WhiteNoiseAppState.fenceMessageDisplayThumbnails(
+    account: String,
+    groupIdHex: String,
+    messageIdHex: String,
+) {
     val prefix = mediaCacheKey(account, groupIdHex, messageIdHex, 0).dropLast(1)
-    withContext(NonCancellable) {
-        runCatching {
-            withContext(Dispatchers.Main.immediate) {
-                displayThumbnails.retireMessagePending(prefix)
-                mediaMemoryCacheKeysSnapshot()
-                    .filter { it.startsWith(prefix, ignoreCase = true) }
-                    .forEach(::removeMediaMemoryCacheEntry)
-            }
-            withContext(Dispatchers.IO) { displayThumbnails.removeMessage(prefix) }
-        }.onFailure { android.util.Log.w("DisplayThumbnailCache", "deleted_message_cleanup_failed") }
+    withContext(NonCancellable + Dispatchers.Main.immediate) {
+        displayThumbnails.retireMessagePending(prefix)
+        mediaMemoryCacheKeysSnapshot()
+            .filter { it.startsWith(prefix, ignoreCase = true) }
+            .forEach(::removeMediaMemoryCacheEntry)
+        displayThumbnails.queueMessageRemoval(prefix)
     }
+}
+
+/** Removes every queued deleted message; deletes arriving together share one authenticated cache scan. */
+internal suspend fun WhiteNoiseAppState.sweepRemovedMessageDisplayThumbnails() {
+    withContext(NonCancellable + Dispatchers.IO) {
+        runCatching { displayThumbnails.removeQueuedMessages() }
+            .onFailure { android.util.Log.w("DisplayThumbnailCache", "deleted_message_cleanup_failed") }
+    }
+}
+
+/** Deletes for everyone under the commit lock, then sweeps the message's disk derivatives without holding it. */
+internal suspend fun ConversationController.deleteMessageForEveryone(
+    account: String,
+    target: String,
+) {
+    appState.withGroupCommitLock(account, group.groupIdHex) {
+        appState.marmotIo { deleteMessage(account, group.groupIdHex, target) }
+        appState.fenceMessageDisplayThumbnails(account, group.groupIdHex, target)
+    }
+    appState.mutationsScope.launch { appState.sweepRemovedMessageDisplayThumbnails() }
 }
 
 /** Recovers only the cache's own encrypted source descriptor; native state remains authoritative. */
