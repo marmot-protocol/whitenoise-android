@@ -137,7 +137,7 @@ internal fun StickerBrowserPage(
     var refreshRequests by remember { mutableIntStateOf(0) }
     var syncGeneration by remember { mutableIntStateOf(0) }
     val discovery = remember { DiscoveryResults() }
-    val whiteNoise = rememberWhiteNoisePacks(library)
+    val whiteNoise = rememberWhiteNoisePacks(library, refreshRequests)
     val discoverable = discovery.packs.filterNot { pack -> whiteNoise.any { it.coordinate == pack.coordinate } }
     LaunchedEffect(refreshRequests) {
         syncing = true

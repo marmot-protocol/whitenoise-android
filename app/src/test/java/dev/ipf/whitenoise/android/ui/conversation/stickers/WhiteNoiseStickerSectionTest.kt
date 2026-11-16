@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.stickers
 import android.app.Application
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -62,6 +63,40 @@ class WhiteNoiseStickerSectionTest {
 
         assertEquals(listOf(marmotAt), opened)
         assertEquals(0, installs)
+    }
+
+    /** A lookup that failed offline is retried by Refresh, so the section appears without reopening the browser. */
+    @Test
+    fun refreshRetriesAFailedWhiteNoiseLookup() {
+        val offered = WhiteNoiseStickerPacks.coordinates.map { pack(it, it.substringAfterLast(':')) }
+        var online = false
+        val library =
+            StickerLibrary(
+                packs = { _, _ -> emptyList() },
+                syncPacks = {},
+                fetchPack = { input ->
+                    check(online) { "network unreachable" }
+                    offered.first { WhiteNoiseStickerPacks.link(it.coordinate) == input }
+                },
+                installPack = { error("unused") },
+                uninstallPack = { error("unused") },
+            )
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Column {
+                    StickerBrowserPage(library, { _, _, _ -> }, onOpen = {}, onBack = {}, onClose = {})
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.white_noise)).assertDoesNotExist()
+
+        online = true
+        composeRule.onNodeWithContentDescription(app.getString(R.string.refresh)).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.white_noise)).assertExists()
+        composeRule.onNodeWithText("marmot").assertExists()
     }
 
     /** A pack at [coordinate] titled [title], not installed. */

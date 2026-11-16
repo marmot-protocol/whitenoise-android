@@ -12,15 +12,21 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StickerLibrary
+import dev.ipf.whitenoise.android.state.WhiteNoiseStickerPacks
 
 /**
- * White Noise's own packs that aren't installed, fetched once per browser through links naming its relays. An added
- * pack drops out as soon as the installed list changes; Add itself stays a tap away on the pack's page.
+ * White Noise's own packs that aren't installed, fetched through links naming its relays. The lookup runs again on
+ * each Refresh ([refreshes]) and whenever one of these packs is added or removed, so a lookup that failed offline,
+ * or a pack removed while the browser is open, comes back without reopening it. Add stays a tap away on the pack.
  */
 @Composable
-internal fun rememberWhiteNoisePacks(library: StickerLibrary): List<StickerPackFfi> {
+internal fun rememberWhiteNoisePacks(
+    library: StickerLibrary,
+    refreshes: Int,
+): List<StickerPackFfi> {
     var fetched by remember(library) { mutableStateOf(emptyList<StickerPackFfi>()) }
-    LaunchedEffect(library) { fetched = library.whiteNoisePacks() }
+    val installed = WhiteNoiseStickerPacks.coordinates.filter(library::isInstalled)
+    LaunchedEffect(library, refreshes, installed) { fetched = library.whiteNoisePacks() }
     return fetched.filterNot { library.isInstalled(it.coordinate) }
 }
 
