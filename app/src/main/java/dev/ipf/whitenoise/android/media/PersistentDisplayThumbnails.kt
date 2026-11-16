@@ -159,9 +159,8 @@ internal class PersistentDisplayThumbnails(
             val bytes = disk.get(key)
             if (bytes != null) {
                 val header = runCatching { header(bytes) }.getOrNull()
-                if (header != null &&
-                    (header.source.copy(sourceMessageIdHex = source.sourceMessageIdHex) != source || header.edge != edge)
-                ) {
+                val matchesSource = header?.source?.copy(sourceMessageIdHex = source.sourceMessageIdHex) == source
+                if (header != null && (!matchesSource || header.edge != edge)) {
                     continue
                 }
                 val entry = header?.let { runCatching { decode(bytes, it) }.getOrNull() }
