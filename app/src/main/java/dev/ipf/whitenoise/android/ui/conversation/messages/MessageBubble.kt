@@ -108,14 +108,14 @@ import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
-import dev.ipf.whitenoise.android.state.canReportMessage
 import dev.ipf.whitenoise.android.state.dismissReports
 import dev.ipf.whitenoise.android.state.effectiveBubbleColorArgb
 import dev.ipf.whitenoise.android.state.hideMessageForMe
+import dev.ipf.whitenoise.android.state.isDurableFailedSend
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
-import dev.ipf.whitenoise.android.state.reportMessage
 import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.teamReportingAvailable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
 import dev.ipf.whitenoise.android.translation.MessageSideDiscSpacing
@@ -499,7 +499,7 @@ internal fun MessageBubble(
     val context = LocalContext.current
     // Per-key state lives in three holders so the bubble stays within ART's compile limit (MessageBubbleState.kt).
     val pressState = remember(item.presentationId) { MessageBubblePressState() }
-    val surfaces = remember(controller, item.presentationId) { MessageBubbleSurfaceState() }
+    val surfaces = rememberMessageBubbleSurfaces(appState, controller, item)
     // The chat setting supplies the default until Read More or Show less changes this message.
     var collapseOverride by androidx.compose.runtime.saveable.rememberSaveable(
         controller.boundAccountRef,
@@ -1660,12 +1660,14 @@ internal fun MessageBubble(
         val readAloudLabels =
             setOf(stringResource(R.string.tts_choose_sentence), stringResource(R.string.tts_read_from_sentence))
         val failedOwnSend = mine && item.status == MessageStatus.Failed
+        // A durable failed send offers Discard alone, retrying it is out of scope here.
+        val discardableSend = failedOwnSend || controller.isDurableFailedSend(item)
         val rowActions =
             listOf(
                 MessageRowAction(stringResource(R.string.retry), failedOwnSend) {
                     appState.launchMutation { controller.retryFailedSend(item) }
                 },
-                MessageRowAction(stringResource(R.string.discard_failed_message), failedOwnSend) {
+                MessageRowAction(stringResource(R.string.discard_failed_message), discardableSend) {
                     appState.launchMutation { controller.discardFailedSend(item) }
                 },
                 MessageRowAction(stringResource(R.string.reply), !deleted && !actionsReadOnly, ::beginReply),
@@ -2967,6 +2969,13 @@ internal fun MessageBubble(
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
+                val reportAudience =
+                    messageReportAudience(
+                        mine = mine,
+                        deleted = deleted,
+                        directConversation = controller.isDirectConversation,
+                        teamAvailable = appState.teamReportingAvailable,
+                    )
                 MessageActionMenu(
                     // A tombstone gets a focused delete-only menu. Batch or partial
                     // text selection still owns the row interaction completely.
@@ -3031,12 +3040,7 @@ internal fun MessageBubble(
                     canShare = canShareMessage,
                     canSave = !deleted && mediaReferences.isNotEmpty() && !surfaces.attachmentSaveInFlight,
                     canInfo = !deleted,
-                    canReport =
-                        canReportMessage(
-                            mine = mine,
-                            deleted = deleted,
-                            directConversation = controller.isDirectConversation,
-                        ),
+                    canReport = reportAudience != null,
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReactionOrigin = localReactionMotion::choose,
@@ -3352,29 +3356,7 @@ internal fun MessageBubble(
                     )
                 }
                 if (surfaces.reportSheetOpen) {
-                    ReportMessageSheet(
-                        onDismissRequest = { surfaces.reportSheetOpen = false },
-                        sending = surfaces.reportInFlight,
-                        onSubmit = { reason, explanation ->
-                            surfaces.reportInFlight = true
-                            appState.launchMutation {
-                                try {
-                                    val outcome = controller.reportMessage(record.messageIdHex, reason, explanation)
-                                    surfaces.reportSheetOpen = false
-                                    when (outcome) {
-                                        ReportOutcome.Sent -> appState.present(R.string.report_message_sent)
-                                        ReportOutcome.Queued -> appState.present(R.string.report_message_queued)
-                                        ReportOutcome.NotAllowed ->
-                                            appState.present(R.string.report_message_not_allowed)
-                                        // The controller already presented the failure with its report.
-                                        ReportOutcome.Failed -> Unit
-                                    }
-                                } finally {
-                                    surfaces.reportInFlight = false
-                                }
-                            }
-                        },
-                    )
+                    reportAudience?.let { MessageReportSheetHost(appState, controller, record, it, surfaces) }
                 }
                 if (surfaces.infoSheetOpen && !deleted) {
                     LaunchedEffect(hasReports, surfaces.reportsRevision) {

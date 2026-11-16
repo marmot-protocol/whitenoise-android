@@ -251,6 +251,14 @@
         "test_ids": [
           "ACC-001"
         ]
+      },
+      {
+        "surface": "Profile report to White Noise team action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.report_team_action",
+        "test_ids": [
+          "ACC-002"
+        ]
       }
     ],
     "source_coverage": [

@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -59,7 +60,10 @@ class NotificationInviteRefreshOrderingTest {
         manager.cancelAll()
     }
 
-    /** A resolved sender name rewrites the live invite once, as an update that keeps its alerting and rank. */
+    /**
+     * A resolved sender name rewrites the live invite once, as an update that keeps its alerting and rank. The card's
+     * text names only the group, so the resolved name never appears in it.
+     */
     @Test
     fun resolvedInviteSenderRefreshesTheLiveCardWithoutEndingItsHeadsUp() =
         runBlocking {
@@ -92,8 +96,10 @@ class NotificationInviteRefreshOrderingTest {
                             avatarUrl = null,
                         ),
                     )
-                    val refreshed = awaitInviteCard(fixture) { it.bodyText().contains(RESOLVED_NAME) }
+                    val refreshed = awaitInviteCard(fixture) { writes.get() >= 2 }
                     delay(NO_EXTRA_WRITE_WINDOW_MS)
+
+                    assertFalse(refreshed.bodyText().contains(RESOLVED_NAME))
 
                     assertTrue(refreshed.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
                     assertEquals(first.groupAlertBehavior, refreshed.groupAlertBehavior)

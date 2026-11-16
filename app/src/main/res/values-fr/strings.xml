@@ -280,6 +280,8 @@
     <string name="jump_to_newest">Aller au plus récent</string>
     <string name="scroll_to_top">Faire défiler vers le haut</string>
     <string name="discard_failed_message">Supprimer le message échoué</string>
+    <string name="message_discard_still_sending">Ce message est encore en cours d’envoi. Réessayez dans un instant.</string>
+    <string name="message_discard_not_failed">Ce message ne peut plus être supprimé.</string>
     <string name="decline">Refuser</string>
     <string name="accept">Accepter</string>
     <string name="invited_as_account">Compte invité : %1$s</string>
@@ -810,8 +812,8 @@
     <string name="notification_sent_voice_message">a envoyé un message vocal</string>
     <string name="notification_sent_file">a envoyé un fichier</string>
     <string name="notification_sender_in_group">%1$s dans %2$s</string>
-    <string name="notification_invite_from_sender">Invitation de %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s vous a invité à %2$s</string>
+    <string name="notification_invitation_to_group">Invitation à %1$s</string>
+    <string name="notification_open_to_view_invite">Ouvrez White Noise pour afficher l’invitation</string>
     <string name="notification_removed_from_group">Votre accès à %1$s a été retiré</string>
     <string name="notification_removed_from_unnamed_group">Votre accès à ce groupe a été retiré</string>
     <string name="notification_made_admin_of_group">Vous êtes désormais admin de %1$s</string>
@@ -2027,10 +2029,14 @@
     <string name="setup_continue_without_profile">Continuer sans profil</string>
     <string name="setup_review_suggested_changes">Examiner les modifications suggérées</string>
     <string name="setup_chats_on_this_device">Discussions sur cet appareil</string>
-    <string name="setup_chats_on_this_device_help">Se connecter ne suffit pas à restaurer vos discussions ni vos messages existants. Si vous utilisez un autre appareil, conservez son app et ses données jusqu’à ce que vous ayez vérifié vos discussions ici.</string>
+    <string name="setup_device_none_found">Nous n’avons trouvé aucune clé de messagerie provenant d’une autre app ou d’un autre appareil.</string>
+    <string name="setup_device_unchecked">Nous n’avons pas pu vérifier si ce compte utilise une autre app ou un autre appareil pour la messagerie.</string>
+    <string name="setup_device_found_on_date">Nous avons trouvé des clés de messagerie publiées par ce compte depuis une autre app ou un autre appareil, les plus récentes le %1$s.</string>
+    <string name="setup_device_found">Nous avons trouvé des clés de messagerie publiées par ce compte depuis une autre app ou un autre appareil.</string>
+    <string name="setup_device_separate_chats">Cet appareil aura ses propres discussions, séparées. Les discussions de l’autre app y restent et n’apparaîtront pas ici.</string>
+    <string name="setup_device_new_chats_either_app">Quand quelqu’un commence une nouvelle discussion avec vous, elle peut arriver dans l’une ou l’autre app.</string>
+    <string name="setup_device_separate_chats_if_other_app">Si vous utilisez une autre app de messagerie, cet appareil aura ses propres discussions, séparées, et les discussions de cette app n’apparaîtront pas ici.</string>
     <string name="setup_device_stage">Utilisation de l\'appareil</string>
-    <string name="setup_other_sign_ins_found">D’autres traces de connexion ont été trouvées. Elles peuvent provenir d’une autre installation ou d’une installation antérieure.</string>
-    <string name="setup_other_sign_ins_unchecked">Les autres connexions n’ont pas pu être vérifiées.</string>
     <string name="setup_approval_saved_pending">Votre approbation est enregistrée. Le changement est toujours en attente.</string>
     <string name="setup_profile_scope_help">Cela met à jour votre profil dans d\'autres applications Nostr.</string>
     <string name="setup_optional_profile_help">Facultatif. Vous pourrez ajouter un profil plus tard.</string>
@@ -2548,6 +2554,20 @@
     <string name="group_change_undelivered_message">Votre dernière modification de ce groupe n’a pas encore atteint tous ses relais. Si vous continuez, les membres qui n’utilisent que ces relais pourraient ne plus pouvoir suivre le groupe. Attendre ou continuer quand même ?</string>
     <string name="group_change_wait">Attendre</string>
     <string name="group_change_continue_anyway">Continuer quand même</string>
+    <string name="group_change_refused_title">Un relais a refusé votre dernière modification</string>
+    <string name="group_change_refused_message">Au moins un relais de ce groupe a définitivement refusé votre dernière modification. Si vous continuez, les membres qui n’utilisent que ce relais pourraient ne pas la recevoir ni pouvoir suivre le groupe. Attendre n’y changera rien. Continuer masque aussi l’avertissement dans cette discussion.</string>
+    <string name="group_commit_refused_title">Modification du groupe refusée</string>
+    <string name="group_commit_refused_relay_too_large">%1$s a refusé une modification du groupe que vous avez faite, car elle était trop volumineuse. Les membres qui utilisent uniquement ce relais risquent de ne pas la recevoir.</string>
+    <string name="group_commit_refused_relay">%1$s a refusé une modification du groupe que vous avez faite. Les membres qui utilisent uniquement ce relais risquent de ne pas la recevoir.</string>
+    <string name="group_commit_refusal_dismiss_failed">Impossible d’ignorer cet avertissement. Réessayez.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d relais a refusé une modification du groupe que vous avez faite, car elle était trop volumineuse. Les membres qui utilisent uniquement ce relais risquent de ne pas la recevoir.</item>
+        <item quantity="other">%1$d relais ont refusé une modification du groupe que vous avez faite, car elle était trop volumineuse. Les membres qui utilisent uniquement ces relais risquent de ne pas la recevoir.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d relais a refusé une modification du groupe que vous avez faite. Les membres qui utilisent uniquement ce relais risquent de ne pas la recevoir.</item>
+        <item quantity="other">%1$d relais ont refusé une modification du groupe que vous avez faite. Les membres qui utilisent uniquement ces relais risquent de ne pas la recevoir.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Inviter quand même</string>
     <string name="starting_as">Démarrer en tant que</string>
     <string name="starting_as_account">Démarrer en tant que %1$s</string>

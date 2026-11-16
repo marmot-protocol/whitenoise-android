@@ -72,13 +72,25 @@ class GroupChangeConfirmationScreenshotTest {
         capture("undelivered_dark_large_rtl")
     }
 
+    /** A change after relays refused the last one for good explains the refusal, and Cancel declines it. */
+    @Test
+    fun refusedLight() {
+        val decision = render(GroupChangeCaution.Undelivered, refused = true)
+        capture("refused_light")
+
+        composeRule.onNodeWithText("Cancel").performClick()
+        assertEquals(false, decision.getCompleted())
+    }
+
     /** Shows one question and returns the decision it will record. */
+    @Suppress("LongParameterList")
     private fun render(
         caution: GroupChangeCaution,
         invite: Boolean = false,
         dark: Boolean = false,
         rtl: Boolean = false,
         fontScale: Float = 1f,
+        refused: Boolean = false,
     ): CompletableDeferred<Boolean> {
         val decision = CompletableDeferred<Boolean>()
         val state =
@@ -89,6 +101,7 @@ class GroupChangeConfirmationScreenshotTest {
                 actionLabel = if (invite) R.string.group_action_add_members else R.string.make_admin,
                 affectedMemberIds = listOf("b".repeat(64)),
                 initialAdminIds = if (invite) setOf("b".repeat(64)) else emptySet(),
+                commitRefused = refused,
             )
         val question = GroupChangeConfirmation(caution, invite, target, decision)
         composeRule.setContent {

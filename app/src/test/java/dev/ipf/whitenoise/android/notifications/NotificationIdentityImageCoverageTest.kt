@@ -199,7 +199,7 @@ class NotificationIdentityImageCoverageTest {
             "the presenter falls back to the loader",
             "sources.conversationLoader?.let { boundedIdentityLoad(it) }" in resolve,
         )
-        val bounded = presenter.declaration("internal suspend fun LocalNotificationPresenter.boundedIdentityLoad(")
+        val bounded = presenter.declaration("private suspend fun LocalNotificationPresenter.boundedIdentityLoad(")
         assertTrue("within its own late-refresh bound", "GROUP_IDENTITY_LOAD_TIMEOUT_MS" in bounded)
     }
 

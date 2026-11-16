@@ -1,0 +1,72 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Team report confirmation: sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+        "anchor": "R.string.report_team_sent",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Team report confirmation: queued",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+        "anchor": "R.string.report_team_queued",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Team report confirmation: pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+        "anchor": "R.string.report_team_pending",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Team report rate limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+        "anchor": "R.string.report_team_rate_limited",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Team report failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+        "anchor": "R.string.report_team_failed",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Team reporting availability read once",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.loadTeamReporting(",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Private report to the White Noise team",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ModerationReports.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.reportToTeam(",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

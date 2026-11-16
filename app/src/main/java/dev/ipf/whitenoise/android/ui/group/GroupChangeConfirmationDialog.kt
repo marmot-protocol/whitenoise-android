@@ -23,7 +23,8 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 /**
  * Asks whether to wait or let one refused group change through (#3289). It names the chat the change is for, because
  * the question can outlive the screen that started it. Continuing is the risky choice, so it takes the error role, and
- * dismissing the dialog waits.
+ * dismissing the dialog waits. When a relay refused an earlier change for good, waiting cannot help, so the dismiss
+ * action reads Cancel.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -31,7 +32,8 @@ internal fun GroupChangeConfirmationDialog(
     question: GroupChangeConfirmation,
     appState: WhiteNoiseAppState? = null,
 ) {
-    val (title, message, confirm) = groupChangeConfirmationText(question.caution, question.invite)
+    val refused = question.caution == GroupChangeCaution.Undelivered && question.target.commitRefused
+    val (title, message, confirm) = groupChangeConfirmationText(question.caution, question.invite, refused)
     val chat = question.target.title
     ConfirmDialog(
         title = stringResource(title),
@@ -40,7 +42,7 @@ internal fun GroupChangeConfirmationDialog(
         onConfirm = { question.answer(proceed = appState?.ownsGroupChange(question.target) != false) },
         onDismiss = { question.answer(proceed = false) },
         destructive = true,
-        dismissLabel = stringResource(R.string.group_change_wait),
+        dismissLabel = stringResource(if (refused) R.string.cancel else R.string.group_change_wait),
         identity = {
             Column(Modifier.testTag(GROUP_CHANGE_TARGET_TAG)) {
                 if (appState == null) {
@@ -91,10 +93,14 @@ internal fun GroupChangeConfirmationDialog(
 /** Test tag of the chat name a group-change question is about. */
 internal const val GROUP_CHANGE_TARGET_TAG = "group.change.target"
 
-/** The title, message and continue label for [caution], with MDK's stronger wording when inviting. */
+/**
+ * The title, message and continue label for [caution], with MDK's stronger wording when inviting, and the lasting
+ * refusal's wording when [refused] says a relay refused an earlier change for good.
+ */
 internal fun groupChangeConfirmationText(
     caution: GroupChangeCaution,
     invite: Boolean,
+    refused: Boolean = false,
 ): Triple<Int, Int, Int> =
     when (caution) {
         GroupChangeCaution.CatchingUp ->
@@ -112,9 +118,17 @@ internal fun groupChangeConfirmationText(
                 )
             }
         GroupChangeCaution.Undelivered ->
-            Triple(
-                R.string.group_change_undelivered_title,
-                R.string.group_change_undelivered_message,
-                R.string.group_change_continue_anyway,
-            )
+            if (refused) {
+                Triple(
+                    R.string.group_change_refused_title,
+                    R.string.group_change_refused_message,
+                    R.string.group_change_continue_anyway,
+                )
+            } else {
+                Triple(
+                    R.string.group_change_undelivered_title,
+                    R.string.group_change_undelivered_message,
+                    R.string.group_change_continue_anyway,
+                )
+            }
     }
