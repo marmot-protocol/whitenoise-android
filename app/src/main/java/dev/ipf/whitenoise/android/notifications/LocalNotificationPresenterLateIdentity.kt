@@ -138,7 +138,7 @@ internal fun LocalNotificationPresenter.rewriteWithLateReactorPicture(
 }
 
 /** Writes one late picture rewrite over the same live card, under the refresh's fences up to the platform write. */
-internal fun LocalNotificationPresenter.postLateIdentityRewrite(
+private fun LocalNotificationPresenter.postLateIdentityRewrite(
     refresh: LateIdentityRefresh,
     live: StatusBarNotification,
     rewritten: Notification,

@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerNativePushSync.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Per-account push registration rolls back when a disable races it, so the next enable re-registers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerNativePushSync.kt",
+        "anchor": "private suspend fun NotificationDeliveryController.syncPushForAccount(",
+        "test_ids": [
+          "NTF-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
