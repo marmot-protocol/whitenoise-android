@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -171,7 +172,7 @@ class ChatListUnreadPullSurfaceTest {
         }
     }
 
-    private fun bounds(tag: String) =
+    private fun bounds(tag: String): Rect =
         rule
             .onNodeWithTag(tag, useUnmergedTree = true)
             .fetchSemanticsNode()

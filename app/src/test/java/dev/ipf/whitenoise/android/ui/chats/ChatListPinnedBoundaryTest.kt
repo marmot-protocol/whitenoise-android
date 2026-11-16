@@ -318,7 +318,10 @@ class ChatListPinnedBoundaryTest {
     }
 
     private fun boundaryCount(): Int =
-        composeRule.onAllNodesWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG, useUnmergedTree = true).fetchSemanticsNodes().size
+        composeRule
+            .onAllNodesWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .size
 
     private fun boundary(): Rect =
         composeRule
