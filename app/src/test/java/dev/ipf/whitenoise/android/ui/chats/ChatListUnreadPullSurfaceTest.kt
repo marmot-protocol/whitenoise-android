@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
@@ -66,9 +67,7 @@ class ChatListUnreadPullSurfaceTest {
                             unread.value = it
                             toggles++
                         }) {
-                            LazyColumn {
-                                items(20) { Text("Chat $it", Modifier.size(48.dp).testTag("row.$it")) }
-                            }
+                            PinnedRows(unread.value)
                         }
                     }
                 }
@@ -81,6 +80,7 @@ class ChatListUnreadPullSurfaceTest {
                     .onNodeWithTag("row.0")
                     .fetchSemanticsNode()
                     .boundsInRoot.top
+            val boundaryAtRest = boundaryBelowFirstRow()
             rule.onNodeWithTag("chats.unread_surface").performTouchInput {
                 down(Offset(width / 2f, height * 0.3f))
                 moveBy(Offset(0f, 40f))
@@ -93,14 +93,110 @@ class ChatListUnreadPullSurfaceTest {
             assertTrue(moved > before)
             assertTrue(moved - before < 40f)
             assertEquals(direction, toggles)
+            val boundaryFrom = boundaryBelowFirstRow()
+            assertEquals("the pull must not double-translate the boundary", boundaryAtRest, boundaryFrom, 0.5f)
+            rule.mainClock.autoAdvance = false
             rule.onNodeWithTag("chats.unread_surface").performTouchInput {
                 moveBy(Offset(0f, height * 0.4f))
                 up()
             }
+            val samples = mutableListOf(boundaryFrom)
+            repeat(BOUNDARY_FRAMES) {
+                rule.mainClock.advanceTimeByFrame()
+                rule.runOnIdle { }
+                samples += boundaryBelowFirstRow()
+            }
+            rule.mainClock.autoAdvance = true
             rule.waitForIdle()
             assertEquals(direction + 1, toggles)
             assertEquals(direction + 1, haptics)
             assertEquals(direction == 0, unread.value)
+            val boundaryTo = boundaryBelowFirstRow()
+            assertBoundaryTravelled(samples + boundaryTo)
+            if (unread.value) {
+                assertBoundaryBetween("row.2", "row.4")
+                assertTrue(top("row.0") >= rule.onNodeWithTag("chats.unread_filter").fetchSemanticsNode().boundsInRoot.bottom)
+            } else {
+                assertBoundaryBetween("row.3", "row.4")
+                rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
+                assertEquals(top("chats.unread_surface"), top("row.0"), 0.5f)
+            }
+        }
+    }
+
+    @Test fun belowThresholdPullReturnsRowsAndBoundaryTogether() {
+        var toggles = 0
+        rule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.size(300.dp, 500.dp)) {
+                    ChatListUnreadPullSurface(false, true, true, { true }, { toggles++ }) {
+                        PinnedRows(unreadOnly = false)
+                    }
+                }
+            }
+        }
+        val rowStart = top("row.0")
+        val boundaryStart = boundaryBelowFirstRow()
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("chats.unread_surface").performTouchInput {
+            down(Offset(width / 2f, height * 0.3f))
+            moveBy(Offset(0f, 40f))
+            up()
+        }
+        repeat(BOUNDARY_FRAMES) { frame ->
+            rule.mainClock.advanceTimeByFrame()
+            rule.runOnIdle { }
+            assertEquals("boundary left its row at frame $frame", boundaryStart, boundaryBelowFirstRow(), 0.5f)
+        }
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        assertEquals(0, toggles)
+        assertEquals(rowStart, top("row.0"), 0.5f)
+        assertBoundaryBetween("row.3", "row.4")
+    }
+
+    /** Production keyed rows and boundary: ids 0..3 are pinned, even ids are unread. */
+    @Composable
+    private fun PinnedRows(unreadOnly: Boolean) {
+        val visible = (0 until 20).filter { !unreadOnly || it % 2 == 0 }
+        val boundary = pinnedBoundaryIndex(visible.map { it < 4 }, showArchived = false)
+        LazyColumn {
+            visible.forEachIndexed { targetIndex, id ->
+                if (targetIndex == boundary) chatListPinnedBoundaryItem(CHAT_LIST_ROW_PLACEMENT_MILLIS)
+                item(key = id) {
+                    Text("Chat $id", chatListRowMotion(targetIndex).size(48.dp).testTag("row.$id"))
+                }
+            }
+        }
+    }
+
+    private fun top(tag: String): Float =
+        rule
+            .onNodeWithTag(tag, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .boundsInRoot.top
+
+    private fun boundaryBelowFirstRow(): Float = top(CHAT_LIST_PINNED_BOUNDARY_TAG) - top("row.0")
+
+    private fun assertBoundaryBetween(
+        above: String,
+        below: String,
+    ) {
+        val line = rule.onNodeWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(line.top >= rule.onNodeWithTag(above).fetchSemanticsNode().boundsInRoot.bottom - 0.5f)
+        assertTrue(line.bottom <= top(below) + 0.5f)
+    }
+
+    /** The boundary glides with the rows: monotonic, no overshoot, no single-frame jump. */
+    private fun assertBoundaryTravelled(samples: List<Float>) {
+        val from = samples.first()
+        val to = samples.last()
+        val direction = Math.signum(to - from)
+        assertTrue("boundary must change slot", direction != 0f)
+        samples.zipWithNext().forEachIndexed { frame, (previous, next) ->
+            assertTrue("boundary reversed at frame $frame", (next - previous) * direction >= -0.5f)
+            assertTrue("boundary overshot at frame $frame", (to - next) * direction >= -0.5f)
+            assertTrue("boundary jumped at frame $frame: $previous -> $next", Math.abs(next - previous) < Math.abs(to - from) / 2f)
         }
     }
 
@@ -152,5 +248,9 @@ class ChatListUnreadPullSurfaceTest {
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
         assertEquals(2, changes)
         assertEquals(false, unread.value)
+    }
+
+    private companion object {
+        const val BOUNDARY_FRAMES = 30
     }
 }

@@ -2759,12 +2759,7 @@ internal fun ChatsScreen(
                                     } else {
                                         visibleItems.forEachIndexed { targetIndex, item ->
                                             if (targetIndex == pinnedBoundary) {
-                                                this.item(
-                                                    key = CHAT_LIST_PINNED_BOUNDARY_KEY,
-                                                    contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
-                                                ) {
-                                                    ChatListPinnedBoundary()
-                                                }
+                                                chatListPinnedBoundaryItem(rowPlacementDurationMillis)
                                             }
                                             this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
                                                 chatRowContent(item, targetIndex)
@@ -3187,8 +3182,6 @@ private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
-
-private const val CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE = "pinned-boundary"
 
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
 
