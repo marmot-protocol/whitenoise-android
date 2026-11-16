@@ -37,12 +37,13 @@ internal class ComposerDocumentSelection(
 private val processPreviewName = "process-" + UUID.randomUUID()
 
 /** This process's private directory for staged PDF previews, under [cacheDir]. */
-internal fun composerPreviewDirectory(cacheDir: File): File =
-    File(File(cacheDir, MediaCacheDirs.COMPOSER_DOCUMENT_READER), processPreviewName)
+internal fun composerPreviewDirectory(cacheDir: File): File = File(previewRoot(cacheDir), processPreviewName)
+
+private fun previewRoot(cacheDir: File) = File(cacheDir, MediaCacheDirs.COMPOSER_DOCUMENT_READER)
 
 /** Deletes previews left by earlier processes at any age; safe while this process has a reader open. */
 internal fun sweepOrphanedComposerPreviews(cacheDir: File) {
-    File(cacheDir, MediaCacheDirs.COMPOSER_DOCUMENT_READER)
+    previewRoot(cacheDir)
         .listFiles()
         ?.filterNot { it.name == processPreviewName }
         ?.forEach { orphan -> runCatching { orphan.deleteRecursively() } }

@@ -5,9 +5,9 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
-import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.sandbox.PdfPagePolicy
+import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
