@@ -5,6 +5,12 @@ import dev.ipf.marmotkit.GroupCreationResultFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
+import dev.ipf.marmotkit.MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE
+import dev.ipf.marmotkit.MemberResolutionStatusFfi.INCOMPLETE
+import dev.ipf.marmotkit.MemberResolutionStatusFfi.INVALID_KEY_PACKAGE
+import dev.ipf.marmotkit.MemberResolutionStatusFfi.MISSING_INBOX_ROUTE
+import dev.ipf.marmotkit.MemberResolutionStatusFfi.MISSING_KEY_PACKAGE
+import dev.ipf.marmotkit.MemberResolutionStatusFfi.OBSOLETE_KEY_PACKAGE
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
@@ -14,6 +20,7 @@ import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.groupMemberSelectionFailure
+import dev.ipf.whitenoise.android.state.inviteFailureDetail
 import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
@@ -28,31 +35,61 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InviteFailurePresentationTest {
-    /** Setup names skipped recipients from its captured selection and preserves the reason without names. */
+    /** An all-skipped report names everyone or no one, so an unnamed recipient is never left out of a named list. */
     @Test
-    fun foundingFailureSkipsBlankNames() {
-        val unavailable = MemberResolutionStatusFfi.MISSING_KEY_PACKAGE
-        val report =
-            NoGroupMembersSelectedException(
-                listOf(
-                    MemberResolutionOutcomeFfi("alice", unavailable, 0u),
-                    MemberResolutionOutcomeFfi("bob", unavailable, 0u),
-                ),
-            )
+    fun foundingFailureNamesEveryoneOrNoOne() {
+        val report = allSkipped(MISSING_KEY_PACKAGE, MISSING_KEY_PACKAGE)
 
         assertEquals(
             AppText.Resource(R.string.error_no_group_members_selected),
             groupCreateSelectionFailureDetail(report, null),
         )
         assertEquals(
-            AppText.Resource(R.string.error_no_group_members_selected_for, listOf("Alice")),
+            AppText.Resource(R.string.error_no_group_members_selected),
             groupCreateSelectionFailureDetail(report, null) { if (it == "alice") "Alice" else " " },
         )
         assertEquals(
             AppText.Resource(R.string.error_no_group_members_selected_for, listOf("Alice, Bob")),
-            groupCreateSelectionFailureDetail(report, null) { if (it == "alice") "Alice" else "Bob" },
+            groupCreateSelectionFailureDetail(report, null, ::named),
         )
     }
+
+    /** A skip reason every recipient shares keeps its own remedy; mixed reasons keep the chat setup guidance. */
+    @Test
+    fun allSkippedGuidanceFollowsTheSharedReason() {
+        val cases =
+            listOf(
+                allSkipped(INCOMPLETE, INCOMPLETE) to R.string.error_no_group_members_selected_lookup_incomplete_for,
+                allSkipped(MISSING_INBOX_ROUTE, MISSING_INBOX_ROUTE) to
+                    R.string.error_no_group_members_selected_inbox_for,
+                allSkipped(INCOMPATIBLE_KEY_PACKAGE, OBSOLETE_KEY_PACKAGE) to
+                    R.string.error_no_group_members_selected_update_for,
+                allSkipped(INVALID_KEY_PACKAGE, MISSING_KEY_PACKAGE) to R.string.error_no_group_members_selected_for,
+                allSkipped(INCOMPLETE, MISSING_KEY_PACKAGE) to R.string.error_no_group_members_selected_for,
+            )
+
+        cases.forEach { (report, resource) ->
+            assertEquals(
+                AppText.Resource(resource, listOf("Alice, Bob")),
+                groupCreateSelectionFailureDetail(report, null, ::named),
+            )
+            assertEquals(
+                AppText.Resource(resource, listOf("Alice, Bob")),
+                inviteFailureDetail(report, ::named),
+            )
+        }
+    }
+
+    /** Builds a two-recipient report in which MDK selected no one. */
+    private fun allSkipped(
+        first: MemberResolutionStatusFfi,
+        second: MemberResolutionStatusFfi,
+    ) = NoGroupMembersSelectedException(
+        listOf(MemberResolutionOutcomeFfi("alice", first, 0u), MemberResolutionOutcomeFfi("bob", second, 0u)),
+    )
+
+    /** Resolves the fixture recipients to display names. */
+    private fun named(ref: String): String = ref.replaceFirstChar(Char::uppercaseChar)
 
     /** An incompatible chat key has a reason and action even without a known name. */
     @Test

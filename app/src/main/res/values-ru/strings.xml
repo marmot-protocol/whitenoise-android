@@ -274,6 +274,9 @@
     <string name="error_group_create_failed_retry">Что-то пошло не так при настройке зашифрованного чата. Проверьте подключение и повторите попытку.</string>
     <string name="error_no_group_members_selected">Не удалось добавить никого из выбранных. Попросите их проверить настройки чата или измените свой выбор.</string>
     <string name="error_no_group_members_selected_for">Не удалось добавить %1$s. Попросите проверить настройки чата или измените свой выбор.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Не удалось до конца проверить, можно ли добавить %1$s. Проверьте подключение и повторите попытку.</string>
+    <string name="error_no_group_members_selected_inbox_for">Не удалось добавить %1$s. У них нет пригодного входящего ретранслятора. Попросите их проверить входящие ретрансляторы в настройках White Noise, затем повторите попытку.</string>
+    <string name="error_no_group_members_selected_update_for">Не удалось добавить %1$s. Попросите их обновить и открыть White Noise, затем повторите попытку.</string>
     <string name="error_chat_created_not_loaded">Чат создан, но ещё не появился в вашем списке. Повторите попытку через минуту.</string>
     <string name="remove">Удалить</string>
     <string name="group_name">Название Группы</string>

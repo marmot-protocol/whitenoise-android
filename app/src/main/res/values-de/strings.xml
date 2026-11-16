@@ -248,6 +248,9 @@
     <string name="error_group_create_failed_retry">Beim Einrichten des verschlüsselten Chats ist etwas schiefgelaufen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
     <string name="error_no_group_members_selected">Keine der ausgewählten Personen konnte hinzugefügt werden. Bitten Sie sie, ihre Chat-Einrichtung zu prüfen, oder ändern Sie Ihre Auswahl.</string>
     <string name="error_no_group_members_selected_for">Für %1$s war das Hinzufügen nicht möglich. Bitten Sie die betroffenen Personen, ihre Chat-Einrichtung zu prüfen, oder ändern Sie Ihre Auswahl.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Wir konnten nicht vollständig prüfen, ob %1$s hinzugefügt werden können. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</string>
+    <string name="error_no_group_members_selected_inbox_for">%1$s konnten nicht hinzugefügt werden. Sie haben kein nutzbares Posteingangs-Relay. Bitten Sie sie, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
+    <string name="error_no_group_members_selected_update_for">%1$s konnten nicht hinzugefügt werden. Bitten Sie sie, White Noise zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
     <string name="error_chat_created_not_loaded">Der Chat wurde erstellt, ist aber noch nicht in Ihrer Chatliste erschienen. Versuchen Sie es gleich noch einmal.</string>
     <string name="remove">Entfernen</string>
     <string name="group_name">Gruppenname</string>

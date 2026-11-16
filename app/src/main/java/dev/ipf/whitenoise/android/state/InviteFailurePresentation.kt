@@ -82,7 +82,10 @@ internal fun inviteFailureDetail(
         else -> skippedInviteFailureDetail(throwable, displayName, fallbackResource)
     }
 
-/** Resolves all-skipped reports and uses the caller's fallback for errors without typed recovery. */
+/**
+ * Resolves all-skipped reports and uses the caller's fallback for errors without typed recovery. Several recipients
+ * are named only when every one of them has a name, with the remedy their shared skip reason calls for.
+ */
 private fun skippedInviteFailureDetail(
     failure: Throwable,
     displayName: (String) -> String,
@@ -90,20 +93,17 @@ private fun skippedInviteFailureDetail(
 ): AppText {
     if (failure !is NoGroupMembersSelectedException) return AppText.Resource(fallbackResource)
     val recipient = failure.outcomes.singleOrNull()
-    return if (recipient?.status == MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE) {
-        recipientFailureDetail(
-            recipient.accountIdHex,
-            displayName,
-            R.string.error_incompatible_key_package,
-            R.string.error_incompatible_key_package_for,
-        )
-    } else {
-        val skipped = failure.outcomes.skippedGroupMemberNames(displayName)
-        if (skipped.isEmpty()) {
-            AppText.Resource(R.string.error_no_group_members_selected)
-        } else {
-            AppText.Resource(R.string.error_no_group_members_selected_for, listOf(skipped.joinToString()))
-        }
+    val skipped = failure.outcomes.skippedGroupMemberNames(displayName)
+    return when {
+        recipient?.status == MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE ->
+            recipientFailureDetail(
+                recipient.accountIdHex,
+                displayName,
+                R.string.error_incompatible_key_package,
+                R.string.error_incompatible_key_package_for,
+            )
+        skipped == null -> AppText.Resource(R.string.error_no_group_members_selected)
+        else -> AppText.Resource(failure.outcomes.allSkippedGuidance(), listOf(skipped.joinToString()))
     }
 }
 

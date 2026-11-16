@@ -250,6 +250,9 @@
     <string name="error_group_create_failed_retry">Un problème est survenu lors de la configuration de la discussion chiffrée. Vérifiez votre connexion et réessayez.</string>
     <string name="error_no_group_members_selected">Aucune des personnes sélectionnées n’a pu être ajoutée. Demandez-leur de vérifier la configuration de leur discussion ou modifiez votre sélection.</string>
     <string name="error_no_group_members_selected_for">Impossible d’ajouter %1$s. Demandez aux personnes concernées de vérifier la configuration de leur discussion ou modifiez votre sélection.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Nous n’avons pas pu vérifier entièrement si %1$s peuvent être ajouté·es. Vérifiez votre connexion, puis réessayez.</string>
+    <string name="error_no_group_members_selected_inbox_for">Impossible d’ajouter %1$s. Ces personnes n’ont aucun relais de réception utilisable. Demandez-leur de vérifier leurs relais de réception dans les paramètres de White Noise, puis réessayez.</string>
+    <string name="error_no_group_members_selected_update_for">Impossible d’ajouter %1$s. Demandez-leur de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
     <string name="error_chat_created_not_loaded">La discussion a été créée, mais elle n’apparaît pas encore dans votre liste. Réessayez dans un instant.</string>
     <string name="remove">Supprimer</string>
     <string name="group_name">Nom du Groupe</string>

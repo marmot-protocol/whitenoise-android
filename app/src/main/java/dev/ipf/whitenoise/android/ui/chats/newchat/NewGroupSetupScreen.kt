@@ -36,13 +36,12 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromAuthoritativeGroupDetails
+import dev.ipf.whitenoise.android.state.createdGroupSkippedMembers
 import dev.ipf.whitenoise.android.state.defaultDisappearingMessagesSeconds
 import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.groupCreateSelectionFailureDetail
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
 import dev.ipf.whitenoise.android.ui.account.startingAccount
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
 import dev.ipf.whitenoise.android.ui.common.rememberAvatarPreparationRecovery
@@ -96,10 +95,7 @@ private suspend fun createOrRecoverNewGroup(
                         owner.ensureCurrent()
                         createGroupWithOptions(account, name, members, options)
                     }
-                val groupId = result.requireCreatedGroupId()
-                owner.ensureCurrent()
-                owner.skippedMembers = result.memberOutcomes.skippedGroupMembersDetail(appState::displayName)
-                groupId
+                owner.acceptCreatedGroup(result, appState::displayName)
             }.also {
                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                 if (owner.isCurrent()) {
@@ -108,6 +104,7 @@ private suspend fun createOrRecoverNewGroup(
             }
     }.getOrElse { failure ->
         createdGroupIdAfterProjectionUnavailable(failure)?.also {
+            owner.forgetMemberReport()
             diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
             diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
             diagnostic.failed(DmCreationPhase.PROJECTION, failure)
@@ -191,6 +188,7 @@ private suspend fun runNewGroupCreateMutation(
                     appState = appState,
                     accountRef = account,
                     groupIdHex = groupIdHex,
+                    submittedMembers = submission.members,
                     showCreatedToast = !isRetryLoad,
                     createRequestToken = createRequestToken,
                     onCreateCompletedOpen = onCreateCompletedOpen,
@@ -208,11 +206,15 @@ private suspend fun runNewGroupCreateMutation(
     }
 }
 
-/** Opens the created group once the canonical create confirms, or reports the recovery state. */
+/**
+ * Opens the created group once the canonical create confirms, or reports the recovery state. Without MDK's member
+ * report, the people missing from the created roster are shown as not added.
+ */
 private suspend fun openCreatedGroupAfterCanonicalCreate(
     appState: WhiteNoiseAppState,
     accountRef: String,
     groupIdHex: String,
+    submittedMembers: List<String>,
     showCreatedToast: Boolean,
     createRequestToken: Long,
     onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
@@ -223,18 +225,25 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
 ) {
     diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
     runCatchingCancellable {
-        val item =
+        val (item, memberIds) =
             owner.currentValue {
                 loadCreatedGroupForOwner(appState, accountRef, groupIdHex, owner)
             }
         diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
         onRetryGroupIdCleared()
-        val skipped = owner.skippedMembers
+        val skipped =
+            createdGroupSkippedMembers(
+                owner.skippedMembers,
+                owner.memberReportCaptured,
+                submittedMembers,
+                memberIds,
+                appState::displayName,
+            )
         val title = createdGroupNoticeTitle(showCreatedToast, skipped)
         if (title != null) {
             appState.presentConversationTransient(accountRef, groupIdHex, title, skipped)
         }
-        owner.skippedMembers = null
+        owner.forgetMemberReport()
         onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
         diagnostic.failed(DmCreationPhase.PROJECTION, it)
@@ -254,13 +263,16 @@ internal fun createdGroupNoticeTitle(
         else -> null
     }
 
-/** Same authoritative projection mapper, with a captured account and an IO-boundary owner check. */
+/**
+ * Same authoritative projection mapper, with a captured account and an IO-boundary owner check. Also returns the
+ * created roster's member IDs from that same read.
+ */
 private suspend fun loadCreatedGroupForOwner(
     appState: WhiteNoiseAppState,
     accountRef: String,
     groupIdHex: String,
     owner: GroupCreationSession,
-): ChatListItem {
+): Pair<ChatListItem, List<String>> {
     owner.ensureCurrent()
     val accountHex = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex
     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
@@ -271,7 +283,7 @@ private suspend fun loadCreatedGroupForOwner(
         }
     owner.ensureCurrent()
     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
-    return chatListItemFromAuthoritativeGroupDetails(details, accountHex)
+    return chatListItemFromAuthoritativeGroupDetails(details, accountHex) to details.members.map { it.memberIdHex }
 }
 
 /**

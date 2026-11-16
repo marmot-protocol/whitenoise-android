@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import dev.ipf.marmotkit.GroupCreationResultFfi
 import dev.ipf.whitenoise.android.diagnostics.CreationOperation
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
+import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -15,7 +18,28 @@ internal class GroupCreationSession(
 
     /** Remembers the partial outcome until the newly created group can open. */
     var skippedMembers: AppText? = null
+
+    /** Whether [skippedMembers] came from MDK's member report rather than being unknown until the roster is read. */
+    var memberReportCaptured = false
     val diagnostics = DmCreationInteraction(operation = CreationOperation.GROUP_CREATE)
+
+    /** Records MDK's skipped-member report for this screen, then returns the committed group ID. */
+    fun acceptCreatedGroup(
+        result: GroupCreationResultFfi,
+        displayName: (String) -> String,
+    ): String {
+        val groupId = result.requireCreatedGroupId()
+        ensureCurrent()
+        skippedMembers = result.memberOutcomes.skippedGroupMembersDetail(displayName)
+        memberReportCaptured = true
+        return groupId
+    }
+
+    /** Forgets any earlier report when MDK commits a group whose member report this screen never received. */
+    fun forgetMemberReport() {
+        skippedMembers = null
+        memberReportCaptured = false
+    }
 
     /** Reads the live account, including changes before Compose disposes the old screen. */
     fun isCurrent(): Boolean = active && currentOwner()

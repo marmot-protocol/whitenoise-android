@@ -235,6 +235,9 @@
     <string name="error_group_create_failed_retry">設定加密聊天時發生問題。請檢查連線，然後再試一次。</string>
     <string name="error_no_group_members_selected">無法加入任何選取的聯絡人。請對方檢查聊天設定，或變更你的選擇。</string>
     <string name="error_no_group_members_selected_for">無法加入 %1$s。請對方檢查聊天設定，或變更你的選擇。</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">未能完成檢查 %1$s 是否可以被加入。請檢查網路連線，然後重試。</string>
+    <string name="error_no_group_members_selected_inbox_for">無法加入 %1$s。他們沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
+    <string name="error_no_group_members_selected_update_for">無法加入 %1$s。請對方更新並開啟 White Noise，然後再試一次。</string>
     <string name="error_chat_created_not_loaded">聊天已建立，但尚未出現在聊天清單中。請稍後再試。</string>
     <string name="remove">移除</string>
     <string name="group_name">群組名稱</string>

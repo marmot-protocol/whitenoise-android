@@ -250,6 +250,9 @@
     <string name="error_group_create_failed_retry">Si è verificato un problema durante la configurazione della chat crittografata. Controlla la connessione e riprova.</string>
     <string name="error_no_group_members_selected">Non è stato possibile aggiungere nessuna delle persone selezionate. Chiedi loro di controllare la configurazione della chat oppure modifica la selezione.</string>
     <string name="error_no_group_members_selected_for">Non è stato possibile aggiungere %1$s. Chiedi di controllare la configurazione della chat oppure modifica la selezione.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Non siamo riusciti a completare il controllo per capire se %1$s possono essere aggiunti. Controlla la connessione, poi riprova.</string>
+    <string name="error_no_group_members_selected_inbox_for">Non è stato possibile aggiungere %1$s. Non hanno un relay di ricezione utilizzabile. Chiedi loro di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
+    <string name="error_no_group_members_selected_update_for">Non è stato possibile aggiungere %1$s. Chiedi loro di aggiornare e aprire White Noise, poi riprova.</string>
     <string name="error_chat_created_not_loaded">La chat è stata creata, ma non è ancora comparsa nell’elenco delle chat. Riprova tra poco.</string>
     <string name="remove">Rimuovi</string>
     <string name="group_name">Nome del Gruppo</string>

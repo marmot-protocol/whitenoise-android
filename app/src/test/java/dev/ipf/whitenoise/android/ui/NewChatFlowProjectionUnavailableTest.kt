@@ -17,6 +17,20 @@ class NewChatFlowProjectionUnavailableTest {
         )
     }
 
+    /** A committed group whose member report MDK lost still reopens by its canonical ID instead of creating again. */
+    @Test
+    fun extractsTheCanonicalGroupIdWhenTheMemberReportIsUnavailable() {
+        assertEquals(
+            "created-group",
+            createdGroupIdAfterProjectionUnavailable(
+                MarmotKitException.CreatedGroupMemberReportUnavailable("created-group"),
+            ),
+        )
+        assertNull(
+            createdGroupIdAfterProjectionUnavailable(MarmotKitException.CreatedGroupMemberReportUnavailable(" ")),
+        )
+    }
+
     @Test
     fun rejectsOtherFailuresAndBlankCanonicalGroupIds() {
         assertNull(createdGroupIdAfterProjectionUnavailable(MarmotKitException.Runtime("sqlite busy")))

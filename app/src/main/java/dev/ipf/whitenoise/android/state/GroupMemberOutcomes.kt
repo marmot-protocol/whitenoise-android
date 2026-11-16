@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import androidx.annotation.StringRes
 import dev.ipf.marmotkit.GroupCreationResultFfi
 import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.MarmotKitException
@@ -37,11 +38,33 @@ internal fun GroupInviteResultFfi.requireAcceptedInvite(): GroupInviteResultFfi 
     return this
 }
 
-/** Resolves only skipped recipients and leaves unnamed recipients out of the display list. */
-internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberNames(displayName: (String) -> String): List<String> =
+/** Names every skipped recipient, or returns null when any lacks a name, so a partial list never hides someone. */
+internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberNames(displayName: (String) -> String): List<String>? =
     skippedGroupMemberRefs()
-        .map(displayName)
-        .filter(String::isNotBlank)
+        .map { displayName(it).trim() }
+        .takeIf { names -> names.isNotEmpty() && names.none(String::isBlank) }
+
+/**
+ * Picks the named guidance for an all-skipped report. A reason every skipped recipient shares keeps its own remedy,
+ * so an unfinished lookup still asks for a retry; a mix of reasons falls back to checking their chat setup.
+ */
+@StringRes
+internal fun List<MemberResolutionOutcomeFfi>.allSkippedGuidance(): Int =
+    filter { it.status != MemberResolutionStatusFfi.SELECTED }
+        .map { outcome ->
+            when (outcome.status) {
+                MemberResolutionStatusFfi.INCOMPLETE -> R.string.error_no_group_members_selected_lookup_incomplete_for
+                MemberResolutionStatusFfi.MISSING_INBOX_ROUTE -> R.string.error_no_group_members_selected_inbox_for
+                MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE,
+                MemberResolutionStatusFfi.OBSOLETE_KEY_PACKAGE,
+                -> R.string.error_no_group_members_selected_update_for
+                MemberResolutionStatusFfi.MISSING_KEY_PACKAGE,
+                MemberResolutionStatusFfi.INVALID_KEY_PACKAGE,
+                MemberResolutionStatusFfi.SELECTED,
+                -> R.string.error_no_group_members_selected_for
+            }
+        }.distinct()
+        .singleOrNull() ?: R.string.error_no_group_members_selected_for
 
 /** Preserves a partial result even when some skipped recipients have no display name. */
 internal fun List<MemberResolutionOutcomeFfi>.skippedGroupMembersDetail(displayName: (String) -> String): AppText? =
@@ -57,6 +80,25 @@ internal fun List<String>.missingGroupMembersDetail(displayName: (String) -> Str
         AppText.Plain(names.joinToString())
     }
 }
+
+/**
+ * Uses MDK's member report when this screen received one. An unavailable projection or member report discards it,
+ * so the submitted people missing from the created roster are then the only evidence of who was not added.
+ */
+internal fun createdGroupSkippedMembers(
+    reported: AppText?,
+    reportCaptured: Boolean,
+    submitted: List<String>,
+    memberIds: List<String>,
+    displayName: (String) -> String,
+): AppText? =
+    if (reportCaptured) {
+        reported
+    } else {
+        submitted
+            .filterNot { ref -> memberIds.any { it.equals(ref, ignoreCase = true) } }
+            .missingGroupMembersDetail(displayName)
+    }
 
 /** Reads the shared runtime's eligibility result independently of its display names. */
 private fun List<MemberResolutionOutcomeFfi>.skippedGroupMemberRefs(): List<String> =

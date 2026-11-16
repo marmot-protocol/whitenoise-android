@@ -5,8 +5,7 @@ import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
 import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
-import dev.ipf.whitenoise.android.state.requireCreatedGroupId
-import dev.ipf.whitenoise.android.state.skippedGroupMembersDetail
+import dev.ipf.whitenoise.android.state.createdGroupSkippedMembers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,6 +13,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -165,9 +165,7 @@ class GroupCreationStagesTest {
                             createOrRetry = {
                                 canonical ?: run {
                                     creates++
-                                    val result = GroupCreationResultFfi("accepted", outcomes)
-                                    owner.skippedMembers = result.memberOutcomes.skippedGroupMembersDetail { it }
-                                    result.requireCreatedGroupId()
+                                    owner.acceptCreatedGroup(GroupCreationResultFfi("accepted", outcomes)) { it }
                                 }
                             },
                             openCurrentChat = {
@@ -175,10 +173,18 @@ class GroupCreationStagesTest {
                                 opens++
                                 if (attempt == 0) error("Projection temporarily unavailable")
                                 assertEquals("accepted", it)
-                                assertEquals(AppText.Plain("bob"), owner.skippedMembers)
+                                assertTrue(owner.memberReportCaptured)
+                                val skipped =
+                                    createdGroupSkippedMembers(
+                                        owner.skippedMembers,
+                                        owner.memberReportCaptured,
+                                        submitted = listOf("alice", "bob"),
+                                        memberIds = listOf("self", "alice", "bob"),
+                                    ) { it }
+                                assertEquals(AppText.Plain("bob"), skipped)
                                 assertEquals(
                                     R.string.toast_some_members_not_added,
-                                    createdGroupNoticeTitle(showCreatedToast = false, skipped = owner.skippedMembers),
+                                    createdGroupNoticeTitle(showCreatedToast = false, skipped = skipped),
                                 )
                             },
                         )
@@ -188,6 +194,32 @@ class GroupCreationStagesTest {
             assertEquals(1, creates)
             assertEquals(2, opens)
         }
+
+    /** Without MDK's member report, the people missing from the created roster are the ones shown as not added. */
+    @Test fun unavailableMemberReportFallsBackToTheCreatedRoster() {
+        val owner = GroupCreationSession { true }
+        owner.acceptCreatedGroup(GroupCreationResultFfi("earlier", emptyList())) { it }
+        owner.forgetMemberReport()
+
+        assertEquals(AppText.Plain("bob"), owner.rosterFallback(listOf("self", "ALICE")) { it })
+        assertEquals(
+            AppText.Resource(R.string.group_members_not_added_count, listOf(2)),
+            owner.rosterFallback(listOf("self")) { "" },
+        )
+        assertNull(owner.rosterFallback(listOf("self", "alice", "bob")) { it })
+    }
+
+    /** Resolves the notice for a two-person submission against [memberIds] as the setup screen does after opening. */
+    private fun GroupCreationSession.rosterFallback(
+        memberIds: List<String>,
+        displayName: (String) -> String,
+    ) = createdGroupSkippedMembers(
+        skippedMembers,
+        memberReportCaptured,
+        submitted = listOf("alice", "bob"),
+        memberIds = memberIds,
+        displayName = displayName,
+    )
 
     /** Handled native failure has no canonical ID, so projection may not run. */
     @Test fun unacceptedFailureCannotEnterOpenStage() =
