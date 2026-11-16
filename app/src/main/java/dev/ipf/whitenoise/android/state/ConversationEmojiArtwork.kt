@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import android.util.Log
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.IndexedAttachment
@@ -17,15 +19,19 @@ private typealias ReceivedEmojiReader = suspend (String, ConversationEmojiSource
 
 /**
  * Resolves definitions in text order. Each received original is read within the picker's per-image cap and the
- * remaining aggregate budget. One that is too large, unreadable or unverified stays literal text, while a lost
- * connection fails the lookup so the send can retry it.
+ * remaining aggregate budget. One that is too large, unreadable or unverified stays literal text and is reported to
+ * [onUnreadable]. Only a failure while [deviceOffline] or a closed transport fails the lookup, so the send retries it
+ * on reconnection; a slow or dead image host on a working connection never holds the message back.
  */
+@Suppress("LongParameterList") // Each policy input is a separate seam for the pure resolution tests.
 internal suspend fun resolveConversationEmojiArtwork(
     codes: List<String>,
     known: Map<String, LocalEmojiArtwork>,
     sources: Map<String, ConversationEmojiSource>,
     maxBytes: Long = EMOJI_SEND_MAX_BYTES.toLong(),
     maxImageBytes: Long = CustomEmojiStore.MAX_BYTES.toLong(),
+    deviceOffline: () -> Boolean = { false },
+    onUnreadable: (Throwable) -> Unit = {},
     read: ReceivedEmojiReader,
 ): List<LocalEmojiArtwork> {
     require(maxBytes in 0..EMOJI_SEND_MAX_BYTES.toLong())
@@ -39,31 +45,47 @@ internal suspend fun resolveConversationEmojiArtwork(
         }
     if (limitFailure != null) throw EmojiSendLimitException(limitFailure)
     var remaining = maxBytes - knownBytes
+    val reads = ReceivedEmojiReads(read, deviceOffline, onUnreadable)
     return resolved.mapNotNull { code ->
-        known[code] ?: readReceivedEmojiArtwork(code, sources.getValue(code), minOf(remaining, maxImageBytes), read)
+        known[code] ?: reads
+            .artwork(code, sources.getValue(code), minOf(remaining, maxImageBytes))
             ?.also { remaining -= it.bytes.size }
     }
 }
 
-/** One received original within [limit] bytes, or null when it cannot be included and so stays literal text. */
-private suspend fun readReceivedEmojiArtwork(
-    code: String,
-    source: ConversationEmojiSource,
-    limit: Long,
-    read: ReceivedEmojiReader,
-): LocalEmojiArtwork? {
-    val artwork =
-        try {
-            read(code, source, limit)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (
-            @Suppress("TooGenericExceptionCaught") failure: Exception,
-        ) {
-            if (isConnectivityFailure(failure)) throw failure
-            null
-        }
-    return artwork?.takeIf { it.bytes.size <= limit }
+/** How one send reads received originals: only lost connectivity fails it, anything else stays literal text. */
+private class ReceivedEmojiReads(
+    private val reader: ReceivedEmojiReader,
+    private val deviceOffline: () -> Boolean,
+    private val onUnreadable: (Throwable) -> Unit,
+) {
+    /** One received original within [limit] bytes, or null to leave its code as literal text. */
+    suspend fun artwork(
+        code: String,
+        source: ConversationEmojiSource,
+        limit: Long,
+    ): LocalEmojiArtwork? {
+        if (limit <= 0) return null
+        val artwork =
+            try {
+                reader(code, source, limit)
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (
+                @Suppress("TooGenericExceptionCaught") failure: Exception,
+            ) {
+                if (deviceOffline() || failure.closesTransport()) throw failure
+                onUnreadable(failure)
+                null
+            }
+        return artwork?.takeIf { it.bytes.size <= limit }
+    }
+}
+
+/** Whether MDK reported its own transport closed, which a reconnection can clear, anywhere in this cause chain. */
+private fun Throwable.closesTransport(): Boolean {
+    val chain = generateSequence(this) { it.cause }
+    return chain.any { it is MarmotKitException.TransportClosed }
 }
 
 /** Combines canonical, local, installed and loaded-message definitions within one bounded send. */
@@ -74,10 +96,21 @@ internal suspend fun ConversationController.emojiArtworkIncludingConversation(
     val known = appState.emojiArtworkIn(account, text).associateBy { it.shortcode }
     val codes = Nip30Emoji.shortcodesIn(text)
     val sources = if (codes.all(known::containsKey)) emptyMap() else conversationEmojiSources()
-    return resolveConversationEmojiArtwork(codes, known, sources) { code, source, maxBytes ->
+    return resolveConversationEmojiArtwork(
+        codes,
+        known,
+        sources,
+        deviceOffline = { !appState.hasValidatedInternet() },
+        // Peer-controlled input, so only the failure's class is logged, never its message or locator.
+        onUnreadable = { failure ->
+            Log.w(EMOJI_LOG_TAG, "received_emoji_unreadable type=${failure.javaClass.simpleName}")
+        },
+    ) { code, source, maxBytes ->
         readConversationEmojiArtwork(code, source, AttachmentDownloadPriority.Interactive, maxBytes)
     }
 }
+
+private const val EMOJI_LOG_TAG = "ConversationEmoji"
 
 /** One loaded message's original artwork, retained only by the conversation's transient picker. */
 internal data class ConversationEmojiSource(

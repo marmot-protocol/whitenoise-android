@@ -2673,7 +2673,8 @@ internal fun MessageBubble(
                             showStatus = showOutgoingStatus,
                             status = item.status,
                             editedLabel = footerLabel,
-                            onEditedClick = null,
+                            // Unlike a sticker, a lone emoji is editable text, so its Edited label opens the history.
+                            onEditedClick = onEditedClick,
                             modifier = Modifier.testTag("lone-custom-emoji-footer"),
                             statusContainerColor = MaterialTheme.colorScheme.background,
                         )
