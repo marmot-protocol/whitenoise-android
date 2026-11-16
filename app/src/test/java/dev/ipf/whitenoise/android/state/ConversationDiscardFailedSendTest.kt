@@ -26,6 +26,8 @@ class ConversationDiscardFailedSendTest {
     @Test
     fun failedOwnSendIsDiscardableAndKeepsBothDeleteScopes() =
         withController(listOf(failedSend(), deliveredSend())) { controller ->
+            // Delete for everyone needs the verified roster, which loads after the first timeline page.
+            awaitConversationCondition { controller.canSendMessages }
             val failed = controller.timeline.single { it.record.messageIdHex == FAILED }
             val delivered = controller.timeline.single { it.record.messageIdHex == DELIVERED }
 

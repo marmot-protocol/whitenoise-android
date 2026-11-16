@@ -87,12 +87,12 @@ internal fun MessageBubbleSurfaceState.effectiveReportAudience(audience: ReportA
     if (reportGroupResult != null && !reportCopyPending || reportGroupRefused) ReportAudience.TeamMessage else audience
 
 /**
- * The group's answer to a report: what it tells the reader, whether the group took the report, whether the controller
- * [alreadyShown] it on its own, as it does for a failure with its diagnostics, and whether the group will [refuse] any
- * retry, as when this account is no longer allowed to report there.
+ * The group's answer to a report: the [notice] it gives the reader, whether the group took the report, whether the
+ * controller [alreadyShown] it on its own, as it does for a failure with its diagnostics, and whether the group will
+ * [refuse] any retry, as when this account is no longer allowed to report there.
  */
 internal data class GroupAnswer(
-    @StringRes val message: Int,
+    @StringRes val notice: Int,
     val took: Boolean,
     val alreadyShown: Boolean = false,
     val refuse: Boolean = false,
@@ -122,10 +122,10 @@ internal suspend fun MessageBubbleSurfaceState.sendReport(
     val recorded = reportGroupResult
     val sheetGeneration = reportSheetGeneration
     val answer = if (team.reachesGroup && recorded == null) sends.group() else null
-    val groupResult = if (team.reachesGroup) recorded ?: answer?.message?.takeIf { answer.took } else null
+    val groupResult = if (team.reachesGroup) recorded ?: answer?.notice?.takeIf { answer.took } else null
     if (!team.reachesTeam) {
         finishReport()
-        answer?.takeUnless { it.alreadyShown }?.let { sends.present(it.message, null) }
+        answer?.takeUnless { it.alreadyShown }?.let { sends.present(it.notice, null) }
         return
     }
     if (groupResult != null) reportGroupResult = groupResult
@@ -133,7 +133,7 @@ internal suspend fun MessageBubbleSurfaceState.sendReport(
         is TeamReportOutcome.Accepted -> {
             finishReport()
             // One notice for both, which replaces a group failure the controller showed but still names it.
-            sends.present(answer?.message ?: groupResult, outcome.message)
+            sends.present(answer?.notice ?: groupResult, outcome.message)
         }
         is TeamReportOutcome.Failed -> {
             val sameSheet = reportSheetOpen && reportSheetGeneration == sheetGeneration
@@ -165,11 +165,11 @@ private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
         }
     if (sameSheet) {
         // A failure the controller already showed keeps its own notice and diagnostics.
-        firstGroupAnswer?.takeUnless { it.alreadyShown }?.let { present(it.message, null) }
+        firstGroupAnswer?.takeUnless { it.alreadyShown }?.let { present(it.notice, null) }
         reportCopyPending = groupResult != null
         reportError = error
     } else {
-        present(firstGroupAnswer?.message, error)
+        present(firstGroupAnswer?.notice, error)
     }
 }
 
