@@ -82,6 +82,7 @@ internal class AppReviewDemoNative(
         return existing.groupIdHex
     }
 
+    /** Creates the demo DM, reopening a committed group whose chat projection or member report is unavailable. */
     override suspend fun createDirectConversation(
         ref: String,
         peerId: String,
@@ -97,10 +98,12 @@ internal class AppReviewDemoNative(
                     "",
                     listOf(member.memberRef),
                     CreateGroupOptionsFfi(description = null, initialImage = null, disappearingMessageSecs = 0u),
-                )
+                ).requireCreatedGroupId()
             }
         } catch (projection: MarmotKitException.CreatedGroupProjectionUnavailable) {
             projection.groupIdHex
+        } catch (report: MarmotKitException.CreatedGroupMemberReportUnavailable) {
+            report.groupIdHex
         }
     }
 

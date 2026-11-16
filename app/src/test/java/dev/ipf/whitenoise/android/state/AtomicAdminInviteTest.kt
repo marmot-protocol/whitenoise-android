@@ -5,15 +5,19 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.GroupConversationSnapshotFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
+import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupManagementStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
-import dev.ipf.marmotkit.GroupMutationResultFfi
+import dev.ipf.marmotkit.InviteMembersResultFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -41,6 +45,40 @@ class AtomicAdminInviteTest {
                 assertFalse(OTHER in fixture.controller.group.admins)
                 assertEquals(3, fixture.controller.members.size)
                 assertDiagnosticTerminal("success")
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
+    /** Only selected members enter the native roster when an invite partially succeeds. */
+    @Test
+    fun partialInviteAppliesOnlyTheMembersMdkSelected() =
+        runTest {
+            val fixture = Fixture(unavailable = setOf(OTHER))
+            try {
+                fixture.controller.refreshManagementState()
+                assertTrue(fixture.controller.inviteMembers(listOf(PEER, OTHER), initialAdminRefs = listOf(OTHER)))
+                assertEquals(1, fixture.invocations.size)
+                assertEquals(listOf(SELF, PEER), fixture.controller.members.map { it.memberIdHex })
+                assertEquals(listOf(SELF), fixture.controller.group.admins)
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
+    /** An unrelated roster update cannot turn a definite all-skipped result into a successful invite. */
+    @Test
+    fun allSkippedReportDoesNotSettleOrReconcileAnInvite() =
+        runTest {
+            val fixture = Fixture(unavailable = setOf(PEER, OTHER))
+            try {
+                fixture.controller.refreshManagementState()
+                fixture.beforeReply = { fixture.publishNewerRoster() }
+                assertFalse(fixture.controller.inviteMembers(listOf(PEER, OTHER)))
+                assertEquals(1, fixture.invocations.size)
+                assertEquals(1, fixture.snapshotReads)
+                assertEquals(listOf(SELF), fixture.controller.members.map { it.memberIdHex })
+                assertReconciliationOutcomes(emptyList())
             } finally {
                 fixture.controller.onCleared()
             }
@@ -92,13 +130,42 @@ class AtomicAdminInviteTest {
             }
         }
 
+    /** A partial commit can be observed without retrying or requiring a grant for someone who was skipped. */
+    @Test
+    fun lostReplyAfterPartialCommitKeepsTheObservedMembersAndRoles() =
+        runTest {
+            val fixture = Fixture(loseReply = true, unavailable = setOf(OTHER))
+            try {
+                fixture.controller.refreshManagementState()
+                val recipients = listOf(PEER, OTHER)
+                assertTrue(fixture.controller.inviteMembers(recipients, initialAdminRefs = recipients))
+                assertEquals(1, fixture.invocations.size)
+                assertEquals(2, fixture.snapshotReads)
+                assertEquals(listOf(SELF, PEER), fixture.controller.members.map { it.memberIdHex })
+                assertEquals(listOf(SELF, PEER), fixture.controller.group.admins)
+                assertEquals(
+                    AppText.Resource(R.string.toast_some_members_not_added),
+                    fixture.state.transientNotice?.title,
+                )
+                assertEquals(
+                    AppText.Resource(R.string.group_members_not_added_count, listOf(1)),
+                    fixture.state.transientNotice?.detail,
+                )
+                assertNull(fixture.controller.lastMutationError)
+                assertReconciliationOutcomes(listOf("start", "success"))
+            } finally {
+                fixture.controller.onCleared()
+            }
+        }
+
+    /** A roster published while the invite reply is in flight wins over that reply's membership and admin view. */
     @Test
     fun newerAuthoritativeRosterWinsOverTheInvitationReply() =
         runTest {
             val fixture = Fixture()
             try {
                 fixture.controller.refreshManagementState()
-                fixture.afterCommit = {
+                fixture.beforeReply = {
                     fixture.publishNewerRoster()
                     fixture.controller.refreshManagementState()
                 }
@@ -222,6 +289,7 @@ class AtomicAdminInviteTest {
         private val loseReply: Boolean = false,
         private val failBeforeCommit: Boolean = false,
         private val rejection: Throwable? = null,
+        private val unavailable: Set<String> = emptySet(),
     ) {
         init {
             ShadowLog.clear()
@@ -231,7 +299,7 @@ class AtomicAdminInviteTest {
         var snapshotReads = 0
         var revokeOnRecipientResolution = false
         var onPeerResolution: () -> Unit = {}
-        var afterCommit: suspend () -> Unit = {}
+        var beforeReply: suspend () -> Unit = {}
 
         /** Replaces the current snapshot with a newer roster that adds the other member and makes the peer an admin. */
         fun publishNewerRoster() {
@@ -239,7 +307,7 @@ class AtomicAdminInviteTest {
         }
 
         private var current = snapshot(listOf(SELF), listOf(SELF))
-        private val state: WhiteNoiseAppState =
+        val state: WhiteNoiseAppState =
             WhiteNoiseAppState(
                 context = ApplicationProvider.getApplicationContext(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
@@ -270,23 +338,41 @@ class AtomicAdminInviteTest {
                     invocations += members.toList() to admins.toList()
                     rejection?.let { throw it }
                     if (failBeforeCommit) error("native commit rejected")
-                    current = snapshot(listOf(SELF) + members, listOf(SELF) + admins)
+                    val selected = members.filterNot(unavailable::contains)
+                    current = snapshot(listOf(SELF) + selected, listOf(SELF) + admins.filter(selected::contains))
                     if (loseReply) error("native response lost after commit")
-                    val result =
-                        GroupMutationResultFfi(
-                            SendSummaryFfi(
-                                1u,
-                                emptyList(),
-                                SendAcceptDispositionFfi.PUBLISHED,
-                                SendMaintenanceDispositionFfi.READY,
-                            ),
-                            current.details,
-                            current.managementState,
-                        )
-                    afterCommit()
+                    val result = nativeInviteResult(members, selected)
+                    beforeReply()
                     result
                 },
             )
+
+        /** Builds the native report for the requested subset using the fixture's current roster. */
+        private fun nativeInviteResult(
+            members: List<String>,
+            selected: List<String>,
+        ): GroupInviteResultFfi {
+            val summary =
+                SendSummaryFfi(
+                    1u,
+                    emptyList(),
+                    SendAcceptDispositionFfi.PUBLISHED,
+                    SendMaintenanceDispositionFfi.READY,
+                ).takeIf { selected.isNotEmpty() }
+            val outcomes =
+                members.map { member ->
+                    if (member in selected) {
+                        MemberResolutionOutcomeFfi(member, MemberResolutionStatusFfi.SELECTED, 1u)
+                    } else {
+                        MemberResolutionOutcomeFfi(member, MemberResolutionStatusFfi.MISSING_KEY_PACKAGE, 0u)
+                    }
+                }
+            return GroupInviteResultFfi(
+                InviteMembersResultFfi(summary, outcomes),
+                current.details,
+                current.managementState,
+            )
+        }
     }
 
     private companion object {

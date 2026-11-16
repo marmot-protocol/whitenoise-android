@@ -110,7 +110,6 @@ internal fun formatNativePerformanceSnapshot(snapshot: AppPerformanceSnapshotFfi
                 "account_open" to snapshot.accountOpen,
                 "group_hydration" to snapshot.accountGroupHydration,
                 "profile_load" to snapshot.accountProfileLoad,
-                "group_read_snapshot" to snapshot.accountGroupReadSnapshot,
                 "account_catch_up" to snapshot.accountCatchUp,
                 "message_send" to snapshot.outboundMessageSend,
                 "message_queue_wait" to snapshot.outboundMessageQueueWait,

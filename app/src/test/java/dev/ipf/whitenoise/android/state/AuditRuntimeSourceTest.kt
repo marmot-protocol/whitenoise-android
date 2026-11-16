@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AuditLogSettingsFfi
-import dev.ipf.marmotkit.AuditLogTrackerConfigV4Ffi
+import dev.ipf.marmotkit.AuditLogSourceFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.BuildConfig
 import kotlinx.coroutines.test.runTest
@@ -17,18 +17,16 @@ import java.lang.reflect.Proxy
 /** Exercises the actual host configuration at the versioned native audit boundary. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class AuditRuntimeV4Test {
-    /** Source metadata is preserved while the v4 upload route is disabled. */
+class AuditRuntimeSourceTest {
+    /** Audit source metadata comes from the system hardware model. */
     @Test
     fun auditSourceUsesSystemHardwareModel() =
         runTest {
             ShadowBuild.setModel("  Synthetic Model  ")
             val config = captureConfiguration()
-            assertNull(config.endpoint)
-            assertNull(config.authorizationBearerToken)
-            assertEquals("Synthetic Model", config.source.hardwareModel)
-            assertEquals("android", config.source.platform)
-            assertEquals(BuildConfig.VERSION_NAME, config.source.appVersion)
+            assertEquals("Synthetic Model", config.hardwareModel)
+            assertEquals("android", config.platform)
+            assertEquals(BuildConfig.VERSION_NAME, config.appVersion)
         }
 
     /** Missing model information stays absent rather than falling back to a device name or serial. */
@@ -36,19 +34,19 @@ class AuditRuntimeV4Test {
     fun blankSystemHardwareModelIsOmitted() =
         runTest {
             ShadowBuild.setModel("   ")
-            assertNull(captureConfiguration().source.hardwareModel)
+            assertNull(captureConfiguration().hardwareModel)
         }
 
     /** Captures the real setter argument and permits only the existing recorder-enable sequence. */
-    private suspend fun captureConfiguration(): AuditLogTrackerConfigV4Ffi {
-        var config: AuditLogTrackerConfigV4Ffi? = null
+    private suspend fun captureConfiguration(): AuditLogSourceFfi {
+        var config: AuditLogSourceFfi? = null
         val type = MarmotInterface::class.java
         val marmot =
             Proxy.newProxyInstance(type.classLoader, arrayOf(type)) { _, method, arguments ->
                 when (method.name) {
                     "setAuditOtlpConfigV5" -> arguments!!.first()
-                    "setAuditLogTrackerConfig" -> {
-                        config = arguments!![0] as AuditLogTrackerConfigV4Ffi
+                    "setAuditLogSource" -> {
+                        config = arguments!![0] as AuditLogSourceFfi
                         config
                     }
                     "auditLogSettings" -> AuditLogSettingsFfi(enabled = false)

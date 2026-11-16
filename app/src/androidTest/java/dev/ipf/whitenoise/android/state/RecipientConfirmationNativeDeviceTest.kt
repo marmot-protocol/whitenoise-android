@@ -56,13 +56,14 @@ class RecipientConfirmationNativeDeviceTest {
                 withTimeout(210_000L) {
                     val sender = participant("sender", relay)
                     var peer = participant("peer", relay)
-                    val group =
+                    val createdGroup =
                         sender.native.createGroup(
                             sender.account.label,
                             "",
                             listOf(peer.account.accountIdHex),
                             null,
                         )
+                    val group = createdGroup.requireCreatedGroupId()
                     awaitInvite(peer, group)
                     assertTwoMemberRoster(sender, peer, group)
 

@@ -143,7 +143,10 @@ class ChatListColdStartDirectPeerPresentationFfiIntegrationTest {
             val owner = native.createIdentity(relays, relays)
             val peer = native.createIdentity(relays, relays)
             native.publishUserProfile(peer.label, peerProfile(), relays, relays)
-            val groupIdHex = native.createGroup(owner.label, "", listOf(peer.accountIdHex), null)
+            val groupIdHex =
+                native
+                    .createGroup(owner.label, "", listOf(peer.accountIdHex), null)
+                    .requireCreatedGroupId()
             val row = awaitStoredPeerTitle(native, owner.label, groupIdHex)
             assertEquals(ChatConversationKindFfi.DIRECT, row.row.conversationKind)
             assertEquals("", row.row.groupName)

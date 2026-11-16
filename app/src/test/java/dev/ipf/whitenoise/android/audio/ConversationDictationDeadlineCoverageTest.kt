@@ -27,7 +27,7 @@ class ConversationDictationDeadlineCoverageTest {
     /** Keeps controller and generation timer routing behind the shared deadline policy. */
     @Test
     fun controllerRoutesGenerationAndDrainTimersThroughTheirSharedOwner() {
-        val controller = source("ConversationDictationController.kt")
+        val controller = conversationDictationControllerSource()
         val generation = source("ConversationDictationGenerationOwner.kt")
         assertTrue(controller.contains("recognitionDeadlines.armGeneration(sessionId, phase)"))
         assertTrue(controller.contains("recognitionDeadlines.beginCallerAudioDrain(sessionId)"))

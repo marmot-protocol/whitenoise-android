@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatListItemFromProjection
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -192,7 +193,7 @@ class MaestroRuntimeHostTest {
                     val invitePeers = fixture == "large-roster" || presentationScenario == "modal-departure-successor"
                     val invited = if (invitePeers) accounts.drop(1) else listOf(accounts[1])
                     val members = invited.map { it.accountIdHex } + listOfNotNull(externalContact?.accountIdHex)
-                    val group = native.createGroup(owner.label, "Maestro group", members, null)
+                    val group = native.createGroup(owner.label, "Maestro group", members, null).requireCreatedGroupId()
                     for (member in invited) acceptMaestroInvite(native, member.label, group)
                     externalContact?.acceptGroup(group)
                     seedMaestroFixtureMessages(native, owner.label, accounts[1].label, group, fixture)

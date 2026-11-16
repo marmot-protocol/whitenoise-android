@@ -233,6 +233,11 @@
     <string name="invite_message">來 White Noise 加入我吧。無需手機號碼，沒有監控，真正保有隱私。點這裡下載：https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">該收件者不是有效的 Nostr 公鑰。使用 npub、設定檔連結或 hex 公鑰。</string>
     <string name="error_group_create_failed_retry">設定加密聊天時發生問題。請檢查連線，然後再試一次。</string>
+    <string name="error_no_group_members_selected">無法加入任何選取的聯絡人。請對方檢查聊天設定，或變更你的選擇。</string>
+    <string name="error_no_group_members_selected_for">無法加入 %1$s。請對方檢查聊天設定，或變更你的選擇。</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">未能完成檢查 %1$s 是否可以被加入。請檢查網路連線，然後重試。</string>
+    <string name="error_no_group_members_selected_inbox_for">無法加入 %1$s。他們沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
+    <string name="error_no_group_members_selected_update_for">無法加入 %1$s。請對方更新並開啟 White Noise，然後再試一次。</string>
     <string name="error_chat_created_not_loaded">聊天已建立，但尚未出現在聊天清單中。請稍後再試。</string>
     <string name="remove">移除</string>
     <string name="group_name">群組名稱</string>
@@ -879,6 +884,8 @@
     <string name="toast_invite_sent">邀請已傳送</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">邀請已送出，但無法新增管理員</string>
     <string name="toast_couldnt_add_members">新增成員失敗。請再試一次。</string>
+    <string name="toast_some_members_not_added">部分聯絡人未加入</string>
+    <string name="group_members_not_added_count">未加入的聯絡人（%1$d 位）</string>
     <string name="toast_couldnt_add_member_duplicate_detail">無法新增 %1$s。對方已是成員，或其簽署金鑰與現有成員衝突。</string>
     <string name="toast_invites_sent_to_groups">邀請已傳送到所選群組</string>
     <string name="toast_invites_sent_to_groups_partial">邀請已傳送到部分群組；有些失敗</string>
@@ -2206,6 +2213,7 @@
     <string name="startup_loading_message">正在啟動 White Noise…</string>
     <string name="chat_rows_no_chats_title">尚無聊天</string>
     <string name="chat_rows_no_chats_detail">發起新聊天以傳送訊息。</string>
+    <string name="conversation_pane_placeholder">選擇一個聊天</string>
     <string name="chat_rows_no_unread_title">沒有未讀聊天</string>
     <string name="chat_rows_no_unread_detail">所有訊息都已讀。</string>
     <string name="chat_rows_no_results_detail">檢查拼字或嘗試其他搜尋詞。</string>
@@ -2371,6 +2379,8 @@
     <string name="group_svg_rejected_detail">無法處理此 SVG。請選擇簡單的 SVG、PNG 或 JPEG。</string>
     <string name="error_invalid_key_package">無法驗證此使用者發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
     <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
+    <string name="error_incompatible_key_package">對方的聊天金鑰不相容。請對方更新並開啟 White Noise，然後再試一次。</string>
+    <string name="error_incompatible_key_package_for">%1$s 的聊天金鑰不相容。請對方更新並開啟 White Noise，然後再試一次。</string>
     <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_invite_welcome_too_large">此邀請過大，收件人的收件匣中繼無法接收。請對方新增可接收較大訊息的收件匣中繼。</string>

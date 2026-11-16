@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AuditLogSettingsFfi
-import dev.ipf.marmotkit.AuditLogTrackerConfigV4Ffi
 import dev.ipf.marmotkit.AuditOtlpConfigV5Ffi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
@@ -485,12 +484,10 @@ class AuditUploadConsentTest {
                     "setAuditOtlpConfigV5" ->
                         (args!!.first() as AuditOtlpConfigV5Ffi).also {
                             auditUploadAttempts += it.enabled
+                            mutations += if (it.enabled) "allow-upload" else "clear-upload"
                             if (failSecondV5Set && auditUploadAttempts.size == 2) error("Native rejected v5 route")
                         }
-                    "setAuditLogTrackerConfig" ->
-                        (args!![0] as AuditLogTrackerConfigV4Ffi).also {
-                            mutations += if (it.authorizationBearerToken == null) "clear-upload" else "allow-upload"
-                        }
+                    "setAuditLogSource" -> args!!.first()
                     "auditLogSettings" -> {
                         check(!failSettingsRead) { "Read unavailable" }
                         AuditLogSettingsFfi(enabled)

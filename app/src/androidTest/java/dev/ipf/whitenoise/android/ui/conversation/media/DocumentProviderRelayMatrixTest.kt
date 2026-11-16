@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.state.page
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.conversation.ConversationAttachmentReader
 import dev.ipf.whitenoise.android.ui.conversation.DocumentReadFailure
 import kotlinx.coroutines.delay
@@ -109,7 +110,10 @@ class DocumentProviderRelayMatrixTest {
                     accounts += sender.label
                     val receiver = marmot.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
                     accounts += receiver.label
-                    val group = marmot.createGroup(sender.label, "Document matrix", listOf(receiver.accountIdHex), null)
+                    val group =
+                        marmot
+                            .createGroup(sender.label, "Document matrix", listOf(receiver.accountIdHex), null)
+                            .requireCreatedGroupId()
                     awaitCondition(180_000) { marmot.chatList(receiver.label, false).any { it.groupIdHex == group } }
                     acceptInviteWhenReady(marmot, receiver.label, group)
 

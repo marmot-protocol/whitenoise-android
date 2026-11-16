@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.enforceAppOwnedAttachmentAcquisitionPolicy
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
@@ -39,7 +40,10 @@ internal class FixtureSession(
         val receiver = marmot.createIdentity(relays, relays)
         accounts += receiver.label
         marmot.enforceAppOwnedAttachmentAcquisitionPolicy(listOf(receiver.label, sender.label))
-        val group = marmot.createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
+        val group =
+            marmot
+                .createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
+                .requireCreatedGroupId()
         ControlledAttachmentProbe.awaitReceivedGroup(marmot, receiver.label, group)
         return FixturePeers(sender, receiver, group)
     }

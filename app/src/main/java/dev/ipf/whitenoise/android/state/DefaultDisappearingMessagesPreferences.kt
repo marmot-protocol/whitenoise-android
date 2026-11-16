@@ -126,6 +126,6 @@ internal suspend fun WhiteNoiseAppState.createProfileChatGroup(npub: String): St
                 initialImage = null,
                 disappearingMessageSecs = retentionSeconds.toULong(),
             ),
-        )
+        ).requireCreatedGroupId()
     }
 }
