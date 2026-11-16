@@ -323,6 +323,47 @@ class StickersTest {
             assertEquals(2, syncs)
         }
 
+    /** A pack opened from a relay-hinted link installs through that link; any other pack by its coordinate. */
+    @Test
+    fun installAsksTheRelayHintsThePackWasOpenedFrom() =
+        runTest {
+            val link = "https://sonarprivacy.xyz/stickers?a=${coordinate("linked")}&relay=wss%3A%2F%2Frelay.example"
+            val inputs = mutableListOf<String>()
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> emptyList() },
+                    syncPacks = {},
+                    fetchPack = { pack("linked") },
+                    installPack = { input ->
+                        inputs += input
+                        pack(input.substringAfter("a=").substringBefore('&').substringAfterLast(':'), installed = true)
+                    },
+                    uninstallPack = { error("unused") },
+                )
+
+            library.install(library.lookUp(link))
+            library.install(pack("browsed"))
+            assertEquals(listOf(link, coordinate("browsed")), inputs)
+        }
+
+    /** Sharing asks MDK for a link naming the pack's relays, and reports none when MDK has none. */
+    @Test
+    fun shareLinkComesFromMdkForThePackCoordinate() =
+        runTest {
+            fun library(link: String?) =
+                StickerLibrary(
+                    packs = { _, _ -> emptyList() },
+                    syncPacks = {},
+                    fetchPack = { error("unused") },
+                    installPack = { error("unused") },
+                    uninstallPack = { error("unused") },
+                    packShareLink = { coordinate -> link?.let { "$it?a=$coordinate" } },
+                )
+
+            assertEquals("https://share?a=${coordinate("a")}", library("https://share").shareLink(pack("a")))
+            assertEquals(null, library(null).shareLink(pack("a")))
+        }
+
     private companion object {
         val KEY = StickerKey(coordinate("pack"), "wave", "ab".repeat(32))
 

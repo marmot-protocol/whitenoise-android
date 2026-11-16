@@ -8,7 +8,9 @@ import androidx.compose.runtime.snapshotFlow
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationEmojiSource
+import dev.ipf.whitenoise.android.state.EmojiSourceDefinitions
 import dev.ipf.whitenoise.android.state.conversationEmojiSources
+import dev.ipf.whitenoise.android.state.emojiSourceRows
 import dev.ipf.whitenoise.android.state.readConversationEmojiArtwork
 import dev.ipf.whitenoise.android.ui.conversation.messages.emojiArt
 import kotlinx.coroutines.flow.collectLatest
@@ -31,7 +33,10 @@ internal class ConversationEmojiPicker(
         }
 }
 
-/** Drops received picker metadata and pixels whenever its account, controller or visible window changes. */
+/**
+ * Drops received picker metadata and pixels whenever its account or controller changes, and re-derives sources only
+ * when a loaded row that could define emoji changes, reusing tag reads for rows that did not.
+ */
 @Composable
 internal fun rememberConversationEmojiPicker(controller: ConversationController): ConversationEmojiPicker? {
     val appState = controller.appState
@@ -39,9 +44,10 @@ internal fun rememberConversationEmojiPicker(controller: ConversationController)
     if (controller.boundAccountRef != owner.first) return null
     return key(controller, owner) {
         val picker by produceState<ConversationEmojiPicker?>(null) {
-            snapshotFlow { controller.timeline.toList() to controller.deletedMessageIds.toSet() }
-                .collectLatest {
-                    val sources = controller.conversationEmojiSources()
+            val definitions: EmojiSourceDefinitions = HashMap()
+            snapshotFlow { controller.emojiSourceRows() }
+                .collectLatest { rows ->
+                    val sources = controller.conversationEmojiSources(rows, definitions)
                     if (sources != value?.sources.orEmpty()) {
                         value = conversationEmojiPicker(controller, sources)
                     }

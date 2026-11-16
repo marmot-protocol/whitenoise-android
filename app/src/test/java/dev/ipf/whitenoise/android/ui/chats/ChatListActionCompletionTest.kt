@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.isConversationMuted
+import dev.ipf.whitenoise.android.state.setConversationMuted
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers

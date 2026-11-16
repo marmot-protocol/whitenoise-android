@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.hideMessageForMe
 
 /** Reads native/controller state on demand and dispatches only actions owned by this mounted activity. */
 internal class GroupSystemRowActions(

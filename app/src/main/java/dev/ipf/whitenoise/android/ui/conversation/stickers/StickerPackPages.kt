@@ -53,6 +53,7 @@ import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StickerAssetCache
 import dev.ipf.whitenoise.android.state.StickerLibrary
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -327,9 +328,16 @@ internal fun StickerPackDetailPage(
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     StickerSheetTopBar(stickerPackTitle(pack), onBack = onBack, onClose = onClose) {
         IconButton(
-            onClick = { context.startActivity(stickerPackShareIntent(pack)) },
+            onClick = {
+                scope.launch {
+                    // MDK's link names the relays the pack was found on; the local link is the offline fallback.
+                    val shared = runCatchingCancellable { library.shareLink(pack) }.getOrNull()
+                    context.startActivity(stickerPackShareIntent(shared ?: stickerPackShareLink(pack)))
+                }
+            },
             modifier = Modifier.testTag("sticker.pack.share"),
         ) {
             Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share))
@@ -402,14 +410,14 @@ private fun StickerPackToggle(
 }
 
 /**
- * Shares [pack] as a Sonar viewer link: it opens in a browser for people without the app, and MDK reads it back
- * when pasted into "Add by link". The system sheet offers Copy as well.
+ * Shares a pack's Sonar viewer [link]: it opens in a browser for people without the app, and MDK reads it back,
+ * relay hints included, when pasted into "Add by link". The system sheet offers Copy as well.
  */
-private fun stickerPackShareIntent(pack: StickerPackFfi): Intent =
+private fun stickerPackShareIntent(link: String): Intent =
     Intent.createChooser(
         Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, stickerPackShareLink(pack))
+            putExtra(Intent.EXTRA_TEXT, link)
         },
         null,
     )

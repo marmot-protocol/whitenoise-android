@@ -58,6 +58,7 @@ import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.HostPerformanceRuntimeOwner
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.actionColorArgb
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.ProvideWindowLayout

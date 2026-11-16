@@ -110,6 +110,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.canReportMessage
 import dev.ipf.whitenoise.android.state.dismissReports
+import dev.ipf.whitenoise.android.state.effectiveBubbleColorArgb
+import dev.ipf.whitenoise.android.state.hideMessageForMe
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportMessage
 import dev.ipf.whitenoise.android.state.reportsFor
@@ -121,6 +123,8 @@ import dev.ipf.whitenoise.android.translation.MessageTranslationToggle
 import dev.ipf.whitenoise.android.translation.MessageTranslationToggleSlotWidth
 import dev.ipf.whitenoise.android.translation.translateMessage
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
@@ -2226,6 +2230,25 @@ internal fun MessageBubble(
                             hasReply = replyPreview != null,
                             hasMedia = hasMedia,
                         )
+                // A message that is exactly one custom emoji draws it like a sticker once its artwork is
+                // ready. A failed send keeps the bubble for its Retry and Discard controls, and text
+                // selection needs the bubble's text.
+                val customEmoji = LocalCustomEmoji.current
+                val loneEmoji =
+                    LoneCustomEmojiPresentation.of(
+                        text = editState?.latestText ?: record.plaintext,
+                        standsAlone =
+                            record.kind == 9uL &&
+                                stickerRef == null &&
+                                !isPollRecord &&
+                                !deleted &&
+                                !persistedFailure &&
+                                item.status != MessageStatus.Failed &&
+                                !textSelectionMode &&
+                                replyPreview == null &&
+                                !hasMedia &&
+                                visibleTranslation == null,
+                    ) { EmojiShortcodes.art(it, customEmoji, receivedEmoji.art) }
                 // Detached media keeps its own rounded Surface. When a caption
                 // is attached, each child delegates its corners and border to
                 // the shared frame so the result is one continuous message card.
@@ -2619,6 +2642,39 @@ internal fun MessageBubble(
                             editedLabel = footerLabel,
                             onEditedClick = null,
                             modifier = Modifier.testTag("sticker-message-footer"),
+                            statusContainerColor = MaterialTheme.colorScheme.background,
+                        )
+                    }
+                } else if (loneEmoji != null) {
+                    // A lone custom emoji replaces the bubble like a sticker; its text bubble returns if art is lost.
+                    Column(
+                        actionAnchorBoundsModifier,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                    ) {
+                        senderNameLabel(false)
+                        LoneCustomEmojiImage(
+                            emoji = loneEmoji,
+                            modifier =
+                                Modifier
+                                    .testTag("lone-custom-emoji")
+                                    .alpha(if (item.status == MessageStatus.Pending) PENDING_STICKER_ALPHA else 1f),
+                        )
+                        invalidationWarning?.let { warning ->
+                            MessageBubbleInvalidationWarning(
+                                warning = warning,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.testTag("lone-custom-emoji-warning"),
+                            )
+                        }
+                        MessageInlineFooter(
+                            timeText = rememberedMessageBubbleTime(record.recordedAt),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            showStatus = showOutgoingStatus,
+                            status = item.status,
+                            editedLabel = footerLabel,
+                            onEditedClick = null,
+                            modifier = Modifier.testTag("lone-custom-emoji-footer"),
                             statusContainerColor = MaterialTheme.colorScheme.background,
                         )
                     }

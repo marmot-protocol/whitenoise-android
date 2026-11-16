@@ -40,9 +40,12 @@ internal class SendEmojiArtwork(
 }
 
 /** Whether [throwable] is an upload-stage failure that a connectivity recovery can retry without duplicating. */
-internal fun isRetryableEmojiUploadFailure(throwable: Throwable): Boolean {
+internal fun isRetryableEmojiUploadFailure(throwable: Throwable): Boolean =
+    generateSequence(throwable) { it.cause }.any { it is EmojiUploadFailure } && isConnectivityFailure(throwable)
+
+/** Whether [throwable] or one of its causes reads as lost connectivity, which a later attempt may clear. */
+internal fun isConnectivityFailure(throwable: Throwable): Boolean {
     val chain = generateSequence(throwable) { it.cause }.toList()
-    if (chain.none { it is EmojiUploadFailure }) return false
     val text = chain.joinToString("\n") { "${it.javaClass.simpleName} ${it.message}" }.lowercase(Locale.ROOT)
     return chain.any { it is MarmotKitException.TransportClosed } ||
         listOf("connection", "timed out", "timeout", "no relay", "network", "unreachable").any(text::contains)

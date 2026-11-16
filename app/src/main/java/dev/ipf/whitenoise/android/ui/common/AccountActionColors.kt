@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.actionColorArgb
 import dev.ipf.whitenoise.android.state.resolveActionColorArgb
 
 internal data class AccountActionColors(
