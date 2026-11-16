@@ -169,7 +169,7 @@ private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
         reportCopyPending = groupResult != null
         reportError = error
     } else {
-        present(firstGroupAnswer?.notice, error)
+        present(firstGroupAnswer?.takeUnless { it.alreadyShown }?.notice, error)
     }
 }
 

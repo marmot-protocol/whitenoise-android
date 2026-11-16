@@ -134,6 +134,26 @@ class MessageReportSendTest {
             assertFalse(surfaces.reportGroupRefused)
         }
 
+    /** After dismissal, a late team failure is shown alone when the controller already showed the group failure. */
+    @Test
+    fun aLateTeamFailureAfterAShownGroupFailureIsShownAlone() =
+        runBlocking {
+            teamAnswers += FAILED
+            val closing =
+                MessageReportSends(
+                    group = failingGroup().group,
+                    team = {
+                        surfaces.closeReport()
+                        teamAnswers.removeFirst()
+                    },
+                    present = sends.present,
+                )
+
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), closing)
+
+            assertEquals(listOf(null to R.string.report_team_failed), presented)
+        }
+
     /** A group-only report the controller already reported as failed adds no second notice. */
     @Test
     fun aGroupOnlyFailureIsNotShownTwice() =
