@@ -20,8 +20,7 @@ private const val MEDIA_THUMBNAIL_CACHE_MEMORY_SHARE = 16L
 
 /**
  * The decoded-thumbnail budget for this device, read once: a sixteenth of its RAM within the floor and ceiling, and the
- * floor on a low-RAM device. Hiding the UI halves it and backgrounding empties it, so the share is held only while the
- * app is in use.
+ * floor on a low-RAM device. [mediaThumbnailTrimTargetBytes] limits what survives once the UI is hidden.
  */
 internal fun mediaThumbnailCacheMaxBytes(context: Context): Long =
     mediaThumbnailCacheBytes.takeIf { it > 0L } ?: run {
@@ -31,6 +30,15 @@ internal fun mediaThumbnailCacheMaxBytes(context: Context): Long =
             mediaThumbnailCacheBytes = it
         }
     }
+
+/**
+ * The thumbnail bytes a memory trim keeps. Hiding the UI keeps half the floor, the warm share of the former fixed
+ * budget, and a background trim keeps none. The RAM-scaled share is therefore held only while the app is visible: a
+ * process kept alive by its connection service may get only the UI-hidden trim, so halving the larger budget would
+ * keep up to 128 MiB of thumbnails in the background.
+ */
+internal fun mediaThumbnailTrimTargetBytes(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim): Long =
+    trim.targetBytes(MEDIA_THUMBNAIL_CACHE_MIN_BYTES)
 
 /** A sixteenth of [totalMemoryBytes] within the thumbnail floor and ceiling; a low-RAM device keeps the floor. */
 internal fun mediaThumbnailCacheBudget(

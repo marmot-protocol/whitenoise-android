@@ -710,7 +710,7 @@ class WhiteNoiseAppState private constructor(
         val plaintextRemoved = mediaPlaintextCache.trimToSize(trim.targetBytes(MEDIA_PLAINTEXT_CACHE_MAX_BYTES))
         val thumbnailsRemoved =
             mediaThumbnailCache.trimToSize(
-                targetBytes = trim.targetBytes(mediaThumbnailCacheMaxBytes(appContext)),
+                targetBytes = mediaThumbnailTrimTargetBytes(trim),
                 keep = mediaThumbnailHolds::containsKey,
             )
         if (plaintextRemoved > 0) bumpMediaCacheRevision()

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -22,6 +23,13 @@ class MediaThumbnailCacheBudgetTest {
     @Test
     fun lowRamDevicesKeepTheFloor() {
         assertEquals(MEDIA_THUMBNAIL_CACHE_MIN_BYTES, mediaThumbnailCacheBudget(4L * GIB, lowRam = true))
+    }
+
+    /** Hiding the UI keeps only the former warm share, whatever the device budget; backgrounding keeps none. */
+    @Test
+    fun trimsKeepTheFormerWarmShareAtMost() {
+        assertEquals(24L * MIB, mediaThumbnailTrimTargetBytes(PresentationMemoryTrim.WARM))
+        assertEquals(0L, mediaThumbnailTrimTargetBytes(PresentationMemoryTrim.EMPTY))
     }
 
     private companion object {
