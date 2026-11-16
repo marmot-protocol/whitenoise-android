@@ -31,6 +31,7 @@ internal class AutomaticBacklogStoppedException : CancellationException("automat
  * permit so a short-lived concurrency hiccup self-heals before the UI exposes a
  * manual retry affordance.
  */
+@Suppress("TooManyFunctions") // Each lane change (promote, bring forward, forget) is one small locked operation.
 internal class AttachmentDownloadGate(
     parallelism: Int = DEFAULT_PARALLELISM,
 ) {
@@ -44,7 +45,11 @@ internal class AttachmentDownloadGate(
         var priority: AttachmentDownloadPriority,
         val admitted: CompletableDeferred<Unit> = CompletableDeferred(),
         var ownsPermit: Boolean = false,
-    )
+    ) {
+        /** Whether this request is still waiting in the automatic lane. */
+        val queuedAutomatic: Boolean
+            get() = !ownsPermit && priority == AttachmentDownloadPriority.Automatic
+    }
 
     /** Tracks stale replacements while enforcing one permit owner per caller key. */
     private class KeyedWaiters {
@@ -95,7 +100,8 @@ internal class AttachmentDownloadGate(
     /**
      * Runs [block] while holding one permit for [key]. A [foreground] automatic request, one a visible bubble made,
      * queues ahead of every other automatic request, the newest first, as MDK orders its own automatic queue.
-     * Background work queues behind them in arrival order.
+     * Background work queues behind them in arrival order. Interactive requests still go first, except that after
+     * [MAX_INTERACTIVE_BURST] of them in a row one automatic request, the front of that queue, is admitted.
      */
     suspend fun <T> withPermit(
         key: String,
@@ -113,36 +119,51 @@ internal class AttachmentDownloadGate(
     }
 
     /**
-     * Moves a queued automatic identity to the interactive lane without creating another waiter. An [explicit]
-     * promotion that wins the race with gate registration is retained until that key registers.
-     *
-     * A non-[explicit] call, for a visible bubble that asks again for work it joined, only moves the queued request to
-     * the front of the automatic queue, never ahead of explicit requests, and reports whether anything was queued.
-     * Joined work can exist before its owner registers here, so that demand is kept until the key registers too.
+     * Moves a queued automatic identity to the interactive lane without creating another waiter.
+     * A promotion that wins the race with gate registration is retained until that key registers.
      */
-    fun promote(
-        key: String,
-        explicit: Boolean = true,
-    ): Boolean =
+    fun promote(key: String): Boolean =
         synchronized(lock) {
             val waiters =
                 keyedWaiters.forKey(key)
                     ?: run {
-                        (if (explicit) pendingPromotions else pendingForeground).add(key)
-                        return@synchronized explicit
+                        pendingPromotions.add(key)
+                        return@synchronized true
                     }
-            val queued = waiters.filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
-            queued.forEach { waiter ->
-                automatic.remove(waiter)
-                if (explicit) {
+            waiters
+                .filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
+                .forEach { waiter ->
+                    automatic.remove(waiter)
                     waiter.priority = AttachmentDownloadPriority.Interactive
                     interactive.addLast(waiter)
-                } else {
-                    automatic.addFirst(waiter)
                 }
-            }
-            explicit || queued.isNotEmpty()
+            true
         }
+
+    /**
+     * Moves a queued automatic request for [key], one a visible bubble asked for again after joining it, to the front
+     * of the automatic queue. Interactive requests keep their lane, which wins except for the one automatic admission
+     * every [MAX_INTERACTIVE_BURST] taps. Joined work can exist before its owner registers here, so the demand is kept
+     * until the key registers or [forgetForeground] drops it.
+     */
+    fun bringForward(key: String) {
+        synchronized(lock) {
+            val waiters = keyedWaiters.forKey(key)
+            if (waiters == null) {
+                pendingForeground.add(key)
+                return
+            }
+            waiters.filter(Waiter::queuedAutomatic).forEach { waiter ->
+                automatic.remove(waiter)
+                automatic.addFirst(waiter)
+            }
+        }
+    }
+
+    /** Drops a [bringForward] still waiting for [key]'s owner, once that owner has finished without registering. */
+    fun forgetForeground(key: String) {
+        synchronized(lock) { pendingForeground.remove(key) }
+    }
 
     /** True only while this attachment currently owns one of the bounded native-work permits. */
     fun isAdmitted(key: String): Boolean =

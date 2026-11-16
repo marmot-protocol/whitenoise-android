@@ -8,7 +8,7 @@ import kotlinx.coroutines.async
 /** Owns one shared native-or-legacy acquisition decision per attachment cache key. */
 internal class InFlightAttachmentAcquisitions(
     private val scope: CoroutineScope,
-    private val promote: (String, Boolean) -> Unit,
+    private val gate: AttachmentDownloadGate,
 ) {
     private val lock = Any()
     private val entries = mutableMapOf<String, Deferred<AttachmentAcquisitionOutcome>>()
@@ -18,7 +18,8 @@ internal class InFlightAttachmentAcquisitions(
 
     /**
      * Joins active work without choosing a second network path. Interactive demand promotes the queued owner, and a
-     * [foreground] bubble's automatic demand only brings it to the front of the automatic queue.
+     * [foreground] bubble's automatic demand only brings it to the front of the automatic queue. When an owner
+     * finishes, any such demand it never consumed is dropped, so a later owner of the key does not inherit it.
      */
     fun acquire(
         cacheKey: String,
@@ -29,8 +30,8 @@ internal class InFlightAttachmentAcquisitions(
         synchronized(lock) {
             entries[cacheKey]?.takeIf { it.isActive }?.let { active ->
                 when {
-                    priority == AttachmentDownloadPriority.Interactive -> promote(cacheKey, true)
-                    foreground -> promote(cacheKey, false)
+                    priority == AttachmentDownloadPriority.Interactive -> gate.promote(cacheKey)
+                    foreground -> gate.bringForward(cacheKey)
                 }
                 return@synchronized active
             }
@@ -38,7 +39,10 @@ internal class InFlightAttachmentAcquisitions(
                 entries[cacheKey] = deferred
                 deferred.invokeOnCompletion {
                     synchronized(lock) {
-                        if (entries[cacheKey] === deferred) entries.remove(cacheKey)
+                        if (entries[cacheKey] !== deferred) return@synchronized
+                        entries.remove(cacheKey)
+                        // An owner settled from a cache never registers, so its visible joins' demand ends here.
+                        gate.forgetForeground(cacheKey)
                     }
                 }
             }

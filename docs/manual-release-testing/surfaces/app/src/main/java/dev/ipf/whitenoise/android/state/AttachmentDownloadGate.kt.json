@@ -6,7 +6,7 @@
       {
         "surface": "Download gate: four slots, visible images ahead of background work",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadGate.kt",
-        "anchor": "fun promote(",
+        "anchor": "fun bringForward(",
         "test_ids": [
           "MED-024"
         ]

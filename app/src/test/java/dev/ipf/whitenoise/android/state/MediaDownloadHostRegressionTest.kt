@@ -89,6 +89,30 @@ class MediaDownloadHostRegressionTest {
         }
     }
 
+    /** With every slot held, a visible bubble's request is admitted before durable work that queued earlier. */
+    @Test
+    fun aVisibleBubbleRequestGoesAheadOfEarlierDurableWork() =
+        runTest(dispatcher) {
+            val held = (0 until 4).map { index -> async { download(index) } }
+            val holders = List(4) { fixture.entered.receive() }
+            val durable = async { observe(4) }
+            fixture.awaitOwners(5)
+            runCurrent()
+            val visible = async { download(5) }
+            fixture.awaitOwners(6)
+            runCurrent()
+            holders.first().succeed(bytes(holders.first().reference.fileName))
+            val next = fixture.entered.receive()
+            assertEquals(reference(5), next.reference)
+            next.succeed(bytes(next.reference.fileName))
+            holders[1].succeed(bytes(holders[1].reference.fileName))
+            val afterVisible = fixture.entered.receive()
+            assertEquals("durable work still runs once a slot frees", reference(4), afterVisible.reference)
+            (holders.drop(2) + afterVisible).forEach { it.succeed(bytes(it.reference.fileName)) }
+            (held + visible).awaitAll()
+            durable.await()
+        }
+
     /** Sixteen distinct cold references share four slots; a late explicit request gets the next slot. */
     @Test
     fun distinctImageBacklogIsBoundedAndAnExplicitTapJoinsAndPromotesItsOwner() =
@@ -578,6 +602,17 @@ class MediaDownloadHostRegressionTest {
         priority,
         persistInteractiveIntent = false,
     )
+
+    /** Fetches [index] the way durable background work does: automatic demand that only observes native work. */
+    private suspend fun observe(index: Int) =
+        fixture.state
+            .downloadAttachmentPlaintextSource(
+                request(index),
+                reference(index),
+                AttachmentDownloadPriority.Automatic,
+                persistInteractiveIntent = false,
+                demandIntent = AttachmentDemandIntent.Observe,
+            ).use { }
 
     /** Distinct bounded payloads catch accidental cross-attachment result reuse. */
     private fun bytes(name: String): ByteArray = ByteArray(64 * 1024) { (name.hashCode() + it).toByte() }

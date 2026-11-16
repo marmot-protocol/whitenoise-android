@@ -1886,7 +1886,7 @@ class WhiteNoiseAppState private constructor(
             },
         )
     private val inFlightAttachmentAcquisitions =
-        InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate::promote)
+        InFlightAttachmentAcquisitions(mutationsScope, attachmentDownloadGate)
 
     /** Captures one runtime so later replacement cannot receive an older owner's sample. */
     private fun runtimeHostPerformanceEmitter(runtime: AppMarmotRuntime): HostPerformanceEmitter =

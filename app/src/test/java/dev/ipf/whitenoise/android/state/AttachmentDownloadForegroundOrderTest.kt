@@ -9,8 +9,6 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Images a visible bubble asks for are fetched before background automatic work (#3819). */
@@ -41,9 +39,9 @@ class AttachmentDownloadForegroundOrderTest {
             }
         }
 
-    /** A visible bubble joining queued background work moves it forward, but never ahead of a tap. */
+    /** A visible bubble joining queued background work moves it to the front of the automatic queue only. */
     @Test
-    fun bringingJoinedWorkForwardKeepsExplicitRequestsFirst() =
+    fun bringingJoinedWorkForwardLeavesATapInItsLane() =
         runBlocking {
             withTimeout(TEST_TIMEOUT) {
                 val gate = AttachmentDownloadGate(parallelism = 1)
@@ -55,14 +53,67 @@ class AttachmentDownloadForegroundOrderTest {
                         start(gate, "background-0", started),
                         start(gate, "background-1", started),
                         start(gate, "background-2", started),
-                        start(gate, "tap", started, priority = AttachmentDownloadPriority.Interactive),
+                        start(gate, "tap", started, priority = INTERACTIVE),
                     )
-                assertTrue(gate.promote("background-2", explicit = false))
-                assertFalse("nothing queued under that key", gate.promote("absent", explicit = false))
+                gate.bringForward("background-2")
                 release.complete(Unit)
                 (queued + holder).awaitAll()
 
                 assertEquals(listOf("holder", "tap", "background-2", "background-0", "background-1"), started)
+            }
+        }
+
+    /**
+     * Taps go first, but after [AttachmentDownloadGate.MAX_INTERACTIVE_BURST] of them in a row the front of the
+     * automatic queue, the newest visible request, gets one slot before the next tap.
+     */
+    @Test
+    fun aVisibleRequestGetsOneSlotAfterThreeTapsInARow() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val release = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val holder = start(gate, "holder", started) { release.await() }
+                val queued =
+                    listOf(start(gate, "visible-0", started, foreground = true)) +
+                        (0 until 4).map { start(gate, "tap-$it", started, priority = INTERACTIVE) }
+                release.complete(Unit)
+                (queued + holder).awaitAll()
+
+                assertEquals(listOf("holder", "tap-0", "tap-1", "tap-2", "visible-0", "tap-3"), started)
+            }
+        }
+
+    /**
+     * A visible join whose owner finishes from a cache, without ever reaching the gate, leaves no demand behind. A
+     * later owner of the same key queues in arrival order.
+     */
+    @Test
+    fun aJoinWhoseOwnerNeverQueuedDoesNotMoveALaterOwner() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val acquisitions = InFlightAttachmentAcquisitions(this, gate)
+                val release = CompletableDeferred<Unit>()
+                val cacheRead = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val holder = start(gate, "holder", started) { release.await() }
+                val cached =
+                    acquisitions.acquire("image", AttachmentDownloadPriority.Automatic) {
+                        cacheRead.await()
+                        AttachmentAcquisitionOutcome.LegacyBytes(byteArrayOf())
+                    }
+                acquisitions.acquire("image", AttachmentDownloadPriority.Automatic, foreground = true) {
+                    error("a join never starts a second owner")
+                }
+                cacheRead.complete(Unit)
+                cached.await()
+                val queued = listOf(start(gate, "background", started), start(gate, "image", started))
+                release.complete(Unit)
+                (queued + holder).awaitAll()
+
+                assertEquals(listOf("holder", "background", "image"), started)
             }
         }
 
@@ -72,7 +123,7 @@ class AttachmentDownloadForegroundOrderTest {
         runBlocking {
             withTimeout(TEST_TIMEOUT) {
                 val gate = AttachmentDownloadGate(parallelism = 1)
-                val acquisitions = InFlightAttachmentAcquisitions(this, gate::promote)
+                val acquisitions = InFlightAttachmentAcquisitions(this, gate)
                 val release = CompletableDeferred<Unit>()
                 val started = mutableListOf<String>()
                 val holder = start(gate, "holder", started) { release.await() }
@@ -105,7 +156,7 @@ class AttachmentDownloadForegroundOrderTest {
         runBlocking {
             withTimeout(TEST_TIMEOUT) {
                 val gate = AttachmentDownloadGate(parallelism = 1)
-                val acquisitions = InFlightAttachmentAcquisitions(this, gate::promote)
+                val acquisitions = InFlightAttachmentAcquisitions(this, gate)
                 val release = CompletableDeferred<Unit>()
                 val started = mutableListOf<String>()
                 val holder = start(gate, "holder", started) { release.await() }
@@ -163,6 +214,7 @@ class AttachmentDownloadForegroundOrderTest {
 
     private companion object {
         const val ACCOUNT = "account-a"
+        val INTERACTIVE = AttachmentDownloadPriority.Interactive
         const val TEST_TIMEOUT = 5_000L
     }
 }
