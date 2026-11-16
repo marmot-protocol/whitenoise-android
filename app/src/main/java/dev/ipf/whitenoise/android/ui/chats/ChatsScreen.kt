@@ -2763,7 +2763,13 @@ internal fun ChatsScreen(
                                                     key = CHAT_LIST_PINNED_BOUNDARY_KEY,
                                                     contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
                                                 ) {
-                                                    ChatListPinnedBoundary()
+                                                    ChatListPinnedBoundary(
+                                                        modifier =
+                                                            chatListPinnedBoundaryMotion(
+                                                                rowCount = visibleItems.size,
+                                                                placementDurationMillis = rowPlacementDurationMillis,
+                                                            ),
+                                                    )
                                                 }
                                             }
                                             this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {

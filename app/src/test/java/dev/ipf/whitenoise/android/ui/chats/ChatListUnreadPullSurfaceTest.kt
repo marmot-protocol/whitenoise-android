@@ -104,6 +104,70 @@ class ChatListUnreadPullSurfaceTest {
         }
     }
 
+    /** The pinned divider rides the single body offset with its rows through a held pull, release and toggles (#3842). */
+    @Test fun pinnedDividerMovesWithRowsOnEveryPullFrame() {
+        val unread = mutableStateOf(false)
+        rule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.size(300.dp, 500.dp)) {
+                    ChatListUnreadPullSurface(unread.value, true, true, { true }, { unread.value = it }) {
+                        LazyColumn {
+                            items(2, key = { it }) { Text("Chat $it", Modifier.size(48.dp).testTag("row.$it")) }
+                            item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {
+                                ChatListPinnedBoundary(chatListPinnedBoundaryMotion(rowCount = 6))
+                            }
+                            items(4, key = { it + 2 }) { Text("Chat ${it + 2}", Modifier.size(48.dp).testTag("row.${it + 2}")) }
+                        }
+                    }
+                }
+            }
+        }
+        fun top(tag: String) = rule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.top
+        val above = top(CHAT_LIST_PINNED_BOUNDARY_TAG) - top("row.1")
+        val below = top("row.2") - top(CHAT_LIST_PINNED_BOUNDARY_TAG)
+        fun assertTogether(phase: String) {
+            assertEquals(phase, above, top(CHAT_LIST_PINNED_BOUNDARY_TAG) - top("row.1"), 0.5f)
+            assertEquals(phase, below, top("row.2") - top(CHAT_LIST_PINNED_BOUNDARY_TAG), 0.5f)
+        }
+        val rest = top("row.0")
+        // Below the threshold: the held pull and its spring return move rows and divider together.
+        rule.onNodeWithTag("chats.unread_surface").performTouchInput {
+            down(Offset(width / 2f, height * 0.3f))
+            moveBy(Offset(0f, 40f))
+        }
+        assertTrue(top("row.0") > rest)
+        assertTogether("held pull")
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithTag("chats.unread_surface").performTouchInput { up() }
+        repeat(40) { frame ->
+            rule.mainClock.advanceTimeByFrame()
+            rule.runOnIdle { }
+            assertTogether("return frame $frame")
+        }
+        rule.mainClock.autoAdvance = true
+        rule.waitForIdle()
+        assertEquals(rest, top("row.0"), 0.5f)
+        assertEquals(false, unread.value)
+        // Past the threshold in both directions: every settling frame keeps the divider attached.
+        repeat(2) { direction ->
+            rule.onNodeWithTag("chats.unread_surface").performTouchInput {
+                down(Offset(width / 2f, height * 0.3f))
+                moveBy(Offset(0f, height * 0.6f))
+            }
+            rule.mainClock.autoAdvance = false
+            rule.onNodeWithTag("chats.unread_surface").performTouchInput { up() }
+            repeat(40) { frame ->
+                rule.mainClock.advanceTimeByFrame()
+                rule.runOnIdle { }
+                assertTogether("toggle $direction frame $frame")
+            }
+            rule.mainClock.autoAdvance = true
+            rule.waitForIdle()
+            assertEquals(direction == 0, unread.value)
+            assertTogether("toggle $direction settled")
+        }
+    }
+
     /** While the unread snapshot loads, a scrolled unread list scrolls instead of clearing the filter (#3622). */
     @Test fun scrolledUnreadListPassesDownwardDragToTheList() {
         var toggles = 0

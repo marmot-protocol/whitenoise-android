@@ -44,6 +44,24 @@ internal fun LazyItemScope.chatListRowMotion(
 
 internal fun chatListTargetZIndex(targetIndex: Int): Float = -targetIndex.toFloat()
 
+/**
+ * Pinned-section divider motion. It travels with the rows' placement timing so
+ * the section boundary never jumps while rows animate around it. It paints
+ * beneath every row, so an opaque row crossing the boundary covers the line
+ * instead of the line drawing through the row. It fades in like an inserted row
+ * and leaves at once when either section empties, so no stranded line remains.
+ */
+internal fun LazyItemScope.chatListPinnedBoundaryMotion(
+    rowCount: Int,
+    placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
+): Modifier =
+    Modifier
+        .animateItem(
+            fadeInSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
+            placementSpec = tween(placementDurationMillis),
+            fadeOutSpec = null,
+        ).zIndex(chatListTargetZIndex(rowCount))
+
 internal fun chatListAutoScrollSessionStarts(
     autoScrollWasActive: Boolean,
     scrollDelta: Float,

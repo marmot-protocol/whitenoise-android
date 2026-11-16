@@ -20,6 +20,14 @@
         "test_ids": [
           "CHL-029"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListHeadReorderMotion.kt",
+        "surface": "Pinned-section divider placement motion",
+        "anchor": "internal fun LazyItemScope.chatListPinnedBoundaryMotion(",
+        "test_ids": [
+          "CHL-038"
+        ]
       }
     ]
   },
