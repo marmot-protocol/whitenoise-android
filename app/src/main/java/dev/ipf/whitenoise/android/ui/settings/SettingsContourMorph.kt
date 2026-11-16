@@ -137,7 +137,7 @@ private fun interpolateSettingsContour(
     t: Float,
     key: Int,
 ): SettingsContour {
-    val bounds = lerp(a.bounds, b.bounds, t)
+    val bounds = if (a.bounds == b.bounds) a.bounds else lerp(a.bounds, b.bounds, t)
     val viewport = interpolateContourViewport(a, b, t)
 
     fun radius(
@@ -158,16 +158,20 @@ private fun interpolateSettingsContour(
         }
     return SettingsContour(
         bounds,
-        RoundRect(
-            bounds.left,
-            bounds.top,
-            bounds.right,
-            bounds.bottom,
-            radius(a.corners.topLeftCornerRadius, b.corners.topLeftCornerRadius),
-            radius(a.corners.topRightCornerRadius, b.corners.topRightCornerRadius),
-            radius(a.corners.bottomRightCornerRadius, b.corners.bottomRightCornerRadius),
-            radius(a.corners.bottomLeftCornerRadius, b.corners.bottomLeftCornerRadius),
-        ),
+        if (a.bounds == b.bounds && a.corners == b.corners) {
+            a.corners
+        } else {
+            RoundRect(
+                bounds.left,
+                bounds.top,
+                bounds.right,
+                bounds.bottom,
+                radius(a.corners.topLeftCornerRadius, b.corners.topLeftCornerRadius),
+                radius(a.corners.topRightCornerRadius, b.corners.topRightCornerRadius),
+                radius(a.corners.bottomRightCornerRadius, b.corners.bottomRightCornerRadius),
+                radius(a.corners.bottomLeftCornerRadius, b.corners.bottomLeftCornerRadius),
+            )
+        },
         viewport,
         if (a.bounds.isEmpty) {
             b.color
@@ -292,8 +296,26 @@ internal fun interpolateSettingsContours(
                 )
         }
     }
-    return (correspondence ?: matchSettingsContours(source, target, correspondenceKey, null, emptyPoint, viewport))
-        .map { pair -> interpolateSettingsContour(pair.source, pair.target, t, pair.key) }
+    val contours =
+        (correspondence ?: matchSettingsContours(source, target, correspondenceKey, null, emptyPoint, viewport))
+            .map { pair -> interpolateSettingsContour(pair.source, pair.target, t, pair.key) }
+    // Frozen matched windows can expand on a new leg. Partition paint, never rigid outlines.
+    val painted = contours.map { it.bounds.intersect(it.viewport) }
+    val visible = contours.indices.filter { !painted[it].isEmpty }
+    val windows = contours.map { it.viewport }.toMutableList()
+    visible.forEachIndexed { index, before ->
+        // Include non-neighbours: a rigid surplus between them may already be fully clipped.
+        visible.drop(index + 1).forEach { after ->
+            if (painted[before].bottom > painted[after].top) {
+                val edge = (painted[before].bottom + painted[after].top) / 2f
+                val upper = windows[before]
+                val lower = windows[after]
+                windows[before] = Rect(upper.left, upper.top, upper.right, edge.coerceIn(upper.top, upper.bottom))
+                windows[after] = Rect(lower.left, edge.coerceIn(lower.top, lower.bottom), lower.right, lower.bottom)
+            }
+        }
+    }
+    return contours.mapIndexed { index, contour -> contour.copy(viewport = windows[index]) }
 }
 
 /** A measured batch owns correspondence; animation only samples these immutable endpoints. */
@@ -444,17 +466,27 @@ internal fun matchSettingsContours(
                     viewport = Rect(visible.left, clippedEdge, visible.right, clippedEdge),
                     rows = emptyList(),
                 )
-            result +=
+            // Insert in the assignment gap, not by a rigid surplus outline's raw position.
+            // The same gap order is retained when source and target are reversed.
+            val insertion =
+                after?.let { next ->
+                    result.indexOfFirst { pair ->
+                        if (reverse) pair.target == own[next.first] else pair.source == own[next.first]
+                    }
+                } ?: result.size
+            result.add(
+                insertion,
                 if (reverse) {
                     SettingsContourPair(peer, frozen, slot.key)
                 } else {
                     SettingsContourPair(frozen, peer, slot.key)
-                }
+                },
+            )
         }
     }
     addSurplus(a, b, false)
     addSurplus(b, a, true)
-    return result.sortedWith(compareBy({ it.source.bounds.top }, { it.target.bounds.top }))
+    return result
 }
 
 /** True-empty compatibility alone retains its native seed reveal. */

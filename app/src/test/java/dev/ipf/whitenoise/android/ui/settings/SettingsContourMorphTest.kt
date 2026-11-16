@@ -25,7 +25,7 @@ class SettingsContourMorphTest {
         val bounds = Rect(16f, top, 344f, top + height)
         return SettingsContour(
             bounds,
-            RoundRect(bounds, minOf(20f, height / 2f), minOf(20f, height / 2f)),
+            RoundRect(bounds, minOf(20f, bounds.height / 2f), minOf(20f, bounds.height / 2f)),
             viewport,
             Color.White,
             1f,
@@ -321,6 +321,7 @@ class SettingsContourMorphTest {
             forward.zip(reverse).forEach { (a, b) ->
                 assertEquals(a.key, b.key)
                 assertBounds(a.bounds, b.bounds)
+                assertBounds(a.viewport, b.viewport)
                 assertEquals(a.corners.topLeftCornerRadius.x, b.corners.topLeftCornerRadius.x, 0.001f)
                 assertEquals(a.width, b.width, 0f)
                 assertEquals(a.color, b.color)
@@ -434,6 +435,17 @@ class SettingsContourMorphTest {
         )
     }
 
+    @Test fun stationarySurplusPreservesExactBoundsAndCorners() {
+        val slot = group(123.4567f, 81.2345f, key = 1)
+        val source = listOf(slot, group(300f, key = 2))
+        val target = listOf(group(150f, key = 2))
+        for (step in 1 until 240) {
+            val surplus = sample(source, target, step / 240f).single { it.key == slot.key }
+            assertEquals(slot.bounds, surplus.bounds)
+            assertEquals(slot.corners, surplus.corners)
+        }
+    }
+
     @Test fun nativeEndpointsIncludingRowsCornersViewportAndStylesAreTheOriginalObjects() {
         val source = home()
         val target = listOf(dividedGroup(120f, 2, 3).copy(viewport = Rect(0f, 90f, 360f, 650f)))
@@ -461,11 +473,15 @@ class SettingsContourMorphTest {
         }
         val newlyArriving = pairs.filter { it.target.key == 1 }
         assertEquals(1, newlyArriving.size)
-        assertTrue(
-            newlyArriving
-                .single()
-                .source.bounds.bottom <= viewport.top,
-        )
+        val existing = visible.singleOrNull { it.key == 1 }
+        if (existing != null) {
+            assertSame(existing, newlyArriving.single().source)
+        } else {
+            val incoming = newlyArriving.single()
+            assertEquals(incoming.target.bounds, incoming.source.bounds)
+            assertEquals(incoming.target.corners, incoming.source.corners)
+            assertTrue(incoming.source.bounds.intersect(incoming.source.viewport).isEmpty)
+        }
     }
 
     @Test fun frozenFramesRemainOrderedOnReturnAndOnRetargetToAnotherGroup() {
@@ -476,7 +492,14 @@ class SettingsContourMorphTest {
             for (target in listOf(source, listOf(group(540f, 120f, key = 2)))) {
                 assertSame(frozen, sample(frozen, target, 0f))
                 assertSame(target, sample(frozen, target, 1f))
-                for (step in 1 until 240) assertNotNull(orderedSettingsContours(sample(frozen, target, step / 240f)))
+                for (step in 1 until 240) {
+                    val frame = sample(frozen, target, step / 240f)
+                    assertNotNull(orderedSettingsContours(frame))
+                    val ink = frame.map { it.bounds.intersect(it.viewport) }.filterNot { it.isEmpty }
+                    ink.forEachIndexed { index, bounds ->
+                        ink.drop(index + 1).forEach { other -> assertTrue(bounds.intersect(other).isEmpty) }
+                    }
+                }
                 val visibleFrozen =
                     frozen.filter {
                         !it.bounds

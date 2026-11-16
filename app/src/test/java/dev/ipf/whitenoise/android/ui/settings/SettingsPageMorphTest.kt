@@ -301,7 +301,9 @@ class SettingsPageMorphTest {
             val selected = frame.single { it.key == selectedKey }
             assertEquals(lerp(first, target, AppMotionOpenEasing.transform(time)), selected.bounds)
             assertEquals(2, frame.size)
-            assertTrue(frame[0].bounds.bottom < frame[1].bounds.top)
+            val firstInk = frame[0].bounds.intersect(frame[0].viewport)
+            val secondInk = frame[1].bounds.intersect(frame[1].viewport)
+            assertTrue(firstInk.intersect(secondInk).isEmpty)
             assertEquals(second.width, frame[1].bounds.width, 0.001f)
             frame.forEach { contour ->
                 assertEquals(1f, contour.modulationAlpha, 0f)
