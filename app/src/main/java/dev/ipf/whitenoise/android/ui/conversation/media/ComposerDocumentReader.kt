@@ -67,7 +67,7 @@ internal fun ComposerDocumentReader(
             loadBytes = loadBytes,
             withPdfFile = { use ->
                 check(actions.isCurrent())
-                withPrivatePdfFile(context.cacheDir, AttachmentPlaintext.Bytes(attachment.plaintext)) { file ->
+                withPrivatePdfFile(context.cacheDir, { AttachmentPlaintext.Bytes(attachment.plaintext) }) { file ->
                     check(actions.isCurrent())
                     use(file)
                 }

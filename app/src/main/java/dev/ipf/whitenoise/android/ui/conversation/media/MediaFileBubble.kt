@@ -485,11 +485,12 @@ internal fun MediaFileBubble(
                 // The renderer reads a private copy that no FileProvider path exposes and is deleted on close.
                 withPdfFile = { use ->
                     check(actions.isCurrent())
-                    attachmentSource(controller, messageIdHex, attachmentIndex, reference, mine).use { plaintext ->
-                        withPrivatePdfFile(context.cacheDir, plaintext) { file ->
-                            check(actions.isCurrent())
-                            use(file)
-                        }
+                    withPrivatePdfFile(
+                        context.cacheDir,
+                        { attachmentSource(controller, messageIdHex, attachmentIndex, reference, mine) },
+                    ) { file ->
+                        check(actions.isCurrent())
+                        use(file)
                     }
                 },
                 onOpenExternal = {

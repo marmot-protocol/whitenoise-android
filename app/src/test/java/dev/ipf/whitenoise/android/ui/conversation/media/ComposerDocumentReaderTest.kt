@@ -73,7 +73,7 @@ class ComposerDocumentReaderTest {
             val bytes = "%PDF prepared draft".toByteArray()
             val reader =
                 launch {
-                    withPrivatePdfFile(temporary.root, AttachmentPlaintext.Bytes(bytes)) {
+                    withPrivatePdfFile(temporary.root, { AttachmentPlaintext.Bytes(bytes) }) {
                         assertTrue(it.readBytes().contentEquals(bytes))
                         ready.complete(it)
                         awaitCancellation()
@@ -90,15 +90,37 @@ class ComposerDocumentReaderTest {
             var owned: File? = null
             val result =
                 runCatching {
-                    withPrivatePdfFile(temporary.root, AttachmentPlaintext.Bytes(byteArrayOf(1))) {
+                    withPrivatePdfFile(temporary.root, { AttachmentPlaintext.Bytes(byteArrayOf(1)) }) {
                         owned = it
                         error("renderer failed")
                     }
                 }
             assertTrue(result.isFailure)
             assertFalse(checkNotNull(owned).exists())
-            withPrivatePdfFile(temporary.root, AttachmentPlaintext.Bytes(byteArrayOf(2))) { owned = it }
+            withPrivatePdfFile(temporary.root, { AttachmentPlaintext.Bytes(byteArrayOf(2)) }) { owned = it }
             assertFalse(checkNotNull(owned).exists())
+        }
+
+    /** The decrypted source is released once copied, so an open reader keeps one plaintext copy, not two. */
+    @Test fun sourceIsClosedBeforeTheReaderUsesTheCopyAndOnFailure() =
+        runBlocking {
+            class Tracked(
+                val oversized: Boolean,
+            ) : AttachmentPlaintext {
+                var closed = false
+                override val size = if (oversized) PdfPagePolicy.MAX_INPUT + 1 else 1L
+
+                override fun copyTo(output: OutputStream) = output.write(1)
+
+                override fun close() {
+                    closed = true
+                }
+            }
+            val copied = Tracked(oversized = false)
+            withPrivatePdfFile(temporary.root, { copied }) { assertTrue(copied.closed) }
+            val refused = Tracked(oversized = true)
+            assertTrue(runCatching { withPrivatePdfFile(temporary.root, { refused }) {} }.isFailure)
+            assertTrue(refused.closed)
         }
 
     /** A kill skips the reader's cleanup; the next process removes that copy, and sign-out removes this one's. */
@@ -110,7 +132,7 @@ class ComposerDocumentReaderTest {
             val earlier = File(root, "process-earlier").apply { mkdirs() }
             val orphan = File(earlier, "preview-orphan.pdf").apply { writeText("orphan") }
 
-            withPrivatePdfFile(cache, AttachmentPlaintext.Bytes(byteArrayOf(1))) { open ->
+            withPrivatePdfFile(cache, { AttachmentPlaintext.Bytes(byteArrayOf(1)) }) { open ->
                 sweepStaleSharedMedia(context, maxAgeMillis = Long.MAX_VALUE)
 
                 assertFalse(orphan.exists())
@@ -128,7 +150,7 @@ class ComposerDocumentReaderTest {
             val result =
                 runCatching {
                     val oversized = AttachmentPlaintext.Bytes(ByteArray(PdfPagePolicy.MAX_INPUT.toInt() + 1))
-                    withPrivatePdfFile(temporary.root, oversized) {
+                    withPrivatePdfFile(temporary.root, { oversized }) {
                         error("must not render")
                     }
                 }
@@ -160,7 +182,7 @@ class ComposerDocumentReaderTest {
 
                     override fun close() = Unit
                 }
-            val result = runCatching { withPrivatePdfFile(temporary.root, misreported) { error("must not render") } }
+            val result = runCatching { withPrivatePdfFile(temporary.root, { misreported }) { error("must not render") } }
             assertTrue(result.exceptionOrNull() is IOException)
             assertTrue(
                 documentReaderDirectory(temporary.root)

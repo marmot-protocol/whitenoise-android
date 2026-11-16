@@ -31,23 +31,33 @@ internal fun sweepOrphanedDocumentReaderFiles(cacheDir: File) {
 }
 
 /**
- * Copies [source] into a private file that no FileProvider path exposes, lends it to [use] and deletes it afterwards.
- * The declared size is checked before any file exists and the streamed size while copying, so a source that
- * misreports its size cannot write past the renderer's input limit. The coroutine owns even partial writes,
- * including cancellation at the dispatcher return boundary.
+ * Copies the source from [openSource] into a private file that no FileProvider path exposes, closes the source, lends
+ * the copy to [use] and deletes it afterwards, so an open reader holds one plaintext copy rather than two. The declared
+ * size is checked before any file exists and the streamed size while copying, so a source that misreports its size
+ * cannot write past the renderer's input limit. The coroutine owns even partial writes, including cancellation at the
+ * dispatcher return boundary.
  */
 internal suspend fun withPrivatePdfFile(
     cacheDir: File,
-    source: AttachmentPlaintext,
+    openSource: suspend () -> AttachmentPlaintext,
     use: suspend (File) -> Unit,
 ) = withContext(Dispatchers.IO) {
-    require(source.size in 1..PdfPagePolicy.MAX_INPUT)
-    val directory = documentReaderDirectory(cacheDir)
-    check(directory.isDirectory || directory.mkdirs())
-    val file = File.createTempFile("reader-", ".pdf", directory)
+    val file =
+        openSource().use { source ->
+            require(source.size in 1..PdfPagePolicy.MAX_INPUT)
+            val directory = documentReaderDirectory(cacheDir)
+            check(directory.isDirectory || directory.mkdirs())
+            val copy = File.createTempFile("reader-", ".pdf", directory)
+            try {
+                ensureActive()
+                BoundedPdfOutput(copy.outputStream(), this).use { source.copyTo(it) }
+                copy
+            } catch (failure: Throwable) {
+                copy.delete()
+                throw failure
+            }
+        }
     try {
-        ensureActive()
-        BoundedPdfOutput(file.outputStream(), this).use { source.copyTo(it) }
         ensureActive()
         use(file)
     } finally {
