@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.conversationControllerSource
+import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -182,7 +183,8 @@ class AppStateSendLockCoverageTest {
         val finishBody = notificationDeliveryFunctionBody("finishNotificationDeliveryModeTransaction")
         val modeEntryBodies =
             listOf(
-                notificationDeliveryFunctionBody("setNotificationDeliveryMode"),
+                // setNotificationDeliveryMode is an expression body that delegates to applyMode.
+                notificationDeliveryFunctionBody("applyMode"),
                 notificationDeliveryFunctionBody("launchNotificationDeliveryModeReconciliation"),
             )
 
@@ -224,6 +226,11 @@ class AppStateSendLockCoverageTest {
                 body.contains("finishNotificationDeliveryModeTransaction"),
             )
         }
+        assertTrue(
+            "explicit delivery-mode selection must enter through the busy applyMode transaction",
+            Regex("""fun setNotificationDeliveryMode\([^)]*\): Boolean = applyMode\(mode, true\)""")
+                .containsMatchIn(notificationDeliveryControllerSource()),
+        )
     }
 
     /** Refused native wipes must exit before any successful-wipe-only profile or avatar cache eviction. */
@@ -701,10 +708,10 @@ class AppStateSendLockCoverageTest {
         controllerFileName: String = "ConversationController.kt",
     ): String {
         val source =
-            if (controllerFileName == "ConversationController.kt") {
-                conversationControllerSource()
-            } else {
-                controllersSource().resolveSibling(controllerFileName).readText()
+            when (controllerFileName) {
+                "ConversationController.kt" -> conversationControllerSource()
+                "NotificationDeliveryController.kt" -> notificationDeliveryControllerSource()
+                else -> controllersSource().resolveSibling(controllerFileName).readText()
             }
         val start =
             // Extensions declare a receiver between `fun` and the name.
