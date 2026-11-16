@@ -178,6 +178,9 @@ class ChatListPinnedBoundaryMotionTest {
     ) {
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnUiThread(change)
+        // The first frame after the write still draws the previous state; sampling starts with the new one.
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { }
         repeat(frames) { frame ->
             composeRule.mainClock.advanceTimeByFrame()
             composeRule.runOnIdle { }
