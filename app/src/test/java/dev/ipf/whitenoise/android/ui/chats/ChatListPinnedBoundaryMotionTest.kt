@@ -116,6 +116,8 @@ class ChatListPinnedBoundaryMotionTest {
         var state by mutableStateOf(from)
         mountRows(from.first) { state }
         composeRule.waitForIdle()
+        val (visible, width) = linePixels()
+        assertTrue("settled divider not visible ($visible of $width px)", visible >= width * 3 / 4)
         val start = dividerBounds().top
         val rowHeight = rowBounds(from.first.first()).height
         val direction = if (to.second > from.second) 1f else -1f
@@ -144,15 +146,20 @@ class ChatListPinnedBoundaryMotionTest {
 
     /** The line's own pixels must belong to the opaque row passing over it, not to the divider. */
     private fun assertCoveredByRow(frame: Int) {
+        val (linePixels, width) = linePixels()
+        assertTrue(
+            "divider painted through the crossing row at frame $frame ($linePixels of $width px)",
+            linePixels < width / 4,
+        )
+    }
+
+    /** Pixels on the divider's top pixel row that match the divider colour, and that row's width. */
+    private fun linePixels(): Pair<Int, Int> {
         val line = dividerBounds()
         val pixels = composeRule.onRoot().captureToImage().toPixelMap()
         val y = line.top.toInt()
         val xs = line.left.toInt() until line.right.toInt()
-        val linePixels = xs.count { x -> pixels[x, y].closeTo(dividerColor) }
-        assertTrue(
-            "divider painted through the crossing row at frame $frame ($linePixels of ${xs.count()} px)",
-            linePixels < xs.count() / 4,
-        )
+        return xs.count { x -> pixels[x, y].closeTo(dividerColor) } to xs.count()
     }
 
     private fun assertSettledBetween(
