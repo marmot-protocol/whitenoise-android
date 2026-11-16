@@ -144,24 +144,7 @@ private fun interpolateSettingsContour(
     key: Int,
 ): SettingsContour {
     val bounds = lerp(a.bounds, b.bounds, t)
-    val interpolatedViewport = lerp(a.viewport, b.viewport, t)
-    // A rebased surplus can already be partially hidden. Never reveal that ink again
-    // while its rigid outline leaves; incoming surplus uses its native target window.
-    val nativeWindow =
-        if (a.bounds == b.bounds && a.viewport.isEmpty != b.viewport.isEmpty) {
-            if (a.viewport.isEmpty) b.viewport else a.viewport
-        } else {
-            null
-        }
-    val viewport =
-        nativeWindow?.let { window ->
-            Rect(
-                interpolatedViewport.left.coerceIn(window.left, window.right),
-                interpolatedViewport.top.coerceIn(window.top, window.bottom),
-                interpolatedViewport.right.coerceIn(window.left, window.right),
-                interpolatedViewport.bottom.coerceIn(window.top, window.bottom),
-            )
-        } ?: interpolatedViewport
+    val viewport = interpolateContourViewport(a, b, t)
 
     fun radius(
         a: CornerRadius,
@@ -220,6 +203,30 @@ private fun interpolateSettingsContour(
                 else -> lerp(a.fill, b.fill, t)
             },
     )
+}
+
+private fun interpolateContourViewport(
+    a: SettingsContour,
+    b: SettingsContour,
+    t: Float,
+): Rect {
+    val interpolatedViewport = lerp(a.viewport, b.viewport, t)
+    // A rebased surplus can already be partially hidden. Never reveal that ink again
+    // while its rigid outline leaves; incoming surplus uses its native target window.
+    val nativeWindow =
+        if (a.bounds == b.bounds && a.viewport.isEmpty != b.viewport.isEmpty) {
+            if (a.viewport.isEmpty) b.viewport else a.viewport
+        } else {
+            null
+        }
+    return nativeWindow?.let { window ->
+        Rect(
+            interpolatedViewport.left.coerceIn(window.left, window.right),
+            interpolatedViewport.top.coerceIn(window.top, window.bottom),
+            interpolatedViewport.right.coerceIn(window.left, window.right),
+            interpolatedViewport.bottom.coerceIn(window.top, window.bottom),
+        )
+    } ?: interpolatedViewport
 }
 
 internal fun nearestSettingsContour(
@@ -438,9 +445,17 @@ internal fun matchSettingsContours(
             val clippedEdge = edge.coerceIn(viewport.top, viewport.bottom)
             val visible = slot.bounds.intersect(slot.viewport).intersect(viewport)
             val frozen = slot.copy(viewport = visible)
-            val peer = frozen.copy(viewport = Rect(visible.left, clippedEdge, visible.right, clippedEdge), rows = emptyList())
+            val peer =
+                frozen.copy(
+                    viewport = Rect(visible.left, clippedEdge, visible.right, clippedEdge),
+                    rows = emptyList(),
+                )
             result +=
-                if (reverse) SettingsContourPair(peer, frozen, slot.key) else SettingsContourPair(frozen, peer, slot.key)
+                if (reverse) {
+                    SettingsContourPair(peer, frozen, slot.key)
+                } else {
+                    SettingsContourPair(frozen, peer, slot.key)
+                }
         }
     }
     addSurplus(a, b, false)

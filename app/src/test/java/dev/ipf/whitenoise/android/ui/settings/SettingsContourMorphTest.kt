@@ -198,7 +198,16 @@ class SettingsContourMorphTest {
         val pairs = matchSettingsContours(source, target, 2, null, source[1].bounds.center, viewport)
         for (step in 1 until 100) {
             val t = step / 100f
-            val frame = interpolateSettingsContours(source, target, t, source[1].bounds.center, viewport, 2, correspondence = pairs)
+            val frame =
+                interpolateSettingsContours(
+                    source,
+                    target,
+                    t,
+                    source[1].bounds.center,
+                    viewport,
+                    2,
+                    correspondence = pairs,
+                )
             val surplus = frame.single { it.key == 1 }
             assertBounds(partiallyVisible.bounds, surplus.bounds)
             assertTrue(surplus.viewport.top >= partiallyVisible.viewport.top)
