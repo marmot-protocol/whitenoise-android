@@ -11,11 +11,8 @@ import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StickerAssetCache
-import dev.ipf.whitenoise.android.state.StickerDefaultPackLedger
-import dev.ipf.whitenoise.android.state.StickerDefaultPacks
 import dev.ipf.whitenoise.android.state.StickerLibrary
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -25,7 +22,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.net.URLDecoder
 
 /** The sticker picker's Try again after its installed packs couldn't be read. */
 @RunWith(RobolectricTestRunner::class)
@@ -70,41 +66,6 @@ class StickerPickerRetryTest {
         assertTrue(library.hasLoadedInstalled)
         composeRule.onNodeWithTag("sticker.load.failed").assertDoesNotExist()
         composeRule.onNodeWithText("Cats").assertExists()
-    }
-
-    /** A first open waits through the relay sync and the default installs instead of flashing the browser prompt. */
-    @Test
-    fun firstOpenWaitsForDefaultPacksThroughSync() {
-        val syncing = CompletableDeferred<Unit>()
-        val present = mutableListOf<StickerPackFfi>()
-        var offered = emptySet<String>()
-        val library =
-            StickerLibrary(
-                packs = { _, _ -> present.toList() },
-                syncPacks = { syncing.await() },
-                fetchPack = { error("unused") },
-                installPack = { input ->
-                    val coordinate = URLDecoder.decode(input.substringAfter("a=").substringBefore('&'), "UTF-8")
-                    pack(coordinate.substringAfterLast(':')).copy(coordinate = coordinate).also { present += it }
-                },
-                uninstallPack = { error("unused") },
-                defaultPacks = StickerDefaultPackLedger(read = { offered }, write = { offered = it }),
-            )
-
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                StickerPickerPage(library, cache(), onBrowse = {}, onSend = {}, onClose = {})
-            }
-        }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("sticker.progress").assertExists()
-        composeRule.onNodeWithText(app.getString(R.string.stickers_browse)).assertDoesNotExist()
-
-        syncing.complete(Unit)
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("sticker.progress").assertDoesNotExist()
-        composeRule.onNodeWithText(app.getString(R.string.stickers_browse)).assertDoesNotExist()
-        assertTrue(StickerDefaultPacks.coordinates.all(library::isInstalled))
     }
 
     private companion object {

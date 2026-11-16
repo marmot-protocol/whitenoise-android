@@ -6092,7 +6092,6 @@ class WhiteNoiseAppState private constructor(
             }
             chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
-            StickerDefaultPackLedger.forget(appContext, wipedRef)
             attachmentCollections.forgetAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             composerDraftExpansionBridge.removeAccount(wipedRef)

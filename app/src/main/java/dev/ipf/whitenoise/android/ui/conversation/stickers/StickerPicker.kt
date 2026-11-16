@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 
 private val PackTabShape = RoundedCornerShape(10.dp)
 
-/** The account's installed packs, one tab per pack, for sending a sticker; it installs White Noise's defaults once. */
+/** The account's installed packs, one tab per pack, for sending a sticker. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerPickerPage(
@@ -67,16 +67,9 @@ internal fun StickerPickerPage(
     onSend: (StickerFfi) -> Unit,
     onClose: () -> Unit,
 ) {
-    // A new account's White Noise packs land after its first sync, so wait through the sync and the installs
-    // instead of offering the browser.
-    var awaitingDefaults by remember(library) { mutableStateOf(library.mayInstallDefaults) }
     LaunchedEffect(library) {
-        try {
-            library.loadInstalledIfNeeded()
-            if (attemptSticker { library.sync() } == null) library.installDefaultPacksIfNeeded()
-        } finally {
-            awaitingDefaults = false
-        }
+        library.loadInstalledIfNeeded()
+        attemptSticker { library.sync() }
     }
     val packs = library.installed.filter { it.stickers.isNotEmpty() }
     var selectedCoordinate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -97,8 +90,7 @@ internal fun StickerPickerPage(
                     retrying = false
                 }
             }
-        (!library.hasLoadedInstalled || awaitingDefaults || library.isInstallingDefaults) && packs.isEmpty() ->
-            StickerProgress()
+        !library.hasLoadedInstalled && packs.isEmpty() -> StickerProgress()
         selected == null -> EmptyStickerPicker(onBrowse)
         else -> {
             if (packs.size > 1) {

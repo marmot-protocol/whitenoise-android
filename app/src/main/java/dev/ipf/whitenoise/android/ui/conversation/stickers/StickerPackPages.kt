@@ -120,7 +120,7 @@ private fun StickerBrowserTopBar(
     }
 }
 
-/** Lists packs to discover, with search and an optional add-by-link field. */
+/** Lists White Noise's own packs and packs to discover, with search and an optional add-by-link field. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerBrowserPage(
@@ -137,6 +137,8 @@ internal fun StickerBrowserPage(
     var refreshRequests by remember { mutableIntStateOf(0) }
     var syncGeneration by remember { mutableIntStateOf(0) }
     val discovery = remember { DiscoveryResults() }
+    val whiteNoise = rememberWhiteNoisePacks(library)
+    val discoverable = discovery.packs.filterNot { pack -> whiteNoise.any { it.coordinate == pack.coordinate } }
     LaunchedEffect(refreshRequests) {
         syncing = true
         syncFailed = attemptSticker { library.sync(force = refreshRequests > 0) } != null
@@ -169,6 +171,7 @@ internal fun StickerBrowserPage(
                 }
             }
         }
+        whiteNoiseSection(whiteNoise, onOpen)
         if (library.installed.isNotEmpty()) {
             item { StickerSectionTitle(stringResource(R.string.sticker_packs_installed)) }
             items(library.installed, key = { "installed:${it.coordinate}" }) { pack -> PackRow(pack) { onOpen(pack) } }
@@ -177,8 +180,8 @@ internal fun StickerBrowserPage(
         item { StickerSearchField(search) { search = it } }
         discoveryResults(
             state =
-                StickerPresentation.discoveryState(syncing, discovery.packs.size, search, syncFailed, discovery.failed),
-            packs = discovery.packs,
+                StickerPresentation.discoveryState(syncing, discoverable.size, search, syncFailed, discovery.failed),
+            packs = discoverable,
             onOpen = onOpen,
             onRetry = { refreshRequests++ },
         )
@@ -284,7 +287,7 @@ private fun DiscoveryRetry(
 /** One discovered pack with its title and sticker count; opens the pack. */
 @Suppress("FunctionNaming")
 @Composable
-private fun PackRow(
+internal fun PackRow(
     pack: StickerPackFfi,
     onClick: () -> Unit,
 ) {

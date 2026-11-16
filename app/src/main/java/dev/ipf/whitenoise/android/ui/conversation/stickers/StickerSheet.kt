@@ -189,10 +189,7 @@ internal fun StickerDisclosure(text: String) {
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerProgress() {
-    Box(
-        Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.Section).testTag("sticker.progress"),
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.Section), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
     }
 }

@@ -367,90 +367,60 @@ class StickersTest {
             assertEquals(null, library(null).shareLink(pack("a")))
         }
 
-    /** White Noise's packs install once, after a sync, through links naming White Noise's relays. */
+    /** White Noise's packs are fetched through links naming its relays, and only an Add installs one, via that link. */
     @Test
-    fun defaultPacksInstallOnceThroughWhiteNoiseRelayLinks() =
+    fun whiteNoisePacksAreFetchedThroughItsRelaysAndInstallOnlyOnAdd() =
         runTest {
-            val defaults = DefaultsHarness()
-            defaults.library.installDefaultPacksIfNeeded()
-            assertEquals(emptyList<String>(), defaults.inputs)
+            val lookups = mutableListOf<String>()
+            val installs = mutableListOf<String>()
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> emptyList() },
+                    syncPacks = {},
+                    fetchPack = { input -> packAt(linkedCoordinate(input)).also { lookups += input } },
+                    installPack = { input ->
+                        installs += input
+                        packAt(linkedCoordinate(input), installed = true)
+                    },
+                    uninstallPack = { error("unused") },
+                )
 
-            defaults.library.sync()
-            defaults.library.installDefaultPacksIfNeeded()
-            assertEquals(StickerDefaultPacks.coordinates.map(StickerDefaultPacks::installInput), defaults.inputs)
-            assertTrue(StickerDefaultPacks.coordinates.all(defaults.library::isInstalled))
-            assertEquals(StickerDefaultPacks.coordinates.toSet(), defaults.offered)
+            val offered = library.whiteNoisePacks()
+            val links = WhiteNoiseStickerPacks.coordinates.map(WhiteNoiseStickerPacks::link)
+            assertEquals(WhiteNoiseStickerPacks.coordinates, offered.map { it.coordinate })
+            assertEquals(links, lookups)
+            assertEquals(emptyList<String>(), installs)
 
-            defaults.library.installDefaultPacksIfNeeded()
-            assertEquals(2, defaults.inputs.size)
-            assertFalse(defaults.library.mayInstallDefaults)
+            library.install(offered.first())
+            assertEquals(links.take(1), installs)
         }
 
-    /** An open that arrives while a run still reads the installed list, then installs, doesn't start a second run. */
+    /** An installed or unreachable White Noise pack is left out of the offer. */
     @Test
-    fun overlappingOpensInstallEachDefaultOnce() =
+    fun installedOrUnreachableWhiteNoisePacksAreLeftOut() =
         runTest {
-            val defaults = DefaultsHarness()
-            // The sync's own reread fails, so the first run must read the installed list itself.
-            defaults.failReads = true
-            defaults.library.sync()
-            defaults.failReads = false
-            assertTrue(defaults.library.mayInstallDefaults)
-            val reads = CompletableDeferred<Unit>()
-            val installs = CompletableDeferred<Unit>()
-            defaults.readGate = reads
-            defaults.installGate = installs
+            val (originals, marmot) = WhiteNoiseStickerPacks.coordinates
+            val library =
+                StickerLibrary(
+                    packs = { _, _ -> listOf(packAt(originals, installed = true)) },
+                    syncPacks = {},
+                    fetchPack = { input ->
+                        check(linkedCoordinate(input) != marmot) { "relay unreachable" }
+                        packAt(linkedCoordinate(input))
+                    },
+                    installPack = { error("unused") },
+                    uninstallPack = { error("unused") },
+                )
+            library.loadInstalledIfNeeded()
 
-            val first = async { defaults.library.installDefaultPacksIfNeeded() }
-            runCurrent()
-            val second = async { defaults.library.installDefaultPacksIfNeeded() }
-            runCurrent()
-            reads.complete(Unit)
-            runCurrent()
-            installs.complete(Unit)
-            first.await()
-            second.await()
-
-            assertEquals(StickerDefaultPacks.coordinates.map(StickerDefaultPacks::installInput), defaults.inputs)
+            assertEquals(emptyList<StickerPackFfi>(), library.whiteNoisePacks())
         }
 
-    /** A removed default stays removed, and a default the account already has is recorded without reinstalling. */
+    /** Each White Noise link names the pack and every White Noise bootstrap relay. */
     @Test
-    fun removedOrPresentDefaultsAreNeverInstalledAgain() =
-        runTest {
-            val originals = StickerDefaultPacks.coordinates.first()
-            val defaults = DefaultsHarness(alreadyInstalled = listOf(originals))
-            defaults.library.sync()
-            defaults.library.installDefaultPacksIfNeeded()
-            val marmot = StickerDefaultPacks.installInput(StickerDefaultPacks.coordinates.last())
-            assertEquals(listOf(marmot), defaults.inputs)
-
-            defaults.library.uninstall(packAt(originals))
-            defaults.library.installDefaultPacksIfNeeded()
-            assertEquals(1, defaults.inputs.size)
-            assertFalse(defaults.library.isInstalled(originals))
-        }
-
-    /** A default that fails to install, offline say, is tried again on the next open. */
-    @Test
-    fun failedDefaultInstallIsRetriedNextTime() =
-        runTest {
-            val defaults = DefaultsHarness(failing = mutableSetOf(StickerDefaultPacks.coordinates.last()))
-            defaults.library.sync()
-            defaults.library.installDefaultPacksIfNeeded()
-            assertEquals(setOf(StickerDefaultPacks.coordinates.first()), defaults.offered)
-
-            defaults.failing.clear()
-            defaults.library.installDefaultPacksIfNeeded()
-            assertEquals(StickerDefaultPacks.coordinates.toSet(), defaults.offered)
-            assertFalse(defaults.library.isInstallingDefaults)
-        }
-
-    /** Each default install link names the pack and every White Noise bootstrap relay. */
-    @Test
-    fun defaultInstallLinksNameWhiteNoiseRelays() {
-        for (coordinate in StickerDefaultPacks.coordinates) {
-            val link = URI(StickerDefaultPacks.installInput(coordinate))
+    fun whiteNoiseLinksNameEveryBootstrapRelay() {
+        for (coordinate in WhiteNoiseStickerPacks.coordinates) {
+            val link = URI(WhiteNoiseStickerPacks.link(coordinate))
             val parameters =
                 link.rawQuery.split('&').map { part ->
                     val (name, value) = part.split('=', limit = 2)
@@ -462,43 +432,10 @@ class StickersTest {
         }
     }
 
-    /** A library backed by an in-memory installed list and ledger, recording every install input. */
-    private class DefaultsHarness(
-        alreadyInstalled: List<String> = emptyList(),
-        val failing: MutableSet<String> = mutableSetOf(),
-    ) {
-        /** While set, installed-list reads fail, as an unreadable pack store does. */
-        var failReads = false
-
-        /** While set, each installed-list read waits for it. */
-        var readGate: CompletableDeferred<Unit>? = null
-
-        /** While set, each install waits for it after recording its input. */
-        var installGate: CompletableDeferred<Unit>? = null
-
-        val inputs = mutableListOf<String>()
-        var offered: Set<String> = emptySet()
-        private val present = alreadyInstalled.toMutableSet()
-        val library =
-            StickerLibrary(
-                packs = { _, _ ->
-                    check(!failReads) { "pack storage busy" }
-                    readGate?.await()
-                    present.map { packAt(it, installed = true) }
-                },
-                syncPacks = {},
-                fetchPack = { error("unused") },
-                installPack = { input ->
-                    inputs += input
-                    installGate?.await()
-                    val coordinate = URLDecoder.decode(input.substringAfter("a=").substringBefore('&'), "UTF-8")
-                    check(coordinate !in failing) { "relay unreachable" }
-                    present += coordinate
-                    packAt(coordinate, installed = true)
-                },
-                uninstallPack = { coordinate -> present -= coordinate },
-                defaultPacks = StickerDefaultPackLedger(read = { offered }, write = { offered = it }),
-            )
+    /** The pack coordinate a Sonar link names. */
+    private fun linkedCoordinate(link: String): String {
+        val encoded = link.substringAfter("a=").substringBefore('&')
+        return URLDecoder.decode(encoded, "UTF-8")
     }
 
     private companion object {

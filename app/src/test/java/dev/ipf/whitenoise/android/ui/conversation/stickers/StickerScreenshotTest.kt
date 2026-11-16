@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.state.LoadedSticker
 import dev.ipf.whitenoise.android.state.StickerAssetCache
 import dev.ipf.whitenoise.android.state.StickerKey
 import dev.ipf.whitenoise.android.state.StickerLibrary
+import dev.ipf.whitenoise.android.state.WhiteNoiseStickerPacks
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -143,6 +144,39 @@ class StickerScreenshotTest {
         composeRule.setContent {
             Frame(darkTheme = darkTheme, amoled = amoled) {
                 StickerPickerPage(library, cache(), onBrowse = {}, onSend = {}, onClose = {})
+            }
+        }
+        capture(name)
+    }
+
+    /** White Noise's own packs lead the browser in their own section and leave Discover until one is added. */
+    @Test fun browserWhiteNoiseLight() = whiteNoiseBrowser(rtlLarge = false, name = "sticker_browser_white_noise_light")
+
+    /** The White Noise section mirrors with large text in RTL. */
+    @Test
+    fun browserWhiteNoiseRtlLargeFont() = whiteNoiseBrowser(rtlLarge = true, name = "sticker_browser_white_noise_rtl")
+
+    /** Captures the browser with White Noise's packs fetched through their relay links and also cached for Discover. */
+    private fun whiteNoiseBrowser(
+        rtlLarge: Boolean,
+        name: String,
+    ) {
+        val (originalsAt, marmotAt) = WhiteNoiseStickerPacks.coordinates
+        val originals = pack("originals", "White Noise Originals", installed = false).copy(coordinate = originalsAt)
+        val marmot = pack("marmot", "Marmot", installed = false).copy(coordinate = marmotAt)
+        val offered = listOf(originals, marmot)
+        val frogs = pack("frogs", "Frog moods", installed = false)
+        val library =
+            StickerLibrary(
+                packs = { installedOnly, _ -> if (installedOnly) emptyList() else listOf(frogs, originals, marmot) },
+                syncPacks = {},
+                fetchPack = { input -> offered.first { WhiteNoiseStickerPacks.link(it.coordinate) == input } },
+                installPack = { error("No install in screenshots") },
+                uninstallPack = { error("No uninstall in screenshots") },
+            )
+        composeRule.setContent {
+            Frame(darkTheme = rtlLarge, amoled = rtlLarge, rtlLarge = rtlLarge) {
+                StickerBrowserPage(library, { _, _, _ -> }, onOpen = {}, onBack = {}, onClose = {})
             }
         }
         capture(name)
