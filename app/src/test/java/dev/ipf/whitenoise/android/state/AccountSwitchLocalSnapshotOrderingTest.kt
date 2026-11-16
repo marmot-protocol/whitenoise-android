@@ -282,9 +282,9 @@ class AccountSwitchLocalSnapshotOrderingTest {
     /** Keeps process-scoped catch-up fenced by account, runtime, and shared network lifetime. */
     @Test
     fun catchUpLaunchIsProcessScopedAndDeduplicated() {
-        val body = appStateSource().readText().kotlinFunctionBody("launchAccountCatchUp")
-        val admitted = appStateSource().readText().kotlinFunctionBody("performAdmittedAccountCatchUp")
-        val instrumented = appStateSource().readText().kotlinFunctionBody("instrumentedCatchUpAccounts")
+        val body = pushWakeRecoverySource().readText().kotlinFunctionBody("launchAccountCatchUp")
+        val admitted = pushWakeRecoverySource().readText().kotlinFunctionBody("performAdmittedAccountCatchUp")
+        val instrumented = pushWakeRecoverySource().readText().kotlinFunctionBody("instrumentedCatchUpAccounts")
         val coordinator = connectivityRuntimeSource().readText()
 
         assertTrue(
@@ -314,7 +314,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     /** Foreground recovery shares catch-up without issuing a second transport wake. */
     @Test
     fun foregroundRecoveryUsesTheSharedCatchUpOnly() {
-        val body = appStateSource().readText().kotlinFunctionBody("catchUpAfterForegroundActivation")
+        val body = pushWakeRecoverySource().readText().kotlinFunctionBody("catchUpAfterForegroundActivation")
 
         assertFalse("foreground recovery must not duplicate the transport wake", "notifyConnectivityRestored()" in body)
         assertTrue(
@@ -330,7 +330,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
     /** Durable push recovery joins the same process-owned native call. */
     @Test
     fun pushWakeRecoveryUsesTheSharedCatchUp() {
-        val body = appStateSource().readText().kotlinFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
+        val body = pushWakeRecoverySource().readText().kotlinFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
 
         assertTrue(
             "push-wake recovery must use the post-trigger catch-up boundary",
@@ -555,6 +555,8 @@ class AccountSwitchLocalSnapshotOrderingTest {
     private fun appStateSource(): File = source("state/AppState.kt")
 
     private fun accountSwitchPreloadSource(): File = source("state/AppStateAccountSwitchPreload.kt")
+
+    private fun pushWakeRecoverySource(): File = source("state/PushWakeRecoveryController.kt")
 
     private fun accountSwitchSnapshotSource(): File = source("state/AccountSwitchLocalSnapshot.kt")
 

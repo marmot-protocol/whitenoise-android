@@ -35,7 +35,7 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "an armed push catch-up must still drain when the initial snapshot is online",
-            "if (network != null) schedulePendingPushWakeCatchUpDrain()" in seed,
+            "if (network != null) pushWakeRecovery.schedulePendingPushWakeCatchUpDrain()" in seed,
         )
     }
 
@@ -157,11 +157,12 @@ class NotificationNetworkReconnectCoverageTest {
                 "catchUpAccounts =" in attempt &&
                 "notifyConnectivityRestored()" in bridge &&
                 "ensureNotificationReceiverForNetworkReconnect" in bridge &&
+                "catchUpAccounts = { pushWakeRecovery.catchUpAfterNetworkReconnect() }" in bridge &&
                 Regex(
                     """catchUpAfterObservedPushWake\(\s*""" +
                         """pendingGeneration\s*=\s*pendingGeneration,\s*""" +
                         """trigger\s*=\s*PerformanceTrigger\.NETWORK_RECONNECT,\s*\)""",
-                ).containsMatchIn(bridge) &&
+                ).containsMatchIn(pushWakeRecoverySource().readText().functionBody("catchUpAfterNetworkReconnect")) &&
                 "PerformancePhase.NOTIFICATION_RECEIVER_RETRY" in attempt &&
                 "PerformancePhase.ACCOUNT_CATCH_UP_RETRY" in attempt &&
                 "pushWakeCatchUpPending()" !in bridge,
@@ -193,7 +194,11 @@ class NotificationNetworkReconnectCoverageTest {
         val reconnect = appState.functionBody("ensureNotificationReceiverForNetworkReconnect")
         val startup = appState.functionBody("completeReceiverGatedStartup")
         val resumedStartup = appState.functionBody("resumeCompletedBootstrap")
-        val runtimeStart = appState.functionBody("ensureNotificationRuntimeStarted")
+        // Skip the one-line PushWakeRecoveryHost forwarder and pin the class-level implementation.
+        val runtimeStart =
+            appState
+                .substring(appState.indexOf("\n    suspend fun ensureNotificationRuntimeStarted("))
+                .functionBody("ensureNotificationRuntimeStarted")
 
         assertTrue(
             "the reconnect receiver wait must be capped at three seconds",
@@ -215,7 +220,7 @@ class NotificationNetworkReconnectCoverageTest {
     /** Foreground catch-up must not replay the transport wake owned by network recovery. */
     @Test
     fun foregroundCatchUpUsesSharedCoordinatorWithoutAnotherConnectivityWake() {
-        val body = appStateSource().readText().functionBody("catchUpAfterForegroundActivation")
+        val body = pushWakeRecoverySource().readText().functionBody("catchUpAfterForegroundActivation")
 
         assertTrue(
             "foreground recovery must share catch-up without sending another transport wake",
@@ -245,7 +250,7 @@ class NotificationNetworkReconnectCoverageTest {
         val sessionBindings =
             appState
                 .substringAfter("internal val accountSession by lazy {")
-                .substringBefore("private val accountCatchUpCoordinator")
+                .substringBefore("internal val pushWakeRecovery")
         val teardownBindings = appState.propertyInitializerCall("runtimeListenerTeardownOwner")
         val teardownOwner =
             File(appStateSource().parentFile, "AppRuntimeListenerTeardownOwner.kt")
@@ -255,14 +260,14 @@ class NotificationNetworkReconnectCoverageTest {
         val recovery = notificationNetworkRecoverySource().readText()
         val reconnect = recovery.functionBody("schedule")
         val bridge = appState.propertyInitializerCall("notificationNetworkRecovery")
-        val pendingPushDrain = appState.functionBody("schedulePendingPushWakeCatchUpDrain")
+        val pendingPushDrain = pushWakeRecoverySource().readText().functionBody("schedulePendingPushWakeCatchUpDrain")
 
         assertTrue(
             "failed-wipe recovery must remember every notification runtime owner",
             "backgroundConnectionEnabled" in prepare &&
                 "notificationJob.isActive()" in prepare &&
                 "notificationNetworkRecovery.isActive()" in prepare &&
-                "pushWakeCatchUpDrainJob.isActive()" in prepare,
+                "pushWakeRecovery.isDrainActive()" in prepare,
         )
         assertTrue(
             "teardown must cancel producers before they can reinstall the notification listener",
@@ -270,7 +275,7 @@ class NotificationNetworkReconnectCoverageTest {
                 "listenerTeardown().stopForAccountTeardown()" in sessionTeardown &&
                 "listenerTeardown = { runtimeListenerTeardownOwner }" in sessionBindings &&
                 "cancelNetworkRecovery = { notificationNetworkRecovery.cancelAndJoin() }" in teardownBindings &&
-                "cancelPushWakeDrain = { pushWakeCatchUpDrainJob.cancelAndJoin() }" in teardownBindings &&
+                "cancelPushWakeDrain = { pushWakeRecovery.cancelDrainAndJoin() }" in teardownBindings &&
                 "cancelListener = { notificationJob.cancelAndJoin() }" in teardownBindings &&
                 teardownOwner.indexOf("cancelNetworkRecovery()") in 0 until
                 teardownOwner.indexOf("cancelPushWakeDrain()") &&
@@ -362,6 +367,13 @@ class NotificationNetworkReconnectCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateNotificationContent.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppStateNotificationContent.kt source file")
+
+    private fun pushWakeRecoverySource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing PushWakeRecoveryController.kt source file")
 
     /** Locates the isolated reconnect coordinator source for structural contracts. */
     private fun notificationNetworkRecoverySource(): File =

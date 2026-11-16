@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Push-wake recovery attempt budget and retry backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt",
+        "anchor": "internal suspend fun runPushWakeRecoveryAttempt()",
+        "test_ids": [
+          "NTF-020"
+        ]
+      },
+      {
+        "surface": "Foreground-service release hands unfinished push-wake recovery to durable scheduling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt",
+        "anchor": "internal fun releasePushWakeServiceOwner(owner: Any)",
+        "test_ids": [
+          "NTF-020"
+        ]
+      },
+      {
+        "surface": "Foreground return catch-up acknowledges the observed push-wake marker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt",
+        "anchor": "internal suspend fun catchUpAfterForegroundActivation()",
+        "test_ids": [
+          "NTF-020"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
