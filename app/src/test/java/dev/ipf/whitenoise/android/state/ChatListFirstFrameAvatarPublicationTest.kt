@@ -70,13 +70,9 @@ class ChatListFirstFrameAvatarPublicationTest {
                     1_024uL,
                 )
             val item = controller.items.single().copy(selectedAvatarAsset = selected)
-            val method =
-                ChatsController::class.java
-                    .getDeclaredMethod("firstFrameAvatarSeed", ChatListItem::class.java)
-                    .apply { isAccessible = true }
-            assertNull(method.invoke(controller, item))
+            assertNull(controller.firstFrameAvatarSeed(item))
             AvatarImageLoader.putCached(checkNotNull(selected.cacheKey(ACCOUNT_REF)), image)
-            val seed = method.invoke(controller, item) as ChatListAvatarSeed
+            val seed = checkNotNull(controller.firstFrameAvatarSeed(item))
             assertEquals(ChatListAvatarSource.DURABLE, seed.source)
             assertSame(image, seed.image)
             assertEquals(ACCOUNT_REF, seed.accountRef)

@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.chatsControllerFiles
+import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerFiles
 import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertFalse
@@ -365,11 +367,15 @@ class StalenessGuardCoverageTest {
         val candidates =
             asyncPublicationCandidates("AppState.kt", appState) +
                 asyncPublicationCandidates("NotificationDeliveryController.kt", notificationDelivery) +
-                asyncPublicationCandidates("ChatsController.kt", chats) +
+                asyncPublicationCandidates(
+                    "ChatsController.kt",
+                    chats,
+                    controllerFunctionSections(chatsControllerFiles()),
+                ) +
                 asyncPublicationCandidates(
                     "ConversationController.kt",
                     conversation,
-                    conversationControllerFunctionSections(),
+                    controllerFunctionSections(conversationControllerFiles()),
                 ) +
                 asyncPublicationCandidates("DirectChatResolution.kt", directChatResolution) +
                 asyncPublicationCandidates("ConversationTimelineSession.kt", timelineSession) +
@@ -536,8 +542,8 @@ class StalenessGuardCoverageTest {
     }
 
     /** Splits class members, plus the top-level extension functions of each controller topic file. */
-    private fun conversationControllerFunctionSections(): List<Pair<String, String>> {
-        val (classFile, topicFiles) = conversationControllerFiles().let { it.first() to it.drop(1) }
+    private fun controllerFunctionSections(files: List<File>): List<Pair<String, String>> {
+        val (classFile, topicFiles) = files.first() to files.drop(1)
         return classFile.readText().functionSections() +
             topicFiles.flatMap { it.readText().functionSections(indentation = "") }
     }
@@ -582,9 +588,16 @@ class StalenessGuardCoverageTest {
             "DirectChatResolution.kt",
         ).associateWith(::productionSource)
 
+    /** Loads one production source; split controllers include their topic files. */
+    private fun productionSource(fileName: String): String =
+        when (fileName) {
+            "ChatsController.kt" -> chatsControllerSource()
+            "ConversationController.kt" -> conversationControllerSource()
+            else -> packageSource(fileName)
+        }
+
     /** Locates one production source from either the module or repository working directory. */
-    private fun productionSource(fileName: String): String {
-        if (fileName == "ConversationController.kt") return conversationControllerSource()
+    private fun packageSource(fileName: String): String {
         val packages =
             listOf(
                 "state",

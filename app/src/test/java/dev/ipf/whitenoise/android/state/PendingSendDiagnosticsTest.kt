@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerSource
 import dev.ipf.whitenoise.android.diagnostics.PerformanceConnectivity
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -140,13 +141,7 @@ class PendingSendDiagnosticsTest {
 
     @Test
     fun textSendAndBothProjectionSurfacesUseTheProcessOwnedTracker() {
-        val controllersSource =
-            listOf("ChatsController.kt").joinToString("\n") { name ->
-                sequenceOf(
-                    File("src/main/java/dev/ipf/whitenoise/android/state/$name"),
-                    File("app/src/main/java/dev/ipf/whitenoise/android/state/$name"),
-                ).first(File::isFile).readText()
-            } + "\n" + conversationControllerSource()
+        val controllersSource = chatsControllerSource() + "\n" + conversationControllerSource()
         val trackerSource =
             sequenceOf(
                 File("src/main/java/dev/ipf/whitenoise/android/state/PendingSendDiagnostics.kt"),
