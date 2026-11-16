@@ -78,14 +78,16 @@ class DisplayThumbnailRetentionTest {
     @Test
     fun nativeCleanupRemovesOnlyAuthoritativelyRemovedSources() =
         runTest(dispatcher) {
-            (0..3).map(::source).forEach(::seed)
+            (0..5).map(::source).forEach(::seed)
             fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
             fixture.setNativePhase(1, AttachmentTransferStateFfi.UNAVAILABLE)
             fixture.setNativePhase(2, AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE)
+            fixture.setNativePhase(3, AttachmentTransferStateFfi.COMPLETED_UNRETAINED)
+            fixture.setNativePhase(4, AttachmentTransferStateFfi.FAILED)
             var snapshots = 0
             fixture.onNativeSnapshot = { snapshots++ }
             fixture.state.reconcileDisplayThumbnails()
-            assertEquals(setOf(source(2), source(3)), fixture.thumbnails.storedSources())
+            assertEquals(setOf(source(4), source(5)), fixture.thumbnails.storedSources())
             assertEquals(1, snapshots)
             assertEquals(0, fixture.nativeAssetReads.get())
             assertTrue(fixture.calls.isEmpty())
@@ -124,6 +126,20 @@ class DisplayThumbnailRetentionTest {
             fixture.state.reconcileDisplayThumbnails()
             assertNotNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
         }
+
+    /** Every state in which MDK keeps no retained body rejects the derivative; transfers in progress keep it. */
+    @Test
+    fun onlyStatesWithoutARetainedBodyRemoveTheDerivative() {
+        val removed =
+            setOf(
+                AttachmentTransferStateFfi.UNAVAILABLE,
+                AttachmentTransferStateFfi.REMOVED,
+                AttachmentTransferStateFfi.CLEANED_BY_SETTING,
+                AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
+                AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
+            )
+        assertEquals(removed, AttachmentTransferStateFfi.entries.filter { it.removesDisplayThumbnail() }.toSet())
+    }
 
     /** Native read failure leaves cache data for a later authoritative answer. */
     @Test

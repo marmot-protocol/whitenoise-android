@@ -58,7 +58,6 @@ import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
-import dev.ipf.whitenoise.android.state.REMOVED_DISPLAY_THUMBNAIL_SOURCES
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
@@ -72,6 +71,7 @@ import dev.ipf.whitenoise.android.state.persistDisplayThumbnail
 import dev.ipf.whitenoise.android.state.readDisplayThumbnail
 import dev.ipf.whitenoise.android.state.readerDownloadParkedForStorage
 import dev.ipf.whitenoise.android.state.recordReaderParkedDownload
+import dev.ipf.whitenoise.android.state.removesDisplayThumbnail
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
@@ -968,7 +968,7 @@ internal fun rememberImageLoadState(
         if (thumbnailRequest != null && seedStatic) {
             val nativeState = controller.displayAttachmentNativeState(messageIdHex, attachmentIndex)
             if (!loadCurrent()) return@LaunchedEffect
-            if (nativeState in REMOVED_DISPLAY_THUMBNAIL_SOURCES) {
+            if (nativeState?.removesDisplayThumbnail() == true) {
                 cachedPlaintextOnEntry = false
                 tooLargeToPreview = false
                 awaitingOriginal = true

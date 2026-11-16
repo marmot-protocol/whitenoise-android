@@ -112,7 +112,7 @@ internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
                 val transfer = request.source.transferRequest() ?: return@runCatchingCancellable
                 val target = resolveNativeAttachmentTarget(transfer) ?: return@runCatchingCancellable
                 val phase = nativeAttachmentState(transfer.copy(sourceMessageIdHex = target.sourceMessageIdHex))
-                if (phase == null || phase in REMOVED_DISPLAY_THUMBNAIL_SOURCES) return@runCatchingCancellable
+                if (phase == null || phase.removesDisplayThumbnail()) return@runCatchingCancellable
                 val bitmap = pixels.get()?.takeUnless { it.isRecycled } ?: return@runCatchingCancellable
                 recordDisplayThumbnailEvent(DisplayThumbnailEvent.WRITE_ATTEMPT)
                 displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.write") {

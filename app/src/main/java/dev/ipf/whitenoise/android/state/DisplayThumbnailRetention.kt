@@ -12,12 +12,35 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-internal val REMOVED_DISPLAY_THUMBNAIL_SOURCES =
-    setOf(
+/**
+ * True when MDK holds no retained body for the source, so its derivative must not be read, written or kept.
+ * Exhaustive on purpose: a state added by a future MarmotKit fails the build here instead of granting reads.
+ */
+internal fun AttachmentTransferStateFfi.removesDisplayThumbnail(): Boolean =
+    when (this) {
         AttachmentTransferStateFfi.UNAVAILABLE,
         AttachmentTransferStateFfi.REMOVED,
         AttachmentTransferStateFfi.CLEANED_BY_SETTING,
-    )
+        AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
+        AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
+        -> true
+        AttachmentTransferStateFfi.NOT_REQUESTED,
+        AttachmentTransferStateFfi.QUEUED,
+        AttachmentTransferStateFfi.DOWNLOADING,
+        AttachmentTransferStateFfi.VERIFYING_CIPHERTEXT,
+        AttachmentTransferStateFfi.DECRYPTING,
+        AttachmentTransferStateFfi.VERIFYING_PLAINTEXT,
+        AttachmentTransferStateFfi.READY,
+        AttachmentTransferStateFfi.RETRY_SCHEDULED,
+        AttachmentTransferStateFfi.FAILED,
+        AttachmentTransferStateFfi.CANCELLED,
+        AttachmentTransferStateFfi.PAUSED,
+        AttachmentTransferStateFfi.POLICY_BLOCKED,
+        AttachmentTransferStateFfi.RETRY_EXHAUSTED,
+        AttachmentTransferStateFfi.STORAGE_BLOCKED,
+        -> false
+    }
+
 private const val THUMBNAIL_RECONCILIATION_BATCH = 64
 private const val CACHE_TARGET_COMPONENTS = 3
 private const val FOREGROUND_RECONCILIATION_INTERVAL_MILLIS = 15 * 60 * 1000L
@@ -95,7 +118,7 @@ private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
         }.getOrNull()
             ?.items
             ?.takeIf { it.size == resolved.size }
-    states?.indices?.filter { states[it].state in REMOVED_DISPLAY_THUMBNAIL_SOURCES }?.forEach { index ->
+    states?.indices?.filter { states[it].state.removesDisplayThumbnail() }?.forEach { index ->
         evictRemovedDisplaySource(resolved[index].first, tokens[index], stillOwned)
     }
     return states != null
