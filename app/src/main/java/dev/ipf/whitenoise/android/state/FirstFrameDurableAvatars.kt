@@ -79,13 +79,14 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     accountRef: String,
     rows: List<PresentedChatRowFfi>,
     awaitColdWorkers: Boolean = true,
+    budgetMs: Long = FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS,
 ): List<FirstFrameDurableAvatar> {
     val selections =
         firstFrameDurableAvatarSelections(rows, accountRef) { groupIdHex ->
             draftStore.draftedAtSecondsFor(accountRef, groupIdHex)
         }.takeIf { it.isNotEmpty() } ?: return emptyList()
     val awaited = if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef)
-    withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
+    withTimeoutOrNull(budgetMs) {
         coroutineScope {
             awaited
                 .map { (asset, domain) -> async { durableAvatar(asset, accountRef, acquireMissing = false, domain) } }

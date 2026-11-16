@@ -139,13 +139,13 @@ class FirstFrameDurableAvatarsTest {
     }
 
     /** Pre-existing stored bytes are decoded before publication, so the first frame seeds the avatar. */
-    @Test
+    @Test(timeout = 10_000)
     fun restoredDirectRowSeedsTheStoredAvatarOnItsFirstFrame() {
         val storedBytes = payload()
         val fixture = NativeAvatars { listOf(storedBytes) }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
-        // This tests stored-byte publication, not cold native codec initialization within the frame budget.
+        // Publication correctness has an outer test timeout, independent of the production frame deadline.
         val pixels = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
         IsolatedMediaDecoder.installTestTransport(
             object : MediaDecodeTransport by TestMediaDecodeTransport {
@@ -160,7 +160,9 @@ class FirstFrameDurableAvatarsTest {
             },
         )
         try {
-            runBlocking { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
+            runBlocking {
+                fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), budgetMs = Long.MAX_VALUE)
+            }
 
             assertEquals(1, fixture.reads.get())
             assertEquals("a restored frame never starts acquisition", 0, fixture.requests.get())
