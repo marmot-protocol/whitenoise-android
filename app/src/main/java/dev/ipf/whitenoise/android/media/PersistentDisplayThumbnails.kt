@@ -158,7 +158,13 @@ internal class PersistentDisplayThumbnails(
             val key = slot(source, edge)
             val bytes = disk.get(key)
             if (bytes != null) {
-                val entry = runCatching { decode(bytes, source, edge) }.getOrNull()
+                val header = runCatching { header(bytes) }.getOrNull()
+                if (header != null &&
+                    (header.source.copy(sourceMessageIdHex = source.sourceMessageIdHex) != source || header.edge != edge)
+                ) {
+                    continue
+                }
+                val entry = header?.let { runCatching { decode(bytes, it) }.getOrNull() }
                 if (entry == null) {
                     synchronized(publicationLock) { disk.discardIfMatches(key, bytes) }
                 } else {
@@ -339,18 +345,12 @@ internal class PersistentDisplayThumbnails(
     }
 
     /** Allocates pixels only after authenticating source identity and the requested decode ceiling. */
-    @Suppress("ReturnCount") // Each validation boundary rejects before allocating or publishing pixels.
     private fun decode(
         bytes: ByteArray,
-        source: DisplayThumbnailSource,
-        edge: Int,
+        header: Header,
     ): MediaThumbnail? {
-        val header =
-            header(bytes)?.takeIf {
-                it.source.copy(sourceMessageIdHex = source.sourceMessageIdHex) == source && it.edge == edge
-            } ?: return null
         val bitmap = decodePixels(bytes, header.offset, header.length) ?: return null
-        return MediaThumbnail(bitmap, edge)
+        return MediaThumbnail(bitmap, header.edge)
     }
 
     companion object {

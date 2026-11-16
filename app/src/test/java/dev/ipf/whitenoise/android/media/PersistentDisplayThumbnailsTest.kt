@@ -65,6 +65,24 @@ class PersistentDisplayThumbnailsTest {
         ).forEach { assertNull(cache.read(it, 128, cache.captureGeneration(it))) }
     }
 
+    /** A late reader for an older source cannot evict the valid replacement sharing its size slot. */
+    @Test
+    fun staleSourceReadPreservesTheReplacement() {
+        val cache = cache()
+        val oldToken = cache.captureGeneration(source)
+        cache.write(source, MediaThumbnail(bitmap, 256), oldToken)
+        val replacement = source.copy(sourceEpoch = 8uL, ciphertextTag = "b".repeat(64))
+        cache.write(replacement, MediaThumbnail(bitmap, 256), cache.captureGeneration(replacement))
+        val bytesBeforeRead = cache.residentBytes()
+
+        assertTrue(cache.isCurrent(oldToken))
+        assertNull(cache.read(source, 128, oldToken))
+        assertEquals(bytesBeforeRead, cache.residentBytes())
+        val entry = checkNotNull(cache.read(replacement, 128, cache.captureGeneration(replacement)))
+        assertEquals(256, entry.maxEdgePx)
+        entry.bitmap.recycle()
+    }
+
     /** Every explicit invalidation rejects a producer that began before it, even when no file existed yet. */
     @Test
     fun removalCannotBeUndoneByLateFirstPublication() {
