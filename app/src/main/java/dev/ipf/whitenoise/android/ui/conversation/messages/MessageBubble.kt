@@ -2228,7 +2228,9 @@ internal fun MessageBubble(
                             hasReply = replyPreview != null,
                             hasMedia = hasMedia,
                         )
-                // A message that is exactly one custom emoji draws it like a sticker once its artwork is ready.
+                // A message that is exactly one custom emoji draws it like a sticker once its artwork is
+                // ready. A failed send keeps the bubble for its Retry and Discard controls, and text
+                // selection needs the bubble's text.
                 val customEmoji = LocalCustomEmoji.current
                 val loneEmoji =
                     LoneCustomEmojiPresentation.of(
@@ -2239,6 +2241,8 @@ internal fun MessageBubble(
                                 !isPollRecord &&
                                 !deleted &&
                                 !persistedFailure &&
+                                item.status != MessageStatus.Failed &&
+                                !textSelectionMode &&
                                 replyPreview == null &&
                                 !hasMedia &&
                                 visibleTranslation == null,

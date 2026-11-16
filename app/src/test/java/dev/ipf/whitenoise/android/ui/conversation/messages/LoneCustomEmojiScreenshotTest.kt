@@ -9,19 +9,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.CustomEmoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
@@ -100,6 +107,36 @@ class LoneCustomEmojiScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         assertEquals(3, composeRule.onAllLoneEmoji())
     }
 
+    /** A failed lone-emoji send keeps its bubble, so Retry and Discard stay reachable. */
+    @Test
+    fun failedSendKeepsRetryAndDiscard() {
+        val failed = message(7, ":marmot:", mine = true).copy(status = MessageStatus.Failed)
+        composeRule.setContent { WhiteNoiseTheme { Bubble(failed) } }
+        composeRule.waitForIdle()
+        assertEquals(0, composeRule.onAllLoneEmoji())
+        composeRule.onNodeWithContentDescription(context.getString(R.string.retry)).assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.discard_failed_message)).assertExists()
+    }
+
+    /** Entering text selection swaps a lone emoji back to its bubble text, and leaving restores it. */
+    @Test
+    fun textSelectionShowsTheBubbleText() {
+        var selecting by mutableStateOf(false)
+        val lone = message(8, ":marmot_wave:")
+        composeRule.setContent { WhiteNoiseTheme { Bubble(lone, textSelectionMode = selecting) } }
+        composeRule.waitForIdle()
+        assertEquals(1, composeRule.onAllLoneEmoji())
+
+        selecting = true
+        composeRule.waitForIdle()
+        assertEquals(0, composeRule.onAllLoneEmoji())
+        composeRule.onNodeWithText(":marmot_wave:", substring = true, useUnmergedTree = true).assertExists()
+
+        selecting = false
+        composeRule.waitForIdle()
+        assertEquals(1, composeRule.onAllLoneEmoji())
+    }
+
     /** Captures lone built-in and local emoji beside unresolved, worded and reply messages that keep their bubble. */
     private fun capture(variant: Variant) {
         render(variant)
@@ -154,17 +191,20 @@ class LoneCustomEmojiScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         return CustomEmojiSet(listOf(CustomEmoji(":party:", File("party.png"), image.asImageBitmap())))
     }
 
-    /** Composes the real message bubble for [item]. */
+    /** Composes the real message bubble for [item], optionally in text selection mode. */
     @Composable
     @Suppress("FunctionNaming")
-    private fun Bubble(item: TimelineMessage) {
+    private fun Bubble(
+        item: TimelineMessage,
+        textSelectionMode: Boolean = false,
+    ) {
         MessageBubble(
             item = item,
             controller = controller,
             appState = appState,
             highlighted = false,
             selectionMode = false,
-            textSelectionMode = false,
+            textSelectionMode = textSelectionMode,
             onTextSelectionModeChange = {},
             onTextSelectionBoundsChange = {},
             batchSelectable = true,
