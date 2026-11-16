@@ -144,6 +144,24 @@ private fun interpolateSettingsContour(
     key: Int,
 ): SettingsContour {
     val bounds = lerp(a.bounds, b.bounds, t)
+    val interpolatedViewport = lerp(a.viewport, b.viewport, t)
+    // A rebased surplus can already be partially hidden. Never reveal that ink again
+    // while its rigid outline leaves; incoming surplus uses its native target window.
+    val nativeWindow =
+        if (a.bounds == b.bounds && a.viewport.isEmpty != b.viewport.isEmpty) {
+            if (a.viewport.isEmpty) b.viewport else a.viewport
+        } else {
+            null
+        }
+    val viewport =
+        nativeWindow?.let { window ->
+            Rect(
+                interpolatedViewport.left.coerceIn(window.left, window.right),
+                interpolatedViewport.top.coerceIn(window.top, window.bottom),
+                interpolatedViewport.right.coerceIn(window.left, window.right),
+                interpolatedViewport.bottom.coerceIn(window.top, window.bottom),
+            )
+        } ?: interpolatedViewport
 
     fun radius(
         a: CornerRadius,
@@ -173,7 +191,7 @@ private fun interpolateSettingsContour(
             radius(a.corners.bottomRightCornerRadius, b.corners.bottomRightCornerRadius),
             radius(a.corners.bottomLeftCornerRadius, b.corners.bottomLeftCornerRadius),
         ),
-        lerp(a.viewport, b.viewport, t),
+        viewport,
         if (a.bounds.isEmpty) {
             b.color
         } else if (b.bounds.isEmpty) {

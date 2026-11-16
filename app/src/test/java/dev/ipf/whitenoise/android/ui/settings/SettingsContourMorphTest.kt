@@ -191,6 +191,23 @@ class SettingsContourMorphTest {
         }
     }
 
+    @Test fun rebasedSurplusCannotRevealAlreadyClippedInkWhenItsExitChangesDirection() {
+        val partiallyVisible = group(100f, 60f, 1).copy(viewport = Rect(0f, 140f, 400f, 160f))
+        val source = listOf(partiallyVisible, group(250f, 100f, 2))
+        val target = listOf(group(40f, 220f, 2))
+        val pairs = matchSettingsContours(source, target, 2, null, source[1].bounds.center, viewport)
+        for (step in 1 until 100) {
+            val t = step / 100f
+            val frame = interpolateSettingsContours(source, target, t, source[1].bounds.center, viewport, 2, correspondence = pairs)
+            val surplus = frame.single { it.key == 1 }
+            assertBounds(partiallyVisible.bounds, surplus.bounds)
+            assertTrue(surplus.viewport.top >= partiallyVisible.viewport.top)
+            assertTrue(surplus.viewport.bottom <= partiallyVisible.viewport.bottom)
+            assertTrue(surplus.viewport.height >= 0f)
+            assertNotNull(orderedSettingsContours(frame))
+        }
+    }
+
     @Test fun trueEmptyPaintFadesAndInvertsIncludingFrozenPartialSeams() {
         val native =
             dividedGroup(100f, 2).let { contour ->
