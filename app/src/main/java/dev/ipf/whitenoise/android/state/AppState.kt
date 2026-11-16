@@ -9863,8 +9863,6 @@ class WhiteNoiseAppState private constructor(
         private const val PROFILE_REFRESH_FANOUT = 6
         private const val NOTIFICATION_ENRICHMENT_FANOUT = 4
 
-        // Bulk account-unread refresh runs on cold start/account switch. Bound
-        // both dimensions of the FFI fan-out: accounts and per-account rosters.
         private const val MAX_PROFILE_PRESENTATION_CACHE_ENTRIES = 4096
         private const val MAX_USER_PROFILE_CACHE_ENTRIES = 4096
         private const val MAX_PENDING_AVATAR_PREWARMS = 64

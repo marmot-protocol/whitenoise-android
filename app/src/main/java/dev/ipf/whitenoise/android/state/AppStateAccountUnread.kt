@@ -7,6 +7,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
+// Bulk account-unread refresh runs on cold start/account switch. Bound
+// both dimensions of the FFI fan-out: accounts and per-account rosters.
 private const val ACCOUNT_UNREAD_ACCOUNT_FANOUT = 4
 private const val ACCOUNT_UNREAD_MEMBER_FANOUT = 4
 
