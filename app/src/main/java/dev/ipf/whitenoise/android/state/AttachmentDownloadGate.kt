@@ -73,6 +73,7 @@ internal class AttachmentDownloadGate(
     private val interactive = ArrayDeque<Waiter>()
     private val keyedWaiters = KeyedWaiters()
     private val pendingPromotions = mutableSetOf<String>()
+    private val pendingForeground = mutableSetOf<String>()
     private val anonymousKey = AtomicLong()
     private var activePermits = 0
     private var consecutiveInteractiveAdmissions = 0
@@ -117,6 +118,7 @@ internal class AttachmentDownloadGate(
      *
      * A non-[explicit] call, for a visible bubble that asks again for work it joined, only moves the queued request to
      * the front of the automatic queue, never ahead of explicit requests, and reports whether anything was queued.
+     * Joined work can exist before its owner registers here, so that demand is kept until the key registers too.
      */
     fun promote(
         key: String,
@@ -126,7 +128,7 @@ internal class AttachmentDownloadGate(
             val waiters =
                 keyedWaiters.forKey(key)
                     ?: run {
-                        if (explicit) pendingPromotions.add(key)
+                        (if (explicit) pendingPromotions else pendingForeground).add(key)
                         return@synchronized explicit
                     }
             val queued = waiters.filter { !it.ownsPermit && it.priority == AttachmentDownloadPriority.Automatic }
@@ -204,6 +206,7 @@ internal class AttachmentDownloadGate(
         val waiter =
             synchronized(lock) {
                 val promotedBeforeRegistration = pendingPromotions.remove(key)
+                val visibleBeforeRegistration = pendingForeground.remove(key)
                 val effectivePriority =
                     if (
                         priority == AttachmentDownloadPriority.Interactive ||
@@ -215,7 +218,8 @@ internal class AttachmentDownloadGate(
                     }
                 val registered = Waiter(key, accountRef, effectivePriority)
                 keyedWaiters.register(registered)
-                if (foreground && effectivePriority == AttachmentDownloadPriority.Automatic) {
+                val toFront = foreground || visibleBeforeRegistration
+                if (toFront && effectivePriority == AttachmentDownloadPriority.Automatic) {
                     automatic.addFirst(registered)
                 } else {
                     lane(effectivePriority).addLast(registered)

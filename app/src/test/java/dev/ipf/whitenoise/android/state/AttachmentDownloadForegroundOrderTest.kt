@@ -96,6 +96,39 @@ class AttachmentDownloadForegroundOrderTest {
             }
         }
 
+    /**
+     * A visible bubble can join background work before that owner's coroutine has registered with the gate. The
+     * demand is kept until the key registers, so the owner still enters at the front.
+     */
+    @Test
+    fun aForegroundJoinBeforeTheOwnerRegistersStillBringsItForward() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val acquisitions = InFlightAttachmentAcquisitions(this, gate::promote)
+                val release = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val holder = start(gate, "holder", started) { release.await() }
+                val owners =
+                    listOf("background-0", "background-1").map { key ->
+                        acquisitions.acquire(key, AttachmentDownloadPriority.Automatic) {
+                            gate.withPermit(key, ACCOUNT, AttachmentDownloadPriority.Automatic) { started += key }
+                            AttachmentAcquisitionOutcome.LegacyBytes(byteArrayOf())
+                        }
+                    }
+                // No yield: neither owner has run, so neither has registered with the gate yet.
+                val joined =
+                    acquisitions.acquire("background-1", AttachmentDownloadPriority.Automatic, foreground = true) {
+                        error("a join never starts a second owner")
+                    }
+                release.complete(Unit)
+                holder.await()
+                (owners + joined).awaitAll()
+
+                assertEquals(listOf("holder", "background-1", "background-0"), started)
+            }
+        }
+
     /** The default gate admits as many downloads at once as MarmotKit's own transfer limit. */
     @Test
     fun defaultGateMatchesMarmotKitsTransferLimit() =
