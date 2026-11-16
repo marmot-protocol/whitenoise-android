@@ -53,6 +53,54 @@ class EmojiSetsControllerTest {
             assertEquals(0, changes)
         }
 
+    /** Closing during the native metadata read retires the request before it creates an install handle. */
+    @Test
+    fun closeDuringMetadataReadPreventsInstallAdmission() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            val metadataReady = CompletableDeferred<Unit>()
+            backend.beforeCurrent = { metadataReady.await() }
+            var changes = 0
+            val controller = EmojiSetsController(backend) { changes++ }
+            controller.show(backend.set)
+            val job = launch { controller.install() }
+            runCurrent()
+            assertTrue(controller.state.busy)
+            assertEquals(0, backend.newInstallCalls)
+
+            controller.close()
+            metadataReady.complete(Unit)
+            job.join()
+
+            assertEquals(0, backend.newInstallCalls)
+            assertTrue(backend.install.attempts.isEmpty())
+            assertFalse(controller.state.busy)
+            assertNull(controller.state.progress)
+            assertEquals(0, changes)
+        }
+
+    /** A close during handle creation cancels and releases that handle before its native run starts. */
+    @Test
+    fun closeDuringHandleCreationCancelsBeforeRun() =
+        runTest {
+            val backend = FakeEmojiSetsBackend()
+            var changes = 0
+            val controller = EmojiSetsController(backend) { changes++ }
+            backend.beforeNewInstall = controller::close
+            controller.show(backend.set)
+
+            controller.install()
+
+            assertEquals(1, backend.newInstallCalls)
+            assertEquals(1, backend.install.cancelCalls)
+            assertTrue(backend.install.closed)
+            assertTrue(backend.install.attempts.isEmpty())
+            assertEquals(EmojiSetNotice.Cancelled, controller.state.notice)
+            assertFalse(controller.state.busy)
+            assertNull(controller.state.progress)
+            assertEquals(0, changes)
+        }
+
     /** A changed set reopens the new version and never starts an install without another decision. */
     @Test
     fun newVersionRequiresAnotherInstallTap() =
@@ -101,7 +149,13 @@ class EmojiSetsControllerTest {
         runTest {
             val backend = FakeEmojiSetsBackend()
             backend.set =
-                backend.set.copy(emoji = backend.set.emoji + backend.set.emoji.first().copy(shortcode = "forest-bear"))
+                backend.set.copy(
+                    emoji =
+                        backend.set.emoji +
+                            backend.set.emoji
+                                .first()
+                                .copy(shortcode = "forest-bear"),
+                )
             val partial =
                 backend.set.copy(installed = InstalledEmojiSetStateFfi(backend.set.eventIdHex, 0u, 0u, 1u, 100u, false))
             backend.install.result.complete(
@@ -225,6 +279,9 @@ private class FakeEmojiSetsBackend : EmojiSetsBackend {
     var set = emojiSetFixture()
     val install = FakeEmojiSetInstall()
     var removals = 0
+    var newInstallCalls = 0
+    var beforeCurrent: suspend () -> Unit = {}
+    var beforeNewInstall: () -> Unit = {}
 
     override suspend fun sets(search: String?) = listOf(set)
 
@@ -232,11 +289,20 @@ private class FakeEmojiSetsBackend : EmojiSetsBackend {
 
     override suspend fun fetch(input: String) = set
 
-    override suspend fun current(coordinate: String) = set
+    /** Allows the metadata read to remain suspended while the screen closes. */
+    override suspend fun current(coordinate: String): EmojiSetFfi {
+        beforeCurrent()
+        return set
+    }
 
     override suspend fun preview(set: EmojiSetFfi) = byteArrayOf()
 
-    override fun newInstall() = install
+    /** Exercises disposal before the new handle is attached to its controller. */
+    override fun newInstall(): EmojiSetInstall {
+        newInstallCalls++
+        beforeNewInstall()
+        return install
+    }
 
     override suspend fun remove(coordinate: String) {
         removals++
@@ -249,6 +315,7 @@ private class FakeEmojiSetInstall : EmojiSetInstall {
     val attempts = mutableListOf<String>()
     val result = CompletableDeferred<EmojiSetInstallResultFfi>()
     var closed = false
+    var cancelCalls = 0
 
     override suspend fun run(set: EmojiSetFfi): EmojiSetInstallResultFfi {
         attempts += set.eventIdHex
@@ -257,7 +324,9 @@ private class FakeEmojiSetInstall : EmojiSetInstall {
 
     override fun progress() = report
 
+    /** Records native cancellation and releases any pending run with its typed outcome. */
     override fun cancel() {
+        cancelCalls++
         result.completeExceptionally(MarmotKitException.EmojiSetInstallCancelled())
     }
 

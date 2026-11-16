@@ -178,6 +178,7 @@ internal class EmojiSetsController(
         val set = state.preview ?: return
         operate(set) {
             val current = backend.current(set.coordinate)
+            if (closed) return@operate
             if (current == null) {
                 state = state.copy(preview = null, artwork = null, notice = EmojiSetNotice.NotFound)
                 return@operate
@@ -236,6 +237,11 @@ internal class EmojiSetsController(
         backend.newInstall().use { install ->
             activeInstall = install
             try {
+                // Main owns disposal and this handoff, before the first native suspension.
+                if (closed) {
+                    install.cancel()
+                    throw MarmotKitException.EmojiSetInstallCancelled()
+                }
                 state = state.copy(progress = install.progress())
                 coroutineScope {
                     val poll =
