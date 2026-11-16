@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="conversation_select_messages">Valitse viestit</string>
+    <string name="conversation_search_messages">Viestit</string>
+    <string name="conversation_jump_to_date">Siirry päivämäärään</string>
+    <string name="conversation_edit_revision">Versio %1$d</string>
+</resources>

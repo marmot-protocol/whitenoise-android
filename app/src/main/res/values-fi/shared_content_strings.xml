@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_content_in_chat">Jaettu keskustelussa</string>
+    <string name="shared_content_photos_videos">Kuvat ja videot</string>
+    <string name="shared_content_loaded_scope">Vain tähän keskusteluun jo ladatut viestit näytetään.</string>
+    <string name="shared_content_loading">Ladataan jaettua sisältöä…</string>
+    <string name="shared_content_empty">Ei jaettua sisältöä</string>
+    <string name="shared_content_go_to_message">Siirry viestiin</string>
+    <plurals name="shared_item_count">
+        <item quantity="one">%1$d kohde</item>
+        <item quantity="other">%1$d kohdetta</item>
+    </plurals>
+    <string name="shared_content_browse_history">Selaa jaettujen liitteiden historiaa</string>
+    <string name="shared_content_partial">Vastaavia liitteitä ei ole vielä ladattu</string>
+    <string name="shared_content_page_failed">Jaettua sisältöä ei voitu ladata. Yritä uudelleen.</string>
+    <string name="shared_content_history_end">Paikallisen liitehistorian loppu</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shared_group_remove_person">Poista %1$s ryhmästä %2$s</string>
+    <string name="shared_group_remove_confirmation">Poistetaanko %1$s (%2$s) ryhmästä %3$s?\nToimiva tili: %4$s (%5$s).\n\nHänen pääsynsä tähän ryhmään poistetaan.</string>
+</resources>

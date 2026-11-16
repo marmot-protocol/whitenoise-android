@@ -1,0 +1,105 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+  "legacy_sha256": "1b99c74becb32124db3d2472fa25edfb165ea0a901902b77861b3bbe7f9101dd",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "setting:language_chinese_simplified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_chinese_simplified",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_chinese_traditional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_chinese_traditional",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_english",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_english",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_finnish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_finnish",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_french",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_french",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_german",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_german",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_italian",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_italian",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_portuguese",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_portuguese",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_russian",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_russian",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_spanish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_spanish",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_system",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_system",
+        "test_ids": [
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "setting:language_turkish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageOption.kt",
+        "anchor": "R.string.language_turkish",
+        "test_ids": [
+          "SET-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

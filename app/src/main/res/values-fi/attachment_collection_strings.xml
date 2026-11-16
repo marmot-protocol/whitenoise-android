@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Valitse ne tai jaa ne uudelleen lähettääksesi ne.</string>
+    <string name="attachment_collection_progress">Lähetetään liitteitä: %1$d/%2$d lähetetty</string>
+    <string name="attachment_collection_blocked">Viestin lähetys epäonnistui. Myöhemmät liitteet odottavat, kunnes yrität uudelleen tai ohitat sen.</string>
+    <string name="attachment_collection_paused">Lähetys keskeytyi: %1$d/%2$d lähetetty.</string>
+    <string name="attachment_collection_skip_failed">Ohita epäonnistunut</string>
+    <string name="attachment_collection_resume">Jatka</string>
+    <string name="attachment_collection_cancel">Peruuta lähetys</string>
+    <string name="attachment_collection_show_items">Näytä kohteet</string>
+    <string name="attachment_collection_hide_items">Piilota kohteet</string>
+    <string name="attachment_collection_state_queued">Odottaa</string>
+    <string name="attachment_collection_state_preparing">Valmistellaan</string>
+    <string name="attachment_collection_state_uploading">Lähetetään</string>
+    <string name="attachment_collection_state_published">Lähetetty</string>
+    <string name="attachment_collection_state_failed">Epäonnistui</string>
+    <string name="attachment_collection_state_cancelled">Peruttu</string>
+    <string name="attachment_collection_state_skipped">Ohitettu</string>
+    <string name="attachment_collection_item_media">Kuva tai video %1$d</string>
+    <string name="attachment_collection_item_document">Tiedosto %1$d</string>
+    <string name="media_collection_selected_count">%1$d/%2$d valittu</string>
+    <string name="media_collection_select_all">Valitse kaikki</string>
+    <string name="media_collection_clear_selection">Tyhjennä valinta</string>
+    <string name="media_collection_remove_selected">Poista valitut</string>
+    <string name="media_collection_move_earlier">Siirrä aiemmaksi</string>
+    <string name="media_collection_move_later">Siirrä myöhemmäksi</string>
+    <string name="media_collection_show_grid">Kaikki kohteet</string>
+    <string name="media_collection_show_single">Esikatselu</string>
+    <string name="media_collection_item_photo">Kuva %1$d/%2$d</string>
+    <string name="media_collection_item_video">Video %1$d/%2$d</string>
+    <string name="media_collection_item_document">%1$s, tiedosto %2$d/%3$d</string>
+    <string name="media_collection_selected">Valittu</string>
+    <string name="media_collection_not_selected">Ei valittu</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">Lisättiin %1$d/%2$d. %3$d liite ei mahtunut mukaan: raja on %4$d lähetystä kohden.</item>
+        <item quantity="other">Lisättiin %1$d/%2$d. %3$d liitettä ei mahtunut mukaan: raja on %4$d lähetystä kohden.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">%d liite jäi lähettämättä, koska sitä ei voitu valmistella.</item>
+        <item quantity="other">%d liitettä jäi lähettämättä, koska niitä ei voitu valmistella.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d liite ei ole enää luettavissa. Valitse se tai jaa se uudelleen lähettääksesi sen.</item>
+        <item quantity="other">%d liitettä ei ole enää luettavissa. Valitse ne tai jaa ne uudelleen lähettääksesi ne.</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="one">%d kohde</item>
+        <item quantity="other">%d kohdetta</item>
+    </plurals>
+</resources>

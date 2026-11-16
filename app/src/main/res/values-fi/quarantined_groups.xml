@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="quarantined_groups">Karanteenissa olevat ryhmät</string>
+    <string name="quarantine_explanation">Näitä ryhmiä ei voitu ladata turvallisesti. Palautus suorittaa jaetun moottorin tarkistukset uudelleen poistamatta historiaa, ohittamatta tarkistuksia tai liittymättä ryhmään uudelleen.</string>
+    <string name="quarantine_unavailable">Aktiivista kirjautunutta tiliä ei ole saatavilla.</string>
+    <string name="quarantine_loading">Ladataan karanteenissa olevia ryhmiä…</string>
+    <string name="quarantine_load_failed">Karanteenissa olevia ryhmiä ei voitu ladata. Kokeile päivittää.</string>
+    <string name="quarantine_count">Karanteenissa: %1$d</string>
+    <string name="quarantine_refresh">Päivitä ryhmät</string>
+    <string name="quarantine_empty">Yksikään ryhmä ei ole karanteenissa.</string>
+    <string name="quarantine_group">Ryhmä %1$s</string>
+    <string name="quarantine_retry">Yritä palautusta uudelleen</string>
+    <string name="quarantine_stored_state">Tallennettua salaustilaa ei voitu ladata.</string>
+    <string name="quarantine_missing_state">Tallennettu salaustila puuttuu.</string>
+    <string name="quarantine_member_validation">Jäsenten tai salaustilan tarkistus ei mennyt läpi.</string>
+    <string name="quarantine_group_record">Ryhmän tietuetta ei voitu ladata.</string>
+    <string name="quarantine_pending_commit">Keskeytynyttä ryhmäpäivitystä ei voitu palauttaa.</string>
+    <string name="quarantine_rewind_restore">Ryhmää ei voitu palauttaa sen aiemman tilan lukemisen jälkeen. Voit yrittää uudelleen pakottamalla White Noisen lopetuksen Androidin asetuksista tai käynnistämällä puhelimen uudelleen. Avaa sitten White Noise.</string>
+    <string name="quarantine_recovered">Palautus onnistui. Ryhmä voi palata keskustelulistaan.</string>
+    <string name="quarantine_still_quarantined">Ryhmä on edelleen karanteenissa. Sen historiaa ei ole poistettu.</string>
+    <string name="quarantine_retry_failed">Palautusta ei voitu suorittaa loppuun. Yritä myöhemmin uudelleen.</string>
+</resources>

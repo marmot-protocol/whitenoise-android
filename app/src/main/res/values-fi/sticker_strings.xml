@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">Tarra</string>
+    <string name="sticker_alt">Tarra: %1$s</string>
+    <string name="sticker_with_emoji">%1$s tarra</string>
+    <string name="stickers_title">Tarrat</string>
+    <string name="sticker_load_hint">Lataa tarra</string>
+    <string name="sticker_tap_to_load">Lataa napauttamalla</string>
+    <string name="sticker_tap_to_retry">Yritä uudelleen napauttamalla</string>
+    <string name="stickers_empty_title">Ei tarroja</string>
+    <string name="stickers_empty_detail">Lisää tarrapaketti, niin voit lähettää tarroja.</string>
+    <string name="stickers_browse">Selaa tarrapaketteja</string>
+    <string name="sticker_server_disclosure">Tarrat ladataan palvelimilta, jotka kunkin paketin tekijä on valinnut. Nämä palvelimet näkevät IP-osoitteesi.</string>
+    <string name="sticker_packs_title">Tarrapaketit</string>
+    <string name="sticker_pack">Tarrapaketti</string>
+    <string name="sticker_packs_add_by_link">Lisää linkillä</string>
+    <string name="sticker_pack_link">Tarrapaketin linkki</string>
+    <string name="sticker_pack_open_link">Avaa linkki</string>
+    <string name="sticker_pack_opening">Avataan…</string>
+    <string name="sticker_packs_installed">Asennetut</string>
+    <string name="sticker_packs_discover">Löydä</string>
+    <string name="sticker_packs_search">Hae tarrapaketteja</string>
+    <string name="sticker_packs_none_on_relays">Releilläsi ei ole vielä tarrapaketteja. Lisää paketti linkillä napauttamalla linkkipainiketta.</string>
+    <string name="sticker_packs_no_matches">Hakuasi vastaavia tarrapaketteja ei löytynyt.</string>
+    <string name="sticker_packs_unreachable">Tarrapaketteja ei voitu hakea releiltäsi.</string>
+    <string name="sticker_packs_try_again">Yritä uudelleen</string>
+    <string name="sticker_packs_load_failed">Tarrapaketteja ei voitu ladata.</string>
+    <string name="sticker_packs_public_footer">Tarrapaketit ovat julkisia, eikä White Noise tarkista niitä. Asentamasi paketit näkyvät julkisesti releilläsi.</string>
+    <string name="sticker_pack_add">Lisää</string>
+    <string name="sticker_pack_by">Tekijä: %1$s</string>
+    <string name="sticker_pack_tap_to_send">Lähetä tarra napauttamalla sitä.</string>
+    <string name="sticker_pack_add_failed">Tarrapakettia ei voitu lisätä</string>
+    <string name="sticker_pack_remove_failed">Tarrapakettia ei voitu poistaa</string>
+    <string name="sticker_pack_open_failed">Tarrapakettia ei voitu avata</string>
+    <string name="sticker_send_failed">Tarraa ei voitu lähettää</string>
+    <string name="sticker_error_invalid">Tämä tarrapaketti ei ole kelvollinen.</string>
+    <string name="sticker_error_not_found">Tarrapakettia ei löytynyt.</string>
+    <string name="sticker_error_network">Tarrapaketin releisiin ei saatu yhteyttä. Tarkista yhteys ja yritä uudelleen.</string>
+    <string name="sticker_error_import">Tätä tarrapakettia ei voi tuoda.</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="one">%1$d tarra</item>
+        <item quantity="other">%1$d tarraa</item>
+    </plurals>
+</resources>

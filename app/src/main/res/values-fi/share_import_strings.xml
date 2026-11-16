@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">Tuodaan jaettuja tiedostoja</string>
+    <string name="share_import_error_title">Joitakin tiedostoja ei voitu tuoda</string>
+    <string name="share_import_recovery">Peruuta ja jaa uudelleen lähdesovelluksesta tai jatka saatavilla olevilla kohteilla.</string>
+    <string name="share_import_unreadable">Tiedosto ei ole luettavissa tai sen käyttöoikeus on vanhentunut.</string>
+    <string name="share_import_scheme">Vain content provider -tiedostoja tuetaan.</string>
+    <string name="share_import_empty">Jaettu tiedosto on tyhjä.</string>
+    <string name="share_import_file_limit">Tiedosto ylittää tuontirajan (%1$s kuville, %2$s muille tiedostoille).</string>
+    <string name="share_import_batch_limit">Tiedostojen yhteiskoko ylittää rajan %1$s.</string>
+    <string name="share_import_count_limit">Vain 100 ensimmäistä tiedostoa voidaan tuoda.</string>
+    <string name="share_import_metadata">Tiedoston metatiedot ovat virheelliset tai sen koko on muuttunut.</string>
+    <string name="share_import_storage">Yksityinen tallennustila ei ole käytettävissä tai se on täynnä.</string>
+    <string name="share_import_interrupted">Tuonti keskeytyi. Jaa tiedostot uudelleen.</string>
+    <string name="share_import_progress">Tiedosto %1$d/%2$d: %3$d tavua</string>
+    <string name="share_import_rejected_count">Tuomatta jääneet tiedostot: %1$d</string>
+    <string name="share_import_recovered_limit">Valittuna on yli 100 liitettä. Poista ylimääräiset ennen lähettämistä.</string>
+</resources>

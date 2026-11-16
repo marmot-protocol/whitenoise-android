@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_provider_title">Puheentunnistuspalvelu</string>
+    <string name="dictation_provider_explanation">Valitse palvelu tulevaa sanelua varten. Kun olet valinnut, aloita napauttamalla sanelua uudelleen. Valinta ja peruutus eivät nauhoita ääntä eivätkä muuta luonnostasi.</string>
+    <string name="dictation_provider_automatic">Automaattinen</string>
+    <string name="dictation_provider_precedence">Androidissa valittu puhepalvelu on etusijalla. Muuten käytetään White Noisessa tekemääsi valintaa tai ainoaa saatavilla olevaa moottoria.</string>
+    <string name="dictation_provider_loading">Etsitään puheentunnistuspalveluja…</string>
+    <string name="dictation_provider_empty">Puheentunnistuspalvelua ei löytynyt. Asenna ja ota käyttöön puheentunnistuspalvelu, viimeistele sen käyttöönotto ja palaa sitten tänne. Näppäimistö voi tarjota puhekirjoitusta suoraan omissa säätimissään.</string>
+    <string name="dictation_provider_in_app">Toimii White Noisen sisällä</string>
+    <string name="dictation_provider_window">Avaa palvelun ikkunan</string>
+    <string name="dictation_provider_keyboard">Vain näppäimistö</string>
+    <string name="dictation_provider_unknown">Sovelluksen sisäistä tukea ei ole varmistettu</string>
+    <string name="dictation_send_blocked">Ei lähetetty</string>
+    <string name="dictation_retry_send">Yritä lähettää uudelleen</string>
+    <string name="dictation_recovery_title">Sanelu vaatii huomiota</string>
+    <string name="dictation_recovery_text">Avaa White Noise palauttaaksesi sanelun. Säilytetty ääni on väliaikainen ja voi kadota, jos Android pysäyttää sovelluksen.</string>
+    <string name="dictation_recovery_open">Avaa sovellus</string>
+    <string name="dictation_recovery_expired_title">Sanelun palautus saatavilla sovelluksessa</string>
+    <string name="dictation_recovery_expired_text">Taustasuojaus päättyi. Avaa White Noise palauttaaksesi säilytetyn sanelun.</string>
+    <string name="dictation_incomplete_title">Keskeneräinen sanelu</string>
+    <string name="dictation_incomplete_text">Litterointi pysähtyi ennen kuin se valmistui. Tarkista tunnistettu teksti luonnoksessa ennen lähettämistä.</string>
+    <string name="dictation_send_recognized_text">Lähetä tunnistettu teksti</string>
+    <string name="dictation_remaining_audio">Jäljellä oleva saneluääni</string>
+    <string name="dictation_stopped_remaining">Nauhoitus pysähtyi. Osaa äänestä ei ole litteroitu.</string>
+    <string name="dictation_remaining_explanation">Uusi yritys litteroi säilytetyn äänen nauhoittamatta tai lähettämättä. Ääni on väliaikainen ja voi kadota, jos Android pysäyttää sovelluksen.</string>
+    <string name="dictation_retry_remaining">Litteroi jäljellä oleva ääni uudelleen</string>
+    <string name="dictation_keep_later">Säilytä myöhempää varten</string>
+    <string name="dictation_discard_remaining">Hylätäänkö litteroimaton ääni? Kirjoituskentässä jo oleva teksti säilyy.</string>
+    <string name="dictation_finishing_microphone">Suljetaan mikrofonia…</string>
+    <string name="dictation_audio_state_unavailable">Säilytettyä ääntä ei voitu tarkistaa. Säilytä se ja yritä uudelleen.</string>
+    <string name="dictation_original_conversation">Viimeistele sanelu alkuperäisessä keskustelussa.</string>
+</resources>

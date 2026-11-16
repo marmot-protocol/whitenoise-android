@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="search_filter_unavailable">Ei nykyisessä rajauksessa</string>
+    <string name="search_filter_members_pending">Kaikki vaihtoehdot eivät ole vielä saatavilla. Valitut suodattimet pysyvät käytössä, kunnes poistat ne.</string>
+</resources>

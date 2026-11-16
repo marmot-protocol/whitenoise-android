@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">Kaikki keskustelut</string>
+    <string name="folder_exclude_chat">Jätä pois tästä kansiosta</string>
+    <string name="folder_sort_title">Keskustelujen järjestys</string>
+    <string name="folder_sort_recent">Viimeisin toiminta</string>
+    <string name="folder_sort_name">Nimi A–Z</string>
+    <string name="folder_sort_unread">Lukemattomat ensin</string>
+    <string name="folder_sort_hint">Kutsut ja kiinnitetyt keskustelut pysyvät ensimmäisinä. Kiinnitetyt keskustelut säilyttävät oman järjestyksensä.</string>
+    <string name="folder_all_active">Sisällytä kaikki aktiiviset keskustelut</string>
+</resources>
