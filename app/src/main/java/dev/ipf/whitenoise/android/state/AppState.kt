@@ -611,8 +611,8 @@ class WhiteNoiseAppState private constructor(
      */
     private val mediaThumbnailCache =
         dev.ipf.whitenoise.android.media.ByteSizeLruCache<String, dev.ipf.whitenoise.android.media.MediaThumbnail>(
-            maxBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
-            maxEntryBytes = MEDIA_THUMBNAIL_CACHE_MAX_BYTES,
+            maxBytes = mediaThumbnailCacheMaxBytes(context),
+            maxEntryBytes = mediaThumbnailCacheMaxBytes(context),
             sizeOf = { it.bitmap.allocationByteCount },
         )
 
@@ -692,7 +692,7 @@ class WhiteNoiseAppState private constructor(
         val plaintextRemoved = mediaPlaintextCache.trimToSize(trim.targetBytes(MEDIA_PLAINTEXT_CACHE_MAX_BYTES))
         val thumbnailsRemoved =
             mediaThumbnailCache.trimToSize(
-                targetBytes = trim.targetBytes(MEDIA_THUMBNAIL_CACHE_MAX_BYTES),
+                targetBytes = mediaThumbnailTrimTargetBytes(trim),
                 keep = mediaThumbnailHolds::containsKey,
             )
         if (plaintextRemoved > 0) bumpMediaCacheRevision()
