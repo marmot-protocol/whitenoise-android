@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
+import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
+import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -808,12 +810,12 @@ class SettingsPageMorphHostTest {
             child.value = true
             time.value = 0.4f
         }
-        for (fraction in listOf(0.39f, 0.4f, 0.6f, 0.84f, 0.86f)) {
+        for (fraction in listOf(0.05f, 0.1f, 0.39f, 0.4f, 0.6f, 0.84f, 0.86f)) {
             rule.runOnIdle { time.value = fraction }
             val pixels = rule.onRoot().captureToImage().toPixelMap()
             assertEquals(
                 "one incoming body schedule at $fraction",
-                ((fraction - 0.4f) / 0.6f).coerceIn(0f, 1f),
+                if (AppMotionOpenEasing.transform(fraction) >= 0.5f) 1f else 0f,
                 pixels[100, 150].blue,
                 0.02f,
             )
@@ -980,13 +982,13 @@ class SettingsPageMorphHostTest {
             assertTrue(page.admitDestination())
         }
         val pixels = rule.onRoot().captureToImage().toPixelMap()
-        assertEquals("measured unoutlined ink fades", 0.75f, pixels[100, 150].red, 0.02f)
+        assertEquals("measured unoutlined ink stays opaque before handoff", 1f, pixels[100, 150].red, 0.02f)
         assertEquals("header stays live", 1f, pixels[100, 50].blue, 0.01f)
         assertEquals("outside group stays live", 1f, pixels[8, 150].blue, 0.01f)
         assertEquals("source viewport stays frozen", 1f, pixels[100, 240].blue, 0.01f)
-        rule.runOnIdle { time.value = 0.4f }
+        rule.runOnIdle { time.value = 0.9f }
         assertEquals(
-            "unoutlined outgoing ink retires fast",
+            "unoutlined outgoing ink retires at handoff",
             0f,
             rule
                 .onRoot()
@@ -1032,11 +1034,11 @@ class SettingsPageMorphHostTest {
         val outgoing = ink(0.8f) { if (child) it.red else it.blue }.drop(2)
         assertEquals("fixed opaque header", nativeHeader, ink(0.8f) { it.green }.take(2))
         if (fraction == 0f) assertEquals("outgoing starts at native coordinates", nativeOutgoing, outgoing)
-        if (fraction >= 0.4f) {
+        if ((if (child) AppMotionOpenEasing else AppMotionCloseEasing).transform(fraction) >= 0.5f) {
             val remaining = ink(0.01f) { if (child) it.red else it.blue }.drop(2)
-            assertTrue("outgoing retires in the fast phase", remaining.all { it.isEmpty() })
+            assertTrue("outgoing retires at geometry handoff", remaining.all { it.isEmpty() })
         }
-        if (fraction <= 0.8f) {
+        if ((if (child) AppMotionOpenEasing else AppMotionCloseEasing).transform(fraction) < 0.5f) {
             assertTrue("body waits for the outlines", actual.drop(2).all { it.isEmpty() })
         } else if (fraction == 1f) {
             assertEquals("body arrives at native coordinates", nativeBody, actual.drop(2))

@@ -14,8 +14,8 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asComposePath
@@ -59,6 +59,7 @@ internal data class SettingsRouteEndpoint(
     val visibleBounds: Rect = bounds,
     val strokeWidth: Float = 1f,
     val viewportToken: Any? = null,
+    val rtl: Boolean = false,
 )
 
 /** One route clock owns continuous opaque chrome and the separately permitted content picture. */
@@ -73,17 +74,25 @@ internal class SettingsPageMorph {
     private data class ReturnTarget(
         val point: Offset,
         val groupKey: Int?,
+        val childGroupKey: Int? = null,
     )
 
     private val returnTargets = mutableMapOf<Any?, ReturnTarget>()
     private val routeGroupKeys = mutableMapOf<Any?, MutableMap<Any, Int>>()
     private var nextGroupKey = 1
 
-    // A route opened from an anchor keeps one key for it, so its saved group keys still pair on reopening.
+    // Anchor-only routes retain their native identity independently from destination group identity.
     private val anchorGroupKeys = mutableMapOf<Any?, Int>()
     private var correspondenceKey: Int? = null
+    private var targetAnchorKey: Int? = null
     private var sourceContours: List<SettingsContour> = emptyList()
     private var targetContours: List<SettingsContour>? = null
+    private var correspondence: List<SettingsContourPair>? = null
+    private var externalSource: SettingsContour? = null
+    private var externalPairs: List<SettingsContourPair>? = null
+    private var bodyMask = Path()
+    private var unoutlinedBodyMask = Path()
+    private var bodyReports: NativeFrame? = null
     private var rebaseTime = 0f
     private var transitionHost = Rect.Zero
     private var target: Any? = null
@@ -188,6 +197,7 @@ internal class SettingsPageMorph {
             return false
         }
         targetContours = closingTarget(native)
+        updateCorrespondence()
         return true
     }
 
@@ -199,21 +209,39 @@ internal class SettingsPageMorph {
             (closingAnchorContour ?: anchorContour)
                 ?.invoke()
                 ?.takeIf { it.bounds.validIn(transitionHost) }
-                ?.let { listOf(it.copy(key = correspondenceKey ?: 0, viewport = transitionHost)) }
+                ?.let { listOf(it.copy(key = targetAnchorKey ?: correspondenceKey ?: 0, viewport = transitionHost)) }
                 ?: native
         }
 
     internal fun outgoingPresence(time: Float): Float =
-        if (!active || entryOnly) {
-            0f
-        } else {
-            exitStart * (1f - (time / SETTINGS_OUTGOING_PHASE_END).coerceIn(0f, 1f))
-        }
+        if (active && !entryOnly && exitStart > 0f && geometryFraction(time) < 0.5f) 1f else 0f
 
-    internal fun incomingPresence(time: Float): Float {
-        if (!active) return 1f
-        val fraction = if (entryOnly) time else (time - SETTINGS_OUTGOING_PHASE_END) / 0.6f
-        return entryStart + (1f - entryStart) * fraction.coerceIn(0f, 1f)
+    internal fun incomingPresence(time: Float): Float =
+        if (!active || entryOnly || entryStart > 0f || geometryFraction(time) >= 0.5f) 1f else 0f
+
+    private fun geometryFraction(time: Float): Float {
+        val easing = if (opening) AppMotionOpenEasing else AppMotionCloseEasing
+        return easing.transform(time.coerceIn(0f, 1f))
+    }
+
+    private fun updateCorrespondence() {
+        correspondence =
+            targetContours?.let {
+                matchSettingsContours(
+                    sourceContours,
+                    it,
+                    correspondenceKey,
+                    if (opening) target else null,
+                    origin?.center ?: transitionHost.center,
+                    transitionHost,
+                    targetAnchorKey,
+                )
+            }
+        if (opening) {
+            val saved = returnTargets[target]
+            val child = correspondence?.firstOrNull { it.source.key == correspondenceKey }?.target?.key
+            if (saved != null && child != null) returnTargets[target] = saved.copy(childGroupKey = child)
+        }
     }
 
     /** Freeze exactly what was drawn before replacement; native target movement rebases this same clock. */
@@ -232,6 +260,7 @@ internal class SettingsPageMorph {
             transitionHost,
             correspondenceKey,
             paintFraction,
+            correspondence,
         )
     }
 
@@ -281,7 +310,13 @@ internal class SettingsPageMorph {
                     ?.let { it[nearestSettingsContour(it, bounds.center)].key }
             }
         correspondenceKey =
-            if (forward) activatedGroup ?: correspondenceKey else returnTarget?.groupKey ?: correspondenceKey
+            if (forward) {
+                activatedGroup ?: correspondenceKey
+            } else {
+                returnTarget?.childGroupKey?.takeIf { key -> current.orEmpty().any { it.key == key } }
+                    ?: returnTarget?.groupKey ?: correspondenceKey
+            }
+        targetAnchorKey = if (forward) null else returnTarget?.groupKey
         val eligible =
             animate &&
                 !changedHost &&
@@ -316,6 +351,7 @@ internal class SettingsPageMorph {
         }
         sourceContours = anchorSource?.let(::listOf) ?: current.orEmpty()
         targetContours = null
+        correspondence = null
         rebaseTime = 0f
         settled = null
         exitStart =
@@ -369,7 +405,7 @@ internal class SettingsPageMorph {
         return buildNativeContours(host).also { nativeFrame = NativeFrame(host, it) }
     }
 
-    // Native measurement and stable route-group correspondence are one batch.
+    // Keys identify native groups only; transition correspondence belongs to the measured pair batch.
     @Suppress("LongMethod", "ReturnCount")
     private fun buildNativeContours(host: Rect): List<SettingsContour>? {
         val groups =
@@ -396,26 +432,20 @@ internal class SettingsPageMorph {
                             )
                         },
                         nativeRows.map { SettingsNativeRow(it.bounds, it.corners, it.first, it.last) },
+                        destination = endpoint.destination,
+                        fill = endpoint.fill,
+                        rtl = endpoint.rtl,
                     )
                 },
             ) ?: return null
         if (contours.isEmpty()) return contours
         val saved = routeGroupKeys.getOrPut(target) { mutableMapOf() }
         nextGroupKey = maxOf(nextGroupKey, (sourceContours.maxOfOrNull { it.key } ?: 0) + 1)
-        val selectedIndex = nearestSettingsContour(contours, origin?.center ?: contours.first().bounds.center)
-        val sourceIndex = sourceContours.indexOfFirst { it.key == correspondenceKey }
-        val keys =
-            contours.indices.map { index ->
-                val identity = groups[index].value.key
-                val occurrence = groups.take(index).count { it.value.key == identity }
-                saved.getOrPut(identity to occurrence) {
-                    sourceContours.getOrNull(sourceIndex + index - selectedIndex)?.key?.takeIf {
-                        sourceIndex >= 0 &&
-                            it !in saved.values
-                    }
-                        ?: nextGroupKey++
-                }
-            }
+        val keys = contours.indices.map { index ->
+            val identity = groups[index].value.key
+            val occurrence = groups.take(index).count { it.value.key == identity }
+            saved.getOrPut(identity to occurrence) { nextGroupKey++ }
+        }
         return contours.mapIndexed { index, contour -> contour.copy(key = keys[index]) }
     }
 
@@ -425,6 +455,7 @@ internal class SettingsPageMorph {
         leaving = null
         sourceContours = emptyList()
         targetContours = null
+        correspondence = null
         leavingMask = null
     }
 
@@ -492,13 +523,27 @@ internal class SettingsPageMorph {
         }
         updateNativeFrame(native, host, time)
         drawRect(backplate)
-        val body = activeNativeBody(native.orEmpty(), host)
-        clipPath(body, ClipOp.Difference) {
+        val contours = renderedContours(time)
+        val interiors = if (contours.isEmpty()) leaving?.body ?: bodyMask else movingBodyMask(contours, host)
+        contours.forEach { drawContourFill(it, host) }
+        // One live display-list invocation: the fixed header and, after handoff, clipped body.
+        val live = Path().apply {
+            addRect(Rect(Offset.Zero, size))
+            op(this, bodyMask, PathOperation.Difference)
+            if (incomingPresence(time) > 0f) {
+                val incoming = Path().apply {
+                    addPath(unoutlinedBodyMask)
+                    val outlined = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
+                    op(this, outlined, PathOperation.Union)
+                }
+                op(this, incoming, PathOperation.Union)
+            }
+        }
+        clipPath(live) {
             clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
         }
-        drawIncomingBody(body, time)
-        drawOutgoingInk(host, time)
-        renderedContours(time).forEach { drawContinuousContour(it, host) }
+        clipPath(interiors) { drawOutgoingInk(host, time) }
+        contours.forEach { drawContinuousContour(it, host) }
     }
 
     /** Cross-window presentation uses the same native contour batch and exclusive stroke mask. */
@@ -514,33 +559,37 @@ internal class SettingsPageMorph {
             return
         }
         drawRect(backplate)
-        val chrome = nativeChromeMask(native, host)
-        val body = activeNativeBody(native, host)
-        clipPath(body, ClipOp.Difference) {
-            clipPath(chrome, ClipOp.Difference) { this@drawExternal.drawContent() }
+        if (maskFrame != native || maskHost != host || externalSource != source) {
+            maskFrame = native
+            maskHost = host
+            mask = nativeChromeMask(native, host)
+            bodyMask = activeNativeBody(native, host)
+            externalSource = source
+            externalPairs =
+                matchSettingsContours(listOf(source), native, source.key, source.destination, source.bounds.center, host)
         }
-        val ink = ((presence - 0.75f) / 0.25f).coerceIn(0f, 1f)
-        if (ink > 0f) {
-            clipPath(body) {
-                clipPath(chrome, ClipOp.Difference) {
-                    drawIntoCanvas { it.saveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = ink }) }
-                    this@drawExternal.drawContent()
-                    drawIntoCanvas { it.restore() }
-                }
+        val contours =
+            interpolateSettingsContours(
+                listOf(source), native, presence, source.bounds.center, host, source.key,
+                correspondence = externalPairs,
+            )
+        contours.forEach { drawContourFill(it, host) }
+        val interiors = movingBodyMask(contours, host)
+        val live = Path().apply {
+            addRect(Rect(Offset.Zero, size))
+            op(this, bodyMask, PathOperation.Difference)
+            if (presence >= 0.5f) {
+                val incoming = Path().apply { op(interiors, bodyMask, PathOperation.Intersect) }
+                op(this, incoming, PathOperation.Union)
             }
         }
-        val selected = native[nearestSettingsContour(native, source.bounds.center)].key
-        interpolateSettingsContours(
-            listOf(source.copy(key = selected)),
-            native,
-            presence,
-            source.bounds.center,
-            host,
-            selected,
-        ).forEach { drawContinuousContour(it, host) }
+        clipPath(live) {
+            clipPath(mask, ClipOp.Difference) { this@drawExternal.drawContent() }
+        }
+        contours.forEach { drawContinuousContour(it, host) }
     }
 
-    /** Outgoing ink fades at its native coordinates; only the measured chrome changes geometry. */
+    /** Frozen ink stays at native coordinates and leaves only through the moving interior clip. */
     private fun ContentDrawScope.drawOutgoingInk(
         host: Rect,
         time: Float,
@@ -555,9 +604,7 @@ internal class SettingsPageMorph {
             clipPath(body) {
                 clipPath(chrome, ClipOp.Difference) {
                     drawIntoCanvas { canvas ->
-                        canvas.saveLayer(Rect(Offset.Zero, size), Paint().apply { this.alpha = alpha })
                         canvas.nativeCanvas.drawPicture(frame.picture)
-                        canvas.restore()
                     }
                 }
             }
@@ -577,15 +624,21 @@ internal class SettingsPageMorph {
             nativeFrame = null
             rebaseTime = time.coerceIn(0f, 1f)
             targetContours = end
+            updateCorrespondence()
         }
-        // One presence schedule reveals body ink in place. No old route picture travels
-        // with the outline or covers the destination's fixed header.
+        // Native masks change only with measured batches; body ink stays at native coordinates.
         // Headers and other ink outside the measured groups remain live throughout.
         val chrome = if (!opening && native?.isEmpty() == true) end else native
-        if (maskFrame != chrome || maskHost != host) {
+        if (maskFrame != chrome || maskHost != host || bodyReports !== nativeFrame) {
+            bodyReports = nativeFrame
             maskHost = host
             maskFrame = chrome
             mask = nativeChromeMask(chrome.orEmpty(), host)
+            bodyMask = activeNativeBody(native.orEmpty(), host)
+            unoutlinedBodyMask = Path().apply {
+                op(bodyMask, nativeBodyMask(native.orEmpty(), host), PathOperation.Difference)
+            }
+            externalSource = null
         }
     }
 
@@ -600,22 +653,6 @@ internal class SettingsPageMorph {
                 if (!visible.isEmpty) addRect(visible.translate(-host.topLeft))
             }
         }
-
-    private fun ContentDrawScope.drawIncomingBody(
-        body: Path,
-        time: Float,
-    ) {
-        val incoming = incomingPresence(time)
-        if (incoming > 0f) {
-            clipPath(body) {
-                clipPath(mask, ClipOp.Difference) {
-                    drawIntoCanvas { it.saveLayer(Rect(Offset.Zero, size), Paint().apply { alpha = incoming }) }
-                    this@drawIncomingBody.drawContent()
-                    drawIntoCanvas { it.restore() }
-                }
-            }
-        }
-    }
 }
 
 /** Native group interiors only: no header replay and no travelling cell-sized crop. */
@@ -695,6 +732,41 @@ private fun nativeChromeMask(
         result.op(chrome, android.graphics.Path.Op.UNION)
     }
     return result.asComposePath()
+}
+
+private fun SettingsContour.drawnCorners(host: Rect): RoundRect {
+    val b = bounds.translate(-host.topLeft)
+    return RoundRect(
+        b.left, b.top, b.right, b.bottom,
+        corners.topLeftCornerRadius, corners.topRightCornerRadius,
+        corners.bottomRightCornerRadius, corners.bottomLeftCornerRadius,
+    )
+}
+
+/** Current rounded interiors own body visibility; native viewport/header clipping stays stationary. */
+private fun movingBodyMask(
+    contours: List<SettingsContour>,
+    host: Rect,
+): Path = Path().apply {
+    contours.forEach { contour ->
+        if (!contour.bounds.isEmpty) {
+            val rounded = Path().apply { addRoundRect(contour.drawnCorners(host)) }
+            val viewport = Path().apply { addRect(contour.viewport.intersect(host).translate(-host.topLeft)) }
+            rounded.op(rounded, viewport, PathOperation.Intersect)
+            addPath(rounded)
+        }
+    }
+}
+
+private fun DrawScope.drawContourFill(
+    contour: SettingsContour,
+    host: Rect,
+) {
+    if (!contour.fill.isSpecified || contour.bounds.isEmpty) return
+    val viewport = contour.viewport.intersect(host).translate(-host.topLeft)
+    clipRect(viewport.left, viewport.top, viewport.right, viewport.bottom) {
+        drawPath(Path().apply { addRoundRect(contour.drawnCorners(host)) }, contour.fill)
+    }
 }
 
 private fun DrawScope.drawContinuousContour(
@@ -879,6 +951,7 @@ internal fun rememberSettingsNativeSurface(
                     visibleBounds = rect.intersect(clipped),
                     strokeWidth = width,
                     viewportToken = viewport,
+                    rtl = direction == androidx.compose.ui.unit.LayoutDirection.Rtl,
                 ),
             )
         }

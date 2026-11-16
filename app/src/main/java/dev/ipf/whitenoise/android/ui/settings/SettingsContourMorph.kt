@@ -6,6 +6,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.lerp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.lerp
 import kotlin.math.max
 import kotlin.math.min
@@ -38,6 +39,9 @@ internal data class SettingsContour(
     val rows: List<SettingsNativeRow> = emptyList(),
     // Native route groups and frozen frames retain the same correspondence.
     val key: Int = 0,
+    val destination: Any? = null,
+    val fill: Color = Color.Unspecified,
+    val rtl: Boolean = false,
 ) {
     // Paint alpha is carried by each frozen color; no independent route-alpha owner.
     val modulationAlpha: Float get() = 1f
@@ -113,7 +117,13 @@ private fun absentSettingsSeam(
 ): SettingsContourSeam {
     val relativeY = if (from.bounds.height == 0f) 0.5f else (seam.start.y - from.bounds.top) / from.bounds.height
     val y = to.bounds.top + relativeY * to.bounds.height
-    val x = if (to.bounds.isEmpty) to.bounds.center.x else settingsContourSpan(to, y).first
+    val x =
+        if (to.bounds.isEmpty) {
+            to.bounds.center.x
+        } else {
+            val span = settingsContourSpan(to, y)
+            if (from.rtl) span.second else span.first
+        }
     return seam.copy(start = Offset(x, y), end = Offset(x, y))
 }
 
@@ -125,6 +135,11 @@ private fun interpolateSettingsContour(
     key: Int,
 ): SettingsContour {
     val bounds = lerp(a.bounds, b.bounds, t)
+    fun radius(a: CornerRadius, b: CornerRadius): CornerRadius {
+        val value = contourRadius(a, b, t)
+        val limit = min(bounds.width, bounds.height) / 2f
+        return CornerRadius(min(value.x, limit), min(value.y, limit))
+    }
     val width =
         if (a.width == 0f) {
             b.width
@@ -140,10 +155,10 @@ private fun interpolateSettingsContour(
             bounds.top,
             bounds.right,
             bounds.bottom,
-            contourRadius(a.corners.topLeftCornerRadius, b.corners.topLeftCornerRadius, t),
-            contourRadius(a.corners.topRightCornerRadius, b.corners.topRightCornerRadius, t),
-            contourRadius(a.corners.bottomRightCornerRadius, b.corners.bottomRightCornerRadius, t),
-            contourRadius(a.corners.bottomLeftCornerRadius, b.corners.bottomLeftCornerRadius, t),
+            radius(a.corners.topLeftCornerRadius, b.corners.topLeftCornerRadius),
+            radius(a.corners.topRightCornerRadius, b.corners.topRightCornerRadius),
+            radius(a.corners.bottomRightCornerRadius, b.corners.bottomRightCornerRadius),
+            radius(a.corners.bottomLeftCornerRadius, b.corners.bottomLeftCornerRadius),
         ),
         lerp(a.viewport, b.viewport, t),
         if (a.bounds.isEmpty) {
@@ -165,25 +180,14 @@ private fun interpolateSettingsContour(
             )
         },
         key = key,
-    )
-}
-
-/** Each absent peer has its own point, carried by the facing edge of its nearest matched group. */
-private fun satelliteSettingsContour(
-    slot: SettingsContour,
-    matched: SettingsContour,
-    partner: SettingsContour,
-    above: Boolean,
-): SettingsContour {
-    val dy = if (above) partner.bounds.top - matched.bounds.top else partner.bounds.bottom - matched.bounds.bottom
-    val point = slot.bounds.center + Offset(partner.bounds.center.x - matched.bounds.center.x, dy)
-    return SettingsContour(
-        Rect(point, point),
-        RoundRect(Rect(point, point)),
-        slot.viewport,
-        slot.color,
-        0f,
-        key = slot.key,
+        destination = if (t < 0.5f) a.destination else b.destination,
+        rtl = a.rtl,
+        fill =
+            when {
+                !a.fill.isSpecified -> b.fill
+                !b.fill.isSpecified -> a.fill
+                else -> lerp(a.fill, b.fill, t)
+            },
     )
 }
 
@@ -202,10 +206,10 @@ internal fun nearestSettingsContour(
 
 /**
  * The activated group moves 1:1 for the entire clock. Neighbouring groups correspond in order;
- * surplus outer groups shrink to separate facing-edge-carried points, never into the survivor.
- * Rank correspondence also preserves ordinary N↔M routes with several native destination groups.
+ * surplus groups leave through the viewport or contract into an exclusive interior gap.
+ * Correspondence is measured once by the presentation owner.
  */
-@Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount")
+@Suppress("LongMethod", "CyclomaticComplexMethod", "ReturnCount", "LongParameterList")
 internal fun interpolateSettingsContours(
     source: List<SettingsContour>,
     target: List<SettingsContour>,
@@ -214,6 +218,7 @@ internal fun interpolateSettingsContours(
     viewport: Rect,
     correspondenceKey: Int? = null,
     paintFraction: Float = fraction,
+    correspondence: List<SettingsContourPair>? = null,
 ): List<SettingsContour> {
     val t = fraction.coerceIn(0f, 1f)
     if (t == 0f) return source
@@ -245,7 +250,7 @@ internal fun interpolateSettingsContours(
                                 style.width,
                             )
                         },
-                ).withSatellitePresence(
+                ).withEmptyPresence(
                     if (source.isNotEmpty()) {
                         1f - (paintFraction / SETTINGS_OUTGOING_PHASE_END).coerceIn(0f, 1f)
                     } else {
@@ -254,68 +259,154 @@ internal fun interpolateSettingsContours(
                 )
         }
     }
-    val sharedKeys = source.map { it.key }.intersect(target.map { it.key }.toSet())
-    val selectedKey =
-        correspondenceKey?.takeIf { it in sharedKeys }
-            ?: source
-                .filter {
-                    it.key in sharedKeys
-                }.takeIf { it.isNotEmpty() }
-                ?.let { it[nearestSettingsContour(it, emptyPoint)].key }
-    val sourceIndex =
-        source.indexOfFirst { it.key == selectedKey }.takeIf { it >= 0 } ?: nearestSettingsContour(source, emptyPoint)
-    val targetIndex =
-        target.indexOfFirst { it.key == selectedKey }.takeIf { it >= 0 } ?: nearestSettingsContour(target, emptyPoint)
-    val firstRank = min(-sourceIndex, -targetIndex)
-    val lastRank = max(source.lastIndex - sourceIndex, target.lastIndex - targetIndex)
-    return (firstRank..lastRank).map { rank ->
-        val a = source.getOrNull(sourceIndex + rank)
-        val b = target.getOrNull(targetIndex + rank)
-        when {
-            a != null && b != null ->
-                interpolateSettingsContour(
-                    a,
-                    b,
-                    t,
-                    if (source.size >= target.size) {
-                        a.key
-                    } else {
-                        b.key
-                    },
-                )
-            a != null -> {
-                val matchedIndex =
-                    (sourceIndex + rank).coerceIn(
-                        sourceIndex - targetIndex,
-                        sourceIndex + target.lastIndex - targetIndex,
-                    )
-                val matched = source[matchedIndex]
-                val partner = target[targetIndex + matchedIndex - sourceIndex]
-                interpolateSettingsContour(a, satelliteSettingsContour(a, matched, partner, rank < 0), t, a.key)
-                    .withSatellitePresence(1f - (paintFraction / SETTINGS_OUTGOING_PHASE_END).coerceIn(0f, 1f))
-            }
-            else -> {
-                val slot = requireNotNull(b)
-                val matchedIndex =
-                    (targetIndex + rank).coerceIn(
-                        targetIndex - sourceIndex,
-                        targetIndex + source.lastIndex - sourceIndex,
-                    )
-                val matched = target[matchedIndex]
-                val partner = source[sourceIndex + matchedIndex - targetIndex]
-                interpolateSettingsContour(
-                    satelliteSettingsContour(slot, matched, partner, rank < 0),
-                    slot,
-                    t,
-                    slot.key,
-                ).withSatellitePresence(1f - ((1f - paintFraction) / SETTINGS_OUTGOING_PHASE_END).coerceIn(0f, 1f))
-            }
-        }
-    }
+    return (correspondence ?: matchSettingsContours(source, target, correspondenceKey, null, emptyPoint, viewport))
+        .map { pair -> interpolateSettingsContour(pair.source, pair.target, t, pair.key) }
 }
 
-/** Only surplus boxes fade, including their seams; frozen source alpha is never reset. */
-private fun SettingsContour.withSatellitePresence(presence: Float): SettingsContour =
+/** A measured batch owns correspondence; animation only samples these immutable endpoints. */
+internal data class SettingsContourPair(
+    val source: SettingsContour,
+    val target: SettingsContour,
+    val key: Int,
+)
+
+/** Maximum-cardinality minimum-distance monotone assignment on either side of the semantic anchor. */
+@Suppress("LongMethod", "CyclomaticComplexMethod", "LongParameterList", "NestedBlockDepth")
+internal fun matchSettingsContours(
+    source: List<SettingsContour>,
+    target: List<SettingsContour>,
+    anchorKey: Int?,
+    routeKey: Any?,
+    point: Offset,
+    viewport: Rect,
+    targetAnchorKey: Int? = anchorKey,
+): List<SettingsContourPair> {
+    fun visible(contours: List<SettingsContour>) =
+        contours.filter { !it.bounds.intersect(it.viewport).intersect(viewport).isEmpty }
+    val a = visible(source)
+    val b = visible(target)
+    if (a.isEmpty() || b.isEmpty()) {
+        // Offscreen outlined endpoints are not genuinely empty: visible peers still leave rigidly.
+        val visible = a.ifEmpty { b }
+        val dy = visible.firstOrNull()?.let { viewport.bottom - it.bounds.top + it.width } ?: 0f
+        return visible.map { slot ->
+            val offset = Offset(0f, dy)
+            val bounds = slot.bounds.translate(offset)
+            val peer = slot.copy(
+                bounds = bounds,
+                corners = RoundRect(bounds, slot.corners.topLeftCornerRadius.x, slot.corners.topLeftCornerRadius.y),
+                seams = slot.seams.map { it.copy(start = it.start + offset, end = it.end + offset) },
+                rows = emptyList(),
+            )
+            if (a.isEmpty()) SettingsContourPair(peer, slot, slot.key) else SettingsContourPair(slot, peer, slot.key)
+        }
+    }
+    val shared = a.filter { from -> b.any { it.key == from.key } }
+    val selectedKey =
+        anchorKey ?: shared.takeIf { it.isNotEmpty() }?.let { it[nearestSettingsContour(it, point)].key }
+    val ai = a.indexOfFirst { it.key == selectedKey }.takeIf { it >= 0 } ?: nearestSettingsContour(a, point)
+    val bi =
+        b.indexOfFirst { routeKey != null && it.destination == routeKey }.takeIf { it >= 0 }
+            ?: b.indexOfFirst { it.key == (targetAnchorKey ?: selectedKey) }.takeIf { it >= 0 }
+            ?: nearestSettingsContour(b, point)
+    fun cost(x: SettingsContour, y: SettingsContour): Float {
+        val xc = x.bounds.intersect(x.viewport).intersect(viewport)
+        val yc = y.bounds.intersect(y.viewport).intersect(viewport)
+        return kotlin.math.abs(xc.center.y - yc.center.y) + kotlin.math.abs(xc.height - yc.height) * 0.25f
+    }
+    fun assign(xs: List<Int>, ys: List<Int>): List<Pair<Int, Int>> {
+        if (xs.isEmpty() || ys.isEmpty()) return emptyList()
+        // The smaller side is fully matched; skip only on the larger side.
+        val swapped = xs.size > ys.size
+        val small = if (swapped) ys else xs
+        val large = if (swapped) xs else ys
+        val scores = Array(small.size + 1) { FloatArray(large.size + 1) { Float.POSITIVE_INFINITY } }
+        val take = Array(small.size + 1) { BooleanArray(large.size + 1) }
+        scores[0].fill(0f)
+        for (i in 1..small.size) {
+            for (j in i..large.size) {
+                val x = if (swapped) large[j - 1] else small[i - 1]
+                val y = if (swapped) small[i - 1] else large[j - 1]
+                val paired = scores[i - 1][j - 1] + cost(a[x], b[y])
+                take[i][j] = paired <= scores[i][j - 1]
+                scores[i][j] = min(paired, scores[i][j - 1])
+            }
+        }
+        val result = mutableListOf<Pair<Int, Int>>()
+        var i = small.size
+        var j = large.size
+        while (i > 0) {
+            if (take[i][j]) {
+                result += if (swapped) large[j - 1] to small[i - 1] else small[i - 1] to large[j - 1]
+                i--
+            }
+            j--
+        }
+        return result.reversed()
+    }
+    val indices =
+        assign((0 until ai).toList(), (0 until bi).toList()) +
+            listOf(ai to bi) + assign((ai + 1..a.lastIndex).toList(), (bi + 1..b.lastIndex).toList())
+    val result =
+        indices.map { (x, y) ->
+            val key =
+                when {
+                    a.size > b.size -> a[x].key
+                    b.size > a.size -> b[y].key
+                    else -> min(a[x].key, b[y].key)
+                }
+            SettingsContourPair(a[x], b[y], key)
+        }.toMutableList()
+    fun addSurplus(own: List<SettingsContour>, other: List<SettingsContour>, reverse: Boolean) {
+        val pairs = if (reverse) indices.map { it.second to it.first } else indices
+        own.indices.filter { index -> pairs.none { it.first == index } }.forEach { index ->
+            val slot = own[index]
+            val before = pairs.lastOrNull { it.first < index }
+            val after = pairs.firstOrNull { it.first > index }
+            val bounds =
+                when {
+                    before == null -> {
+                        val next = requireNotNull(after)
+                        val edge = min(viewport.top, other[next.second].bounds.top)
+                        slot.bounds.translate(Offset(0f, edge - own[next.first - 1].bounds.bottom - slot.width))
+                    }
+                    after == null -> {
+                        val edge = max(viewport.bottom, other[before.second].bounds.bottom)
+                        slot.bounds.translate(Offset(0f, edge - own[before.first + 1].bounds.top + slot.width))
+                    }
+                    else -> {
+                        // Each interior surplus owns a separate position in the destination's empty gap.
+                        val low = other[before.second].bounds.bottom
+                        val high = other[after.second].bounds.top
+                        val rank = (index - before.first).toFloat() / (after.first - before.first)
+                        val y = low + (high - low) * rank
+                        Rect(slot.bounds.left, y, slot.bounds.right, y)
+                    }
+                }
+            val seams = slot.seams.map { seam ->
+                fun move(point: Offset): Offset {
+                    val relative = if (slot.bounds.height == 0f) 0.5f else (point.y - slot.bounds.top) / slot.bounds.height
+                    return Offset(point.x, bounds.top + relative * bounds.height)
+                }
+                seam.copy(start = move(seam.start), end = move(seam.end))
+            }
+            val peer =
+                slot.copy(
+                    bounds = bounds,
+                    corners = RoundRect(bounds, slot.corners.topLeftCornerRadius.x, slot.corners.topLeftCornerRadius.y),
+                    seams = seams,
+                    rows = emptyList(),
+                )
+            result += if (reverse) SettingsContourPair(peer, slot, slot.key) else SettingsContourPair(slot, peer, slot.key)
+        }
+    }
+    addSurplus(a, b, false)
+    addSurplus(b, a, true)
+    return result.sortedWith(compareBy({ it.source.bounds.top }, { it.target.bounds.top }))
+}
+
+/** True-empty compatibility alone retains its native seed reveal. */
+private fun SettingsContour.withEmptyPresence(presence: Float): SettingsContour =
     copy(
         color = color.copy(alpha = color.alpha * presence),
         seams = seams.map { it.copy(color = it.color.copy(alpha = it.color.alpha * presence)) },

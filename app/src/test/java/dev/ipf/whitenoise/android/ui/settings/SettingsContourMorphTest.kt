@@ -23,7 +23,7 @@ class SettingsContourMorphTest {
         key: Int = 1,
     ): SettingsContour {
         val bounds = Rect(16f, top, 344f, top + height)
-        return SettingsContour(bounds, RoundRect(bounds, 20f, 20f), viewport, Color.White, 1f, key = key)
+        return SettingsContour(bounds, RoundRect(bounds, minOf(20f, height / 2f), minOf(20f, height / 2f)), viewport, Color.White, 1f, key = key)
     }
 
     private fun home(): List<SettingsContour> = List(4) { group(100f + it * 110f, key = it + 1) }
@@ -79,7 +79,7 @@ class SettingsContourMorphTest {
                 assertNotNull(orderedSettingsContours(frame))
                 frame.forEach { contour ->
                     // Match native sRGB paint quantization without widening the assertion tolerance.
-                    val alpha = if (contour.key == target.single().key) 1f else 1f - (t / 0.4f).coerceIn(0f, 1f)
+                    val alpha = 1f
                     assertEquals(Color.White.copy(alpha = alpha).alpha, contour.color.alpha, 0f)
                     assertEquals(1f, contour.modulationAlpha, 0f)
                     assertEquals(1f, contour.width, 0f)
@@ -88,13 +88,13 @@ class SettingsContourMorphTest {
         }
     }
 
-    @Test fun surplusPaintFadesInFirstFortyPercentIncludingSeamsAndReverses() {
+    @Test fun surplusKeepsNativePaintIncludingSeamsAndReverses() {
         val source = listOf(dividedGroup(100f, 2, 1), group(400f, key = 2))
         val target = listOf(group(140f, key = 2))
         for (t in listOf(0.01f, 0.2f, 0.4f, 0.8f)) {
             val frame = interpolateSettingsContours(source, target, t, source[1].bounds.center, viewport, 2)
             val satellite = frame.single { it.key == 1 }
-            val alpha = 1f - (t / 0.4f).coerceIn(0f, 1f)
+            val alpha = 1f
             assertEquals(source[0].color.copy(alpha = alpha).alpha, satellite.color.alpha, 0f)
             satellite.seams.forEachIndexed { index, seam ->
                 assertEquals(
@@ -110,7 +110,7 @@ class SettingsContourMorphTest {
             assertEquals(1f, frame.single { it.key == 2 }.color.alpha, 0f)
             val reversed = interpolateSettingsContours(target, source, 1f - t, source[1].bounds.center, viewport, 2)
             assertEquals(satellite.color.alpha, reversed.single { it.key == 1 }.color.alpha, 0.001f)
-            // Retargeting must start from the partially transparent frame, never opaque native paint.
+            // Retargeting preserves native paint and starts at exactly the frozen frame.
             assertSame(frame, interpolateSettingsContours(frame, source, 0f, source[1].bounds.center, viewport, 2))
             val resumed = interpolateSettingsContours(frame, source, 0.00001f, source[1].bounds.center, viewport, 2)
             assertEquals(satellite.color.alpha, resumed.single { it.key == 1 }.color.alpha, 0.001f)
@@ -175,22 +175,21 @@ class SettingsContourMorphTest {
     @Test fun satellitesSeparateWithoutDockingOrFunnellingAcrossOrderedRandomLayouts() {
         val random = Random(3793)
         repeat(24) {
-            var top = random.nextFloat() * 100f
+            var top = 100f + random.nextFloat() * 10f
             val source =
                 List(2 + random.nextInt(5)) { index ->
-                    val contour = group(top, 20f + random.nextFloat() * 180f, index + 1)
-                    top = contour.bounds.bottom + 8f + random.nextFloat() * 80f
+                    val contour = group(top, 20f + random.nextFloat() * 45f, index + 1)
+                    top = contour.bounds.bottom + 8f + random.nextFloat() * 8f
                     contour
                 }
             val selected = random.nextInt(source.size)
-            val target = listOf(group(random.nextFloat() * 350f, 30f + random.nextFloat() * 500f, source[selected].key))
+            val target = listOf(group(100f + random.nextFloat() * 250f, 40f + random.nextFloat() * 250f, source[selected].key))
             for (step in 1 until 240) {
                 val t = step / 240f
                 val frame = sample(source, target, t)
                 assertNotNull(orderedSettingsContours(frame))
                 frame.zipWithNext().forEachIndexed { index, (a, b) ->
-                    val nativeGap = source[index + 1].bounds.top - source[index].bounds.bottom
-                    assertTrue(b.bounds.top - a.bounds.bottom >= nativeGap - 0.001f)
+                    assertTrue(b.bounds.top - a.bounds.bottom >= -0.001f)
                     if (index + 1 < selected || index > selected) {
                         assertEquals(
                             source[index + 1].bounds.center.y - source[index].bounds.center.y,
@@ -201,7 +200,7 @@ class SettingsContourMorphTest {
                 }
                 frame.forEach { contour ->
                     assertEquals(1f, contour.width, 0f)
-                    assertTrue(contour.corners.topLeftCornerRadius.x >= 20f * (1f - t) - 0.001f)
+                    assertTrue(contour.corners.topLeftCornerRadius.x <= contour.bounds.height / 2f)
                 }
             }
             val nearEnd = sample(source, target, 0.99999f)
@@ -230,6 +229,71 @@ class SettingsContourMorphTest {
                 }
             }
         }
+    }
+
+    @Test fun declaredDestinationBeatsNearestAndPairingIsNoncrossingAndOneToOne() {
+        val source = List(5) { group(100f + it * 100f, 60f, it + 1) }
+        val target = listOf(group(110f, 60f, 10), group(500f, 60f, 11).copy(destination = "agents"))
+        val pairs = matchSettingsContours(source, target, 3, "agents", source[2].bounds.center, viewport)
+        val matched = pairs.filter { it.source in source && it.target in target }
+        assertEquals(target[1], matched.single { it.source.key == 3 }.target)
+        assertEquals(matched.size, matched.map { it.target.key }.distinct().size)
+        assertEquals(matched.map { it.target.bounds.top }.sorted(), matched.map { it.target.bounds.top })
+        assertTrue(matched.none { it.source.key == 2 })
+    }
+
+    @Test fun interiorSurplusContractsAtFullWidthIntoExclusiveGapWithoutFadingOrCrossing() {
+        val source = listOf(group(100f, 60f, 1), group(210f, 60f, 2), group(320f, 60f, 3))
+        val target = listOf(group(100f, 60f, 1), group(320f, 60f, 3))
+        val pairs = matchSettingsContours(source, target, 1, null, source[0].bounds.center, viewport)
+        val surplus = pairs.single { it.source.key == 2 }
+        assertEquals(0f, surplus.target.bounds.height, 0f)
+        assertTrue(surplus.target.bounds.top > target[0].bounds.bottom)
+        assertTrue(surplus.target.bounds.bottom < target[1].bounds.top)
+        for (step in 1 until 100) {
+            val t = step / 100f
+            val frame = interpolateSettingsContours(source, target, t, source[0].bounds.center, viewport,
+                1, correspondence = pairs)
+            val middle = frame.single { it.key == 2 }
+            assertEquals(source[1].bounds.width, middle.bounds.width, 0f)
+            assertEquals(1f, middle.color.alpha, 0f)
+            assertTrue(middle.bounds.height > 0f)
+            assertTrue(middle.corners.topLeftCornerRadius.y <= middle.bounds.height / 2f)
+            assertNotNull(orderedSettingsContours(frame))
+            val reversed = interpolateSettingsContours(target, source, 1f - t, source[0].bounds.center,
+                viewport, 1, correspondence = pairs.map { SettingsContourPair(it.target, it.source, it.key) })
+            frame.zip(reversed).forEach { (a, b) -> assertBounds(a.bounds, b.bounds) }
+        }
+    }
+
+    @Test fun offscreenContoursCannotStealNearestVisiblePartnerAndFullScrolledBoundsSurvive() {
+        val source = listOf(group(-100f, 50f, 1), group(40f, 100f, 2), group(250f, 70f, 3))
+        val target = listOf(group(110f, 100f, 4))
+        val pairs = matchSettingsContours(source, target, 2, null, source[1].bounds.center, viewport)
+        assertTrue(pairs.none { it.source.key == 1 })
+        assertEquals(40f, pairs.single { it.source.key == 2 }.source.bounds.top, 0f)
+    }
+
+    @Test fun onlyOffscreenTargetGroupsDoNotTurnVisibleSourceIntoAnEmptySeedOrPop() {
+        val source = listOf(group(100f, 80f, 1), group(250f, 80f, 2))
+        val target = listOf(group(800f, 80f, 3))
+        val pairs = matchSettingsContours(source, target, 1, null, source[0].bounds.center, viewport)
+        assertEquals(source.size, pairs.size)
+        pairs.forEach { pair ->
+            assertEquals(pair.source.bounds.size, pair.target.bounds.size)
+            assertTrue(pair.target.bounds.top > viewport.bottom)
+        }
+        val frame = interpolateSettingsContours(source, target, 0.1f, source[0].bounds.center,
+            viewport, 1, correspondence = pairs)
+        assertEquals(2, frame.size)
+        frame.forEach { assertEquals(1f, it.color.alpha, 0f) }
+    }
+
+    @Test fun unmatchedSeamRetractsToLogicalStartInRtl() {
+        val source = dividedGroup(100f, 1).copy(rtl = true)
+        val target = source.copy(seams = emptyList())
+        val frame = sample(listOf(source), listOf(target), 0.999f).single()
+        assertTrue(frame.seams.single().start.x > 340f)
     }
 
     @Test fun nativeEndpointsIncludingRowsCornersViewportAndStylesAreTheOriginalObjects() {

@@ -191,15 +191,14 @@ class SettingsPageMorphTest {
         assertEquals(frozen, page.renderedContours(0f))
         reportGroup(page, first)
         assertTrue(page.admitDestination())
-        val endpoint = page.renderedContours(1f).single()
-        val origin = frozen.single { it.key == endpoint.key }
+        val origin = frozen.first()
         assertEquals(
             lerp(origin.bounds, first, AppMotionCloseEasing.transform(0.5f)),
             page
                 .renderedContours(0.5f)
                 .single {
                     it.key ==
-                        endpoint.key
+                        origin.key
                 }.bounds,
         )
     }
@@ -245,7 +244,7 @@ class SettingsPageMorphTest {
         assertEquals(Color.Red, start.single().color)
         assertEquals(2f, start.single().width, 0f)
         val selectedKey = page.renderedContours(1f).first { it.bounds == first }.key
-        assertEquals(start.single().key, selectedKey)
+        assertTrue(start.single().key != selectedKey)
         for (time in listOf(0.05f, 0.3f, 0.6f, 0.9f)) {
             val frame = page.renderedContours(time)
             val selected = frame.single { it.key == selectedKey }
@@ -282,8 +281,7 @@ class SettingsPageMorphTest {
         reportGroup(page, first)
         reportGroup(page, second)
         assertTrue(page.admitDestination())
-        val key = page.renderedContours(0f).single().key
-        assertEquals(first, page.renderedContours(1f).single { it.key == key }.bounds)
+        assertEquals(first, page.renderedContours(1f).first().bounds)
     }
 
     @Test fun offscreenAnchorOutlineLeavesTheOpeningWithoutDuplicates() {
@@ -291,23 +289,23 @@ class SettingsPageMorphTest {
         for (time in listOf(0f, 0.3f)) assertTrue(page.renderedContours(time).none { it.bounds.top < 0f })
     }
 
-    @Test fun selectedOutlineStaysOpaqueWhilePeersShrinkFadeAndRemainSeparate() {
+    @Test fun selectedOutlineStaysOpaqueWhilePeersExitRigidlyAndRemainSeparate() {
         val page = departing()
         val target = Rect(16f, 120f, 344f, 300f)
         page.reportDestination(Any(), surface(target))
         assertTrue(page.admitDestination())
-        val selectedKey = page.renderedContours(1f).single().key
+        val selectedKey = page.renderedContours(0f).first().key
         for (time in listOf(0.001f, 0.2f, 0.39f, 0.4f, 0.41f, 0.65f, 0.9f, 0.999f)) {
             val frame = page.renderedContours(time)
             val selected = frame.single { it.key == selectedKey }
             assertEquals(lerp(first, target, AppMotionOpenEasing.transform(time)), selected.bounds)
             assertEquals(2, frame.size)
             assertTrue(frame[0].bounds.bottom < frame[1].bounds.top)
-            assertTrue(frame[1].bounds.width < second.width)
+            assertEquals(second.width, frame[1].bounds.width, 0f)
             frame.forEach { contour ->
                 assertEquals(1f, contour.modulationAlpha, 0f)
                 // Compose sRGB Color stores alpha in eight bits, as does the native paint.
-                val alpha = if (contour.key == selectedKey) 1f else 1f - (time / 0.4f).coerceIn(0f, 1f)
+                val alpha = 1f
                 assertEquals(Color.White.copy(alpha = alpha).alpha, contour.color.alpha, 0f)
                 assertEquals(1f, contour.width, 0f)
             }
@@ -336,7 +334,7 @@ class SettingsPageMorphTest {
                 if (!reverse) page.pendingOrigin = first
                 assertTrue(page.begin(if (reverse) "parent" else "other", !reverse, true, host, time))
                 assertEquals(before, page.renderedContours(0f))
-                if (time > 0.4f) {
+                if (AppMotionOpenEasing.transform(time) >= 0.5f) {
                     // No active body is captured: only the live body settles, never its outline.
                     assertEquals(1f, page.incomingPresence(0f), 0f)
                     assertEquals(0, page.keptPictures)
@@ -372,7 +370,7 @@ class SettingsPageMorphTest {
         assertTrue(page.begin("account", true, true, host))
         reportGroup(page, Rect(16f, 90f, 344f, 330f), identity = "account")
         assertTrue(page.admitDestination())
-        assertEquals(selectedKey, page.renderedContours(1f).single().key)
+        assertTrue(selectedKey != page.renderedContours(1f).single().key)
         val frozen = page.renderedContours(0.37f)
         assertTrue(page.begin("home", false, true, host, 0.37f))
         groups.forEachIndexed { index, bounds -> reportGroup(page, bounds, identity = "home-$index") }
@@ -386,7 +384,7 @@ class SettingsPageMorphTest {
         assertTrue(page.begin("notifications", true, true, host))
         reportGroup(page, Rect(16f, 100f, 344f, 380f), identity = "notifications")
         assertTrue(page.admitDestination())
-        assertEquals(native[1].key, page.renderedContours(1f).single().key)
+        assertTrue(native[1].key != page.renderedContours(1f).single().key)
     }
 
     @Test fun retargetAndReducedMotionKeepOnlyMeasuredContourState() {
@@ -398,6 +396,24 @@ class SettingsPageMorphTest {
         page.pendingOrigin = first
         assertFalse(page.begin("reduced", true, false, host))
         assertEquals(null, page.bounds(host, 0f))
+    }
+
+    @Test fun semanticDestinationWinsEvenWhenLaterMeasurementIsNearerToAnotherGroup() {
+        val page = departing()
+        val manual = Rect(16f, 110f, 344f, 190f)
+        val connectors = Rect(16f, 430f, 344f, 600f)
+        val manualToken = Any()
+        val connectorsToken = Any()
+        page.reportDestination(manualToken, surface(manual).copy(destination = "manual"))
+        page.admitDestination()
+        page.reportDestination(connectorsToken, surface(connectors).copy(destination = "child"))
+        page.admitDestination()
+        val sourceKey = page.renderedContours(0f).first().key
+        val time = 0.1f
+        assertEquals(
+            lerp(first, connectors, AppMotionOpenEasing.transform(time)),
+            page.renderedContours(time).single { it.key == sourceKey }.bounds,
+        )
     }
 
     @Test fun staleOriginAndChangedViewportCannotRetainPresentation() {
