@@ -1019,18 +1019,22 @@ internal class ConversationDictationController internal constructor(
         if (abort) abortSessionPreservingTranscript("app_background")
     }
 
-    /** Retries any deferred narrowing only after a real foreground return. */
-    fun onAppForegrounded() {
+    /** Keeps a settings return bound to its original failure and the host's unlocked state. */
+    private fun resumeMicrophoneSettingsRecovery(): Boolean {
         val microphoneRecovery = microphoneSettingsRecovery
         // A foreground callback can precede app-lock evaluation; wait for the host's unlocked return.
-        if (microphoneRecovery != null && state === microphoneRecovery && !microphoneRecoveryAllowed()) return
+        if (microphoneRecovery != null && state === microphoneRecovery && !microphoneRecoveryAllowed()) return true
         microphoneSettingsRecovery = null
-        if (microphoneRecovery != null && state === microphoneRecovery &&
-            runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
-        ) {
-            retry()
-            return
-        }
+        val restored =
+            microphoneRecovery != null && state === microphoneRecovery &&
+                runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
+        if (restored) retry()
+        return restored
+    }
+
+    /** Retries any deferred narrowing only after a real foreground return. */
+    fun onAppForegrounded() {
+        if (resumeMicrophoneSettingsRecovery()) return
         pendingForegroundRecoverySessionId = (state as? ConversationDictationState.Failed)?.sessionId
         expireRetainedRecoveryIfDue()
         val failed = state as? ConversationDictationState.Failed

@@ -98,12 +98,17 @@ internal class AndroidConversationDictationPlatform(
     }
 
     /** Detects system microphone blocking before opening a silent recorder. */
-    @Suppress("DEPRECATION")
     override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
         if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
-        if (context.getSystemService(AudioManager::class.java).isMicrophoneMute) {
-            return ConversationDictationMicrophoneAccess.MicrophoneMuted
+        return if (context.getSystemService(AudioManager::class.java).isMicrophoneMute) {
+            ConversationDictationMicrophoneAccess.MicrophoneMuted
+        } else {
+            microphoneAppOpAccess()
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun microphoneAppOpAccess(): ConversationDictationMicrophoneAccess {
         val mode =
             context.getSystemService(AppOpsManager::class.java).unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_RECORD_AUDIO,
