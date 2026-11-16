@@ -22,8 +22,8 @@
     <ID>CyclomaticComplexMethod:AudioWaveformExtractor.kt:AudioWaveformExtractor$internal fun &lt;FormatT&gt; decodeBlocking: FloatArray?</ID>
     <ID>CyclomaticComplexMethod:ChatListReadState.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
     <ID>CyclomaticComplexMethod:ChatRow.kt:@Composable internal fun ChatRow</ID>
-    <ID>CyclomaticComplexMethod:ChatsController.kt:ChatsController$private fun schedulePendingMediaKindResolves</ID>
     <ID>CyclomaticComplexMethod:ChatsController.kt:ChatsController$suspend fun bind</ID>
+    <ID>CyclomaticComplexMethod:ChatsControllerRowEnrichment.kt:internal fun ChatsController.schedulePendingMediaKindResolves</ID>
     <ID>CyclomaticComplexMethod:ComposerBar.kt:@OptIn(ExperimentalLayoutApi::class) @Composable internal fun ComposerBar</ID>
     <ID>CyclomaticComplexMethod:ComposerPills.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun ComposerPill</ID>
     <ID>CyclomaticComplexMethod:ContactPickerScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ContactPickerScreen</ID>
@@ -236,8 +236,8 @@
     <ID>LongMethod:AvatarViewer.kt:@Composable private fun ZoomableAvatarImage</ID>
     <ID>LongMethod:ChatListReadState.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
     <ID>LongMethod:ChatRow.kt:@Composable internal fun ChatRow</ID>
-    <ID>LongMethod:ChatsController.kt:ChatsController$private fun schedulePendingMediaKindResolves</ID>
     <ID>LongMethod:ChatsController.kt:ChatsController$suspend fun bind</ID>
+    <ID>LongMethod:ChatsControllerRowEnrichment.kt:internal fun ChatsController.schedulePendingMediaKindResolves</ID>
     <ID>LongMethod:ComposerBar.kt:@OptIn(ExperimentalLayoutApi::class) @Composable internal fun ComposerBar</ID>
     <ID>LongMethod:ComposerPills.kt:@OptIn(ExperimentalFoundationApi::class) @Composable internal fun ComposerPill</ID>
     <ID>LongMethod:ContactPickerScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ContactPickerScreen</ID>
@@ -340,8 +340,8 @@
     <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$5_000</ID>
     <ID>MagicNumber:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest$64</ID>
     <ID>MagicNumber:AppSelfUpdateStorageTest.kt:AppSelfUpdateStorageTest$1_000L</ID>
-    <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$30u</ID>
     <ID>MagicNumber:AppState.kt:WhiteNoiseAppState$8</ID>
+    <ID>MagicNumber:AppStateNotificationContent.kt:30u</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$0xFF</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$128</ID>
     <ID>MagicNumber:AudioWaveformExtractor.kt:AudioWaveformExtractor$128f</ID>
@@ -370,6 +370,8 @@
     <ID>MagicNumber:ChatsController.kt:8</ID>
     <ID>MagicNumber:ChatsController.kt:9uL</ID>
     <ID>MagicNumber:ChatsController.kt:ChatsController$8</ID>
+    <ID>MagicNumber:ChatsControllerInitialMembers.kt:8</ID>
+    <ID>MagicNumber:ChatsControllerMemberSnapshots.kt:8</ID>
     <ID>MagicNumber:ComposerBar.kt:900L</ID>
     <ID>MagicNumber:ConversationCardPostSynchronizer.kt:ConversationCardPostSynchronizer$31</ID>
     <ID>MagicNumber:ConversationControllerAgentStream.kt:1000L</ID>
@@ -567,9 +569,10 @@
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun launchVerifiedAppSelfUpdate: Boolean</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$fun</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private fun cachedUserProfile: UserProfileMetadataFfi?</ID>
-    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private val notificationDrainSignals = MutableSharedFlow&lt;Long&gt;(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)</ID>
+    <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$internal val notificationDrainSignals = MutableSharedFlow&lt;Long&gt;(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$private</ID>
     <ID>MaxLineLength:AppState.kt:WhiteNoiseAppState$suspend</ID>
+    <ID>MaxLineLength:AppStateNotificationContent.kt:private suspend</ID>
     <ID>MaxLineLength:AppStateRelayLists.kt:suspend fun WhiteNoiseAppState.accountRelayLists: AccountRelayListsFfi?</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"auto-chain should skip invisible edit and group-system rows before checking the immediate visible voice neighbor"</ID>
     <ID>MaxLineLength:AppStateSendLockCoverageTest.kt:AppStateSendLockCoverageTest$"paginate guard must serialize paginate against close and re-check the active timeline subscription identity"</ID>
@@ -616,6 +619,8 @@
     <ID>MaxLineLength:ChatsController.kt:ChatsController$val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }</ID>
     <ID>MaxLineLength:ChatsController.kt:internal</ID>
     <ID>MaxLineLength:ChatsControllerListVisibilityTest.kt:ChatsControllerListVisibilityTest$"""if\s*\(\s*visible\s*&amp;&amp;\s*\(\s*pendingRecompute\s*\|\|\s*recomputeScheduled\s*\)\s*\)\s*\{\s*recompute\(\s*\)\s*}"""</ID>
+    <ID>MaxLineLength:ChatsControllerProjection.kt:internal</ID>
+    <ID>MaxLineLength:ChatsControllerRows.kt:internal suspend</ID>
     <ID>MaxLineLength:ComposeHotPathCoverageTest.kt:ComposeHotPathCoverageTest$"""remember\(replyingTo,\s*messageTextCopy\)\s*\{\s*MessageProjector\.displayBody\(replyingTo,\s*messageTextCopy\)"""</ID>
     <ID>MaxLineLength:ComposerBar.kt:LaunchedEffect</ID>
     <ID>MaxLineLength:ComposerPills.kt:&lt;no name provided&gt;$override fun originalToTransformed: Int</ID>
@@ -1130,6 +1135,7 @@
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$error: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppState.kt:WhiteNoiseAppState$throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppStateForwarding.kt:throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:AppStateNotificationContent.kt:throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:AppUpdateWorker.kt:AppUpdateWorker$error: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:AttachmentCachePublication.kt:AttachmentCachePublication$throwable: Throwable</ID>
@@ -1139,6 +1145,8 @@
     <ID>TooGenericExceptionCaught:BackgroundConnectionBootReceiver.kt:BackgroundConnectionBootReceiver$t: Throwable</ID>
     <ID>TooGenericExceptionCaught:Cancellation.kt:throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:ChatsController.kt:ChatsController$throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatsControllerMemberSnapshots.kt:throwable: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ChatsControllerRowEnrichment.kt:throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:ConversationController.kt:ConversationController$throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:ConversationControllerAdministration.kt:throwable: Throwable</ID>
     <ID>TooGenericExceptionCaught:ConversationControllerMedia.kt:throwable: Throwable</ID>
@@ -1166,11 +1174,17 @@
     <ID>TooManyFunctions:AppLockController.kt:AppLockController</ID>
     <ID>TooManyFunctions:AppSelfUpdateDownloaderTest.kt:AppSelfUpdateDownloaderTest</ID>
     <ID>TooManyFunctions:AppState.kt:WhiteNoiseAppState</ID>
+    <ID>TooManyFunctions:AppStateNotificationContent.kt:dev.ipf.whitenoise.android.state.AppStateNotificationContent.kt</ID>
     <ID>TooManyFunctions:AttachmentCachePublication.kt:AttachmentCachePublication</ID>
     <ID>TooManyFunctions:AudioWaveformExtractor.kt:AndroidAudioDecoderCodec : AudioDecoderCodec</ID>
     <ID>TooManyFunctions:AudioWaveformExtractor.kt:AudioDecoderCodec&lt;FormatT&gt;</ID>
     <ID>TooManyFunctions:ChatsController.kt:ChatsController</ID>
     <ID>TooManyFunctions:ChatsController.kt:dev.ipf.whitenoise.android.state.ChatsController.kt</ID>
+    <ID>TooManyFunctions:ChatsControllerDeparture.kt:dev.ipf.whitenoise.android.state.ChatsControllerDeparture.kt</ID>
+    <ID>TooManyFunctions:ChatsControllerInitialMembers.kt:dev.ipf.whitenoise.android.state.ChatsControllerInitialMembers.kt</ID>
+    <ID>TooManyFunctions:ChatsControllerOptimisticPreview.kt:dev.ipf.whitenoise.android.state.ChatsControllerOptimisticPreview.kt</ID>
+    <ID>TooManyFunctions:ChatsControllerProjection.kt:dev.ipf.whitenoise.android.state.ChatsControllerProjection.kt</ID>
+    <ID>TooManyFunctions:ChatsControllerRows.kt:dev.ipf.whitenoise.android.state.ChatsControllerRows.kt</ID>
     <ID>TooManyFunctions:ConversationController.kt:ConversationController</ID>
     <ID>TooManyFunctions:ConversationController.kt:dev.ipf.whitenoise.android.state.ConversationController.kt</ID>
     <ID>TooManyFunctions:ConversationControllerAdministration.kt:dev.ipf.whitenoise.android.state.ConversationControllerAdministration.kt</ID>

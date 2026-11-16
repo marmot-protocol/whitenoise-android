@@ -32,6 +32,7 @@ class DisplayThumbnailInvalidationCoverageTest {
         val root = "src/main/java/dev/ipf/whitenoise/android/state/"
         val controller = appModuleSource(root + "ConversationController.kt")
         val appState = appModuleSource(root + "AppState.kt")
+        val notificationContent = appModuleSource(root + "AppStateNotificationContent.kt")
         assertTrue(
             controller
                 .substringAfter("internal suspend fun deleteMessageResult(")
@@ -39,9 +40,9 @@ class DisplayThumbnailInvalidationCoverageTest {
                 .contains("removeMessageDisplayThumbnails("),
         )
         assertTrue(
-            appState
-                .substringAfter("private fun CoroutineScope.handleNotificationContentEvent(")
-                .substringBefore("private suspend fun reconcileConversationNotificationCards(")
+            notificationContent
+                .substringAfter("private fun WhiteNoiseAppState.handleNotificationContentEvent(")
+                .substringBefore("private suspend fun WhiteNoiseAppState.reconcileConversationNotificationCards(")
                 .contains("removeMessageDisplayThumbnails("),
         )
         assertTrue(

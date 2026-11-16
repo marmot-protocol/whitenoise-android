@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerDeparture.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.toast_group_needs_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerDeparture.kt",
+        "anchor": "R.string.toast_group_needs_admin",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_leave_not_confirmed_history_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerDeparture.kt",
+        "anchor": "R.string.toast_leave_not_confirmed_history_kept",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_left_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerDeparture.kt",
+        "anchor": "R.string.toast_left_chat",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_left_chat_delete_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerDeparture.kt",
+        "anchor": "R.string.toast_left_chat_delete_failed",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_make_another_admin_before_leaving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerDeparture.kt",
+        "anchor": "R.string.toast_make_another_admin_before_leaving",
+        "test_ids": [
+          "CHL-012"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Reviewed group action context: R.string.group_action_step_down_and_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatsControllerDeparture.kt",
+        "anchor": "R.string.group_action_step_down_and_leave",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

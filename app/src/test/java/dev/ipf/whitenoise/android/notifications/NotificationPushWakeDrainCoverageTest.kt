@@ -7,6 +7,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
+private const val CONTENT_SLICE = "AppStateNotificationContent.kt"
+
 class NotificationPushWakeDrainCoverageTest {
     @Test
     fun pushWakeRuntimeStartAwaitsNotificationDrain() {
@@ -109,7 +111,8 @@ class NotificationPushWakeDrainCoverageTest {
         assertTrue(
             "notification update processing must signal push-wake drain completion",
             "signalNotificationDrain()" in postMaintenance &&
-                "notificationDrainSignals.tryEmit(notificationDrainSequence.incrementAndGet())" in appState,
+                "notificationDrainSignals.tryEmit(notificationDrainSequence.incrementAndGet())" in
+                notificationContentSource(),
         )
     }
 
@@ -276,7 +279,11 @@ class NotificationPushWakeDrainCoverageTest {
 
     private fun serviceFunctionBody(functionName: String): String = serviceSource().readText().kotlinFunctionBody(functionName)
 
-    private fun appStateFunctionBody(functionName: String): String = appStateSource().readText().kotlinFunctionBody(functionName)
+    /** Reads the named function from AppState or its notification content slice. */
+    private fun appStateFunctionBody(functionName: String): String =
+        (appStateSource().readText() + notificationContentSource()).kotlinFunctionBody(functionName)
+
+    private fun notificationContentSource(): String = File(appStateSource().parentFile, CONTENT_SLICE).readText()
 
     private fun serviceSource(): File =
         listOf(
@@ -302,7 +309,7 @@ class NotificationPushWakeDrainCoverageTest {
 
     private fun String.kotlinFunctionBody(functionName: String): String {
         val start =
-            Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")
+            Regex("""\bfun\s+(?:\w+\.)?${Regex.escape(functionName)}\s*\(""")
                 .find(this)
                 ?.range
                 ?.first

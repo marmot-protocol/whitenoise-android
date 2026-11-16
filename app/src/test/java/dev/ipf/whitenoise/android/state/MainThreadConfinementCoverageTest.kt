@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -214,7 +215,7 @@ class MainThreadConfinementCoverageTest {
     /** Reads every source file that contributes attachment-cache behavior to conversation controllers. */
     private fun controllerSources(): String =
         listOf(
-            sourceFile("ChatsController.kt").readText(),
+            chatsControllerSource(),
             conversationControllerSource(),
             sourceFile("AttachmentControllerCache.kt").readText(),
             sourceFile("ConversationAttachmentPresentation.kt").readText(),
