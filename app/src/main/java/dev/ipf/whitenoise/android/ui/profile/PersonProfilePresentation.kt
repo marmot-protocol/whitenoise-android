@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.profile
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ProfileAccountWideGroups
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.forwardTargets
 import dev.ipf.whitenoise.android.state.mergeForwardTargets
 import kotlinx.coroutines.CancellationException
 

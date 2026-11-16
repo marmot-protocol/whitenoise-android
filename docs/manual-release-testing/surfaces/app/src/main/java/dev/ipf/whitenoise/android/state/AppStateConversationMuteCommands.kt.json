@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateConversationMuteCommands.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Mute and unmute from chat-list actions and group details share one command path and one presentation owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateConversationMuteCommands.kt",
+        "anchor": "private fun WhiteNoiseAppState.submitMuteCommand(",
+        "test_ids": [
+          "GRP-015"
+        ]
+      },
+      {
+        "surface": "Unread chat mute failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateConversationMuteCommands.kt",
+        "anchor": "R.string.toast_couldnt_update_notifications",
+        "test_ids": [
+          "CHL-031"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

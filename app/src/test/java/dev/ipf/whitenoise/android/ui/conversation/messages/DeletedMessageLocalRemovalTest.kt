@@ -51,6 +51,8 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.hiddenMessageIdsInGroup
+import dev.ipf.whitenoise.android.state.hideMessageForMe
 import dev.ipf.whitenoise.android.ui.conversation.TimelineRowMessageBubble
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking

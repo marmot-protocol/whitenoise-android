@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTargets.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Forward picker requests destination members so direct-message titles fill in without reopening",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTargets.kt",
+        "anchor": "internal fun WhiteNoiseAppState.requestForwardTargetMembers(",
+        "test_ids": [
+          "MSG-010"
+        ]
+      },
+      {
+        "surface": "Share picker shows chat-list loading, load errors and retry for the active account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTargets.kt",
+        "anchor": "internal fun WhiteNoiseAppState.retryForwardTargets(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

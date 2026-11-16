@@ -108,7 +108,7 @@ class DeletedNotificationContentCoverageTest {
     /** Accepted deletions, local hides, read changes and stream opens all reach the reconciliation. */
     @Test
     fun everyRemovalSourceReachesTheRetraction() {
-        val source = source("state/AppState.kt")
+        val hiddenMessages = source("state/AppStateHiddenMessages.kt")
         val content = source("state/AppStateNotificationContent.kt")
         val receiptLoop = functionBody(content, "runMutedChatReceiptLoop")
         assertTrue("handleNotificationContentEvent(event, readReconciliations, scope = this)" in receiptLoop)
@@ -121,7 +121,7 @@ class DeletedNotificationContentCoverageTest {
         val onOpen = functionBody(content, "requestActiveCardReconciliation")
         assertTrue("activeConversationCards()" in onOpen)
         assertTrue("coordinator.request(account, group)" in onOpen)
-        assertTrue("retractNotificationContent(" in functionBody(source, "hideMessageForMe"))
+        assertTrue("retractNotificationContent(" in functionBody(hiddenMessages, "hideMessageForMe"))
         val eventBody = functionBody(content, "handleNotificationContentEvent")
         assertTrue("removedNotificationMessages(event)" in eventBody)
         assertTrue("readStateChangedConversation(event)" in eventBody)

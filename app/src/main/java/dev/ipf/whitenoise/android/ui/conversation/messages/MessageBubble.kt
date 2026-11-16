@@ -110,6 +110,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.canReportMessage
 import dev.ipf.whitenoise.android.state.dismissReports
+import dev.ipf.whitenoise.android.state.effectiveBubbleColorArgb
+import dev.ipf.whitenoise.android.state.hideMessageForMe
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportMessage
 import dev.ipf.whitenoise.android.state.reportsFor
