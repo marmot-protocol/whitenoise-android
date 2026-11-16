@@ -480,7 +480,11 @@ class SettingsContourMorphTest {
             val incoming = newlyArriving.single()
             assertEquals(incoming.target.bounds, incoming.source.bounds)
             assertEquals(incoming.target.corners, incoming.source.corners)
-            assertTrue(incoming.source.bounds.intersect(incoming.source.viewport).isEmpty)
+            assertTrue(
+                incoming.source.bounds
+                    .intersect(incoming.source.viewport)
+                    .isEmpty,
+            )
         }
     }
 

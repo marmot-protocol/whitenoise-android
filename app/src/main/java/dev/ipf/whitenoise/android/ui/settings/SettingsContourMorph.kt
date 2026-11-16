@@ -182,8 +182,8 @@ private fun interpolateSettingsContour(
         },
         width,
         List(max(a.seams.size, b.seams.size)) { index ->
-            val sa = a.seams.getOrNull(index) ?: absentSettingsSeam(b.seams[index], b, a)
-            val sb = b.seams.getOrNull(index) ?: absentSettingsSeam(a.seams[index], a, b)
+            val sa = a.seams.getOrElse(index) { absentSettingsSeam(b.seams[index], b, a) }
+            val sb = b.seams.getOrElse(index) { absentSettingsSeam(a.seams[index], a, b) }
             SettingsContourSeam(
                 lerp(sa.start, sb.start, t),
                 lerp(sa.end, sb.end, t),
