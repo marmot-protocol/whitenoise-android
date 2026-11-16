@@ -153,6 +153,15 @@
         ]
       },
       {
+        "surface": "R.string.media_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-010",
+          "MED-052"
+        ]
+      },
+      {
         "surface": "R.string.more_options",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": "R.string.more_options",
@@ -189,6 +198,15 @@
         ]
       },
       {
+        "surface": "Readable active document speech at scroll edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fadeEnabled = playback == null",
+        "test_ids": [
+          "MED-010",
+          "MED-052"
+        ]
+      },
+      {
         "surface": "Scroll boundaries: TextAttachmentReader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
         "anchor": ".fadingVerticalScroll(",
@@ -197,15 +215,6 @@
           "SCR-002",
           "SCR-003",
           "SCR-004",
-          "MED-052"
-        ]
-      },
-      {
-        "surface": "Readable active document speech at scroll edge",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
-        "anchor": "fadeEnabled = playback == null",
-        "test_ids": [
-          "MED-010",
           "MED-052"
         ]
       }
