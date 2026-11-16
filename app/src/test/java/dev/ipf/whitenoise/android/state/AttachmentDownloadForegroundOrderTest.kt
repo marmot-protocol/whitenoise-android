@@ -180,6 +180,63 @@ class AttachmentDownloadForegroundOrderTest {
             }
         }
 
+    /**
+     * A visible join made before its owner registers keeps its place: a newer visible request that registers first
+     * still goes ahead of it.
+     */
+    @Test
+    fun aLateRegisteringJoinKeepsItsDemandOrder() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val acquisitions = InFlightAttachmentAcquisitions(this, gate)
+                val release = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val holder = start(gate, "holder", started) { release.await() }
+                val older = queuedOwner(acquisitions, gate, "older", started)
+                acquisitions.acquire("older", AUTOMATIC, foreground = true) { error("a join never starts an owner") }
+                val newer = start(gate, "newer", started, foreground = true)
+                kotlinx.coroutines.yield()
+                release.complete(Unit)
+                listOf(holder, older, newer).awaitAll()
+
+                assertEquals(listOf("holder", "newer", "older"), started)
+            }
+        }
+
+    /** Closing the session drops visible demand that queued owners never consumed, so the next session starts clean. */
+    @Test
+    fun cancellingEveryOwnerDropsTheirVisibleDemand() =
+        runBlocking {
+            withTimeout(TEST_TIMEOUT) {
+                val gate = AttachmentDownloadGate(parallelism = 1)
+                val acquisitions = InFlightAttachmentAcquisitions(this, gate)
+                val release = CompletableDeferred<Unit>()
+                val started = mutableListOf<String>()
+                val holder = start(gate, "holder", started) { release.await() }
+                queuedOwner(acquisitions, gate, "image", started)
+                acquisitions.acquire("image", AUTOMATIC, foreground = true) { error("a join never starts an owner") }
+                acquisitions.cancelAll()
+                val queued = listOf(start(gate, "background", started), start(gate, "image", started))
+                release.complete(Unit)
+                (queued + holder).awaitAll()
+
+                assertEquals(listOf("holder", "background", "image"), started)
+            }
+        }
+
+    /** Starts an owner for [key] that has not yet run, so it registers with the gate only once this thread yields. */
+    private fun CoroutineScope.queuedOwner(
+        acquisitions: InFlightAttachmentAcquisitions,
+        gate: AttachmentDownloadGate,
+        key: String,
+        started: MutableList<String>,
+    ): Deferred<AttachmentAcquisitionOutcome> =
+        acquisitions.acquire(key, AUTOMATIC) {
+            gate.withPermit(key, ACCOUNT, AUTOMATIC) { started += key }
+            AttachmentAcquisitionOutcome.LegacyBytes(byteArrayOf())
+        }
+
     /** The default gate admits as many downloads at once as MarmotKit's own transfer limit. */
     @Test
     fun defaultGateMatchesMarmotKitsTransferLimit() =
@@ -215,6 +272,7 @@ class AttachmentDownloadForegroundOrderTest {
     private companion object {
         const val ACCOUNT = "account-a"
         val INTERACTIVE = AttachmentDownloadPriority.Interactive
+        val AUTOMATIC = AttachmentDownloadPriority.Automatic
         const val TEST_TIMEOUT = 5_000L
     }
 }

@@ -45,6 +45,7 @@ internal class AttachmentDownloadGate(
         var priority: AttachmentDownloadPriority,
         val admitted: CompletableDeferred<Unit> = CompletableDeferred(),
         var ownsPermit: Boolean = false,
+        var demand: Long = 0,
     ) {
         /** Whether this request is still waiting in the automatic lane. */
         val queuedAutomatic: Boolean
@@ -78,7 +79,8 @@ internal class AttachmentDownloadGate(
     private val interactive = ArrayDeque<Waiter>()
     private val keyedWaiters = KeyedWaiters()
     private val pendingPromotions = mutableSetOf<String>()
-    private val pendingForeground = mutableSetOf<String>()
+    private val pendingForeground = mutableMapOf<String, Long>()
+    private var lastForegroundDemand = 0L
     private val anonymousKey = AtomicLong()
     private var activePermits = 0
     private var consecutiveInteractiveAdmissions = 0
@@ -143,18 +145,20 @@ internal class AttachmentDownloadGate(
     /**
      * Moves a queued automatic request for [key], one a visible bubble asked for again after joining it, to the front
      * of the automatic queue. Interactive requests keep their lane, which wins except for the one automatic admission
-     * every [MAX_INTERACTIVE_BURST] taps. Joined work can exist before its owner registers here, so the demand is kept
-     * until the key registers or [forgetForeground] drops it.
+     * every [MAX_INTERACTIVE_BURST] taps. Joined work can exist before its owner registers here, so the demand is kept,
+     * with its order among visible requests, until the key registers or [forgetForeground] drops it.
      */
     fun bringForward(key: String) {
         synchronized(lock) {
+            val demand = ++lastForegroundDemand
             val waiters = keyedWaiters.forKey(key)
             if (waiters == null) {
-                pendingForeground.add(key)
+                pendingForeground[key] = demand
                 return
             }
             waiters.filter(Waiter::queuedAutomatic).forEach { waiter ->
                 automatic.remove(waiter)
+                waiter.demand = demand
                 automatic.addFirst(waiter)
             }
         }
@@ -218,6 +222,10 @@ internal class AttachmentDownloadGate(
         }
     }
 
+    /**
+     * Registers one waiter for [key] and suspends until it owns a permit. A [foreground] automatic request, or one
+     * whose key a visible bubble asked for before registration, queues by that visible demand.
+     */
     private suspend fun acquire(
         key: String,
         accountRef: String?,
@@ -227,7 +235,7 @@ internal class AttachmentDownloadGate(
         val waiter =
             synchronized(lock) {
                 val promotedBeforeRegistration = pendingPromotions.remove(key)
-                val visibleBeforeRegistration = pendingForeground.remove(key)
+                val pendingDemand = pendingForeground.remove(key)
                 val effectivePriority =
                     if (
                         priority == AttachmentDownloadPriority.Interactive ||
@@ -239,11 +247,11 @@ internal class AttachmentDownloadGate(
                     }
                 val registered = Waiter(key, accountRef, effectivePriority)
                 keyedWaiters.register(registered)
-                val toFront = foreground || visibleBeforeRegistration
-                if (toFront && effectivePriority == AttachmentDownloadPriority.Automatic) {
-                    automatic.addFirst(registered)
+                if (effectivePriority == AttachmentDownloadPriority.Automatic) {
+                    registered.demand = if (foreground) ++lastForegroundDemand else pendingDemand ?: 0
+                    queueAutomaticLocked(registered)
                 } else {
-                    lane(effectivePriority).addLast(registered)
+                    interactive.addLast(registered)
                 }
                 admitAvailableLocked()
                 registered
@@ -267,6 +275,15 @@ internal class AttachmentDownloadGate(
             }
             throw cancellation
         }
+    }
+
+    /**
+     * Keeps the automatic queue ordered newest visible demand first, then background work in arrival order. A demand
+     * made before its owner registered keeps its place among later visible requests.
+     */
+    private fun queueAutomaticLocked(waiter: Waiter) {
+        val position = automatic.indexOfFirst { it.demand < waiter.demand }
+        if (waiter.demand == 0L || position < 0) automatic.addLast(waiter) else automatic.add(position, waiter)
     }
 
     private fun release(waiter: Waiter) {

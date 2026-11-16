@@ -60,7 +60,12 @@ internal class InFlightAttachmentAcquisitions(
 
     /** Cancels and forgets every owner when the enclosing app-state session closes. */
     fun cancelAll() {
-        val owners = synchronized(lock) { entries.values.toList().also { entries.clear() } }
+        val owners =
+            synchronized(lock) {
+                // Completion handlers skip cleared entries, so drop their unconsumed visible demand here.
+                entries.keys.forEach(gate::forgetForeground)
+                entries.values.toList().also { entries.clear() }
+            }
         owners.forEach { it.cancel() }
     }
 }
