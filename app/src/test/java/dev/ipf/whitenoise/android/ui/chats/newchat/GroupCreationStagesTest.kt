@@ -1,5 +1,10 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import dev.ipf.marmotkit.GroupCreationResultFfi
+import dev.ipf.marmotkit.MemberResolutionOutcomeFfi
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AppText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -7,6 +12,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -138,13 +144,18 @@ class GroupCreationStagesTest {
             }
         }
 
-    /** Projection recovery retains the accepted ID and cannot call creation a second time. */
+    /** Partial creation retains the accepted ID and skipped notice through a failed projection and reopen. */
     @Test fun acceptedCreateThenReadFailureRetriesCanonicalGroup() =
         runTest {
             val owner = GroupCreationSession { true }
             var canonical: String? = null
             var creates = 0
             var opens = 0
+            val outcomes =
+                listOf(
+                    MemberResolutionOutcomeFfi("alice", MemberResolutionStatusFfi.SELECTED, 1u),
+                    MemberResolutionOutcomeFfi("bob", MemberResolutionStatusFfi.MISSING_KEY_PACKAGE, 0u),
+                )
             repeat(2) { attempt ->
                 val result =
                     runCatching {
@@ -153,7 +164,7 @@ class GroupCreationStagesTest {
                             createOrRetry = {
                                 canonical ?: run {
                                     creates++
-                                    "accepted"
+                                    owner.acceptCreatedGroup(GroupCreationResultFfi("accepted", outcomes)) { it }
                                 }
                             },
                             openCurrentChat = {
@@ -161,6 +172,13 @@ class GroupCreationStagesTest {
                                 opens++
                                 if (attempt == 0) error("Projection temporarily unavailable")
                                 assertEquals("accepted", it)
+                                // MDK's report wins over a roster that happens to list everyone.
+                                val skipped = owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it }
+                                assertEquals(AppText.Plain("bob"), skipped)
+                                assertEquals(
+                                    R.string.toast_some_members_not_added,
+                                    createdGroupNoticeTitle(showCreatedToast = false, skipped = skipped),
+                                )
                             },
                         )
                     }
@@ -169,6 +187,28 @@ class GroupCreationStagesTest {
             assertEquals(1, creates)
             assertEquals(2, opens)
         }
+
+    /** Without MDK's member report, the people missing from the created roster are the ones shown as not added. */
+    @Test fun unavailableMemberReportFallsBackToTheCreatedRoster() {
+        val owner = GroupCreationSession { true }
+
+        assertEquals(AppText.Plain("bob"), owner.takeSkippedMembers(SUBMITTED, listOf("self", "ALICE")) { it })
+        assertEquals(
+            AppText.Resource(R.string.group_members_not_added_count, listOf(2)),
+            owner.takeSkippedMembers(SUBMITTED, listOf("self")) { "" },
+        )
+        assertNull(owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })
+    }
+
+    /** An opened group consumes MDK's report, so a later open reads only its own roster. */
+    @Test fun openingConsumesTheCapturedReport() {
+        val owner = GroupCreationSession { true }
+        val outcomes = listOf(MemberResolutionOutcomeFfi("bob", MemberResolutionStatusFfi.MISSING_KEY_PACKAGE, 0u))
+        owner.acceptCreatedGroup(GroupCreationResultFfi("accepted", outcomes)) { it }
+
+        assertEquals(AppText.Plain("bob"), owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })
+        assertNull(owner.takeSkippedMembers(SUBMITTED, listOf("self", "alice", "bob")) { it })
+    }
 
     /** Handled native failure has no canonical ID, so projection may not run. */
     @Test fun unacceptedFailureCannotEnterOpenStage() =
@@ -184,4 +224,8 @@ class GroupCreationStagesTest {
             )
             assertEquals(listOf("create"), stages)
         }
+
+    private companion object {
+        val SUBMITTED = listOf("alice", "bob")
+    }
 }

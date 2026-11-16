@@ -303,6 +303,11 @@
     <string name="invite_message">Join me on White Noise. No phone number. No surveillance. Just real privacy. Download it here: https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">That recipient is not a valid Nostr public key. Use an npub, profile link, or hex public key.</string>
     <string name="error_group_create_failed_retry">Something went wrong while setting up encrypted chat. Check your connection and try again.</string>
+    <string name="error_no_group_members_selected">None of the selected people could be added. Ask them to check their chat setup, or edit your selection.</string>
+    <string name="error_no_group_members_selected_for">Couldn’t add %1$s. Ask them to check their chat setup, or edit your selection.</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">Couldn’t finish checking whether %1$s can be added. Check your connection, then retry.</string>
+    <string name="error_no_group_members_selected_inbox_for">Couldn’t add %1$s. They have no usable inbox relay. Ask them to check their inbox relays in White Noise settings, then retry.</string>
+    <string name="error_no_group_members_selected_update_for">Couldn’t add %1$s. Ask them to update and open White Noise, then try again.</string>
     <string name="error_chat_created_not_loaded">The chat was created, but it hasn’t appeared in your chat list yet. Try again in a moment.</string>
     <string name="remove">Remove</string>
     <string name="group_name">Group name</string>
@@ -1246,6 +1251,8 @@
     <string name="toast_invite_sent">Invite sent</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">Invite sent, but couldn\'t add admin</string>
     <string name="toast_couldnt_add_members">Couldn\'t add members</string>
+    <string name="toast_some_members_not_added">Some people weren’t added</string>
+    <string name="group_members_not_added_count">People not added (%1$d)</string>
     <string name="toast_couldnt_add_member_duplicate_detail">Couldn\'t add %1$s. They\'re already a member, or their signing key conflicts with an existing member.</string>
     <string name="toast_invites_sent_to_groups">Invites sent to selected groups</string>
     <string name="toast_invites_sent_to_groups_partial">Invites sent to some groups; some failed</string>
@@ -2592,6 +2599,8 @@
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
     <string name="error_invalid_key_package">The published chat key for this person couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
+    <string name="error_incompatible_key_package">This person’s chat key isn’t compatible. Ask them to update and open White Noise, then try again.</string>
+    <string name="error_incompatible_key_package_for">%1$s’s chat key isn’t compatible. Ask them to update and open White Noise, then try again.</string>
     <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_invite_welcome_too_large">This invitation is too large for a recipient’s inbox relays to accept. Ask them to add an inbox relay that accepts larger messages.</string>

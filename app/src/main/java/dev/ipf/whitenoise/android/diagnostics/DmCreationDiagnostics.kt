@@ -53,7 +53,9 @@ internal fun dmCreationFailure(error: Throwable): DmCreationFailure =
         is MarmotKitException.InvalidIdentity -> DmCreationFailure.INVALID_IDENTITY
         is MarmotKitException.GroupHydrationPending -> DmCreationFailure.HYDRATION_PENDING
         is MarmotKitException.DirectConversationIndexNotReady -> DmCreationFailure.INDEX_NOT_READY
-        is MarmotKitException.CreatedGroupProjectionUnavailable -> DmCreationFailure.CREATED_PROJECTION_UNAVAILABLE
+        is MarmotKitException.CreatedGroupProjectionUnavailable,
+        is MarmotKitException.CreatedGroupMemberReportUnavailable,
+        -> DmCreationFailure.CREATED_PROJECTION_UNAVAILABLE
         is MarmotKitException.Publish -> DmCreationFailure.PUBLISH
         is MarmotKitException -> DmCreationFailure.OTHER_BINDING_ERROR
         else -> DmCreationFailure.UNKNOWN

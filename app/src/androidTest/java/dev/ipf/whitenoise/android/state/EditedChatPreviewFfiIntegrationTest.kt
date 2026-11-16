@@ -48,7 +48,10 @@ class EditedChatPreviewFfiIntegrationTest {
                     val account = native.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
                     phase = "create group"
                     android.util.Log.i("EditPreviewFixture", phase)
-                    val group = native.createGroup(account.label, "Edit preview fixture", emptyList(), null)
+                    val group =
+                        native
+                            .createGroup(account.label, "Edit preview fixture", emptyList(), null)
+                            .requireCreatedGroupId()
                     phase = "send original"
                     android.util.Log.i("EditPreviewFixture", phase)
                     native.sendText(account.label, group, "Before edit")

@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.state.enforceAppOwnedAttachmentAcquisitionPoli
 import dev.ipf.whitenoise.android.state.hasNativeAttachment
 import dev.ipf.whitenoise.android.state.openNativeAttachment
 import dev.ipf.whitenoise.android.state.processNotificationUpdateForTest
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.conversation.media.TileFixtureSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -560,7 +561,10 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         val sender = runtime.createIdentity(relays, relays).also { accounts += it.label }
         val receiver = runtime.createIdentity(relays, relays).also { accounts += it.label }
         runtime.enforceAppOwnedAttachmentAcquisitionPolicy(listOf(receiver.label, sender.label))
-        val group = runtime.createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
+        val group =
+            runtime
+                .createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
+                .requireCreatedGroupId()
         ControlledAttachmentProbe.awaitReceivedGroup(runtime, receiver.label, group)
         return Triple(sender, receiver, group)
     }

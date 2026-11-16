@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.CreateGroupOptionsFfi
+import dev.ipf.marmotkit.GroupCreationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewGroupSubmission
 import kotlinx.coroutines.test.runTest
@@ -43,7 +44,7 @@ class NewChatFoundingOptionsTest {
                             @Suppress("UNCHECKED_CAST")
                             receivedMembers = arguments[2] as List<String>
                             receivedOptions = arguments[3] as CreateGroupOptionsFfi
-                            "created-group"
+                            GroupCreationResultFfi("created-group", emptyList())
                         }
                         "toString" -> "NewChatFoundingOptionsMarmotFake"
                         "hashCode" -> System.identityHashCode(proxy)
@@ -152,7 +153,7 @@ class NewChatFoundingOptionsTest {
                                 members = arguments[2] as List<String>,
                                 options = arguments[3] as CreateGroupOptionsFfi,
                             )
-                        "created-${calls.size}"
+                        GroupCreationResultFfi("created-${calls.size}", emptyList())
                     }
                     "toString" -> "NewChatFoundingOptionsMarmotFake"
                     "hashCode" -> System.identityHashCode(proxy)

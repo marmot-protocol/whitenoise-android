@@ -2,8 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.os.Build
 import android.util.Log
-import dev.ipf.marmotkit.AuditLogTrackerConfigV4Ffi
-import dev.ipf.marmotkit.AuditLogUploadSourceV4Ffi
+import dev.ipf.marmotkit.AuditLogSourceFfi
 import dev.ipf.marmotkit.AuditOtlpConfigV5Ffi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.BuildConfig
@@ -49,7 +48,7 @@ internal class AuditRuntimeReadinessMarker(
 private val processAuditRuntimeReadinessMarker =
     AuditRuntimeReadinessMarker { marker -> Log.i("WhiteNoiseAudit", marker) }
 
-/** Configures v5 delivery and keeps source metadata without a legacy v4 upload destination. */
+/** Configures consented v5 delivery and records source metadata before accounts open. */
 internal suspend fun MarmotInterface.configureAuditRuntime(uploadConsentGranted: Boolean = false) {
     setAuditOtlpConfigV5(
         auditOtlpConfigV5(
@@ -59,16 +58,11 @@ internal suspend fun MarmotInterface.configureAuditRuntime(uploadConsentGranted:
             deploymentEnvironment = BuildConfig.WHITENOISE_DEPLOYMENT_ENVIRONMENT,
         ),
     )
-    setAuditLogTrackerConfig(
-        AuditLogTrackerConfigV4Ffi(
-            endpoint = null,
-            authorizationBearerToken = null,
-            source =
-                AuditLogUploadSourceV4Ffi(
-                    hardwareModel = Build.MODEL.trim().takeIf(String::isNotEmpty),
-                    platform = "android",
-                    appVersion = BuildConfig.VERSION_NAME,
-                ),
+    setAuditLogSource(
+        AuditLogSourceFfi(
+            hardwareModel = Build.MODEL.trim().takeIf(String::isNotEmpty),
+            platform = "android",
+            appVersion = BuildConfig.VERSION_NAME,
         ),
     )
     // Build configuration never substitutes for an explicit disclosure acknowledgement.

@@ -121,7 +121,7 @@ class DmAbandonmentAndroidTest {
         owner: AccountSummaryFfi,
         peer: AccountSummaryFfi,
     ): String {
-        val groupIdHex = native.createGroup(owner.label, "", listOf(peer.accountIdHex), null)
+        val groupIdHex = native.createGroup(owner.label, "", listOf(peer.accountIdHex), null).requireCreatedGroupId()
         while (native.chatListRow(owner.label, groupIdHex)?.conversationKind != ChatConversationKindFfi.DIRECT) {
             delay(POLL_MS)
         }

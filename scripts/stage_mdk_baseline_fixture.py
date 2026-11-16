@@ -5,9 +5,9 @@ import shutil
 import sys
 
 
-BASELINE = '827687ba7fdbb05ec1b8f17667ad919fedde7266'
-# Qualification sources whose MarmotKit API differs on the baseline, swapped in after the copy. The 0.15.0 baseline
-# and 0.16.0 candidate share every type these sources use, so none is needed now.
+BASELINE = 'a2e0558a634bbd20607cdd5afb93abc6220ee58d'
+# Qualification sources whose MarmotKit API differs on the baseline, swapped in after the copy. The 0.16.0 baseline
+# returns a group ID directly while the 0.17.0 candidate returns a member report.
 OVERLAY = Path('scripts/mdk-baseline-overlay')
 
 

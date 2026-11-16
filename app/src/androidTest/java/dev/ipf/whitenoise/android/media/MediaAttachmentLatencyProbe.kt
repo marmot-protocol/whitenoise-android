@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.conversation.media.decodeMessageAttachmentImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -91,7 +92,10 @@ class MediaAttachmentLatencyProbe {
                 withTimeout(900_000L) {
                     marmot.start()
                     val account = marmot.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
-                    val group = marmot.createGroup(account.label, "Media size measurement", emptyList(), null)
+                    val group =
+                        marmot
+                            .createGroup(account.label, "Media size measurement", emptyList(), null)
+                            .requireCreatedGroupId()
                     val includeNearLimit =
                         InstrumentationRegistry.getArguments().getString("allowNearLimitMediaProbe") == "true"
                     MediaProbeSize.entries
@@ -254,7 +258,10 @@ class MediaAttachmentLatencyProbe {
                 withTimeout(600_000L) {
                     marmot.start()
                     val account = marmot.createIdentity(MarmotClient.bootstrapRelays, MarmotClient.bootstrapRelays)
-                    val group = marmot.createGroup(account.label, "Media measurement", emptyList(), null)
+                    val group =
+                        marmot
+                            .createGroup(account.label, "Media measurement", emptyList(), null)
+                            .requireCreatedGroupId()
                     val images = List(16) { syntheticImage(seed = 42 + it) }
                     val attachments =
                         images.mapIndexed { index, bytes ->
