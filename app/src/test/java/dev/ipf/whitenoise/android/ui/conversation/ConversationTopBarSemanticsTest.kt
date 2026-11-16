@@ -222,9 +222,9 @@ class ConversationTopBarSemanticsTest {
     @Test fun headerWithOneShortcutDark() = shortcutHeader("one_dark", listOf(HeaderShortcut.Search), dark = true)
 
     /** Two shortcuts keep the person's order and leave the title its width. */
-    @Test fun headerWithTwoShortcutsLight() = shortcutHeader("two_light", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search))
+    @Test fun headerWithTwoShortcutsLight() = shortcutHeader("two_light", BOTH_SHORTCUTS)
 
-    @Test fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search), dark = true)
+    @Test fun headerWithTwoShortcutsDark() = shortcutHeader("two_dark", BOTH_SHORTCUTS, dark = true)
 
     /** A narrow window at double font keeps two shortcuts, the members line and the tappable timer badge on screen. */
     @Test
@@ -429,9 +429,8 @@ class ConversationTopBarSemanticsTest {
         val controller = ConversationController(appState, group().copy(disappearingMessageSecs = 86_400uL))
         controller.members = (1..3).map { AppGroupMemberRecordFfi("0$it" + "00".repeat(31), ACCOUNT_REF, it == 1) }
         controller.membersLoaded = true
-        val shortcuts = listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search)
         render(appState, controller, fontScale = 2f, rtl = rtl, onTimerClick = {}, actions = {
-            ConversationHeaderShortcuts(shortcuts, muteControl(appState), onSearch = {})
+            ConversationHeaderShortcuts(BOTH_SHORTCUTS, muteControl(appState), onSearch = {})
         })
         composeRule.onNodeWithTag(CONVERSATION_HEADER_TIMER_BUTTON_TAG).assertHasClickAction()
         composeRule
@@ -534,5 +533,6 @@ class ConversationTopBarSemanticsTest {
         const val OPEN_DETAILS_DESCRIPTION = "Open group details"
         val ACCOUNT_ID = "01" + "00".repeat(31)
         val GROUP_ID = "04" + "00".repeat(31)
+        val BOTH_SHORTCUTS = listOf(HeaderShortcut.MuteUnmute, HeaderShortcut.Search)
     }
 }
