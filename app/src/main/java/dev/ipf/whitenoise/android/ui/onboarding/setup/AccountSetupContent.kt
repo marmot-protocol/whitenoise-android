@@ -311,7 +311,7 @@ private fun SetupStepFindings(
     if (step.step == OnboardingStepFfi.PROFILE || snapshot.proposal?.step == step.step) return
     val directRemovalEndpoint = state.directRemovalEndpoint()
     val deviceStep = step.step == OnboardingStepFfi.SINGLE_DEVICE
-    // A dated device notice states the finding with its date, so MDK's undated restatement is left out.
+    // A dated device notice states the finding with its date, so MDK's row keeps only its endpoint and provenance.
     val datedDeviceNotice =
         deviceStep &&
             remember(snapshot.singleDeviceNotice) {
@@ -322,13 +322,15 @@ private fun SetupStepFindings(
         .distinct()
         .filterNot { finding ->
             val routineDeviceNotice = deviceStep && state.routineDeviceNotice
-            val restatedByNotice = datedDeviceNotice && finding.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE
             val directRemovalFinding =
                 directRemovalEndpoint != null &&
                     finding.issue == OnboardingIssueFfi.RETIRED_RELAY &&
                     finding.endpoint == directRemovalEndpoint
-            routineDeviceNotice || restatedByNotice || directRemovalFinding
-        }.forEach { SetupFindingContent(it) }
+            routineDeviceNotice || directRemovalFinding
+        }.forEach { finding ->
+            val restatedByNotice = datedDeviceNotice && finding.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE
+            SetupFindingContent(finding, showTitle = !restatedByNotice)
+        }
 }
 
 /** Distinguishes a saved cancellation from an approved publication that must finish before cancellation. */

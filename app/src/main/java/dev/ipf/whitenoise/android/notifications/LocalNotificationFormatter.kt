@@ -519,7 +519,7 @@ object LocalNotificationFormatter {
 
     /**
      * The invitation's body names only its group, never who invited, so an unaccepted stranger's name or key never
-     * reaches the lock screen; without a group name it asks the user to open the app.
+     * reaches the lock screen, and without a group name it asks the user to open the app.
      */
     private fun inviteBody(
         update: NotificationUpdateFfi,

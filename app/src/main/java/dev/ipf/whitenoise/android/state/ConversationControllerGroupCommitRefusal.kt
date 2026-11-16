@@ -25,7 +25,7 @@ internal suspend fun ConversationController.readGroupCommitRefusal(
     return if (delivery.isSuccess) delivery.getOrNull()?.refusedRelays.orEmpty() else null
 }
 
-/** Publishes [refused] as this chat's refusal banner; an empty list also clears an earlier dismissal failure. */
+/** Publishes [refused] as this chat's refusal banner, and an empty list also clears an earlier dismissal failure. */
 internal fun ConversationController.publishGroupCommitRefusal(refused: List<GroupCommitRefusedRelayFfi>) {
     groupCommitRefusal.refusedRelays = refused
     if (refused.isEmpty()) groupCommitRefusal.dismissFailure = null

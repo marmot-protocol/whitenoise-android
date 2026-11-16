@@ -13,7 +13,7 @@ import dev.ipf.marmotkit.GroupCommitRefusedRelayFfi
  * and blocks further group changes meanwhile.
  */
 internal class GroupCommitRefusalState {
-    /** The refusing relays from the latest successful read; a failed read keeps the previous answer. */
+    /** The refusing relays from the latest successful read, a failed read keeps the previous answer. */
     var refusedRelays by mutableStateOf<List<GroupCommitRefusedRelayFfi>>(emptyList())
         internal set
 
@@ -26,9 +26,9 @@ internal class GroupCommitRefusalState {
     var dismissFailure by mutableStateOf<Int?>(null)
         internal set
 
-    /** Test seam for MDK's commit-delivery read; null reads through the runtime. */
+    /** Test seam for MDK's commit-delivery read, null reads through the runtime. */
     internal var deliveryReader: (suspend (String, String) -> GroupCommitDeliveryFfi?)? = null
 
-    /** Test seam for MDK's acknowledgement of the refusal; null acknowledges through the runtime. */
+    /** Test seam for MDK's acknowledgement of the refusal, null acknowledges through the runtime. */
     internal var acknowledger: (suspend (String, String) -> Boolean)? = null
 }

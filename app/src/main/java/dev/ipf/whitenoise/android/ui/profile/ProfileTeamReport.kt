@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.profile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.whitenoise.android.state.TeamReportOutcome
 import dev.ipf.whitenoise.android.state.ToastMessage
@@ -12,15 +11,30 @@ import dev.ipf.whitenoise.android.state.reportToTeam
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReportAudience
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReportFormState
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReportMessageSheet
-import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val PROFILE_TEAM_REPORT_ACTION_TAG = "person_profile.team_report"
 
 /**
+ * The profile's report to the White Noise team, held by the profile rather than the sheet, so dismissing and reopening
+ * the sheet cannot start a second report while one is sending, and an answer after dismissal is still shown.
+ */
+internal class ProfileTeamReportState {
+    var open by mutableStateOf(false)
+    var sending by mutableStateOf(false)
+    var error by mutableStateOf<Int?>(null)
+
+    /** Closes the sheet and forgets its last error. */
+    fun close() {
+        open = false
+        error = null
+    }
+}
+
+/**
  * Privately reports the person at [targetHex] to the White Noise team from [accountRef]. A failure keeps the sheet
  * open with its reason so the reader can retry, or is shown as feedback when the reader already dismissed it. Nothing
- * is posted in any chat, a second tap while sending does nothing, and a late answer after [canAct] turns false is
- * dropped.
+ * is posted in any chat, a second submit while one is sending does nothing, and a late answer after [canAct] turns
+ * false is dropped.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -29,47 +43,46 @@ internal fun ProfileTeamReportSheet(
     accountRef: String,
     targetHex: String,
     canAct: () -> Boolean,
-    onClose: () -> Unit,
+    state: ProfileTeamReportState,
     onFeedback: (ToastMessage?) -> Unit,
 ) {
-    var sending by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<Int?>(null) }
-    // Outlives the sheet, so an answer that lands after the reader dismissed it is still shown.
-    val dismissed = remember { AtomicBoolean(false) }
     ReportMessageSheet(
-        onDismissRequest = {
-            dismissed.set(true)
-            onClose()
-        },
+        onDismissRequest = state::close,
         onSubmit = submit@{ reason, explanation ->
-            if (sending) return@submit
-            sending = true
-            error = null
+            if (state.sending) return@submit
+            state.sending = true
+            state.error = null
             appState.launchMutation {
                 try {
                     val outcome = appState.reportToTeam(accountRef, targetHex, reason, explanation)
-                    if (canAct()) {
-                        when (outcome) {
-                            is TeamReportOutcome.Accepted -> {
-                                onClose()
-                                appState.present(outcome.message)
-                                onFeedback(appState.toast)
-                            }
-                            is TeamReportOutcome.Failed ->
-                                if (dismissed.get()) {
-                                    appState.present(outcome.message)
-                                    onFeedback(appState.toast)
-                                } else {
-                                    error = outcome.message
-                                }
-                        }
-                    }
+                    if (canAct()) presentProfileReportOutcome(appState, state, outcome, onFeedback)
                 } finally {
-                    sending = false
+                    state.sending = false
                 }
             }
         },
         audience = ReportAudience.TeamProfile,
-        form = ReportFormState(sending, error = error),
+        form = ReportFormState(state.sending, error = state.error),
     )
+}
+
+/** Closes the sheet on success, keeps a failure on an open sheet, and shows it as feedback once dismissed. */
+private fun presentProfileReportOutcome(
+    appState: WhiteNoiseAppState,
+    state: ProfileTeamReportState,
+    outcome: TeamReportOutcome,
+    onFeedback: (ToastMessage?) -> Unit,
+) {
+    val message =
+        when (outcome) {
+            is TeamReportOutcome.Accepted -> outcome.message
+            is TeamReportOutcome.Failed -> outcome.message
+        }
+    if (outcome is TeamReportOutcome.Failed && state.open) {
+        state.error = message
+    } else {
+        state.close()
+        appState.present(message)
+        onFeedback(appState.toast)
+    }
 }

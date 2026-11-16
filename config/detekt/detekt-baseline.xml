@@ -744,7 +744,6 @@
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$fun</ID>
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$group != null &amp;&amp; !update.isDm -&gt; text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)</ID>
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$private fun inviteTitle: String</ID>
-    <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$text(context, R.string.notification_sender_invited_you_to_group, "%1\$s invited you to %2\$s", sender, group)</ID>
     <ID>MaxLineLength:LocalNotificationFormatterTest.kt:LocalNotificationFormatterTest$val redacted = LocalNotificationFormatter.redactedContent(content, appName = "White Noise", body = "New notification")</ID>
     <ID>MaxLineLength:LocalNotificationPolicy.kt:LocalNotificationPolicy$conversationNotifyMode: (accountRef: String, groupIdHex: String) -&gt; ChatNotifyMode = { _, _ -&gt; ChatNotifyMode.ALL }</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$.</ID>

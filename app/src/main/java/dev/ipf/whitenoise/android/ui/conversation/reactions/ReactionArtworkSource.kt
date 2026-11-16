@@ -27,7 +27,7 @@ internal fun interface ReactionArtworkSource {
     suspend fun load(reactionMessageIdHex: String): EmojiArt?
 }
 
-/** The open conversation's reaction artwork; null outside a conversation, where pills stay literal text. */
+/** The open conversation's reaction artwork, null outside a conversation, where pills stay literal text. */
 internal val LocalReactionArtworkSource = staticCompositionLocalOf<ReactionArtworkSource?> { null }
 
 /**

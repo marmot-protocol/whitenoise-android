@@ -105,14 +105,17 @@ class AccountSetupDeviceStepTest {
         composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
     }
 
-    /** Beside MDK's own finding in an error state, a dated notice still names the day, and says it only once. */
+    /** In an error state a dated notice names the day once, and MDK's finding keeps its endpoint, not its sentence. */
     @Test
     fun aDatedNoticeKeepsItsDateBesideTheFinding() {
         val snapshot = foundSignInsSnapshot()
         snapshot.singleDeviceNotice =
             setupDeviceNotice(OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE, listOf(NOON_UTC_2026_03_15))
+        snapshot.steps.first { it.step == OnboardingStepFfi.SINGLE_DEVICE }.findings =
+            listOf(setupFinding(OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE, DEVICE_ENDPOINT))
         show(AccountSetupState(snapshot = snapshot, error = true))
         composeRule.onNodeWithText("$FOUND_ON_DATE_PREFIX March 15, 2026.").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(DEVICE_ENDPOINT).performScrollTo().assertIsDisplayed()
         composeRule.onAllNodesWithText(FOUND_NOTE).assertCountEquals(0)
     }
 
@@ -147,5 +150,6 @@ class AccountSetupDeviceStepTest {
                 "and chats in that app won’t appear here."
         const val NOON_UTC_2025_11_02 = 1_762_084_800uL
         const val NOON_UTC_2026_03_15 = 1_773_576_000uL
+        const val DEVICE_ENDPOINT = "wss://device.example"
     }
 }

@@ -511,7 +511,7 @@ internal fun ProfileSheet(
     var blocked by remember(npub) { mutableStateOf<Boolean?>(null) }
     var blockBusy by remember(npub) { mutableStateOf(false) }
     var feedback by remember(npub) { mutableStateOf<ToastMessage?>(null) }
-    var teamReportOpen by remember(npub) { mutableStateOf(false) }
+    val teamReport = remember(npub) { ProfileTeamReportState() }
     LaunchedEffect(copied) {
         if (copied) {
             delay(PROFILE_COPY_FEEDBACK_MILLIS)
@@ -896,7 +896,7 @@ internal fun ProfileSheet(
             },
             onTeamReport =
                 if (hex != null && !targetIsSelf && appState.teamReportingAvailable) {
-                    { if (owner.canAct()) teamReportOpen = true }
+                    { if (owner.canAct()) teamReport.open = true }
                 } else {
                     null
                 },
@@ -1166,13 +1166,13 @@ internal fun ProfileSheet(
     }
 
     val reportTarget = hex
-    if (teamReportOpen && reportTarget != null && accountAtOpen != null) {
+    if (teamReport.open && reportTarget != null && accountAtOpen != null) {
         ProfileTeamReportSheet(
             appState = appState,
             accountRef = accountAtOpen,
             targetHex = reportTarget,
             canAct = owner::canAct,
-            onClose = { teamReportOpen = false },
+            state = teamReport,
             onFeedback = { feedback = it },
         )
     }

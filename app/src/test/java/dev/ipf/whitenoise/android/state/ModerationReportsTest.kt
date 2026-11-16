@@ -70,7 +70,7 @@ class ModerationReportsTest {
             )
         }
 
-    /** Only a relay's acceptance reads as sent; a queued or unconfirmed report says it is still on its way. */
+    /** Only a relay's acceptance reads as sent, a queued or unconfirmed report says it is still on its way. */
     @Test
     fun eachDispositionSaysWhetherARelayHasIt() {
         assertEquals(R.string.report_team_sent, teamReportAcceptedMessage(SendAcceptDispositionFfi.PUBLISHED))

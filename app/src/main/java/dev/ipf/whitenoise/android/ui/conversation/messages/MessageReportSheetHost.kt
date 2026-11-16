@@ -105,54 +105,61 @@ internal class MessageReportSends(
 )
 
 /**
- * Sends the group report unless the group already has it, then the team copy, and says what each achieved. Once the
- * group has the report it stays recorded until the report finishes, so neither a locked retry nor a reopened,
- * team-only sheet sends it to the group again.
+ * Sends the group report unless the group already has it, then the team copy, and says what each achieved. The
+ * group's answer is recorded as soon as it arrives, before the team copy, and it stays recorded until the report
+ * finishes, so neither a locked retry, a reopened team-only sheet, nor a recreated bubble sends it to the group again.
  */
 internal suspend fun MessageBubbleSurfaceState.sendReport(
     team: ReportTeamChoice,
     sends: MessageReportSends,
 ) {
-    val groupResult = if (team.reachesGroup) reportGroupResult ?: sends.group() else null
+    val recorded = reportGroupResult
+    val sheetGeneration = reportSheetGeneration
+    val groupResult = if (team.reachesGroup) recorded ?: sends.group() else null
     if (team.reachesGroup && groupResult == null || !team.reachesTeam) {
         finishReport()
         groupResult?.let { sends.present(it, null) }
         return
     }
+    if (groupResult != null) reportGroupResult = groupResult
     when (val outcome = sends.team()) {
         is TeamReportOutcome.Accepted -> {
             finishReport()
             sends.present(groupResult, outcome.message)
         }
-        is TeamReportOutcome.Failed -> keepTeamCopyForRetry(groupResult, outcome.message, sends.present)
+        is TeamReportOutcome.Failed -> {
+            val firstGroupAnswer = groupResult.takeIf { recorded == null }
+            val sameSheet = reportSheetOpen && reportSheetGeneration == sheetGeneration
+            keepTeamCopyForRetry(groupResult, firstGroupAnswer, outcome.message, sameSheet, sends.present)
+        }
     }
 }
 
 /**
- * Keeps the sheet open after the team copy failed. A group answer that arrived with this send locks the sheet to
- * that report, and one recorded by an earlier send is never forgotten, so the group never gets the report twice. The
- * group's answer is shown once, when it first arrives, and a failure after the reader dismissed the sheet is shown
- * instead of being kept for a sheet nobody sees.
+ * Keeps the report open after the team copy failed. On the sheet that sent it, a recorded group answer locks the
+ * form to that report so a retry sends only the copy. When the reader dismissed that sheet meanwhile, even if they
+ * reopened one, a single notice says what the group took and that the copy failed, and a reopened sheet stays an
+ * unlocked team-only report. The group's answer is shown once, when it first arrives.
  */
 private fun MessageBubbleSurfaceState.keepTeamCopyForRetry(
     @StringRes groupResult: Int?,
+    @StringRes firstGroupAnswer: Int?,
     @StringRes failure: Int,
+    sameSheet: Boolean,
     present: (Int?, Int?) -> Unit,
 ) {
-    if (reportGroupResult == null && groupResult != null) present(groupResult, null)
-    reportGroupResult = groupResult ?: reportGroupResult
     val error =
         if (reportGroupResult != null && failure == R.string.report_team_failed) {
             R.string.report_team_copy_failed
         } else {
             failure
         }
-    if (reportSheetOpen) {
+    if (sameSheet) {
+        firstGroupAnswer?.let { present(it, null) }
         reportCopyPending = groupResult != null
         reportError = error
     } else {
-        // The reader dismissed the sheet while it was sending, so the failure is shown instead.
-        present(null, error)
+        present(firstGroupAnswer, error)
     }
 }
 

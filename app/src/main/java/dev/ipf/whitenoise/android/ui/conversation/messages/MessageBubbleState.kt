@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MessageReportRegistry
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.MarkdownLinkLayoutRegistry
@@ -38,18 +39,18 @@ internal fun rememberMessageBubbleSurfaces(
     remember(controller, item.presentationId) {
         val chat = "${controller.conversationAccountRef}|${controller.group.groupIdHex}"
         val reportKey = "$chat|${item.record.messageIdHex}"
-        MessageBubbleSurfaceState(appState.runtimeMirrors.groupReports, reportKey)
+        MessageBubbleSurfaceState(appState.runtimeMirrors.messageReports, reportKey)
     }
 
 /**
- * Sheet, dialog and in-flight flags for one message, reset together when the message id changes. A group report the
- * group already took lives in [groupReports] under [reportKey], which outlives this bubble, so scrolling away or
- * recreating the screen cannot make the group receive the same report twice.
+ * Sheet, dialog and in-flight flags for one message, reset together when the message id changes. A report still
+ * sending, and the group's answer once the group took it, live in [reports] under [reportKey], which outlives this
+ * bubble, so scrolling away or recreating the screen cannot make the group receive the same report twice.
  */
 @Stable
 internal class MessageBubbleSurfaceState(
-    private val groupReports: MutableMap<String, Int> = mutableStateMapOf(),
-    private val reportKey: String = "",
+    private val reports: MessageReportRegistry,
+    private val reportKey: String,
 ) {
     var emojiPickerOpen by mutableStateOf(false)
     var bodyExceedsCollapseLimit by mutableStateOf(false)
@@ -70,16 +71,23 @@ internal class MessageBubbleSurfaceState(
     var messageShareInFlight by mutableStateOf(false)
     var messageShareJob by mutableStateOf<Job?>(null)
     var reportSheetOpen by mutableStateOf(false)
-    var reportInFlight by mutableStateOf(false)
+    var reportInFlight: Boolean
+        get() = reports.inFlight[reportKey] == true
+        set(value) {
+            if (value) reports.inFlight[reportKey] = true else reports.inFlight.remove(reportKey)
+        }
 
-    /** Whether a group report also sends the White Noise team a copy; on unless the reader turns it off. */
+    /** Bumped whenever the report sheet closes, so a late answer can tell whether its own sheet is still open. */
+    var reportSheetGeneration by mutableIntStateOf(0)
+
+    /** Whether a group report also sends the White Noise team a copy, on unless the reader turns it off. */
     var reportToTeam by mutableStateOf(true)
 
     /** The group's answer once it has the report, kept until the report finishes so the group never gets it twice. */
     var reportGroupResult: Int?
-        get() = groupReports[reportKey]
+        get() = reports.groupResults[reportKey]
         set(value) {
-            if (value == null) groupReports.remove(reportKey) else groupReports[reportKey] = value
+            if (value == null) reports.groupResults.remove(reportKey) else reports.groupResults[reportKey] = value
         }
 
     /** Whether the open sheet is retrying only a failed team copy, with the group's report already sent. */
@@ -91,6 +99,7 @@ internal class MessageBubbleSurfaceState(
     /** Closes the report sheet. A group report already sent is remembered, so reopening offers only the team copy. */
     fun closeReport() {
         reportSheetOpen = false
+        reportSheetGeneration += 1
         reportToTeam = true
         reportCopyPending = false
         reportError = null

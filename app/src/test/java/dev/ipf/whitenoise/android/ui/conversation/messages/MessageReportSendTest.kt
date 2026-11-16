@@ -1,7 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.MessageReportRegistry
 import dev.ipf.whitenoise.android.state.TeamReportOutcome
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -11,7 +15,8 @@ import org.junit.Test
 
 /** A message report reaches the group at most once, however its White Noise copy fails, retries or is reopened. */
 class MessageReportSendTest {
-    private val surfaces = MessageBubbleSurfaceState().apply { reportSheetOpen = true }
+    private val registry = MessageReportRegistry()
+    private val surfaces = MessageBubbleSurfaceState(registry, KEY).apply { reportSheetOpen = true }
     private var groupSends = 0
     private val teamAnswers = ArrayDeque<TeamReportOutcome>()
     private val presented = mutableListOf<Pair<Int?, Int?>>()
@@ -84,32 +89,59 @@ class MessageReportSendTest {
     @Test
     fun aGroupReportOutlivesTheBubbleThatSentIt() =
         runBlocking {
-            val shared = mutableMapOf<String, Int>()
-            val first = MessageBubbleSurfaceState(shared, "account|group|message")
             teamAnswers += listOf(FAILED, ACCEPTED)
-            first.reportSheetOpen = true
-            first.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), sends)
-            first.closeReport()
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), sends)
+            surfaces.closeReport()
 
-            val recreated = MessageBubbleSurfaceState(shared, "account|group|message")
+            val recreated = MessageBubbleSurfaceState(registry, KEY)
             val audience = recreated.effectiveReportAudience(ReportAudience.GroupAndTeam)
             recreated.sendReport(ReportTeamChoice(audience), sends)
 
             assertEquals(ReportAudience.TeamMessage, audience)
             assertEquals(1, groupSends)
-            assertTrue(shared.isEmpty())
+            assertTrue(registry.groupResults.isEmpty())
         }
 
-    /** A team copy that fails after the reader dismissed the sheet is shown, not kept for a sheet nobody sees. */
+    /** While the team copy is still sending, a recreated bubble sees the report in flight and the group's answer. */
     @Test
-    fun aFailureAfterDismissalIsShown() =
+    fun aBubbleRecreatedMidSendCannotReportToTheGroupAgain() =
+        runBlocking {
+            val teamAnswer = CompletableDeferred<TeamReportOutcome>()
+            val slowTeam =
+                MessageReportSends(group = sends.group, team = { teamAnswer.await() }, present = sends.present)
+            surfaces.reportInFlight = true
+            val first =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), slowTeam)
+                }
+
+            val recreated = MessageBubbleSurfaceState(registry, KEY)
+
+            assertTrue(recreated.reportInFlight)
+            assertEquals(ReportAudience.TeamMessage, recreated.effectiveReportAudience(ReportAudience.GroupAndTeam))
+            teamAnswer.complete(ACCEPTED)
+            first.await()
+            assertEquals(1, groupSends)
+        }
+
+    /** A team copy that fails after the reader dismissed the sheet is shown in one notice with the group's answer. */
+    @Test
+    fun aFailureAfterDismissalIsShownWithTheGroupAnswer() =
         runBlocking {
             teamAnswers += FAILED
-            surfaces.reportSheetOpen = false
+            val slowTeam =
+                MessageReportSends(
+                    group = sends.group,
+                    team = {
+                        surfaces.closeReport()
+                        teamAnswers.removeFirst()
+                    },
+                    present = sends.present,
+                )
 
-            send(ReportAudience.GroupAndTeam)
+            surfaces.sendReport(ReportTeamChoice(ReportAudience.GroupAndTeam), slowTeam)
 
-            assertEquals(null to R.string.report_team_copy_failed, presented.last())
+            assertEquals(listOf(R.string.report_message_sent to R.string.report_team_copy_failed), presented)
             assertFalse(surfaces.reportCopyPending)
             assertEquals(ReportAudience.TeamMessage, surfaces.effectiveReportAudience(ReportAudience.GroupAndTeam))
         }
@@ -120,6 +152,7 @@ class MessageReportSendTest {
     }
 
     private companion object {
+        const val KEY = "account|group|message"
         val FAILED = TeamReportOutcome.Failed(R.string.report_team_failed)
         val ACCEPTED = TeamReportOutcome.Accepted(R.string.report_team_sent)
     }

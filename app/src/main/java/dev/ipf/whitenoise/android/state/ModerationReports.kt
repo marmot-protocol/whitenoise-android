@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.MarmotKitException
@@ -38,6 +39,15 @@ internal fun teamReportAcceptedMessage(disposition: SendAcceptDispositionFfi): I
  */
 internal class TeamReportingMirror {
     var available: Boolean? by mutableStateOf(null)
+}
+
+/**
+ * Message reports that outlive the bubble that sent them, keyed by account, group and message: whether one is still
+ * sending, and the group's answer once the group took it, until the report finishes.
+ */
+internal class MessageReportRegistry {
+    val groupResults: MutableMap<String, Int> = mutableStateMapOf()
+    val inFlight: MutableMap<String, Boolean> = mutableStateMapOf()
 }
 
 /** Whether report actions may offer the White Noise team: false until MDK has confirmed the destination. */

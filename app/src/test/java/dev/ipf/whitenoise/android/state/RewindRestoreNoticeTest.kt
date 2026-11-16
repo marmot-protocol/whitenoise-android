@@ -19,7 +19,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class RewindRestoreNoticeTest {
-    /** Only a rewind-restore quarantine maps to the notice; other reasons and events are ignored. */
+    /** Only a rewind-restore quarantine maps to the notice, other reasons and events are ignored. */
     @Test
     fun onlyARewindRestoreQuarantineMaps() {
         assertEquals(

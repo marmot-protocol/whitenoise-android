@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.BlockListSnapshotFfi
@@ -27,8 +26,7 @@ internal class RuntimeMirrors(
     val teamReporting: TeamReportingMirror = TeamReportingMirror(),
     /** Chats already told a rewind restore failed, per account, so a repeat is not shown twice. Main thread only. */
     val shownRewindRestoreFailures: ShownQueuedRefusals = ShownQueuedRefusals(),
-    /** Group reports whose White Noise copy is still owed, by account, group and message, until the report finishes. */
-    val groupReports: MutableMap<String, Int> = mutableStateMapOf(),
+    val messageReports: MessageReportRegistry = MessageReportRegistry(),
 )
 
 /** Outcome of a block or unblock request, as the UI must present it. */

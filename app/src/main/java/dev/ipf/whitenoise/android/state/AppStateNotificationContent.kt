@@ -44,7 +44,6 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 private const val NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS = 1_000L
 private const val NOTIFICATION_CANDIDATE_PAGE_LIMIT = 30u
@@ -387,7 +386,7 @@ private suspend fun WhiteNoiseAppState.readNotificationCandidateState(
  * Whether [groupIdHex] is an invitation [accountRef] has not accepted. Only a chat-list [row] that says pending is
  * considered, and it is confirmed with the group record, because the row can lag an Accept and the first message after
  * accepting must still ring. No row, or a failed confirmation, counts as accepted, as before this check. MDK should
- * withhold these notifications itself; this guard can go once it does.
+ * withhold these notifications itself (mdk#3469), and this guard can go once it does.
  */
 private suspend fun WhiteNoiseAppState.unacceptedInvite(
     accountRef: String,
@@ -401,17 +400,37 @@ private suspend fun WhiteNoiseAppState.unacceptedInvite(
             ?.pendingConfirmation == true
 
 /**
- * [unacceptedInvite] for an update the read state does not govern, such as a reaction or an admin change, bounded
- * like the governed reads. A read that times out or fails lets the update ring, as it did before this check.
+ * [unacceptedInvite] for an update the read state does not govern, such as a reaction or an admin change. The
+ * blocking chat-row read runs through [WhiteNoiseAppState.notificationCandidateReads], like the governed reads, so
+ * the serial listener stops waiting after [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS] even while the binding still runs.
+ * A read that times out or fails lets the update ring, as it did before this check.
  */
-private suspend fun WhiteNoiseAppState.unacceptedInviteWithinBudget(update: NotificationUpdateFfi): Boolean =
-    withTimeoutOrNull(NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS) {
-        val row =
-            runCatchingCancellable {
-                marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(update.accountRef, update.groupIdHex) }
-            }.getOrNull()
-        unacceptedInvite(update.accountRef, update.groupIdHex, row)
-    } == true
+private suspend fun WhiteNoiseAppState.unacceptedInviteWithinBudget(update: NotificationUpdateFfi): Boolean {
+    val key =
+        NotificationCandidateReadKey(
+            update.accountRef,
+            update.groupIdHex.lowercase(),
+            PENDING_INVITE_READ,
+            notificationPostEpoch.capture(),
+            profileCacheLifetime.capture(),
+        )
+    val state =
+        runCatchingCancellable {
+            notificationCandidateReads.read(key, NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS) {
+                val row =
+                    marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(update.accountRef, update.groupIdHex) }
+                if (unacceptedInvite(update.accountRef, update.groupIdHex, row)) {
+                    NotificationCandidateState.PendingInvite
+                } else {
+                    NotificationCandidateState.Unread
+                }
+            }
+        }.getOrNull()
+    return state == NotificationCandidateState.PendingInvite
+}
+
+/** The read key's message slot for a group's pending-invite check, which no message id can collide with. */
+private const val PENDING_INVITE_READ = "pending-invite"
 
 /** The conversation's latest bounded timeline page, the same window notification preparation reads. */
 private suspend fun WhiteNoiseAppState.notificationTimelinePage(
