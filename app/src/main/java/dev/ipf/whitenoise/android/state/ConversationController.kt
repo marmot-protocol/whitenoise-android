@@ -2742,11 +2742,10 @@ class ConversationController(
                 }
                 result
             }
-            // Same capability model the delete surface renders from; re-checked
-            // here so the mutation path stays authoritative even if a stale or
-            // forged UI state requests an unauthorized scope. Also makes repeat
-            // requests idempotent: once the optimistic tombstone is set, the
-            // capability reads alreadyDeleted and the second call is a no-op.
+            // Same capability model the delete surface renders from; re-checked here so the mutation path stays
+            // authoritative even if a stale or forged UI state requests an unauthorized scope. Also makes repeat
+            // requests idempotent: once the optimistic tombstone is set, the capability reads alreadyDeleted and
+            // the second call is a no-op.
             !deleteCapabilityFor(message).canDeleteForEveryone ->
                 Result.failure(SecurityException("Delete capability unavailable"))
             else -> {
