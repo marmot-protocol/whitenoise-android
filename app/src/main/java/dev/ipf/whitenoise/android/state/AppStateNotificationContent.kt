@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.ui.graphics.asAndroidBitmap
+import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EventsSubscription
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
@@ -297,9 +298,11 @@ private fun WhiteNoiseAppState.isQueuedReactionQuoteCurrent(
 
 /**
  * Reads MDK's durable state for one message candidate right before it may alert or be enriched (#2065, #3323).
- * Only incoming timeline messages are governed: reactions, invites and membership events always pass. A read,
- * deleted or hidden candidate is withheld. A read that fails or exceeds its bounded time is retried once, and a
- * state that still cannot be read is [NotificationCandidateState.Unknown]: the first write is withheld, because a
+ * Only incoming timeline messages are governed by the read state: reactions, invites and membership events pass,
+ * except that nothing but the invitation itself rings for a group this account has not accepted, since MDK still
+ * emits that group's messages and admin changes. A read, deleted or hidden candidate is withheld. A read that fails
+ * or exceeds its bounded time is retried once, and a state that still cannot be read is
+ * [NotificationCandidateState.Unknown]: the first write is withheld, because a
  * stale alert is worse than a missed one, while enrichment of an already-posted card proceeds. The outcome is
  * logged without identifiers or content.
  */
@@ -312,7 +315,10 @@ private suspend fun WhiteNoiseAppState.notificationCandidateGate(
         update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
             !update.isFromSelf &&
             !LocalNotificationFormatter.isReaction(update)
-    if (!governed || messageIdHex == null) return NotificationCandidateState.Unread
+    if (!governed || messageIdHex == null) {
+        val invitation = update.trigger == NotificationTriggerFfi.GROUP_INVITE
+        return if (invitation) NotificationCandidateState.Unread else pendingInviteState(update)
+    }
     val state =
         if (notificationContentInvalidations.isRemoved(update.accountRef, update.groupIdHex, messageIdHex)) {
             NotificationCandidateState.Removed
@@ -354,7 +360,9 @@ private suspend fun WhiteNoiseAppState.readNotificationCandidateStateWithinBudge
  * Resolves one governed candidate from its hidden mark, chat-list row and timeline record, off main. The record
  * is always looked up, first in the latest page and then in the wider reconciliation page, so a deletion MDK
  * already accepted is honoured even when nothing has been read yet or the removal mark did not survive a restart.
+ * A message in a group this account has not accepted is withheld before its timeline is read.
  */
+@Suppress("ReturnCount") // Hidden, pending-invite and read-state outcomes each end the lookup at a different read.
 private suspend fun WhiteNoiseAppState.readNotificationCandidateState(
     update: NotificationUpdateFfi,
     messageIdHex: String,
@@ -363,6 +371,9 @@ private suspend fun WhiteNoiseAppState.readNotificationCandidateState(
         withContext(Dispatchers.IO) { hiddenMessageIdsInGroup(update.accountRef, update.groupIdHex) }
     if (hidden.any { it.equals(messageIdHex, ignoreCase = true) }) return NotificationCandidateState.Removed
     val row = marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(update.accountRef, update.groupIdHex) }
+    // A message whose pending state cannot be confirmed still rings, so the first message after an Accept is kept.
+    val pendingInvite = unacceptedInvite(update.accountRef, update.groupIdHex, row) == true
+    if (pendingInvite) return NotificationCandidateState.PendingInvite
     val latest = notificationTimelinePage(update.accountRef, update.groupIdHex)
     val page =
         if (latest.any { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }) {
@@ -372,6 +383,58 @@ private suspend fun WhiteNoiseAppState.readNotificationCandidateState(
         }
     return notificationCandidateState(messageIdHex, row, page)
 }
+
+/**
+ * Whether [groupIdHex] is an invitation [accountRef] has not accepted. Only a chat-list [row] that says pending is
+ * considered, and it is confirmed with the group record, because the row can lag an Accept and the first message after
+ * accepting must still ring. No row, or a failed confirmation, counts as accepted, as before this check. MDK should
+ * withhold these notifications itself (mdk#3469), and this guard can go once it does.
+ */
+private suspend fun WhiteNoiseAppState.unacceptedInvite(
+    accountRef: String,
+    groupIdHex: String,
+    row: ChatListRowFfi?,
+): Boolean? {
+    if (row?.pendingConfirmation != true) return false
+    val details = runCatchingCancellable { marmotIo { groupDetails(accountRef, groupIdHex) } }.getOrNull()
+    return details?.group?.pendingConfirmation
+}
+
+/**
+ * [unacceptedInvite] for an update the read state does not govern, such as a reaction or an admin change. The
+ * blocking chat-row read runs through its own [PendingInviteReads] coordinator, so the serial listener stops waiting
+ * after [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS] even while the binding still runs, and an abandoned invite read never
+ * holds the slot a message's read-state check needs. A row that says pending but whose group record cannot be read
+ * withholds the update as [NotificationCandidateState.Unknown]. A read that times out lets the update ring, as it did
+ * before this check.
+ */
+private suspend fun WhiteNoiseAppState.pendingInviteState(update: NotificationUpdateFfi): NotificationCandidateState {
+    val key =
+        NotificationCandidateReadKey(
+            update.accountRef,
+            update.groupIdHex.lowercase(),
+            PENDING_INVITE_READ,
+            notificationPostEpoch.capture(),
+            profileCacheLifetime.capture(),
+        )
+    val reads = runtimeMirrors.pendingInviteReads.coordinator(notificationScope)
+    val state =
+        runCatchingCancellable {
+            reads.read(key, NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS) {
+                val row =
+                    marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(update.accountRef, update.groupIdHex) }
+                when (unacceptedInvite(update.accountRef, update.groupIdHex, row)) {
+                    true -> NotificationCandidateState.PendingInvite
+                    null -> NotificationCandidateState.Unknown
+                    false -> NotificationCandidateState.Unread
+                }
+            }
+        }.getOrNull()
+    return state ?: NotificationCandidateState.Unread
+}
+
+/** The read key's message slot for a group's pending-invite check, which no message id can collide with. */
+private const val PENDING_INVITE_READ = "pending-invite"
 
 /** The conversation's latest bounded timeline page, the same window notification preparation reads. */
 private suspend fun WhiteNoiseAppState.notificationTimelinePage(
@@ -1000,7 +1063,10 @@ private suspend fun WhiteNoiseAppState.measureNotificationCandidateGate(update: 
         result =
             when (state) {
                 NotificationCandidateState.Unread -> PerformanceResult.SUCCESS
-                NotificationCandidateState.Read, NotificationCandidateState.Removed -> PerformanceResult.DROPPED
+                NotificationCandidateState.Read,
+                NotificationCandidateState.Removed,
+                NotificationCandidateState.PendingInvite,
+                -> PerformanceResult.DROPPED
                 NotificationCandidateState.Unknown -> PerformanceResult.FAILURE
             },
         layer = PerformanceLayer.ANDROID,
@@ -1178,7 +1244,8 @@ internal fun WhiteNoiseAppState.launchNotificationListenerLoop(): Job =
  * as supervised children of this loop, so they end with it, and a failing one is logged without cancelling the
  * loop or the notification listener above it. The same stream carries MDK's accepted deletions, so each event
  * also retracts removed notification content, and each open reconciles the cards already shown (#3323). It also
- * tells the active account when MDK drops a queued group change for size, which nothing else surfaces.
+ * tells the active account when MDK drops a queued group change for size, which nothing else surfaces, and tells
+ * any signed-in account once when a chat could not return to its latest state and needs a restart.
  */
 internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
     marmot: MarmotInterface,
@@ -1209,6 +1276,12 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                 // read-state workers: a newer open marks a blocked pass dirty and retains its latest follow-up.
                 runCatchingCancellable { requestActiveCardReconciliation(readReconciliations) }
                     .onFailure { appStateDebug(it) { "notification reconcile failed" } }
+                // A chat whose restore failed before this stream opened still tells the user to restart.
+                launch {
+                    rewindRestoreFailuresOnOpen(marmot).forEach { failure ->
+                        launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
+                    }
+                }
                 runCatchingCancellable {
                     var event = subscription.next()
                     while (event != null) {
@@ -1217,6 +1290,10 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                         // MDK drops an oversized queued group change without retrying it, so the user is told.
                         queuedSizeRefusal(event)?.let { refusal ->
                             launch(Dispatchers.Main) { presentQueuedSizeRefusal(refusal) }
+                        }
+                        // A chat MDK could not return to its latest state needs a full restart to retry.
+                        rewindRestoreFailure(event)?.let { failure ->
+                            launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
                         }
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the

@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
         "anchor": "fun ReportMessageSheet(",
         "test_ids": [
-          "MSG-016"
+          "MSG-016",
+          "ACC-002"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
         "anchor": "fun ReportReasonRow(",
         "test_ids": [
-          "MSG-016"
+          "MSG-016",
+          "ACC-002"
         ]
       },
       {
@@ -25,7 +27,8 @@
         "anchor": "fun ReportMessageForm(",
         "test_ids": [
           "MSG-016",
-          "PRO-010"
+          "PRO-010",
+          "ACC-002"
         ]
       },
       {
@@ -33,7 +36,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
         "anchor": "fun ReportMessageBody(",
         "test_ids": [
-          "MSG-016"
+          "MSG-016",
+          "ACC-002"
         ]
       },
       {
@@ -42,6 +46,24 @@
         "anchor": "fun ReportMessageDragHandle(",
         "test_ids": [
           "MSG-016"
+        ]
+      },
+      {
+        "surface": "ReportTeamSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportTeamSection(",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ReportDetail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportDetail(",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
         ]
       }
     ],
@@ -84,6 +106,47 @@
         "anchor": "R.string.dismiss",
         "test_ids": [
           "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_team_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_team_action",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "string:report_team_send_toggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_team_send_toggle",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_team_message_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_team_message_detail",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_team_profile_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_team_profile_detail",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "string:report_team_explanation_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_team_explanation_hint",
+        "test_ids": [
+          "MSG-016",
+          "ACC-002"
         ]
       }
     ]

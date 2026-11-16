@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">向 White Noise 团队举报</string>
+    <string name="report_team_send_toggle">发送给 White Noise</string>
+    <string name="report_team_message_detail">你的举报和发送者的公钥会私密地发送给 White Noise 团队。消息本身不会被分享，发送者也不会收到通知。</string>
+    <string name="report_team_profile_detail">你的举报和此人的公钥会私密地发送给 White Noise 团队。不会分享任何消息，此人也不会收到通知。</string>
+    <string name="report_team_explanation_hint">White Noise 团队需要了解的信息（可选）</string>
+    <string name="report_team_sent">已发送给 White Noise 团队。</string>
+    <string name="report_team_queued">已保存，等待发送给 White Noise 团队。</string>
+    <string name="report_team_pending">已保存；发送给 White Noise 团队的投递正在等待确认。</string>
+    <string name="report_team_copy_failed">未能将副本发送给 White Noise。请重试。</string>
+    <string name="report_team_failed">未能将举报发送给 White Noise 团队。请重试。</string>
+    <string name="report_team_rate_limited">此账号的举报过多。请稍后再试。</string>
+</resources>

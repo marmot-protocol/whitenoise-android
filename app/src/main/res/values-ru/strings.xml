@@ -304,6 +304,8 @@
     <string name="jump_to_newest">К новым</string>
     <string name="scroll_to_top">Прокрутить вверх</string>
     <string name="discard_failed_message">Удалить неотправленное сообщение</string>
+    <string name="message_discard_still_sending">Это сообщение ещё отправляется. Повторите попытку чуть позже.</string>
+    <string name="message_discard_not_failed">Это сообщение больше нельзя удалить.</string>
     <string name="decline">Отклонить</string>
     <string name="accept">Принять</string>
     <string name="invited_as_account">Приглашённый аккаунт: %1$s</string>
@@ -846,8 +848,8 @@
     <string name="notification_sent_voice_message">Отправлено голосовое сообщение</string>
     <string name="notification_sent_file">Отправлен файл</string>
     <string name="notification_sender_in_group">%1$s в %2$s</string>
-    <string name="notification_invite_from_sender">Приглашение от %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s пригласил(а) вас в %2$s</string>
+    <string name="notification_invitation_to_group">Приглашение в %1$s</string>
+    <string name="notification_open_to_view_invite">Откройте White Noise, чтобы просмотреть приглашение</string>
     <string name="notification_removed_from_group">Вас удалили из группы «%1$s»</string>
     <string name="notification_removed_from_unnamed_group">Вас удалили из группы</string>
     <string name="notification_made_admin_of_group">Теперь вы администратор группы «%1$s»</string>
@@ -2097,10 +2099,14 @@
     <string name="setup_continue_without_profile">Продолжить без профиля</string>
     <string name="setup_review_suggested_changes">Просмотрите предлагаемые изменения</string>
     <string name="setup_chats_on_this_device">Чаты на этом устройстве</string>
-    <string name="setup_chats_on_this_device_help">Сам по себе вход не восстанавливает ваши существующие чаты и сообщения. Если вы пользуетесь другим устройством, сохраните на нём приложение и данные, пока не проверите свои чаты здесь.</string>
+    <string name="setup_device_none_found">Мы не нашли ключи для сообщений из другого приложения или с другого устройства.</string>
+    <string name="setup_device_unchecked">Не удалось проверить, использует ли этот аккаунт другое приложение или устройство для сообщений.</string>
+    <string name="setup_device_found_on_date">Мы нашли ключи для сообщений, которые этот аккаунт опубликовал из другого приложения или с другого устройства, последние — %1$s.</string>
+    <string name="setup_device_found">Мы нашли ключи для сообщений, которые этот аккаунт опубликовал из другого приложения или с другого устройства.</string>
+    <string name="setup_device_separate_chats">На этом устройстве будут свои, отдельные чаты. Чаты в другом приложении останутся там и здесь не появятся.</string>
+    <string name="setup_device_new_chats_either_app">Когда кто-то начнёт с вами новый чат, он может прийти в любое из двух приложений.</string>
+    <string name="setup_device_separate_chats_if_other_app">Если вы пользуетесь другим приложением для сообщений, на этом устройстве будут свои, отдельные чаты, а чаты из того приложения здесь не появятся.</string>
     <string name="setup_device_stage">Использование устройства</string>
-    <string name="setup_other_sign_ins_found">Найдены другие записи о входе. Они могут относиться к другой установке или к более ранней.</string>
-    <string name="setup_other_sign_ins_unchecked">Не удалось проверить другие входы.</string>
     <string name="setup_approval_saved_pending">Ваше одобрение сохранено. Изменение все еще ожидается.</string>
     <string name="setup_profile_scope_help">Это обновит ваш профиль в других приложениях Nostr.</string>
     <string name="setup_optional_profile_help">Необязательно. Профиль можно добавить позже.</string>
@@ -2628,6 +2634,24 @@
     <string name="group_change_undelivered_message">Ваше последнее изменение в этой группе ещё не дошло до всех её реле. Если вы продолжите, участники, которые используют только эти реле, могут потерять связь с группой. Подождать или всё равно продолжить?</string>
     <string name="group_change_wait">Подождать</string>
     <string name="group_change_continue_anyway">Всё равно продолжить</string>
+    <string name="group_change_refused_title">Реле отклонило ваше последнее изменение</string>
+    <string name="group_change_refused_message">Как минимум одно реле этой группы окончательно отклонило ваше последнее изменение. Если вы продолжите, участники, которые используют только это реле, могут не получить его и потерять связь с группой. Ожидание не поможет. Продолжение также скроет предупреждение в этом чате.</string>
+    <string name="group_commit_refused_title">Изменение группы отклонено</string>
+    <string name="group_commit_refused_relay_too_large">%1$s отклонил ваше изменение группы, потому что оно слишком большое. Участники, которые используют только этот ретранслятор, могут его не получить.</string>
+    <string name="group_commit_refused_relay">%1$s отклонил ваше изменение группы. Участники, которые используют только этот ретранслятор, могут его не получить.</string>
+    <string name="group_commit_refusal_dismiss_failed">Не удалось скрыть это предупреждение. Попробуйте ещё раз.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d ретранслятор отклонил ваше изменение группы, потому что оно слишком большое. Участники, которые используют только этот ретранслятор, могут его не получить.</item>
+        <item quantity="few">Ретрансляторов, отклонивших ваше изменение группы из‑за его размера: %1$d. Участники, которые используют только эти ретрансляторы, могут его не получить.</item>
+        <item quantity="many">Ретрансляторов, отклонивших ваше изменение группы из‑за его размера: %1$d. Участники, которые используют только эти ретрансляторы, могут его не получить.</item>
+        <item quantity="other">Ретрансляторов, отклонивших ваше изменение группы из‑за его размера: %1$d. Участники, которые используют только эти ретрансляторы, могут его не получить.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d ретранслятор отклонил ваше изменение группы. Участники, которые используют только этот ретранслятор, могут его не получить.</item>
+        <item quantity="few">Ретрансляторов, отклонивших ваше изменение группы: %1$d. Участники, которые используют только эти ретрансляторы, могут его не получить.</item>
+        <item quantity="many">Ретрансляторов, отклонивших ваше изменение группы: %1$d. Участники, которые используют только эти ретрансляторы, могут его не получить.</item>
+        <item quantity="other">Ретрансляторов, отклонивших ваше изменение группы: %1$d. Участники, которые используют только эти ретрансляторы, могут его не получить.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Всё равно пригласить</string>
     <string name="starting_as">Начать от имени</string>
     <string name="starting_as_account">Начать от имени %1$s</string>

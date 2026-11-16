@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">Report to White Noise team</string>
+    <string name="report_team_send_toggle">Send to White Noise</string>
+    <string name="report_team_message_detail">Your report and the sender’s public key are sent privately to the White Noise team. The message itself isn’t shared, and the sender isn’t notified.</string>
+    <string name="report_team_profile_detail">Your report and this person’s public key are sent privately to the White Noise team. No messages are shared, and this person isn’t notified.</string>
+    <string name="report_team_explanation_hint">Anything the White Noise team should know (optional)</string>
+    <string name="report_team_sent">Sent to the White Noise team.</string>
+    <string name="report_team_queued">Saved and waiting to send to the White Noise team.</string>
+    <string name="report_team_pending">Saved; delivery to the White Noise team is pending confirmation.</string>
+    <string name="report_team_copy_failed">The copy to White Noise couldn’t be sent. Try again.</string>
+    <string name="report_team_failed">Couldn’t send the report to the White Noise team. Try again.</string>
+    <string name="report_team_rate_limited">Too many reports from this account. Try again later.</string>
+</resources>

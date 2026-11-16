@@ -265,6 +265,8 @@
     <string name="jump_to_newest">跳至最新</string>
     <string name="scroll_to_top">捲動到頂部</string>
     <string name="discard_failed_message">捨棄發送失敗的訊息</string>
+    <string name="message_discard_still_sending">此訊息仍在傳送中。請稍後再試一次。</string>
+    <string name="message_discard_not_failed">此訊息已無法捨棄。</string>
     <string name="decline">拒絕</string>
     <string name="accept">接受</string>
     <string name="invited_as_account">受邀帳號：%1$s</string>
@@ -793,8 +795,8 @@
     <string name="notification_sent_voice_message">傳送了一則語音訊息</string>
     <string name="notification_sent_file">傳送了一個檔案</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
-    <string name="notification_invite_from_sender">來自 %1$s 的邀請</string>
-    <string name="notification_sender_invited_you_to_group">%1$s 邀請你加入 %2$s</string>
+    <string name="notification_invitation_to_group">邀請加入%1$s</string>
+    <string name="notification_open_to_view_invite">開啟 White Noise 查看邀請</string>
     <string name="notification_removed_from_group">你已被移出「%1$s」</string>
     <string name="notification_removed_from_unnamed_group">你已被移出群組</string>
     <string name="notification_made_admin_of_group">你已成為「%1$s」的管理員</string>
@@ -1989,10 +1991,14 @@
     <string name="setup_continue_without_profile">不新增個人檔案，繼續</string>
     <string name="setup_review_suggested_changes">檢查建議的變更</string>
     <string name="setup_chats_on_this_device">此裝置上的聊天</string>
-    <string name="setup_chats_on_this_device_help">僅登入不會還原你現有的聊天或訊息。如果你使用另一台裝置，請保留該裝置上的 App 和資料，直到你在這裡檢查過聊天。</string>
+    <string name="setup_device_none_found">我們沒有發現來自其他 App 或裝置的訊息金鑰。</string>
+    <string name="setup_device_unchecked">我們無法確認此帳號是否在其他 App 或裝置上收發訊息。</string>
+    <string name="setup_device_found_on_date">我們發現此帳號曾從其他 App 或裝置發佈訊息金鑰，最近一次發佈於 %1$s。</string>
+    <string name="setup_device_found">我們發現此帳號曾從其他 App 或裝置發佈訊息金鑰。</string>
+    <string name="setup_device_separate_chats">此裝置將擁有自己獨立的聊天。另一個 App 中的聊天會留在那裡，不會顯示在這裡。</string>
+    <string name="setup_device_new_chats_either_app">當有人與你開始新的聊天時，聊天可能出現在任一 App 中。</string>
+    <string name="setup_device_separate_chats_if_other_app">如果你使用其他 App 收發訊息，此裝置將擁有自己獨立的聊天，那個 App 中的聊天不會顯示在這裡。</string>
     <string name="setup_device_stage">裝置使用</string>
-    <string name="setup_other_sign_ins_found">發現了其他登入記錄。它們可能屬於另一處安裝或較早的安裝。</string>
-    <string name="setup_other_sign_ins_unchecked">無法檢查其他登入。</string>
     <string name="setup_approval_saved_pending">你的核准已儲存。變更仍待處理。</string>
     <string name="setup_profile_scope_help">這會更新你在其他 Nostr 應用程式中的個人檔案。</string>
     <string name="setup_optional_profile_help">可選。你可以稍後新增個人檔案。</string>
@@ -2506,6 +2512,20 @@
     <string name="group_change_undelivered_message">你對此群組的上一次變更尚未到達其所有中繼。如果繼續，只使用這些中繼的成員可能無法繼續跟上群組。等待，還是仍要繼續？</string>
     <string name="group_change_wait">等待</string>
     <string name="group_change_continue_anyway">仍要繼續</string>
+    <string name="group_change_refused_title">有中繼拒絕了你的上一次變更</string>
+    <string name="group_change_refused_message">此群組至少有一個中繼永久拒絕了你的上一次變更。如果繼續，只使用該中繼的成員可能收不到它，也可能無法繼續跟上群組。等待無法解決此問題。繼續也會關閉此聊天中的警告。</string>
+    <string name="group_commit_refused_title">群組變更遭拒絕</string>
+    <string name="group_commit_refused_relay_too_large">%1$s 因你所做的群組變更過大而拒絕了它。只使用該中繼的成員可能收不到此變更。</string>
+    <string name="group_commit_refused_relay">%1$s 拒絕了你所做的群組變更。只使用該中繼的成員可能收不到此變更。</string>
+    <string name="group_commit_refusal_dismiss_failed">無法關閉此警告。請再試一次。</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d 個中繼因你所做的群組變更過大而拒絕了它。只使用這些中繼的成員可能收不到此變更。</item>
+        <item quantity="other">%1$d 個中繼因你所做的群組變更過大而拒絕了它。只使用這些中繼的成員可能收不到此變更。</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d 個中繼拒絕了你所做的群組變更。只使用這些中繼的成員可能收不到此變更。</item>
+        <item quantity="other">%1$d 個中繼拒絕了你所做的群組變更。只使用這些中繼的成員可能收不到此變更。</item>
+    </plurals>
     <string name="group_change_invite_anyway">仍要邀請</string>
     <string name="starting_as">以此身分發起</string>
     <string name="starting_as_account">以 %1$s 的身分發起</string>

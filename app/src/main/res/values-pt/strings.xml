@@ -280,6 +280,8 @@
     <string name="jump_to_newest">Ir para a mais recente</string>
     <string name="scroll_to_top">Rolar para o topo</string>
     <string name="discard_failed_message">Descartar mensagem com falha</string>
+    <string name="message_discard_still_sending">Esta mensagem ainda está sendo enviada. Tente novamente em instantes.</string>
+    <string name="message_discard_not_failed">Esta mensagem não pode mais ser descartada.</string>
     <string name="decline">Recusar</string>
     <string name="accept">Aceitar</string>
     <string name="invited_as_account">Conta convidada: %1$s</string>
@@ -810,8 +812,8 @@
     <string name="notification_sent_voice_message">enviou uma mensagem de voz</string>
     <string name="notification_sent_file">enviou um arquivo</string>
     <string name="notification_sender_in_group">%1$s em %2$s</string>
-    <string name="notification_invite_from_sender">Convite de %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s convidou você para %2$s</string>
+    <string name="notification_invitation_to_group">Convite para %1$s</string>
+    <string name="notification_open_to_view_invite">Abra o White Noise para ver o convite</string>
     <string name="notification_removed_from_group">Você foi removido de %1$s</string>
     <string name="notification_removed_from_unnamed_group">Você foi removido de um grupo</string>
     <string name="notification_made_admin_of_group">Agora você é administrador de %1$s</string>
@@ -2028,10 +2030,14 @@
     <string name="setup_continue_without_profile">Continuar sem perfil</string>
     <string name="setup_review_suggested_changes">Revisar as alterações sugeridas</string>
     <string name="setup_chats_on_this_device">Conversas neste dispositivo</string>
-    <string name="setup_chats_on_this_device_help">Entrar, por si só, não restaura suas conversas nem mensagens existentes. Se você usa outro dispositivo, mantenha o app e os dados dele até verificar suas conversas aqui.</string>
+    <string name="setup_device_none_found">Não encontramos chaves de mensagens de outro app ou dispositivo.</string>
+    <string name="setup_device_unchecked">Não foi possível verificar se esta conta usa outro app ou outro dispositivo para mensagens.</string>
+    <string name="setup_device_found_on_date">Encontramos chaves de mensagens que esta conta publicou a partir de outro app ou dispositivo, as mais recentes em %1$s.</string>
+    <string name="setup_device_found">Encontramos chaves de mensagens que esta conta publicou a partir de outro app ou dispositivo.</string>
+    <string name="setup_device_separate_chats">Este dispositivo terá suas próprias conversas, separadas. As conversas do outro app continuam lá e não aparecerão aqui.</string>
+    <string name="setup_device_new_chats_either_app">Quando alguém iniciar uma nova conversa com você, ela pode chegar em qualquer um dos dois apps.</string>
+    <string name="setup_device_separate_chats_if_other_app">Se você usa outro app para mensagens, este dispositivo terá suas próprias conversas, separadas, e as conversas desse app não aparecerão aqui.</string>
     <string name="setup_device_stage">Uso do dispositivo</string>
-    <string name="setup_other_sign_ins_found">Foram encontrados outros registros de entrada. Eles podem pertencer a outra instalação ou a uma anterior.</string>
-    <string name="setup_other_sign_ins_unchecked">Não foi possível verificar outras entradas.</string>
     <string name="setup_approval_saved_pending">Sua aprovação está salva. A mudança ainda está pendente.</string>
     <string name="setup_profile_scope_help">Isso atualiza seu perfil em outros aplicativos Nostr.</string>
     <string name="setup_optional_profile_help">Opcional. Você pode adicionar um perfil mais tarde.</string>
@@ -2549,6 +2555,20 @@
     <string name="group_change_undelivered_message">Sua última alteração neste grupo ainda não chegou a todos os seus relays. Se você continuar, membros que usam apenas esses relays podem não conseguir acompanhar o grupo. Aguardar ou continuar mesmo assim?</string>
     <string name="group_change_wait">Aguardar</string>
     <string name="group_change_continue_anyway">Continuar mesmo assim</string>
+    <string name="group_change_refused_title">Um relay recusou sua última alteração</string>
+    <string name="group_change_refused_message">Pelo menos um relay deste grupo recusou definitivamente sua última alteração. Se você continuar, membros que usam apenas esse relay podem não recebê-la nem conseguir acompanhar o grupo. Aguardar não vai resolver. Continuar também dispensa o aviso nesta conversa.</string>
+    <string name="group_commit_refused_title">Alteração do grupo recusada</string>
+    <string name="group_commit_refused_relay_too_large">%1$s recusou uma alteração do grupo que você fez porque ela era grande demais. Membros que usam apenas esse relay podem não recebê-la.</string>
+    <string name="group_commit_refused_relay">%1$s recusou uma alteração do grupo que você fez. Membros que usam apenas esse relay podem não recebê-la.</string>
+    <string name="group_commit_refusal_dismiss_failed">Não foi possível dispensar este aviso. Tente outra vez.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d relay recusou uma alteração do grupo que você fez porque ela era grande demais. Membros que usam apenas esse relay podem não recebê-la.</item>
+        <item quantity="other">%1$d relays recusaram uma alteração do grupo que você fez porque ela era grande demais. Membros que usam apenas esses relays podem não recebê-la.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d relay recusou uma alteração do grupo que você fez. Membros que usam apenas esse relay podem não recebê-la.</item>
+        <item quantity="other">%1$d relays recusaram uma alteração do grupo que você fez. Membros que usam apenas esses relays podem não recebê-la.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Convidar mesmo assim</string>
     <string name="starting_as">Iniciar como</string>
     <string name="starting_as_account">Iniciar como %1$s</string>

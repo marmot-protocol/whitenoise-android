@@ -316,6 +316,18 @@ class GroupChangeAdmissionTest {
         assertEquals(R.string.group_change_continue_anyway, undelivered.third)
     }
 
+    /** A relay's lasting refusal swaps the undelivered wording for the refusal's, leaving catching up untouched. */
+    @Test
+    fun aLastingRefusalGetsItsOwnUndeliveredWording() {
+        val refused = groupChangeConfirmationText(GroupChangeCaution.Undelivered, invite = false, refused = true)
+        val catchingUp = groupChangeConfirmationText(GroupChangeCaution.CatchingUp, invite = false, refused = true)
+
+        assertEquals(R.string.group_change_refused_title, refused.first)
+        assertEquals(R.string.group_change_refused_message, refused.second)
+        assertEquals(R.string.group_change_continue_anyway, refused.third)
+        assertEquals(R.string.group_change_catching_up_message, catchingUp.second)
+    }
+
     /** A change that fails with each of [refusals] in turn, then returns "done", counting its attempts. */
     private class Scripted(
         private val refusals: List<MarmotKitException>,

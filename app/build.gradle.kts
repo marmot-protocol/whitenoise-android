@@ -398,6 +398,13 @@ android {
         buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "false")
         buildConfigField("boolean", "STARTUP_DIAGNOSTICS_ENABLED", "false")
         buildConfigField("String", "MARMOT_SOURCE_SHA", requiredMarmotKitProperty("mdk-sha").asBuildConfigString())
+        // The White Noise team's staging reports key, which every environment but production reports to. Production
+        // overrides it below, so test reports never reach the production moderation queue.
+        buildConfigField(
+            "String",
+            "WHITENOISE_MODERATION_REPORT_PUBKEY",
+            "npub1vnlg8lzm48f3awy0lqqhff66rzaxxyqf85twvyrnj6ycjtfy47rsk52fml".asBuildConfigString(),
+        )
         buildConfigField(
             "String",
             "MDK_SHORT_SHA",
@@ -553,6 +560,11 @@ android {
                 runtimeConfigProperty("WHITENOISE_AUDIT_OTLP_AUTH_TOKEN").asBuildConfigString(),
             )
             buildConfigField("String", "WHITENOISE_DEPLOYMENT_ENVIRONMENT", "production".asBuildConfigString())
+            buildConfigField(
+                "String",
+                "WHITENOISE_MODERATION_REPORT_PUBKEY",
+                "npub1cwlgauttl8fr3va4gy0sawq62sjt8hrz4wc200pvkrz6fjdj7tlseeq8rl".asBuildConfigString(),
+            )
             // MarmotKit requires a tenant resource value; deploymentEnvironment
             // carries the actual flavor for the shared metrics token.
             buildConfigField(

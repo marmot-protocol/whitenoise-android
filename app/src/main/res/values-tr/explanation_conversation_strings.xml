@@ -57,6 +57,6 @@
     <string name="explanation_message_action_share">Bu mesajla Android paylaşım menüsünü açar. Seçtiğiniz uygulama mesajı alır ve White Noise dışındadır.</string>
     <string name="explanation_message_action_save">Bu mesajın eklerini cihazınıza kaydeder.</string>
     <string name="explanation_message_action_info">Bu mesajın ne zaman gönderildiğini ve alındığını, kimin gönderdiğini, kimliğini ve durumunu gösterir.</string>
-    <string name="explanation_message_action_report">Grup yöneticileri için bir bildirim formu açar. Onaylamadan hiçbir şey gönderilmez ve yöneticiler bildirenin kim olduğunu görür.</string>
+    <string name="explanation_message_action_report">Bu grubun yöneticileri, White Noise ekibi veya her ikisi için bir bildirim formu açar. Siz onaylayana kadar hiçbir şey gönderilmez.</string>
     <string name="explanation_message_action_delete">Bu mesajı yalnızca bu cihazdan veya herkes için silmenizi sağlar. Herkes için silme geri alınamaz. Siz seçmeden hiçbir şey silinmez.</string>
 </resources>

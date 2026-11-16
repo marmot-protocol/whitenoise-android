@@ -66,6 +66,30 @@
         "test_ids": [
           "GRP-032"
         ]
+      },
+      {
+        "surface": "Lasting relay refusal caution title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_refused_title",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Lasting relay refusal caution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.group_change_refused_message",
+        "test_ids": [
+          "GRP-032"
+        ]
+      },
+      {
+        "surface": "Cancel instead of waiting on a lasting refusal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupChangeConfirmationDialog.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "GRP-032"
+        ]
       }
     ],
     "composable_surfaces": [

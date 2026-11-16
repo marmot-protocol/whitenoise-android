@@ -216,9 +216,15 @@ internal fun SetupDetails(state: AccountSetupState) {
     }
 }
 
-/** Keeps the affected endpoint beside its finding, including before the user opens diagnostic details. */
+/**
+ * Keeps the affected endpoint beside its finding, including before the user opens diagnostic details. Without
+ * [showTitle] only the endpoint and provenance show, for a finding whose sentence the screen already states.
+ */
 @Composable
-internal fun SetupFindingContent(finding: OnboardingFindingFfi) {
+internal fun SetupFindingContent(
+    finding: OnboardingFindingFfi,
+    showTitle: Boolean = true,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSm),
@@ -235,11 +241,13 @@ internal fun SetupFindingContent(finding: OnboardingFindingFfi) {
                 )
             }
             SetupFindingEvidence(finding)
-            Text(
-                stringResource(setupFindingTitle(finding.issue)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (showTitle) {
+                Text(
+                    stringResource(setupFindingTitle(finding.issue)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
