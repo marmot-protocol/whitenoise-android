@@ -155,6 +155,7 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
+import dev.ipf.whitenoise.android.state.removeForMeResult
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.sendSticker
@@ -4100,7 +4101,8 @@ internal fun ConversationScreen(
                         deleteForEveryone = { record ->
                             controller.deleteMessageResult(record, presentFailure = false)
                         },
-                        hideLocally = controller::hideMessageForMeResult,
+                        // A failed send goes through MDK's discard; anything else is hidden on this device.
+                        hideLocally = controller::removeForMeResult,
                         onOutcome = completedOutcomes::add,
                     )
                 val retryState =

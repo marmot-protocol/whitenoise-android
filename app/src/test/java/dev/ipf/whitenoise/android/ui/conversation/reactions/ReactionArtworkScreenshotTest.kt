@@ -53,7 +53,7 @@ class ReactionArtworkScreenshotTest {
     @Test
     fun eachReactionDrawsItsOwnArtworkLargeRtl() = capture(Theme.LARGE_RTL)
 
-    /** Only shortcode pills with a reaction id ask for artwork, once per reaction. */
+    /** Only shortcode pills ask for artwork, each from its own reaction, and a Unicode emoji never asks. */
     @Test
     fun onlyShortcodeReactionsAskForArtwork() {
         val asked = mutableListOf<String>()

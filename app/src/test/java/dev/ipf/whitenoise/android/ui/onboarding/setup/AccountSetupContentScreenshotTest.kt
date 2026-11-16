@@ -417,7 +417,7 @@ class AccountSetupContentScreenshotTest {
                         it.singleDeviceNotice =
                             setupDeviceNotice(
                                 OnboardingDeviceDiscoveryFfi.OTHER_INSTALLATION_POSSIBLE,
-                                // Noon UTC, so the day reads 15 March 2026 in any time zone the tests run in.
+                                // Noon UTC, so the day reads 15 March 2026 anywhere from UTC−11 to UTC+11.
                                 publishedAt = listOf(1_773_576_000uL),
                             )
                     },

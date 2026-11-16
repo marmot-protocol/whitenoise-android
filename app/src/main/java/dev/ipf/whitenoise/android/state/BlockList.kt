@@ -24,6 +24,8 @@ internal class RuntimeMirrors(
     val attention: AccountAttentionMirror = AccountAttentionMirror(),
     val blocks: BlockListMirror = BlockListMirror(),
     val teamReporting: TeamReportingMirror = TeamReportingMirror(),
+    /** Chats already told a rewind restore failed, per account, so a repeat is not shown twice. Main thread only. */
+    val shownRewindRestoreFailures: ShownQueuedRefusals = ShownQueuedRefusals(),
 )
 
 /** Outcome of a block or unblock request, as the UI must present it. */

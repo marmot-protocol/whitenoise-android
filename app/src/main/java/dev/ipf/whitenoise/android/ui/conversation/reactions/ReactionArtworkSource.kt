@@ -15,7 +15,8 @@ import dev.ipf.whitenoise.android.state.reactionAttachment
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
-import dev.ipf.whitenoise.android.ui.conversation.media.imageAttachmentBytes
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentBytes
+import dev.ipf.whitenoise.android.ui.conversation.media.localAttachmentBytes
 import dev.ipf.whitenoise.android.ui.conversation.messages.reactionArtworkAutoDownloadAllowed
 import dev.ipf.whitenoise.android.ui.decodeEmojiImage
 import kotlinx.coroutines.Dispatchers
@@ -30,8 +31,11 @@ internal fun interface ReactionArtworkSource {
 /** The open conversation's reaction artwork; null outside a conversation, where pills stay literal text. */
 internal val LocalReactionArtworkSource = staticCompositionLocalOf<ReactionArtworkSource?> { null }
 
-/** Largest reaction artwork read for decoding; an emoji image never needs more, and a bigger one stays text. */
+/** Largest reaction artwork read for decoding, an emoji image never needs more and a bigger one stays text. */
 internal const val REACTION_ARTWORK_MAX_BYTES = 4 * 1024 * 1024
+
+/** [REACTION_ARTWORK_MAX_BYTES] as the attachment readers' byte limit, so no larger image is copied at all. */
+private const val MAX_BYTES = REACTION_ARTWORK_MAX_BYTES.toLong()
 
 /**
  * The artwork for a `:shortcode:` pill, read from the reaction [reactionMessageIdHex] that defined it. Each reaction's
@@ -92,18 +96,18 @@ private suspend fun loadReactionArtwork(
             mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
             automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused(),
         )
+    // The reaction may be the viewer's own, whose upload can still be held in memory before MDK retains it.
+    val mine = entry.sender.equals(controller.conversationAccountIdHex, ignoreCase = true)
+    val index = accepted.attachmentIndex.toInt()
     val bytes =
         runCatchingCancellable {
-            imageAttachmentBytes(
-                controller = controller,
-                messageIdHex = entry.messageIdHex,
-                attachmentIndex = accepted.attachmentIndex.toInt(),
-                reference = accepted.reference,
-                mine = false,
-                priority = AttachmentDownloadPriority.Automatic,
-                allowNetwork = allowNetwork,
-            )
-        }.getOrNull()?.takeIf { it.size <= REACTION_ARTWORK_MAX_BYTES }
+            if (allowNetwork) {
+                val priority = AttachmentDownloadPriority.Automatic
+                attachmentBytes(controller, entry.messageIdHex, index, accepted.reference, mine, priority, MAX_BYTES)
+            } else {
+                localAttachmentBytes(controller, entry.messageIdHex, index, mine, MAX_BYTES)
+            }
+        }.getOrNull()
     return bytes
         ?.let { withContext(Dispatchers.Default) { decodeEmojiImage(it, controller.mediaTrustDomain) } }
         ?.let(EmojiArt::Decoded)

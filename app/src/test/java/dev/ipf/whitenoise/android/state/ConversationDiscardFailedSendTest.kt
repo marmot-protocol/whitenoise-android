@@ -97,14 +97,44 @@ class ConversationDiscardFailedSendTest {
 
             // Undispatched, the first discard runs until it waits on MDK, so it is in flight for the second tap.
             val first =
-                async(start = CoroutineStart.UNDISPATCHED) { controller.discardDurableFailedSend(FAILED, discard) }
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.discardDurableFailedSend(FAILED, discard = discard)
+                }
             assertEquals(1, calls)
-            val second = controller.discardDurableFailedSend(FAILED, discard)
+            val second = controller.discardDurableFailedSend(FAILED, discard = discard)
             release.complete(Unit)
 
             assertFalse(second)
             assertTrue(first.await())
             assertEquals(1, calls)
+        }
+
+    /** Discard leaves a row MDK no longer counts as a failed send, and only Delete for me hides it then. */
+    @Test
+    fun aSendNoLongerFailedIsHiddenOnlyByDeleteForMe() =
+        withController(listOf(failedSend())) { controller ->
+            val notFailed: suspend (String, String, String) -> DiscardFailedSendResultFfi = { _, _, _ ->
+                result(DiscardFailedSendOutcomeFfi.NOT_FAILED_SEND)
+            }
+            var hides = 0
+
+            assertFalse(controller.discardDurableFailedSend(FAILED, discard = notFailed))
+            assertEquals(0, hides)
+            assertTrue(controller.discardDurableFailedSend(FAILED, { ++hides > 0 }, discard = notFailed))
+            assertEquals(1, hides)
+        }
+
+    /** Batch Delete for me hides a delivered row locally but never hides a failed send MDK did not discard. */
+    @Test
+    fun batchDeleteForMeSendsAFailedSendToMdkInsteadOfHidingIt() =
+        withController(listOf(failedSend(), deliveredSend())) { controller ->
+            val delivered = controller.removeForMeResult(DELIVERED)
+            val failed = controller.removeForMeResult(FAILED)
+
+            assertTrue(delivered.isSuccess)
+            assertTrue(controller.timeline.none { it.record.messageIdHex == DELIVERED })
+            assertTrue(failed.isFailure)
+            assertTrue(controller.timeline.any { it.record.messageIdHex == FAILED })
         }
 
     /** Opens a controller on [records] and runs [block] once the initial timeline page has loaded. */

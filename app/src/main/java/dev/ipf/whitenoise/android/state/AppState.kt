@@ -1420,6 +1420,7 @@ class WhiteNoiseAppState private constructor(
      */
     @Volatile
     internal var accountListLoaded = initialAccounts.isNotEmpty()
+
     internal val accountUnreadStore = AccountUnreadStore()
     internal val runtimeMirrors = RuntimeMirrors()
     internal val freshGroupCreations = FreshGroupCreationRegistry()
@@ -1568,7 +1569,6 @@ class WhiteNoiseAppState private constructor(
 
     /** Queued-change size refusals already shown, so a redelivered refusal is not shown twice. Main thread only. */
     internal val shownQueuedSizeRefusals = ShownQueuedRefusals()
-    internal val shownRewindRestoreFailures = ShownQueuedRefusals()
 
     var transientNotice by mutableStateOf<TransientNotice?>(null)
         private set

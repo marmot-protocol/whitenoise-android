@@ -57,7 +57,9 @@ class BatchDeleteControllerCoverageTest {
         assertTrue(
             "batch deletion must retain structured commit failures without emitting one snackbar per item",
             "controller.deleteMessageResult(record, presentFailure = false)" in conversation &&
-                "hideLocally = controller::hideMessageForMeResult" in conversation &&
+                "hideLocally = controller::removeForMeResult" in conversation &&
+                "presentFailure = false" in
+                source.controllerFunctionBody("removeForMeResult", "ConversationControllerFailedSendDiscard.kt") &&
                 "BatchDeleteRetryState.from(result)" in conversation &&
                 "if (presentFailure)" in body &&
                 "record.messageIdHex !in controller.deletedMessageIds" !in conversation,

@@ -55,8 +55,8 @@ internal suspend fun WhiteNoiseAppState.rewindRestoreFailuresOnOpen(marmot: Marm
  */
 internal fun WhiteNoiseAppState.presentRewindRestoreFailure(failure: RewindRestoreFailure) {
     if (accounts.none { it.label == failure.accountRef && it.isSignedInSigningAccount() }) return
-    // Keyed by account and chat; the bounded record is shared in shape with the queued-refusal notices.
-    if (!shownRewindRestoreFailures.firstShowing(failure.accountRef, failure.groupIdHex)) return
+    // Keyed by account and chat, with the same bounded record the queued-refusal notices use.
+    if (!runtimeMirrors.shownRewindRestoreFailures.firstShowing(failure.accountRef, failure.groupIdHex)) return
     presentText(
         AppText.Resource(R.string.notice_rewind_restore_title),
         AppText.Resource(R.string.quarantine_rewind_restore),

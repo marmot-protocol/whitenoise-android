@@ -1041,7 +1041,9 @@ internal fun MessageBubble(
             try {
                 val removed =
                     if (controller.isDurableFailedSend(item)) {
-                        controller.discardDurableFailedSend(record.messageIdHex)
+                        controller.discardDurableFailedSend(record.messageIdHex, {
+                            controller.hideMessageForMe(record.messageIdHex)
+                        })
                     } else {
                         controller.hideMessageForMe(record.messageIdHex)
                     }
@@ -1665,7 +1667,7 @@ internal fun MessageBubble(
         val readAloudLabels =
             setOf(stringResource(R.string.tts_choose_sentence), stringResource(R.string.tts_read_from_sentence))
         val failedOwnSend = mine && item.status == MessageStatus.Failed
-        // MDK can discard a durable failed send but has no host retry for it, so it offers Discard alone.
+        // A durable failed send offers Discard alone, and resending it stays with MDK convergence.
         val discardableSend = failedOwnSend || controller.isDurableFailedSend(item)
         val rowActions =
             listOf(
