@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.Context
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.wipeSessionAttachmentPlaintext
@@ -97,22 +99,26 @@ class ComposerDocumentReaderTest {
         }
 
     /** A kill skips the reader's cleanup; the next process removes that copy, and sign-out removes this one's. */
-    @Test fun previewCopiesFromEarlierProcessesAreSweptAndSignOutWipesTheRest() {
-        val cache = temporary.newFolder("cache")
-        val earlier = File(File(cache, MediaCacheDirs.COMPOSER_DOCUMENT_READER), "process-earlier").apply { mkdirs() }
-        val orphan = File(earlier, "preview-orphan.pdf").apply { writeText("orphan") }
-        val own = File(composerPreviewDirectory(cache).apply { mkdirs() }, "preview-open.pdf").apply { writeText("open") }
+    @Test fun previewCopiesFromEarlierProcessesAreSweptAndSignOutWipesTheRest() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val cache = context.cacheDir
+            val root = File(cache, MediaCacheDirs.COMPOSER_DOCUMENT_READER)
+            val earlier = File(root, "process-earlier").apply { mkdirs() }
+            val orphan = File(earlier, "preview-orphan.pdf").apply { writeText("orphan") }
 
-        sweepOrphanedComposerPreviews(cache)
+            withComposerPdfFile(cache, byteArrayOf(1)) { open ->
+                sweepStaleSharedMedia(context, maxAgeMillis = Long.MAX_VALUE)
 
-        assertFalse(orphan.exists())
-        assertFalse(earlier.exists())
-        assertTrue("an open reader keeps its copy", own.exists())
+                assertFalse(orphan.exists())
+                assertFalse(earlier.exists())
+                assertTrue("an open reader keeps its copy", open.exists())
 
-        wipeSessionAttachmentPlaintext(cache) { name, failure -> throw AssertionError(name, failure) }
+                wipeSessionAttachmentPlaintext(cache) { name, failure -> throw AssertionError(name, failure) }
 
-        assertFalse(File(cache, MediaCacheDirs.COMPOSER_DOCUMENT_READER).exists())
-    }
+                assertFalse(root.exists())
+            }
+        }
 
     @Test fun oversizedPdfIsRejectedBeforeCreatingAFile() =
         runBlocking {
