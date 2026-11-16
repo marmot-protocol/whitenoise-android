@@ -194,12 +194,12 @@ val WhiteNoiseAppState.accountUnreadCounts: Map<String, ULong>
     get() = accountUnreadStore.retainedCounts
 
 /** Retained count for reconciliation and diagnostics, even while freshness is unknown. */
-fun WhiteNoiseAppState.unreadCountForAccount(accountRef: String): ULong =
-    accountUnreadStore.values[accountRef]?.unreadCount ?: 0uL
+@Suppress("MaxLineLength")
+fun WhiteNoiseAppState.unreadCountForAccount(accountRef: String): ULong = accountUnreadStore.values[accountRef]?.unreadCount ?: 0uL
 
 /** Count safe to render as current. Unknown retained values intentionally present as no badge. */
-fun WhiteNoiseAppState.confirmedUnreadCountForAccount(accountRef: String): ULong =
-    accountUnreadStore.values[accountRef].confirmedUnreadCount()
+@Suppress("MaxLineLength")
+fun WhiteNoiseAppState.confirmedUnreadCountForAccount(accountRef: String): ULong = accountUnreadStore.values[accountRef].confirmedUnreadCount()
 
 /**
  * Whether [accountRef]'s avatar should light the unread dot, from that
