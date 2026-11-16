@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.updateAccountUnreadCount
 import dev.ipf.whitenoise.android.ui.chats.CHAT_LIST_SEARCH_FILTERS_ACTION_TAG
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerState

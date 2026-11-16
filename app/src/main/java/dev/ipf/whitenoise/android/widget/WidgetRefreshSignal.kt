@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.widget
 
 import androidx.compose.runtime.snapshotFlow
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.accountUnreadCounts
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest

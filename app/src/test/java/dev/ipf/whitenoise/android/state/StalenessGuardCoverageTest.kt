@@ -295,8 +295,6 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:retryPushStorageRecovery" to "single-flight push storage recovery command",
                 // Existing settings snapshot refresh is outside the audited stale-counter migration inventory.
                 "AppState.kt:refreshSecurityPrivacySettings" to "pre-existing settings snapshot path",
-                // Telemetry toggle completion is an authoritative engine command, not a replaceable cache read.
-                "AppState.kt:setTelemetryEnabled" to "authoritative settings command result",
                 // Setter completions are authoritative engine commands; every accepted toggle must apply.
                 "NotificationDeliveryController.kt:setLocalNotificationsEnabled" to
                     "authoritative settings command result",
@@ -311,8 +309,6 @@ class StalenessGuardCoverageTest {
                 // The caller rechecks ownership under the lifetime and delivery-mode locks before this body runs.
                 "NotificationDeliveryController.kt:setNativePushEnabledLocked" to
                     "lock-owned authoritative settings command with rollback",
-                // Foreground catch-up is lifecycle-admitted and clears only the durable generation it observed.
-                "AppState.kt:catchUpAfterForegroundActivation" to "lifecycle admission with generation-checked clear",
                 // The durable attempted flag makes this a one-shot orchestration, not a refresh race.
                 "AppState.kt:enableDefaultNotificationsIfReady" to "durable one-shot orchestration",
                 // Follow/unfollow is an accepted server mutation; the revision only notifies Compose afterward.
