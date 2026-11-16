@@ -56,6 +56,12 @@ internal class PersistentDisplayThumbnails(
     private val removingTags = mutableMapOf<String, Int>()
     private val removingMessages = mutableMapOf<String, Int>()
     private val queuedMessagePrefixes = mutableSetOf<String>()
+
+    // Logical slot -> authenticated source. Payloads are decrypted to fill it only once per process; writes add to it
+    // and lookups drop slots the disk no longer holds, which covers removal, LRU eviction and discard.
+    private val sourceIndex = mutableMapOf<String, DisplayThumbnailSource>()
+    private val indexScanLock = Any()
+    private var indexed = false
     private val messageSweepLock = Any()
 
     /** Elapsed-realtime instant of the last complete native reconciliation in this process, if any. */
@@ -109,21 +115,38 @@ internal class PersistentDisplayThumbnails(
         removalsCompleted.first { captureGeneration(source).admitted }
     }
 
-    /** Hydrates the authenticated disk index off main. */
+    /** Hydrates the authenticated disk index and the source index off main. */
     fun prepare() {
         disk.prepare()
         storedSources()
     }
 
-    /** Enumerates only encrypted, authenticated source identities; legacy or malformed derivatives are discarded. */
+    /** Enumerates the authenticated sources still on disk; only the first call in a process decrypts payloads. */
     fun storedSources(): Set<DisplayThumbnailSource> {
-        val sources = mutableSetOf<DisplayThumbnailSource>()
-        disk.forEachStoredEntry { slot, bytes ->
-            val header = runCatching { header(bytes) }.getOrNull()
-            if (header == null) disk.discardStoredEntryIfMatches(slot, bytes) else sources += header.source
-        }
-        return sources
+        indexStoredSources()
+        val snapshot = synchronized(sourceIndex) { sourceIndex.toMap() }
+        val gone = snapshot.keys.filterNot(disk::containsAfterHydration)
+        synchronized(sourceIndex) { gone.filterNot(disk::contains).forEach(sourceIndex::remove) }
+        return (snapshot - gone.toSet()).values.toSet()
     }
+
+    /** Reads every header once, discarding legacy or malformed derivatives; later writes keep the index current. */
+    private fun indexStoredSources() =
+        synchronized(indexScanLock) {
+            if (indexed) return@synchronized
+            val scanned = mutableMapOf<String, DisplayThumbnailSource>()
+            disk.forEachStoredEntry { stored, bytes ->
+                val header = runCatching { header(bytes) }.getOrNull()
+                if (header == null) {
+                    disk.discardStoredEntryIfMatches(stored, bytes)
+                } else {
+                    scanned[slot(header.source, header.edge)] = header.source
+                }
+            }
+            // A write that landed during the scan already recorded its newer source.
+            synchronized(sourceIndex) { scanned.forEach(sourceIndex::putIfAbsent) }
+            indexed = true
+        }
 
     /** Records a deleted message for the next sweep; it costs no disk read, so it is safe under a commit lock. */
     fun queueMessageRemoval(attachmentKeyPrefix: String) {
@@ -223,6 +246,7 @@ internal class PersistentDisplayThumbnails(
             if (isCurrent(token) && canPublish()) {
                 val key = slot(source, entry.maxEdgePx)
                 disk.put(key, bytes, disk.capturePublicationToken(), source.ciphertextTag)
+                synchronized(sourceIndex) { sourceIndex[key] = source }
                 if (!isCurrent(token) || !canPublish()) disk.remove(key)
             }
         }
@@ -240,7 +264,11 @@ internal class PersistentDisplayThumbnails(
     }
 
     /** Account teardown and Clear Cache retire both persisted data and all pending producers. */
-    fun clear() = invalidate { disk.clear() }
+    fun clear() =
+        invalidate {
+            disk.clear()
+            synchronized(sourceIndex) { sourceIndex.clear() }
+        }
 
     /** Fences matching requests before disk work and again after it, including requests admitted during removal. */
     private fun invalidate(

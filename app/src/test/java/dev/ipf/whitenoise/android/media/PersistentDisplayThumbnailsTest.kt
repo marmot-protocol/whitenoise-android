@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.spec.SecretKeySpec
 
 /** Exercises authenticated derivative storage, without a native or network boundary. */
@@ -284,13 +285,38 @@ class PersistentDisplayThumbnailsTest {
         assertEquals(0L, cache.residentBytes())
     }
 
+    /** After the first listing, deletes and maintenance read the source index instead of decrypting payloads. */
+    @Test
+    fun onlyTheFirstListingDecryptsStoredEntries() {
+        val writer = cache()
+        writer.write(source, MediaThumbnail(bitmap, 256), writer.captureGeneration(source))
+        val keyUses = AtomicInteger()
+        val reopened = cache(keyUses = keyUses)
+        assertEquals(setOf(source), reopened.storedSources())
+        assertTrue(keyUses.get() > 0)
+
+        val other = source.copy(attachmentKey = "account:chat:other:0")
+        reopened.write(other, MediaThumbnail(bitmap, 128), reopened.captureGeneration(other))
+        reopened.remove(source.attachmentKey)
+        keyUses.set(0)
+        assertEquals(setOf(other), reopened.storedSources())
+        assertEquals(0, keyUses.get())
+    }
+
     /** Independent instances share encrypted bytes and a test-only key, as across process restart. */
-    private fun cache(budget: Long = PersistentDisplayThumbnails.MAX_BYTES): PersistentDisplayThumbnails =
+    private fun cache(
+        budget: Long = PersistentDisplayThumbnails.MAX_BYTES,
+        keyUses: AtomicInteger = AtomicInteger(),
+    ): PersistentDisplayThumbnails =
         PersistentDisplayThumbnails(
             DiskByteCache(
                 File(directory.path),
                 maxBytes = budget,
-                keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") },
+                keyProvider =
+                    DiskByteCacheKeyProvider {
+                        keyUses.incrementAndGet()
+                        SecretKeySpec(ByteArray(32) { 7 }, "AES")
+                    },
             ),
         )
 }

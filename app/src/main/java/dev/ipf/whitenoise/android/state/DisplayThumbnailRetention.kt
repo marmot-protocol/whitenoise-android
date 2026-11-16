@@ -59,7 +59,7 @@ internal fun WhiteNoiseAppState.scheduleDisplayThumbnailReconciliation(): Job {
         }.also { displayThumbnailReconciliationJob = it }
 }
 
-/** A foreground return reuses a recent completed pass, because each pass authenticates every stored derivative. */
+/** A foreground return reuses a recent completed pass, because each pass reads native state for every source. */
 internal fun WhiteNoiseAppState.scheduleForegroundDisplayThumbnailReconciliation(): Job? {
     val completedAt = displayThumbnails.reconciledAtElapsedMillis
     val recent =
