@@ -62,6 +62,7 @@ internal data class ConversationDictationKey(
 @Suppress("LargeClass", "ReturnCount", "TooManyFunctions")
 internal class ConversationDictationController internal constructor(
     internal val platform: ConversationDictationPlatform,
+    private val microphoneRecoveryAllowed: () -> Boolean = { true },
     internal val readDraft: (accountRef: String, groupIdHex: String) -> ConversationDictationDraftSnapshot,
     internal val writeDraft: (
         accountRef: String,
@@ -108,6 +109,7 @@ internal class ConversationDictationController internal constructor(
 ) {
     constructor(
         context: Context,
+        microphoneRecoveryAllowed: () -> Boolean = { true },
         readDraft: (accountRef: String, groupIdHex: String) -> ConversationDictationDraftSnapshot,
         writeDraft: (
             accountRef: String,
@@ -134,6 +136,7 @@ internal class ConversationDictationController internal constructor(
         completionWrite: ((String, String, Long, TextFieldValue) -> ConversationDictationDraftWrite)? = null,
     ) : this(
         platform = AndroidConversationDictationPlatform(context.applicationContext),
+        microphoneRecoveryAllowed = microphoneRecoveryAllowed,
         readDraft = readDraft,
         writeDraft = writeDraft,
         completionWrite = completionWrite,
@@ -246,6 +249,7 @@ internal class ConversationDictationController internal constructor(
     internal var recoveryDeadlineElapsedMillis: Long? = null
     internal var recoveryProtectionExpired = false
     internal var pendingForegroundRecoverySessionId: Long? = null
+    internal var microphoneSettingsRecovery: ConversationDictationState.Failed? = null
     var foregroundMicrophoneRequired by mutableStateOf(true)
         internal set
     var notificationActionGeneration by mutableLongStateOf(0L)
@@ -886,6 +890,19 @@ internal class ConversationDictationController internal constructor(
         if (state is ConversationDictationState.Failed) cancelSession()
     }
 
+    /** Arms one return from settings only for the failure whose recovery the user chose. */
+    fun resumeAfterMicrophoneSettings() {
+        val failed = state as? ConversationDictationState.Failed ?: return
+        if (failed.reason !in setOf(
+                ConversationDictationFailure.MicrophoneMuted,
+                ConversationDictationFailure.PermissionDenied,
+                ConversationDictationFailure.PermissionPermanentlyDenied,
+            ) || !failed.retainedTranscript.isNullOrBlank() ||
+            runCatching(platform::callerAudioHasPending).getOrDefault(true)
+        ) return
+        microphoneSettingsRecovery = failed
+    }
+
     /** Recreates a failed session against the origin's current authoritative draft. */
     fun retry() {
         expireRetainedRecoveryIfDue()
@@ -1004,6 +1021,16 @@ internal class ConversationDictationController internal constructor(
 
     /** Retries any deferred narrowing only after a real foreground return. */
     fun onAppForegrounded() {
+        val microphoneRecovery = microphoneSettingsRecovery
+        // A foreground callback can precede app-lock evaluation; wait for the host's unlocked return.
+        if (microphoneRecovery != null && state === microphoneRecovery && !microphoneRecoveryAllowed()) return
+        microphoneSettingsRecovery = null
+        if (microphoneRecovery != null && state === microphoneRecovery &&
+            runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
+        ) {
+            retry()
+            return
+        }
         pendingForegroundRecoverySessionId = (state as? ConversationDictationState.Failed)?.sessionId
         expireRetainedRecoveryIfDue()
         val failed = state as? ConversationDictationState.Failed

@@ -24,7 +24,7 @@ internal fun dictationFailureRecovery(reason: ConversationDictationFailure): Con
     }
 
 /** Opens White Noise's Android permission page after a permanent microphone denial. */
-internal fun openDictationAppSettings(context: Context) {
+internal fun openDictationAppSettings(context: Context): Boolean =
     startFirstResolvable(
         context,
         Intent(
@@ -32,7 +32,6 @@ internal fun openDictationAppSettings(context: Context) {
             Uri.fromParts("package", context.packageName, null),
         ),
     )
-}
 
 /**
  * Opens the speech service itself, because that is the only place a user can finish setting it up:
@@ -66,12 +65,13 @@ internal fun openSpeechProviderSetup(
 private fun startFirstResolvable(
     context: Context,
     vararg candidates: Intent,
-) {
+): Boolean {
     for (intent in candidates) {
         val launched =
             runCatching {
                 context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }.isSuccess
-        if (launched) return
+        if (launched) return true
     }
+    return false
 }

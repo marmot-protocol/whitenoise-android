@@ -543,6 +543,7 @@ class WhiteNoiseAppState private constructor(
         lazy {
             ConversationDictationController(
                 context = appContext,
+                microphoneRecoveryAllowed = { appInForeground && !appLock.screenVisible && !appLock.evaluationPending },
                 readDraft = ::conversationDictationDraftSnapshot,
                 writeDraft = ::setConversationDictationDraftIfCurrent,
                 completionWrite = ::writeCompletedDictationDraft,
@@ -8381,9 +8382,10 @@ class WhiteNoiseAppState private constructor(
             }
         }
         if (foreground) {
+            // Resolve app lock before any automatic microphone recovery can start capture.
+            appLock.onAppForegrounded()
             dictationDiagnosticLifecycle.foreground { conversationDictation }
             NotificationStreamForegroundService.onAppForegrounded(initializedConversationDictation())
-            appLock.onAppForegrounded()
             if (dismissRetainedVisibleConversation) {
                 dismissVisibleConversationNotifications()
             }

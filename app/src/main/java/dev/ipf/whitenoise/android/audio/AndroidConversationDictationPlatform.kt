@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -96,14 +97,13 @@ internal class AndroidConversationDictationPlatform(
         return granted
     }
 
-    /** Leaves global microphone privacy to Android while preserving hard app-op denial. */
+    /** Detects system microphone blocking before opening a silent recorder. */
     @Suppress("DEPRECATION")
     override fun microphoneAccess(): ConversationDictationMicrophoneAccess {
         if (!hasRecordAudioPermission()) return ConversationDictationMicrophoneAccess.RuntimePermissionRequired
-        // Android folds the global microphone toggle into its effective permission result. Do not
-        // treat MODE_IGNORED as an app denial: starting recognition is what lets Android present
-        // its native microphone-unblock prompt while White Noise stays on the current surface.
-        // MODE_ERRORED is distinguishable: Android documents it as a hard denial that should fail.
+        if (context.getSystemService(AudioManager::class.java).isMicrophoneMute) {
+            return ConversationDictationMicrophoneAccess.MicrophoneMuted
+        }
         val mode =
             context.getSystemService(AppOpsManager::class.java).unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_RECORD_AUDIO,
@@ -111,7 +111,7 @@ internal class AndroidConversationDictationPlatform(
                 context.packageName,
             )
         val access =
-            if (mode == AppOpsManager.MODE_ERRORED) {
+            if (mode == AppOpsManager.MODE_IGNORED || mode == AppOpsManager.MODE_ERRORED) {
                 ConversationDictationMicrophoneAccess.AppOpDenied
             } else {
                 ConversationDictationMicrophoneAccess.Granted

@@ -79,7 +79,8 @@
         "anchor": "fun ConversationDictationMicrophoneDialog(",
         "test_ids": [
           "DIC-001",
-          "DIC-002"
+          "DIC-002",
+          "DIC-015"
         ]
       },
       {

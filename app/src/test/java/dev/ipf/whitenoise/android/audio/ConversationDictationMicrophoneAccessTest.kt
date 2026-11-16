@@ -30,17 +30,16 @@ class ConversationDictationMicrophoneAccessTest {
     }
 
     @Test
-    fun globalMicrophoneToggleLeavesGrantedRuntimePermissionUsableForNativeRecovery() {
+    fun globalMicrophoneToggleRequiresVisibleRecoveryBeforeCapture() {
         setMode(AppOpsManager.MODE_FOREGROUND)
         context.getSystemService(AudioManager::class.java).isMicrophoneMute = true
 
-        // Android 16's effective check includes global sensor privacy, but creating the recognizer
-        // is what gives Android the opportunity to present its native microphone-unblock prompt.
+        // Detect privacy blocking before starting a recorder that would receive only silence.
         assertEquals(
             AppOpsManager.MODE_IGNORED,
             appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
-        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
     }
 
     @Test
@@ -66,14 +65,20 @@ class ConversationDictationMicrophoneAccessTest {
             AppOpsManager.MODE_IGNORED,
             appOps.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_RECORD_AUDIO, Process.myUid(), context.packageName),
         )
-        assertEquals(ConversationDictationMicrophoneAccess.Granted, platform.microphoneAccess())
+        assertEquals(ConversationDictationMicrophoneAccess.MicrophoneMuted, platform.microphoneAccess())
     }
 
     @Test
-    fun hardAppOpDenialRemainsActionable() {
-        setMode(AppOpsManager.MODE_ERRORED)
-
-        assertEquals(ConversationDictationMicrophoneAccess.AppOpDenied, platform.microphoneAccess())
+    fun appOpDenialsRemainActionableWhenUnmuted() {
+        context.getSystemService(AudioManager::class.java).isMicrophoneMute = false
+        for (mode in listOf(AppOpsManager.MODE_IGNORED, AppOpsManager.MODE_ERRORED)) {
+            setMode(mode)
+            assertEquals(
+                "AppOp mode $mode",
+                ConversationDictationMicrophoneAccess.AppOpDenied,
+                platform.microphoneAccess(),
+            )
+        }
     }
 
     @Test

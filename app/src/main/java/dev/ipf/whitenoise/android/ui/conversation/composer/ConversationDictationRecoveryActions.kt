@@ -79,7 +79,9 @@ private fun dictationFailureAction(
         state.reason == ConversationDictationFailure.SendBlocked && state.recognitionIncomplete ->
             ({ if (controller.state === state) controller.finishFailedToDraft(state.sessionId) })
         state.reason == ConversationDictationFailure.SendBlocked -> controller::retry
-        recovery == ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
+        recovery == ConversationDictationRecovery.AppSettings -> ({
+            if (openDictationAppSettings(context)) controller.resumeAfterMicrophoneSettings()
+        })
         recovery == ConversationDictationRecovery.SpeechProviderSetup ->
             ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
         else -> controller::retry
