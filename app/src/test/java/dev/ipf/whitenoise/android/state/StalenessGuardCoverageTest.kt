@@ -359,6 +359,9 @@ class StalenessGuardCoverageTest {
                 // Runs under cancelBlockedLeave's mutation lock and the group commit lock, rechecking the owner first.
                 "ConversationController.kt:cancelNativeBlockedLeave" to
                     "serialized group command with captured owner checks",
+                // One in-flight discard per message; its cache purge is account-keyed and notices recheck the owner.
+                "ConversationController.kt:applyDiscardOutcome" to
+                    "single-flight discard command result with captured owner checks",
             )
         assertTrue(
             "every exemption must explain why no latest-wins guard is required",

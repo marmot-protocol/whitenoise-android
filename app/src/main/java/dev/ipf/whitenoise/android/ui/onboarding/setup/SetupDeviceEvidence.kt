@@ -5,9 +5,7 @@ import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingSingleDeviceNoticeFfi
 import dev.ipf.whitenoise.android.R
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import java.time.format.FormatStyle
 
 /** What MDK's device check found, which the "Chats on this device" step states before explaining what it means. */
@@ -68,8 +66,7 @@ internal fun setupDeviceFinding(evidence: SetupDeviceEvidence): String =
     }
 
 /** [epochSeconds] as the long date in the device's time zone and locale. */
-private fun longLocalDate(epochSeconds: Long): String =
-    DateTimeFormatter
-        .ofLocalizedDate(FormatStyle.LONG)
-        .withZone(ZoneId.systemDefault())
-        .format(Instant.ofEpochSecond(epochSeconds))
+private fun longLocalDate(epochSeconds: Long): String {
+    val stamp = epochSeconds.toULong()
+    return IdentityFormatter.dateTime(stamp, dateStyle = FormatStyle.LONG, timeStyle = null)
+}
