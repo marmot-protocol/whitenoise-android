@@ -1645,7 +1645,7 @@
     <plurals name="emoji_sets_skipped">
         <item quantity="other">已安裝，略過了 %1$d 項。</item>
     </plurals>
-    <string name="custom_emoji_detail">此處的圖片會變成儲存在此裝置上的 :shortcode: 表情。使用其中之一的新訊息（非回覆）會把圖片加密上傳到該聊天。回應、回覆和編輯只傳送短代碼。</string>
+    <string name="custom_emoji_detail">此處的圖片會變成儲存在此裝置上的 :shortcode: 表情。使用這些表情的訊息、回覆和回應會把圖片加密上傳到該聊天。編輯只傳送短代碼。內建圖片在其短代碼上優先顯示。</string>
     <string name="custom_emoji_empty">尚無自訂表情。</string>
     <string name="custom_emoji_name_title">為此表情命名</string>
     <string name="custom_emoji_name_label">短代碼</string>

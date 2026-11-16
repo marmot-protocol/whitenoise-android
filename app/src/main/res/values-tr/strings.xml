@@ -1663,7 +1663,7 @@
         <item quantity="one">Yüklendi, %1$d giriş atlandı.</item>
         <item quantity="other">Yüklendi, %1$d giriş atlandı.</item>
     </plurals>
-    <string name="custom_emoji_detail">Buradaki görseller bu cihazda saklanan :shortcode: emojilerine dönüşür. Birini kullanan yeni bir mesaj (yanıt değil) görselini şifreli olarak o sohbete yükler. Tepkiler, yanıtlar ve düzenlemeler yalnızca kısa kodu gönderir.</string>
+    <string name="custom_emoji_detail">Buradaki görseller bu cihazda saklanan :shortcode: emojilerine dönüşür. Birini kullanan mesajlar, yanıtlar ve tepkiler görselini şifreli olarak o sohbete yükler. Düzenlemeler yalnızca kısa kodu gönderir. Yerleşik görseller kendi kısa kodlarında önceliklidir.</string>
     <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
     <string name="custom_emoji_name_title">Bu emojiye ad ver</string>
     <string name="custom_emoji_name_label">Kısa kod</string>

@@ -354,23 +354,18 @@ private fun EmojiSetActions(
             }
         } else {
             val installed = set.installed
-            val label =
-                stringResource(
-                    when {
-                        installed == null -> R.string.emoji_sets_install
-                        installed.updateAvailable -> R.string.emoji_sets_update
-                        else -> R.string.emoji_sets_reinstall
-                    },
-                )
-            val body =
-                stringResource(
-                    when {
-                        installed == null -> R.string.explanation_organize_emoji_install
-                        installed.updateAvailable -> R.string.explanation_organize_emoji_update
-                        else -> R.string.explanation_organize_emoji_reinstall
-                    },
-                )
-            if (installed == null || installed.updateAvailable || set.canRetryPartialInstall()) {
+            val labels =
+                when {
+                    installed == null -> R.string.emoji_sets_install to R.string.explanation_organize_emoji_install
+                    installed.updateAvailable ->
+                        R.string.emoji_sets_update to R.string.explanation_organize_emoji_update
+                    set.canRetryPartialInstall() ->
+                        R.string.emoji_sets_reinstall to R.string.explanation_organize_emoji_reinstall
+                    else -> null
+                }
+            labels?.let { (labelResource, bodyResource) ->
+                val label = stringResource(labelResource)
+                val body = stringResource(bodyResource)
                 Button(
                     onClick = onInstall,
                     modifier = Modifier.explainOnLongPress(Explanation(label, body)),

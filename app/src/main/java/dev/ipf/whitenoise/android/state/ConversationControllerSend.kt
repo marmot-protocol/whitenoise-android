@@ -245,8 +245,7 @@ internal suspend fun ConversationController.publishTextWithRetry(
     optimisticKey: String,
 ): dev.ipf.marmotkit.SendSummaryFfi =
     appState.withConversationTextSendOrder(account, group.groupIdHex) {
-        // Replies and injected publishers keep their plain-text path. A message that uses the user's
-        // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
+        // Artwork uploads run outside the commit lock, and only an upload-stage failure is retried.
         // Resolving its artwork inside the text order keeps a later message from publishing first,
         // and inside the attempt lets a transient lookup failure retry before anything is published.
         val artwork = SendEmojiArtwork { emojiArtworkForSend(account, trimmed) }

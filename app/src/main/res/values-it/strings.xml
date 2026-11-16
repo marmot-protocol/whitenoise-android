@@ -1678,7 +1678,7 @@
         <item quantity="one">Installato con %1$d voce saltata.</item>
         <item quantity="other">Installato con %1$d voci saltate.</item>
     </plurals>
-    <string name="custom_emoji_detail">Le immagini qui diventano emoji :shortcode: salvate su questo dispositivo. Un nuovo messaggio (non una risposta) che ne usa una carica la sua immagine, cifrata, in quella chat. Reazioni, risposte e modifiche inviano solo lo shortcode.</string>
+    <string name="custom_emoji_detail">Le immagini qui diventano emoji :shortcode: salvate su questo dispositivo. Messaggi, risposte e reazioni che usano una emoji caricano la sua immagine cifrata in quella chat. Le modifiche inviano solo lo shortcode. Le immagini integrate hanno la precedenza per i loro codici.</string>
     <string name="custom_emoji_empty">Ancora nessuna emoji personalizzata.</string>
     <string name="custom_emoji_name_title">Dai un nome a questa emoji</string>
     <string name="custom_emoji_name_label">Codice breve</string>

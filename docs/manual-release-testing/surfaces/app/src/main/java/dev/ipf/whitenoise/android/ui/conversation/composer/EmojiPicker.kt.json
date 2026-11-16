@@ -21,16 +21,6 @@
           "MSG-005"
         ]
       }
-    ],
-    "source_coverage": [
-      {
-        "surface": "Keep conversation and account artwork out of global reaction settings",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPicker.kt",
-        "anchor": "fun emojiPickerShortcodes(",
-        "test_ids": [
-          "MSG-023"
-        ]
-      }
     ]
   },
   "discovery_exceptions": []

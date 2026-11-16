@@ -1678,7 +1678,7 @@
         <item quantity="one">Installé, %1$d entrée ignorée.</item>
         <item quantity="other">Installé, %1$d entrées ignorées.</item>
     </plurals>
-    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des émojis :shortcode: et sont stockées sur cet appareil. Un nouveau message (pas une réponse) avec un émoji envoie son image chiffrée dans cette discussion. Réactions, réponses et modifications n’envoient que le shortcode.</string>
+    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des émojis :shortcode: et sont stockées sur cet appareil. Les messages, réponses et réactions avec un émoji envoient son image chiffrée dans cette discussion. Les modifications envoient seulement le shortcode. Les images intégrées sont prioritaires pour leurs codes.</string>
     <string name="custom_emoji_empty">Aucun emoji personnalisé pour l’instant.</string>
     <string name="custom_emoji_name_title">Nommer cet emoji</string>
     <string name="custom_emoji_name_label">Code court</string>

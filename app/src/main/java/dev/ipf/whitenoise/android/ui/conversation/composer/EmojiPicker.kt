@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
@@ -30,20 +29,6 @@ internal enum class EmojiPickerPurpose {
     CONFIGURE_QUICK_REACTION,
     GROUP_IMAGE,
 }
-
-/** Persistent reaction slots use device-wide artwork while ordinary sends can use account and chat sources. */
-internal fun emojiPickerShortcodes(
-    emoji: CustomEmojiSet,
-    purpose: EmojiPickerPurpose,
-): List<String> =
-    if (purpose == EmojiPickerPurpose.GROUP_IMAGE) {
-        emptyList()
-    } else {
-        emoji.composerShortcodes.filterNot {
-            purpose == EmojiPickerPurpose.CONFIGURE_QUICK_REACTION &&
-                (emoji.usesInstalledArtwork(it) || emoji.usesConversationArtwork(it))
-        }
-    }
 
 internal const val EMOJI_PICKER_TEST_TAG = "emoji.picker"
 

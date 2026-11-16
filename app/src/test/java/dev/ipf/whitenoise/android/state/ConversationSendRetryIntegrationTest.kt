@@ -1923,7 +1923,8 @@ class ConversationSendRetryIntegrationTest {
                 assertTrue(state.setActiveAccount(ACCOUNT_REF, preloadPolicy = preload))
                 release.complete(Unit)
                 holder.await()
-                send.await()
+                val failure = runCatching { send.await() }.exceptionOrNull()
+                assertTrue(failure is java.util.concurrent.CancellationException)
                 assertEquals(0, published)
             } finally {
                 release.complete(Unit)

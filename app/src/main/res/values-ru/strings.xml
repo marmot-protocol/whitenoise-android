@@ -1742,7 +1742,7 @@
         <item quantity="many">Установлено, пропущено %1$d записей.</item>
         <item quantity="other">Установлено, пропущено %1$d записи.</item>
     </plurals>
-    <string name="custom_emoji_detail">Изображения здесь становятся эмодзи :shortcode:, хранящимися на устройстве. Новое сообщение (не ответ) с таким эмодзи загружает его изображение в зашифрованном виде в этот чат. Реакции, ответы и правки отправляют только shortcode.</string>
+    <string name="custom_emoji_detail">Изображения здесь становятся эмодзи :shortcode:, хранящимися на устройстве. Сообщения, ответы и реакции с таким эмодзи загружают его изображение в зашифрованном виде в этот чат. Правки отправляют только shortcode. Встроенные изображения имеют приоритет для своих кодов.</string>
     <string name="custom_emoji_empty">Своих эмодзи пока нет.</string>
     <string name="custom_emoji_name_title">Название эмодзи</string>
     <string name="custom_emoji_name_label">Код</string>

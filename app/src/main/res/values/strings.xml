@@ -1967,7 +1967,7 @@
         <item quantity="one">Installed with %1$d entry skipped.</item>
         <item quantity="other">Installed with %1$d entries skipped.</item>
     </plurals>
-    <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. A new message (not a reply) using one uploads its image, encrypted, to that chat. Reactions, replies and edits send only the shortcode.</string>
+    <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. Messages, replies and reactions using one upload its image, encrypted, to that chat. Edits send only the shortcode. Built-in images take precedence for their shortcodes.</string>
     <string name="custom_emoji_empty">No custom emoji yet.</string>
     <string name="custom_emoji_name_title">Name this emoji</string>
     <string name="custom_emoji_name_label">Shortcode</string>

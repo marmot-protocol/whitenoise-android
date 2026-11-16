@@ -18,9 +18,14 @@ internal suspend fun resolveConversationEmojiArtwork(
 ): List<LocalEmojiArtwork> {
     require(maxBytes in 0..EMOJI_SEND_MAX_BYTES.toLong())
     val resolved = codes.distinct().filter { it in known || it in sources }
-    if (resolved.size > Nip30Emoji.MAX_TAGS) throw EmojiSendLimitException("too many custom emoji")
     val knownBytes = resolved.sumOf { known[it]?.bytes?.size?.toLong() ?: 0L }
-    if (knownBytes > maxBytes) throw EmojiSendLimitException("too much custom emoji artwork for one message")
+    val limitFailure =
+        when {
+            resolved.size > Nip30Emoji.MAX_TAGS -> "too many custom emoji"
+            knownBytes > maxBytes -> "too much custom emoji artwork for one message"
+            else -> null
+        }
+    if (limitFailure != null) throw EmojiSendLimitException(limitFailure)
     var remaining = maxBytes - knownBytes
     return resolved.map { code ->
         known[code] ?: run {
@@ -28,9 +33,9 @@ internal suspend fun resolveConversationEmojiArtwork(
                 try {
                     read(code, sources.getValue(code), remaining)
                 } catch (_: AttachmentTooLargeToPresentException) {
-                    throw EmojiSendLimitException("too much custom emoji artwork for one message")
+                    null
                 }
-            if (artwork.bytes.size > remaining) {
+            if (artwork == null || artwork.bytes.size > remaining) {
                 throw EmojiSendLimitException("too much custom emoji artwork for one message")
             }
             remaining -= artwork.bytes.size

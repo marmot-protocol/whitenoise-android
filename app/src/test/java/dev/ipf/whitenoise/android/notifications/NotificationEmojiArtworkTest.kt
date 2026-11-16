@@ -363,6 +363,7 @@ class NotificationEmojiArtworkTest {
             assertTrue(artifacts().isEmpty())
         }
 
+    /** Modern custom artwork wins its legacy copy while notification export preserves both source files. */
     @Test
     fun localFileTakesPrecedenceAndItsSourceIsNotExported() =
         runBlocking {
@@ -373,12 +374,12 @@ class NotificationEmojiArtworkTest {
                     source.compress(Bitmap.CompressFormat.PNG, 100, stream)
                     stream.toByteArray()
                 }
-            store.save("wn", bytes)
+            store.save("party", bytes)
             val legacy = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
-            File(context.filesDir, "emoji/wn.img").outputStream().use {
+            File(context.filesDir, "emoji/party.img").outputStream().use {
                 check(legacy.compress(Bitmap.CompressFormat.PNG, 100, it))
             }
-            val artifact = requireNotNull(notificationEmojiArtwork(context, ":wn:"))
+            val artifact = requireNotNull(notificationEmojiArtwork(context, ":party:"))
             artifact.use {
                 val bitmap =
                     context.contentResolver
@@ -386,9 +387,9 @@ class NotificationEmojiArtworkTest {
                             it.uri,
                         ).use { input -> BitmapFactory.decodeStream(input) }
                 assertEquals(Color.GREEN, bitmap.getPixel(64, 64))
-                assertTrue(File(context.filesDir, "emoji/wn.png").isFile)
+                assertTrue(File(context.filesDir, "emoji/party.png").isFile)
             }
-            assertTrue(File(context.filesDir, "emoji/wn.img").delete())
+            assertTrue(File(context.filesDir, "emoji/party.img").delete())
         }
 
     @Test

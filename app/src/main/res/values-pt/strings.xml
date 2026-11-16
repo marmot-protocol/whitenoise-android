@@ -1667,7 +1667,7 @@
         <item quantity="one">Instalado com %1$d item ignorado.</item>
         <item quantity="other">Instalado com %1$d itens ignorados.</item>
     </plurals>
-    <string name="custom_emoji_detail">As imagens aqui viram emojis :shortcode: guardados neste dispositivo. Uma nova mensagem (não resposta) que use um envia a imagem, criptografada, à conversa. Reações, respostas e edições enviam só o shortcode.</string>
+    <string name="custom_emoji_detail">As imagens aqui viram emojis :shortcode: guardados neste dispositivo. Mensagens, respostas e reações que usam um emoji enviam a imagem criptografada à conversa. Edições enviam só o shortcode. As imagens integradas têm prioridade para os seus códigos.</string>
     <string name="custom_emoji_empty">Nenhum emoji personalizado ainda.</string>
     <string name="custom_emoji_name_title">Dê um nome a este emoji</string>
     <string name="custom_emoji_name_label">Código</string>

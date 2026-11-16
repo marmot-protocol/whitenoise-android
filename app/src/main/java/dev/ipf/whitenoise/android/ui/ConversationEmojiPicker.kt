@@ -4,11 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.snapshotFlow
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationEmojiSource
 import dev.ipf.whitenoise.android.state.conversationEmojiSources
 import dev.ipf.whitenoise.android.state.readConversationEmojiArtwork
 import dev.ipf.whitenoise.android.ui.conversation.messages.emojiArt
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
@@ -34,17 +36,29 @@ internal fun rememberConversationEmojiPicker(controller: ConversationController)
     val appState = controller.appState
     val owner = Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.mediaUploadSessionEpoch())
     if (controller.boundAccountRef != owner.first) return null
-    val rows = controller.timeline.toList()
-    val deleted = controller.deletedMessageIds.toSet()
-    return key(controller, owner, rows, deleted) {
+    return key(controller, owner) {
         val picker by produceState<ConversationEmojiPicker?>(null) {
-            value =
-                ConversationEmojiPicker(controller.conversationEmojiSources()) { code, source ->
-                    emojiArt(controller.mediaTrustDomain) {
-                        controller.readConversationEmojiArtwork(code, source, CustomEmojiStore.MAX_BYTES.toLong()).bytes
+            snapshotFlow { controller.timeline.toList() to controller.deletedMessageIds.toSet() }
+                .collectLatest {
+                    val sources = controller.conversationEmojiSources()
+                    if (sources != value?.sources.orEmpty()) {
+                        value = conversationEmojiPicker(controller, sources)
                     }
                 }
         }
         picker
+    }
+}
+
+/** Creates visible-cell readers only when the current window contains received definitions. */
+private fun conversationEmojiPicker(
+    controller: ConversationController,
+    sources: Map<String, ConversationEmojiSource>,
+): ConversationEmojiPicker? {
+    if (sources.isEmpty()) return null
+    return ConversationEmojiPicker(sources) { code, source ->
+        emojiArt(controller.mediaTrustDomain) {
+            controller.readConversationEmojiArtwork(code, source, CustomEmojiStore.MAX_BYTES.toLong()).bytes
+        }
     }
 }

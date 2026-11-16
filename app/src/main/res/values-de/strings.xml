@@ -1674,7 +1674,7 @@
         <item quantity="one">Installiert, %1$d Eintrag übersprungen.</item>
         <item quantity="other">Installiert, %1$d Einträge übersprungen.</item>
     </plurals>
-    <string name="custom_emoji_detail">Bilder hier werden zu :shortcode:-Emoji und auf diesem Gerät gespeichert. Eine neue Nachricht (keine Antwort) mit einem Emoji lädt dessen Bild verschlüsselt in diesen Chat hoch. Reaktionen, Antworten und Bearbeitungen senden nur den Shortcode.</string>
+    <string name="custom_emoji_detail">Bilder hier werden zu :shortcode:-Emoji und auf diesem Gerät gespeichert. Nachrichten, Antworten und Reaktionen mit einem Emoji laden dessen Bild verschlüsselt in diesen Chat hoch. Bearbeitungen senden nur den Shortcode. Integrierte Bilder haben bei ihren Shortcodes Vorrang.</string>
     <string name="custom_emoji_empty">Noch keine eigenen Emoji.</string>
     <string name="custom_emoji_name_title">Emoji benennen</string>
     <string name="custom_emoji_name_label">Kurzcode</string>

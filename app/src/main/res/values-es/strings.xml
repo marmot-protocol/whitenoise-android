@@ -1667,7 +1667,7 @@
         <item quantity="one">Instalado con %1$d entrada omitida.</item>
         <item quantity="other">Instalado con %1$d entradas omitidas.</item>
     </plurals>
-    <string name="custom_emoji_detail">Las imágenes añadidas aquí se convierten en emojis :shortcode: y se guardan en este dispositivo. Un mensaje nuevo (no una respuesta) con un emoji sube su imagen cifrada a este chat. Reacciones, respuestas y ediciones solo envían el shortcode.</string>
+    <string name="custom_emoji_detail">Las imágenes añadidas aquí se convierten en emojis :shortcode: y se guardan en este dispositivo. Los mensajes, las respuestas y las reacciones con un emoji suben su imagen cifrada a este chat. Las ediciones solo envían el shortcode. Las imágenes integradas tienen prioridad para sus códigos.</string>
     <string name="custom_emoji_empty">Aún no hay emoji personalizados.</string>
     <string name="custom_emoji_name_title">Nombra este emoji</string>
     <string name="custom_emoji_name_label">Código</string>
