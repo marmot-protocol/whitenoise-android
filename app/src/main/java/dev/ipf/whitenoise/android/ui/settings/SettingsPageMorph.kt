@@ -542,7 +542,7 @@ internal class SettingsPageMorph {
         clipPath(live) {
             clipPath(mask, ClipOp.Difference) { this@draw.drawContent() }
         }
-        clipPath(interiors) { drawOutgoingInk(host, time) }
+        clipPath(interiors) { this@draw.drawOutgoingInk(host, time) }
         contours.forEach { drawContinuousContour(it, host) }
     }
 
