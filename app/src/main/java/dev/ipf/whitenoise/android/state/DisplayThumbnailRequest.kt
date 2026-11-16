@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.graphics.Bitmap
 import android.util.Log
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
 import dev.ipf.whitenoise.android.media.DisplayThumbnailToken
@@ -70,16 +71,22 @@ internal fun WhiteNoiseAppState.displayThumbnailRequestCurrent(request: DisplayT
 internal fun WhiteNoiseAppState.displayThumbnailSessionCurrent(request: DisplayThumbnailRequest): Boolean =
     activeAccountRef == request.account && mediaUploadSessionEpoch() == request.sessionEpoch
 
-/** Reads an expendable derivative off main; failures never request a transfer or alter download policy. */
+/**
+ * Reads an expendable derivative off main, only while [nativeState] or Android's own original still backs it.
+ * Failures never request a transfer or alter download policy.
+ */
 internal suspend fun WhiteNoiseAppState.readDisplayThumbnail(
     request: DisplayThumbnailRequest,
     maxEdgePx: Int,
+    nativeState: AttachmentTransferStateFfi,
 ): MediaThumbnail? {
     val entry =
         displayThumbnailTracer.trace("WhiteNoise.displayThumbnail.read") {
             withContext(Dispatchers.IO) {
                 runCatchingCancellable {
-                    displayThumbnails.read(request.source, maxEdgePx, request.generation)
+                    displayThumbnails
+                        .takeIf { nativeState.keepsDisplayThumbnail(hostHoldsOriginal(request.source.attachmentKey)) }
+                        ?.read(request.source, maxEdgePx, request.generation)
                 }.getOrNull()
             }
         }
@@ -102,14 +109,19 @@ internal suspend fun WhiteNoiseAppState.persistDisplayThumbnail(
     maxEdgePx: Int,
 ) {
     val owner = currentCoroutineContext().job
-    // The native check runs before the one write permit, so no encode waits behind another source's MDK lookup.
+    // A stored size skips the native check, which runs before the one write permit so no encode waits behind
+    // another source's MDK lookup.
     val target =
         withContext(Dispatchers.IO) {
             runCatchingCancellable {
+                if (displayThumbnails.hasMatching(request.source, maxEdgePx, request.generation)) {
+                    return@runCatchingCancellable null
+                }
                 val transfer = request.source.transferRequest() ?: return@runCatchingCancellable null
                 val target = resolveNativeAttachmentTarget(transfer) ?: return@runCatchingCancellable null
                 val phase = nativeAttachmentState(transfer.copy(sourceMessageIdHex = target.sourceMessageIdHex))
-                target.takeUnless { phase == null || phase.removesDisplayThumbnail() }
+                val backed = phase?.keepsDisplayThumbnail(hostHoldsOriginal(request.source.attachmentKey)) == true
+                target.takeIf { backed }
             }.getOrNull()
         } ?: return
     displayThumbnailWritePermit.withPermit {

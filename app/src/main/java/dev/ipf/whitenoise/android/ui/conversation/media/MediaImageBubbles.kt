@@ -945,6 +945,7 @@ internal fun rememberImageLoadState(
             ownerCurrent() && (thumbnailRequest == null || appState.displayThumbnailRequestCurrent(thumbnailRequest))
         }
 
+        /** True while this request still owns the bubble; otherwise waits for a matching removal and reloads. */
         suspend fun loadCurrent(): Boolean {
             if (sourceCurrent()) return true
             if (ownerCurrent() && thumbnailRequest != null) {
@@ -977,7 +978,7 @@ internal fun rememberImageLoadState(
             }
             val persisted =
                 if (nativeState != null) {
-                    appState.readDisplayThumbnail(thumbnailRequest, requestedMaxEdgePx)
+                    appState.readDisplayThumbnail(thumbnailRequest, requestedMaxEdgePx, nativeState)
                 } else {
                     null
                 }

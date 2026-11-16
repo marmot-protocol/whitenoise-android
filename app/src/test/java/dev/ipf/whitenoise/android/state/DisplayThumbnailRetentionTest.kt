@@ -74,24 +74,42 @@ class DisplayThumbnailRetentionTest {
             assertEquals(setOf(neighbor), reopened.storedSources())
         }
 
-    /** MDK cleanup and missed deletion reclaim unloaded derivatives in one group batch without downloading. */
+    /**
+     * MDK cleanup and missed deletion reclaim unloaded derivatives in one group batch without downloading. A removal
+     * state takes the original too; a state with no retained body takes only the derivatives, unless this device
+     * still holds its own original.
+     */
     @Test
-    fun nativeCleanupRemovesOnlyAuthoritativelyRemovedSources() =
+    fun nativeCleanupRemovesRemovedAndUnbackedSources() =
         runTest(dispatcher) {
-            (0..5).map(::source).forEach(::seed)
+            (0..6).map(::source).forEach(::seed)
             fixture.setNativePhase(0, AttachmentTransferStateFfi.CLEANED_BY_SETTING)
             fixture.setNativePhase(1, AttachmentTransferStateFfi.UNAVAILABLE)
             fixture.setNativePhase(2, AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE)
             fixture.setNativePhase(3, AttachmentTransferStateFfi.COMPLETED_UNRETAINED)
             fixture.setNativePhase(4, AttachmentTransferStateFfi.FAILED)
+            fixture.setNativePhase(5, AttachmentTransferStateFfi.READY)
+            fixture.setNativePhase(6, AttachmentTransferStateFfi.CANCELLED)
+            fixture.disk.put(qualifiedRequest(6).cacheKey(), byteArrayOf(1, 2, 3))
             var snapshots = 0
             fixture.onNativeSnapshot = { snapshots++ }
             fixture.state.reconcileDisplayThumbnails()
-            assertEquals(setOf(source(4), source(5)), fixture.thumbnails.storedSources())
+            assertEquals(setOf(source(5), source(6)), fixture.thumbnails.storedSources())
+            assertTrue("this device's own original stays", fixture.disk.contains(qualifiedRequest(6).cacheKey()))
             assertEquals(1, snapshots)
             assertEquals(0, fixture.nativeAssetReads.get())
             assertTrue(fixture.calls.isEmpty())
         }
+
+    /** A derivative backs a read only while MDK retains the body or this device holds its own original. */
+    @Test
+    fun onlyARetainedBodyOrOwnOriginalKeepsTheDerivative() {
+        val kept = AttachmentTransferStateFfi.entries.filter { it.keepsDisplayThumbnail(hostOriginal = false) }
+        assertEquals(listOf(AttachmentTransferStateFfi.READY), kept)
+        AttachmentTransferStateFfi.entries.forEach { state ->
+            assertEquals(!state.removesDisplayThumbnail(), state.keepsDisplayThumbnail(hostOriginal = true))
+        }
+    }
 
     /** A foreground return shortly after a complete pass does not authenticate the whole cache again. */
     @Test
@@ -127,9 +145,9 @@ class DisplayThumbnailRetentionTest {
             assertNotNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
         }
 
-    /** Only MDK's removal states reject the derivative; transfers in progress and other bodiless states keep it. */
+    /** MDK's removal states, and only those, remove the original along with its derivatives. */
     @Test
-    fun onlyRemovalStatesRemoveTheDerivative() {
+    fun onlyRemovalStatesRemoveTheOriginal() {
         val removed =
             setOf(
                 AttachmentTransferStateFfi.UNAVAILABLE,

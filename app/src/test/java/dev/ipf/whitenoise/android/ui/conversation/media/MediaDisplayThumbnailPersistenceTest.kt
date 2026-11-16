@@ -97,6 +97,7 @@ class MediaDisplayThumbnailPersistenceTest {
     /** A still-visible L1 image waits for an occupied encoder and persists when that encoder becomes free. */
     @Test
     fun busyEncoderEventuallyPersistsAVisibleMemoryHit() {
+        fixture.setNativePhase(0, AttachmentTransferStateFfi.READY)
         runBlocking { fixture.state.displayThumbnailWritePermit.acquire() }
         controller.cacheThumbnail(request(0).messageIdHex, 0, Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888))
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }

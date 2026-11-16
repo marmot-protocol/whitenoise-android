@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.SystemClock
-import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
 import kotlinx.coroutines.Dispatchers
@@ -11,37 +10,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/**
- * True for MDK's removal states: the body was deleted, cleaned by a retention setting or is gone for good, so its
- * derivative must not be read, written or kept. Other states without a body (for example CANCELLED after a cleaned
- * file was requested again) keep the derivative, because Android's own cached original may still back it. Exhaustive
- * on purpose: a state added by a future MarmotKit fails the build here instead of granting reads.
- */
-internal fun AttachmentTransferStateFfi.removesDisplayThumbnail(): Boolean =
-    when (this) {
-        AttachmentTransferStateFfi.UNAVAILABLE,
-        AttachmentTransferStateFfi.REMOVED,
-        AttachmentTransferStateFfi.CLEANED_BY_SETTING,
-        AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
-        AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
-        -> true
-        AttachmentTransferStateFfi.NOT_REQUESTED,
-        AttachmentTransferStateFfi.QUEUED,
-        AttachmentTransferStateFfi.DOWNLOADING,
-        AttachmentTransferStateFfi.VERIFYING_CIPHERTEXT,
-        AttachmentTransferStateFfi.DECRYPTING,
-        AttachmentTransferStateFfi.VERIFYING_PLAINTEXT,
-        AttachmentTransferStateFfi.READY,
-        AttachmentTransferStateFfi.RETRY_SCHEDULED,
-        AttachmentTransferStateFfi.FAILED,
-        AttachmentTransferStateFfi.CANCELLED,
-        AttachmentTransferStateFfi.PAUSED,
-        AttachmentTransferStateFfi.POLICY_BLOCKED,
-        AttachmentTransferStateFfi.RETRY_EXHAUSTED,
-        AttachmentTransferStateFfi.STORAGE_BLOCKED,
-        -> false
-    }
 
 private const val THUMBNAIL_RECONCILIATION_BATCH = 64
 private const val CACHE_TARGET_COMPONENTS = 3
@@ -101,8 +69,9 @@ internal suspend fun WhiteNoiseAppState.reconcileDisplayThumbnails() {
 }
 
 /**
- * Reads one bounded group batch and applies only successful native removal answers. False when MDK was unreadable,
- * including a source whose message lookup failed, so the pass does not count as complete.
+ * Reads one bounded group batch and applies only successful native answers: a removal state removes the original
+ * and its derivatives, and any other state without a retained body removes the derivatives alone. False when MDK was
+ * unreadable, so the pass does not count as complete.
  */
 private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
     engine: MarmotInterface,
@@ -111,15 +80,8 @@ private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
     batch: List<Pair<DisplayThumbnailSource, AttachmentTransferRequest>>,
     stillOwned: () -> Boolean,
 ): Boolean {
-    var unreadable = false
-    val resolved =
-        batch.mapNotNull { (source, request) ->
-            runCatchingCancellable { resolveNativeAttachmentTarget(request) }
-                .onFailure { unreadable = true }
-                .getOrNull()
-                ?.let { source to it }
-        }
-    if (resolved.isEmpty() || !stillOwned()) return !unreadable
+    val resolved = batch.mapNotNull { (source, request) -> resolveNativeAttachmentTarget(request)?.let(source::to) }
+    if (resolved.isEmpty() || !stillOwned()) return true
     val tokens = resolved.map { displayThumbnails.captureGeneration(it.first) }
     val states =
         runCatchingCancellable {
@@ -129,31 +91,43 @@ private suspend fun WhiteNoiseAppState.reconcileDisplayThumbnailBatch(
         }.getOrNull()
             ?.items
             ?.takeIf { it.size == resolved.size }
-    states?.indices?.filter { states[it].state.removesDisplayThumbnail() }?.forEach { index ->
-        evictRemovedDisplaySource(resolved[index].first, tokens[index], stillOwned)
+    states?.forEachIndexed { index, item ->
+        val source = resolved[index].first
+        val removed = item.state.removesDisplayThumbnail()
+        val unbacked =
+            !removed &&
+                withContext(Dispatchers.IO) {
+                    !item.state.keepsDisplayThumbnail(hostHoldsOriginal(source.attachmentKey))
+                }
+        if (removed || unbacked) evictRemovedDisplaySource(source, tokens[index], stillOwned, unbacked)
     }
-    return states != null && !unreadable
+    return states != null
 }
 
-/** Checks the snapshot owner before destructive cache work and fences all pending producers of that source. */
+/**
+ * Checks the snapshot owner before destructive cache work and fences all pending producers of that source. With
+ * [derivativesOnly], the original caches are left alone and only the display thumbnails go.
+ */
 private suspend fun WhiteNoiseAppState.evictRemovedDisplaySource(
     source: DisplayThumbnailSource,
     token: dev.ipf.whitenoise.android.media.DisplayThumbnailToken,
     stillOwned: () -> Boolean,
+    derivativesOnly: Boolean = false,
 ) {
     withContext(NonCancellable) {
         val accepted =
             withContext(Dispatchers.Main.immediate) {
-                if (!stillOwned() || !displayThumbnails.isCurrent(token)) {
-                    false
-                } else {
-                    removeMediaMemoryCacheEntry(source.attachmentKey)
-                    true
+                (stillOwned() && displayThumbnails.isCurrent(token)).also { current ->
+                    if (current && !derivativesOnly) removeMediaMemoryCacheEntry(source.attachmentKey)
                 }
             }
         if (accepted) {
             withContext(Dispatchers.IO) {
-                if (stillOwned()) removeMediaDiskCacheEntry(source.attachmentKey)
+                when {
+                    !stillOwned() -> Unit
+                    derivativesOnly -> displayThumbnails.remove(source.attachmentKey)
+                    else -> removeMediaDiskCacheEntry(source.attachmentKey)
+                }
             }
         }
     }

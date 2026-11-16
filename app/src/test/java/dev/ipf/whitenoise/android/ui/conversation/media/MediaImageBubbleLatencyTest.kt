@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -155,10 +156,13 @@ class MediaImageBubbleLatencyTest {
         assertEquals(0, fixture.calls.size)
     }
 
-    /** A thumbnail-only hit cannot consume a durable explicit request for the original bytes. */
+    /**
+     * A derivative whose body MDK no longer retains is not shown, and it cannot consume a durable explicit request for
+     * the original bytes.
+     */
     @Test
     fun derivativeDoesNotCompleteAnOriginalDownloadIntent() {
-        seedDisplayThumbnail()
+        seedDisplayThumbnail(retainedByMdk = false)
         fixture.state.attachmentOpens.setDestination(
             AttachmentOpenDestination(
                 accountRef = MediaDownloadIntegrationFixture.ACCOUNT,
@@ -168,7 +172,8 @@ class MediaImageBubbleLatencyTest {
         )
         assertTrue(controller.requestAttachmentDownload(request(0).messageIdHex, 0))
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
-        awaitLoaded()
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithContentDescription(reference(0).fileName).assertCountEquals(0)
         assertTrue(controller.hasAttachmentDownloadIntent(request(0).messageIdHex, 0))
         // WorkManager's platform scheduler is absent from this fixture. Run its production transfer entry point.
         val worker =
@@ -196,7 +201,8 @@ class MediaImageBubbleLatencyTest {
             worker.isCompleted
         }
         assertTrue(runBlocking { worker.await() })
-        assertEquals(1, fixture.nativeAssetReads.get()) // The durable worker's lease, with no second UI read.
+        // The durable worker's lease, then the bubble's own read of the original, since no derivative backs it.
+        assertEquals(2, fixture.nativeAssetReads.get())
     }
 
     /** A visible L1 thumbnail settles an already-retained original's intent using metadata alone. */
@@ -285,8 +291,9 @@ class MediaImageBubbleLatencyTest {
         assertEquals(0, fixture.nativeSubscriptions.get())
     }
 
-    /** Writes only a synthetic derivative; no full-size encrypted/native fixture is seeded. */
-    private fun seedDisplayThumbnail() {
+    /** Writes only a synthetic derivative, which MDK reports as retained unless [retainedByMdk] is false. */
+    private fun seedDisplayThumbnail(retainedByMdk: Boolean = true) {
+        if (retainedByMdk) fixture.setNativePhase(0, AttachmentTransferStateFfi.READY)
         val source =
             DisplayThumbnailSource(request(0).cacheKey(), reference(0).sourceEpoch, reference(0).ciphertextSha256)
         val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
