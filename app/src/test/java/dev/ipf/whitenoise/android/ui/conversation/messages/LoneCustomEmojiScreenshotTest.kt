@@ -21,12 +21,15 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.EditState
+import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -116,6 +119,21 @@ class LoneCustomEmojiScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         assertEquals(0, composeRule.onAllLoneEmoji())
         composeRule.onNodeWithContentDescription(context.getString(R.string.retry)).assertExists()
         composeRule.onNodeWithContentDescription(context.getString(R.string.discard_failed_message)).assertExists()
+    }
+
+    /** A message edited down to one custom emoji still opens its edit history from the Edited label. */
+    @Test
+    fun editedLoneEmojiKeepsItsHistoryTap() {
+        val original = message(9, "see you there")
+        val id = original.record.messageIdHex
+        controller.editsByTarget =
+            mapOf(id to EditState(":marmot_wave:", 1, listOf(EditVersion(id, ":marmot_wave:", 2uL))))
+        composeRule.setContent { WhiteNoiseTheme { Bubble(original) } }
+        composeRule.waitForIdle()
+        assertEquals(1, composeRule.onAllLoneEmoji())
+        // The label's semantics are replaced by its text, so tap it as a touch rather than through an OnClick action.
+        composeRule.onNodeWithText(context.getString(R.string.edited), useUnmergedTree = true).performClick()
+        composeRule.onNodeWithTag("message.history").assertExists()
     }
 
     /** Entering text selection swaps a lone emoji back to its bubble text, and leaving restores it. */

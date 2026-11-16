@@ -169,7 +169,7 @@ class MarkReadChatListProjectionTest {
 
     @Test
     fun markNotificationMessageRead_foldsReturnedChatListRowIntoChatsController() {
-        val body = appStateSource().readText().kotlinFunctionBody("markNotificationMessageRead")
+        val body = notificationReplySource().readText().kotlinFunctionBody("markNotificationMessageRead")
 
         assertTrue(
             "notification mark-read must apply markTimelineMessageRead's returned ChatListRowFfi to the chat list",
@@ -179,7 +179,7 @@ class MarkReadChatListProjectionTest {
 
     @Test
     fun markNotificationMessageRead_schedulesAccountReconciliationOnlyWhenTheRowDidNotFold() {
-        val body = appStateSource().readText().kotlinFunctionBody("markNotificationMessageRead")
+        val body = notificationReplySource().readText().kotlinFunctionBody("markNotificationMessageRead")
 
         assertTrue(
             "a bound-controller fold must remain the single refresh for the active account",
