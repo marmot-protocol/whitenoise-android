@@ -110,6 +110,8 @@ internal class AndroidConversationDictationPlatform(
         }
     }
 
+    // Any platform RuntimeException must release the registered receiver before propagating.
+    @Suppress("TooGenericExceptionCaught")
     override fun requestMicrophoneUnblock(onChanged: () -> Unit): (() -> Unit)? {
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||

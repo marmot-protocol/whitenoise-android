@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
+private const val MICROPHONE_UNBLOCK_TIMEOUT_MS = 30_000L
+
 /** One original failure owns both settings return and the finite native reminder lifetime. */
 internal class DictationMicrophoneRecovery(
     val failure: ConversationDictationState.Failed,
@@ -40,17 +42,26 @@ internal fun ConversationDictationController.armMicrophoneSettingsRecovery() {
 
 internal fun ConversationDictationController.resumeMicrophoneSettingsRecovery(): Boolean {
     val pending = microphoneSettingsRecovery ?: return false
-    if (pending.native && !pending.resumed) return true
-    val restored = runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
-    // Consume refusal before lock gating: a cancelled return must never arm a later unmute.
-    if (state !== pending.failure || !restored) {
-        if (!pending.native || pending.paused) clearMicrophoneRecovery()
-        return false
+    return when {
+        pending.native && !pending.resumed -> true
+        else -> {
+            val restored =
+                runCatching(platform::microphoneAccess).getOrNull() == ConversationDictationMicrophoneAccess.Granted
+            // Consume refusal before lock gating: a cancelled return must never arm a later unmute.
+            when {
+                state !== pending.failure || !restored -> {
+                    if (!pending.native || pending.paused) clearMicrophoneRecovery()
+                    false
+                }
+                !microphoneRecoveryAllowed() || (pending.native && !microphoneHostReady()) -> true
+                else -> {
+                    clearMicrophoneRecovery()
+                    retry()
+                    true
+                }
+            }
+        }
     }
-    if (!microphoneRecoveryAllowed() || (pending.native && !microphoneHostReady())) return true
-    clearMicrophoneRecovery()
-    retry()
-    return true
 }
 
 /** Called only from a fresh user gesture or its runtime permission continuation. */
@@ -70,18 +81,23 @@ internal fun ConversationDictationController.requestNativeMicrophoneUnblock(
     val failed = microphoneSettingsRecovery?.failure ?: return
     val pending = DictationMicrophoneRecovery(failed, native = true, resumed = microphoneHostReady())
     microphoneSettingsRecovery = pending
-    pending.timeout = scheduleTimeout(30_000L) {
+    pending.timeout = scheduleTimeout(MICROPHONE_UNBLOCK_TIMEOUT_MS) {
         if (microphoneSettingsRecovery === pending) clearMicrophoneRecovery()
     }
     dispatchNativeMicrophoneUnblock(pending)
 }
 
 private fun ConversationDictationController.dispatchNativeMicrophoneUnblock(pending: DictationMicrophoneRecovery) {
-    if (pending.dispatched || !pending.resumed || !microphoneHostReady() || !microphoneRecoveryAllowed()) return
+    if (pending.dispatched || !pending.resumed) return
+    if (!microphoneHostReady() || !microphoneRecoveryAllowed()) return
     if (platform.microphoneAccess() == ConversationDictationMicrophoneAccess.Granted) {
         resumeMicrophoneSettingsRecovery()
-        return
+    } else {
+        registerNativeMicrophoneUnblock(pending)
     }
+}
+
+private fun ConversationDictationController.registerNativeMicrophoneUnblock(pending: DictationMicrophoneRecovery) {
     pending.paused = false
     pending.dispatched = true
     val unregister =
@@ -90,23 +106,20 @@ private fun ConversationDictationController.dispatchNativeMicrophoneUnblock(pend
                 if (microphoneSettingsRecovery === pending && pending.resumed) resumeMicrophoneSettingsRecovery()
             }
         }.getOrNull()
-    if (unregister == null) {
-        clearMicrophoneRecovery()
-        return
+    when {
+        unregister == null -> clearMicrophoneRecovery()
+        microphoneSettingsRecovery !== pending -> unregister()
+        else -> pending.unregister = unregister
     }
-    if (microphoneSettingsRecovery !== pending) {
-        unregister()
-        return
-    }
-    pending.unregister = unregister
 }
 
 /** A pending prompt belongs to the visible origin, unlike an already running durable capture. */
 internal fun ConversationDictationController.onMicrophoneOriginChanged(accountRef: String?, groupIdHex: String?) {
     val pending = microphoneSettingsRecovery ?: return
+    if (!pending.native) return
     if (
-        pending.native &&
-        (accountRef == null || groupIdHex == null || !pending.failure.target.matchesConversation(accountRef, groupIdHex))
+        accountRef == null || groupIdHex == null ||
+        !pending.failure.target.matchesConversation(accountRef, groupIdHex)
     ) {
         clearMicrophoneRecovery()
     }
@@ -131,7 +144,9 @@ internal fun ConversationDictationController.onMicrophoneHostResumed() {
     }
 }
 
-internal fun ConversationDictationController.resumeAfterMicrophonePermission(pending: ConversationDictationState.PermissionRequired) {
+internal fun ConversationDictationController.resumeAfterMicrophonePermission(
+    pending: ConversationDictationState.PermissionRequired,
+) {
     when (platform.microphoneAccess()) {
         ConversationDictationMicrophoneAccess.Granted -> startWhenProviderAvailable(pending.sessionId, pending.target)
         ConversationDictationMicrophoneAccess.RuntimePermissionRequired ->

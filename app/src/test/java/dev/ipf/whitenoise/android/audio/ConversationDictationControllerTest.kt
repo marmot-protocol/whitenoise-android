@@ -3027,7 +3027,10 @@ class ConversationDictationControllerTest {
     @Test
     fun nativeReminderCannotOutliveOriginSwitchOrTimeout() {
         val blockedAccess =
-            listOf(ConversationDictationMicrophoneAccess.MicrophoneMuted, ConversationDictationMicrophoneAccess.AppOpDenied)
+            listOf(
+                ConversationDictationMicrophoneAccess.MicrophoneMuted,
+                ConversationDictationMicrophoneAccess.AppOpDenied,
+            )
         for (access in blockedAccess) {
             for (originChanged in listOf(true, false)) {
                 val platform =
