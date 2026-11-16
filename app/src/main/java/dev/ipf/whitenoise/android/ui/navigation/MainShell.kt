@@ -1983,8 +1983,10 @@ internal fun MainShell(
                 withFrameNanos { }
                 if (selectedChat?.id != exiting.chat.id) exitingConversationContent = null
             }
-            LaunchedEffect(displacedConversationControllers.isEmpty(), routeTransition) {
-                if (displacedConversationControllers.isEmpty()) return@LaunchedEffect
+            // Keyed on the exact displaced set: a close that displaces another controller during the
+            // wait restarts it, so only controllers whose exit already settled are released.
+            LaunchedEffect(displacedControllers, routeTransition) {
+                if (displacedControllers.isEmpty()) return@LaunchedEffect
                 snapshotFlow {
                     conversationRouteTransitionComplete(
                         currentStateMatchesTarget = routeTransition.currentState == routeTransition.targetState,
@@ -1993,7 +1995,7 @@ internal fun MainShell(
                 }.filter { it }
                     .first()
                 withFrameNanos { }
-                displacedConversationControllers.clear()
+                displacedConversationControllers.removeAll(displacedControllers)
             }
             // One movable list route, so its screen state survives moving between the side pane and the
             // full-width slot when the window crosses the two-pane width.
