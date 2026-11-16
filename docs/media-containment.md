@@ -297,6 +297,12 @@ Admission:
   at once as requests wait for a slot, so several new domains are not served
   one eviction at a time, and none beyond that: slots already being freed are
   awaited while they cover every waiting request.
+- The conversation on screen is a foreground domain (#3819). While one of its
+  requests waits for a worker, other domains take no spare, start none and
+  evict none, so it gets the next one; its idle worker is evicted only when no
+  other idle one remains. Without this, an opened chat waited behind every
+  chat-list group picture queued before it: one exec-spawned start each, about
+  0.5 s on a GrapheneOS Pixel 9a.
 - A refused bind fails that input. A binding Android reports dead or null before
   it ever connects never received input: it is unbound and its slot freed. A
   death link that fails because the Binder is already dead records that death
