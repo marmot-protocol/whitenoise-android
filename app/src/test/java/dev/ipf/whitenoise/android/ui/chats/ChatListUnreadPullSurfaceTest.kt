@@ -104,7 +104,7 @@ class ChatListUnreadPullSurfaceTest {
         }
     }
 
-    /** The pinned divider rides the single body offset with its rows through a held pull, release and toggles (#3842). */
+    /** The pinned divider rides the single body offset with its rows through a pull, release and toggles (#3842). */
     @Test fun pinnedDividerMovesWithRowsOnEveryPullFrame() {
         val unread = mutableStateOf(false)
         rule.setContent {
@@ -114,9 +114,11 @@ class ChatListUnreadPullSurfaceTest {
                         LazyColumn {
                             items(2, key = { it }) { Text("Chat $it", Modifier.size(48.dp).testTag("row.$it")) }
                             item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {
-                                ChatListPinnedBoundary(chatListPinnedBoundaryMotion(rowCount = 6))
+                                ChatListPinnedBoundary(chatListPinnedBoundaryMotion())
                             }
-                            items(4, key = { it + 2 }) { Text("Chat ${it + 2}", Modifier.size(48.dp).testTag("row.${it + 2}")) }
+                            items(4, key = { it + 2 }) { index ->
+                                Text("Chat ${index + 2}", Modifier.size(48.dp).testTag("row.${index + 2}"))
+                            }
                         }
                     }
                 }

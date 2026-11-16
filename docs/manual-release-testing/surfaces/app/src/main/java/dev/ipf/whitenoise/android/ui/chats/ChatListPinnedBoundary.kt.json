@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListPinnedBoundary.kt",
+  "legacy_sha256": "fc5443c6db90adc11023fc364094fedcc09a09063d67cc8aa78a189418248d9a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatListPinnedBoundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListPinnedBoundary.kt",
+        "anchor": "fun ChatListPinnedBoundary(",
+        "test_ids": [
+          "CHL-012"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListPinnedBoundary.kt",
+        "surface": "Pinned-section divider placement motion",
+        "anchor": "internal fun LazyItemScope.chatListPinnedBoundaryMotion(",
+        "test_ids": [
+          "CHL-038"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -2766,7 +2766,6 @@ internal fun ChatsScreen(
                                                     ChatListPinnedBoundary(
                                                         modifier =
                                                             chatListPinnedBoundaryMotion(
-                                                                rowCount = visibleItems.size,
                                                                 placementDurationMillis = rowPlacementDurationMillis,
                                                             ),
                                                     )

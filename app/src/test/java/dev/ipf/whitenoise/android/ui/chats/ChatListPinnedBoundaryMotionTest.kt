@@ -85,7 +85,7 @@ class ChatListPinnedBoundaryMotionTest {
 
     @Test
     fun emptyingEitherSectionRemovesTheDividerAtOnceAndRefillingShowsExactlyOne() {
-        var state by mutableStateOf(listOf("P1", "A", "B", "C") to 1)
+        var state by mutableStateOf<Pair<List<String>, Int?>>(listOf("P1", "A", "B", "C") to 1)
         mountRows(listOf("P1", "A", "B", "C")) { state }
         composeRule.waitForIdle()
         assertEquals(1, dividerCount())
@@ -101,7 +101,7 @@ class ChatListPinnedBoundaryMotionTest {
         assertSettledBetween(above = "B", below = "A")
 
         // Pin every row: all pinned, no divider on any frame.
-        stepFrames({ state = listOf("A", "B", "P1", "C") to null }) { frame ->
+        stepFrames({ state = listOf("A", "B", "P1", "C") to 4 }) { frame ->
             assertEquals("stranded divider at frame $frame", 0, dividerCount())
         }
     }

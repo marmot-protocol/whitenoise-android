@@ -813,7 +813,7 @@ internal fun ChatListHeadReorderMotionHarness(
             if (targetIndex == pinnedCount) {
                 item(key = CHAT_LIST_PINNED_BOUNDARY_KEY) {
                     ChatListPinnedBoundary(
-                        modifier = chatListPinnedBoundaryMotion(itemIds.size, rowPlacementDurationMillis),
+                        modifier = chatListPinnedBoundaryMotion(rowPlacementDurationMillis),
                     )
                 }
             }
