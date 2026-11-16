@@ -400,6 +400,9 @@ class ConversationAcceptedSendRouteScreenshotTest {
         if (retireDuringFlight) {
             composeRule.onNode(hasSetTextAction()).performTextInput("Next draft")
             composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            // Match the flight frames' native draw synchronization with the clock frozen.
+            composeRule.onRoot().captureToImage()
             composeRule.onNodeWithText("Next draft").assertIsDisplayed()
         }
     }
