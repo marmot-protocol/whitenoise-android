@@ -847,8 +847,8 @@
     <string name="notification_sent_voice_message">Отправлено голосовое сообщение</string>
     <string name="notification_sent_file">Отправлен файл</string>
     <string name="notification_sender_in_group">%1$s в %2$s</string>
-    <string name="notification_invite_from_sender">Приглашение от %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s пригласил(а) вас в %2$s</string>
+    <string name="notification_invitation_to_group">Приглашение в %1$s</string>
+    <string name="notification_open_to_view_invite">Откройте White Noise, чтобы просмотреть приглашение</string>
     <string name="notification_removed_from_group">Вас удалили из группы «%1$s»</string>
     <string name="notification_removed_from_unnamed_group">Вас удалили из группы</string>
     <string name="notification_made_admin_of_group">Теперь вы администратор группы «%1$s»</string>

@@ -794,8 +794,8 @@
     <string name="notification_sent_voice_message">发送了一条语音消息</string>
     <string name="notification_sent_file">发送了一个文件</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
-    <string name="notification_invite_from_sender">来自 %1$s 的邀请</string>
-    <string name="notification_sender_invited_you_to_group">%1$s 邀请你加入 %2$s</string>
+    <string name="notification_invitation_to_group">邀请加入%1$s</string>
+    <string name="notification_open_to_view_invite">打开 White Noise 查看邀请</string>
     <string name="notification_removed_from_group">你已被移出“%1$s”</string>
     <string name="notification_removed_from_unnamed_group">你已被移出群组</string>
     <string name="notification_made_admin_of_group">你已成为“%1$s”的管理员</string>

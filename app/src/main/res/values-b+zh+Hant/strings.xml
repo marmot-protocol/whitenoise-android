@@ -794,8 +794,8 @@
     <string name="notification_sent_voice_message">傳送了一則語音訊息</string>
     <string name="notification_sent_file">傳送了一個檔案</string>
     <string name="notification_sender_in_group">%1$s 在 %2$s 中</string>
-    <string name="notification_invite_from_sender">來自 %1$s 的邀請</string>
-    <string name="notification_sender_invited_you_to_group">%1$s 邀請你加入 %2$s</string>
+    <string name="notification_invitation_to_group">邀請加入%1$s</string>
+    <string name="notification_open_to_view_invite">開啟 White Noise 查看邀請</string>
     <string name="notification_removed_from_group">你已被移出「%1$s」</string>
     <string name="notification_removed_from_unnamed_group">你已被移出群組</string>
     <string name="notification_made_admin_of_group">你已成為「%1$s」的管理員</string>

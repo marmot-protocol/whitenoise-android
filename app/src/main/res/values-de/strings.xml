@@ -809,8 +809,8 @@
     <string name="notification_sent_voice_message">hat eine Sprachnachricht gesendet</string>
     <string name="notification_sent_file">hat eine Datei gesendet</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
-    <string name="notification_invite_from_sender">Einladung von %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s hat dich zu %2$s eingeladen</string>
+    <string name="notification_invitation_to_group">Einladung zu %1$s</string>
+    <string name="notification_open_to_view_invite">Öffnen Sie White Noise, um die Einladung anzuzeigen</string>
     <string name="notification_removed_from_group">Du wurdest aus %1$s entfernt</string>
     <string name="notification_removed_from_unnamed_group">Du wurdest aus einer Gruppe entfernt</string>
     <string name="notification_made_admin_of_group">Du bist jetzt Admin von %1$s</string>

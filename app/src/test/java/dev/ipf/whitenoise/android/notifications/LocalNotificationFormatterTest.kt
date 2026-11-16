@@ -109,6 +109,7 @@ class LocalNotificationFormatterTest {
         assertNull(content?.conversationTitle)
     }
 
+    /** An invitation without a group name asks the user to open the app instead of naming who invited them. */
     @Test
     fun inviteNotificationUsesInviteCopy() {
         val content =
@@ -122,7 +123,7 @@ class LocalNotificationFormatterTest {
             )
 
         assertEquals("Group invite", content?.title)
-        assertEquals("Invite from Bob", content?.body)
+        assertEquals("Open White Noise to view the invite", content?.body)
     }
 
     /** Ordinary message and native activity previews share the same safe reaction notification path. */
@@ -604,20 +605,21 @@ class LocalNotificationFormatterTest {
         assertEquals(receiverAccountIdHex, content?.selfKey)
     }
 
+    /** The invitation's body names its group and never the inviter, even when a sender name is known. */
     @Test
-    fun inviteBodyUsesSenderNameOverride() {
+    fun inviteBodyNamesOnlyTheGroup() {
         val content =
             content(
                 update(
                     trigger = NotificationTriggerFfi.GROUP_INVITE,
-                    groupName = null,
+                    groupName = "Book Club",
                     previewText = null,
                     sender = user(displayName = null),
                 ),
                 senderNameOverride = "Carol",
             )
 
-        assertEquals("Invite from Carol", content?.body)
+        assertEquals("Invitation to Book Club", content?.body)
     }
 
     /** A nickname or profile name supplied by the caller wins over everything in the payload. */

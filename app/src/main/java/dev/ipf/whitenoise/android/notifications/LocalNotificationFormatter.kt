@@ -305,7 +305,6 @@ object LocalNotificationFormatter {
                 kind,
                 update,
                 context,
-                senderName,
                 previewTextOverride,
                 reactedToPreviewOverride,
                 mediaKind,
@@ -362,7 +361,6 @@ object LocalNotificationFormatter {
         kind: ContentKind,
         update: NotificationUpdateFfi,
         context: Context?,
-        senderName: String,
         previewTextOverride: String?,
         reactedToPreviewOverride: String?,
         mediaKind: ReplyMediaKind,
@@ -371,7 +369,7 @@ object LocalNotificationFormatter {
             when (kind) {
                 ContentKind.MESSAGE ->
                     messageBody(update, context, previewTextOverride, reactedToPreviewOverride, mediaKind)
-                ContentKind.INVITE -> inviteBody(update, context, senderName)
+                ContentKind.INVITE -> inviteBody(update, context)
                 ContentKind.REMOVED_FROM_GROUP -> ""
                 ContentKind.MADE_ADMIN ->
                     clean(previewTextOverride)
@@ -519,16 +517,19 @@ object LocalNotificationFormatter {
 
     private fun inviteTitle(context: Context?): String = text(context, R.string.notification_group_invite, "Group invite")
 
+    /**
+     * The invitation's body names only its group, never who invited, so an unaccepted stranger's name or key never
+     * reaches the lock screen; without a group name it asks the user to open the app.
+     */
     private fun inviteBody(
         update: NotificationUpdateFfi,
         context: Context?,
-        sender: String,
     ): String {
         val group = clean(update.groupName)
         return if (group == null) {
-            text(context, R.string.notification_invite_from_sender, "Invite from %1\$s", sender)
+            text(context, R.string.notification_open_to_view_invite, "Open White Noise to view the invite")
         } else {
-            text(context, R.string.notification_sender_invited_you_to_group, "%1\$s invited you to %2\$s", sender, group)
+            text(context, R.string.notification_invitation_to_group, "Invitation to %1\$s", group)
         }
     }
 

@@ -811,8 +811,8 @@
     <string name="notification_sent_voice_message">enviou uma mensagem de voz</string>
     <string name="notification_sent_file">enviou um arquivo</string>
     <string name="notification_sender_in_group">%1$s em %2$s</string>
-    <string name="notification_invite_from_sender">Convite de %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s convidou você para %2$s</string>
+    <string name="notification_invitation_to_group">Convite para %1$s</string>
+    <string name="notification_open_to_view_invite">Abra o White Noise para ver o convite</string>
     <string name="notification_removed_from_group">Você foi removido de %1$s</string>
     <string name="notification_removed_from_unnamed_group">Você foi removido de um grupo</string>
     <string name="notification_made_admin_of_group">Agora você é administrador de %1$s</string>
