@@ -5582,8 +5582,21 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileTeamReport.kt",
       "symbol": "ProfileTeamReportSheet",
-      "bindings": [],
-      "remaining": "Report to White Noise team from another person's profile: needs a Maestro fixture whose build reports moderation reporting available, opening the sheet from the profile row and cancelling before submitModerationReport."
+      "bindings": [
+        {
+          "case": "profiles-team-report-back",
+          "selector": {
+            "id": "message.report.body"
+          },
+          "scope": "private White Noise team report sheet opened from Bob's profile; Back cancels before submitModerationReport.",
+          "entry_assertion": {
+            "id": "message.report.body"
+          },
+          "opened_by": {
+            "text": "Report to White Noise team"
+          }
+        }
+      ]
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
