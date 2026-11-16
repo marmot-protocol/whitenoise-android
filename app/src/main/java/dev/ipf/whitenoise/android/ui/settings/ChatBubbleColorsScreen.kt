@@ -33,6 +33,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatBubbleColorArgb
+import dev.ipf.whitenoise.android.state.globalBubbleColorArgb
+import dev.ipf.whitenoise.android.state.updateChatBubbleColor
+import dev.ipf.whitenoise.android.state.updateGlobalBubbleColor
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu

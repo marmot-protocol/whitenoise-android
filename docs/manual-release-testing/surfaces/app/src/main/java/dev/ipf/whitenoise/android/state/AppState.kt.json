@@ -283,14 +283,6 @@
         ]
       },
       {
-        "surface": "Unread chat mute failure",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_update_notifications",
-        "test_ids": [
-          "CHL-031"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "surface": "Font-scale cancellation reconciles actual commit and latest visible selection",
         "anchor": "fun updateFontScale(",
@@ -320,14 +312,6 @@
         "anchor": "private fun setDraftForAccount(",
         "test_ids": [
           "DIC-011"
-        ]
-      },
-      {
-        "surface": "Mute and unmute from chat-list actions and group details share one command path and one presentation owner",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "private fun submitMuteCommand(",
-        "test_ids": [
-          "GRP-015"
         ]
       },
       {
