@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.StickerFfi
 import dev.ipf.marmotkit.StickerPackFfi
+import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -17,6 +18,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.URI
+import java.net.URLDecoder
 
 /** Sticker image caching and the pack library's loading, discovery and sync rules. */
 class StickersTest {
@@ -364,6 +367,97 @@ class StickersTest {
             assertEquals(null, library(null).shareLink(pack("a")))
         }
 
+    /** White Noise's packs install once, after a sync, through links naming White Noise's relays. */
+    @Test
+    fun defaultPacksInstallOnceThroughWhiteNoiseRelayLinks() =
+        runTest {
+            val defaults = DefaultsHarness()
+            defaults.library.installDefaultPacksIfNeeded()
+            assertEquals(emptyList<String>(), defaults.inputs)
+
+            defaults.library.sync()
+            defaults.library.installDefaultPacksIfNeeded()
+            assertEquals(StickerDefaultPacks.coordinates.map(StickerDefaultPacks::installInput), defaults.inputs)
+            assertTrue(StickerDefaultPacks.coordinates.all(defaults.library::isInstalled))
+            assertEquals(StickerDefaultPacks.coordinates.toSet(), defaults.offered)
+
+            defaults.library.installDefaultPacksIfNeeded()
+            assertEquals(2, defaults.inputs.size)
+        }
+
+    /** A removed default stays removed, and a default the account already has is recorded without reinstalling. */
+    @Test
+    fun removedOrPresentDefaultsAreNeverInstalledAgain() =
+        runTest {
+            val originals = StickerDefaultPacks.coordinates.first()
+            val defaults = DefaultsHarness(alreadyInstalled = listOf(originals))
+            defaults.library.sync()
+            defaults.library.installDefaultPacksIfNeeded()
+            val marmot = StickerDefaultPacks.installInput(StickerDefaultPacks.coordinates.last())
+            assertEquals(listOf(marmot), defaults.inputs)
+
+            defaults.library.uninstall(packAt(originals))
+            defaults.library.installDefaultPacksIfNeeded()
+            assertEquals(1, defaults.inputs.size)
+            assertFalse(defaults.library.isInstalled(originals))
+        }
+
+    /** A default that fails to install, offline say, is tried again on the next open. */
+    @Test
+    fun failedDefaultInstallIsRetriedNextTime() =
+        runTest {
+            val defaults = DefaultsHarness(failing = mutableSetOf(StickerDefaultPacks.coordinates.last()))
+            defaults.library.sync()
+            defaults.library.installDefaultPacksIfNeeded()
+            assertEquals(setOf(StickerDefaultPacks.coordinates.first()), defaults.offered)
+
+            defaults.failing.clear()
+            defaults.library.installDefaultPacksIfNeeded()
+            assertEquals(StickerDefaultPacks.coordinates.toSet(), defaults.offered)
+            assertFalse(defaults.library.isInstallingDefaults)
+        }
+
+    /** Each default install link names the pack and every White Noise bootstrap relay. */
+    @Test
+    fun defaultInstallLinksNameWhiteNoiseRelays() {
+        for (coordinate in StickerDefaultPacks.coordinates) {
+            val link = URI(StickerDefaultPacks.installInput(coordinate))
+            val parameters =
+                link.rawQuery.split('&').map { part ->
+                    val (name, value) = part.split('=', limit = 2)
+                    name to URLDecoder.decode(value, "UTF-8")
+                }
+            assertEquals("https", link.scheme)
+            assertEquals(listOf(coordinate), parameters.filter { it.first == "a" }.map { it.second })
+            assertEquals(MarmotClient.bootstrapRelays, parameters.filter { it.first == "relay" }.map { it.second })
+        }
+    }
+
+    /** A library backed by an in-memory installed list and ledger, recording every install input. */
+    private class DefaultsHarness(
+        alreadyInstalled: List<String> = emptyList(),
+        val failing: MutableSet<String> = mutableSetOf(),
+    ) {
+        val inputs = mutableListOf<String>()
+        var offered: Set<String> = emptySet()
+        private val present = alreadyInstalled.toMutableSet()
+        val library =
+            StickerLibrary(
+                packs = { _, _ -> present.map { packAt(it, installed = true) } },
+                syncPacks = {},
+                fetchPack = { error("unused") },
+                installPack = { input ->
+                    inputs += input
+                    val coordinate = URLDecoder.decode(input.substringAfter("a=").substringBefore('&'), "UTF-8")
+                    check(coordinate !in failing) { "relay unreachable" }
+                    present += coordinate
+                    packAt(coordinate, installed = true)
+                },
+                uninstallPack = { coordinate -> present -= coordinate },
+                defaultPacks = StickerDefaultPackLedger(read = { offered }, write = { offered = it }),
+            )
+    }
+
     private companion object {
         val KEY = StickerKey(coordinate("pack"), "wave", "ab".repeat(32))
 
@@ -381,6 +475,12 @@ class StickersTest {
                 null,
                 null,
             )
+
+        /** A pack at an arbitrary [coordinate], such as one of White Noise's defaults. */
+        fun packAt(
+            coordinate: String,
+            installed: Boolean = false,
+        ) = pack(coordinate.substringAfterLast(':'), installed).copy(coordinate = coordinate)
 
         fun pack(
             id: String,

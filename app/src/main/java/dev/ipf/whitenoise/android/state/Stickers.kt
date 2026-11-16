@@ -58,6 +58,8 @@ class StickerLibrary(
     private val uninstallPack: suspend (input: String) -> Unit,
     /** MDK's share link for a coordinate, naming the relays the pack was found on; null when none is available. */
     private val packShareLink: suspend (coordinate: String) -> String? = { null },
+    /** Which White Noise default packs this account has had; null for a library that installs no defaults. */
+    private val defaultPacks: StickerDefaultPackLedger? = null,
 ) {
     /** The link or address each pack was last opened from, so installing it asks the same relay hints. */
     private val openedFrom = HashMap<String, String>()
@@ -76,6 +78,10 @@ class StickerLibrary(
 
     /** Whether the latest installed read failed and settled; a successful read clears it. */
     var installedReadFailed: Boolean by mutableStateOf(false)
+        private set
+
+    /** Whether White Noise's default packs are installing, so an empty picker waits instead of offering the browser. */
+    var isInstallingDefaults: Boolean by mutableStateOf(false)
         private set
 
     private val loadMutex = Mutex()
@@ -156,6 +162,8 @@ class StickerLibrary(
      */
     suspend fun uninstall(pack: StickerPackFfi) {
         uninstallPack(pack.coordinate)
+        // A default removed before it was recorded must not be installed again.
+        if (pack.coordinate in StickerDefaultPacks.coordinates) defaultPacks?.record(listOf(pack.coordinate))
         membershipGeneration++
         installed = installed.filterNot { it.coordinate == pack.coordinate }
         reloadInstalled()
@@ -163,6 +171,47 @@ class StickerLibrary(
 
     /** A link to [pack] naming the relays it was found on, so recipients on other relays can open it; null if none. */
     suspend fun shareLink(pack: StickerPackFfi): String? = packShareLink(pack.coordinate)
+
+    /**
+     * Installs White Noise's default packs this account hasn't had yet. It waits for a successful [sync], so packs
+     * already on the account's list count as installed. A failed install, offline say, is tried again next time; an
+     * installed or removed default is recorded and never installed again.
+     */
+    suspend fun installDefaultPacksIfNeeded() {
+        val ledger = defaultPacks
+        if (ledger != null && synced && !isInstallingDefaults) {
+            loadInstalledIfNeeded()
+            if (hasLoadedInstalled) installDefaults(ledger)
+        }
+    }
+
+    /** Installs each default the account still needs; one that fails stays pending for the next open. */
+    private suspend fun installDefaults(ledger: StickerDefaultPackLedger) {
+        val present = installed.mapTo(HashSet()) { it.coordinate }
+        ledger.record(StickerDefaultPacks.coordinates.filter { it in present })
+        val pending = StickerDefaultPacks.toInstall(present, ledger.offered())
+        if (pending.isEmpty()) return
+        isInstallingDefaults = true
+        try {
+            for (coordinate in pending) {
+                // A default the person removed while an earlier one installed stays removed.
+                val added =
+                    if (coordinate in ledger.offered()) {
+                        null
+                    } else {
+                        runCatchingCancellable { installPack(StickerDefaultPacks.installInput(coordinate)) }.getOrNull()
+                    }
+                if (added != null) {
+                    ledger.record(listOf(coordinate))
+                    membershipGeneration++
+                    installed = installed.filterNot { it.coordinate == added.coordinate } + added
+                }
+            }
+        } finally {
+            isInstallingDefaults = false
+        }
+        reloadInstalled()
+    }
 }
 
 /**

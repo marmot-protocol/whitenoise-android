@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 
 private val PackTabShape = RoundedCornerShape(10.dp)
 
-/** The account's installed packs, one tab per pack, for sending a sticker. */
+/** The account's installed packs, one tab per pack, for sending a sticker; it installs White Noise's defaults once. */
 @Suppress("FunctionNaming")
 @Composable
 internal fun StickerPickerPage(
@@ -69,7 +69,8 @@ internal fun StickerPickerPage(
 ) {
     LaunchedEffect(library) {
         library.loadInstalledIfNeeded()
-        attemptSticker { library.sync() }
+        // White Noise's own packs install once per account, after a sync shows what the account already has.
+        if (attemptSticker { library.sync() } == null) library.installDefaultPacksIfNeeded()
     }
     val packs = library.installed.filter { it.stickers.isNotEmpty() }
     var selectedCoordinate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -90,7 +91,7 @@ internal fun StickerPickerPage(
                     retrying = false
                 }
             }
-        !library.hasLoadedInstalled && packs.isEmpty() -> StickerProgress()
+        (!library.hasLoadedInstalled || library.isInstallingDefaults) && packs.isEmpty() -> StickerProgress()
         selected == null -> EmptyStickerPicker(onBrowse)
         else -> {
             if (packs.size > 1) {
