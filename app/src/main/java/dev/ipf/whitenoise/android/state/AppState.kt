@@ -1406,9 +1406,6 @@ class WhiteNoiseAppState private constructor(
     internal val runtimeMirrors = RuntimeMirrors()
     internal val freshGroupCreations = FreshGroupCreationRegistry()
 
-    val accountUnreadCounts: Map<String, ULong>
-        get() = accountUnreadStore.retainedCounts
-
     var activeAccountRef by mutableStateOf(initialActiveAccountRef ?: preferences.getString(ACTIVE_ACCOUNT_KEY, null))
         private set
 
@@ -3838,19 +3835,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Runs one shared account catch-up; see [PushWakeRecoveryController.catchUpAccounts]. */
-    suspend fun catchUpAccounts() {
-        pushWakeRecovery.catchUpAccounts()
-    }
-
-    /** Starts the process-owned chat-list catch-up shared by callers for the same identity. */
-    internal fun launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = pushWakeRecovery.launchCatchUpAccounts()
-
-    /** Best-effort catch-up when the app returns to the foreground. */
-    suspend fun catchUpAfterForegroundActivation() {
-        pushWakeRecovery.catchUpAfterForegroundActivation()
-    }
-
     /**
      * Memoize an in-flight attachment download keyed on [cacheKey] and route
      * the work through [mutationsScope] so it survives caller cancellation
@@ -4530,21 +4514,6 @@ class WhiteNoiseAppState private constructor(
         return pushWakeRecovery.drainPendingPushWakeCatchUpIfNeeded()
     }
 
-    /** Fences teardown while preserving existing screen-lock notification redaction. */
-    internal fun pushWakeRecoveryAllowed(): Boolean = pushWakeRecovery.pushWakeRecoveryAllowed()
-
-    /** Acknowledges the foreground-service instance that currently owns background runtime. */
-    internal fun acknowledgePushWakeServiceOwner(owner: Any) = pushWakeRecovery.acknowledgePushWakeServiceOwner(owner)
-
-    /** Releases only the matching service lease. */
-    internal fun releasePushWakeServiceOwner(owner: Any) = pushWakeRecovery.releasePushWakeServiceOwner(owner)
-
-    /** Accepts a process-owned drain only while an Activity or acknowledged service owns its lifetime. */
-    internal fun acceptPushWakeRecovery(): Boolean = pushWakeRecovery.acceptPushWakeRecovery()
-
-    /** Runs one bounded push-wake recovery attempt shared by the service and worker owners. */
-    internal suspend fun runPushWakeRecoveryAttempt() = pushWakeRecovery.runPushWakeRecoveryAttempt()
-
     /** Captures the active notification-runtime recovery lifetime. */
     internal fun notificationRuntimeRecoveryGeneration(): Long = notificationRuntimeRecovery.capture()
 
@@ -5039,56 +5008,6 @@ class WhiteNoiseAppState private constructor(
             }
         return latestAccounts
     }
-
-    /** Retained count for reconciliation and diagnostics, even while freshness is unknown. */
-    fun unreadCountForAccount(accountRef: String): ULong = accountUnreadStore.values[accountRef]?.unreadCount ?: 0uL
-
-    /** Count safe to render as current. Unknown retained values intentionally present as no badge. */
-    fun confirmedUnreadCountForAccount(accountRef: String): ULong = accountUnreadStore.values[accountRef].confirmedUnreadCount()
-
-    /**
-     * Whether [accountRef]'s avatar should light the unread dot, from that
-     * account's own per-account aggregate (#805). Shared by the active avatar,
-     * the secondary top-bar avatars, and the account switcher so no avatar can
-     * light for another account's unread.
-     */
-    fun accountShowsUnreadDot(accountRef: String?): Boolean {
-        val ref = accountRef?.takeIf { it.isNotBlank() } ?: return false
-        return accountUnreadStore.values[ref].showsUnreadDot()
-    }
-
-    internal fun updateAccountUnreadCount(
-        accountRef: String?,
-        unreadCount: ULong,
-    ) = accountUnreadStore.updateCount(accountRef, unreadCount)
-
-    /**
-     * Publishes a chat-list row fold only while no complete native total exists for [accountRef]. The fold sees
-     * just the bounded loaded rows, so it must not replace a Ready total that also counts chats outside the
-     * window, such as an older unread chat or a manual reminder (#3729).
-     */
-    internal fun updateAccountUnreadProjection(
-        accountRef: String?,
-        unreadCount: ULong,
-        hasManualUnread: Boolean,
-    ) {
-        val accountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex
-        if (accountIdHex != null && runtimeMirrors.attention.latest?.hasReadyTotal(accountIdHex) == true) return
-        accountUnreadStore.updateProjection(accountRef, unreadCount, hasManualUnread)
-    }
-
-    /**
-     * Accounts with at least one manually-marked-unread chat. A boolean
-     * sidecar to [accountUnreadCounts]: the numeric map stays a real message
-     * count (it feeds literal count badges), while this set only lights dots.
-     */
-    internal val accountManualUnreadRefs: Set<String>
-        get() = accountUnreadStore.manualUnreadRefs
-
-    internal fun updateAccountManualUnread(
-        accountRef: String?,
-        hasManualUnread: Boolean,
-    ) = accountUnreadStore.updateManualUnread(accountRef, hasManualUnread)
 
     internal fun recordAccountSwitchPreloadStage(
         accountRef: String,
@@ -5997,17 +5916,6 @@ class WhiteNoiseAppState private constructor(
         stopTtsForRemovedAccount(account)
     }
 
-    suspend fun exportActiveAccountNsec(): String? {
-        val accountRef = activeAccountRef ?: return null
-        return runCatchingCancellable {
-            marmotIo { revealNsec(accountRef) }
-        }.onFailure {
-            // Secret-key export holds the nsec in hand and the toast is not
-            // behind FLAG_SECURE — scrub the FFI message before showing it (#846).
-            presentFailure(R.string.toast_couldnt_export_nsec, "SECRET_KEY_EXPORT", it)
-        }.getOrNull()
-    }
-
     /**
      * Destructive sign-out: leave MLS groups, delete relay KeyPackages, and
      * wipe all local state for the active account via Marmot's
@@ -6199,18 +6107,6 @@ class WhiteNoiseAppState private constructor(
         accountListLoaded = result.isSuccess
     }
 
-    suspend fun exportEncryptedSecretKeyBackup(passphrase: String): String? {
-        val account = activeAccountRef ?: return null
-        return runCatchingCancellable {
-            marmotIo { exportEncryptedSecretKey(account, passphrase) }
-        }.onSuccess {
-            presentTransient(R.string.toast_encrypted_backup_created)
-        }.onFailure {
-            appStateDebug { "encrypted backup failed: ${it.javaClass.simpleName}" }
-            presentFailure(R.string.toast_couldnt_create_encrypted_backup, "ENCRYPTED_BACKUP_EXPORT", it)
-        }.getOrNull()
-    }
-
     /** Commits one host preference transaction off-main and times actual durable completion. */
     @Suppress("TooGenericExceptionCaught") // Editor creation/configuration can throw provider-specific failures.
     private fun persistHostSetting(edit: SharedPreferences.Editor.() -> Unit) {
@@ -6268,12 +6164,6 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Saves the explicit sharing choice and returns false while the retryable error remains visible. */
-    suspend fun setTelemetryEnabled(enabled: Boolean): Boolean = diagnostics.choose(marmot(), enabled)
-
-    /** Retries the failed user choice, rather than discarding it with a passive settings read. */
-    internal suspend fun retryUsageDiagnostics() = diagnostics.retry(marmot())
-
     /** Gives the diagnostics screen a fresh controller bound to the runtime it opened with. */
     internal fun auditDiagnosticsSettings(): AuditDiagnosticsSettings {
         val generation = runtimeGeneration
@@ -6317,9 +6207,6 @@ class WhiteNoiseAppState private constructor(
             if (generation != runtimeGeneration) throw CancellationException("Audit settings runtime changed")
             block()
         }
-
-    /** Whether the current MDK policy has a confirmed explicit grant. */
-    fun isUsageDiagnosticsGranted(): Boolean = diagnostics.granted
 
     internal fun recordProductEvent(
         event: dev.ipf.marmotkit.ProductEventFfi,

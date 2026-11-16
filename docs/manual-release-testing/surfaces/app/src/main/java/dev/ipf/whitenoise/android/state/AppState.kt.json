@@ -323,14 +323,6 @@
         ]
       },
       {
-        "surface": "Account dot follows the complete native total",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "hasReadyTotal(accountIdHex)",
-        "test_ids": [
-          "NAV-005"
-        ]
-      },
-      {
         "surface": "Bind audit status and retention to the current runtime and acknowledged consent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "internal fun auditDiagnosticsSettings(",
