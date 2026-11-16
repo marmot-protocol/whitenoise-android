@@ -814,6 +814,17 @@ androidComponents {
         }
     }
 
+    // Direct downloads pay for every APK byte. Extract compressed native libraries
+    // at install time; leave Play's bundle packaging and delivery defaults intact.
+    onVariants(
+        selector()
+            .withBuildType("release")
+            .withFlavor("environment" to "production")
+            .withFlavor("distribution" to "zapstore"),
+    ) { variant ->
+        variant.packaging.jniLibs.useLegacyPackaging.set(true)
+    }
+
     // Embed short commit SHA + build date into every release APK filename so
     // multiple CI builds against master don't produce identically named APKs.
     // Local builds without GITHUB_SHA fall back to "local".
