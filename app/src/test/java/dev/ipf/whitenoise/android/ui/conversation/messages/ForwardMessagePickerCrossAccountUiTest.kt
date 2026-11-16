@@ -27,8 +27,8 @@ import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.PendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.SerializedPendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.presentedRow
 import dev.ipf.whitenoise.android.state.forwardTargets
+import dev.ipf.whitenoise.android.state.presentedRow
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG
@@ -536,11 +536,7 @@ class ForwardMessagePickerCrossAccountUiTest {
         val appState =
             emptyAppState(
                 chatListSubscriptions = completeTargetSubscriptions(),
-                profiles =
-                    mutableMapOf(
-                        PEER_A_ID to profile("Person A"),
-                        PEER_A_2_ID to profile("Person A2"),
-                    ),
+                profiles = mutableMapOf(PEER_A_ID to profile("Person A"), PEER_A_2_ID to profile("Person A2")),
             )
         val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
         controller.applyLocalDirectChat(GROUP_UNDER_A, ACCOUNT_HEX, PEER_A_ID)
@@ -569,8 +565,8 @@ class ForwardMessagePickerCrossAccountUiTest {
             val initialMemberRevision = controller.memberSnapshotsRevision
 
             composeRule.runOnIdle {
-                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A, PEER_A_ID)
-                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A_2, PEER_A_2_ID)
+                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A, PEER_A_ID, "Person A")
+                controller.applyLocalGroupDetailsWithRuleMember(GROUP_UNDER_A_2, PEER_A_2_ID, "Person A2")
             }
             composeRule.waitForIdle()
 
@@ -638,13 +634,14 @@ class ForwardMessagePickerCrossAccountUiTest {
         avatarUrl = null,
     )
 
-    /** Replaces one direct-chat roster with an authoritative rule-matching member set. */
+    /** Replaces the roster with rule-matching members while preserving its visible title. */
     private fun ChatsController.applyLocalGroupDetailsWithRuleMember(
         groupIdHex: String,
         peerIdHex: String,
+        title: String,
     ) {
         applyLocalGroupDetails(
-            record = group(groupIdHex),
+            record = group(groupIdHex).copy(name = title),
             members =
                 listOf(
                     member(ACCOUNT_HEX, local = true),
