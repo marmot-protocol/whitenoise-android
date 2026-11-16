@@ -2765,9 +2765,7 @@ internal fun ChatsScreen(
                                                 ) {
                                                     ChatListPinnedBoundary(
                                                         modifier =
-                                                            chatListPinnedBoundaryMotion(
-                                                                placementDurationMillis = rowPlacementDurationMillis,
-                                                            ),
+                                                            chatListPinnedBoundaryMotion(rowPlacementDurationMillis),
                                                     )
                                                 }
                                             }

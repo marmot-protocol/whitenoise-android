@@ -37,13 +37,11 @@ internal fun pinnedBoundaryIndex(
  * instead of the line drawing through the row. It fades in like an inserted row
  * and leaves at once when either section empties, so no stranded line remains.
  */
-internal fun LazyItemScope.chatListPinnedBoundaryMotion(
-    placementDurationMillis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS,
-): Modifier =
+internal fun LazyItemScope.chatListPinnedBoundaryMotion(millis: Int = CHAT_LIST_ROW_PLACEMENT_MILLIS): Modifier =
     Modifier
         .animateItem(
             fadeInSpec = tween(CHAT_LIST_MEMBERSHIP_FADE_MILLIS),
-            placementSpec = tween(placementDurationMillis),
+            placementSpec = tween(millis),
             fadeOutSpec = null,
         ).zIndex(CHAT_LIST_PINNED_BOUNDARY_Z_INDEX)
 
