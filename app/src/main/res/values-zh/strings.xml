@@ -2505,6 +2505,20 @@
     <string name="group_change_undelivered_message">你对此群组的上一次更改尚未到达其所有中继。如果继续，只使用这些中继的成员可能无法继续跟上群组。等待，还是仍然继续？</string>
     <string name="group_change_wait">等待</string>
     <string name="group_change_continue_anyway">仍然继续</string>
+    <string name="group_change_refused_title">有中继拒绝了你的上一次更改</string>
+    <string name="group_change_refused_message">此群组至少有一个中继永久拒绝了你的上一次更改。如果继续，只使用该中继的成员可能收不到它，也可能无法继续跟上群组。等待无法解决此问题。继续还会关闭此聊天中的警告。</string>
+    <string name="group_commit_refused_title">群组更改被拒绝</string>
+    <string name="group_commit_refused_relay_too_large">%1$s 因你所做的群组更改过大而拒绝了它。仅使用该中继的成员可能收不到此更改。</string>
+    <string name="group_commit_refused_relay">%1$s 拒绝了你所做的群组更改。仅使用该中继的成员可能收不到此更改。</string>
+    <string name="group_commit_refusal_dismiss_failed">无法关闭此警告。请再试一次。</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d 个中继因你所做的群组更改过大而拒绝了它。仅使用这些中继的成员可能收不到此更改。</item>
+        <item quantity="other">%1$d 个中继因你所做的群组更改过大而拒绝了它。仅使用这些中继的成员可能收不到此更改。</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d 个中继拒绝了你所做的群组更改。仅使用这些中继的成员可能收不到此更改。</item>
+        <item quantity="other">%1$d 个中继拒绝了你所做的群组更改。仅使用这些中继的成员可能收不到此更改。</item>
+    </plurals>
     <string name="group_change_invite_anyway">仍然邀请</string>
     <string name="starting_as">以此身份发起</string>
     <string name="starting_as_account">以 %1$s 的身份发起</string>

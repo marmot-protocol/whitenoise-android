@@ -2562,6 +2562,20 @@
     <string name="group_change_undelivered_message">Ihre letzte Änderung an dieser Gruppe hat noch nicht alle Relays der Gruppe erreicht. Mitglieder, die nur diese Relays nutzen, können der Gruppe womöglich nicht folgen, wenn Sie fortfahren. Warten oder trotzdem fortfahren?</string>
     <string name="group_change_wait">Warten</string>
     <string name="group_change_continue_anyway">Trotzdem fortfahren</string>
+    <string name="group_change_refused_title">Ein Relay hat Ihre letzte Änderung abgelehnt</string>
+    <string name="group_change_refused_message">Mindestens ein Relay dieser Gruppe hat Ihre letzte Änderung endgültig abgelehnt. Mitglieder, die nur dieses Relay nutzen, erhalten sie womöglich nicht und können der Gruppe nicht folgen, wenn Sie fortfahren. Warten hilft hier nicht. Fortfahren blendet auch die Warnung in diesem Chat aus.</string>
+    <string name="group_commit_refused_title">Gruppenänderung abgelehnt</string>
+    <string name="group_commit_refused_relay_too_large">%1$s hat eine Gruppenänderung von dir abgelehnt, weil sie zu groß war. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</string>
+    <string name="group_commit_refused_relay">%1$s hat eine Gruppenänderung von dir abgelehnt. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</string>
+    <string name="group_commit_refusal_dismiss_failed">Diese Warnung konnte nicht ausgeblendet werden. Versuche es noch einmal.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d Relay hat eine Gruppenänderung von dir abgelehnt, weil sie zu groß war. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</item>
+        <item quantity="other">%1$d Relays haben eine Gruppenänderung von dir abgelehnt, weil sie zu groß war. Mitglieder, die nur diese Relays nutzen, erhalten sie möglicherweise nicht.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d Relay hat eine Gruppenänderung von dir abgelehnt. Mitglieder, die nur dieses Relay nutzen, erhalten sie möglicherweise nicht.</item>
+        <item quantity="other">%1$d Relays haben eine Gruppenänderung von dir abgelehnt. Mitglieder, die nur diese Relays nutzen, erhalten sie möglicherweise nicht.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Trotzdem einladen</string>
     <string name="starting_as">Starten als</string>
     <string name="starting_as_account">Starten als %1$s</string>

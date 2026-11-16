@@ -1292,7 +1292,7 @@ class ConversationController(
     internal val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
     internal val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
     internal val reactionIntentConflator = ReactionIntentConflator()
-
+    internal val groupCommitRefusal = GroupCommitRefusalState()
     internal val window = ConversationWindowState()
     internal val timelineSession =
         ConversationTimelineSession(onTimelineRetired = { window.readySubscription = null })

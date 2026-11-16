@@ -2543,6 +2543,20 @@
     <string name="group_change_undelivered_message">Bu gruptaki son değişikliğiniz henüz grubun tüm rölelerine ulaşmadı. Devam ederseniz yalnızca bu röleleri kullanan üyeler grubu takip edemeyebilir. Beklemek mi yoksa yine de devam etmek mi istersiniz?</string>
     <string name="group_change_wait">Bekle</string>
     <string name="group_change_continue_anyway">Yine de devam et</string>
+    <string name="group_change_refused_title">Bir röle son değişikliğinizi reddetti</string>
+    <string name="group_change_refused_message">Bu grubun rölelerinden en az biri son değişikliğinizi kalıcı olarak reddetti. Devam ederseniz yalnızca o röleyi kullanan üyeler değişikliği alamayabilir ve grubu takip edemeyebilir. Beklemek bunu düzeltmez. Devam etmek bu sohbetteki uyarıyı da kapatır.</string>
+    <string name="group_commit_refused_title">Grup değişikliği reddedildi</string>
+    <string name="group_commit_refused_relay_too_large">%1$s yaptığınız bir grup değişikliğini çok büyük olduğu için reddetti. Yalnızca bu röleyi kullanan üyeler bu değişikliği alamayabilir.</string>
+    <string name="group_commit_refused_relay">%1$s yaptığınız bir grup değişikliğini reddetti. Yalnızca bu röleyi kullanan üyeler bu değişikliği alamayabilir.</string>
+    <string name="group_commit_refusal_dismiss_failed">Bu uyarı kapatılamadı. Tekrar deneyin.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d röle yaptığınız bir grup değişikliğini çok büyük olduğu için reddetti. Yalnızca bu röleleri kullanan üyeler bu değişikliği alamayabilir.</item>
+        <item quantity="other">%1$d röle yaptığınız bir grup değişikliğini çok büyük olduğu için reddetti. Yalnızca bu röleleri kullanan üyeler bu değişikliği alamayabilir.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d röle yaptığınız bir grup değişikliğini reddetti. Yalnızca bu röleleri kullanan üyeler bu değişikliği alamayabilir.</item>
+        <item quantity="other">%1$d röle yaptığınız bir grup değişikliğini reddetti. Yalnızca bu röleleri kullanan üyeler bu değişikliği alamayabilir.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Yine de davet et</string>
     <string name="starting_as">Şu hesapla başlat</string>
     <string name="starting_as_account">Şu hesapla başlat: %1$s</string>

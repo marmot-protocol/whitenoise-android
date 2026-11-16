@@ -2550,6 +2550,20 @@
     <string name="group_change_undelivered_message">La tua ultima modifica a questo gruppo non ha ancora raggiunto tutti i suoi relay. Se continui, i membri che usano solo quei relay potrebbero non riuscire a seguire il gruppo. Aspettare o continuare comunque?</string>
     <string name="group_change_wait">Aspetta</string>
     <string name="group_change_continue_anyway">Continua comunque</string>
+    <string name="group_change_refused_title">Un relay ha rifiutato la tua ultima modifica</string>
+    <string name="group_change_refused_message">Almeno un relay di questo gruppo ha rifiutato definitivamente la tua ultima modifica. Se continui, i membri che usano solo quel relay potrebbero non riceverla né riuscire a seguire il gruppo. Aspettare non risolverà il problema. Continuare chiude anche l’avviso in questa chat.</string>
+    <string name="group_commit_refused_title">Modifica del gruppo rifiutata</string>
+    <string name="group_commit_refused_relay_too_large">%1$s ha rifiutato una modifica del gruppo che hai fatto perché era troppo grande. I membri che usano solo quel relay potrebbero non riceverla.</string>
+    <string name="group_commit_refused_relay">%1$s ha rifiutato una modifica del gruppo che hai fatto. I membri che usano solo quel relay potrebbero non riceverla.</string>
+    <string name="group_commit_refusal_dismiss_failed">Impossibile ignorare questo avviso. Riprova.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d relay ha rifiutato una modifica del gruppo che hai fatto perché era troppo grande. I membri che usano solo quel relay potrebbero non riceverla.</item>
+        <item quantity="other">%1$d relay hanno rifiutato una modifica del gruppo che hai fatto perché era troppo grande. I membri che usano solo quei relay potrebbero non riceverla.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d relay ha rifiutato una modifica del gruppo che hai fatto. I membri che usano solo quel relay potrebbero non riceverla.</item>
+        <item quantity="other">%1$d relay hanno rifiutato una modifica del gruppo che hai fatto. I membri che usano solo quei relay potrebbero non riceverla.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Invita comunque</string>
     <string name="starting_as">Avvio come</string>
     <string name="starting_as_account">Avvio come %1$s</string>
