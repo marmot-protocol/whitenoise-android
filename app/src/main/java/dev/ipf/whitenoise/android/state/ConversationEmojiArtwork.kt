@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.Nip30Emoji
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
@@ -20,8 +21,9 @@ private typealias ReceivedEmojiReader = suspend (String, ConversationEmojiSource
 /**
  * Resolves definitions in text order. Each received original is read within the picker's per-image cap and the
  * remaining aggregate budget. One that is too large, unreadable or unverified stays literal text and is reported to
- * [onUnreadable]. Only a failure while [deviceOffline] or a closed transport fails the lookup, so the send retries it
- * on reconnection; a slow or dead image host on a working connection never holds the message back.
+ * [onUnreadable]. A read that fails for want of a connection, while [deviceOffline] or on a closed transport, instead
+ * fails the lookup with [EmojiArtworkConnectionLost] so the send retries it; content failures never wait for one, and
+ * a slow or dead image host on a working connection never holds the message back.
  */
 @Suppress("LongParameterList") // Each policy input is a separate seam for the pure resolution tests.
 internal suspend fun resolveConversationEmojiArtwork(
@@ -74,13 +76,22 @@ private class ReceivedEmojiReads(
             } catch (
                 @Suppress("TooGenericExceptionCaught") failure: Exception,
             ) {
-                if (deviceOffline() || failure.closesTransport()) throw failure
+                // Too large or forged never improves on retry; other failures without a connection wait for one.
+                val lost = !failure.isArtworkContentFailure() && (deviceOffline() || failure.closesTransport())
+                if (lost) throw EmojiArtworkConnectionLost(failure)
                 onUnreadable(failure)
                 null
             }
         return artwork?.takeIf { it.bytes.size <= limit }
     }
 }
+
+/** Whether this read failed on the artwork itself, too large or forged, which no retry can change. */
+private fun Throwable.isArtworkContentFailure(): Boolean =
+    when (this) {
+        is AttachmentTooLargeToPresentException, is ReceivedEmojiMismatchException -> true
+        else -> false
+    }
 
 /** Whether MDK reported its own transport closed, which a reconnection can clear, anywhere in this cause chain. */
 private fun Throwable.closesTransport(): Boolean {
@@ -200,7 +211,7 @@ internal suspend fun ConversationController.readConversationEmojiArtwork(
             reference.thumbhash,
         )
     withContext(Dispatchers.Default) {
-        check(artwork.sha256.equals(reference.plaintextSha256, ignoreCase = true)) { "emoji plaintext hash mismatch" }
+        if (!artwork.sha256.equals(reference.plaintextSha256, ignoreCase = true)) throw ReceivedEmojiMismatchException()
     }
     return artwork
 }

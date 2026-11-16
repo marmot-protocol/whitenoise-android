@@ -7,9 +7,11 @@ import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companio
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.net.UnknownHostException
 
 /** Reads one received original within a byte limit, as the send path does. */
 private typealias ReceivedReader = suspend (String, ConversationEmojiSource, Long) -> LocalEmojiArtwork
@@ -96,10 +98,44 @@ class ConversationEmojiArtworkTest {
                 }.exceptionOrNull()
             }
 
-            assertTrue(outcome(IOException("connection reset"), offline = true) is IOException)
+            val unresolved = UnknownHostException("Unable to resolve host")
+            assertTrue(outcome(unresolved, offline = true) is EmojiArtworkConnectionLost)
             val closed = MarmotKitException.TransportClosed()
-            assertTrue(outcome(IllegalStateException("upload", closed), offline = false) is IllegalStateException)
+            assertTrue(outcome(IllegalStateException("upload", closed), offline = false) is EmojiArtworkConnectionLost)
         }
+
+    /** Artwork that is too large or forged stays literal even offline, since a reconnection can never fix it. */
+    @Test
+    fun contentFailuresStayLiteralOffline() =
+        runTest {
+            val sources = mapOf(":huge:" to source, ":forged:" to source.copy(attachmentIndex = 1))
+            val skipped = mutableListOf<Throwable>()
+            val result =
+                resolveConversationEmojiArtwork(
+                    listOf(":huge:", ":forged:"),
+                    emptyMap(),
+                    sources,
+                    deviceOffline = { true },
+                    onUnreadable = { skipped += it },
+                ) { code, _, limit ->
+                    if (code == ":huge:") throw AttachmentTooLargeToPresentException(limit, limit + 1)
+                    throw ReceivedEmojiMismatchException()
+                }
+            assertTrue(result.isEmpty())
+            assertEquals(
+                listOf(AttachmentTooLargeToPresentException::class.java, ReceivedEmojiMismatchException::class.java),
+                skipped.map { it.javaClass },
+            )
+        }
+
+    /** A typed lost connection is retryable after the send wraps it, whatever the underlying error text says. */
+    @Test
+    fun lostConnectionIsRetryableAtTheSendBoundary() {
+        val lost = EmojiArtworkConnectionLost(UnknownHostException("Unable to resolve host"))
+        assertTrue(isRetryableEmojiUploadFailure(EmojiUploadFailure(lost)))
+        assertFalse(isRetryableEmojiUploadFailure(EmojiUploadFailure(UnknownHostException("Unable to resolve host"))))
+        assertFalse(isRetryableEmojiUploadFailure(lost))
+    }
 
     /** A slow or dead image host on a working connection leaves the code literal instead of holding the send. */
     @Test
