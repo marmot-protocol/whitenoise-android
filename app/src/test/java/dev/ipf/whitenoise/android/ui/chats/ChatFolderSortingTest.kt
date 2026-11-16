@@ -65,6 +65,9 @@ class ChatFolderSortingTest {
             projection =
                 base.projection!!.copy(
                     groupIdHex = id,
+                    // The base fixture stamps its last message with the wall clock, so rows built
+                    // across a second boundary would stop tying on recency. Pin it so every row ties.
+                    activitySortAt = 1_000uL,
                     hasUnread = unread,
                     unreadCount = if (unread) 1uL else 0uL,
                     pinned = pinned,

@@ -121,6 +121,7 @@ import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.reportVisibleFolderChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.setConversationMuted
 import dev.ipf.whitenoise.android.ui.account.RetainedAccountAvatarPixels
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
@@ -2759,12 +2760,7 @@ internal fun ChatsScreen(
                                     } else {
                                         visibleItems.forEachIndexed { targetIndex, item ->
                                             if (targetIndex == pinnedBoundary) {
-                                                this.item(
-                                                    key = CHAT_LIST_PINNED_BOUNDARY_KEY,
-                                                    contentType = CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE,
-                                                ) {
-                                                    ChatListPinnedBoundary()
-                                                }
+                                                chatListPinnedBoundaryItem(rowPlacementDurationMillis)
                                             }
                                             this.item(key = item.id, contentType = CHAT_LIST_ROW_CONTENT_TYPE) {
                                                 chatRowContent(item, targetIndex)
@@ -3187,8 +3183,6 @@ private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 
 private const val CHAT_LIST_JUMP_TO_TOP_SNAP_INDEX = 10
-
-private const val CHAT_LIST_PINNED_BOUNDARY_CONTENT_TYPE = "pinned-boundary"
 
 private const val CHAT_LIST_ROW_CONTENT_TYPE = "chat-row"
 

@@ -1685,7 +1685,7 @@
         <item quantity="one">Installé, %1$d entrée ignorée.</item>
         <item quantity="other">Installé, %1$d entrées ignorées.</item>
     </plurals>
-    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des émojis :shortcode: et sont stockées sur cet appareil. Un nouveau message (pas une réponse) avec un émoji envoie son image chiffrée dans cette discussion. Réactions, réponses et modifications n’envoient que le shortcode.</string>
+    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des émojis :shortcode: et sont stockées sur cet appareil. Les messages, réponses et réactions avec un émoji envoient son image chiffrée dans cette discussion. Les modifications envoient seulement le shortcode. Les images intégrées sont prioritaires pour leurs codes.</string>
     <string name="custom_emoji_empty">Aucun emoji personnalisé pour l’instant.</string>
     <string name="custom_emoji_name_title">Nommer cet emoji</string>
     <string name="custom_emoji_name_label">Code court</string>
@@ -2674,4 +2674,16 @@
     <string name="settings_voice_language">Voix et langue</string>
     <string name="photo_editor_rotate">Pivoter</string>
     <string name="toast_wipe_outcome_unconfirmed">Le résultat de la suppression n’a pas pu être confirmé. Vérifiez vos comptes avant de continuer.</string>
+
+    <string name="emoji_name_marmot_classic">Marmotte classique</string>
+    <string name="emoji_name_marmot_wave">Marmotte qui salue</string>
+    <string name="emoji_name_marmot_yes">Marmotte pouce levé</string>
+    <string name="emoji_name_marmot_laugh">Marmotte qui rit</string>
+    <string name="emoji_name_marmot_love">Marmotte avec un cœur</string>
+    <string name="emoji_name_marmot_party">Marmotte en fête</string>
+    <string name="emoji_name_marmot_fire">Marmotte en feu</string>
+    <string name="emoji_name_marmot_wow">Marmotte surprise</string>
+    <string name="emoji_name_marmot_smirk">Marmotte au sourire narquois</string>
+    <string name="emoji_name_marmot_cry">Marmotte qui pleure</string>
+    <string name="emoji_name_marmot_angry">Marmotte en colère</string>
 </resources>

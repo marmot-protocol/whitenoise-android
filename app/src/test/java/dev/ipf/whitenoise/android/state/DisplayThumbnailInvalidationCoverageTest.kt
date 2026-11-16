@@ -58,9 +58,9 @@ class DisplayThumbnailInvalidationCoverageTest {
                 .contains("removeMessageDisplayThumbnails("),
         )
         assertTrue(
-            appState
-                .substringAfter("suspend fun sweepExpiredDisappearingMessages()")
-                .substringBefore("internal suspend fun runRetentionSweep(")
+            appModuleSource(root + "AppStateRetentionSweep.kt")
+                .substringAfter("suspend fun WhiteNoiseAppState.sweepExpiredDisappearingMessages()")
+                .substringBefore("internal suspend fun WhiteNoiseAppState.runRetentionSweep(")
                 .contains("scheduleDisplayThumbnailReconciliation().join()"),
         )
         assertTrue(appState.contains("bootstrapCompleted = true\n            scheduleDisplayThumbnailReconciliation()"))

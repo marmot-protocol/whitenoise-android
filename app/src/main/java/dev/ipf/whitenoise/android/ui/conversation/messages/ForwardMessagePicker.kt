@@ -63,6 +63,7 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
+import dev.ipf.whitenoise.android.state.requestForwardTargetMembers
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderChip
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader

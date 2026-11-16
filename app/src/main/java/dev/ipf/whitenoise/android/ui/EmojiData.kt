@@ -34,12 +34,21 @@ object EmojiData {
 
     @Volatile private var cache: List<EmojiEntry>? = null
 
+    /** Refreshes built-in spoken search names from this context while reusing parsed Unicode metadata. */
     fun load(context: Context): List<EmojiEntry> =
         load {
             context.applicationContext.assets
                 .open("emoji.json")
                 .bufferedReader()
                 .use { it.readText() }
+        }.map { entry ->
+            val name = EmojiShortcodes.builtinName(entry.emoji)
+            if (name == null) {
+                entry
+            } else {
+                val spoken = context.getString(name)
+                entry.copy(name = spoken, keywords = entry.keywords + entry.name + spoken)
+            }
         }
 
     internal fun load(readEmojiJson: () -> String): List<EmojiEntry> {
@@ -72,7 +81,12 @@ object EmojiData {
             }
             for (shortcode in EmojiShortcodes.builtins) {
                 val name = shortcode.trim(':')
-                val keywords = if (name == "wn") listOf(shortcode, "white noise", "whitenoise") else listOf(shortcode)
+                val keywords =
+                    if (name == "wn") {
+                        listOf(shortcode, "white noise", "whitenoise")
+                    } else {
+                        listOf(shortcode, name.replace('_', ' '))
+                    }
                 add(EmojiEntry(shortcode, name, SymbolsGroup, keywords))
             }
         }

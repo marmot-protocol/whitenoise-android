@@ -1,0 +1,29 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerModeSelection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Notification permission feedback when a selected delivery mode cannot activate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerModeSelection.kt",
+        "anchor": "R.string.toast_notification_permission_needed",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Delivery-mode activation failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationDeliveryControllerModeSelection.kt",
+        "anchor": "R.string.toast_couldnt_enable_notifications",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

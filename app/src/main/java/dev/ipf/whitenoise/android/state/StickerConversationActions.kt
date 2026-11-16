@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -54,12 +55,14 @@ private fun stickerLibraryFor(
         fetchPack = { input -> appState.marmotIo { fetchStickerPack(account(), input) } },
         installPack = { input -> appState.marmotIo { installStickerPack(account(), input) } },
         uninstallPack = { input -> appState.marmotIo { uninstallStickerPack(account(), input) } },
+        packShareLink = { coordinate -> appState.marmotIo { stickerPackShareLink(account(), coordinate) } },
     )
 }
 
 /**
  * Sticker bytes come from a URL the pack's public author chose, and the pack is a public event anyone can fetch, so
- * they decode in the account's [MediaTrustDomain.PublicProfiles] worker, never a conversation's.
+ * they decode in the account's [MediaTrustDomain.PublicProfiles] worker, never a conversation's. Failure logs
+ * distinguish native fetch rejection from decoder refusal using fixed categories and exception class names only.
  */
 private fun stickerAssetCacheFor(
     appState: WhiteNoiseAppState,
@@ -71,11 +74,17 @@ private fun stickerAssetCacheFor(
         scope = scope,
         load = { key ->
             val account = accountRef ?: return@StickerAssetCache null
-            val asset = appState.marmotIo { fetchStickerAsset(account, key.ref) }
+            val asset =
+                runCatchingCancellable {
+                    appState.marmotIo { fetchStickerAsset(account, key.ref) }
+                }.onFailure { failure ->
+                    Log.w("StickerAssetCache", "sticker_fetch_failed type=${failure.javaClass.simpleName}")
+                }.getOrThrow()
             val bitmap =
                 withContext(Dispatchers.IO) {
                     MediaPipeline.decodeSampledBitmap(asset.bytes, StickerMetrics.DECODE_EDGE_PX, domain = domain)
                 }
+            if (bitmap == null) Log.w("StickerAssetCache", "sticker_decode_failed")
             bitmap?.let { LoadedSticker(it.asImageBitmap(), asset.sticker) }
         },
         maxBytes = STICKER_IMAGE_CACHE_BYTES,

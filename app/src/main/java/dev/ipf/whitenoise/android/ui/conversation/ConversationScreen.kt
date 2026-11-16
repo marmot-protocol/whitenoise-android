@@ -134,11 +134,14 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
+import dev.ipf.whitenoise.android.state.collapseLongMessagesInGroup
+import dev.ipf.whitenoise.android.state.consumeInboundShareStreamsCapped
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
 import dev.ipf.whitenoise.android.state.createPoll
 import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
 import dev.ipf.whitenoise.android.state.dmPeerAccount
 import dev.ipf.whitenoise.android.state.hasKnownTranscriptPresentation
+import dev.ipf.whitenoise.android.state.hiddenMessageIdsInGroup
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.isUserBlocked
@@ -212,6 +215,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSave
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachmentSaveSummaries
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
+import dev.ipf.whitenoise.android.ui.conversation.media.conversationImagePriorityEffect
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
 import dev.ipf.whitenoise.android.ui.conversation.media.newPendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
@@ -606,6 +610,7 @@ internal fun ConversationScreen(
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
     // Protected windows and decorative pixels must disappear in the lock-producing frame.
     if (appState.appLock.screenVisible) return
+    conversationImagePriorityEffect(controller)
     // The conversation's own account. Identical to the active account except
     // during a notification-routed early open (#586), while the switch is
     // still landing; conversation-scoped state keys and self-identity follow

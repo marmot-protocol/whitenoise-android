@@ -270,7 +270,7 @@ class FreshSweepCoverageTest {
         val markReadEnqueue = receiver.section("private suspend fun enqueueMarkReadAction", "\n}")
         val markReadWorker = source("notifications/NotificationMarkReadWorker.kt")
         val replyWorker = source("notifications/NotificationReplyWorker.kt")
-        val presenter = source("notifications/LocalNotificationPresenter.kt")
+        val presenter = localNotificationPresenterSource()
         val mainConfinedMutations =
             Regex(
                 """withContext\(Dispatchers\.Main\.immediate\) \{\s*""" +

@@ -30,12 +30,13 @@ class EmojiShortcodesTest {
     /** Only the padded Marmot canvas is cropped, and only built-ins have a product name for text-only surfaces. */
     @Test
     fun builtinArtworkRegionsAndNames() {
-        val marmot = checkNotNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_marmot))
+        val marmot = checkNotNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_marmot_classic))
         assertEquals(11, marmot.left)
         assertEquals(10, marmot.top)
         assertEquals(51, marmot.width)
         assertEquals(51, marmot.height)
         assertNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_wn))
+        assertNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_marmot))
         assertEquals(R.string.emoji_name_marmot, EmojiShortcodes.builtinName(":marmot:"))
         assertEquals(R.string.white_noise, EmojiShortcodes.builtinName(":wn:"))
         assertNull(EmojiShortcodes.builtinName(":party:"))
@@ -95,14 +96,19 @@ class EmojiShortcodesTest {
         assertFalse(EmojiShortcodes.isShortcode("party"))
     }
 
+    /** Bundled shortcodes retain canonical artwork when a message supplies a conflicting definition. */
     @Test
-    fun userFileBeatsReceivedArtworkWhichBeatsBuiltIn() {
+    fun builtinArtworkWinsOverAReceivedDefinition() {
         val received = EmojiArt.Bundled(R.drawable.ic_image)
         assertEquals(
             EmojiArt.Bundled(R.drawable.builtin_emoji_wn),
             EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, emptyMap()),
         )
-        assertSame(received, EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, mapOf(":wn:" to received)))
+        assertEquals(
+            EmojiArt.Bundled(R.drawable.builtin_emoji_wn),
+            EmojiShortcodes.art(":wn:", CustomEmojiSet.Empty, mapOf(":wn:" to received)),
+        )
+        assertSame(received, EmojiShortcodes.art(":party:", CustomEmojiSet.Empty, mapOf(":party:" to received)))
         assertNull(EmojiShortcodes.art(":party:", CustomEmojiSet.Empty, mapOf(":wn:" to received)))
         assertNull(EmojiShortcodes.art(":WN:", CustomEmojiSet.Empty, emptyMap()))
     }

@@ -88,6 +88,15 @@ internal interface MediaDecodeTransport {
      * has nothing to retire.
      */
     fun retireDomain(domain: MediaTrustDomain) = Unit
+
+    /**
+     * Gives [domain] the next worker while [prioritized], such as the conversation on screen. A lane without
+     * domain-bound workers has no worker starts to order.
+     */
+    fun prioritizeDomain(
+        domain: MediaTrustDomain,
+        prioritized: Boolean,
+    ) = Unit
 }
 
 /** A lane that starts domain-bound workers on demand, and can say which inputs need none started first. */
@@ -156,6 +165,15 @@ internal class IsolatedMediaTransport(
      */
     override fun retireDomain(domain: MediaTrustDomain) {
         if (domain != MediaTrustDomain.Unique) pool.retireDomain(domain)
+    }
+
+    /** Never blocks, so the screen showing [domain] calls it on main as it enters and leaves. */
+    override fun prioritizeDomain(
+        domain: MediaTrustDomain,
+        prioritized: Boolean,
+    ) {
+        if (domain == MediaTrustDomain.Unique) return
+        if (prioritized) pool.prioritize(domain) else pool.deprioritize(domain)
     }
 
     /**

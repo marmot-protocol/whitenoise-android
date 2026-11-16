@@ -70,7 +70,7 @@ class CustomEmojiSendTest {
                         },
                         null,
                     )
-                "sendTaggedMedia" -> publish(++publishes)
+                "sendTaggedMedia", "reactWithMedia" -> publish(++publishes)
                 else -> error(method)
             }
         }
@@ -81,6 +81,74 @@ class CustomEmojiSendTest {
         code: String,
         bytes: ByteArray = byteArrayOf(1, 2, 3, code.length.toByte()),
     ) = LocalEmojiArtwork(":$code:", "$code.png", "image/png", bytes)
+
+    /** Artwork replies preserve both reply references alongside the original emoji definition. */
+    @Test
+    fun repliesCarryEmojiAndReplyTags() =
+        runTest {
+            val calls = mutableListOf<Pair<String, List<Any?>>>()
+            recordingEngine(calls).sendTextWithCustomEmoji(
+                "a",
+                "g",
+                "hi :party:",
+                listOf(artwork("party")),
+                EmojiUploadCache(),
+                currentEpoch = { 7uL },
+                replyTarget = "parent",
+            )
+            val sent = calls.single { it.first == "sendTaggedMedia" }.second
+            assertEquals(
+                listOf(
+                    listOf("emoji", "party", "https://blob/party.png"),
+                    listOf("e", "parent"),
+                    listOf("q", "parent"),
+                ),
+                sent[4],
+            )
+        }
+
+    /** A reaction uses MDK's media reaction entry point with one matching image definition. */
+    @Test
+    fun reactionsCarryArtworkThroughTheNativeReactionApi() =
+        runTest {
+            val calls = mutableListOf<Pair<String, List<Any?>>>()
+            recordingEngine(calls).sendReactionWithCustomEmoji(
+                "a",
+                "g",
+                "parent",
+                ":party:",
+                listOf(artwork("party")),
+                EmojiUploadCache(),
+                currentEpoch = { 7uL },
+            )
+            val sent = calls.single { it.first == "reactWithMedia" }.second
+            assertEquals("parent", sent[2])
+            assertEquals(":party:", sent[3])
+            assertEquals(listOf(listOf("emoji", "party", "https://blob/party.png")), sent[4])
+            assertEquals(listOf(reference("https://blob/party.png")), sent[5])
+            assertTrue(calls.none { it.first == "sendTaggedMedia" })
+        }
+
+    /** Reply reference rows count toward the native limit before any image upload begins. */
+    @Test
+    fun replyTagOverflowFailsBeforeUploading() =
+        runTest {
+            val calls = mutableListOf<Pair<String, List<Any?>>>()
+            val result =
+                runCatching {
+                    recordingEngine(calls).sendTextWithCustomEmoji(
+                        "a",
+                        "g",
+                        "reply",
+                        List(Nip30Emoji.MAX_TAGS - 1) { artwork("code$it") },
+                        EmojiUploadCache(),
+                        currentEpoch = { 7uL },
+                        replyTarget = "parent",
+                    )
+                }
+            assertTrue(result.exceptionOrNull() is EmojiSendLimitException)
+            assertTrue(calls.isEmpty())
+        }
 
     /** Sends `hi :party:` with [artwork] through [cache], reporting [epoch] as the group's current epoch. */
     private suspend fun MarmotInterface.send(
@@ -390,10 +458,50 @@ class CustomEmojiSendTest {
             val calls = mutableListOf<Pair<String, List<Any?>>>()
             val failure =
                 runCatching {
-                    recordingEngine(calls).send(listOf(artwork("party")), ensureCurrent = { error("account changed") })
+                    recordingEngine(
+                        calls,
+                    ).send(
+                        listOf(artwork("party")),
+                        ensureCurrent = { check(calls.none { it.first == "uploadMedia" }) { "account changed" } },
+                    )
                 }.exceptionOrNull()
             assertTrue(failure is IllegalStateException)
             assertEquals(listOf("uploadMedia"), calls.map { it.first })
+        }
+
+    /** A retired owner is refused before uploading any artwork. */
+    @Test
+    fun retiredOwnerStartsNoUpload() =
+        runTest {
+            val calls = mutableListOf<Pair<String, List<Any?>>>()
+            val result =
+                runCatching {
+                    recordingEngine(calls).send(listOf(artwork("party")), ensureCurrent = { error("owner retired") })
+                }
+            assertTrue(result.exceptionOrNull() is IllegalStateException)
+            assertTrue(calls.isEmpty())
+        }
+
+    /** Reaction tokens include both colons within MDK's content limit, before any upload occurs. */
+    @Test
+    fun oversizedReactionStartsNoUpload() =
+        runTest {
+            val calls = mutableListOf<Pair<String, List<Any?>>>()
+            val code = "a".repeat(63)
+            val result =
+                runCatching {
+                    recordingEngine(calls).sendReactionWithCustomEmoji(
+                        "a",
+                        "g",
+                        "parent",
+                        ":$code:",
+                        listOf(artwork(code)),
+                        EmojiUploadCache(),
+                        currentEpoch = { 7uL },
+                    )
+                }
+            assertTrue(result.exceptionOrNull() is EmojiSendLimitException)
+            assertTrue(calls.isEmpty())
         }
 
     /** A failed upload sends nothing, so no message can reference an image that is not stored. */
@@ -444,12 +552,11 @@ class CustomEmojiSendTest {
         assertFalse(isRetryableEmojiUploadFailure(EmojiSendLimitException("too many")))
     }
 
-    /** Replies and injected publishers never carry emoji, and a plain send does. */
+    /** Composer artwork is used for messages and replies while an injected text publisher keeps its own contract. */
     @Test
-    fun emojiSendAppliesOnlyToPlainTextWithoutAnInjectedPublisher() {
-        assertTrue(emojiSendApplies(replyTarget = null, customPublisherInjected = false))
-        assertFalse(emojiSendApplies(replyTarget = "parent", customPublisherInjected = false))
-        assertFalse(emojiSendApplies(replyTarget = null, customPublisherInjected = true))
+    fun emojiSendAppliesWithoutAnInjectedPublisher() {
+        assertTrue(emojiSendApplies(customPublisherInjected = false))
+        assertFalse(emojiSendApplies(customPublisherInjected = true))
     }
 
     /** The tag always names the first locator, so peers resolve the same blob across epochs. */

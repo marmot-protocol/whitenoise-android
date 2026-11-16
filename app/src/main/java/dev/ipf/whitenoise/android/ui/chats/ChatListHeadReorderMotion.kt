@@ -345,6 +345,6 @@ private fun CoroutineScope.launchHeadScrollCorrection(
         }
     }
 
-private const val CHAT_LIST_MEMBERSHIP_FADE_MILLIS = 120
+internal const val CHAT_LIST_MEMBERSHIP_FADE_MILLIS = 120
 internal const val CHAT_LIST_ROW_PLACEMENT_MILLIS = 240
 internal const val CHAT_LIST_HEAD_INPUT_GATE_MILLIS = 500L
