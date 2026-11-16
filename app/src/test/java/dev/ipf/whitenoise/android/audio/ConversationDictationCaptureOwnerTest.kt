@@ -48,6 +48,25 @@ class ConversationDictationCaptureOwnerTest {
         assertFalse(buffer.hasPending)
     }
 
+    @Test
+    fun laterLookupFailureCannotReplaceRetainedAudioWithProviderMicrophone() {
+        val capture = ConversationDictationCallerAudio(FakeCaptureDevice(), ConversationDictationAudioChunkBuffer(19L))
+        var creates = 0
+        val owner =
+            ConversationDictationCaptureOwner {
+                creates += 1
+                capture
+            }
+        assertNull(owner.acquire(allowCreate = false))
+        assertTrue(creates == 0)
+        assertTrue(owner.acquire() === capture)
+        assertTrue(owner.acquire(allowCreate = false) === capture)
+        assertTrue(creates == 1)
+        val released = owner.discard {}
+        assertTrue(released)
+        assertNull(owner.acquire(allowCreate = false))
+    }
+
     private fun await(predicate: () -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
         while (!predicate() && System.nanoTime() < deadline) Thread.sleep(5)
