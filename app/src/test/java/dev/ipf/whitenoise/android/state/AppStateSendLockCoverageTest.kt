@@ -261,7 +261,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun retentionSweepRoutesThroughEngineAccountWorker() {
-        val body = appStateFunctionBody("runRetentionSweep")
+        val body = appStateFunctionBody("runRetentionSweep", sourceFile = retentionSweepSource())
 
         assertTrue(
             "the retention sweep core must be the engine's atomic gate+prune call",
@@ -277,7 +277,7 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun retentionSweepOutcomeKeepsDiskEvictionTagScoped() {
-        val body = appStateFunctionBody("processRetentionSweepOutcome")
+        val body = appStateFunctionBody("processRetentionSweepOutcome", sourceFile = retentionSweepSource())
 
         assertTrue(
             "pruned groups must dismiss tray cards only when rows were actually pruned",
@@ -669,6 +669,13 @@ class AppStateSendLockCoverageTest {
             ?: error("Missing AppStateNotificationReply.kt source file")
 
     /** The forwarding extensions, which fan one message out under each target's commit lock. */
+    private fun retentionSweepSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateRetentionSweep.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateRetentionSweep.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing AppStateRetentionSweep.kt source file")
+
     private fun forwardingSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/AppStateForwarding.kt"),
