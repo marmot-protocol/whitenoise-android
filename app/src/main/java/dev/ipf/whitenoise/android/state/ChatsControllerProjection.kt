@@ -203,11 +203,6 @@ internal fun ChatsController.projectPresentedRow(
     activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
 ): ChatListItem = rowProjector(activeAccountIdHex).presented(presented)
 
-internal fun ChatsController.profileAddableGroups(
-    targetAccountIdHex: String,
-    activeAccountIdHex: String?,
-): List<ChatListItem> = profileAddableGroupsState(targetAccountIdHex, activeAccountIdHex).groups
-
 /** Groups [targetAccountIdHex] can be added to, including those [accountWide] holds beyond the window. */
 internal fun ChatsController.profileAddableGroupsState(
     targetAccountIdHex: String,
