@@ -1945,6 +1945,9 @@ internal fun MainShell(
                     ?.takeIf { it.controller !== content.controller }
                     ?.let { displacedConversationControllers += it.controller }
                 exitingConversationContent = content
+                // Closing the retained conversation beside the list also cancels a tap still
+                // preparing. onOpenGroup installs its own request after this returns.
+                pendingConversationOpen = null
                 selectedChat = null
                 selectedChatOpenContext = ConversationOpenContext()
                 selectedChatJustCreated = false
