@@ -8,6 +8,8 @@ import dev.ipf.whitenoise.android.ui.common.AppMotionCloseEasing
 import dev.ipf.whitenoise.android.ui.common.AppMotionOpenEasing
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -60,6 +62,80 @@ class SettingsPageMorphTest {
             page.pendingOrigin = first
             assertTrue(page.begin("child", true, true, host))
         }
+
+    @Test fun unchangedNativeFramesReuseGeometryButChangedReportsReplaceIt() {
+        val page = SettingsPageMorph()
+        page.begin("parent", true, false, host)
+        val group = Any()
+        val row = Any()
+        val viewport = Any()
+        val endpoint = surface(first).copy(viewportToken = viewport)
+        val rowEndpoint = surface(first.copy(bottom = 160f)).copy(last = false)
+        page.reportDestination(group, endpoint)
+        page.reportRow(group, row, rowEndpoint)
+        page.reportViewport(viewport, host)
+        val original = requireNotNull(page.presentedContours(host, 1f))
+        repeat(60) { assertSame(original, page.presentedContours(host, 1f)) }
+        page.reportDestination(group, endpoint)
+        page.reportRow(group, row, rowEndpoint)
+        page.reportViewport(viewport, host)
+        assertSame(original, page.presentedContours(host, 1f))
+
+        page.reportRow(group, row, rowEndpoint.copy(bounds = first.copy(bottom = 180f)))
+        val moved = requireNotNull(page.presentedContours(host, 1f))
+        assertNotSame(original, moved)
+        assertEquals(179.5f, moved.single().seams.single().start.y, 0f)
+        assertEquals(159.5f, original.single().seams.single().start.y, 0f)
+        assertEquals(original.single().key, moved.single().key)
+
+        val clipped = host.copy(top = 150f)
+        page.reportViewport(viewport, clipped)
+        assertEquals(clipped, page.presentedContours(host, 1f)?.single()?.viewport)
+        page.removeViewport(viewport)
+        assertEquals(host, page.presentedContours(host, 1f)?.single()?.viewport)
+        page.removeRow(group, row)
+        assertTrue(requireNotNull(page.presentedContours(host, 1f)).single().seams.isEmpty())
+        page.reportDestination(group, endpoint.copy(bounds = second))
+        assertEquals(second, page.presentedContours(host, 1f)?.single()?.bounds)
+        page.removeDestination(group)
+        assertTrue(requireNotNull(page.presentedContours(host, 1f)).isEmpty())
+    }
+
+    @Test fun nativeFrameReuseRespectsHostInvalidGeometryAndNewRoutes() {
+        val page = SettingsPageMorph()
+        page.begin("parent", true, false, host)
+        val group = Any()
+        val endpoint = surface(first)
+        page.reportDestination(group, endpoint)
+        val original = requireNotNull(page.presentedContours(host, 1f))
+        val resized = host.copy(bottom = 900f)
+        assertEquals(resized, page.presentedContours(resized, 1f)?.single()?.viewport)
+        page.reportDestination(group, endpoint.copy(bounds = first.copy(top = Float.NaN)))
+        assertEquals(null, page.presentedContours(host, 1f))
+        assertEquals(null, page.presentedContours(host, 1f))
+        page.reportDestination(group, endpoint)
+        assertEquals(original, page.presentedContours(host, 1f))
+        page.cancel()
+        page.begin("another", true, false, host)
+        assertTrue(requireNotNull(page.presentedContours(host, 1f)).isEmpty())
+        page.reportDestination(group, endpoint)
+        assertEquals(first, page.presentedContours(host, 1f)?.single()?.bounds)
+    }
+
+    @Test fun childFramesRemainLiveWithoutParentLayoutReports() {
+        val page = SettingsPageMorph()
+        page.begin("parent", true, false, host)
+        reportGroup(page, first)
+        val native = requireNotNull(page.presentedContours(host, 1f))
+        var child = native
+        page.childContours = { child }
+        assertSame(child, page.presentedContours(host, 1f))
+        child = native.map { it.copy(bounds = second) }
+        assertSame(child, page.presentedContours(host, 1f))
+        assertEquals(second, page.presentedContours(host, 1f)?.single()?.bounds)
+        page.childContours = { null }
+        assertSame(native, page.presentedContours(host, 1f))
+    }
 
     @Test fun partiallyVisibleActivationKeepsFullSourcePerimeterAndReturnsToIt() {
         val page = SettingsPageMorph()

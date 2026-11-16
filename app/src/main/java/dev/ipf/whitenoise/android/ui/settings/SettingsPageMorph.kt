@@ -113,6 +113,13 @@ internal class SettingsPageMorph {
         val inputs: Any?,
     )
 
+    // Derived only from reports and route context; child animation is sampled separately.
+    private data class NativeFrame(
+        val host: Rect,
+        val contours: List<SettingsContour>?,
+    )
+
+    private var nativeFrame: NativeFrame? = null
     private var settled: PresentedFrame? = null
     private var leaving: PresentedFrame? = null
     private var maskFrame: List<SettingsContour>? = null
@@ -129,12 +136,15 @@ internal class SettingsPageMorph {
         token: Any,
         endpoint: SettingsRouteEndpoint,
     ) {
+        if (destinations[token] == endpoint) return
         destinations[token] = endpoint
+        nativeFrame = null
     }
 
     fun removeDestination(token: Any) {
-        destinations.remove(token)
-        rows.remove(token)
+        val destination = destinations.remove(token)
+        val groupRows = rows.remove(token)
+        if (destination != null || groupRows != null) nativeFrame = null
     }
 
     fun reportRow(
@@ -142,25 +152,30 @@ internal class SettingsPageMorph {
         token: Any,
         endpoint: SettingsRouteEndpoint,
     ) {
-        rows.getOrPut(group) { mutableMapOf() }[token] = endpoint
+        val groupRows = rows.getOrPut(group) { mutableMapOf() }
+        if (groupRows[token] == endpoint) return
+        groupRows[token] = endpoint
+        nativeFrame = null
     }
 
     fun removeRow(
         group: Any,
         token: Any,
     ) {
-        rows[group]?.remove(token)
+        if (rows[group]?.remove(token) != null) nativeFrame = null
     }
 
     fun reportViewport(
         token: Any,
         bounds: Rect,
     ) {
+        if (viewports[token] == bounds) return
         viewports[token] = bounds
+        nativeFrame = null
     }
 
     fun removeViewport(token: Any) {
-        viewports.remove(token)
+        if (viewports.remove(token) != null) nativeFrame = null
     }
 
     // Null native layouts cancel; absent and empty destination frames have separate admission gates.
@@ -328,6 +343,7 @@ internal class SettingsPageMorph {
         opening = forward
         destinations.clear()
         rows.clear()
+        nativeFrame = null
         pendingOrigin = null
         pendingEndpoint = null
         if (!active) finish()
@@ -348,12 +364,14 @@ internal class SettingsPageMorph {
     /** Full native bounds are retained; the separate containing viewport clips offscreen edges. */
     private fun nativeContours(host: Rect) = childContours?.let { it() } ?: ownNativeContours(host)
 
-    // Native measurement and stable route-group correspondence are one batch.
-
-    @Suppress("LongMethod", "ReturnCount")
-    // Invalid host and invalid measured groups reject before building the native contour batch.
-
     private fun ownNativeContours(host: Rect): List<SettingsContour>? {
+        nativeFrame?.takeIf { it.host == host }?.let { return it.contours }
+        return buildNativeContours(host).also { nativeFrame = NativeFrame(host, it) }
+    }
+
+    // Native measurement and stable route-group correspondence are one batch.
+    @Suppress("LongMethod", "ReturnCount")
+    private fun buildNativeContours(host: Rect): List<SettingsContour>? {
         val groups =
             destinations.entries
                 .filter { it.value.outline.isSpecified }
@@ -402,6 +420,7 @@ internal class SettingsPageMorph {
     }
 
     fun finish() {
+        nativeFrame = null
         origin = null
         leaving = null
         sourceContours = emptyList()
@@ -555,6 +574,7 @@ internal class SettingsPageMorph {
         if (targetContours != null && targetContours != end) {
             // All layout callbacks precede drawing; one coherent measured batch updates the target.
             sourceContours = renderedContours(time)
+            nativeFrame = null
             rebaseTime = time.coerceIn(0f, 1f)
             targetContours = end
         }
