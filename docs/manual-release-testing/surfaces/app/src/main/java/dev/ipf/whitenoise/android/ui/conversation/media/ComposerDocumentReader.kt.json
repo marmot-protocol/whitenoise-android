@@ -16,7 +16,7 @@
       {
         "surface": "Prepared document identity and private PDF lifetime",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerDocumentReader.kt",
-        "anchor": "withComposerPdfFile(",
+        "anchor": "withPrivatePdfFile(",
         "test_ids": [
           "MED-052"
         ]
