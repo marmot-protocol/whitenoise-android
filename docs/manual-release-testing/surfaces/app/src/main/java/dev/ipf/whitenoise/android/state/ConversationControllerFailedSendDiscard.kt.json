@@ -30,9 +30,9 @@
         ]
       },
       {
-        "surface": "Discard notice for a send that was already delivered",
+        "surface": "Discard notice for a send that is no longer a failed send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerFailedSendDiscard.kt",
-        "anchor": "R.string.message_discard_already_delivered",
+        "anchor": "R.string.message_discard_not_failed",
         "test_ids": [
           "MSG-008"
         ]

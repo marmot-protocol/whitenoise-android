@@ -316,8 +316,8 @@ private suspend fun WhiteNoiseAppState.notificationCandidateGate(
             !update.isFromSelf &&
             !LocalNotificationFormatter.isReaction(update)
     if (!governed || messageIdHex == null) {
-        val pending = update.trigger != NotificationTriggerFfi.GROUP_INVITE && unacceptedInviteWithinBudget(update)
-        return if (pending) NotificationCandidateState.PendingInvite else NotificationCandidateState.Unread
+        val invitation = update.trigger == NotificationTriggerFfi.GROUP_INVITE
+        return if (invitation) NotificationCandidateState.Unread else pendingInviteState(update)
     }
     val state =
         if (notificationContentInvalidations.isRemoved(update.accountRef, update.groupIdHex, messageIdHex)) {
@@ -371,7 +371,9 @@ private suspend fun WhiteNoiseAppState.readNotificationCandidateState(
         withContext(Dispatchers.IO) { hiddenMessageIdsInGroup(update.accountRef, update.groupIdHex) }
     if (hidden.any { it.equals(messageIdHex, ignoreCase = true) }) return NotificationCandidateState.Removed
     val row = marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(update.accountRef, update.groupIdHex) }
-    if (unacceptedInvite(update.accountRef, update.groupIdHex, row)) return NotificationCandidateState.PendingInvite
+    // A message whose pending state cannot be confirmed still rings, so the first message after an Accept is kept.
+    val pendingInvite = unacceptedInvite(update.accountRef, update.groupIdHex, row) == true
+    if (pendingInvite) return NotificationCandidateState.PendingInvite
     val latest = notificationTimelinePage(update.accountRef, update.groupIdHex)
     val page =
         if (latest.any { it.messageIdHex.equals(messageIdHex, ignoreCase = true) }) {
@@ -392,20 +394,21 @@ private suspend fun WhiteNoiseAppState.unacceptedInvite(
     accountRef: String,
     groupIdHex: String,
     row: ChatListRowFfi?,
-): Boolean =
-    row?.pendingConfirmation == true &&
-        runCatchingCancellable { marmotIo { groupDetails(accountRef, groupIdHex) } }
-            .getOrNull()
-            ?.group
-            ?.pendingConfirmation == true
+): Boolean? {
+    if (row?.pendingConfirmation != true) return false
+    val details = runCatchingCancellable { marmotIo { groupDetails(accountRef, groupIdHex) } }.getOrNull()
+    return details?.group?.pendingConfirmation
+}
 
 /**
  * [unacceptedInvite] for an update the read state does not govern, such as a reaction or an admin change. The
- * blocking chat-row read runs through [WhiteNoiseAppState.notificationCandidateReads], like the governed reads, so
- * the serial listener stops waiting after [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS] even while the binding still runs.
- * A read that times out or fails lets the update ring, as it did before this check.
+ * blocking chat-row read runs through its own [PendingInviteReads] coordinator, so the serial listener stops waiting
+ * after [NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS] even while the binding still runs, and an abandoned invite read never
+ * holds the slot a message's read-state check needs. A row that says pending but whose group record cannot be read
+ * withholds the update as [NotificationCandidateState.Unknown]. A read that times out lets the update ring, as it did
+ * before this check.
  */
-private suspend fun WhiteNoiseAppState.unacceptedInviteWithinBudget(update: NotificationUpdateFfi): Boolean {
+private suspend fun WhiteNoiseAppState.pendingInviteState(update: NotificationUpdateFfi): NotificationCandidateState {
     val key =
         NotificationCandidateReadKey(
             update.accountRef,
@@ -414,19 +417,20 @@ private suspend fun WhiteNoiseAppState.unacceptedInviteWithinBudget(update: Noti
             notificationPostEpoch.capture(),
             profileCacheLifetime.capture(),
         )
+    val reads = runtimeMirrors.pendingInviteReads.coordinator(notificationScope)
     val state =
         runCatchingCancellable {
-            notificationCandidateReads.read(key, NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS) {
+            reads.read(key, NOTIFICATION_CANDIDATE_TIMEOUT_MILLIS) {
                 val row =
                     marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(update.accountRef, update.groupIdHex) }
-                if (unacceptedInvite(update.accountRef, update.groupIdHex, row)) {
-                    NotificationCandidateState.PendingInvite
-                } else {
-                    NotificationCandidateState.Unread
+                when (unacceptedInvite(update.accountRef, update.groupIdHex, row)) {
+                    true -> NotificationCandidateState.PendingInvite
+                    null -> NotificationCandidateState.Unknown
+                    false -> NotificationCandidateState.Unread
                 }
             }
         }.getOrNull()
-    return state == NotificationCandidateState.PendingInvite
+    return state ?: NotificationCandidateState.Unread
 }
 
 /** The read key's message slot for a group's pending-invite check, which no message id can collide with. */

@@ -353,7 +353,7 @@
     <string name="scroll_to_top">Scroll to top</string>
     <string name="discard_failed_message">Discard failed message</string>
     <string name="message_discard_still_sending">This message is still sending. Try again in a moment.</string>
-    <string name="message_discard_already_delivered">This message was already delivered, so it wasn\'t discarded.</string>
+    <string name="message_discard_not_failed">This message can no longer be discarded.</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
     <string name="invited_as_account">Invited as %1$s</string>

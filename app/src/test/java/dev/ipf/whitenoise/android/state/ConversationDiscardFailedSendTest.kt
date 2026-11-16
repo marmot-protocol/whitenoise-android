@@ -109,9 +109,9 @@ class ConversationDiscardFailedSendTest {
             assertEquals(1, calls)
         }
 
-    /** A row MDK no longer counts as a failed send was delivered, so Discard leaves it visible and says so. */
+    /** A row MDK no longer counts as a failed send stays visible, and Discard says it can no longer discard it. */
     @Test
-    fun aSendAlreadyDeliveredStaysVisible() =
+    fun aSendNoLongerFailedStaysVisible() =
         withController(listOf(failedSend())) { controller ->
             val removed =
                 controller.discardDurableFailedSend(FAILED) { _, _, _ ->

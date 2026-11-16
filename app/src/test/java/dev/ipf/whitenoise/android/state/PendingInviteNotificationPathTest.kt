@@ -95,10 +95,39 @@ class PendingInviteNotificationPathTest {
             assertTrue("the first message after accepting was dropped", awaitAnyCard())
         }
 
-    /** Runs [block] against a bootstrapped fixture whose chat row and group record report the given pending states. */
+    /** An admin change in a group whose row says pending but whose record cannot be read is withheld. */
+    @Test
+    fun anUnconfirmableInviteWithholdsAnAdminChange() =
+        runWith(rowPending = true, groupPending = true, groupReadFails = true) { fixture ->
+            val adminChange =
+                fixture.update.copy(
+                    notificationKey = "made-admin:account-a",
+                    trigger = NotificationTriggerFfi.MADE_ADMIN,
+                    messageIdHex = null,
+                )
+
+            fixture.appState.processNotificationUpdateForTest(adminChange)
+
+            assertEquals(0, manager.activeNotifications.size)
+        }
+
+    /** A message in that group still rings, so the first message after an Accept the row lags behind is kept. */
+    @Test
+    fun anUnconfirmableInviteStillRingsAMessage() =
+        runWith(rowPending = true, groupPending = true, groupReadFails = true) { fixture ->
+            fixture.appState.processNotificationUpdateForTest(fixture.update)
+
+            assertTrue("a message was dropped on an unreadable group record", awaitAnyCard())
+        }
+
+    /**
+     * Runs [block] against a bootstrapped fixture whose chat row and group record report the given pending states, or
+     * whose group record read fails when [groupReadFails].
+     */
     private fun runWith(
         rowPending: Boolean,
         groupPending: Boolean,
+        groupReadFails: Boolean = false,
         block: suspend (NotificationBootstrapTestFixture) -> Unit,
     ) = runBlocking {
         lateinit var fixture: NotificationBootstrapTestFixture
@@ -108,7 +137,10 @@ class PendingInviteNotificationPathTest {
                 emitStartupNotification = false,
                 accounts = listOf(account("account-a")),
                 onChatListRow = { _, groupIdHex -> pendingRow(groupIdHex, rowPending) },
-                onGroupDetails = { _, groupIdHex -> pendingGroup(groupIdHex, groupPending) },
+                onGroupDetails = { _, groupIdHex ->
+                    check(!groupReadFails) { "group record unavailable" }
+                    pendingGroup(groupIdHex, groupPending)
+                },
             )
         try {
             fixture.bootstrap()

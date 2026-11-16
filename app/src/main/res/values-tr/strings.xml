@@ -279,7 +279,7 @@
     <string name="scroll_to_top">Başa kaydır</string>
     <string name="discard_failed_message">Başarısız mesajı sil</string>
     <string name="message_discard_still_sending">Bu mesaj hâlâ gönderiliyor. Birazdan tekrar deneyin.</string>
-    <string name="message_discard_already_delivered">Bu mesaj zaten teslim edildi, bu yüzden silinmedi.</string>
+    <string name="message_discard_not_failed">Bu mesaj artık silinemez.</string>
     <string name="decline">Reddet</string>
     <string name="accept">Kabul et</string>
     <string name="invited_as_account">Davet edilen hesap: %1$s</string>

@@ -279,7 +279,7 @@
     <string name="scroll_to_top">Nach oben scrollen</string>
     <string name="discard_failed_message">Fehlgeschlagene Nachricht verwerfen</string>
     <string name="message_discard_still_sending">Diese Nachricht wird noch gesendet. Versuche es gleich noch einmal.</string>
-    <string name="message_discard_already_delivered">Diese Nachricht wurde bereits zugestellt und deshalb nicht verworfen.</string>
+    <string name="message_discard_not_failed">Diese Nachricht kann nicht mehr verworfen werden.</string>
     <string name="decline">Ablehnen</string>
     <string name="accept">Annehmen</string>
     <string name="invited_as_account">Eingeladenes Konto: %1$s</string>

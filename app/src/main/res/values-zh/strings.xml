@@ -266,7 +266,7 @@
     <string name="scroll_to_top">滚动到顶部</string>
     <string name="discard_failed_message">丢弃发送失败的消息</string>
     <string name="message_discard_still_sending">此消息仍在发送中。请稍后再试。</string>
-    <string name="message_discard_already_delivered">此消息已送达，因此未被丢弃。</string>
+    <string name="message_discard_not_failed">此消息已无法丢弃。</string>
     <string name="decline">拒绝</string>
     <string name="accept">接受</string>
     <string name="invited_as_account">受邀账号：%1$s</string>
