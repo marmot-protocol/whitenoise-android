@@ -2029,10 +2029,14 @@
     <string name="setup_continue_without_profile">Continua senza un profilo</string>
     <string name="setup_review_suggested_changes">Esamina le modifiche suggerite</string>
     <string name="setup_chats_on_this_device">Chat su questo dispositivo</string>
-    <string name="setup_chats_on_this_device_help">Il solo accesso non ripristina le chat né i messaggi esistenti. Se usi un altro dispositivo, conserva la sua app e i suoi dati finché non hai controllato le chat qui.</string>
+    <string name="setup_device_none_found">Non abbiamo trovato chiavi di messaggistica di un’altra app o di un altro dispositivo.</string>
+    <string name="setup_device_unchecked">Non è stato possibile verificare se questo account usa un’altra app o un altro dispositivo per i messaggi.</string>
+    <string name="setup_device_found_on_date">Abbiamo trovato chiavi di messaggistica pubblicate da questo account da un’altra app o da un altro dispositivo, le più recenti il %1$s.</string>
+    <string name="setup_device_found">Abbiamo trovato chiavi di messaggistica pubblicate da questo account da un’altra app o da un altro dispositivo.</string>
+    <string name="setup_device_separate_chats">Questo dispositivo avrà chat proprie e separate. Le chat nell’altra app restano lì e non appariranno qui.</string>
+    <string name="setup_device_new_chats_either_app">Quando qualcuno inizia una nuova chat con te, può arrivare in una delle due app.</string>
+    <string name="setup_device_separate_chats_if_other_app">Se usi un’altra app per i messaggi, questo dispositivo avrà chat proprie e separate, e le chat di quell’app non appariranno qui.</string>
     <string name="setup_device_stage">Utilizzo del dispositivo</string>
-    <string name="setup_other_sign_ins_found">Sono stati trovati altri record di accesso. Potrebbero appartenere a un’altra installazione o a una precedente.</string>
-    <string name="setup_other_sign_ins_unchecked">Non è stato possibile controllare altri accessi.</string>
     <string name="setup_approval_saved_pending">La tua approvazione è salvata. La modifica è ancora in sospeso.</string>
     <string name="setup_profile_scope_help">Questo aggiorna il tuo profilo in altre app Nostr.</string>
     <string name="setup_optional_profile_help">Opzionale. Puoi aggiungere un profilo in un secondo momento.</string>

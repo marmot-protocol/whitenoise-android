@@ -2233,10 +2233,14 @@
     <string name="setup_continue_without_profile">Continue without a profile</string>
     <string name="setup_review_suggested_changes">Review suggested changes</string>
     <string name="setup_chats_on_this_device">Chats on this device</string>
-    <string name="setup_chats_on_this_device_help">Signing in alone does not restore your existing chats or messages. If you use another device, keep its app and data until you’ve checked your chats here.</string>
+    <string name="setup_device_none_found">We didn’t find messaging keys from another app or device.</string>
+    <string name="setup_device_unchecked">We couldn’t check whether this account uses another app or device for messaging.</string>
+    <string name="setup_device_found_on_date">We found messaging keys this account published from another app or device, most recently on %1$s.</string>
+    <string name="setup_device_found">We found messaging keys this account published from another app or device.</string>
+    <string name="setup_device_separate_chats">This device will have its own separate chats. Chats in the other app stay there and won’t appear here.</string>
+    <string name="setup_device_new_chats_either_app">When someone starts a new chat with you, it may arrive in either app.</string>
+    <string name="setup_device_separate_chats_if_other_app">If you use another app for messaging, this device will have its own separate chats, and chats in that app won’t appear here.</string>
     <string name="setup_device_stage">Device use</string>
-    <string name="setup_other_sign_ins_found">Other sign-in records were found. They may belong to another installation or an earlier one.</string>
-    <string name="setup_other_sign_ins_unchecked">Other sign-ins could not be checked.</string>
     <string name="setup_approval_saved_pending">Your approval is saved. The change is still pending.</string>
     <string name="setup_profile_scope_help">This updates your profile in other Nostr apps.</string>
     <string name="setup_optional_profile_help">Optional. You can add a profile later.</string>

@@ -2022,10 +2022,14 @@
     <string name="setup_continue_without_profile">Profil olmadan devam et</string>
     <string name="setup_review_suggested_changes">Önerilen değişiklikleri inceleyin</string>
     <string name="setup_chats_on_this_device">Bu cihazdaki sohbetler</string>
-    <string name="setup_chats_on_this_device_help">Yalnızca giriş yapmak mevcut sohbetlerinizi veya mesajlarınızı geri yüklemez. Başka bir cihaz kullanıyorsanız, sohbetlerinizi burada kontrol edene kadar oradaki uygulamayı ve verilerini saklayın.</string>
+    <string name="setup_device_none_found">Başka bir uygulamadan veya cihazdan mesajlaşma anahtarı bulamadık.</string>
+    <string name="setup_device_unchecked">Bu hesabın mesajlaşma için başka bir uygulama veya cihaz kullanıp kullanmadığını kontrol edemedik.</string>
+    <string name="setup_device_found_on_date">Bu hesabın başka bir uygulamadan veya cihazdan yayımladığı mesajlaşma anahtarları bulduk. En yenileri %1$s tarihli.</string>
+    <string name="setup_device_found">Bu hesabın başka bir uygulamadan veya cihazdan yayımladığı mesajlaşma anahtarları bulduk.</string>
+    <string name="setup_device_separate_chats">Bu cihazın kendi ayrı sohbetleri olacak. Diğer uygulamadaki sohbetler orada kalır ve burada görünmez.</string>
+    <string name="setup_device_new_chats_either_app">Biri sizinle yeni bir sohbet başlattığında, sohbet iki uygulamadan herhangi birine gelebilir.</string>
+    <string name="setup_device_separate_chats_if_other_app">Mesajlaşma için başka bir uygulama kullanıyorsanız bu cihazın kendi ayrı sohbetleri olur ve o uygulamadaki sohbetler burada görünmez.</string>
     <string name="setup_device_stage">Cihaz kullanımı</string>
-    <string name="setup_other_sign_ins_found">Başka giriş kayıtları bulundu. Bunlar başka bir kuruluma veya daha önceki bir kuruluma ait olabilir.</string>
-    <string name="setup_other_sign_ins_unchecked">Diğer girişler kontrol edilemedi.</string>
     <string name="setup_approval_saved_pending">Onayınız kaydedildi. Değişiklik hâlâ beklemede.</string>
     <string name="setup_profile_scope_help">Bu, diğer Nostr uygulamalarındaki profilinizi günceller.</string>
     <string name="setup_optional_profile_help">İsteğe bağlı. Daha sonra profil ekleyebilirsiniz.</string>

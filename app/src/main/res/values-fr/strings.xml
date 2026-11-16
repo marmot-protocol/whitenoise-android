@@ -2029,10 +2029,14 @@
     <string name="setup_continue_without_profile">Continuer sans profil</string>
     <string name="setup_review_suggested_changes">Examiner les modifications suggérées</string>
     <string name="setup_chats_on_this_device">Discussions sur cet appareil</string>
-    <string name="setup_chats_on_this_device_help">Se connecter ne suffit pas à restaurer vos discussions ni vos messages existants. Si vous utilisez un autre appareil, conservez son app et ses données jusqu’à ce que vous ayez vérifié vos discussions ici.</string>
+    <string name="setup_device_none_found">Nous n’avons trouvé aucune clé de messagerie provenant d’une autre app ou d’un autre appareil.</string>
+    <string name="setup_device_unchecked">Nous n’avons pas pu vérifier si ce compte utilise une autre app ou un autre appareil pour la messagerie.</string>
+    <string name="setup_device_found_on_date">Nous avons trouvé des clés de messagerie publiées par ce compte depuis une autre app ou un autre appareil, les plus récentes le %1$s.</string>
+    <string name="setup_device_found">Nous avons trouvé des clés de messagerie publiées par ce compte depuis une autre app ou un autre appareil.</string>
+    <string name="setup_device_separate_chats">Cet appareil aura ses propres discussions, séparées. Les discussions de l’autre app y restent et n’apparaîtront pas ici.</string>
+    <string name="setup_device_new_chats_either_app">Quand quelqu’un commence une nouvelle discussion avec vous, elle peut arriver dans l’une ou l’autre app.</string>
+    <string name="setup_device_separate_chats_if_other_app">Si vous utilisez une autre app de messagerie, cet appareil aura ses propres discussions, séparées, et les discussions de cette app n’apparaîtront pas ici.</string>
     <string name="setup_device_stage">Utilisation de l\'appareil</string>
-    <string name="setup_other_sign_ins_found">D’autres traces de connexion ont été trouvées. Elles peuvent provenir d’une autre installation ou d’une installation antérieure.</string>
-    <string name="setup_other_sign_ins_unchecked">Les autres connexions n’ont pas pu être vérifiées.</string>
     <string name="setup_approval_saved_pending">Votre approbation est enregistrée. Le changement est toujours en attente.</string>
     <string name="setup_profile_scope_help">Cela met à jour votre profil dans d\'autres applications Nostr.</string>
     <string name="setup_optional_profile_help">Facultatif. Vous pourrez ajouter un profil plus tard.</string>

@@ -1990,10 +1990,14 @@
     <string name="setup_continue_without_profile">不新增個人檔案，繼續</string>
     <string name="setup_review_suggested_changes">檢查建議的變更</string>
     <string name="setup_chats_on_this_device">此裝置上的聊天</string>
-    <string name="setup_chats_on_this_device_help">僅登入不會還原你現有的聊天或訊息。如果你使用另一台裝置，請保留該裝置上的 App 和資料，直到你在這裡檢查過聊天。</string>
+    <string name="setup_device_none_found">我們沒有發現來自其他 App 或裝置的訊息金鑰。</string>
+    <string name="setup_device_unchecked">我們無法確認此帳號是否在其他 App 或裝置上收發訊息。</string>
+    <string name="setup_device_found_on_date">我們發現此帳號曾從其他 App 或裝置發佈訊息金鑰，最近一次發佈於 %1$s。</string>
+    <string name="setup_device_found">我們發現此帳號曾從其他 App 或裝置發佈訊息金鑰。</string>
+    <string name="setup_device_separate_chats">此裝置將擁有自己獨立的聊天。另一個 App 中的聊天會留在那裡，不會顯示在這裡。</string>
+    <string name="setup_device_new_chats_either_app">當有人與你開始新的聊天時，聊天可能出現在任一 App 中。</string>
+    <string name="setup_device_separate_chats_if_other_app">如果你使用其他 App 收發訊息，此裝置將擁有自己獨立的聊天，那個 App 中的聊天不會顯示在這裡。</string>
     <string name="setup_device_stage">裝置使用</string>
-    <string name="setup_other_sign_ins_found">發現了其他登入記錄。它們可能屬於另一處安裝或較早的安裝。</string>
-    <string name="setup_other_sign_ins_unchecked">無法檢查其他登入。</string>
     <string name="setup_approval_saved_pending">你的核准已儲存。變更仍待處理。</string>
     <string name="setup_profile_scope_help">這會更新你在其他 Nostr 應用程式中的個人檔案。</string>
     <string name="setup_optional_profile_help">可選。你可以稍後新增個人檔案。</string>

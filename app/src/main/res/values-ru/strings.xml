@@ -2098,10 +2098,14 @@
     <string name="setup_continue_without_profile">Продолжить без профиля</string>
     <string name="setup_review_suggested_changes">Просмотрите предлагаемые изменения</string>
     <string name="setup_chats_on_this_device">Чаты на этом устройстве</string>
-    <string name="setup_chats_on_this_device_help">Сам по себе вход не восстанавливает ваши существующие чаты и сообщения. Если вы пользуетесь другим устройством, сохраните на нём приложение и данные, пока не проверите свои чаты здесь.</string>
+    <string name="setup_device_none_found">Мы не нашли ключи для сообщений из другого приложения или с другого устройства.</string>
+    <string name="setup_device_unchecked">Не удалось проверить, использует ли этот аккаунт другое приложение или устройство для сообщений.</string>
+    <string name="setup_device_found_on_date">Мы нашли ключи для сообщений, которые этот аккаунт опубликовал из другого приложения или с другого устройства, последние — %1$s.</string>
+    <string name="setup_device_found">Мы нашли ключи для сообщений, которые этот аккаунт опубликовал из другого приложения или с другого устройства.</string>
+    <string name="setup_device_separate_chats">На этом устройстве будут свои, отдельные чаты. Чаты в другом приложении останутся там и здесь не появятся.</string>
+    <string name="setup_device_new_chats_either_app">Когда кто-то начнёт с вами новый чат, он может прийти в любое из двух приложений.</string>
+    <string name="setup_device_separate_chats_if_other_app">Если вы пользуетесь другим приложением для сообщений, на этом устройстве будут свои, отдельные чаты, а чаты из того приложения здесь не появятся.</string>
     <string name="setup_device_stage">Использование устройства</string>
-    <string name="setup_other_sign_ins_found">Найдены другие записи о входе. Они могут относиться к другой установке или к более ранней.</string>
-    <string name="setup_other_sign_ins_unchecked">Не удалось проверить другие входы.</string>
     <string name="setup_approval_saved_pending">Ваше одобрение сохранено. Изменение все еще ожидается.</string>
     <string name="setup_profile_scope_help">Это обновит ваш профиль в других приложениях Nostr.</string>
     <string name="setup_optional_profile_help">Необязательно. Профиль можно добавить позже.</string>

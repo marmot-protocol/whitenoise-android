@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -24,11 +25,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.marmotkit.OnboardingActionFfi
-import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
 import dev.ipf.marmotkit.OnboardingRelayRepairModeFfi
 import dev.ipf.marmotkit.OnboardingRepairProposalFfi
+import dev.ipf.marmotkit.OnboardingSingleDeviceNoticeFfi
 import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
@@ -290,7 +291,7 @@ private fun SetupDecisionContent(state: AccountSetupState) {
         SetupStepFindings(state, snapshot, step)
         if (step.step == OnboardingStepFfi.SINGLE_DEVICE) {
             val shownFindings = if (state.routineDeviceNotice) emptyList() else step.findings
-            SetupSingleDeviceNotice(snapshot.singleDeviceNotice?.discovery, shownFindings)
+            SetupSingleDeviceNotice(snapshot.singleDeviceNotice, shownFindings)
         }
         snapshot.proposal?.takeIf { it.step == step.step }?.let { proposal ->
             if (OnboardingActionFfi.APPROVE_REPAIR !in step.actions) {
@@ -339,18 +340,20 @@ private fun SetupOperationNotice(
 }
 
 /**
- * Explains what signing in restores, adding a note only when other sign-ins were found or could not
- * be checked, and not when one of the [shownFindings] already says it.
+ * States what MDK's device check found, unless one of the [shownFindings] already says it, then explains that this
+ * sign-in keeps its own chats apart from any other app.
  */
 @Composable
 private fun SetupSingleDeviceNotice(
-    discovered: OnboardingDeviceDiscoveryFfi?,
+    notice: OnboardingSingleDeviceNoticeFfi?,
     shownFindings: List<OnboardingFindingFfi>,
 ) {
-    Text(stringResource(R.string.setup_chats_on_this_device_help))
-    setupDeviceDiscoveryNote(discovered)
-        ?.takeUnless { note -> shownFindings.any { setupFindingTitle(it.issue) == note } }
-        ?.let { SetupNotice(stringResource(it)) }
+    val evidence = remember(notice) { setupDeviceEvidence(notice, System.currentTimeMillis() / 1_000L) }
+    val restated =
+        evidence is SetupDeviceEvidence.OtherApps &&
+            shownFindings.any { it.issue == OnboardingIssueFfi.OTHER_INSTALLATION_POSSIBLE }
+    evidence?.takeUnless { restated }?.let { SetupNotice(setupDeviceFinding(it)) }
+    setupDeviceExplanation(evidence).forEach { Text(stringResource(it)) }
 }
 
 /** Shows usable relay routes and explains recommendation preservation versus custom replacement. */

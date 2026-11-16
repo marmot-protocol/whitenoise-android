@@ -1989,10 +1989,14 @@
     <string name="setup_continue_without_profile">不添加个人资料，继续</string>
     <string name="setup_review_suggested_changes">查看建议的更改</string>
     <string name="setup_chats_on_this_device">此设备上的聊天</string>
-    <string name="setup_chats_on_this_device_help">仅登录不会恢复你现有的聊天或消息。如果你使用另一台设备，请保留该设备上的应用和数据，直到你在这里检查过聊天。</string>
+    <string name="setup_device_none_found">我们没有发现来自其他应用或设备的消息密钥。</string>
+    <string name="setup_device_unchecked">我们无法确认此账号是否在其他应用或设备上收发消息。</string>
+    <string name="setup_device_found_on_date">我们发现此账号曾从其他应用或设备发布消息密钥，最近一次发布于 %1$s。</string>
+    <string name="setup_device_found">我们发现此账号曾从其他应用或设备发布消息密钥。</string>
+    <string name="setup_device_separate_chats">此设备将拥有自己独立的聊天。另一个应用中的聊天会留在那里，不会显示在这里。</string>
+    <string name="setup_device_new_chats_either_app">当有人与你开始新的聊天时，聊天可能出现在任一应用中。</string>
+    <string name="setup_device_separate_chats_if_other_app">如果你使用其他应用收发消息，此设备将拥有自己独立的聊天，那个应用中的聊天不会显示在这里。</string>
     <string name="setup_device_stage">设备使用</string>
-    <string name="setup_other_sign_ins_found">发现了其他登录记录。它们可能属于另一处安装或较早的安装。</string>
-    <string name="setup_other_sign_ins_unchecked">无法检查其他登录。</string>
     <string name="setup_approval_saved_pending">您的批准已保存。变更仍在等待中。</string>
     <string name="setup_profile_scope_help">这会更新您在其他 Nostr 应用程序中的个人资料。</string>
     <string name="setup_optional_profile_help">可选。你可以稍后添加个人资料。</string>

@@ -2029,10 +2029,14 @@
     <string name="setup_continue_without_profile">Continuar sin perfil</string>
     <string name="setup_review_suggested_changes">Revisar los cambios sugeridos</string>
     <string name="setup_chats_on_this_device">Chats en este dispositivo</string>
-    <string name="setup_chats_on_this_device_help">Iniciar sesión por sí solo no restaura tus chats ni mensajes existentes. Si usas otro dispositivo, conserva su app y sus datos hasta que hayas comprobado tus chats aquí.</string>
+    <string name="setup_device_none_found">No encontramos claves de mensajería de otra app u otro dispositivo.</string>
+    <string name="setup_device_unchecked">No pudimos comprobar si esta cuenta usa otra app u otro dispositivo para mensajes.</string>
+    <string name="setup_device_found_on_date">Encontramos claves de mensajería que esta cuenta publicó desde otra app u otro dispositivo; las más recientes, el %1$s.</string>
+    <string name="setup_device_found">Encontramos claves de mensajería que esta cuenta publicó desde otra app u otro dispositivo.</string>
+    <string name="setup_device_separate_chats">Este dispositivo tendrá sus propios chats, separados. Los chats de la otra app se quedan allí y no aparecerán aquí.</string>
+    <string name="setup_device_new_chats_either_app">Cuando alguien inicie un chat nuevo contigo, puede llegar a cualquiera de las dos apps.</string>
+    <string name="setup_device_separate_chats_if_other_app">Si usas otra app para mensajes, este dispositivo tendrá sus propios chats, separados, y los chats de esa app no aparecerán aquí.</string>
     <string name="setup_device_stage">Uso del dispositivo</string>
-    <string name="setup_other_sign_ins_found">Se encontraron otros registros de inicio de sesión. Pueden pertenecer a otra instalación o a una anterior.</string>
-    <string name="setup_other_sign_ins_unchecked">No se pudieron comprobar otros inicios de sesión.</string>
     <string name="setup_approval_saved_pending">Tu aprobación está guardada. El cambio sigue pendiente.</string>
     <string name="setup_profile_scope_help">Esto actualiza su perfil en otras aplicaciones de Nostr.</string>
     <string name="setup_optional_profile_help">Opcional. Puede agregar un perfil más tarde.</string>

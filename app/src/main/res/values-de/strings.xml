@@ -2041,10 +2041,14 @@
     <string name="setup_continue_without_profile">Ohne Profil fortfahren</string>
     <string name="setup_review_suggested_changes">Vorgeschlagene Änderungen prüfen</string>
     <string name="setup_chats_on_this_device">Chats auf diesem Gerät</string>
-    <string name="setup_chats_on_this_device_help">Die Anmeldung allein stellt deine bestehenden Chats und Nachrichten nicht wieder her. Wenn du ein anderes Gerät verwendest, behalte dort die App und ihre Daten, bis du deine Chats hier überprüft hast.</string>
+    <string name="setup_device_none_found">Wir haben keine Nachrichtenschlüssel von einer anderen App oder einem anderen Gerät gefunden.</string>
+    <string name="setup_device_unchecked">Wir konnten nicht prüfen, ob dieses Konto für Nachrichten eine andere App oder ein anderes Gerät verwendet.</string>
+    <string name="setup_device_found_on_date">Wir haben Nachrichtenschlüssel gefunden, die dieses Konto von einer anderen App oder einem anderen Gerät veröffentlicht hat, zuletzt am %1$s.</string>
+    <string name="setup_device_found">Wir haben Nachrichtenschlüssel gefunden, die dieses Konto von einer anderen App oder einem anderen Gerät veröffentlicht hat.</string>
+    <string name="setup_device_separate_chats">Dieses Gerät wird seine eigenen, getrennten Chats haben. Chats in der anderen App bleiben dort und werden hier nicht angezeigt.</string>
+    <string name="setup_device_new_chats_either_app">Wenn jemand einen neuen Chat mit dir beginnt, kann er in jeder der beiden Apps ankommen.</string>
+    <string name="setup_device_separate_chats_if_other_app">Wenn du eine andere App für Nachrichten verwendest, wird dieses Gerät seine eigenen, getrennten Chats haben, und Chats in der anderen App werden hier nicht angezeigt.</string>
     <string name="setup_device_stage">Gerätenutzung</string>
-    <string name="setup_other_sign_ins_found">Es wurden weitere Anmeldeeinträge gefunden. Sie können zu einer anderen oder einer früheren Installation gehören.</string>
-    <string name="setup_other_sign_ins_unchecked">Weitere Anmeldungen konnten nicht geprüft werden.</string>
     <string name="setup_approval_saved_pending">Deine Zustimmung ist gespeichert. Die Änderung steht noch aus.</string>
     <string name="setup_profile_scope_help">Dadurch wird dein Profil in anderen Nostr-Apps aktualisiert.</string>
     <string name="setup_optional_profile_help">Optional. Du kannst später ein Profil hinzufügen.</string>
