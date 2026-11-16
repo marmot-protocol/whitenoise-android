@@ -56,6 +56,10 @@ internal class PersistentDisplayThumbnails(
     private val removingTags = mutableMapOf<String, Int>()
     private val removingMessages = mutableMapOf<String, Int>()
 
+    /** Elapsed-realtime instant of the last complete native reconciliation in this process, if any. */
+    @Volatile
+    var reconciledAtElapsedMillis: Long? = null
+
     /** Captures before an original read; weak revision cells disappear after their last request is released. */
     fun captureGeneration(source: DisplayThumbnailSource): DisplayThumbnailToken =
         synchronized(requestLock) {

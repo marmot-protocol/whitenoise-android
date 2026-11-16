@@ -8386,7 +8386,7 @@ class WhiteNoiseAppState private constructor(
             localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
             notificationScope.launch { catchUpAfterForegroundActivation() }
-            scheduleDisplayThumbnailReconciliation()
+            scheduleForegroundDisplayThumbnailReconciliation()
         }
         if (shouldStartBackgroundConnectionForForeground(foreground)) {
             notificationDelivery.startBackgroundConnectionService()

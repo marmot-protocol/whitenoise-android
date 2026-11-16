@@ -56,7 +56,7 @@ class DisplayThumbnailInvalidationCoverageTest {
             appState
                 .substringAfter("fun setAppInForeground(")
                 .substringBefore("fun ")
-                .contains("scheduleDisplayThumbnailReconciliation()"),
+                .contains("scheduleForegroundDisplayThumbnailReconciliation()"),
         )
     }
 

@@ -17,6 +17,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -24,7 +26,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowSystemClock
 import java.io.IOException
+import java.time.Duration
 import javax.crypto.spec.SecretKeySpec
 
 /** Unopened-chat cleanup uses real encrypted cache entries and authoritative, batched native metadata. */
@@ -85,6 +89,17 @@ class DisplayThumbnailRetentionTest {
             assertEquals(1, snapshots)
             assertEquals(0, fixture.nativeAssetReads.get())
             assertTrue(fixture.calls.isEmpty())
+        }
+
+    /** A foreground return shortly after a complete pass does not authenticate the whole cache again. */
+    @Test
+    fun foregroundReturnReusesARecentCompletePass() =
+        runTest(dispatcher) {
+            seed(source(0))
+            fixture.state.reconcileDisplayThumbnails()
+            assertNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
+            ShadowSystemClock.advanceBy(Duration.ofMinutes(16))
+            assertNotNull(fixture.state.scheduleForegroundDisplayThumbnailReconciliation())
         }
 
     /** Native read failure leaves cache data for a later authoritative answer. */

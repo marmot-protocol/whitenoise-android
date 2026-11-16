@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.SystemClock
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.media.DisplayThumbnailSource
@@ -19,6 +20,7 @@ internal val REMOVED_DISPLAY_THUMBNAIL_SOURCES =
     )
 private const val THUMBNAIL_RECONCILIATION_BATCH = 64
 private const val CACHE_TARGET_COMPONENTS = 3
+private const val FOREGROUND_RECONCILIATION_INTERVAL_MILLIS = 15 * 60 * 1000L
 
 /** Requests cache maintenance outside rendering; concurrent lifecycle requests coalesce onto the current pass. */
 internal fun WhiteNoiseAppState.scheduleDisplayThumbnailReconciliation(): Job {
@@ -32,6 +34,15 @@ internal fun WhiteNoiseAppState.scheduleDisplayThumbnailReconciliation(): Job {
                     .onFailure { android.util.Log.w("DisplayThumbnailCache", "reconciliation_failed") }
             } while (displayThumbnailReconciliationRequested)
         }.also { displayThumbnailReconciliationJob = it }
+}
+
+/** A foreground return reuses a recent completed pass, because each pass authenticates every stored derivative. */
+internal fun WhiteNoiseAppState.scheduleForegroundDisplayThumbnailReconciliation(): Job? {
+    val completedAt = displayThumbnails.reconciledAtElapsedMillis
+    val recent =
+        completedAt != null &&
+            SystemClock.elapsedRealtime() - completedAt < FOREGROUND_RECONCILIATION_INTERVAL_MILLIS
+    return if (recent) null else scheduleDisplayThumbnailReconciliation()
 }
 
 /** Applies MDK's authoritative removal states across encrypted sources, including unopened conversations. */
@@ -54,6 +65,7 @@ internal suspend fun WhiteNoiseAppState.reconcileDisplayThumbnails() {
                 reconcileDisplayThumbnailBatch(engine, identity.first, identity.second, batch, stillOwned)
             }
         }
+        displayThumbnails.reconciledAtElapsedMillis = SystemClock.elapsedRealtime()
     } finally {
         displayThumbnailReconciliationMutex.unlock()
     }
