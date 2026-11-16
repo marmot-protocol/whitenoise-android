@@ -177,8 +177,8 @@ class DownloadNeverOpensTest {
     }
 
     /**
-     * A downloaded PDF routes to the in-app reader, so the tap that opens a downloaded archive requests no external
-     * open here. The reader needs a timeline source to stay current; device and Maestro proof cover its UI.
+     * Tapping a downloaded PDF card requests no external open. This harness has no timeline source, so the in-app
+     * reader is not asserted here; device and Maestro proof cover its UI.
      */
     @Test
     fun aDownloadedPdfCardTapRequestsNoExternalOpen() {
@@ -192,7 +192,7 @@ class DownloadNeverOpensTest {
         }
     }
 
-    /** Downloads the file card's attachment with one tap, asserting that the tap requested no open. */
+    /** Downloads the file card's attachment with one tap and returns the open revision captured before that tap. */
     private fun downloadThroughFileCard(downloadedTypeDescription: String): Int {
         awaitDescribed(text(R.string.media_tap_to_download))
         val revision = composeRule.runOnIdle { fixture.state.attachmentOpens.revision }
