@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="emoji_sets_reinstall">Reinstalla set</string>
-    <string name="explanation_organize_emoji_reinstall">Scarica di nuovo questo set e sostituisce la copia installata. Il download condivide il tuo indirizzo IP con i server delle immagini. Puoi annullarlo mentre è in corso.</string>
-</resources>

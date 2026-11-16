@@ -39,7 +39,6 @@ import dev.ipf.whitenoise.android.state.EmojiSetNotice
 import dev.ipf.whitenoise.android.state.EmojiSetsController
 import dev.ipf.whitenoise.android.state.EmojiSetsState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.canRetryPartialInstall
 import dev.ipf.whitenoise.android.state.emojiSetsBackend
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiArtImage
@@ -354,18 +353,18 @@ private fun EmojiSetActions(
             }
         } else {
             val installed = set.installed
-            val labels =
-                when {
-                    installed == null -> R.string.emoji_sets_install to R.string.explanation_organize_emoji_install
-                    installed.updateAvailable ->
-                        R.string.emoji_sets_update to R.string.explanation_organize_emoji_update
-                    set.canRetryPartialInstall() ->
-                        R.string.emoji_sets_reinstall to R.string.explanation_organize_emoji_reinstall
-                    else -> null
-                }
-            labels?.let { (labelResource, bodyResource) ->
-                val label = stringResource(labelResource)
-                val body = stringResource(bodyResource)
+            if (installed == null || installed.updateAvailable) {
+                val isInstall = installed == null
+                val label =
+                    stringResource(if (isInstall) R.string.emoji_sets_install else R.string.emoji_sets_update)
+                val body =
+                    stringResource(
+                        if (isInstall) {
+                            R.string.explanation_organize_emoji_install
+                        } else {
+                            R.string.explanation_organize_emoji_update
+                        },
+                    )
                 Button(
                     onClick = onInstall,
                     modifier = Modifier.explainOnLongPress(Explanation(label, body)),

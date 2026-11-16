@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="emoji_sets_reinstall">重新安裝表情包</string>
-    <string name="explanation_organize_emoji_reinstall">重新下載此表情包並取代已安裝的副本。下載時，圖片代管伺服器會得知你的 IP 位址。你可以在下載過程中取消。</string>
-</resources>

@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="emoji_sets_reinstall">Seti yeniden yükle</string>
-    <string name="explanation_organize_emoji_reinstall">Bu seti yeniden indirir ve yüklü kopyanın yerine koyar. İndirme sırasında IP adresiniz görsel sunucularıyla paylaşılır. İşlem sürerken iptal edebilirsiniz.</string>
-</resources>

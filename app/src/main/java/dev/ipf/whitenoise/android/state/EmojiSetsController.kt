@@ -113,12 +113,6 @@ internal fun WhiteNoiseAppState.emojiSetsBackend(
 /** The typed outcome of the last operation the screen reports. */
 internal enum class EmojiSetNotice { Error, NotFound, Changed, Cancelled, DiscoveryIncomplete }
 
-/** A same-version retry is useful only when MDK retained fewer emoji than that version declares. */
-internal fun EmojiSetFfi.canRetryPartialInstall(): Boolean {
-    val current = installed ?: return false
-    return current.eventIdHex == eventIdHex && current.emojiCount < emoji.size.toUInt()
-}
-
 /** Everything the browser and preview render. Only MDK's projection, never a copy of set contents. */
 internal data class EmojiSetsState(
     val sets: List<EmojiSetFfi> = emptyList(),
@@ -179,7 +173,7 @@ internal class EmojiSetsController(
         operate(set) { state = state.copy(artwork = backend.preview(set)) }
     }
 
-    /** Installs exactly the displayed version and updates the composer projection on completion. */
+    /** Refreshes the native projection, installs a new version and updates the composer on completion. */
     suspend fun install() {
         val set = state.preview ?: return
         operate(set) {
@@ -194,7 +188,9 @@ internal class EmojiSetsController(
             }
             state = state.copy(preview = current)
             val installed = current.installed
-            if (installed != null && !installed.updateAvailable && !current.canRetryPartialInstall()) {
+            if (installed != null &&
+                (installed.eventIdHex == current.eventIdHex || !installed.updateAvailable)
+            ) {
                 return@operate
             }
             val result = installWithProgress(current)
