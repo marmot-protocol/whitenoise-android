@@ -822,7 +822,8 @@ androidComponents {
             .withFlavor("environment" to "production")
             .withFlavor("distribution" to "zapstore"),
     ) { variant ->
-        variant.packaging.jniLibs.useLegacyPackaging.set(true)
+        variant.packaging.jniLibs.useLegacyPackaging
+            .set(true)
     }
 
     // Embed short commit SHA + build date into every release APK filename so
