@@ -8,7 +8,7 @@ name: presentation-text-document-html
     text: Rendered
 - tapOn: Source
 - assertVisible:
-    text: .*Fixture source paragraph.*
+    text: .*<p>Fixture source paragraph</p>.*
 - tapOn: Close
 - assertVisible:
     id: presentation.complete

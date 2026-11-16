@@ -6570,9 +6570,9 @@
         {
           "case": "presentation-text-document-html",
           "selector": {
-            "text": ".*Fixture source paragraph.*"
+            "text": ".*<p>Fixture source paragraph</p>.*"
           },
-          "scope": "Production HTML reader decodes fixture bytes, sanitises them and shows the original markup on the Source tab. WebView rendering, link confirmation and PDF isolated-process pages unproven.",
+          "scope": "Production HTML reader decodes fixture bytes and shows the original markup, including the <p> tag, on the Source tab. Sanitiser output, WebView rendering, link confirmation and PDF isolated-process pages unproven.",
           "entry_assertion": {
             "text": "Fixture page.html"
           },
