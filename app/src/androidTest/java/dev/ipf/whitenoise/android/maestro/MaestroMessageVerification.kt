@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.hiddenMessageIdsInGroup
 import dev.ipf.whitenoise.android.state.page
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

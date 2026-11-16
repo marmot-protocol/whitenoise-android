@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="report_team_action">An das White-Noise-Team melden</string>
+    <string name="report_team_send_toggle">An White Noise senden</string>
+    <string name="report_team_message_detail">Deine Meldung und der öffentliche Schlüssel des Absenders werden vertraulich an das White-Noise-Team gesendet. Die Nachricht selbst wird nicht geteilt, und der Absender wird nicht benachrichtigt.</string>
+    <string name="report_team_profile_detail">Deine Meldung und der öffentliche Schlüssel dieser Person werden vertraulich an das White-Noise-Team gesendet. Es werden keine Nachrichten geteilt, und die Person wird nicht benachrichtigt.</string>
+    <string name="report_team_explanation_hint">Was das White-Noise-Team wissen sollte (optional)</string>
+    <string name="report_team_sent">An das White-Noise-Team gesendet.</string>
+    <string name="report_team_queued">Gespeichert und wartet auf das Senden an das White-Noise-Team.</string>
+    <string name="report_team_pending">Gespeichert; die Zustellung an das White-Noise-Team wartet auf Bestätigung.</string>
+    <string name="report_team_copy_failed">Die Kopie an White Noise konnte nicht gesendet werden. Versuche es erneut.</string>
+    <string name="report_team_failed">Die Meldung konnte nicht an das White-Noise-Team gesendet werden. Versuche es erneut.</string>
+    <string name="report_team_rate_limited">Zu viele Meldungen von diesem Konto. Versuche es später erneut.</string>
+</resources>

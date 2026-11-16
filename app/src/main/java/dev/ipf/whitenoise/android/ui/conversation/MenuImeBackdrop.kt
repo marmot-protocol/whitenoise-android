@@ -4,8 +4,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
@@ -23,15 +26,20 @@ internal fun captureMenuImeBackdrop(
 internal fun animatedMenuImeBackdrop(
     frozenBottom: Int?,
     returning: Boolean,
-    liveBottom: Int,
+    liveBottom: () -> Int,
     onReleased: () -> Unit,
 ): Int? {
-    val bottom = remember(frozenBottom) { Animatable((frozenBottom ?: liveBottom).toFloat()) }
-    LaunchedEffect(frozenBottom, returning, liveBottom) {
+    val readLiveBottom by rememberUpdatedState(liveBottom)
+    val release by rememberUpdatedState(onReleased)
+    val bottom = remember(frozenBottom) { Animatable((frozenBottom ?: 0).toFloat()) }
+    LaunchedEffect(frozenBottom, returning) {
         if (frozenBottom != null && returning) {
-            // A changed live inset cancels and retargets from the displayed value.
-            bottom.animateTo(liveBottom.toFloat(), tween(durationMillis = 160))
-            onReleased()
+            // Observe animation frames in the effect, not the conversation composition.
+            snapshotFlow { readLiveBottom() }.collectLatest { live ->
+                // A changed live inset cancels and retargets from the displayed value.
+                bottom.animateTo(live.toFloat(), tween(durationMillis = 160))
+                release()
+            }
         }
     }
     // Null, rather than zero, identifies ownership: zero is a valid animated

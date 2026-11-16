@@ -40,6 +40,8 @@ import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
+import dev.ipf.whitenoise.android.core.Nip30Emoji
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +66,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -73,6 +76,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
 import java.lang.reflect.Proxy
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 
 /** Integration boundary for optimistic send state plus the shared relay retry policy (#2016). */
@@ -1885,6 +1889,55 @@ class ConversationSendRetryIntegrationTest {
         customEmojiSender = { _, _, _, _, _ -> send() },
     )
 
+    /** A queued artwork send cannot adopt a later session after switching away and back. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun queuedEmojiSendStaysBoundToItsOriginalAccountSession() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state =
+                appState(
+                    additionalAccounts =
+                        listOf(AccountSummaryFfi("bob", "b".repeat(64), true, false, false, true, false)),
+                )
+            var published = 0
+            val controller =
+                emojiController(state) {
+                    published += 1
+                    successfulSendSummary()
+                }
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val holder =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    state.withConversationTextSendOrder(ACCOUNT_REF, GROUP_ID) {
+                        entered.complete(Unit)
+                        release.await()
+                    }
+                }
+            try {
+                entered.await()
+                val send =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        state.sendConversationText(controller, "hi :party:")
+                    }
+                runCurrent()
+                val preload = AccountSwitchPreloadPolicy.STARTUP_RESTORATION
+                assertTrue(state.setActiveAccount("bob", preloadPolicy = preload))
+                assertTrue(state.setActiveAccount(ACCOUNT_REF, preloadPolicy = preload))
+                release.complete(Unit)
+                holder.await()
+                val failure = runCatching { send.await() }.exceptionOrNull()
+                assertTrue(failure is java.util.concurrent.CancellationException)
+                assertEquals(0, published)
+            } finally {
+                release.complete(Unit)
+                holder.await()
+                clearAndAwaitConversationTestFixture(controller)
+                Dispatchers.resetMain()
+            }
+        }
+
     /**
      * Cancelling while the emoji images upload must not wait for the upload, must publish nothing, and
      * must not hold the group commit lock, so reactions and edits stay usable meanwhile.
@@ -2093,6 +2146,77 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(2, lookups)
             assertEquals(1, sends)
         }
+
+    /** An offline read of a received emoji, whatever its error says, is retried and the message then sends once. */
+    @Test
+    fun offlineReceivedEmojiLookupIsRetriedThenSends() =
+        runTest {
+            var lookups = 0
+            var sends = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { text ->
+                        lookups += 1
+                        val offline = lookups == 1
+                        resolveConversationEmojiArtwork(
+                            Nip30Emoji.shortcodesIn(text),
+                            emptyMap(),
+                            mapOf(":party:" to receivedSource()),
+                            deviceOffline = { offline },
+                        ) { _, _, _ ->
+                            if (offline) throw UnknownHostException("Unable to resolve host")
+                            partyArtwork()
+                        }
+                    },
+                    customEmojiSender = { _, _, _, _, _ ->
+                        sends += 1
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(2, lookups)
+            assertEquals(1, sends)
+        }
+
+    /** An oversized received original offline leaves its code literal, and the rest of the message still sends. */
+    @Test
+    fun offlineOversizedReceivedEmojiSendsTheRestAsLiteral() =
+        runTest {
+            val sent = mutableListOf<List<String>>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { text ->
+                        resolveConversationEmojiArtwork(
+                            Nip30Emoji.shortcodesIn(text),
+                            mapOf(":party:" to partyArtwork()),
+                            mapOf(":huge:" to receivedSource()),
+                            deviceOffline = { true },
+                        ) { _, _, limit -> throw AttachmentTooLargeToPresentException(limit, limit + 1) }
+                    },
+                    customEmojiSender = { _, _, artwork, _, _ ->
+                        sent += artwork.map { it.shortcode }
+                        successfulSendSummary()
+                    },
+                )
+
+            appState.sendConversationText(controller, "hi :party: :huge:")
+
+            assertEquals(listOf(listOf(":party:")), sent)
+            assertNotEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A received emoji definition for the send-boundary lookups; its bytes come from each test's reader. */
+    private fun receivedSource() = ConversationEmojiSource("message", 0, MediaDownloadIntegrationFixture.reference(0))
 
     /** Cancelling a send whose artwork lookup keeps failing ends it and lets the next send publish without backoff. */
     @Test

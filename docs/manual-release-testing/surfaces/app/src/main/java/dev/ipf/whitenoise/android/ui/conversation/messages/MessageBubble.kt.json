@@ -26,6 +26,7 @@
           "MSG-015",
           "MSG-019",
           "MSG-026",
+          "MSG-034",
           "MSG-039",
           "MSG-040"
         ]
@@ -104,30 +105,6 @@
         "surface": "string:report_dismissed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "R.string.report_dismissed",
-        "test_ids": [
-          "MSG-016"
-        ]
-      },
-      {
-        "surface": "string:report_message_not_allowed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "R.string.report_message_not_allowed",
-        "test_ids": [
-          "MSG-016"
-        ]
-      },
-      {
-        "surface": "string:report_message_queued",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "R.string.report_message_queued",
-        "test_ids": [
-          "MSG-016"
-        ]
-      },
-      {
-        "surface": "string:report_message_sent",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "R.string.report_message_sent",
         "test_ids": [
           "MSG-016"
         ]

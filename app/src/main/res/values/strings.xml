@@ -352,6 +352,8 @@
     <string name="jump_to_newest">Jump to newest</string>
     <string name="scroll_to_top">Scroll to top</string>
     <string name="discard_failed_message">Discard failed message</string>
+    <string name="message_discard_still_sending">This message is still sending. Try again in a moment.</string>
+    <string name="message_discard_not_failed">This message can no longer be discarded.</string>
     <string name="decline">Decline</string>
     <string name="accept">Accept</string>
     <string name="invited_as_account">Invited as %1$s</string>
@@ -1156,8 +1158,8 @@
     <string name="notification_sent_voice_message">sent a voice message</string>
     <string name="notification_sent_file">sent a file</string>
     <string name="notification_sender_in_group">%1$s in %2$s</string>
-    <string name="notification_invite_from_sender">Invite from %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s invited you to %2$s</string>
+    <string name="notification_invitation_to_group">Invitation to %1$s</string>
+    <string name="notification_open_to_view_invite">Open White Noise to view the invite</string>
     <string name="notification_removed_from_group">You were removed from %1$s</string>
     <string name="notification_removed_from_unnamed_group">You were removed from a group</string>
     <string name="notification_made_admin_of_group">You are now an admin of %1$s</string>
@@ -1974,7 +1976,7 @@
         <item quantity="one">Installed with %1$d entry skipped.</item>
         <item quantity="other">Installed with %1$d entries skipped.</item>
     </plurals>
-    <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. A new message (not a reply) using one uploads its image, encrypted, to that chat. Reactions, replies and edits send only the shortcode.</string>
+    <string name="custom_emoji_detail">Images here become :shortcode: emoji, stored on this device. Messages, replies and reactions using one upload its image, encrypted, to that chat. Edits send only the shortcode. Built-in images take precedence for their shortcodes.</string>
     <string name="custom_emoji_empty">No custom emoji yet.</string>
     <string name="custom_emoji_name_title">Name this emoji</string>
     <string name="custom_emoji_name_label">Shortcode</string>
@@ -2232,10 +2234,14 @@
     <string name="setup_continue_without_profile">Continue without a profile</string>
     <string name="setup_review_suggested_changes">Review suggested changes</string>
     <string name="setup_chats_on_this_device">Chats on this device</string>
-    <string name="setup_chats_on_this_device_help">Signing in alone does not restore your existing chats or messages. If you use another device, keep its app and data until you’ve checked your chats here.</string>
+    <string name="setup_device_none_found">We didn’t find messaging keys from another app or device.</string>
+    <string name="setup_device_unchecked">We couldn’t check whether this account uses another app or device for messaging.</string>
+    <string name="setup_device_found_on_date">We found messaging keys this account published from another app or device, most recently on %1$s.</string>
+    <string name="setup_device_found">We found messaging keys this account published from another app or device.</string>
+    <string name="setup_device_separate_chats">This device will have its own separate chats. Chats in the other app stay there and won’t appear here.</string>
+    <string name="setup_device_new_chats_either_app">When someone starts a new chat with you, it may arrive in either app.</string>
+    <string name="setup_device_separate_chats_if_other_app">If you use another app for messaging, this device will have its own separate chats, and chats in that app won’t appear here.</string>
     <string name="setup_device_stage">Device use</string>
-    <string name="setup_other_sign_ins_found">Other sign-in records were found. They may belong to another installation or an earlier one.</string>
-    <string name="setup_other_sign_ins_unchecked">Other sign-ins could not be checked.</string>
     <string name="setup_approval_saved_pending">Your approval is saved. The change is still pending.</string>
     <string name="setup_profile_scope_help">This updates your profile in other Nostr apps.</string>
     <string name="setup_optional_profile_help">Optional. You can add a profile later.</string>
@@ -2728,6 +2734,20 @@
     <string name="group_change_undelivered_message">Your last change to this group hasn’t reached all of its relays yet. Members who only use those relays may not be able to follow the group if you continue. Wait, or continue anyway?</string>
     <string name="group_change_wait">Wait</string>
     <string name="group_change_continue_anyway">Continue anyway</string>
+    <string name="group_change_refused_title">A relay refused your last change</string>
+    <string name="group_change_refused_message">At least one of this group’s relays refused your last change for good. Members who use only that relay may not get it or be able to follow the group if you continue. Waiting won’t fix this. Continuing also dismisses the warning in this chat.</string>
+    <string name="group_commit_refused_title">Group change refused</string>
+    <string name="group_commit_refused_relay_too_large">%1$s refused a group change you made because it was too large. Members who use only that relay may not get it.</string>
+    <string name="group_commit_refused_relay">%1$s refused a group change you made. Members who use only that relay may not get it.</string>
+    <string name="group_commit_refusal_dismiss_failed">Couldn’t dismiss this warning. Try again.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d relay refused a group change you made because it was too large. Members who use only that relay may not get it.</item>
+        <item quantity="other">%1$d relays refused a group change you made because it was too large. Members who use only those relays may not get it.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d relay refused a group change you made. Members who use only that relay may not get it.</item>
+        <item quantity="other">%1$d relays refused a group change you made. Members who use only those relays may not get it.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Invite anyway</string>
     <string name="group_action_acting_account">Acting account</string>
     <string name="group_action_local_nickname">Local nickname: %1$s</string>
@@ -2852,4 +2872,16 @@
     <string name="settings_search_alias_date_time_format">time format|date format|clock|12-hour|24-hour|AM/PM</string>
     <string name="photo_editor_rotate">Rotate</string>
     <string name="toast_wipe_outcome_unconfirmed">The wipe result could not be confirmed. Check your accounts before continuing.</string>
+
+    <string name="emoji_name_marmot_classic">Classic marmot</string>
+    <string name="emoji_name_marmot_wave">Waving marmot</string>
+    <string name="emoji_name_marmot_yes">Marmot thumbs up</string>
+    <string name="emoji_name_marmot_laugh">Laughing marmot</string>
+    <string name="emoji_name_marmot_love">Marmot with heart</string>
+    <string name="emoji_name_marmot_party">Party marmot</string>
+    <string name="emoji_name_marmot_fire">Marmot on fire</string>
+    <string name="emoji_name_marmot_wow">Surprised marmot</string>
+    <string name="emoji_name_marmot_smirk">Smirking marmot</string>
+    <string name="emoji_name_marmot_cry">Crying marmot</string>
+    <string name="emoji_name_marmot_angry">Angry marmot</string>
 </resources>

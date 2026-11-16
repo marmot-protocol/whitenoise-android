@@ -42,6 +42,7 @@ internal class CustomEmoji(
 internal class CustomEmojiSet(
     val entries: List<CustomEmoji>,
     val installed: InstalledEmojiPicker? = null,
+    val conversation: ConversationEmojiPicker? = null,
 ) {
     private val byShortcode = entries.associateBy { it.shortcode }
 
@@ -50,12 +51,22 @@ internal class CustomEmojiSet(
 
     /** Installed codes follow device-local artwork and keep a stable collision winner. */
     val composerShortcodes: List<String> =
-        (sendable.map { it.shortcode } + installed?.entries?.keys.orEmpty()).distinct()
+        (
+            sendable.map { it.shortcode } + installed?.entries?.keys.orEmpty() + conversation?.sources?.keys.orEmpty()
+        ).distinct()
 
     /** True when the composer sends installed artwork instead of a sendable device-local file. */
     fun usesInstalledArtwork(shortcode: String): Boolean =
-        installed?.entries?.containsKey(shortcode) == true &&
+        shortcode !in EmojiShortcodes.builtins &&
+            installed?.entries?.containsKey(shortcode) == true &&
             byShortcode[shortcode]?.sendable != true
+
+    /** Received sources follow bundled, device-local and installed definitions without entering device-wide recents. */
+    fun usesConversationArtwork(shortcode: String): Boolean =
+        shortcode !in EmojiShortcodes.builtins &&
+            byShortcode[shortcode]?.sendable != true &&
+            installed?.entries?.containsKey(shortcode) != true &&
+            conversation?.sources?.containsKey(shortcode) == true
 
     /** Any emoji with this code, sendable or not, so existing artwork keeps rendering. */
     operator fun get(shortcode: String): CustomEmoji? = byShortcode[shortcode]

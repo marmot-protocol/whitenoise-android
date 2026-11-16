@@ -57,6 +57,7 @@ import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
+import dev.ipf.whitenoise.android.state.forwardTargetsRevision
 import dev.ipf.whitenoise.android.state.inviteFailureDetail
 import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import dev.ipf.whitenoise.android.state.recordProductObservation

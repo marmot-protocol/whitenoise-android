@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageCacheMaterialization.kt",
+  "legacy_sha256": "8236ab71767a7e9809cdce5c1bfeeb38c3e2269d5f162ef02ea512846df17a9f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Cache-only image render from MDK retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageCacheMaterialization.kt",
+        "anchor": "internal suspend fun imageAttachmentBytes(",
+        "test_ids": [
+          "MED-023"
+        ]
+      },
+      {
+        "surface": "Open conversation's images get the next decode worker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageCacheMaterialization.kt",
+        "anchor": "internal fun conversationImagePriorityEffect(",
+        "test_ids": [
+          "MED-053"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

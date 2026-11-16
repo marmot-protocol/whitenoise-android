@@ -169,7 +169,7 @@ internal fun reactionArtworkAutoDownloadAllowed(
     )
 
 /** Decoded artwork, in a worker serving only [domain], or null when unavailable under policy or undecodable. */
-private suspend fun emojiArt(
+internal suspend fun emojiArt(
     domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     bytes: suspend () -> ByteArray?,
 ): EmojiArt? {

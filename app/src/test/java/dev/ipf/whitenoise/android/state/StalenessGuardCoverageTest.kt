@@ -4,6 +4,8 @@ import dev.ipf.whitenoise.android.chatsControllerFiles
 import dev.ipf.whitenoise.android.chatsControllerSource
 import dev.ipf.whitenoise.android.conversationControllerFiles
 import dev.ipf.whitenoise.android.conversationControllerSource
+import dev.ipf.whitenoise.android.notificationDeliveryControllerFiles
+import dev.ipf.whitenoise.android.notificationDeliveryControllerSource
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -93,7 +95,7 @@ class StalenessGuardCoverageTest {
                     ),
                 "NotificationDeliveryController.kt:drainPendingPushDisables" to
                     listOf("runtime.marmot.setNativePushEnabled", "marmotRuntime !== runtime"),
-                "AppState.kt:refreshAccountUnreadCounts" to
+                "AppStateAccountUnread.kt:refreshAccountUnreadCounts" to
                     listOf("accountListLifetime.capture", "accountListLifetime.isCurrent"),
                 "AppState.kt:refreshAccountSnapshot" to
                     listOf("accountListLifetime.advance", "accountListLifetime.runIfCurrent"),
@@ -130,7 +132,7 @@ class StalenessGuardCoverageTest {
                     ),
                 "NotificationDeliveryController.kt:clearPushRegistrationForOwnerLocked" to
                     listOf("ownsNativePushFallback(owner)", "clearPending(owner.accountRef)"),
-                "AppState.kt:acknowledgePendingPushWakeCatchUp" to
+                "PushWakeRecoveryController.kt:acknowledgePendingPushWakeCatchUp" to
                     listOf("isCatchUpKeyCurrent(key)", "recordPendingPushWakeCatchUp"),
                 "NotificationDeliveryController.kt:ensureNotificationRenderingEnabled" to
                     listOf("ownsNotificationDeliveryMode(owner)", "localNotificationSettings = it"),
@@ -293,8 +295,6 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:retryPushStorageRecovery" to "single-flight push storage recovery command",
                 // Existing settings snapshot refresh is outside the audited stale-counter migration inventory.
                 "AppState.kt:refreshSecurityPrivacySettings" to "pre-existing settings snapshot path",
-                // Telemetry toggle completion is an authoritative engine command, not a replaceable cache read.
-                "AppState.kt:setTelemetryEnabled" to "authoritative settings command result",
                 // Setter completions are authoritative engine commands; every accepted toggle must apply.
                 "NotificationDeliveryController.kt:setLocalNotificationsEnabled" to
                     "authoritative settings command result",
@@ -309,8 +309,6 @@ class StalenessGuardCoverageTest {
                 // The caller rechecks ownership under the lifetime and delivery-mode locks before this body runs.
                 "NotificationDeliveryController.kt:setNativePushEnabledLocked" to
                     "lock-owned authoritative settings command with rollback",
-                // Foreground catch-up is lifecycle-admitted and clears only the durable generation it observed.
-                "AppState.kt:catchUpAfterForegroundActivation" to "lifecycle admission with generation-checked clear",
                 // The durable attempted flag makes this a one-shot orchestration, not a refresh race.
                 "AppState.kt:enableDefaultNotificationsIfReady" to "durable one-shot orchestration",
                 // Follow/unfollow is an accepted server mutation; the revision only notifies Compose afterward.
@@ -359,6 +357,9 @@ class StalenessGuardCoverageTest {
                 // Runs under cancelBlockedLeave's mutation lock and the group commit lock, rechecking the owner first.
                 "ConversationController.kt:cancelNativeBlockedLeave" to
                     "serialized group command with captured owner checks",
+                // One in-flight discard per message, its cache purge is account-keyed and notices recheck the owner.
+                "ConversationController.kt:applyDiscardOutcome" to
+                    "single-flight discard command result with captured owner checks",
             )
         assertTrue(
             "every exemption must explain why no latest-wins guard is required",
@@ -373,7 +374,11 @@ class StalenessGuardCoverageTest {
                     appState,
                     notificationContent.functionSections(indentation = ""),
                 ) +
-                asyncPublicationCandidates("NotificationDeliveryController.kt", notificationDelivery) +
+                asyncPublicationCandidates(
+                    "NotificationDeliveryController.kt",
+                    notificationDelivery,
+                    controllerFunctionSections(notificationDeliveryControllerFiles()),
+                ) +
                 asyncPublicationCandidates(
                     "ChatsController.kt",
                     chats,
@@ -600,6 +605,7 @@ class StalenessGuardCoverageTest {
         when (fileName) {
             "ChatsController.kt" -> chatsControllerSource()
             "ConversationController.kt" -> conversationControllerSource()
+            "NotificationDeliveryController.kt" -> notificationDeliveryControllerSource()
             else -> packageSource(fileName)
         }
 

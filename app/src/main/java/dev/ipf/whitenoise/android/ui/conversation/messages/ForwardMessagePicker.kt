@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListPinnedBoundary
 import dev.ipf.whitenoise.android.ui.chats.pinnedBoundaryIndex
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
+import dev.ipf.whitenoise.android.state.requestForwardTargetMembers
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
 import dev.ipf.whitenoise.android.ui.common.LoadingScreen

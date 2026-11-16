@@ -57,6 +57,6 @@
     <string name="explanation_message_action_share">用這則訊息開啟 Android 分享選單。所選應用程式會收到它，且位於 White Noise 之外。</string>
     <string name="explanation_message_action_save">將這則訊息的附件儲存到你的裝置。</string>
     <string name="explanation_message_action_info">顯示這則訊息的傳送和接收時間、傳送者、ID 和狀態。</string>
-    <string name="explanation_message_action_report">開啟給群組管理員的檢舉表單。在你確認之前不會傳送任何內容，管理員可以看到是誰檢舉的。</string>
+    <string name="explanation_message_action_report">開啟檢舉表單，可傳送給此群組的管理員、White Noise 團隊或兩者。確認前不會傳送任何內容。</string>
     <string name="explanation_message_action_delete">讓你選擇只在此裝置上刪除這則訊息，或為所有人刪除。為所有人刪除無法復原。在你選擇之前不會刪除任何內容。</string>
 </resources>

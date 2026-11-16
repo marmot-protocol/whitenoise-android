@@ -5580,6 +5580,25 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileTeamReport.kt",
+      "symbol": "ProfileTeamReportSheet",
+      "bindings": [
+        {
+          "case": "profiles-team-report-back",
+          "selector": {
+            "id": "message.report.body"
+          },
+          "scope": "private White Noise team report sheet opened from Bob's profile; Back cancels before submitModerationReport.",
+          "entry_assertion": {
+            "id": "message.report.body"
+          },
+          "opened_by": {
+            "text": "Report to White Noise team"
+          }
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
       "symbol": "GroupMembersReviewDialog",
       "bindings": [

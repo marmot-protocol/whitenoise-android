@@ -66,7 +66,7 @@ class RecoveryTraceTest {
     /** Requires every catch-up entry point to provide one of the closed trigger values. */
     @Test
     fun everyCatchUpEntryPointSuppliesASourceConfirmedTrigger() {
-        val appState = source("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
+        val appState = source("src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt")
 
         listOf(
             "PerformanceTrigger.EXPLICIT",

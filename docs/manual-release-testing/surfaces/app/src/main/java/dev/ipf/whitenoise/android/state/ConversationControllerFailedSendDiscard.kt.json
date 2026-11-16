@@ -1,0 +1,42 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerFailedSendDiscard.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Failed-send discard through MDK",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerFailedSendDiscard.kt",
+        "anchor": "internal suspend fun ConversationController.discardDurableFailedSend(",
+        "test_ids": [
+          "MSG-008",
+          "MSG-017",
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "toast message still sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerFailedSendDiscard.kt",
+        "anchor": "R.string.message_discard_still_sending",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "toast couldnt discard failed send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerFailedSendDiscard.kt",
+        "anchor": "R.string.toast_couldnt_delete_message",
+        "test_ids": [
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "Discard notice for a send that is no longer a failed send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationControllerFailedSendDiscard.kt",
+        "anchor": "R.string.message_discard_not_failed",
+        "test_ids": [
+          "MSG-008"
+        ]
+      }
+    ]
+  }
+}

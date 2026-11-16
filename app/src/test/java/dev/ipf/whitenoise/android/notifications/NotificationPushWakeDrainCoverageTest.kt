@@ -92,7 +92,7 @@ class NotificationPushWakeDrainCoverageTest {
         val appState = appStateSource().readText()
         val wait =
             appState
-                .substringAfter("suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(")
+                .substringAfter("\n    suspend fun ensureNotificationRuntimeStartedAndAwaitPushDrain(")
                 .substringBefore("\n\n")
         val drain = File(appStateSource().parentFile, "NotificationPushDrain.kt").readText()
         val postMaintenance = appStateFunctionBody("schedulePostNotificationMaintenance")
@@ -223,10 +223,11 @@ class NotificationPushWakeDrainCoverageTest {
     @Test
     fun pendingPushWakeDrainUsesSingleFlightAndGenerationClear() {
         val appState = appStateSource().readText()
-        val drain = appStateFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
-        val acknowledgeObserved = appStateFunctionBody("acknowledgePendingPushWakeCatchUp")
+        val pushWakeRecovery = pushWakeRecoverySource().readText()
+        val drain = pushWakeRecovery.kotlinFunctionBody("drainPendingPushWakeCatchUpIfNeeded")
+        val acknowledgeObserved = pushWakeRecovery.kotlinFunctionBody("acknowledgePendingPushWakeCatchUp")
         val reconnect = notificationNetworkRecoverySource().readText().kotlinFunctionBody("schedule")
-        val schedule = appStateFunctionBody("schedulePendingPushWakeCatchUpDrain")
+        val schedule = pushWakeRecovery.kotlinFunctionBody("schedulePendingPushWakeCatchUpDrain")
         val expectedPushWakeCatchUp =
             Regex(
                 """catchUpAfterObservedPushWake\(\s*""" +
@@ -250,7 +251,7 @@ class NotificationPushWakeDrainCoverageTest {
         )
         assertTrue(
             "connectivity callbacks must defer push-wake drain while reconnect owns receiver readiness",
-            "notificationNetworkRecovery.isActive()" in schedule &&
+            "host.networkRecoveryActive" in schedule &&
                 "notificationPushWakeRecoveryCircuit.allowsIndependentDrain" in schedule &&
                 "notificationPushWakeRecoveryCircuit.claimIndependentDrain" in schedule &&
                 "pushWakeCatchUpDrainJob.startIfInactive" in schedule &&
@@ -258,22 +259,16 @@ class NotificationPushWakeDrainCoverageTest {
                 ".launch {" in schedule &&
                 "ensureNotificationRuntimeStarted()" in schedule,
         )
-        assertTrue(
-            "recovery exhaustion must block the exact network and durable-wake trigger it attempted",
-            "onRecoveryAttemptStarted =" in appState &&
-                "notificationPushWakeRecoveryCircuit.noteRecoveryAttempt" in appState &&
-                "onRecoveryExhausted =" in appState &&
-                "notificationPushWakeRecoveryCircuit.noteRecoveryExhausted" in appState,
-        )
+        assertRecoveryCircuitBlocksAttemptedTrigger(appState, pushWakeRecovery)
         assertTrue(
             "reconnect completion must retry a pending marker when its catch-up did not clear it",
             "invokeOnCompletion" in reconnect &&
                 "onDrainCompleted()" in reconnect &&
-                "onDrainCompleted = ::schedulePendingPushWakeCatchUpDrain" in appState,
+                "onDrainCompleted = { pushWakeRecovery.schedulePendingPushWakeCatchUpDrain() }" in appState,
         )
         assertTrue(
             "foreground catch-up must use the same generation-fenced acknowledgement as runtime-start drains",
-            "acknowledgePendingPushWakeCatchUp" in appState,
+            "acknowledgePendingPushWakeCatchUp" in pushWakeRecovery.kotlinFunctionBody("catchUpAfterObservedPushWake"),
         )
     }
 
@@ -298,6 +293,29 @@ class NotificationPushWakeDrainCoverageTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull { it.exists() }
             ?: error("Missing AppState.kt source file")
+
+    /** Network recovery forwards each attempt and exhaustion to the push-wake circuit for its exact generation. */
+    private fun assertRecoveryCircuitBlocksAttemptedTrigger(
+        appState: String,
+        pushWakeRecovery: String,
+    ) {
+        assertTrue(
+            "recovery exhaustion must block the exact network and durable-wake trigger it attempted",
+            "onRecoveryAttemptStarted =" in appState &&
+                "pushWakeRecovery.noteNetworkRecoveryAttempt(networkGeneration)" in appState &&
+                "notificationPushWakeRecoveryCircuit.noteRecoveryAttempt" in pushWakeRecovery &&
+                "onRecoveryExhausted =" in appState &&
+                "pushWakeRecovery.noteNetworkRecoveryExhausted(networkGeneration)" in appState &&
+                "notificationPushWakeRecoveryCircuit.noteRecoveryExhausted" in pushWakeRecovery,
+        )
+    }
+
+    private fun pushWakeRecoverySource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/PushWakeRecoveryController.kt"),
+        ).firstOrNull { it.exists() }
+            ?: error("Missing PushWakeRecoveryController.kt source file")
 
     /** Locates the isolated network-recovery coordinator source. */
     private fun notificationNetworkRecoverySource(): File =

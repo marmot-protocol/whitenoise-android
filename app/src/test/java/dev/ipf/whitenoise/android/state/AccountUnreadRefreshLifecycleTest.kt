@@ -10,7 +10,7 @@ import java.io.File
 class AccountUnreadRefreshLifecycleTest {
     @Test
     fun bulkRefreshPublishesFreshnessBeforeExactFoldsAndGenerationFencesBothWrites() {
-        val body = appStateSource().functionBody("refreshAccountUnreadCounts")
+        val body = accountUnreadRefreshSource().functionBody("refreshAccountUnreadCounts")
         val interim = body.indexOf("val interimPublication")
         val exactFolds = body.indexOf("val refreshedPairs")
         val firstGuard = body.indexOf("if (!refreshIsCurrent()) return")
@@ -29,7 +29,7 @@ class AccountUnreadRefreshLifecycleTest {
 
     @Test
     fun unreadRefreshFailuresLogNoAccountGroupOrThrowablePayload() {
-        val source = appStateSource()
+        val source = accountUnreadRefreshSource()
         val bulk = source.functionBody("refreshAccountUnreadCounts")
         val exact = source.functionBody("refreshEffectiveAccountUnreadCount")
 
@@ -188,9 +188,9 @@ class AccountUnreadRefreshLifecycleTest {
         unlinked = false,
     )
 
-    private fun appStateSource(): String =
+    private fun accountUnreadRefreshSource(): String =
         sequenceOf(
-            File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-        ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppState.kt")
+            File("src/main/java/dev/ipf/whitenoise/android/state/AppStateAccountUnread.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/AppStateAccountUnread.kt"),
+        ).firstOrNull(File::isFile)?.readText() ?: error("Missing AppStateAccountUnread.kt")
 }

@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.state.PendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.SerializedPendingForwardRequestStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentedRow
+import dev.ipf.whitenoise.android.state.forwardTargets
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.SHARE_CHAT_PICKER_ACCOUNT_SHEET_TEST_TAG
@@ -487,7 +488,7 @@ class ForwardMessagePickerCrossAccountUiTest {
     /** Profile hydration re-evaluates a keyword folder under the active search without remounting. */
     @Test
     fun profileRevisionRefreshesAFilteredKeywordFolder() {
-        val appState = twoAccountAppState()
+        val appState = twoAccountAppState(completeTargets = true)
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
         val folder = requireNotNull(appState.chatFolderPreferences.createFolder(ACCOUNT_REF, "Profile updates"))
         appState.chatFolderPreferences.setFolderRule(
@@ -496,7 +497,14 @@ class ForwardMessagePickerCrossAccountUiTest {
             rule = ChatFolderRule(keyword = "ready"),
         )
         val (factory, _) = accountBControllerFactory()
-        composeRule.setContent { Picker(appState = appState, factory = factory) }
+        var selected = emptyList<String>()
+        composeRule.setContent {
+            Picker(
+                appState = appState,
+                factory = factory,
+                onPickerStateChanged = { _, groupIds, _ -> selected = groupIds },
+            )
+        }
         composeRule
             .onNodeWithContentDescription(context.getString(R.string.forward_search_chats))
             .performClick()
@@ -513,7 +521,11 @@ class ForwardMessagePickerCrossAccountUiTest {
         assertTrue(initialProfileRevision != appState.profileRevisionForCompose)
         assertFolderPill(folder)
         composeRule.onNodeWithTag("destination.filter.${folder.id}").performClick()
-        composeRule.onNodeWithTag("forward.selectAll").performClick()
+        composeRule.onNodeWithText("Ready A").assertExists()
+        composeRule.onNodeWithText("Ready A2").assertExists()
+        composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf(GROUP_UNDER_A, GROUP_UNDER_A_2), selected)
         assertFolderPill(folder)
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
     }
@@ -523,6 +535,7 @@ class ForwardMessagePickerCrossAccountUiTest {
     fun memberRevisionRefreshesAnOrderedMixedRuleFolder() {
         val appState =
             emptyAppState(
+                chatListSubscriptions = completeTargetSubscriptions(),
                 profiles =
                     mutableMapOf(
                         PEER_A_ID to profile("Person A"),
@@ -543,7 +556,14 @@ class ForwardMessagePickerCrossAccountUiTest {
                 rule = ChatFolderRule(includeMemberPubkeys = setOf(RULE_MEMBER_ID)),
             )
             val (factory, _) = accountBControllerFactory()
-            composeRule.setContent { Picker(appState = appState, factory = factory) }
+            var selected = emptyList<String>()
+            composeRule.setContent {
+                Picker(
+                    appState = appState,
+                    factory = factory,
+                    onPickerStateChanged = { _, groupIds, _ -> selected = groupIds },
+                )
+            }
             composeRule.onNodeWithText("Person A").performClick()
             assertFolderPill(rosterFolder)
             val initialMemberRevision = controller.memberSnapshotsRevision
@@ -564,6 +584,13 @@ class ForwardMessagePickerCrossAccountUiTest {
             )
             assertFolderPill(manualFolder)
             assertFolderPill(rosterFolder)
+            composeRule.onNodeWithTag("destination.filter.${rosterFolder.id}").performClick()
+            composeRule.onNodeWithText("Person A").assertExists()
+            composeRule.onNodeWithText("Person A2").assertExists()
+            assertEquals(listOf(GROUP_UNDER_A), selected)
+            composeRule.onNodeWithTag("forward.selectAll").assertIsEnabled().performClick()
+            composeRule.waitForIdle()
+            assertEquals(listOf(GROUP_UNDER_A, GROUP_UNDER_A_2), selected)
         } finally {
             appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
             appState.attachChatsController(null)

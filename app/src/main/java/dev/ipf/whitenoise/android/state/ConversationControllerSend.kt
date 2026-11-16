@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.ui.conversation.media.uploadSourcesDirectory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -41,9 +42,14 @@ private fun ConversationController.commitPublishLock(
     account: String,
     optimisticKey: String,
     controllerContext: CoroutineContext,
+    uploadJob: Job? = null,
 ): EmojiPublishLock =
     { publish ->
         appState.withGroupCommitLock(account, group.groupIdHex) {
+            // Upload cancellation ends before publication can acquire native ownership.
+            withContext(controllerContext) {
+                appState.untrackInFlightMediaUpload(account, group.groupIdHex, optimisticKey, uploadJob)
+            }
             try {
                 publish().also { summary ->
                     withContext(controllerContext) { recordOptimisticSendAcceptance(optimisticKey, summary) }
@@ -128,19 +134,19 @@ private suspend fun <T> ConversationController.commitLockUnless(
 ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
 
 /**
- * The user's own emoji a plain, non-reply text send must carry, or none when this send carries none.
+ * The artwork a composer message or reply carries before publication.
  * A lookup failure is raised as an [EmojiUploadFailure], a definite pre-publication failure.
  */
-private suspend fun ConversationController.emojiArtworkForSend(
+internal suspend fun ConversationController.emojiArtworkForSend(
     account: String,
-    replyTarget: String?,
     text: String,
 ): List<LocalEmojiArtwork> {
-    val applies = emojiSendApplies(replyTarget, textPublisher != null)
+    val applies = emojiSendApplies(textPublisher != null)
     if (!applies) return emptyList()
     // The lookup runs before anything is published, so its failure is never an uncertain delivery.
-    return runCatchingCancellable { customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text) }
-        .getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
+    return runCatchingCancellable {
+        customEmojiReader?.invoke(text) ?: emojiArtworkIncludingConversation(account, text)
+    }.getOrElse { failure -> throw failure as? EmojiSendLimitException ?: EmojiUploadFailure(failure) }
 }
 
 /**
@@ -177,28 +183,48 @@ private suspend fun ConversationController.publishComposerTextOnce(
     // The native calls run on the IO dispatcher, but the send phases belong to this controller's context.
     val controllerContext = currentCoroutineContext()
     val ensureCurrent: suspend () -> Unit = {
-        withContext(controllerContext) { requireOptimisticSendNotCancelled(optimisticKey) }
+        withContext(controllerContext) {
+            requireOptimisticSendNotCancelled(optimisticKey)
+            if (appState.activeAccountRef != account ||
+                appState.runtimeGeneration != conversationRuntimeGeneration ||
+                appState.mediaUploadSessionEpoch() != mediaUploadSessionEpoch
+            ) {
+                throw CancellationException("composer artwork owner changed")
+            }
+        }
     }
     val injected = customEmojiSender
-    return when {
-        emojiArtwork.isEmpty() ->
-            publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
-        injected != null -> {
-            val lock = commitPublishLock(account, optimisticKey, controllerContext)
-            injected(account, text, emojiArtwork, ensureCurrent, lock)
+    if (emojiArtwork.isNotEmpty()) ensureCurrent()
+    val uploadJob =
+        if (emojiArtwork.isEmpty()) {
+            null
+        } else {
+            appState.trackInFlightMediaUpload(account, group.groupIdHex, optimisticKey)
         }
-        else ->
-            appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
-                sendTextWithCustomEmoji(
-                    account,
-                    group.groupIdHex,
-                    text,
-                    emojiArtwork,
-                    appState.emojiUploads,
-                    ensureCurrent = ensureCurrent,
-                    publishLock = commitPublishLock(account, optimisticKey, controllerContext),
-                )
+    try {
+        return when {
+            emojiArtwork.isEmpty() ->
+                publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
+            injected != null -> {
+                val lock = commitPublishLock(account, optimisticKey, controllerContext, uploadJob)
+                injected(account, text, emojiArtwork, ensureCurrent, lock)
             }
+            else ->
+                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
+                    sendTextWithCustomEmoji(
+                        account,
+                        group.groupIdHex,
+                        text,
+                        emojiArtwork,
+                        appState.emojiUploads,
+                        ensureCurrent = ensureCurrent,
+                        publishLock = commitPublishLock(account, optimisticKey, controllerContext, uploadJob),
+                        replyTarget = replyTarget,
+                    )
+                }
+        }
+    } finally {
+        appState.untrackInFlightMediaUpload(account, group.groupIdHex, optimisticKey, uploadJob)
     }
 }
 
@@ -219,11 +245,10 @@ internal suspend fun ConversationController.publishTextWithRetry(
     optimisticKey: String,
 ): dev.ipf.marmotkit.SendSummaryFfi =
     appState.withConversationTextSendOrder(account, group.groupIdHex) {
-        // Replies and injected publishers keep their plain-text path. A message that uses the user's
-        // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
+        // Artwork uploads run outside the commit lock, and only an upload-stage failure is retried.
         // Resolving its artwork inside the text order keeps a later message from publishing first,
         // and inside the attempt lets a transient lookup failure retry before anything is published.
-        val artwork = SendEmojiArtwork { emojiArtworkForSend(account, replyTarget, trimmed) }
+        val artwork = SendEmojiArtwork { emojiArtworkForSend(account, trimmed) }
         retryPendingConversationSend(
             connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
             cancellationGeneration = optimisticCancellationGeneration,

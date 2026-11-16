@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,7 +46,7 @@ class MenuImeBackdropTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f)) {
                 val held =
-                    animatedMenuImeBackdrop(frozen, returning, live) {
+                    animatedMenuImeBackdrop(frozen, returning, { live }) {
                         frozen = null
                         returning = false
                     }
@@ -74,6 +75,26 @@ class MenuImeBackdropTest {
         assertEquals(target, displayed)
         composeRule.runOnIdle { assertNull("Ownership releases only at matching geometry", frozen) }
         assertEquals("Dropping the override adds no final jump", target, frame())
+    }
+
+    @Test
+    fun insetFramesDoNotRecomposeTheCallerWithoutAnActiveReturn() {
+        var compositions = 0
+        frozen = null
+        composeRule.setContent {
+            animatedMenuImeBackdrop(frozen, returning, { live }) {}
+            SideEffect { compositions++ }
+        }
+        for (hold in listOf<Int?>(null, 320)) {
+            composeRule.runOnIdle { frozen = hold }
+            composeRule.waitForIdle()
+            val settled = compositions
+            for (height in listOf(0, 80, 160, 300, 0)) {
+                composeRule.runOnIdle { live = height }
+                composeRule.waitForIdle()
+                assertEquals("Inset frames must not subscribe the conversation", settled, compositions)
+            }
+        }
     }
 
     @Test

@@ -225,6 +225,9 @@ internal fun ConversationBottomBar(
                                 controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                             }
                         ComposerBar(
+                            conversationEmoji =
+                                dev.ipf.whitenoise.android.ui
+                                    .rememberConversationEmojiPicker(controller),
                             replyingToEmoji =
                                 rememberReplyReceivedEmoji(
                                     controller.replyingTo?.messageIdHex,

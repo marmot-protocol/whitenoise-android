@@ -31,6 +31,7 @@ import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.dismissGroupCommitRefusal
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
@@ -65,6 +66,13 @@ internal fun ConversationGroupRecoveryCard(
                 retryFailure = controller.groupConvergenceRetryFailure,
             ),
         onRetryConvergence = { appState.launchMutation { controller.retryGroupConvergence() } },
+        refusal =
+            GroupCommitRefusalNoticeModel(
+                refusedRelays = controller.groupCommitRefusal.refusedRelays,
+                dismissing = controller.groupCommitRefusal.dismissing,
+                dismissFailure = controller.groupCommitRefusal.dismissFailure,
+            ),
+        onDismissCommitRefusal = { appState.launchMutation { controller.dismissGroupCommitRefusal() } },
     )
 }
 
@@ -75,12 +83,16 @@ internal data class GroupConvergenceNotice(
     @param:StringRes val retryFailure: Int? = null,
 )
 
-/** Whether the conversation shows the recovery card for [status] and the parked flag [convergenceParked]. */
+/**
+ * Whether the conversation shows the recovery card for [status], the parked flag [convergenceParked] and a relay's
+ * lasting refusal of one of the user's changes, [commitRefused].
+ */
 internal fun hasVisibleGroupRecoveryCard(
     status: GroupRecoveryStatusFfi?,
     readFailed: Boolean,
     convergenceParked: Boolean,
-): Boolean = readFailed || status.hasVisibleRecoveryState(convergenceParked)
+    commitRefused: Boolean = false,
+): Boolean = readFailed || commitRefused || status.hasVisibleRecoveryState(convergenceParked)
 
 /** Whether the engine status, or a parked convergence, contains information that belongs in the conversation UI. */
 internal fun GroupRecoveryStatusFfi?.hasVisibleRecoveryState(convergenceParked: Boolean = false): Boolean =
@@ -110,30 +122,18 @@ internal fun GroupRecoveryCard(
     historyRejoined: Boolean = false,
     convergence: GroupConvergenceNotice = GroupConvergenceNotice(),
     onRetryConvergence: () -> Unit = {},
+    refusal: GroupCommitRefusalNoticeModel = GroupCommitRefusalNoticeModel(),
+    onDismissCommitRefusal: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (!hasVisibleGroupRecoveryCard(status, readFailed, convergence.parked)) return
+    if (!hasVisibleGroupRecoveryCard(status, readFailed, convergence.parked, refusal.refusedRelays.isNotEmpty())) return
     var selectedInvitation by remember(status?.groupIdHex) { mutableStateOf<GroupRejoinInvitationFfi?>(null) }
     RecoveryNoticeSurface(modifier) {
         GroupConvergenceParkedNotice(convergence, busy, onRetryConvergence)
-        if (status?.automaticRecoveryFailed == true) {
-            Text(
-                stringResource(R.string.group_recovery_automatic_failed),
-                style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
-            )
-        }
-        if ((status?.pendingReinvites ?: 0u) > 0u) {
-            Text(
-                stringResource(R.string.group_recovery_pending_reinvites),
-                style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
-            )
-        }
-        if ((status?.failedReinvites ?: 0u) > 0u) {
-            Text(
-                stringResource(R.string.group_recovery_failed_reinvites),
-                style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
-            )
-        }
+        GroupCommitRefusalNotice(refusal, busy, onDismissCommitRefusal)
+        RecoveryStatusLine(R.string.group_recovery_automatic_failed, status?.automaticRecoveryFailed == true)
+        RecoveryStatusLine(R.string.group_recovery_pending_reinvites, (status?.pendingReinvites ?: 0u) > 0u)
+        RecoveryStatusLine(R.string.group_recovery_failed_reinvites, (status?.failedReinvites ?: 0u) > 0u)
         GroupHistoryNotice(status, historyRejoined, busy, onDismissHistoryNotices)
         status?.rejoinInvitations.orEmpty().forEach { invitation ->
             WhiteNoiseOutlinedButton(
@@ -171,6 +171,17 @@ internal fun GroupRecoveryCard(
             onDecline = onDecline,
         )
     }
+}
+
+/** One centered line of the engine's recovery status, shown only while [visible]. */
+@Composable
+@Suppress("FunctionNaming")
+private fun RecoveryStatusLine(
+    @StringRes text: Int,
+    visible: Boolean,
+) {
+    if (!visible) return
+    Text(stringResource(text), style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center))
 }
 
 /**

@@ -96,6 +96,7 @@ internal fun emptyAppState(
     profileDisplayName: suspend (String) -> String? = { profiles[it]?.displayName },
     accounts: List<AccountSummaryFfi> = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX)),
     activeAccountRef: String = ACCOUNT_REF,
+    chatListSubscriptions: ChatListLiveSubscriptions? = null,
     accountIdHex: suspend (String) -> String? = { null },
 ): WhiteNoiseAppState =
     WhiteNoiseAppState(
@@ -107,7 +108,7 @@ internal fun emptyAppState(
         profileReader = { profiles[it] },
         profileDisplayNameReader = profileDisplayName,
         profileRefreshRequest = profileRefresh,
-    )
+    ).also { it.liveSubscriptionOverrides.chatList = chatListSubscriptions }
 
 internal fun profile(
     displayName: String,

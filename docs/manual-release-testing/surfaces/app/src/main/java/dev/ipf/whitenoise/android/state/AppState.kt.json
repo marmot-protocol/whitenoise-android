@@ -66,22 +66,6 @@
     ],
     "settings_controls": [
       {
-        "surface": "Reviewed group action context: R.string.group_action_add_members",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.group_action_add_members",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
-        "surface": "Reviewed group action context: R.string.make_admin",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.make_admin",
-        "test_ids": [
-          "GRP-034"
-        ]
-      },
-      {
         "surface": "setting:font_size_save_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "R.string.font_size_save_failed",
@@ -224,15 +208,6 @@
         ]
       },
       {
-        "surface": "Startup and account-switch snapshots carry MDK's stored per-row presentation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "awaitColdWorkers = plan.awaitColdAvatarWorkers",
-        "test_ids": [
-          "CHL-023",
-          "NAV-006"
-        ]
-      },
-      {
         "surface": "Single notification delivery mode and safe cutover",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "internal suspend fun setNotificationDeliveryMode(",
@@ -284,22 +259,6 @@
         ]
       },
       {
-        "surface": "Profile invite failure: toast_couldnt_add_member_duplicate_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_add_member_duplicate_detail",
-        "test_ids": [
-          "PRO-005"
-        ]
-      },
-      {
-        "surface": "Unread chat mute failure",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "R.string.toast_couldnt_update_notifications",
-        "test_ids": [
-          "CHL-031"
-        ]
-      },
-      {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "surface": "Font-scale cancellation reconciles actual commit and latest visible selection",
         "anchor": "fun updateFontScale(",
@@ -332,27 +291,11 @@
         ]
       },
       {
-        "surface": "Mute and unmute from chat-list actions and group details share one command path and one presentation owner",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "private fun submitMuteCommand(",
-        "test_ids": [
-          "GRP-015"
-        ]
-      },
-      {
         "surface": "Over-limit dictation sent with no conversation open is refused",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "R.string.toast_message_too_long",
         "test_ids": [
           "MSG-048"
-        ]
-      },
-      {
-        "surface": "Account dot follows the complete native total",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "hasReadyTotal(accountIdHex)",
-        "test_ids": [
-          "NAV-005"
         ]
       },
       {

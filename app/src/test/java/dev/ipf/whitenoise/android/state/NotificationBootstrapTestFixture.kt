@@ -32,6 +32,7 @@ import dev.ipf.marmotkit.ChatsSubscription
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.marmotkit.EventsSubscription
+import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -169,6 +170,7 @@ internal class NotificationBootstrapTestFixture(
     // Per-call timeline and read-state hooks for deletion and read-gate scenarios (#3323, #2065).
     private val onTimelineMessages: ((accountRef: String, groupIdHex: String) -> TimelinePageFfi?)? = null,
     private val onChatListRow: ((accountRef: String, groupIdHex: String) -> ChatListRowFfi?)? = null,
+    private val onGroupDetails: ((accountRef: String, groupIdHex: String) -> GroupDetailsFfi?)? = null,
     private val messageRecords: List<AppMessageRecordFfi> = emptyList(),
     // Newest-first attachment history the receipt scheduler pages through (#3308).
     private val attachmentHistory: List<AttachmentEntryFfi> = emptyList(),
@@ -626,9 +628,10 @@ internal class NotificationBootstrapTestFixture(
                 }
                 "groupDetails" -> {
                     notificationGroupDetailsCalls.incrementAndGet()
-                    throw UnsupportedOperationException(
-                        "Notification avatar group details are unavailable in this fixture",
-                    )
+                    onGroupDetails?.invoke(arguments?.get(0) as String, arguments[1] as String)
+                        ?: throw UnsupportedOperationException(
+                            "Notification avatar group details are unavailable in this fixture",
+                        )
                 }
                 "displayName" -> {
                     val accountIdHex = arguments?.firstOrNull() as String
@@ -896,7 +899,7 @@ internal class NotificationBootstrapTestFixture(
 
     /** Replaces only durable push bookkeeping for storage-race tests. */
     fun replacePushTokenStore(store: PushTokenStore) {
-        listOf(appState, appState.notificationDelivery).forEach { owner ->
+        listOf(appState, appState.notificationDelivery, appState.pushWakeRecovery).forEach { owner ->
             val field = owner.javaClass.getDeclaredField("pushTokenStore")
             field.isAccessible = true
             field.set(owner, store)

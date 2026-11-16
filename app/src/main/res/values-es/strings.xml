@@ -280,6 +280,8 @@
     <string name="jump_to_newest">Saltar al más reciente</string>
     <string name="scroll_to_top">Desplazar al inicio</string>
     <string name="discard_failed_message">Descartar mensaje fallido</string>
+    <string name="message_discard_still_sending">Este mensaje aún se está enviando. Inténtalo de nuevo en un momento.</string>
+    <string name="message_discard_not_failed">Este mensaje ya no se puede descartar.</string>
     <string name="decline">Rechazar</string>
     <string name="accept">Aceptar</string>
     <string name="invited_as_account">Cuenta invitada: %1$s</string>
@@ -810,8 +812,8 @@
     <string name="notification_sent_voice_message">envió un mensaje de voz</string>
     <string name="notification_sent_file">envió un archivo</string>
     <string name="notification_sender_in_group">%1$s en %2$s</string>
-    <string name="notification_invite_from_sender">Invitación de %1$s</string>
-    <string name="notification_sender_invited_you_to_group">%1$s te invitó a %2$s</string>
+    <string name="notification_invitation_to_group">Invitación a %1$s</string>
+    <string name="notification_open_to_view_invite">Abre White Noise para ver la invitación</string>
     <string name="notification_removed_from_group">Te eliminaron de %1$s</string>
     <string name="notification_removed_from_unnamed_group">Te eliminaron de un grupo</string>
     <string name="notification_made_admin_of_group">Ahora eres administrador de %1$s</string>
@@ -1674,7 +1676,7 @@
         <item quantity="one">Instalado con %1$d entrada omitida.</item>
         <item quantity="other">Instalado con %1$d entradas omitidas.</item>
     </plurals>
-    <string name="custom_emoji_detail">Las imágenes añadidas aquí se convierten en emojis :shortcode: y se guardan en este dispositivo. Un mensaje nuevo (no una respuesta) con un emoji sube su imagen cifrada a este chat. Reacciones, respuestas y ediciones solo envían el shortcode.</string>
+    <string name="custom_emoji_detail">Las imágenes añadidas aquí se convierten en emojis :shortcode: y se guardan en este dispositivo. Los mensajes, las respuestas y las reacciones con un emoji suben su imagen cifrada a este chat. Las ediciones solo envían el shortcode. Las imágenes integradas tienen prioridad para sus códigos.</string>
     <string name="custom_emoji_empty">Aún no hay emoji personalizados.</string>
     <string name="custom_emoji_name_title">Nombra este emoji</string>
     <string name="custom_emoji_name_label">Código</string>
@@ -2028,10 +2030,14 @@
     <string name="setup_continue_without_profile">Continuar sin perfil</string>
     <string name="setup_review_suggested_changes">Revisar los cambios sugeridos</string>
     <string name="setup_chats_on_this_device">Chats en este dispositivo</string>
-    <string name="setup_chats_on_this_device_help">Iniciar sesión por sí solo no restaura tus chats ni mensajes existentes. Si usas otro dispositivo, conserva su app y sus datos hasta que hayas comprobado tus chats aquí.</string>
+    <string name="setup_device_none_found">No encontramos claves de mensajería de otra app u otro dispositivo.</string>
+    <string name="setup_device_unchecked">No pudimos comprobar si esta cuenta usa otra app u otro dispositivo para mensajes.</string>
+    <string name="setup_device_found_on_date">Encontramos claves de mensajería que esta cuenta publicó desde otra app u otro dispositivo; las más recientes, el %1$s.</string>
+    <string name="setup_device_found">Encontramos claves de mensajería que esta cuenta publicó desde otra app u otro dispositivo.</string>
+    <string name="setup_device_separate_chats">Este dispositivo tendrá sus propios chats, separados. Los chats de la otra app se quedan allí y no aparecerán aquí.</string>
+    <string name="setup_device_new_chats_either_app">Cuando alguien inicie un chat nuevo contigo, puede llegar a cualquiera de las dos apps.</string>
+    <string name="setup_device_separate_chats_if_other_app">Si usas otra app para mensajes, este dispositivo tendrá sus propios chats, separados, y los chats de esa app no aparecerán aquí.</string>
     <string name="setup_device_stage">Uso del dispositivo</string>
-    <string name="setup_other_sign_ins_found">Se encontraron otros registros de inicio de sesión. Pueden pertenecer a otra instalación o a una anterior.</string>
-    <string name="setup_other_sign_ins_unchecked">No se pudieron comprobar otros inicios de sesión.</string>
     <string name="setup_approval_saved_pending">Tu aprobación está guardada. El cambio sigue pendiente.</string>
     <string name="setup_profile_scope_help">Esto actualiza su perfil en otras aplicaciones de Nostr.</string>
     <string name="setup_optional_profile_help">Opcional. Puede agregar un perfil más tarde.</string>
@@ -2549,6 +2555,20 @@
     <string name="group_change_undelivered_message">Tu último cambio en este grupo aún no ha llegado a todos sus relés. Si continúas, los miembros que solo usan esos relés podrían no poder seguir el grupo. ¿Esperar o continuar de todos modos?</string>
     <string name="group_change_wait">Esperar</string>
     <string name="group_change_continue_anyway">Continuar de todos modos</string>
+    <string name="group_change_refused_title">Un relé rechazó tu último cambio</string>
+    <string name="group_change_refused_message">Al menos un relé de este grupo rechazó tu último cambio de forma definitiva. Si continúas, los miembros que solo usan ese relé podrían no recibirlo ni poder seguir el grupo. Esperar no lo solucionará. Continuar también descarta la advertencia en este chat.</string>
+    <string name="group_commit_refused_title">Cambio en el grupo rechazado</string>
+    <string name="group_commit_refused_relay_too_large">%1$s rechazó un cambio que hiciste en el grupo porque era demasiado grande. Es posible que los miembros que solo usan ese relay no lo reciban.</string>
+    <string name="group_commit_refused_relay">%1$s rechazó un cambio que hiciste en el grupo. Es posible que los miembros que solo usan ese relay no lo reciban.</string>
+    <string name="group_commit_refusal_dismiss_failed">No se pudo descartar este aviso. Inténtalo de nuevo.</string>
+    <plurals name="group_commit_refused_relays_too_large">
+        <item quantity="one">%1$d relay rechazó un cambio que hiciste en el grupo porque era demasiado grande. Es posible que los miembros que solo usan ese relay no lo reciban.</item>
+        <item quantity="other">%1$d relays rechazaron un cambio que hiciste en el grupo porque era demasiado grande. Es posible que los miembros que solo usan esos relays no lo reciban.</item>
+    </plurals>
+    <plurals name="group_commit_refused_relays">
+        <item quantity="one">%1$d relay rechazó un cambio que hiciste en el grupo. Es posible que los miembros que solo usan ese relay no lo reciban.</item>
+        <item quantity="other">%1$d relays rechazaron un cambio que hiciste en el grupo. Es posible que los miembros que solo usan esos relays no lo reciban.</item>
+    </plurals>
     <string name="group_change_invite_anyway">Invitar de todos modos</string>
     <string name="starting_as">Iniciar como</string>
     <string name="starting_as_account">Iniciar como %1$s</string>
@@ -2674,4 +2694,16 @@
     <string name="settings_voice_language">Voz e idioma</string>
     <string name="photo_editor_rotate">Girar</string>
     <string name="toast_wipe_outcome_unconfirmed">No se pudo confirmar el resultado del borrado. Revisa tus cuentas antes de continuar.</string>
+
+    <string name="emoji_name_marmot_classic">Marmota clásica</string>
+    <string name="emoji_name_marmot_wave">Marmota saludando</string>
+    <string name="emoji_name_marmot_yes">Marmota con el pulgar arriba</string>
+    <string name="emoji_name_marmot_laugh">Marmota riendo</string>
+    <string name="emoji_name_marmot_love">Marmota con corazón</string>
+    <string name="emoji_name_marmot_party">Marmota de fiesta</string>
+    <string name="emoji_name_marmot_fire">Marmota en llamas</string>
+    <string name="emoji_name_marmot_wow">Marmota sorprendida</string>
+    <string name="emoji_name_marmot_smirk">Marmota con sonrisa pícara</string>
+    <string name="emoji_name_marmot_cry">Marmota llorando</string>
+    <string name="emoji_name_marmot_angry">Marmota enfadada</string>
 </resources>

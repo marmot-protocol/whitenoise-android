@@ -133,11 +133,13 @@ private suspend fun ConversationController.refreshGroupConvergenceParked(): Bool
     val runtimeGeneration = appState.runtimeGeneration
     val recoveryEpoch = groupRecoveryLifetime.capture()
     val readEpoch = groupConvergenceReads.advance()
+    // A relay's lasting refusal of a confirmed change is read beside the flag, each keeping its own last answer.
+    val refused = accountRef?.let { account -> readGroupCommitRefusal(account, groupIdHex) }
     // Any non-cancellation native failure keeps the last known answer.
     val parked =
         accountRef?.let { account ->
             runCatchingCancellable { groupConvergenceParkedReader(account, groupIdHex) }.getOrNull()
-        } ?: return null
+        }
     var published = false
     groupRecoveryLifetime.runIfCurrent(recoveryEpoch) {
         if (
@@ -145,11 +147,15 @@ private suspend fun ConversationController.refreshGroupConvergenceParked(): Bool
             accountRef != null &&
             ownsGroupRecoveryRead(accountRef, groupIdHex, runtimeGeneration)
         ) {
-            groupConvergenceParked = parked
-            if (!parked) groupConvergenceRetryFailure = null
-            published = true
+            refused?.let(::publishGroupCommitRefusal)
+            if (parked != null) {
+                groupConvergenceParked = parked
+                if (!parked) groupConvergenceRetryFailure = null
+                published = true
+            }
         }
     }
+    if (parked == null) return null
     // A group-state edge during the read only made this answer stale, so read again while this chat is still owned.
     // The rereads are bounded, so a steady stream of edges can't spin; the next event or foreground return reads.
     if (published) {
