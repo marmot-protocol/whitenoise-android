@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -11,6 +12,24 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.cachedAttachmentPlaintext
 import dev.ipf.whitenoise.android.state.retainedNativeAttachmentBytes
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+
+/**
+ * Gives this conversation's images the next decode worker while it is on screen. After a cold start the chat list
+ * queues a worker start for each chat's group picture, and each start takes about half a second on a device that
+ * exec-spawns isolated services, so an opened chat otherwise waits behind all of them.
+ */
+@Composable
+internal fun conversationImagePriorityEffect(controller: ConversationController) {
+    DisposableEffect(controller) {
+        val domain = controller.mediaTrustDomain
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .prioritizeDomain(domain, prioritized = true)
+        onDispose {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .prioritizeDomain(domain, prioritized = false)
+        }
+    }
+}
 
 /** Resolves cold cache metadata off-main and lets a rejected payload revoke its stale availability hint. */
 @Composable

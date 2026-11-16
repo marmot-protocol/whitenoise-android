@@ -44,6 +44,12 @@ internal class MediaWorkerPool(
 
     /** Claims now waiting for a slot — evictions in flight never outnumber them. Guarded by [lock]. */
     private var slotDemand = 0
+
+    /** Foreground domains, such as the open conversation, each counted once per surface showing it. Under [lock]. */
+    private val priority = HashMap<Any, Int>()
+
+    /** Claims of a [priority] domain still waiting for a generation of their own. Guarded by [lock]. */
+    private var priorityDemand = 0
     private var signal = CountDownLatch(1)
     private var closed = false
     private val callbackThread = lazy { HandlerThread("media-decoder-ipc").apply { start() } }
@@ -80,14 +86,46 @@ internal class MediaWorkerPool(
                 }
             }
         } finally {
-            synchronized(lock) { satisfy(demand) }
+            synchronized(lock) {
+                satisfy(demand)
+                settlePriority(demand)
+            }
         }
     }
 
-    /** Whether one claim is counted in [slotDemand]. Guarded by [lock]. */
+    /** Whether one claim is counted in [slotDemand] and in [priorityDemand]. Guarded by [lock]. */
     private class SlotDemand {
         var counted = false
+        var prioritized = false
     }
+
+    /** Stops counting [demand] as a waiting foreground claim, waking the claims it held back. Under the lock. */
+    private fun settlePriority(demand: SlotDemand) {
+        if (demand.prioritized) {
+            demand.prioritized = false
+            if (--priorityDemand == 0) signalLocked()
+        }
+    }
+
+    /**
+     * Marks [domain] as shown in the foreground until a matching [deprioritize]. While one of its claims needs a
+     * generation, other domains take no spare, start none and evict none, so it gets the next one, and its idle
+     * generation is evicted only when no other idle one remains. Each process start costs about half a second where
+     * isolated services are exec-spawned, so an open conversation would otherwise wait behind every chat-list avatar
+     * queued before it.
+     */
+    fun prioritize(domain: Any) =
+        synchronized(lock) {
+            priority[domain] = priority.getOrDefault(domain, 0) + 1
+        }
+
+    /** Ends one [prioritize] of [domain]; its generation becomes evictable again once no surface shows it. */
+    fun deprioritize(domain: Any) =
+        synchronized(lock) {
+            val count = priority[domain] ?: return@synchronized
+            if (count > 1) priority[domain] = count - 1 else priority.remove(domain)
+            signalLocked()
+        }
 
     /** Stops counting [demand] as waiting for a slot. Called under the lock. */
     private fun satisfy(demand: SlotDemand) {
@@ -119,6 +157,15 @@ internal class MediaWorkerPool(
                 else -> ClaimStep.Claimed(owner.also { it.busy = true })
             }
         }
+        // A foreground domain without a generation is served first: others wait rather than take what it needs.
+        if (domain in priority) {
+            if (!demand.prioritized) {
+                demand.prioritized = true
+                priorityDemand++
+            }
+        } else if (priorityDemand > 0) {
+            return ClaimStep.Await(signal)
+        }
         generations.firstOrNull(MediaWorker::clean)?.let { ready ->
             ready.domain = domain
             ready.reusable = reusable
@@ -147,10 +194,11 @@ internal class MediaWorkerPool(
         }
         val freeing = generations.filter { it.retiring && it.dead.count != 0L }
         if (freeing.size >= slotDemand) return ClaimStep.AwaitDeath(freeing.first())
-        // The least recently used idle domain leaves through the death fence.
-        generations
-            .filter { it.reusable && !it.busy && !it.retiring && it.dead.count != 0L }
-            .minByOrNull { it.lastUsedNanos }
+        // The least recently used idle domain leaves through the death fence. A foreground domain's generation goes
+        // last, and only while none of its claims waits, so a lane full of foreground workers cannot starve others.
+        val idle = generations.filter { it.reusable && !it.busy && !it.retiring && it.dead.count != 0L }
+        (idle.filter { it.domain !in priority }.takeIf { it.isNotEmpty() } ?: idle.takeIf { priorityDemand == 0 })
+            ?.minByOrNull { it.lastUsedNanos }
             ?.let { victim ->
                 // Marked here, under the lock, so no claim for the victim's domain takes it before RETIRE.
                 victim.retiring = true
