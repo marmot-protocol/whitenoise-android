@@ -87,11 +87,16 @@ import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.forwardTargetsRevision
+import dev.ipf.whitenoise.android.state.inviteProfileToGroups
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadTeamReporting
 import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
+import dev.ipf.whitenoise.android.state.profileAddableGroupsState
+import dev.ipf.whitenoise.android.state.profileGroupPickerRevision
 import dev.ipf.whitenoise.android.state.profileNotificationOverrides
+import dev.ipf.whitenoise.android.state.profilePromotableGroupsState
+import dev.ipf.whitenoise.android.state.promoteProfileInGroup
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
