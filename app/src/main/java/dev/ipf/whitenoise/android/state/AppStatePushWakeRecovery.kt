@@ -8,7 +8,8 @@ suspend fun WhiteNoiseAppState.catchUpAccounts() {
 }
 
 /** Starts the process-owned chat-list catch-up shared by callers for the same identity. */
-internal fun WhiteNoiseAppState.launchCatchUpAccounts(): Deferred<AccountCatchUpResult> = pushWakeRecovery.launchCatchUpAccounts()
+internal fun WhiteNoiseAppState.launchCatchUpAccounts(): Deferred<AccountCatchUpResult> =
+    pushWakeRecovery.launchCatchUpAccounts()
 
 /** Best-effort catch-up when the app returns to the foreground. */
 suspend fun WhiteNoiseAppState.catchUpAfterForegroundActivation() {
@@ -19,10 +20,12 @@ suspend fun WhiteNoiseAppState.catchUpAfterForegroundActivation() {
 internal fun WhiteNoiseAppState.pushWakeRecoveryAllowed(): Boolean = pushWakeRecovery.pushWakeRecoveryAllowed()
 
 /** Acknowledges the foreground-service instance that currently owns background runtime. */
-internal fun WhiteNoiseAppState.acknowledgePushWakeServiceOwner(owner: Any) = pushWakeRecovery.acknowledgePushWakeServiceOwner(owner)
+internal fun WhiteNoiseAppState.acknowledgePushWakeServiceOwner(owner: Any) =
+    pushWakeRecovery.acknowledgePushWakeServiceOwner(owner)
 
 /** Releases only the matching service lease. */
-internal fun WhiteNoiseAppState.releasePushWakeServiceOwner(owner: Any) = pushWakeRecovery.releasePushWakeServiceOwner(owner)
+internal fun WhiteNoiseAppState.releasePushWakeServiceOwner(owner: Any) =
+    pushWakeRecovery.releasePushWakeServiceOwner(owner)
 
 /** Accepts a process-owned drain only while an Activity or acknowledged service owns its lifetime. */
 internal fun WhiteNoiseAppState.acceptPushWakeRecovery(): Boolean = pushWakeRecovery.acceptPushWakeRecovery()
