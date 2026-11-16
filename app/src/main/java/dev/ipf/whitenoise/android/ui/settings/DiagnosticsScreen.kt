@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnosticStatus
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.bootstrapRelayCount
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.common.Explanation
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -188,6 +189,7 @@ internal data class DiagnosticLogEntry(
 internal const val DIAGNOSTICS_CONTENT_TAG = "diagnostics-content"
 private const val PERFORMANCE_STATUS_REFRESH_MILLIS = 1_000L
 
+/** Settings page showing relay health and the live diagnostic event log, with a test ping and a log copy action. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DiagnosticsScreen(
@@ -304,7 +306,7 @@ internal fun DiagnosticsScreen(
                                         "diagnostic-${System.currentTimeMillis() / 1000L}",
                                         emptyList(),
                                         null,
-                                    )
+                                    ).requireCreatedGroupId()
                                 }
                             appState.marmotIo {
                                 sendText(

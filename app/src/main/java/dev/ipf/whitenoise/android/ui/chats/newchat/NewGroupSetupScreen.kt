@@ -33,6 +33,7 @@ import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.ProfilePictureDraftProcessor
 import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
+import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -92,10 +93,12 @@ private suspend fun createOrRecoverNewGroup(
         }
         submission
             .createWith { name, members, options ->
-                appState.marmotIo {
-                    owner.ensureCurrent()
-                    createGroupWithOptions(account, name, members, options)
-                }
+                val result =
+                    appState.marmotIo {
+                        owner.ensureCurrent()
+                        createGroupWithOptions(account, name, members, options)
+                    }
+                owner.acceptCreatedGroup(result, appState::displayName)
             }.also {
                 diagnostic.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
                 if (owner.isCurrent()) {
@@ -187,6 +190,7 @@ private suspend fun runNewGroupCreateMutation(
                     appState = appState,
                     accountRef = account,
                     groupIdHex = groupIdHex,
+                    submittedMembers = submission.members,
                     showCreatedToast = !isRetryLoad,
                     createRequestToken = createRequestToken,
                     onCreateCompletedOpen = onCreateCompletedOpen,
@@ -204,11 +208,15 @@ private suspend fun runNewGroupCreateMutation(
     }
 }
 
-/** Opens the created group once the canonical create confirms, or reports the recovery state. */
+/**
+ * Opens the created group once the canonical create confirms, or reports the recovery state. Without MDK's member
+ * report, the people missing from the created roster are shown as not added.
+ */
 private suspend fun openCreatedGroupAfterCanonicalCreate(
     appState: WhiteNoiseAppState,
     accountRef: String,
     groupIdHex: String,
+    submittedMembers: List<String>,
     showCreatedToast: Boolean,
     createRequestToken: Long,
     onCreateCompletedOpen: (ChatListItem, Long) -> Unit,
@@ -219,14 +227,16 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
 ) {
     diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
     runCatchingCancellable {
-        val item =
+        val (item, memberIds) =
             owner.currentValue {
                 loadCreatedGroupForOwner(appState, accountRef, groupIdHex, owner)
             }
         diagnostic.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
         onRetryGroupIdCleared()
-        if (showCreatedToast) {
-            appState.presentConversationTransient(accountRef, groupIdHex, R.string.toast_chat_created)
+        val skipped = owner.takeSkippedMembers(submittedMembers, memberIds, appState::displayName)
+        val title = createdGroupNoticeTitle(showCreatedToast, skipped)
+        if (title != null) {
+            appState.presentConversationTransient(accountRef, groupIdHex, title, skipped)
         }
         onCreateCompletedOpen(item, createRequestToken)
     }.onFailure {
@@ -236,13 +246,27 @@ private suspend fun openCreatedGroupAfterCanonicalCreate(
     }
 }
 
-/** Same authoritative projection mapper, with a captured account and an IO-boundary owner check. */
+/** Shows the skipped-recipient report even when opening needed a projection retry. */
+internal fun createdGroupNoticeTitle(
+    showCreatedToast: Boolean,
+    skipped: AppText?,
+): Int? =
+    when {
+        skipped != null -> R.string.toast_some_members_not_added
+        showCreatedToast -> R.string.toast_chat_created
+        else -> null
+    }
+
+/**
+ * Same authoritative projection mapper, with a captured account and an IO-boundary owner check. Also returns the
+ * created roster's member IDs from that same read.
+ */
 private suspend fun loadCreatedGroupForOwner(
     appState: WhiteNoiseAppState,
     accountRef: String,
     groupIdHex: String,
     owner: GroupCreationSession,
-): ChatListItem {
+): Pair<ChatListItem, List<String>> {
     owner.ensureCurrent()
     val accountHex = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex
     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_START)
@@ -253,7 +277,7 @@ private suspend fun loadCreatedGroupForOwner(
         }
     owner.ensureCurrent()
     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_RETURN)
-    return chatListItemFromAuthoritativeGroupDetails(details, accountHex)
+    return chatListItemFromAuthoritativeGroupDetails(details, accountHex) to details.members.map { it.memberIdHex }
 }
 
 /**
@@ -447,11 +471,17 @@ private fun NewGroupSetupAccountScreen(
                         if (owner.isCurrent() && attempt == submittedAttempt) {
                             val captured = groupCreationRecovery(failure, submittedAttempt, submittedMembers)
                             recovery = captured
-                            error =
+                            val detail =
                                 groupCreateSelectionFailureDetail(
                                     failure,
                                     captured.recipient?.displayName,
-                                ).resolve(context)
+                                ) { ref ->
+                                    submittedMembers
+                                        .firstOrNull { it.accountIdHex.equals(ref, ignoreCase = true) }
+                                        ?.let { selectedMemberDisplayName(it, appState) }
+                                        .orEmpty()
+                                }
+                            error = detail.resolve(context)
                         }
                     },
                     onCreateCompletedOpen = { item, token ->

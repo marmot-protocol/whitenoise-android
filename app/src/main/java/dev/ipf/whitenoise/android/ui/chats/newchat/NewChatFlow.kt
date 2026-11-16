@@ -102,9 +102,11 @@ internal data class StartChatErrorUiState(
  * create a duplicate conversation.
  */
 internal fun createdGroupIdAfterProjectionUnavailable(error: Throwable): String? =
-    (error as? MarmotKitException.CreatedGroupProjectionUnavailable)
-        ?.groupIdHex
-        ?.takeIf { it.isNotBlank() }
+    when (error) {
+        is MarmotKitException.CreatedGroupProjectionUnavailable -> error.groupIdHex
+        is MarmotKitException.CreatedGroupMemberReportUnavailable -> error.groupIdHex
+        else -> null
+    }?.takeIf { it.isNotBlank() }
 
 private fun startChatFailureReport(error: Throwable): String? =
     if (startProfileChatFailureCopyable(error)) {

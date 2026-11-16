@@ -142,7 +142,7 @@ internal class PrivacyAuditFixture(
         beforeSave: () -> Unit,
     ): Any? =
         when (method) {
-            "setAuditLogTrackerConfig", "setAuditOtlpConfigV5" -> arguments!!.first()
+            "setAuditLogSource", "setAuditOtlpConfigV5" -> arguments!!.first()
             "auditLogFiles" -> {
                 clearInventoryReads++
                 emptyList<dev.ipf.marmotkit.AuditLogFileFfi>()
@@ -166,7 +166,7 @@ internal class PrivacyAuditFixture(
                             it.copy(paused = false, consecutiveFailures = 0uL, lastFailure = null)
                         }
                 }
-                AuditLogTrackerUpdateResultV5Ffi(true, emptyList(), null, null)
+                AuditLogTrackerUpdateResultV5Ffi(true, null)
             }
             "setAuditLogSettings" -> {
                 beforeSave()

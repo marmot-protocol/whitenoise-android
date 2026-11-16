@@ -233,6 +233,11 @@
     <string name="invite_message">快来 White Noise 加入我吧。无需手机号，无监控，真正的隐私。点击此处下载：https://www.whitenoise.chat/download</string>
     <string name="error_invalid_identity_reference">该收件人不是有效的 Nostr 公钥。使用 npub、配置文件链接或 hex 公钥。</string>
     <string name="error_group_create_failed_retry">设置加密聊天时出了点问题。请检查连接，然后重试。</string>
+    <string name="error_no_group_members_selected">未能添加任何选中的联系人。请对方检查聊天设置，或修改你的选择。</string>
+    <string name="error_no_group_members_selected_for">未能添加 %1$s。请对方检查聊天设置，或修改你的选择。</string>
+    <string name="error_no_group_members_selected_lookup_incomplete_for">未能完成检查 %1$s 是否可以被添加。请检查网络连接，然后重试。</string>
+    <string name="error_no_group_members_selected_inbox_for">未能添加 %1$s。他们没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
+    <string name="error_no_group_members_selected_update_for">未能添加 %1$s。请对方更新并打开 White Noise，然后重试。</string>
     <string name="error_chat_created_not_loaded">聊天已创建，但还没有出现在聊天列表中。请稍后重试。</string>
     <string name="remove">移除</string>
     <string name="group_name">群组名称</string>
@@ -879,6 +884,8 @@
     <string name="toast_invite_sent">邀请已发送</string>
     <string name="toast_invite_sent_but_couldnt_add_admin">邀请已发送，但无法添加管理员</string>
     <string name="toast_couldnt_add_members">添加成员失败。请重试。</string>
+    <string name="toast_some_members_not_added">部分联系人未添加</string>
+    <string name="group_members_not_added_count">未添加的联系人（%1$d 位）</string>
     <string name="toast_couldnt_add_member_duplicate_detail">无法添加 %1$s。对方已是成员，或其签名密钥与现有成员冲突。</string>
     <string name="toast_invites_sent_to_groups">邀请已发送到所选群组</string>
     <string name="toast_invites_sent_to_groups_partial">邀请已发送到部分群组；有些失败了</string>
@@ -2371,6 +2378,8 @@
     <string name="group_svg_rejected_detail">无法处理此 SVG。请选择简单的 SVG、PNG 或 JPEG。</string>
     <string name="error_invalid_key_package">无法验证此用户发布的聊天密钥。请对方更新 White Noise 并发布新的聊天密钥，然后重试。</string>
     <string name="error_invalid_key_package_for">无法验证%1$s发布的聊天密钥。请对方更新 White Noise 并发布新的聊天密钥，然后重试。</string>
+    <string name="error_incompatible_key_package">对方的聊天密钥不兼容。请对方更新并打开 White Noise，然后重试。</string>
+    <string name="error_incompatible_key_package_for">%1$s 的聊天密钥不兼容。请对方更新并打开 White Noise，然后重试。</string>
     <string name="error_missing_member_inbox">此用户没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
     <string name="error_missing_member_inbox_for">%1$s没有可用的收件箱中继。请对方在 White Noise 设置中检查收件箱中继，然后重试。</string>
     <string name="error_invite_welcome_too_large">此邀请过大，收件人的收件箱中继无法接收。请对方添加可接收更大消息的收件箱中继。</string>

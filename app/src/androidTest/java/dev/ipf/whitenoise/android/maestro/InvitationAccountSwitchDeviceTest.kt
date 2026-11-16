@@ -18,7 +18,8 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.CreateGroupOptionsFfi
-import dev.ipf.marmotkit.GroupMutationResultFfi
+import dev.ipf.marmotkit.GroupCreationResultFfi
+import dev.ipf.marmotkit.GroupInviteResultFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotInterface
@@ -33,6 +34,7 @@ import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.requireCreatedGroupId
 import dev.ipf.whitenoise.android.ui.chats.newchat.SELECTED_MEMBERS_CONFIRM_TAG
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -89,7 +91,13 @@ class InvitationAccountSwitchDeviceTest {
                     val discoveryRoutes = listOf(discovery.url)
                     peer.publishRelayLists(recipient.label, listOf(advertised.url), discoveryRoutes, discoveryRoutes)
                     val group =
-                        if (add) native.createGroup(accounts[0].label, "Pixel invitation", emptyList(), null) else null
+                        if (add) {
+                            native
+                                .createGroup(accounts[0].label, "Pixel invitation", emptyList(), null)
+                                .requireCreatedGroupId()
+                        } else {
+                            null
+                        }
                     val command = ObservedInvitationCommands(native)
                     val state = createState(context, root, native, command, accounts)
                     app = state
@@ -128,14 +136,14 @@ class InvitationAccountSwitchDeviceTest {
             name: String,
             memberRefs: List<String>,
             options: CreateGroupOptionsFfi,
-        ): String = observe { native.createGroupWithOptions(accountRef, name, memberRefs, options) }
+        ): GroupCreationResultFfi = observe { native.createGroupWithOptions(accountRef, name, memberRefs, options) }
 
         override suspend fun inviteMembersDetailedWithInitialAdmins(
             accountRef: String,
             groupIdHex: String,
             memberRefs: List<String>,
             initialAdminRefs: List<String>,
-        ): GroupMutationResultFfi =
+        ): GroupInviteResultFfi =
             observe {
                 native.inviteMembersDetailedWithInitialAdmins(accountRef, groupIdHex, memberRefs, initialAdminRefs)
             }

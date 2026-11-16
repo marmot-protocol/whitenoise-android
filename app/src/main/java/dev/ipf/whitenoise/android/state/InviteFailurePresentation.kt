@@ -3,21 +3,29 @@ package dev.ipf.whitenoise.android.state
 import androidx.annotation.StringRes
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MarmotKitException.MissingKeyPackage
+import dev.ipf.marmotkit.MemberResolutionStatusFfi
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
 import dev.ipf.marmotkit.OversizedArtifactFfi
 import dev.ipf.whitenoise.android.R
 
+/** Uses recipient-specific copy only when the native account can be resolved to a visible name. */
 private fun recipientFailureDetail(
     account: String,
     displayName: (String) -> String,
     @StringRes genericResource: Int,
     @StringRes namedResource: Int,
 ): AppText {
-    val normalizedAccount = account.trim()
-    return if (normalizedAccount.isEmpty()) {
+    val name =
+        account
+            .trim()
+            .takeIf(String::isNotEmpty)
+            ?.let(displayName)
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+    return if (name == null) {
         AppText.Resource(genericResource)
     } else {
-        AppText.Resource(namedResource, listOf(displayName(normalizedAccount)))
+        AppText.Resource(namedResource, listOf(name))
     }
 }
 
@@ -71,8 +79,34 @@ internal fun inviteFailureDetail(
         // A full disk refuses the change before anything is written; freeing space makes Retry worthwhile.
         is MarmotKitException.StorageFull -> AppText.Resource(R.string.error_storage_full)
         is MarmotKitException.EventTooLarge -> oversizedInviteDetail(throwable, fallbackResource)
-        else -> AppText.Resource(fallbackResource)
+        else -> skippedInviteFailureDetail(throwable, displayName, fallbackResource)
     }
+
+/**
+ * Resolves all-skipped reports and uses the caller's fallback for errors without typed recovery. Several recipients
+ * are named only when every one of them has a name, with the remedy their shared skip reason calls for. Display names
+ * fall back to a short npub, so the unnamed general message is a defensive fallback rather than an expected state.
+ */
+private fun skippedInviteFailureDetail(
+    failure: Throwable,
+    displayName: (String) -> String,
+    @StringRes fallbackResource: Int,
+): AppText {
+    if (failure !is NoGroupMembersSelectedException) return AppText.Resource(fallbackResource)
+    val recipient = failure.outcomes.singleOrNull()
+    val skipped = failure.outcomes.skippedGroupMemberNames(displayName)
+    return when {
+        recipient?.status == MemberResolutionStatusFfi.INCOMPATIBLE_KEY_PACKAGE ->
+            recipientFailureDetail(
+                recipient.accountIdHex,
+                displayName,
+                R.string.error_incompatible_key_package,
+                R.string.error_incompatible_key_package_for,
+            )
+        skipped == null -> AppText.Resource(R.string.error_no_group_members_selected)
+        else -> AppText.Resource(failure.outcomes.allSkippedGuidance(), listOf(skipped.joinToString()))
+    }
+}
 
 /**
  * MDK refuses a create or invite up front when an invitee's Welcome fits none of their inbox relays, so Retry cannot
@@ -105,9 +139,11 @@ internal fun startProfileChatFailureDetail(
     displayName: (String) -> String,
 ): AppText = groupCreateFailureDetail(throwable, displayName)
 
+/** Offers a diagnostic report for unexpected and publish failures while keeping known recovery guidance in the UI. */
 internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> false
+        is NoGroupMembersSelectedException -> false
         is MissingKeyPackage -> false
         is MarmotKitException.InvalidKeyPackageEvent -> false
         is MarmotKitException.MissingMemberInboxRoute -> false
@@ -120,14 +156,16 @@ internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
 internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
 
 /**
- * Founding-roster recovery names only a recipient matched to the submitted selection. An incomplete lookup is never
- * matched, because retrying, not removing the recipient, is its remedy.
+ * Uses the captured recipient for a typed removal action. [skippedName] resolves a report covering multiple recipients
+ * against that same submission. An incomplete lookup keeps its retry guidance.
  */
 internal fun groupCreateSelectionFailureDetail(
     throwable: Throwable,
     recipientName: String?,
+    skippedName: (String) -> String = { "" },
 ): AppText =
     when {
+        throwable is NoGroupMembersSelectedException -> groupCreateFailureDetail(throwable, skippedName)
         recipientName != null -> groupCreateFailureDetail(throwable) { recipientName }
         throwable is MissingKeyPackage && throwable.reason == MissingKeyPackageReasonFfi.OBSOLETE_ONLY ->
             AppText.Resource(R.string.error_obsolete_key_package)

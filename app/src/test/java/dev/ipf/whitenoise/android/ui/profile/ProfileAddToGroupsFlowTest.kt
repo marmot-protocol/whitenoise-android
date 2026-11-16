@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerLoadState
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.asTestInviteResult
 import dev.ipf.whitenoise.android.state.testGroupMutationResult
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundCoordinator
 import dev.ipf.whitenoise.android.ui.navigation.ProfileGroupForegroundState
@@ -789,10 +790,10 @@ private class NestedInviteRuntimeFixture(
     private fun invite(
         name: String,
         args: List<Any?>,
-    ): dev.ipf.marmotkit.GroupMutationResultFfi {
+    ): dev.ipf.marmotkit.GroupInviteResultFfi {
         expect(name, args, listOf(selfRef, group.groupIdHex, listOf(targetHex)))
         invited += group.groupIdHex
-        return mutation(listOf(selfHex, targetHex, thirdHex))
+        return mutation(listOf(selfHex, targetHex, thirdHex)).asTestInviteResult(listOf(targetHex))
     }
 
     /** Builds a mutation result with [members] and the local profile as sole admin, in this fixture's group. */
