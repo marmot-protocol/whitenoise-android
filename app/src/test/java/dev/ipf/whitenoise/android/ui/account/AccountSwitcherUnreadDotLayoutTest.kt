@@ -36,6 +36,9 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.accountShowsUnreadDot
+import dev.ipf.whitenoise.android.state.confirmedUnreadCountForAccount
+import dev.ipf.whitenoise.android.state.updateAccountUnreadCount
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
 import dev.ipf.whitenoise.android.ui.chats.ConnectivityBannerState

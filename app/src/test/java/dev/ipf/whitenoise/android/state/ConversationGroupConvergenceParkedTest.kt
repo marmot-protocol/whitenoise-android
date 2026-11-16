@@ -3,10 +3,14 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.GroupCommitDeliveryFfi
+import dev.ipf.marmotkit.GroupCommitRefusalCauseFfi
+import dev.ipf.marmotkit.GroupCommitRefusedRelayFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.conversationGroupRecoveryRowVisible
 import dev.ipf.whitenoise.android.ui.conversation.hasVisibleGroupRecoveryCard
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -72,6 +76,86 @@ class ConversationGroupConvergenceParkedTest {
             answer = { throw MarmotKitException.TransportClosed() }
             controller.retryGroupRecoveryStatus()
             assertFalse("a failed read invented a parked chat", controller.groupConvergenceParked)
+        }
+
+    /** A relay's lasting refusal shows the card on its own, survives a failed read, and leaves once MDK clears it. */
+    @Test
+    fun aRelaysLastingRefusalShowsTheCardUntilMdkClearsIt() =
+        runBlocking {
+            var delivery: () -> GroupCommitDeliveryFfi? = { refusedDelivery() }
+            val controller = controller(testAppState(), parked = { false })
+            controller.groupCommitRefusal.deliveryReader = { account, group ->
+                assertEquals(ACCOUNT_REF, account)
+                assertEquals(conversationTimelineTestGroup().groupIdHex, group)
+                delivery()
+            }
+
+            controller.retryGroupRecoveryStatus()
+            assertEquals(listOf(REFUSED_RELAY), controller.groupCommitRefusal.refusedRelays.map { it.relayUrl })
+            assertTrue(controller.conversationGroupRecoveryRowVisible())
+
+            delivery = { error("delivery unavailable") }
+            controller.retryGroupRecoveryStatus()
+            assertEquals("a failed read cleared the refusal", 1, controller.groupCommitRefusal.refusedRelays.size)
+
+            delivery = { null }
+            controller.retryGroupRecoveryStatus()
+            assertTrue(controller.groupCommitRefusal.refusedRelays.isEmpty())
+            assertFalse(controller.conversationGroupRecoveryRowVisible())
+        }
+
+    /** Dismissing acknowledges the refusal once for this chat, and the reread that follows clears the banner. */
+    @Test
+    fun dismissingARefusalAcknowledgesItOnceAndClearsTheBanner() =
+        runBlocking {
+            var acknowledged = 0
+            val controller = controller(testAppState(), parked = { false })
+            controller.groupCommitRefusal.deliveryReader = { _, _ -> refusedDelivery().takeIf { acknowledged == 0 } }
+            controller.groupCommitRefusal.acknowledger = { account, group ->
+                assertEquals(ACCOUNT_REF, account)
+                assertEquals(conversationTimelineTestGroup().groupIdHex, group)
+                assertTrue(controller.groupCommitRefusal.dismissing)
+                acknowledged += 1
+                true
+            }
+            controller.retryGroupRecoveryStatus()
+
+            controller.dismissGroupCommitRefusal()
+
+            assertEquals(1, acknowledged)
+            assertTrue(controller.groupCommitRefusal.refusedRelays.isEmpty())
+            assertFalse(controller.groupCommitRefusal.dismissing)
+            assertNull(controller.groupCommitRefusal.dismissFailure)
+        }
+
+    /** A dismissal MDK refuses shows a localized reason and keeps the banner for another try. */
+    @Test
+    fun aFailedDismissalShowsALocalizedReasonAndKeepsTheBanner() =
+        runBlocking {
+            val controller = controller(testAppState(), parked = { false })
+            controller.groupCommitRefusal.deliveryReader = { _, _ -> refusedDelivery() }
+            controller.groupCommitRefusal.acknowledger = { _, _ -> error("runtime closed") }
+            controller.retryGroupRecoveryStatus()
+
+            controller.dismissGroupCommitRefusal()
+
+            assertEquals(R.string.group_commit_refusal_dismiss_failed, controller.groupCommitRefusal.dismissFailure)
+            assertEquals(1, controller.groupCommitRefusal.refusedRelays.size)
+            assertFalse(controller.groupCommitRefusal.dismissing)
+        }
+
+    /** With nothing refused, Dismiss acknowledges nothing. */
+    @Test
+    fun dismissingWithoutARefusalDoesNothing() =
+        runBlocking {
+            val controller = controller(testAppState(), parked = { false })
+            controller.groupCommitRefusal.deliveryReader = { _, _ -> null }
+            controller.groupCommitRefusal.acknowledger = { _, _ -> error("unexpected acknowledgement") }
+            controller.retryGroupRecoveryStatus()
+
+            controller.dismissGroupCommitRefusal()
+
+            assertNull(controller.groupCommitRefusal.dismissFailure)
         }
 
     /** A group-state edge that lands while the read is in flight makes its answer stale. */
@@ -456,6 +540,19 @@ class ConversationGroupConvergenceParkedTest {
             .invoke(appState, state)
     }
 
+    /** MDK's delivery answer naming one relay that refused a confirmed change for good. */
+    private fun refusedDelivery() =
+        GroupCommitDeliveryFfi(
+            groupIdHex = conversationTimelineTestGroup().groupIdHex,
+            owedRelayUrls = emptyList(),
+            relayCount = 1u,
+            since = 0uL,
+            refusedRelays =
+                listOf(
+                    GroupCommitRefusedRelayFfi(REFUSED_RELAY, GroupCommitRefusalCauseFfi.TOO_LARGE, sizeClass = null),
+                ),
+        )
+
     /** A healthy recovery status for this suite's group, so only the parked flag can show the card. */
     private fun healthyStatus() =
         GroupRecoveryStatusFfi(
@@ -548,6 +645,7 @@ class ConversationGroupConvergenceParkedTest {
 
     private companion object {
         const val ACCOUNT_REF = "alice"
+        const val REFUSED_RELAY = "wss://relay.example"
         val ACCOUNT_ID = "aa".repeat(32)
         const val EVENT_TIMEOUT_MILLIS = 5_000L
         const val POLL_MILLIS = 10L

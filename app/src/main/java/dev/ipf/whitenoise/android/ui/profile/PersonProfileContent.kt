@@ -93,6 +93,7 @@ internal fun PersonProfileContent(
     onCopyLightning: () -> Unit,
     block: ProfileBlockRowState? = null,
     onBlock: () -> Unit = {},
+    onTeamReport: (() -> Unit)? = null,
     memberMute: ProfileMemberMuteRowState? = null,
     onMemberMute: () -> Unit = {},
     notificationSummary: String? = null,
@@ -262,6 +263,17 @@ internal fun PersonProfileContent(
                                         }
                                     },
                                     modifier = Modifier.testTag(PROFILE_BLOCK_ACTION_TAG),
+                                )
+                            }
+                        }
+                        if (onTeamReport != null) {
+                            row("team_report") { row ->
+                                SettingsAction(
+                                    row,
+                                    stringResource(R.string.report_team_action),
+                                    onTeamReport,
+                                    leading = { SettingsLeadingIcon(R.drawable.ic_emoji_flags) },
+                                    modifier = Modifier.testTag(PROFILE_TEAM_REPORT_ACTION_TAG),
                                 )
                             }
                         }

@@ -1,0 +1,45 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionArtworkSource.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Reaction artwork read from its own reaction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionArtworkSource.kt",
+        "anchor": "internal fun rememberReactionArtwork(",
+        "test_ids": [
+          "MSG-035",
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Reaction artwork as the pill's received emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionArtworkSource.kt",
+        "anchor": "internal fun rememberReactionReceivedEmoji(",
+        "test_ids": [
+          "MSG-035",
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Conversation reaction artwork source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionArtworkSource.kt",
+        "anchor": "internal fun conversationReactionArtwork(",
+        "test_ids": [
+          "MSG-035",
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Reaction artwork download policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionArtworkSource.kt",
+        "anchor": "private suspend fun loadReactionArtwork(",
+        "test_ids": [
+          "MSG-035",
+          "MSG-037"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

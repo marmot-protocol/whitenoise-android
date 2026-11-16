@@ -113,7 +113,7 @@ internal class NotificationDeliveryController(
         internal set
 
     var localNotificationPermissionGranted by mutableStateOf(localNotificationPresenter.canPostNotifications())
-        internal set
+        private set
 
     var backgroundConnectionEnabled by mutableStateOf(BackgroundConnectionPreferences.isEnabled(appContext))
         internal set

@@ -718,6 +718,8 @@ private class NestedInviteRuntimeFixture(
                 "npub" -> npubs.getValue(readIdentity(name, args))
                 "displayName" -> names.getValue(readIdentity(name, args))
                 "isUserBlocked", "isFollowing" -> relationship(name, args)
+                // The profile asks once whether this build can reach the White Noise team.
+                "moderationReportingAvailable" -> false
                 "groupCommitDelivery" -> {
                     expect(name, args, listOf(selfRef, group.groupIdHex))
                     null

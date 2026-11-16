@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.state.ProfileAccountWideGroups
 import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatRow
+import dev.ipf.whitenoise.android.state.profileAddableGroupsState
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_HEX
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.PEER_A

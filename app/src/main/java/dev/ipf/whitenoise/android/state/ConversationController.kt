@@ -1292,7 +1292,7 @@ class ConversationController(
     internal val optimisticReactionChanges = linkedMapOf<String, OptimisticReactionChange>()
     internal val unprojectedOwnReactionEventIds = linkedMapOf<Pair<String, String>, String>()
     internal val reactionIntentConflator = ReactionIntentConflator()
-
+    internal val groupCommitRefusal = GroupCommitRefusalState()
     internal val window = ConversationWindowState()
     internal val timelineSession =
         ConversationTimelineSession(onTimelineRetired = { window.readySubscription = null })
@@ -3278,20 +3278,16 @@ class ConversationController(
     }
 
     /**
-     * Drops a failed outgoing send from the local timeline. Purely client-side
-     * cleanup; the message was never accepted by MarmotKit, so there is
-     * nothing to retract. Cancellation still enters the group commit lock so
-     * a stale failure action cannot race a retry that has already been admitted.
+     * Drops a failed outgoing send. An optimistic send MarmotKit never accepted is local cleanup only, and its
+     * cancellation still enters the group commit lock so a stale failure action cannot race an admitted retry. A
+     * durable send whose publish failed goes to [discardDurableFailedSend], which publishes nothing to the group.
      */
     suspend fun discardFailedSend(item: TimelineMessage) {
         val key = item.id
-        // Discarding a failed edit drops the local overlay, reverting the
-        // bubble to its pre-edit body. The original message is untouched —
-        // only the unsent kind-1009 edit is abandoned.
+        // A failed edit only abandons its unsent kind-1009 edit, reverting the bubble to the untouched original.
         val failedEdit = failedEditForAction(item)
         if (failedEdit != null) {
-            val edit = failedEdit
-            val intent = edit.durableIntent
+            val intent = failedEdit.durableIntent
             if (intent == null) {
                 optimisticEdits.remove(item.record.messageIdHex)
                 publishTimelineFromIndexes()
@@ -3303,7 +3299,11 @@ class ConversationController(
         val current =
             optimisticMessages[key]
                 ?: run {
-                    removeCancelledOptimisticSend(key, item.record.messageIdHex)
+                    if (isDurableFailedSend(item)) {
+                        discardDurableFailedSend(item.record.messageIdHex)
+                    } else {
+                        removeCancelledOptimisticSend(key, item.record.messageIdHex)
+                    }
                     return
                 }
         cancelOptimisticSendResult(current.record, optimisticKeyOverride = key)

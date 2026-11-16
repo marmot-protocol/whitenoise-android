@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.DiagnosticsExporterStatusFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.retryUsageDiagnostics
+import dev.ipf.whitenoise.android.state.setTelemetryEnabled
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing

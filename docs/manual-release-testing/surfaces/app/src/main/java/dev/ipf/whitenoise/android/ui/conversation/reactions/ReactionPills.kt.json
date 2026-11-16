@@ -4,12 +4,13 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Reaction artwork source isolation",
+        "surface": "Reaction artwork from the pill's own reaction",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
-        "anchor": "ReceivedEmoji.None",
+        "anchor": "rememberReactionReceivedEmoji(emoji, pill.reactionMessageIdHex)",
         "test_ids": [
           "MSG-037",
-          "MSG-024"
+          "MSG-024",
+          "MSG-035"
         ]
       },
       {

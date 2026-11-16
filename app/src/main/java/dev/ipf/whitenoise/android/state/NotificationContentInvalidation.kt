@@ -114,6 +114,9 @@ internal enum class NotificationCandidateState(
 
     /** The read state could not be established, so the stale candidate is withheld. */
     Unknown("unknown"),
+
+    /** In a group this account has not accepted, where only the invitation itself may ring. */
+    PendingInvite("pending_invite"),
 }
 
 /**

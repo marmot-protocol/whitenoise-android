@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingCheckOutcomeFfi
 import dev.ipf.marmotkit.OnboardingCheckPurposeFfi
 import dev.ipf.marmotkit.OnboardingDeviceDiscoveryFfi
+import dev.ipf.marmotkit.OnboardingDevicePackageFfi
 import dev.ipf.marmotkit.OnboardingFindingContextFfi
 import dev.ipf.marmotkit.OnboardingFindingFfi
 import dev.ipf.marmotkit.OnboardingIssueFfi
@@ -24,11 +25,24 @@ internal fun setupFinding(
 ): OnboardingFindingFfi =
     OnboardingFindingFfi(issue, endpoint, context, purpose, outcome, capability, actions, observedRevision)
 
-/** A completed device notice reporting [discovery]. */
-internal fun setupDeviceNotice(discovery: OnboardingDeviceDiscoveryFfi): OnboardingSingleDeviceNoticeFfi =
+/** A completed device notice reporting [discovery], with one other package published at each of [publishedAt]. */
+internal fun setupDeviceNotice(
+    discovery: OnboardingDeviceDiscoveryFfi,
+    publishedAt: List<ULong> = emptyList(),
+): OnboardingSingleDeviceNoticeFfi =
     OnboardingSingleDeviceNoticeFfi(
         discovery = discovery,
-        otherPackages = emptyList(),
+        otherPackages =
+            publishedAt.mapIndexed { index, seconds ->
+                OnboardingDevicePackageFfi(
+                    slotId = "slot-$index",
+                    keyPackageRefHex = null,
+                    eventIdHex = index.toString().padStart(64, '0'),
+                    publishedAt = seconds,
+                    expiresAt = null,
+                    usable = true,
+                )
+            },
         discoveryComplete = true,
         acknowledgedAt = null,
     )

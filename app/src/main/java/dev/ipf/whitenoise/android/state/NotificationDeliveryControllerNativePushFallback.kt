@@ -52,7 +52,7 @@ internal fun NotificationDeliveryController.ownsNativePushFallback(owner: Native
 
 /** Clears only [owner]'s registration on its captured runtime and retains failed cleanup for retry. */
 @Suppress("MaxLineLength")
-internal suspend fun NotificationDeliveryController.clearPushRegistrationForOwnerLocked(owner: NativePushFallbackOwner) {
+private suspend fun NotificationDeliveryController.clearPushRegistrationForOwnerLocked(owner: NativePushFallbackOwner) {
     if (!ownsNativePushFallback(owner)) return
     currentCoroutineContext().ensureActive()
     runCatchingCancellable {
