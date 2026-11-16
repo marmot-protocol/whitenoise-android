@@ -1178,7 +1178,8 @@ internal fun WhiteNoiseAppState.launchNotificationListenerLoop(): Job =
  * as supervised children of this loop, so they end with it, and a failing one is logged without cancelling the
  * loop or the notification listener above it. The same stream carries MDK's accepted deletions, so each event
  * also retracts removed notification content, and each open reconciles the cards already shown (#3323). It also
- * tells the active account when MDK drops a queued group change for size, which nothing else surfaces.
+ * tells the active account when MDK drops a queued group change for size, which nothing else surfaces, and tells
+ * any signed-in account once when a chat could not return to its latest state and needs a restart.
  */
 internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
     marmot: MarmotInterface,
@@ -1209,6 +1210,12 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                 // read-state workers: a newer open marks a blocked pass dirty and retains its latest follow-up.
                 runCatchingCancellable { requestActiveCardReconciliation(readReconciliations) }
                     .onFailure { appStateDebug(it) { "notification reconcile failed" } }
+                // A chat whose restore failed before this stream opened still tells the user to restart.
+                launch {
+                    rewindRestoreFailuresOnOpen(marmot).forEach { failure ->
+                        launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
+                    }
+                }
                 runCatchingCancellable {
                     var event = subscription.next()
                     while (event != null) {
@@ -1217,6 +1224,10 @@ internal suspend fun WhiteNoiseAppState.runMutedChatReceiptLoop(
                         // MDK drops an oversized queued group change without retrying it, so the user is told.
                         queuedSizeRefusal(event)?.let { refusal ->
                             launch(Dispatchers.Main) { presentQueuedSizeRefusal(refusal) }
+                        }
+                        // A chat MDK could not return to its latest state needs a full restart to retry.
+                        rewindRestoreFailure(event)?.let { failure ->
+                            launch(Dispatchers.Main) { presentRewindRestoreFailure(failure) }
                         }
                         val received = (event as? MarmotEventFfi.MessageReceived)?.received
                         // Only the cheap kind and sender check runs here; the suppression reads run with the
