@@ -84,8 +84,26 @@ class SettingsPageMorphTest {
         page.reportRow(group, row, rowEndpoint.copy(bounds = first.copy(bottom = 180f)))
         val moved = requireNotNull(page.presentedContours(host, 1f))
         assertNotSame(original, moved)
-        assertEquals(179.5f, moved.single().seams.single().start.y, 0f)
-        assertEquals(159.5f, original.single().seams.single().start.y, 0f)
+        assertEquals(
+            179.5f,
+            moved
+                .single()
+                .seams
+                .single()
+                .start
+                .y,
+            0f,
+        )
+        assertEquals(
+            159.5f,
+            original
+                .single()
+                .seams
+                .single()
+                .start
+                .y,
+            0f,
+        )
         assertEquals(original.single().key, moved.single().key)
 
         val clipped = host.copy(top = 150f)
