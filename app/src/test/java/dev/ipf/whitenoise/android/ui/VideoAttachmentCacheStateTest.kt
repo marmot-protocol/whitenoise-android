@@ -257,7 +257,7 @@ class VideoAttachmentCacheStateTest {
 
     @Test
     fun videoMaterializationUsesSharedSingleFlight() {
-        val source = mediaVideoSource().readText()
+        val source = mediaVideoCacheSource().readText()
 
         assertTrue(
             "video materialization should use the shared single-flight utility",
@@ -351,7 +351,7 @@ class VideoAttachmentCacheStateTest {
             ).firstOrNull { it.exists() }?.readText()
                 ?: error("Missing MediaVideo.kt source file")
         val bubbleStart = source.indexOf("internal fun MediaVideoBubble(")
-        val bubbleEnd = source.indexOf("@VisibleForTesting", bubbleStart)
+        val bubbleEnd = source.indexOf("internal fun VideoUploadIndicator(", bubbleStart)
         check(bubbleStart >= 0 && bubbleEnd > bubbleStart) {
             "Could not locate MediaVideoBubble boundaries in MediaVideo.kt; update this regression test"
         }
@@ -387,12 +387,12 @@ class VideoAttachmentCacheStateTest {
             thumbhash = null,
         )
 
-    private fun mediaVideoSource(): File =
+    private fun mediaVideoCacheSource(): File =
         listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
+            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoCache.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideoCache.kt"),
         ).firstOrNull { it.exists() }
-            ?: error("Missing MediaVideo.kt source file")
+            ?: error("Missing MediaVideoCache.kt source file")
 
     /**
      * The in-chat video bubble keys its local-availability probe on the source epoch, as the grid tile and voice
@@ -405,7 +405,10 @@ class VideoAttachmentCacheStateTest {
                 File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
                 File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
             ).first { it.exists() }.readText()
-        val bubble = source.substringAfter("internal fun MediaVideoBubble(").substringBefore("@VisibleForTesting")
+        val bubble =
+            source
+                .substringAfter("internal fun MediaVideoBubble(")
+                .substringBefore("internal fun VideoUploadIndicator(")
         assertTrue(
             "the bubble's probe must re-key on the source epoch",
             "rememberLocalAttachmentAvailability(controller, messageIdHex, attachmentIndex, Pair(pillKey, epoch))" in

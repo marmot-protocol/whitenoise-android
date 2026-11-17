@@ -305,6 +305,21 @@ class SupplementalCampaignTest(unittest.TestCase):
         for status, old, new in [('A', '000000', '100644'), ('D', '100644', '000000')]:
             self.assertFalse(supplemental_campaigns_diff(entry(ordinary[2], old, new, status)))
 
+    def test_detekt_baseline_is_ordinary_but_its_rules_stay_full(self):
+        """Only the detekt baseline, which every lane already enforces, may use the PR precheck."""
+        baseline = 'config/detekt/detekt-baseline.xml'
+        self.assertFalse(supplemental_campaigns_diff(entry(baseline)))
+        self.assertFalse(supplemental_campaigns_diff(
+            entry('app/src/main/java/org/example/Screen.kt') + entry(baseline)))
+        for path in ('config/detekt/detekt.yml', 'config/detekt/other.xml', baseline + '/extra'):
+            with self.subTest(path=path):
+                self.assertTrue(supplemental_campaigns_diff(entry(path)))
+        self.assertTrue(supplemental_campaigns_diff(entry(baseline, old='100755', new='100755')))
+        self.assertTrue(supplemental_campaigns_diff(entry(baseline) + entry('config/detekt/detekt.yml')))
+        self.assertEqual('precheck', cli_outputs('pull_request', 'merge-queue', [], entry(baseline))['ci_mode'])
+        for event in ('merge_group', 'push'):
+            self.assertEqual('full', cli_outputs(event, 'merge-queue', [], entry(baseline))['ci_mode'])
+
     def test_build_security_packaging_and_unknown_inputs_run_campaigns(self):
         full = ['app/build.gradle.kts', 'gradle/libs.versions.toml', 'gradlew',
                 '.github/workflows/android-ci.yml', 'scripts/check_ci_changes.py',

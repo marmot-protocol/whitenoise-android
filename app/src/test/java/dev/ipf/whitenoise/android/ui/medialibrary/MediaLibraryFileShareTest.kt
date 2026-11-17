@@ -126,10 +126,15 @@ class MediaLibraryFileShareTest {
     /** The row's Share reads the streamed attachment source, never the budgeted whole-file byte transfer. */
     @Test
     fun fileRowShareUsesTheStreamedSourceInsteadOfTheBudgetedByteTransfer() {
+        val source = mediaLibrarySource()
+        val start = "internal fun FileLibraryRow("
+        val end = "internal fun rememberRelativeTimestamp("
+        assertTrue(start in source)
+        assertTrue(end in source.substringAfter(start))
         val row =
-            mediaLibrarySource()
-                .substringAfter("internal fun FileLibraryRow(")
-                .substringBefore("/** Links tab of the library. */")
+            source
+                .substringAfter(start)
+                .substringBefore(end)
                 .replace(Regex("\\s+"), " ")
 
         assertTrue("shareLibraryFile(" in row)

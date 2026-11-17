@@ -97,7 +97,9 @@ import dev.ipf.whitenoise.android.state.profileGroupPickerRevision
 import dev.ipf.whitenoise.android.state.profileNotificationOverrides
 import dev.ipf.whitenoise.android.state.profilePromotableGroupsState
 import dev.ipf.whitenoise.android.state.promoteProfileInGroup
+import dev.ipf.whitenoise.android.state.removeMember
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
+import dev.ipf.whitenoise.android.state.setMemberAdmin
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.teamReportingAvailable

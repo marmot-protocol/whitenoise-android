@@ -174,11 +174,14 @@ class MediaSavePresentationTest {
     @Test
     fun shareAndUrlFlowsUseTheCapabilityAwarePresenter() {
         val mediaLibrarySource = source("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt")
+        val urlTabSource = source("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibraryUrlTab.kt")
         val mediaViewerSource = source("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt")
+        val launchFailure = Regex("appState\\.presentMediaLaunchFailure\\(")
 
         assertTrue(mediaLibrarySource.contains("\"MEDIA_LIBRARY_FILE_SHARE\""))
-        assertTrue(mediaLibrarySource.contains("\"MEDIA_LIBRARY_URL_OPEN\""))
-        assertEquals(2, Regex("appState\\.presentMediaLaunchFailure\\(").findAll(mediaLibrarySource).count())
+        assertTrue(urlTabSource.contains("\"MEDIA_LIBRARY_URL_OPEN\""))
+        assertEquals(1, launchFailure.findAll(mediaLibrarySource).count())
+        assertEquals(1, launchFailure.findAll(urlTabSource).count())
         assertTrue(mediaViewerSource.contains("\"MEDIA_VIEWER_IMAGE_SHARE\""))
         assertTrue(mediaViewerSource.contains("appState.presentMediaLaunchFailure("))
     }
@@ -196,7 +199,11 @@ class MediaSavePresentationTest {
         assertTrue(avatarViewerSource.contains("mediaSaveSnackbarVisuals("))
         assertTrue(avatarViewerSource.contains("operationCode = \"AVATAR_VIEWER_SAVE\""))
 
-        val combined = mediaLibrarySource + mediaViewerSource + avatarViewerSource
+        val mediaLibraryTabSources =
+            listOf("MediaLibraryVoiceTab.kt", "MediaLibraryUrlTab.kt").joinToString("") { file ->
+                source("src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/$file")
+            }
+        val combined = mediaLibrarySource + mediaLibraryTabSources + mediaViewerSource + avatarViewerSource
         assertFalse(Regex("copyable\\s*=\\s*!saved").containsMatchIn(combined))
         assertFalse(Regex("showSnackbar\\(if \\(ok\\)").containsMatchIn(combined))
     }

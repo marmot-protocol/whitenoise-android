@@ -35,6 +35,9 @@ class AttachmentMediaContainmentCoverageTest {
                     "audio/RawVoicePlaybackPlayer.kt",
                     "audio/AttachmentPcmDecoder.kt",
                     "ui/conversation/media/MediaVideo.kt",
+                    "ui/conversation/media/MediaVideoGridTile.kt",
+                    "ui/conversation/media/MediaVideoCache.kt",
+                    "ui/conversation/media/MediaVideoViewer.kt",
                     "ui/conversation/media/DraftVideoPreview.kt",
                     "ui/conversation/media/LocalVideoSource.kt",
                 ).map(::source)
@@ -106,7 +109,7 @@ class AttachmentMediaContainmentCoverageTest {
         val video = source("ui/conversation/media/LocalVideoSource.kt").readText()
         assertTrue("Local video must select the isolated player", "IsolatedAttachmentPlayer(context, uri)" in video)
         assertTrue("Remote URLs cannot select an attachment parser", "isLocalVideoUri(uri)" in video)
-        for (path in listOf("MediaVideo.kt", "DraftVideoPreview.kt")) {
+        for (path in listOf("MediaVideoViewer.kt", "DraftVideoPreview.kt")) {
             assertTrue(
                 "Every attachment video surface must share its local player factory",
                 "localVideoPlayer(context," in source("ui/conversation/media/$path").readText(),

@@ -28,6 +28,10 @@ def test_metadata_path(path):
 ROOT_DOCS = {'README.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md',
              'SECURITY.md', 'CODE_OF_CONDUCT.md', 'CHANGELOG.md'}
 
+# Only `:app:detekt` reads the baseline, and every PR lane and the queue already run it.
+# Treating it as ordinary keeps the many PRs that merely refresh it out of the full lane.
+DETEKT_BASELINE = 'config/detekt/detekt-baseline.xml'
+
 
 def documentation_path(path):
     if path in BUILD_INPUT_DOCS:
@@ -113,7 +117,7 @@ def supplemental_campaigns_diff(raw):
         if (not parts or str(PurePosixPath(path)) != path or path.startswith('/') or '..' in parts or '.' in parts
                 or '\\' in path or any(ord(c) < 32 for c in path)):
             return True
-        ordinary = documentation_path(path) or test_metadata_path(path)
+        ordinary = documentation_path(path) or test_metadata_path(path) or path == DETEKT_BASELINE
         if path.startswith('app/src/'):
             # Manifests, assets, native artifacts and generated inputs stay full.
             ordinary |= (len(parts) > 4 and parts[3] == 'java' and
