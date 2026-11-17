@@ -42,6 +42,7 @@ import androidx.test.uiautomator.Until
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerResizeStripHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.repairComposerMentionEdit
@@ -128,10 +129,10 @@ class ComposerImeEditSequenceTest {
         assertValue("first second", TextRange(12), null)
     }
 
-    /** A blank pill tap outside every control and the editor starts the real keyboard (#3857). */
+    /** A blank tap in the expanded empty pill, outside its controls and editor, opens the real keyboard (#3857). */
     @Test
     fun emptyComposerBlankSurfaceTapShowsTheKeyboard() {
-        render("", liveIme = true)
+        render("", liveIme = true, expansionMode = ComposerExpansionMode.FullScreen)
         val editor = composeRule.onNode(hasSetTextAction())
         editor.assertIsNotFocused()
         assertFalse(imeVisible())
@@ -361,6 +362,7 @@ class ComposerImeEditSequenceTest {
     private fun render(
         text: String,
         liveIme: Boolean = false,
+        expansionMode: ComposerExpansionMode = ComposerExpansionMode.Automatic,
     ) {
         value = TextFieldValue(text)
         composeRule.setContent {
@@ -394,6 +396,7 @@ class ComposerImeEditSequenceTest {
                             attachmentSheetOpen = false,
                             onPickFromGallery = null,
                             onPickDocument = null,
+                            expansionMode = expansionMode,
                         )
                     }
                 }
