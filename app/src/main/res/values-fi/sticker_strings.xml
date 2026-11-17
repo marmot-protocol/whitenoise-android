@@ -25,7 +25,7 @@
     <string name="sticker_packs_unreachable">Tarrapaketteja ei voitu hakea releiltäsi.</string>
     <string name="sticker_packs_try_again">Yritä uudelleen</string>
     <string name="sticker_packs_load_failed">Tarrapaketteja ei voitu ladata.</string>
-    <string name="sticker_packs_public_footer">Tarrapaketit ovat julkisia, eikä White Noise tarkista niitä. Asentamasi paketit näkyvät julkisesti releilläsi.</string>
+    <string name="sticker_packs_public_footer">Tarrapaketit ovat julkisia, eikä Kohina tarkista niitä. Asentamasi paketit näkyvät julkisesti releilläsi.</string>
     <string name="sticker_pack_add">Lisää</string>
     <string name="sticker_pack_by">Tekijä: %1$s</string>
     <string name="sticker_pack_tap_to_send">Lähetä tarra napauttamalla sitä.</string>
